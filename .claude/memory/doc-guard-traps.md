@@ -25,7 +25,8 @@ metadata:
   2 KB at most — split it instead of adding; a new "corrected 2026-…" / "(was …)" / "until 2026-…" note in a hub page
   fails — say it in git or a short *Changes* list; a new hub page needs a `type`/`title`/`description` header; a new
   hand-written Basic | Standard | Advanced table fails outside `EDITIONS.md` / `spec-editions.md`; the board's ledger
-  past 60 KB fails — `node tools/roll-backlog-ledger.mjs --write`. After SHRINKING debt run `--baseline-write` in the same
-  commit. The board, glossary and plans are size-exempt. `archived-documents/README.md` is now link-checked.
+  past 60 KB fails — `node tools/roll-backlog-ledger.mjs --write`. After SHRINKING debt, or after a `git mv` of a
+  baselined page (the new path reads as new debt), run `--baseline-write` in the same commit. Pages with a generator
+  banner (`> **Generated** by \`tools/…\``) are never ratcheted. The board, glossary and plans are size-exempt. `archived-documents/README.md` is now link-checked.
 
 Related: [[guard-scope-is-a-silent-exemption]].
