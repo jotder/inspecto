@@ -1,13 +1,11 @@
 package com.gamma.pipeline.exec;
 
+import com.gamma.parse.SampleProfiler;
 import com.gamma.util.DuckDbUtil;
 
-import com.gamma.util.SqlIdent;
 import java.io.File;
 import java.sql.Connection;
-import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -23,9 +21,11 @@ import java.util.Set;
  * strings carried no time part) → {@code BOOLEAN} — else {@code VARCHAR}. Text written with a decimal
  * point or an exponent is never {@code BIGINT}, even {@code 47.00}. {@code BIGINT} is checked
  * before {@code BOOLEAN} so a {@code 0/1} column stays numeric. A column no bare cast accepts is then
- * tried against {@link #DATE_FORMATS} (human spellings such as {@code March 22,2025}); a unique fit
- * votes {@code DATE} <b>with that strptime format</b>, which the draft carries as
- * {@code raw.fields[].format} so the engine parses the column exactly that way at ingest.
+ * tried against {@link SampleProfiler#DATE_FORMATS} (human spellings such as {@code March 22,2025}); a
+ * unique fit votes {@code DATE} <b>with that strptime format</b>, which the draft carries as
+ * {@code raw.fields[].format} so the engine parses the column exactly that way at ingest. The vote itself
+ * lives in the engine's sample profiler ({@link SampleProfiler#types}, {@code BASIC-ELT-PROFILE-1} BE-3
+ * slice 2), which Add data's draft and the parse preview also call.
  *
  * <p><b>A draft, never applied.</b> The caller returns it for a human to edit (the
  * {@code ParserPlugin.suggest} posture: "never auto-applied"), and real ingest keeps
@@ -61,21 +61,6 @@ public final class SchemaSuggest {
         }
     }
 
-    /** Candidates most→least specific; see the class doc for the ordering rationale. */
-    private static final List<String> CANDIDATES = List.of("BIGINT", "DOUBLE", "TIMESTAMP", "BOOLEAN");
-
-    /**
-     * Human date spellings tried when a column is not a bare castable TIMESTAMP (and, for a DATE, to
-     * pin the ISO spelling too), in preference order. ⚠ DuckDB's strptime matches literal whitespace
-     * and punctuation EXACTLY, so {@code March 22,2025} and {@code March 22, 2025} need separate
-     * entries; {@code %d}/{@code %m} accept one or two digits; month names match case-insensitively.
-     */
-    static final List<String> DATE_FORMATS = List.of(
-            "%Y-%m-%d", "%Y/%m/%d",
-            "%B %d,%Y", "%B %d, %Y", "%B %d %Y", "%d %B %Y", "%d %B, %Y",
-            "%b %d,%Y", "%b %d, %Y", "%b %d %Y", "%d %b %Y", "%d-%b-%Y",
-            "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y", "%m-%d-%Y", "%d.%m.%Y");
-
     /**
      * Infer a draft field list from {@code sampleRows} (the parsing preview's own output shape:
      * string-valued maps). Throws {@link IllegalArgumentException} on an empty or column-less sample.
@@ -90,8 +75,10 @@ public final class SchemaSuggest {
         File db = DuckDbUtil.tempDbFile("suggest_");
         try (Connection conn = DuckDbUtil.openConnection(db)) {
             ScratchTables.seed(conn, "suggest_input", columns, sampleRows);
+            // the vote is the sample profiler's (BASIC-ELT-PROFILE-1 BE-3 slice 2), the one Add data proposes from too
             List<Field> out = new ArrayList<>(columns.size());
-            for (String c : columns) out.add(inferColumn(conn, c));
+            for (SampleProfiler.ColumnType c : SampleProfiler.types(conn, "suggest_input", 0))
+                out.add(new Field(c.name(), c.type(), c.format()));
             return out;
         } finally {
             DuckDbUtil.deleteTempDb(db);   // throwaway scratch DB
@@ -164,76 +151,5 @@ public final class SchemaSuggest {
     /** Trimmed text, never null — the draft is caller-supplied JSON. */
     private static String text(Object v) {
         return v == null ? "" : String.valueOf(v).trim();
-    }
-
-    private static Field inferColumn(Connection conn, String column) throws SQLException {
-        String col = SqlIdent.q(column);
-        String nonBlank = col + " IS NOT NULL AND trim(" + col + ") <> ''";
-        if (count(conn, "SELECT count(*) FROM suggest_input WHERE " + nonBlank) == 0)
-            return new Field(column, "VARCHAR");   // nothing to vote with — unknown is not evidence
-        for (String candidate : CANDIDATES) {
-            if ("BOOLEAN".equals(candidate)) {
-                // Not a castable TIMESTAMP — but it may still be a human-written date.
-                String fmt = dateFormat(conn, col, nonBlank);
-                if (fmt != null) return new Field(column, "DATE", fmt);
-            }
-            // ⚠ DuckDB's TRY_CAST('1.5' AS BIGINT) SUCCEEDS by rounding, so a bare cast check lets
-            // BIGINT swallow every decimal column. The round-trip guard: BIGINT only wins a value
-            // whose DOUBLE cast equals its BIGINT cast (no fractional part was lost). And text written
-            // with a decimal point or an exponent ('47.00', '1e3') is a decimal even when its fraction
-            // is zero (DECIMAL-TEXT-NOT-BIGINT-1): a later '12.25' in that column must not be cut to 12.
-            String accepts = "BIGINT".equals(candidate)
-                    ? "(TRY_CAST(" + col + " AS BIGINT) IS NOT NULL"
-                            + " AND TRY_CAST(" + col + " AS DOUBLE) = TRY_CAST(" + col + " AS BIGINT)"
-                            + " AND NOT regexp_matches(" + col + ", '[.eE]'))"
-                    : "TRY_CAST(" + col + " AS " + candidate + ") IS NOT NULL";
-            long failures = count(conn, "SELECT count(*) FROM suggest_input WHERE " + nonBlank
-                    + " AND NOT " + accepts);
-            if (failures > 0) continue;
-            if ("TIMESTAMP".equals(candidate)) {
-                long timed = count(conn, "SELECT count(*) FROM suggest_input WHERE " + nonBlank
-                        + " AND strftime(TRY_CAST(" + col + " AS TIMESTAMP), '%H:%M:%S') <> '00:00:00'");
-                // A DATE carries the format it was proven with when one fits, so it lands as DATE
-                // whatever the pipeline's own date_formats list says.
-                return timed == 0 ? new Field(column, "DATE", dateFormat(conn, col, nonBlank))
-                        : new Field(column, "TIMESTAMP");
-            }
-            return new Field(column, candidate);
-        }
-        return new Field(column, "VARCHAR");
-    }
-
-    /**
-     * The one {@link #DATE_FORMATS} entry every non-blank value parses with, or {@code null}.
-     *
-     * <p>⛔ <b>Ambiguity is refused, not guessed.</b> Where several formats accept the whole sample and
-     * any value parses to a DIFFERENT date under two of them — {@code 03/04/2025} under
-     * {@code %d/%m/%Y} vs {@code %m/%d/%Y} — the column gets no format (and so stays {@code VARCHAR}
-     * unless a bare cast proved otherwise). One value such as {@code 13/04/2025} settles it. Formats
-     * that agree on every value ({@code %B} and {@code %b} over {@code May}) are not ambiguous; the
-     * first in preference order wins. The value is tested exactly as the engine parses it
-     * ({@code TRY_STRPTIME} over the untrimmed text), so a suggested format cannot NULL a sample value.
-     */
-    private static String dateFormat(Connection conn, String col, String nonBlank) throws SQLException {
-        List<String> winners = new ArrayList<>();
-        for (String f : DATE_FORMATS) {
-            if (count(conn, "SELECT count(*) FROM suggest_input WHERE " + nonBlank
-                    + " AND TRY_STRPTIME(" + col + ", '" + f + "') IS NULL") == 0) winners.add(f);
-        }
-        if (winners.isEmpty()) return null;
-        String first = winners.get(0);
-        for (String other : winners.subList(1, winners.size())) {
-            if (count(conn, "SELECT count(*) FROM suggest_input WHERE " + nonBlank
-                    + " AND TRY_STRPTIME(" + col + ", '" + first + "') <> TRY_STRPTIME(" + col + ", '"
-                    + other + "')") > 0) return null;
-        }
-        return first;
-    }
-
-    private static long count(Connection conn, String sql) throws SQLException {
-        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
-            rs.next();
-            return rs.getLong(1);
-        }
     }
 }

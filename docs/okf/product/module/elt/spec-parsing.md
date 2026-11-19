@@ -124,7 +124,7 @@ today are **only**:
 | `engine` (`auto`/`duckdb`/`java`) | selects native vs Java path | `[LIVE]` |
 | `skip_junk_lines`, `skip_tail_lines`, `skip_tail_columns` | **Java path only** (route away from native) | `[LIVE]` |
 | `date_formats`, `timestamp_formats` | used at **transform** time (`TRY_STRPTIME`), *not* at read time | `[LIVE]` |
-| `quote`, `escape`, `comment` | `quote`/`escape`/`comment` (single char, validated fail-closed at load; both engines) | `[LIVE]` (5.2) |
+| `quote`, `escape`, `comment` | `quote`/`escape`/`comment` (single char, validated fail-closed at load; both engines). `quote: ""` is **no quote** (DuckDB's `quote=''`, NUL on the Java path); only an absent `quote` takes the default `"` (BE-3 slice 2, 2026-11-19) | `[LIVE]` (5.2) |
 | `encoding`, `compression`, `null_strings`, `strict_mode` | `encoding`/`compression`/`nullstr`/`strict_mode` | `[LIVE]` (4.1) |
 
 Everything else in the PDF — `decimal_separator`, `sample_size`, `auto_type_candidates`, `names`,
@@ -261,12 +261,41 @@ options and returns DuckDB's answer under the grammar option names (`delimiter`,
 `has_header`, `skip_header_lines`, `date_format`, `timestamp_format`), unshaped: DuckDB's `(empty)` ("none found") is
 passed through, and an unsettled dialect (mixed line endings) throws. Both readers call it and keep their own shaping:
 the parse preview (`ComponentPreview.parsing`, the `resolved` line) shows the map and shows nothing when the sniff
-fails; Add data (`OnboardDraft`) passes its chosen encoding, reads `(empty)` as its defaults (`,` and `"`), falls back
-to its own delimiter guess when the sniff throws, and adds its evidence and confidence. Column types are not shared
-yet (the next slice). `DialectSniffGoldenTest` pins both readers' answers; three differences are kept as they are and
-named there: a quote not found is `(empty)` in the preview but `"` in Add data; a stray quote the sniff reads as "no
-quote" therefore previews but is refused by Add data; and rows the sniff skips before the header
-(`skip_header_lines`) are shown by the preview but read as data by Add data.
+fails; Add data (`OnboardDraft`) passes its chosen encoding, falls back to its own delimiter guess (with `"`) when the
+sniff throws, and adds its evidence and confidence. `DialectSniffGoldenTest` pins both readers' answers.
+
+**Add data follows the sniff (BE-3 slice 2; operator ruling 2026-11-19, "follow the sniff").** Slice 1 left three
+differences; they are now one rule — Add data takes the sniff's answer as it is: a quote not found (`(empty)`) is **no
+quote** (it was `"`), so a stray quote such as `1,"x` is text in its value and the file imports (it was a 422); and the
+lines the sniff skips before the header are skipped (`format.skipLines`, present only when the sniff skips lines), so
+the real header is read (the first line was). The person's own `?delimiter=`, `?quote=` and `?header=` still win over
+the sniff. The Pipeline Add data writes reads the file the same way: `skip_header_lines` when the draft skipped lines,
+and `csv_settings.quote` as the draft read it - except that no quote (`quote: ""`, see the key table above) is written
+only when the file holds a `"`: a quote-free file reads alike under the engine's default `"`, which keeps a later file's
+quoted fields whole (`ControlApiDecimalColumnTest` adds a later file with `"1,22"` values to an import made from a
+quote-free file). A later file (Add a file, the inbox) is judged against the lines the import skips: when its own sniff
+skips a different number of lines before the header it is refused (422, "it has N lines before the header line and
+'<id>' skips M") — the run would otherwise lose its first row or read its header as a row.
+`ControlApiOnboardDialectTest` imports each case. A no-quote import made from a file with a stray
+quote reads a later file's quoted fields as text; the quote entry of the fix catalogue offers `"` when a draft's lines
+do not split alike. ⛔ The
+grammar editor cannot author "no quote" (clearing the field removes the key, which means `"`).
+
+**One type inference (BE-3 slice 2, 2026-11-19).** `SampleProfiler.types(conn, relation, limit)` is the one entry for
+column types. Per column it answers two ways: `duckdb`, the type DuckDB's own reader gives the column (`DESCRIBE`:
+the auto-detect sniff for the parse preview's `read_csv(…, auto_detect=true)`, the declared type for Parquet, `VARCHAR`
+for an all-text read), and the **vote** (`type`, `format`) over the first `limit` values read as text — the TRY_CAST
+vote that was `SchemaSuggest`'s (`BIGINT` → `DOUBLE` → `TIMESTAMP`/`DATE` → `BOOLEAN`, then `SampleProfiler.DATE_FORMATS`
+with ambiguity refused). Each caller keeps its own answer: the parse preview's `columnTypes` give `duckdb`; schema
+suggest (`SchemaSuggest.infer`, over the preview's parsed rows) gives the vote; Add data (`OnboardDraft.typed`) gives
+the vote — or `duckdb` for a file that declares its types — and then its own layers: the decimal mark (C1), a later
+fraction (DECIMAL-TEXT-NOT-BIGINT-1), almost-all numbers or dates (finding 3), the timestamp format and the person's
+stated types. `TypeInferenceGoldenTest` pins the three answers; where they differ on a TYPE (not only on whether a
+format is reported) a `disagreement…` test keeps each one, for the operator to decide: dates written in words (text
+in the preview, `DATE` with `%B %d, %Y` in the other two), times of day (`TIME` in the preview, text in the other two),
+numbers with a decimal comma and columns that are almost all numbers (numbers only in Add data), and the full-cycle
+transfers fixture (an amount and a booking time that are text in the preview and suggest, a number and a date with a
+time in Add data).
 
 ---
 

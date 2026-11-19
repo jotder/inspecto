@@ -468,12 +468,6 @@ public final class ComponentPreview {
     }
 
     /**
-     * B2: a second, {@code auto_detect=true} sniff of the same sample — per-column inferred types for
-     * the Data-types Auto mode. Advisory by construction: production ingest stays all-VARCHAR, so a
-     * failed sniff returns empty rather than failing the preview. Deliberately no {@code store_rejects}
-     * — the sniff must not pollute the reject count the parse above just produced.
-     */
-    /**
      * What DuckDB's dialect sniff resolves the raw sample to ({@link com.gamma.parse.SampleProfiler#dialect}, the
      * same sniff Add data reads) — the FILE's answer, not an echo of the grammar, as {@code parsing.delimited.*}
      * option names (GrammarResult#resolved). Advisory by construction: a failed sniff returns empty rather than
@@ -487,20 +481,25 @@ public final class ComponentPreview {
         }
     }
 
+    /**
+     * B2: a second, {@code auto_detect=true} sniff of the same sample — per-column inferred types for
+     * the Data-types Auto mode. The answer is DuckDB's own type per column, through the sample profiler
+     * ({@link com.gamma.parse.SampleProfiler#types}, its {@code duckdb} answer; schema suggest and Add data
+     * give its vote — where the two differ, {@code TypeInferenceGoldenTest} names it). Advisory by
+     * construction: production ingest stays all-VARCHAR, so a failed sniff returns empty rather than failing
+     * the preview. Deliberately no {@code store_rejects} — the sniff must not pollute the reject count the
+     * parse above just produced.
+     */
     private static List<Map<String, String>> sniffColumnTypes(Connection conn, PipelineConfig cfg, String path) {
-        try (java.sql.Statement st = conn.createStatement()) {
-            st.execute("CREATE TABLE preview_sniff AS SELECT * FROM read_csv(" + SqlIdent.sqlStr(path)
-                    + delimitedReadOptions(cfg)
-                    + ", auto_detect=true, ignore_errors=true)");
+        try {
             List<Map<String, String>> out = new java.util.ArrayList<>();
-            try (java.sql.ResultSet rs = st.executeQuery(
-                    "SELECT column_name, column_type FROM (DESCRIBE preview_sniff)")) {
-                while (rs.next()) {
-                    Map<String, String> col = new java.util.LinkedHashMap<>();
-                    col.put("name", rs.getString(1));
-                    col.put("type", rs.getString(2));
-                    out.add(col);
-                }
+            for (com.gamma.parse.SampleProfiler.ColumnType c : com.gamma.parse.SampleProfiler.types(conn,
+                    "read_csv(" + SqlIdent.sqlStr(path) + delimitedReadOptions(cfg) + ", auto_detect=true, ignore_errors=true)",
+                    MAX_ROWS)) {
+                Map<String, String> col = new java.util.LinkedHashMap<>();
+                col.put("name", c.name());
+                col.put("type", c.duckdb());
+                out.add(col);
             }
             return out;
         } catch (Exception sniffFail) {

@@ -153,7 +153,10 @@ src/app/
   - **`<inspecto-page-header title subtitle [terms] [eyebrow] [backLink] [mono] [hasTabs]>`** — the ONE
     header. It renders the page's only `<h1>` at the shared `text-title` size (22 px / 600), a subtitle
     **clamped to one line** that expands on click, the `<inspecto-ai-explain>` affordance when `terms`
-    are declared, and slots `[badge]`, `[actions]`, `[tabs]`. Rules it exists to enforce: one `<h1>` per
+    are declared, at heading level 1 the book-icon **Help for this screen** link (`<inspecto-help-link>`: the
+    Handbook chapter at `/help/<chapter>.html` from the ONE route-to-chapter map `inspecto/help/help-chapter.ts`
+    — a new screen family gets its row there, never a per-pane link; USER-HANDBOOK-1), and slots `[badge]`,
+    `[actions]`, `[tabs]`. Rules it exists to enforce: one `<h1>` per
     page, ONE filled primary action at the right end (everything else an icon button or a `⋯` menu), and
     refresh is always an icon button. ⚠ Put the essay in the explain dialog, not the subtitle.
     `[headingLevel]="2"` is for the ONE case the header is not the page — the `/design` live example, or a

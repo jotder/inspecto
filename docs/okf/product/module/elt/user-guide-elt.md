@@ -1036,8 +1036,8 @@ the cast-failure audit alike: a shared list trying other patterns first is how `
 `%m/%d/%Y`. A value the format does not match follows the existing coercion policy — NULL, row kept, counted
 by `countCastFailures` (there is no reject/quarantine for coercion failures). `Identifiers.validateSchema`
 refuses a format on a non-date (or absent) type, one with no `%` directive or a single quote (it is inlined
-into a SQL literal), and a zone directive. `POST /config/suggest/schema` emits it: `SchemaSuggest` tries
-`DATE_FORMATS` on a column no bare cast accepts, and a DATE carries the format it was proven with; a sample
+into a SQL literal), and a zone directive. `POST /config/suggest/schema` emits it: `SchemaSuggest` (through the
+engine's `SampleProfiler.types` vote since BE-3 slice 2) tries `SampleProfiler.DATE_FORMATS` on a column no bare cast accepts, and a DATE carries the format it was proven with; a sample
 under which two formats give different dates (`03/04/2025`) gets **no** format and stays VARCHAR. ⚠ DuckDB
 strptime matches whitespace exactly, so a column mixing `March 22,2025` and `March 22, 2025` fits no single
 format and is suggested VARCHAR. `SchemaExtractor` regeneration does not preserve `format` (it re-infers).

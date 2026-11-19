@@ -25,6 +25,7 @@ import { APP_ENVIRONMENT } from '@inspecto/core/api/app-environment';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { LA_APP_SHORTCUTS, ShortcutsHelpDialog, isEditingTarget } from 'app/inspecto/shortcuts-help.dialog';
 import { appAreas, appOfUrl, areaIcon, productNav, ProductNavEntry } from '@inspecto/core/product/product-host';
+import { HELP_HOME } from '@inspecto/core/help/help-chapter';
 import { FirstRun } from './first-run';
 import { NoAccessComponent } from './no-access.component';
 import { PRODUCT } from './product.generated';
@@ -197,6 +198,20 @@ export const railLink = (n: ProductNavEntry): RailLink => ({ path: n.path, label
                         ></inspecto-space-switcher>
                     </div>
                 }
+                <!-- USER-HANDBOOK-1: the Handbook the bundle ships at /help/, opened in a new tab. -->
+                <a
+                    class="focus-visible:outline-primary flex h-10 items-center gap-3 rounded-md px-2.5 text-sm focus-visible:outline-2"
+                    data-testid="la-help"
+                    [href]="helpHome"
+                    target="_blank"
+                    rel="noopener"
+                    aria-label="Help (opens the Handbook in a new tab)"
+                    [matTooltip]="expanded() ? '' : 'Help'"
+                    matTooltipPosition="right"
+                >
+                    <mat-icon class="icon-size-5 flex-0" svgIcon="heroicons_outline:book-open"></mat-icon>
+                    <span [class]="expanded() ? 'max-sm:sr-only' : 'sr-only'" aria-hidden="true">Help</span>
+                </a>
                 <user [showAvatar]="false" [schemeChoice]="true"></user>
                 @if (expanded()) {
                     <p class="text-secondary m-0 px-2 text-xs max-sm:hidden">{{ footer }}</p>
@@ -271,6 +286,8 @@ export class LaShellComponent {
         LA_APP_SETTINGS_NAV,
     ]);
     protected readonly product = PRODUCT.brand.name;
+    /** The Handbook's home (USER-HANDBOOK-1): the static site every bundle ships at /help/. */
+    protected readonly helpHome = HELP_HOME;
     protected readonly logo = this.env.appLogo;
     protected readonly footer = this.env.footerText;
     private readonly rail = inject(LaRailService);

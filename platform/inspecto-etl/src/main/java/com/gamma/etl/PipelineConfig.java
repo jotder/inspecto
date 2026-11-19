@@ -95,7 +95,7 @@ public final class PipelineConfig {
      *
      * <p>Dialect characters (5.2): {@code quote}/{@code escape}/{@code comment} are single-character
      * strings, {@code null} when unset (⇒ engine defaults: quote {@code "} / escape = the quote char,
-     * i.e. RFC-4180 doubling / no comment). They
+     * i.e. RFC-4180 doubling / no comment); a {@code quote} of {@code ""} is no quote at all (BE-3). They
      * pass through to DuckDB {@code read_csv} and to the univocity fallback identically, so the two
      * engines cannot diverge on quoting.
      *

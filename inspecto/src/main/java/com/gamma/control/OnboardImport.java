@@ -169,7 +169,9 @@ final class OnboardImport {
                         + " imported Datasets (import.max_datasets); remove one or ask an administrator to raise the limit");
 
             Map<String, Object> schema = plan.schema(id);
-            Map<String, Object> pipeline = plan.pipeline(id, dataRoot, kind, fileName, String.valueOf(draft.get("type")));
+            String type = String.valueOf(draft.get("type"));
+            Map<String, Object> pipeline = plan.pipeline(id, dataRoot, kind, fileName, type,
+                    ("csv".equals(type) || "tsv".equals(type)) && holdsDoubleQuote(draftFile));
             Map<String, Object> dataset = plan.dataset(id, kind, fileName, String.valueOf(draft.get("type")));
             String recordType = commitRecordType(draft, body, LinkAnalysisSettings.forRoot(writeRoot));
             if (recordType != null) dataset.put(DatasetEntryRules.RECORD_TYPE, recordType);
@@ -591,7 +593,12 @@ final class OnboardImport {
             return s;
         }
 
-        Map<String, Object> pipeline(String id, Path dataRoot, String kind, String fileName, String type) {
+        /**
+         * The import's Pipeline. {@code holdsQuote}: the file holds a double quote anywhere - only then does a draft that
+         * read it with no quote write {@code quote: ""}; otherwise the engine's default quote reads the file alike and
+         * keeps a later file's quoted fields whole.
+         */
+        Map<String, Object> pipeline(String id, Path dataRoot, String kind, String fileName, String type, boolean holdsQuote) {
             String d = dataRoot.resolve(id).toString().replace('\\', '/');
             Map<String, Object> p = new LinkedHashMap<>();
             p.put("name", id);
@@ -622,8 +629,12 @@ final class OnboardImport {
             if ("csv".equals(type) || "tsv".equals(type)) {
                 csv.put("delimiter", String.valueOf(formatValue("delimiter")));
                 csv.put("has_header", Boolean.parseBoolean(String.valueOf(formatValue("header"))));
+                // the draft's quote as it read the file (BASIC-ELT-PROFILE-1 BE-3): "" is no quote, written when the file
+                // holds a '"' the default quote would read differently; absent, the engine's '"' reads a quote-free file alike
                 Object q = formatValue("quote");
-                if (q != null && !String.valueOf(q).isEmpty()) csv.put("quote", String.valueOf(q));
+                if (q != null && (holdsQuote || !String.valueOf(q).isEmpty())) csv.put("quote", String.valueOf(q));
+                Object skip = formatValue("skipLines");   // the lines the draft's sniff skipped before the header
+                if (skip != null) csv.put("skip_header_lines", Integer.parseInt(String.valueOf(skip)));
                 Object enc = formatValue("encoding");   // C2: the encoding fix
                 if (enc != null && !"utf-8".equals(enc)) csv.put("encoding", String.valueOf(enc));
             }
@@ -1186,7 +1197,7 @@ final class OnboardImport {
             PipelineConfig.CsvSettings c = cfg.csv();
             try {
                 return OnboardDraft.diagnose(source, fileName, c.delimiter() == null || c.delimiter().isEmpty() ? "," : c.delimiter(),
-                        c.quote() == null ? "" : c.quote(), c.hasHeader(), c.encoding());
+                        c.quote() == null ? "" : c.quote(), c.hasHeader(), c.skipHeaderLines(), c.encoding());
             } catch (IOException unreadable) {
                 return List.of();
             }
@@ -1671,6 +1682,20 @@ final class OnboardImport {
         }
     }
 
+    /** A {@code skip_header_lines} / {@code skipLines} value as a number; {@code 0} when absent or not a count. */
+    private static int skipLines(Object v) {
+        String s = v == null ? "" : String.valueOf(v).trim();
+        return s.matches("\\d{1,9}") ? Integer.parseInt(s) : 0;
+    }
+
+    /** Whether {@code file} holds a {@code "} byte anywhere (BE-3: the engine's default quote would read it otherwise than no quote). */
+    static boolean holdsDoubleQuote(Path file) throws IOException {
+        try (java.io.InputStream in = new java.io.BufferedInputStream(Files.newInputStream(file))) {
+            for (int b; (b = in.read()) != -1; ) if (b == '"') return true;
+        }
+        return false;
+    }
+
     /**
      * New columns of delimited text are not kept: the engine reads by position and sets aside a file whose rows have more
      * fields than the import reads, so the file is rewritten in place with the read columns only (they lead the line: a
@@ -1746,6 +1771,13 @@ final class OnboardImport {
             } catch (OnboardFixes.Refusal notReadable) {   // its fix edits a draft: a later file has none
                 throw new ApiException(notReadable.status, ErrorCodes.CONFIG_VALIDATION_FAILED, notReadable.getMessage());
             }
+            // BASIC-ELT-PROFILE-1 BE-3: the import skips the lines its first file's sniff skipped (skip_header_lines); a
+            // later file with other leading lines would be read wrongly by the run (a row lost, or its header read as one)
+            int skips = skipLines(importSetting(schema, "processing", "csv_settings", "skip_header_lines"));
+            int has = a.format().get("skipLines") instanceof Map<?, ?> sl ? skipLines(sl.get("value")) : 0;
+            if (has != skips)
+                problems.add("it has " + Words.count(has, "line", "lines") + " before the " + (headerless ? "first record" : "header line")
+                        + " and '" + id + "' skips " + skips);
             if (headerless) {
                 if (a.cols().size() <= max)
                     problems.add("it has " + a.cols().size() + " columns and '" + id + "' reads " + (max + 1));
