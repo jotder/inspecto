@@ -3979,7 +3979,7 @@
         "tags" : [ "config" ],
         "summary" : "Suggest a draft schema from sample rows",
         "operationId" : "postConfigSuggestSchema",
-        "description" : "Infers field types by TRY_CAST voting over body sampleRows on a scratch DuckDB and returns draft fields plus an identity mapping, never applied automatically; optional frontend picks index or name selectors, and a posted config adds a drift block. No capability gate. 400 without sampleRows or for an unknown frontend; 422 when inference fails.",
+        "description" : "Infers field types by TRY_CAST voting over body sampleRows on a scratch DuckDB and returns draft fields plus an identity mapping, never applied automatically; optional frontend picks index or name selectors, optional decimalSeparator ('.' or ',', the Grammar's decimal mark) reads number columns through it as the parse preview does, and a posted config adds a drift block. No capability gate. 400 without sampleRows, for an unknown frontend or another decimalSeparator; 422 when inference fails.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."

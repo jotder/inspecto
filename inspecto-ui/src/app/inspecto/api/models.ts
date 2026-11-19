@@ -523,7 +523,7 @@ export interface ParsingPreview {
     rejectedRows: number;
     /** The parse's inferred per-column types, when the preview served them — carried so a surface that
      *  opens on this parse (the Parse drawer after the Grammar dialog) derives the SAME typed schema. */
-    columnTypes?: { name: string; type: string }[];
+    columnTypes?: { name: string; type: string; format?: string }[];
 }
 
 /** Result of POST /config/preview/schema — TRY_CAST already-parsed rows against typed fields.

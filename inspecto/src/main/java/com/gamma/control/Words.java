@@ -38,9 +38,9 @@ final class Words {
     }
 
     private static final Map<String, String> PLURAL = Map.of("VARCHAR", "text", "BIGINT", "whole numbers", "DOUBLE", "decimal numbers",
-            "DATE", "dates", "TIMESTAMP", "dates with a time", "BOOLEAN", "yes / no values");
+            "DATE", "dates", "TIMESTAMP", "dates with a time", "TIME", "times of day", "BOOLEAN", "yes / no values");
     private static final Map<String, String> SINGULAR = Map.of("VARCHAR", "text", "BIGINT", "a whole number", "DOUBLE", "a decimal number",
-            "DATE", "a date", "TIMESTAMP", "a date with a time", "BOOLEAN", "a yes / no value");
+            "DATE", "a date", "TIMESTAMP", "a date with a time", "TIME", "a time of day", "BOOLEAN", "a yes / no value");
     private static final Map<String, String> LABEL = Map.of("VARCHAR", "Text", "BIGINT", "Whole number", "DOUBLE", "Decimal number",
-            "DATE", "Date", "TIMESTAMP", "Date and time", "BOOLEAN", "Yes / no");
+            "DATE", "Date", "TIMESTAMP", "Date and time", "TIME", "Time of day", "BOOLEAN", "Yes / no");
 }

@@ -159,9 +159,9 @@ timestamp: 2026-11-16T00:00:00Z
 - Impact: mark the chosen file line (*transfers.csv, N rows, size*).
 
 ### S04 · Check the columns
-- Voice: Step two: check the columns. What was detected is applied, with its reason beside it: the separator, the header line, each column's type. Two choices are only guesses, highlighted and marked A guess. booked_at is a date with a time, except one value that is not; amount is a number, except one. Each reason names the value that does not fit, and says it will be left blank. Read them, then press Confirm all two guesses.
+- Voice: Step two: check the columns. What was detected is applied, with its reason beside it: the separator, the header line, each column's type. Two choices are only guesses, highlighted and marked A guess. booked_at is a date with a time, except one value that is not; its reason names it and says it will be left blank. amount is kept as text, because one of its values is not a number; its reason names it. Read them, press Confirm all two guesses, then set amount's type to Decimal number: the one value that is not a number will be left blank, and amount can weigh the links.
 - Chip: A guess · Confirm all guesses
-- Action: hold on Separator / Header line / Quote and their reasons ▸ zoom on the `booked_at` and `amount` guesses and their reasons ▸ Confirm all 2 guesses. [check in UI: which columns are guesses and the button's number; the fixture holds `not-a-date` in booked_at and `abc` in amount]
+- Action: hold on Separator / Header line / Quote and their reasons ▸ zoom on the `booked_at` and `amount` guesses and their reasons ▸ Confirm all 2 guesses ▸ amount ▸ Type: Decimal number. [check in UI: which columns are guesses and the button's number; the fixture holds `not-a-date` in booked_at and `abc` in amount, which keeps amount as text since 2026-11-19]
 - Impact: mark each guess and its reason; then the highlights clearing.
 
 ### S05 · What each column holds

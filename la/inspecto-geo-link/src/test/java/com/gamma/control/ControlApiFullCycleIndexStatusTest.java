@@ -187,7 +187,8 @@ class ControlApiFullCycleIndexStatusTest {
             ComponentStore registry = new ComponentStore(config.resolve("registry"));
             Map<String, Object> entry = new LinkedHashMap<>(registry.get("dataset", "transfers").orElseThrow().content());
             entry.remove("name");
-            entry.put("calculated", List.of(Map.of("name", "big", "expr", "amount > 1000")));
+            // over a text column: the fixture's amount is text since operator ruling 4 (2026-11-19, one value is 'abc')
+            entry.put("calculated", List.of(Map.of("name", "at_atm", "expr", "channel = 'atm'")));
             registry.write("dataset", "transfers", entry);
 
             JsonNode stale = indexOf(c, "bank", "transfers");

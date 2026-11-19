@@ -137,19 +137,6 @@ export function matchLine(m: DraftMatch): string {
     return `${m.column} matches ${pct}% of ${m.dataset}.${m.datasetColumn}${held}`;
 }
 
-/**
- * The separator, header and quote a re-read of the same file keeps: the draft's sure choices (stated by the person, or
- * high), never a low guess - a re-read must not confirm what the person has not.
- */
-export function keptFormat(d: OnboardDraft | null): FormatOverrides {
-    const f = d?.format;
-    const out: FormatOverrides = {};
-    if (f?.delimiter?.confidence === 'high') out.delimiter = f.delimiter.value;
-    if (f?.header?.confidence === 'high') out.header = f.header.value;
-    if (f?.quote?.confidence === 'high') out.quote = f.quote.value;
-    return out;
-}
-
 /** One application's follow-on step, as the draft lists it: its summary key, what it does, the entry keys it needs. */
 export interface ImportFollowOnInfo {
     key: string;
@@ -403,7 +390,7 @@ export interface ImportDataset {
 
 // ── Row filter (ADD-DATA-ROW-FILTER-1) ───────────────────────────────────────────────────────────────────────────────
 
-const RANGE_TYPES: ReadonlySet<string> = new Set(['BIGINT', 'DOUBLE', 'DATE', 'TIMESTAMP']);
+const RANGE_TYPES: ReadonlySet<string> = new Set(['BIGINT', 'DOUBLE', 'DATE', 'TIMESTAMP', 'TIME']);
 const ROW_OPS: readonly RowOp[] = ['eq', 'ne', 'contains', 'range'];
 
 export const ROW_OP_LABELS: Record<RowOp, string> = {
@@ -444,15 +431,19 @@ export function conditionProblem(
     return text(c.value) ? '' : 'Enter a value.';
 }
 
+export type ConditionValueType = 'text' | 'number' | 'date' | 'datetime-local' | 'time';
+
 /** The value box a condition on a column of `type` calls for. */
-export function conditionValueType(type: string): 'text' | 'number' | 'date' | 'datetime-local' {
+export function conditionValueType(type: string): ConditionValueType {
     return type === 'BIGINT' || type === 'DOUBLE'
         ? 'number'
         : type === 'DATE'
           ? 'date'
           : type === 'TIMESTAMP'
             ? 'datetime-local'
-            : 'text';
+            : type === 'TIME'
+              ? 'time'
+              : 'text';
 }
 
 /** `GET|PUT /datasets/{id}/filter` (ADD-DATA-FILTER-EDIT-1): the conditions, and the columns with the import's types. */

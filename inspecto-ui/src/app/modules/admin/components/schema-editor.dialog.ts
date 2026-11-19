@@ -25,6 +25,8 @@ import { ComponentFormResult } from './component-form.dialog';
 export interface SchemaEditorData {
     def?: ComponentDef;
     sampleRows?: Record<string, unknown>[];
+    /** The decimal mark the sample was parsed with (the Grammar's `decimal_separator`), for *Suggest from sample*. */
+    decimalSeparator?: string;
     /**
      * Where a CREATE lands — the two openers genuinely differ, which is why this is a parameter rather
      * than a constant (`SCHEMA-DIALOG-CREATE-HOME-1`):
@@ -319,7 +321,7 @@ export class SchemaEditorDialog {
             if (!ok) return;
         }
         this.suggesting.set(true);
-        this.config.suggestSchema(sampleRows, undefined, this.data.frontend).subscribe({
+        this.config.suggestSchema(sampleRows, undefined, this.data.frontend, this.data.decimalSeparator).subscribe({
             next: (s) => {
                 this.suggesting.set(false);
                 this.onRows(

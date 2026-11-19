@@ -19,6 +19,7 @@ import {
     conditionProblem,
     conditionState,
     conditionValueType,
+    ConditionValueType,
     keepsRowsLine,
     rowOps,
 } from './add-data.model';
@@ -285,7 +286,7 @@ export class ImportFilterEditComponent {
         return rowOps(this.columnType(column)).map((op) => ({ value: op, label: ROW_OP_LABELS[op] }));
     }
 
-    protected valueType(column: string): 'text' | 'number' | 'date' | 'datetime-local' {
+    protected valueType(column: string): ConditionValueType {
         return conditionValueType(this.columnType(column));
     }
 

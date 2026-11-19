@@ -169,7 +169,7 @@ class ControlApiOnboardFullCycleTest {
     // ── finding 3: one bad value no longer hides the time column or the measure ─────────────────────────────────────
 
     @Test
-    void aColumnThatIsAlmostAllDatesOrNumbersIsProposedAsOneAtLowConfidenceWithTheOddValueNamed(@TempDir Path cfg, @TempDir Path root)
+    void aColumnThatIsAlmostAllDatesIsProposedAsOneAndAlmostAllNumbersStaysTextBothWithTheOddValueNamed(@TempDir Path cfg, @TempDir Path root)
             throws Exception {
         try (Ctx c = open(cfg, root)) {
             JsonNode d = draft(c, "transfers.csv", "stream", fixture("transfers.csv"));
@@ -184,27 +184,38 @@ class ControlApiOnboardFullCycleTest {
             assertTrue(why.contains("but 1 is not (e.g. 'not-a-date')"), "singular, and the odd value is named: " + why);
             assertTrue(why.contains("it will be left blank"), why);
 
+            // operator ruling 4 (2026-11-19, BASIC-ELT-PROFILE-1): a number is proposed only when every value is one - the
+            // 'abc' keeps amount text, said as a guess the person may change (it was a DOUBLE with 'abc' blanked)
             JsonNode amount = type(d, "amount");
-            assertEquals("DOUBLE", amount.get("value").asText(), amount.toString());
+            assertEquals("VARCHAR", amount.get("value").asText(), amount.toString());
             assertEquals("low", amount.get("confidence").asText());
-            assertTrue(amount.get("evidence").asText().contains("460 of 461 sampled values are numbers, but 1 is not (e.g. 'abc')"),
-                    amount.toString());
+            assertTrue(amount.get("evidence").asText().contains(
+                    "460 of 461 sampled values are numbers, but 1 is not (e.g. 'abc'), so it is kept as text"), amount.toString());
 
             // finding 6: the two guessed types are one Confirm all, then Create and run - what follows a guessed type
             // (the Time, the Measure, the link's When and Weighed by) does not ask a second time
             assertEquals(2, clicksAfterTheDrop(d), "Confirm all 2 guesses, Create and run: " + d.get("entityTypes"));
-            assertEquals("high", d.get("entityTypes").get("link").get("primaryMeasure").get("confidence").asText());
 
-            // the roles that follow see the columns: When and Weighed by are proposed
+            // the roles that follow see the columns: When is proposed; nothing is a number, so nothing weighs a link
             JsonNode link = d.get("entityTypes").get("link");
             assertEquals("from_account", link.get("from").get("value").asText());
             assertEquals("to_account", link.get("to").get("value").asText());
             assertEquals("booked_at", link.get("primaryTime").get("value").asText(), link.toString());
-            assertEquals("amount", link.get("primaryMeasure").get("value").asText(), link.toString());
+            assertTrue(link.get("primaryMeasure").get("value").isNull(), link.toString());
             assertEquals("temporal", proposal(d, "booked_at", "role").get("value").asText());
-            assertEquals("measure", proposal(d, "amount", "role").get("value").asText());
-            assertTrue(link.get("primaryMeasure").get("evidence").asText().contains("460 of 461 sampled values are numbers"),
-                    "never 'all 461' when one is not: " + link.get("primaryMeasure"));
+
+            // the person makes amount a number: the odd value is named, and amount weighs the links, in one edit
+            JsonNode asNumber = data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/redraft",
+                    redraftBody("amount", "type", "DOUBLE"), null), 200);
+            JsonNode n = type(asNumber, "amount");
+            assertEquals("DOUBLE", n.get("value").asText(), n.toString());
+            assertTrue(n.get("evidence").asText().contains("460 of 461 sampled values are numbers, but 1 is not (e.g. 'abc')"), n.toString());
+            JsonNode measure = asNumber.get("entityTypes").get("link").get("primaryMeasure");
+            assertEquals("amount", measure.get("value").asText(), measure.toString());
+            assertEquals("high", measure.get("confidence").asText(), "what follows a stated type does not ask again: " + measure);
+            assertTrue(measure.get("evidence").asText().contains("460 of 461 sampled values are numbers"),
+                    "never 'all 461' when one is not: " + measure);
+            assertEquals("measure", proposal(asNumber, "amount", "role").get("value").asText());
 
             // finding 10: the Entity Type's label, never its id or a column type's engine name
             String from = proposal(d, "from_account", "entityType").get("evidence").asText();
@@ -241,7 +252,7 @@ class ControlApiOnboardFullCycleTest {
             assertTrue(ordered.get("evidence").asText().contains("239 of 240 sampled values are dates, but 1 is not (e.g. '31/02/2026')"), ordered.toString());
             assertEquals(0, o.get("findings").size(), "proposed, so not also offered as a fix: " + o.get("findings"));
 
-            // whole numbers under a name that says no amount stay text: digits with a few letters are often identifiers
+            // almost all whole numbers stay text whatever the name says (operator ruling 4, 2026-11-19)
             StringBuilder ids = new StringBuilder("badge,visits\n");
             for (int i = 0; i < 40; i++) ids.append(i == 7 ? "X-17" : String.valueOf(5000 + i)).append(',').append(i).append('\n');
             JsonNode b = draft(c, "badges.csv", "stream", ids.toString().getBytes(StandardCharsets.UTF_8));
@@ -268,7 +279,8 @@ class ControlApiOnboardFullCycleTest {
             JsonNode time = asText.get("entityTypes").get("link").get("primaryTime");
             assertTrue(time.get("value").isNull(), time.toString());
             assertEquals("no column holds dates or times", time.get("evidence").asText());
-            assertEquals("amount", asText.get("entityTypes").get("link").get("primaryMeasure").get("value").asText(), "the rest stands");
+            assertEquals(d.get("entityTypes").get("link").get("primaryMeasure"), asText.get("entityTypes").get("link").get("primaryMeasure"),
+                    "the rest stands");
 
             // back to a date and time, in one edit: the type, its format, the role and the link's time all follow
             JsonNode asTime = data(json(c, "POST", "/onboard/files/" + draftId + "/redraft", redraftBody("booked_at", "type", "TIMESTAMP"), null), 200);
@@ -348,16 +360,14 @@ class ControlApiOnboardFullCycleTest {
             assertEquals(461, s.get("rowsAfter").asLong());
             assertEquals(s.get("rowsIn").asLong(), s.get("rowsAfter").asLong() + s.get("rowsRejected").asLong());
 
-            // dirty rows 2 and 3: the values a type could not read, per column, with one of them
+            // dirty row 2: the value a type could not read, per column, with one of it. Dirty row 3's 'abc' is kept: amount
+            // is text since operator ruling 4 (2026-11-19) - a number is proposed only when every value is one
             JsonNode blanked = s.get("blanked");
-            assertEquals(2, blanked.size(), blanked.toString());
+            assertEquals(1, blanked.size(), blanked.toString());
             JsonNode when = named(blanked, "booked_at");
             assertEquals(1, when.get("values").asLong(), when.toString());
             assertEquals("not-a-date", when.get("example").asText());
             assertEquals("timestamp", when.get("type").asText(), "the Dataset's own word for the column type");
-            JsonNode amount = named(blanked, "amount");
-            assertEquals(1, amount.get("values").asLong(), amount.toString());
-            assertEquals("abc", amount.get("example").asText());
 
             // dirty row 1: kept, but it cannot be a link, and the result says which end is missing
             JsonNode unlinked = s.get("unlinked");

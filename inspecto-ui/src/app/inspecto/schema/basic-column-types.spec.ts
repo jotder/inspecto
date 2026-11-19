@@ -4,10 +4,10 @@ import { SCHEMA_TYPES } from './schema-fields-editor.component';
 
 /**
  * The types an import commit accepts: `OnboardImport.TYPES`, Java
- * (`inspecto/src/main/java/com/gamma/control/OnboardImport.java:94`). Hard-coded because no UI spec reads Java source;
- * change both together.
+ * (`inspecto/src/main/java/com/gamma/control/OnboardImport.java:93`). Hard-coded because no UI spec reads Java source;
+ * change both together. TIME joined 2026-11-19 (operator ruling, BASIC-ELT-PROFILE-1).
  */
-const ONBOARD_IMPORT_TYPES = ['VARCHAR', 'BIGINT', 'DOUBLE', 'DATE', 'TIMESTAMP', 'BOOLEAN'];
+const ONBOARD_IMPORT_TYPES = ['VARCHAR', 'BIGINT', 'DOUBLE', 'DATE', 'TIMESTAMP', 'TIME', 'BOOLEAN'];
 
 describe('BASIC_COLUMN_TYPES - Basic column types are the named subset of SCHEMA_TYPES (BASIC-ELT-PROFILE-1 U1-types)', () => {
     it('every Basic type is a type the engine honours', () => {

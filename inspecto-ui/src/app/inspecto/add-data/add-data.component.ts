@@ -38,6 +38,7 @@ import {
 } from '@inspecto/core/api/entity-type-options';
 import { OnboardingEventsService } from '@inspecto/core/onboarding/onboarding-events.service';
 import { BASIC_COLUMN_TYPE_LABELS, type BasicColumnType } from '@inspecto/core/schema/basic-column-types';
+import { parsingAttributesFor } from '@inspecto/core/grammar/parsing-attributes';
 import {
     InspectoSchemaMetadataGridComponent,
     type SchemaTypeRow,
@@ -72,12 +73,12 @@ import {
     buildFilter,
     conditionProblem,
     conditionValueType,
+    ConditionValueType,
     keepsRowsLine,
     rowOps,
     choiceKey,
     DraftMatch,
     matchLine,
-    keptFormat,
     rowsWords,
     followOnClause,
     delimiterLabel,
@@ -142,6 +143,17 @@ const NONE = '';
  *
  * @example <inspecto-add-data exploreRoute="/link-analysis" (imported)="onImported($event)" />
  */
+/** The grammar editor's own label for each of Add data's format choices (one dialect vocabulary, U3). */
+function formatLabels(): { delimiter: string; header: string; quote: string } {
+    const specs = parsingAttributesFor('delimited');
+    const label = (key: string): string => specs.find((a) => a.key === key)!.label;
+    return {
+        delimiter: label('delimited__delimiter'),
+        header: label('delimited__has_header'),
+        quote: label('delimited__quote'),
+    };
+}
+
 @Component({
     selector: 'inspecto-add-data',
     standalone: true,
@@ -241,6 +253,11 @@ export class AddDataComponent implements OnInit {
     // ── words and options ────────────────────────────────────────────────────────────────────────────────────────────
     protected readonly accept = ACCEPTED_EXTENSIONS;
     protected readonly formats = READ_FORMATS;
+    /**
+     * BASIC-ELT-PROFILE-1 U3 (ruling O5): one dialect vocabulary - the three format choices are named as the grammar
+     * editor names the same keys (`parsingAttributesFor('delimited')`); Basic offers a locked subset of their values.
+     */
+    protected readonly formatLabels = formatLabels();
     protected readonly delimiterOptions: PickerOption[] = [',', ';', '\t', '|'].map((d) => ({
         value: d,
         label: delimiterLabel(d),
@@ -539,8 +556,8 @@ export class AddDataComponent implements OnInit {
         this.formSub = this.form.valueChanges.subscribe(() => this.formTick.update((n) => n + 1));
         this.formSub.add(this.form.controls.recordType.valueChanges.subscribe((rt) => this.reproposeRoles(rt)));
         // A different separator, header line or quote re-reads the file (the draft's columns were read with the old one).
-        for (const c of [this.form.controls.delimiter, this.form.controls.header, this.form.controls.quote])
-            this.formSub.add(c.valueChanges.subscribe(() => this.reformat()));
+        for (const k of ['delimiter', 'header', 'quote'] as const)
+            this.formSub.add(this.form.controls[k].valueChanges.subscribe(() => this.reformat(k)));
         this.destroyRef.onDestroy(() => {
             this.formSub?.unsubscribe();
             this.columnSubs?.unsubscribe();
@@ -606,6 +623,7 @@ export class AddDataComponent implements OnInit {
             .subscribe({
                 next: (d) => {
                     this.reading.set(false);
+                    this.statedFormat = format; // what this draft was read with: the person's own picks only
                     this.adopt(d);
                 },
                 error: (err: unknown) => {
@@ -787,6 +805,7 @@ export class AddDataComponent implements OnInit {
         this.kind.setValue(kind);
         this.whatOpen.set(this.whatColumnsHold() === 'ask');
         this.pendingLookup = null;
+        this.statedFormat = {};
     }
 
     // ── 2. the columns ───────────────────────────────────────────────────────────────────────────────────────────────
@@ -802,13 +821,22 @@ export class AddDataComponent implements OnInit {
         else g.controls.drop.setValue(change.leaveOut);
     }
 
-    /** A separator, header or quote change re-reads the file with that choice stated (the commit cannot change it). */
-    protected reformat(): void {
+    /**
+     * A separator, header or quote change re-reads the file with that choice stated (the commit cannot change it), beside
+     * the choices the person stated before. Only a value the person picked is stated: the others are the draft's own
+     * proposals, which the screen shows in the same boxes (BASIC-ELT-PROFILE-1 U3 - sending them all made a sniffed "no
+     * quote" come back as "you chose no quote").
+     */
+    protected reformat(picked: keyof FormatOverrides): void {
         const f = this.file();
         const d = this.draft();
         if (!f || !d || this.reading()) return;
         const v = this.form.getRawValue();
-        this.read(f, { delimiter: v.delimiter, header: v.header === 'true', quote: v.quote });
+        const format: FormatOverrides = { ...this.statedFormat };
+        if (picked === 'delimiter') format.delimiter = v.delimiter;
+        else if (picked === 'header') format.header = v.header === 'true';
+        else format.quote = v.quote;
+        this.read(f, format);
     }
 
     /** The type a draft column will have, as the screen holds it ('' = none chosen). */
@@ -821,7 +849,7 @@ export class AddDataComponent implements OnInit {
     }
 
     /** The value box a condition's column calls for. */
-    protected valueType(column: string): 'text' | 'number' | 'date' | 'datetime-local' {
+    protected valueType(column: string): ConditionValueType {
         return conditionValueType(this.columnType(column));
     }
 
@@ -986,6 +1014,8 @@ export class AddDataComponent implements OnInit {
     protected readonly matchLine = matchLine;
     /** The match *Use as a lookup* was chosen for, applied when the same file comes back as details about entities. */
     private pendingLookup: DraftMatch | null = null;
+    /** The separator, header and quote the person picked, as the draft on screen was read with them; `{}` = none. */
+    private statedFormat: FormatOverrides = {};
 
     /** *Use as a lookup*: read the same file again as details about entities, identified by the matched column. */
     protected useAsLookup(m: DraftMatch): void {
@@ -993,7 +1023,7 @@ export class AddDataComponent implements OnInit {
         if (!f) return;
         this.pendingLookup = m;
         this.kind.setValue('reference');
-        this.read(f, keptFormat(this.draft()));
+        this.read(f, this.statedFormat);
     }
 
     /** The matched column identifies each entity, holding the Entity Type its Dataset column holds; a choice, so confirmed. */

@@ -16,33 +16,40 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * {@code BASIC-ELT-PROFILE-1} BE-3 slice 2: the column types the three type inferences answer for one file — the parse
- * preview ({@link ComponentPreview#parsing}, its {@code columnTypes}: DuckDB's own {@code read_csv} auto-detect), schema
- * suggest ({@link SchemaSuggest#infer} over the rows that preview parsed, the way the two routes chain) and Add data
- * ({@link OnboardDraft#analyse}, its proposed column types) — pinned over the repo's sample files and inline fixtures, so
- * moving the inference into one engine service ({@code com.gamma.parse.SampleProfiler}) cannot change any answer.
+ * {@code BASIC-ELT-PROFILE-1} BE-3: the column types the three type inferences answer for one file — the parse
+ * preview ({@link ComponentPreview#parsing}, its {@code columnTypes}), schema suggest ({@link SchemaSuggest#infer} over
+ * the rows that preview parsed, the way the two routes chain) and Add data ({@link OnboardDraft#analyse}, its proposed
+ * column types) — pinned over the repo's sample files and inline fixtures.
  *
- * <p>Each answer is {@code name:TYPE} per column, with {@code /format} when a date was proven with a strptime format.
- * Where the three agree a test says so; where they answer the same column differently a test named
- * {@code disagreement…} keeps each caller's own answer — the operator decides which one wins.
+ * <p>Each answer is {@code name:TYPE} per column, with {@code /format} when a date or a date with a time is read with a
+ * strptime format, and Add data's {@code mark} when a number needs its decimal mark. Since the operator's rulings of
+ * 2026-11-19 the three give ONE answer (the engine's {@code com.gamma.parse.SampleProfiler}): every test here is an
+ * agreement test. The cases that disagreed before the rulings are kept, renamed, under "were disagreements".
  */
 class TypeInferenceGoldenTest {
 
     /** The parse preview over {@code text} under a schema-less draft that splits on {@code delimiter}. */
-    private static ComponentPreview.GrammarResult preview(String text, String delimiter) throws Exception {
+    private static ComponentPreview.GrammarResult preview(String text, String delimiter, String decimalMark) throws Exception {
+        Map<String, Object> csv = new java.util.LinkedHashMap<>();
+        csv.put("delimiter", delimiter);
+        if (decimalMark != null) csv.put("decimal_separator", decimalMark);
         PipelineConfig cfg = PipelineConfig.fromMap(Map.of("name", "PREVIEW",
                 "dirs", Map.of("poll", "in", "database", "out"),
-                "processing", Map.of("threads", 1, "csv_settings", Map.of("delimiter", delimiter))));
+                "processing", Map.of("threads", 1, "csv_settings", csv)));
         return ComponentPreview.parsing(cfg, text);
     }
 
-    /** {@code preview=[…] suggest=[…] addData=[…]}: the three answers for one delimited file. */
-    private static String answers(Path dir, String name, byte[] bytes, String delimiter) throws Exception {
-        ComponentPreview.GrammarResult p = preview(new String(bytes, StandardCharsets.UTF_8), delimiter);
+    /**
+     * {@code preview=[…] suggest=[…] addData=[…]}: the three answers for one delimited file. {@code decimalMark} is the
+     * Grammar's {@code decimal_separator} the preview and suggest read (Add data detects its own), or {@code null}.
+     */
+    private static String answers(Path dir, String name, byte[] bytes, String delimiter, String decimalMark) throws Exception {
+        ComponentPreview.GrammarResult p = preview(new String(bytes, StandardCharsets.UTF_8), delimiter, decimalMark);
         List<String> preview = new ArrayList<>();
-        for (Map<String, String> c : p.columnTypes()) preview.add(c.get("name") + ":" + c.get("type"));
+        for (Map<String, String> c : p.columnTypes())
+            preview.add(c.get("name") + ":" + c.get("type") + (c.get("format") == null ? "" : "/" + c.get("format")));
         List<String> suggest = new ArrayList<>();
-        for (SchemaSuggest.Field f : SchemaSuggest.infer(p.rows()))
+        for (SchemaSuggest.Field f : SchemaSuggest.infer(p.rows(), decimalMark))
             suggest.add(f.name() + ":" + f.type() + (f.format() == null ? "" : "/" + f.format()));
         Path f = dir.resolve(name);
         Files.write(f, bytes);
@@ -53,7 +60,7 @@ class TypeInferenceGoldenTest {
     }
 
     private static String answers(Path dir, String name, String text) throws Exception {
-        return answers(dir, name, text.getBytes(StandardCharsets.UTF_8), ",");
+        return answers(dir, name, text.getBytes(StandardCharsets.UTF_8), ",", null);
     }
 
     /** The three answers, one column list said three times. */
@@ -110,92 +117,129 @@ class TypeInferenceGoldenTest {
         assertEquals(all("[a:BIGINT, b:VARCHAR]"), answers(dir, "e.csv", "a,b\n1,\n2,\n"));
     }
 
-    /**
-     * The same type in all three; the formats differ only in what each reports: the preview reports none (DuckDB's
-     * {@code columnTypes} has a name and a type), schema suggest and Add data the strptime format the date was proven with.
-     */
+    /** The same type and format in all three (the preview named no format before the rulings). */
     @Test
     void isoDates(@TempDir Path dir) throws Exception {
-        assertEquals("preview=[d:DATE] suggest=[d:DATE/%Y-%m-%d] addData=[d:DATE/%Y-%m-%d]",
-                answers(dir, "d.csv", "d\n2026-01-02\n2026-03-04\n"));
+        assertEquals(all("[d:DATE/%Y-%m-%d]"), answers(dir, "d.csv", "d\n2026-01-02\n2026-03-04\n"));
     }
 
-    /** A day above 12 settles day-first for all three (DuckDB's own sniff included). */
+    /** A day above 12 settles day-first for all three. */
     @Test
     void dayFirstDates(@TempDir Path dir) throws Exception {
-        assertEquals("preview=[d:DATE] suggest=[d:DATE/%d/%m/%Y] addData=[d:DATE/%d/%m/%Y]",
-                answers(dir, "dmy.csv", "d\n13/04/2025\n03/04/2025\n"));
+        assertEquals(all("[d:DATE/%d/%m/%Y]"), answers(dir, "dmy.csv", "d\n13/04/2025\n03/04/2025\n"));
     }
 
-    /** The same type; only Add data names the format a date with a time is read with. */
+    /** Day or month first undecided: no format is guessed, so the column stays text in all three. */
+    @Test
+    void ambiguousDatesStayText(@TempDir Path dir) throws Exception {
+        assertEquals(all("[d:VARCHAR]"), answers(dir, "amb.csv", "d\n03/04/2025\n05/06/2025\n"));
+    }
+
+    /** A date with a time names the format it is read with in all three (only Add data did before the rulings). */
     @Test
     void datesWithATime(@TempDir Path dir) throws Exception {
-        assertEquals("preview=[t:TIMESTAMP] suggest=[t:TIMESTAMP] addData=[t:TIMESTAMP/%Y-%m-%d %H:%M:%S]",
+        assertEquals(all("[t:TIMESTAMP/%Y-%m-%d %H:%M:%S]"),
                 answers(dir, "ts.csv", "t\n2026-01-02 10:11:12\n2026-03-04 05:06:07\n"));
+    }
+
+    /** Ruling 1: ISO dates with a time written with a {@code T} - a TIMESTAMP with the {@code T} format in all three. */
+    @Test
+    void isoTimestampsWithAT(@TempDir Path dir) throws Exception {
+        assertEquals(all("[t:TIMESTAMP/%Y-%m-%dT%H:%M:%S]"),
+                answers(dir, "t.csv", "t\n2025-03-22T09:30:00\n2025-04-01T17:05:00\n"));
+    }
+
+    /** Almost all dates (19 of 20, one {@code n/a}): a date in all three, the odd value left blank (finding 3). */
+    @Test
+    void almostAllDates(@TempDir Path dir) throws Exception {
+        assertEquals(all("[d:DATE/%Y-%m-%d]"),
+                answers(dir, "d.csv", column("d", 20, i -> i == 7 ? "n/a" : "2025-03-" + (10 + i))));
+    }
+
+    /** Ruling 4: almost all whole numbers under a name that says an amount - text in all three (Add data said BIGINT). */
+    @Test
+    void almostAllWholeAmountsAreText(@TempDir Path dir) throws Exception {
+        assertEquals(all("[amount:VARCHAR]"),
+                answers(dir, "a.csv", column("amount", 20, i -> i == 7 ? "n/a" : String.valueOf(i * 10))));
+    }
+
+    /** Ruling 2: a Parquet file that declares a TIME column is a TIME column in Add data (it was text). */
+    @Test
+    void parquetTimeColumn(@TempDir Path dir) throws Exception {
+        Path f = dir.resolve("t.parquet");
+        try (java.sql.Connection conn = java.sql.DriverManager.getConnection("jdbc:duckdb:");
+             java.sql.Statement st = conn.createStatement()) {
+            st.execute("COPY (SELECT TIME '09:30:00' AS t UNION ALL SELECT TIME '17:05:00') TO '"
+                    + f.toString().replace('\\', '/') + "' (FORMAT PARQUET)");
+        }
+        List<String> addData = new ArrayList<>();
+        for (OnboardDraft.Col c : OnboardDraft.analyse(dir, f, "t.parquet", OnboardDraft.fileType(f, "t.parquet"), Map.of()).cols())
+            addData.add(c.name() + ":" + c.type());
+        assertEquals("[t:TIME]", addData.toString());
     }
 
     // ── the repo's sample files ──────────────────────────────────────────────────────────────────────────────
 
     @Test
     void helloSample(@TempDir Path dir) throws Exception {
-        assertEquals("preview=[id:BIGINT, customer:VARCHAR, event_date:DATE, amount:DOUBLE] "
-                        + "suggest=[id:BIGINT, customer:VARCHAR, event_date:DATE/%Y-%m-%d, amount:DOUBLE] "
-                        + "addData=[id:BIGINT, customer:VARCHAR, event_date:DATE/%Y-%m-%d, amount:DOUBLE]",
+        assertEquals(all("[id:BIGINT, customer:VARCHAR, event_date:DATE/%Y-%m-%d, amount:DOUBLE]"),
                 answers(dir, "hello.csv", sample("examples/01-ingest/hello-csv/samples/hello.csv")));
     }
 
     @Test
     void fullCycleAccounts(@TempDir Path dir) throws Exception {
-        assertEquals("preview=[account_id:VARCHAR, holder_name:VARCHAR, city:VARCHAR, opened_on:DATE, type:VARCHAR] "
-                        + "suggest=[account_id:VARCHAR, holder_name:VARCHAR, city:VARCHAR, opened_on:DATE/%Y-%m-%d, type:VARCHAR] "
-                        + "addData=[account_id:VARCHAR, holder_name:VARCHAR, city:VARCHAR, opened_on:DATE/%Y-%m-%d, type:VARCHAR]",
+        assertEquals(all("[account_id:VARCHAR, holder_name:VARCHAR, city:VARCHAR, opened_on:DATE/%Y-%m-%d, type:VARCHAR]"),
                 answers(dir, "accounts.csv", sample("src/test/resources/onboard/full-cycle/accounts.csv")));
     }
 
-    // ── where they answer differently (each caller's own answer kept; the operator decides) ───────────────────
+    // ── were disagreements before the operator's rulings (2026-11-19); now one answer ─────────────────────────
 
-    /** Dates written in words ({@code March 22, 2025}): DuckDB's sniff leaves them text; the vote reads them as dates. */
+    /** Ruling 1: dates written in words ({@code March 22, 2025}) - a date with its format in all three. */
     @Test
-    void disagreementDatesWrittenInWordsAreTextInThePreviewButDatesInSuggestAndAddData(@TempDir Path dir) throws Exception {
-        assertEquals("preview=[d:VARCHAR] suggest=[d:DATE/%B %d, %Y] addData=[d:DATE/%B %d, %Y]",
+    void datesWrittenInWordsAreDatesWithTheirFormatEverywhere(@TempDir Path dir) throws Exception {
+        assertEquals(all("[d:DATE/%B %d, %Y]"),
                 answers(dir, "words.csv", "d\n\"March 22, 2025\"\n\"April 1, 2025\"\n"));
     }
 
-    /** Times of day: DuckDB's sniff has a TIME type; the vote has no such candidate (and the schema no such type). */
+    /** Ruling 2: times of day - TIME in all three (suggest and Add data had no TIME). */
     @Test
-    void disagreementTimesOfDayAreTimeInThePreviewButTextInSuggestAndAddData(@TempDir Path dir) throws Exception {
-        assertEquals("preview=[t:TIME] suggest=[t:VARCHAR] addData=[t:VARCHAR]",
-                answers(dir, "time.csv", "t\n09:30:00\n17:05:00\n"));
-    }
-
-    /** Numbers written with a decimal comma: only Add data detects the decimal mark (C1) and reads them as numbers. */
-    @Test
-    void disagreementDecimalCommaNumbersAreNumbersOnlyInAddData(@TempDir Path dir) throws Exception {
-        assertEquals("preview=[id:BIGINT, amount:VARCHAR] suggest=[id:BIGINT, amount:VARCHAR] addData=[id:BIGINT, amount:DOUBLE mark ,]",
-                answers(dir, "semi.csv", "id;amount\n1;3,50\n2;4,25\n".getBytes(StandardCharsets.UTF_8), ";"));
+    void timesOfDayAreTimeEverywhere(@TempDir Path dir) throws Exception {
+        assertEquals(all("[t:TIME]"), answers(dir, "time.csv", "t\n09:30:00\n17:05:00\n"));
     }
 
     /**
-     * A column that is almost all numbers (19 of 20, one {@code n/a}): every value must fit for the preview and the vote,
-     * so it stays text; Add data proposes the number at low confidence and blanks the odd one (finding 3).
+     * Ruling 3: numbers with a decimal comma - a number in all three once the Grammar says {@code decimal_separator: ","}
+     * (the preview and suggest read the key; Add data detects the mark and carries it).
      */
     @Test
-    void disagreementAlmostAllNumbersAreNumbersOnlyInAddData(@TempDir Path dir) throws Exception {
-        assertEquals("preview=[amount:VARCHAR] suggest=[amount:VARCHAR] addData=[amount:DOUBLE]",
+    void decimalCommaNumbersAreNumbersEverywhereUnderTheGrammarKey(@TempDir Path dir) throws Exception {
+        assertEquals("preview=[id:BIGINT, amount:DOUBLE] suggest=[id:BIGINT, amount:DOUBLE] addData=[id:BIGINT, amount:DOUBLE mark ,]",
+                answers(dir, "semi.csv", "id;amount\n1;3,50\n2;4,25\n".getBytes(StandardCharsets.UTF_8), ";", ","));
+    }
+
+    /** Without the key the preview and suggest read {@code 3,50} as text, as the engine would read it. */
+    @Test
+    void decimalCommaNumbersWithoutTheKeyAreTextInThePreviewAndSuggest(@TempDir Path dir) throws Exception {
+        assertEquals("preview=[id:BIGINT, amount:VARCHAR] suggest=[id:BIGINT, amount:VARCHAR] addData=[id:BIGINT, amount:DOUBLE mark ,]",
+                answers(dir, "semi.csv", "id;amount\n1;3,50\n2;4,25\n".getBytes(StandardCharsets.UTF_8), ";", null));
+    }
+
+    /** Ruling 4: a column that is almost all numbers (19 of 20, one {@code n/a}) - text everywhere. */
+    @Test
+    void almostAllNumbersAreTextEverywhere(@TempDir Path dir) throws Exception {
+        assertEquals(all("[amount:VARCHAR]"),
                 answers(dir, "amount.csv", column("amount", 20, i -> i == 7 ? "n/a" : i + ".5")));
     }
 
     /**
      * The full-cycle transfers fixture carries one {@code abc} amount and one {@code not-a-date} booking time among 461
-     * rows: text in the preview and schema suggest, a number and a date with a time (with the {@code T} format) in Add
-     * data — the two Add data layers above (finding 3 and the timestamp format) on a real sample.
+     * rows: the amount is text everywhere (ruling 4: one value would not survive a number), the booking time a date with
+     * a time read with the {@code T} format everywhere (ruling 1; almost all of its values are, finding 3).
      */
     @Test
-    void disagreementTheFullCycleTransfersFixture(@TempDir Path dir) throws Exception {
-        assertEquals("preview=[transfer_id:VARCHAR, from_account:VARCHAR, to_account:VARCHAR, amount:VARCHAR, booked_at:VARCHAR, channel:VARCHAR] "
-                        + "suggest=[transfer_id:VARCHAR, from_account:VARCHAR, to_account:VARCHAR, amount:VARCHAR, booked_at:VARCHAR, channel:VARCHAR] "
-                        + "addData=[transfer_id:VARCHAR, from_account:VARCHAR, to_account:VARCHAR, amount:DOUBLE, "
-                        + "booked_at:TIMESTAMP/%Y-%m-%dT%H:%M:%S, channel:VARCHAR]",
+    void theFullCycleTransfersFixture(@TempDir Path dir) throws Exception {
+        assertEquals(all("[transfer_id:VARCHAR, from_account:VARCHAR, to_account:VARCHAR, amount:VARCHAR, "
+                        + "booked_at:TIMESTAMP/%Y-%m-%dT%H:%M:%S, channel:VARCHAR]"),
                 answers(dir, "transfers.csv", sample("src/test/resources/onboard/full-cycle/transfers.csv")));
     }
 }

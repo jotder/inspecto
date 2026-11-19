@@ -14,6 +14,7 @@ export const BASIC_COLUMN_TYPES = [
     'DOUBLE',
     'DATE',
     'TIMESTAMP',
+    'TIME',
     'BOOLEAN',
 ] as const satisfies readonly SchemaType[];
 
@@ -26,5 +27,6 @@ export const BASIC_COLUMN_TYPE_LABELS: Record<BasicColumnType, string> = {
     DOUBLE: 'Decimal number',
     DATE: 'Date',
     TIMESTAMP: 'Date and time',
+    TIME: 'Time of day',
     BOOLEAN: 'Yes / no',
 };

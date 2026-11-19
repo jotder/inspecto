@@ -11,6 +11,7 @@ import { apiUrl, LensService } from '@inspecto/core/api';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from '@inspecto/core/grid';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { penByLabel, penEdit, pickerSet } from '@inspecto/core/testing/pen-field';
+import { parsingAttributesFor } from '@inspecto/core/grammar/parsing-attributes';
 import { AddDataComponent } from './add-data.component';
 import { ADD_DATA_LINK_ANALYSIS } from './add-data-link-analysis';
 import { REMOTE_FALLBACK, SELF_IMPORT_OFF, NO_UPLOAD_RIGHT } from './add-data.model';
@@ -660,6 +661,15 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         expect((q(el, 'create') as HTMLButtonElement).disabled).toBe(false);
     });
 
+    it("U3: the format choices carry the grammar editor's names for the same keys", () => {
+        const { fixture, el } = create();
+        upload(fixture, el, transfersDraft());
+        const spec = (key: string) => parsingAttributesFor('delimited').find((a) => a.key === key)!.label;
+        expect(q(el, 'format-delimiter')!.textContent).toContain(spec('delimited__delimiter'));
+        expect(q(el, 'format-header')!.textContent).toContain(spec('delimited__has_header'));
+        expect(q(el, 'format-quote')!.textContent).toContain(spec('delimited__quote'));
+    });
+
     it('a failed re-read keeps the draft and puts the format choice back', () => {
         const { fixture, el } = create();
         upload(fixture, el, transfersDraft());
@@ -680,12 +690,41 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         pickerSet(fixture, '[data-testid="format-delimiter"]', ';');
         const req = http.expectOne((r) => r.url === apiUrl('/onboard/files'));
         expect(req.request.params.get('delimiter')).toBe(';');
-        expect(req.request.params.get('header')).toBe('true');
+        // the header and quote on screen are the draft's proposals, not the person's: not stated (BASIC-ELT-PROFILE-1 U3)
+        expect(req.request.params.has('header')).toBe(false);
+        expect(req.request.params.has('quote')).toBe(false);
         const again = transfersDraft();
         again.format.delimiter = { value: ';', evidence: "you chose ';'", confidence: 'high' };
         req.flush(again);
         fixture.detectChanges();
         expect(el.textContent).toContain("you chose ';'");
+        // a later pick keeps the earlier one stated beside it
+        pickerSet(fixture, '[data-testid="format-header"]', 'false');
+        const next = http.expectOne((r) => r.url === apiUrl('/onboard/files'));
+        expect(next.request.params.get('delimiter')).toBe(';');
+        expect(next.request.params.get('header')).toBe('false');
+        expect(next.request.params.has('quote')).toBe(false);
+        next.flush(again);
+    });
+
+    it("U3: after a failed re-read the draft's own quote is never sent back as the person's choice", () => {
+        const { fixture, el } = create();
+        const d = transfersDraft();
+        // the sniff found no quote: the draft proposes "no quoting", the person never picked it
+        d.format.quote = { value: '', evidence: 'no value is wrapped in quotes', confidence: 'high' };
+        upload(fixture, el, d);
+        pickerSet(fixture, '[data-testid="format-delimiter"]', ';');
+        http.expectOne((r) => r.url === apiUrl('/onboard/files')).flush(
+            { error: { message: "nothing could be read with ';'" } },
+            { status: 422, statusText: 'Unprocessable' },
+        );
+        fixture.detectChanges();
+        pickerSet(fixture, '[data-testid="format-header"]', 'false');
+        const req = http.expectOne((r) => r.url === apiUrl('/onboard/files'));
+        expect(req.request.params.get('header')).toBe('false');
+        expect(req.request.params.has('quote')).toBe(false); // was quote= : "you chose no quoting" at high confidence
+        expect(req.request.params.has('delimiter')).toBe(false); // the failed ';' is not stated either
+        req.flush(d);
     });
 
     it('rename and leave out columns; the preview and the commit follow', () => {
@@ -852,8 +891,9 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         // the same file again, as details about entities
         const again = http.expectOne((r) => r.url === apiUrl('/onboard/files'));
         expect(again.request.params.get('kind')).toBe('reference');
-        // the sure format choices travel with it (a low guess would not)
-        expect(again.request.params.get('delimiter')).toBe(',');
+        // only what the person picked travels with it: here nothing, so the server reads the file as it did (U3)
+        expect(again.request.params.has('delimiter')).toBe(false);
+        expect(again.request.params.has('quote')).toBe(false);
         again.flush({ ...accountsDraft(), matches: [match] });
         fixture.detectChanges();
         expect(q(el, 'used-as-lookup')).not.toBeNull();

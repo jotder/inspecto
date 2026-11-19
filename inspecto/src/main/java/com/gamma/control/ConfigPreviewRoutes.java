@@ -334,7 +334,9 @@ final class ConfigPreviewRoutes implements RouteModule {
      * identity {@code mapping} rules, for the schema editor to seed a HUMAN edit — never
      * auto-applied (the {@code ParserPlugin.suggest} posture), and real ingest keeps
      * {@code auto_detect=false}. Body {@code {sampleRows:[{...}]}} — the parsing preview's output
-     * shape, so the two routes chain: parse the sample, then suggest from what parsed.
+     * shape, so the two routes chain: parse the sample, then suggest from what parsed. The optional
+     * {@code decimalSeparator} ({@code "."} or {@code ","}) is the Grammar's decimal mark: number columns are read
+     * through it, as the preview reads them ({@code BASIC-ELT-PROFILE-1} U3).
      *
      * <p><b>B3 (definition-surface unification P4):</b> when the body also carries {@code config} — the
      * draft the caller is currently holding — the response gains a {@code drift} block
@@ -358,9 +360,14 @@ final class ConfigPreviewRoutes implements RouteModule {
         } catch (IllegalArgumentException unknown) {
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, unknown.getMessage());
         }
+        // BASIC-ELT-PROFILE-1 U3: the Grammar's decimal mark, so a '3,50' column is the number the parse preview and
+        // Add data propose too; optional, '.' or ',' only
+        String decimalMark = ApiContext.str(body, "decimalSeparator");
+        if (decimalMark != null && !com.gamma.etl.DecimalMarkText.MARKS.contains(decimalMark))
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "decimalSeparator must be '.' or ','");
         try {
             List<com.gamma.pipeline.exec.SchemaSuggest.Field> inferred =
-                    com.gamma.pipeline.exec.SchemaSuggest.infer(sampleRows);
+                    com.gamma.pipeline.exec.SchemaSuggest.infer(sampleRows, decimalMark);
             List<Map<String, Object>> fields = new ArrayList<>();
             List<Map<String, Object>> mappingFields = new ArrayList<>();
             for (com.gamma.pipeline.exec.SchemaSuggest.Field f : inferred) {

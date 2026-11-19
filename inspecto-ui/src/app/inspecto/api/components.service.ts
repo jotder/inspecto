@@ -168,7 +168,8 @@ export interface ParserTablePreview {
     rejectedRows: number;
     /** B2, additive: per-column INFERRED types from the server's auto_detect sniff — advisory
      *  (ingest stays all-VARCHAR); absent for formats without a sniff and from old servers. */
-    columnTypes?: { name: string; type: string }[];
+    /** `format`: the strptime pattern a date or a date with a time is read with (the one type answer, U3). */
+    columnTypes?: { name: string; type: string; format?: string }[];
     /** Additive (AUTHORING-REDESIGN-1 (i)): what the server's dialect sniff resolves the SAMPLE to, keyed
      *  by the `parsing.delimited.*` option (`delimiter`, `has_header`, …). Delimited only; absent from old
      *  servers. Read through `sampleResolutions` (`inspecto/grammar`). */

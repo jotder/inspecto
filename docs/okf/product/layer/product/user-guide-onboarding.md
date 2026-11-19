@@ -111,7 +111,7 @@ timestamp: 2026-07-16T00:00:00Z
 > read as events, **Use as a lookup** reads the same file again as details about entities, identified by that column,
 > holding the Entity Type the matched Dataset column holds (the identifying column, its Entity Type and the primary
 > Entity Type are set and count as confirmed; the console's closed step 3 opens); the re-read keeps the separator, header and quote
-> the person stated or that were sure (never a low guess); a failed re-read keeps the earlier draft and kind. On a file read as details, the line offers *Identify each entity by …*, or says *Used as a lookup*.
+> the person picked, and only those (a proposal the screen shows is not a pick: `BASIC-ELT-PROFILE-1` U3, 2026-11-19); a failed re-read keeps the earlier draft and kind. On a file read as details, the line offers *Identify each entity by …*, or says *Used as a lookup*.
 > A Postgres table is not re-read this way (no *Use as a lookup* on a snapshot draft). On the console Dataset page, a
 > Reference's card shows **Details**: its rows (`POST /bi/query` grouped on its columns, so masked like every BI read,
 > at most 200, with a note when cut) in the shared data table, filtered by one detail (*Filter by* a column, *Contains*
