@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // docs-health — the health of the information base, and the ratchets that keep it from getting worse
-// (INFO-RESTRUCTURE-1 wave W2, docs/superpower/2026-11-19-information-restructure-and-maintenance-plan.md §2, §4).
+// (INFO-RESTRUCTURE-1 wave W2, docs/okf/product/layer/platform/spec-docs-maintenance.md §2, §4).
 //
 //   node tools/docs-health.mjs [--json] [--ratchet] [--baseline-write]
 //

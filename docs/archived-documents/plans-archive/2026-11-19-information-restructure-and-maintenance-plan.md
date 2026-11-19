@@ -1,6 +1,6 @@
 # Information restructure and maintenance — plan
 
-> **Status: APPROVED 2026-11-19 — the operator: "create a comprehensive … plan and go ahead".** **W1 executed
+> **Status: DONE 2026-11-20 — W1–W4 shipped; as-built rules in `docs/okf/product/layer/platform/spec-docs-maintenance.md`; archived.** Was: APPROVED 2026-11-19 — the operator: "create a comprehensive … plan and go ahead".** **W1 executed
 > 2026-11-19:** `BACKLOG.md` 577 → 280 KB (28 ledger entries of the last three days kept, 570 moved), `INDEX.md`
 > 111 → 23 KB, the stray board archived — nothing lost, checked line by line against the commit before. **W2 done
 > 2026-11-19:** `tools/docs-health.mjs` (report, `--ratchet`, `--baseline-write`) with `tools/docs-health.baseline.json`,

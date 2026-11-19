@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // roll-backlog-ledger — keep the board's ledger short: move older entries, verbatim, into the archive ledger
-// (INFO-RESTRUCTURE-1 D-IR2; docs/superpower/2026-11-19-information-restructure-and-maintenance-plan.md §4).
+// (INFO-RESTRUCTURE-1 D-IR2; docs/okf/product/layer/platform/spec-docs-maintenance.md §4).
 //
 //   node tools/roll-backlog-ledger.mjs [--days 3] [--today YYYY-MM-DD] [--write]
 //
