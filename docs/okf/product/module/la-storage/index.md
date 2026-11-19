@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Link analysis storage - plan of record](plan-la-storage.md) |
+| plan | current | [module.la-storage - board row detail](plan-board-detail.md) · [Link analysis storage - plan of record](plan-la-storage.md) |
 | spec | current | [Link analysis storage - spec](spec-la-storage.md) |
 | architecture | current | [Link analysis storage - architecture](architecture-la-storage.md) |
 | features | current | [Link analysis storage — features](features-la-storage.md) |
@@ -34,5 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-ENTITY-KEY-NEW-CASE-PAIRS-1` | P3 | defect | the SQL entity key and the Java key still differ for about 55 letters per case rule. | — |
-| `LA-INDEX-SCALE-MEASURE-1` | P3 | chore | clauses (1) and (2) MEASURED 2026-10-05; clause (3) 10^9 still open, held for a customer sizing. | operator |
+| `LA-ENTITY-KEY-NEW-CASE-PAIRS-1` | P3 | defect | The SQL entity key and the Java key still differ for about 55 newer Unicode case pairs. | — |
+| `LA-INDEX-SCALE-MEASURE-1` | P3 | chore | Measure the link index at 10^9 rows (clause 3) on a bigger machine. | operator |

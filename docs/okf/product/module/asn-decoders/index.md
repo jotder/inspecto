@@ -17,13 +17,13 @@ tags: [product-item, module]
 |---|---|---|
 | plan | current | [ASN.1 decoders — plan of record](plan-asn-decoders.md) |
 | spec | current | [ASN.1 decoders — implementation spec](spec-asn-decoders.md) |
-| architecture | current | [ASN.1 decoders — architecture](architecture-asn-decoders.md) |
+| architecture | current | [ASN.1 decoders — architecture](architecture-asn-decoders.md) · [ASN.1 decoder modules](architecture-decoder-modules.md) |
 | features | current | [ASN.1 decoders — features](features-asn-decoders.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | n/a | a decoding library with no screens; the ASN.1 grammar fields an end user sees belong to the telecom-asn1 hub |
 | admin-guide | n/a | a library jar with nothing to install or configure on its own; it is staged and configured through telecom-asn1 |
 | api | current | [ASN.1 decoders — Java API](api-asn-decoders.md) |
-| tests | current | [ASN.1 decoders — tests inventory](tests-inventory.md) |
+| tests | current | [ASN.1 decoder corpora](tests-corpus.md) · [ASN.1 decoders — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `TEST-ENV-PG-ASN-UNRUN-1` | P3 | chore | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
+| `TEST-ENV-PG-ASN-UNRUN-1` | P3 | chore | Two test groups (Postgres and asn-*) cannot run on the shared User profile, so a green reactor does not cover them. | operator |

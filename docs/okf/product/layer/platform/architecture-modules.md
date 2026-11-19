@@ -519,3 +519,49 @@ Workflow & SLA: [incidents plan](../../addon/incidents/plan-incidents.md). Build
 
 [Architecture](architecture-platform.md) · [Editions](architecture-editions.md) ·
 [Module reorganisation: decisions](spec-module-reorg-decisions.md) · [gotchas](spec-module-reorg-gotchas.md)
+
+## Identity and module map
+
+**Inspecto** (formerly *UCC File Processor*; repo `inspecto`, checked out here as
+`C:/sandbox/inspecto-clean`). Java (core bytecode
+`release=27`, built & bundled on **JDK 27** — moved off `release=27`/JDK 26 on 2026-09-17; the old
+three-floor split, 24 product / 25 agent modules / 26 toolchain, collapses to a single floor of 27
+because 27 is above every one of them) / Maven
+multi-module · embedded **DuckDB** · **TOON** config · OpenCSV. Mainline = `master` — the ONLY
+line (`4.x` was deleted 2026-08-17; the next major's branch is cut when it ships, `BRANCHING.md` §0-A).
+Editions = build flavors (see below), **never branches**.
+
+Module dirs were renamed 2026-06-12; the **artifactIds caught up on 2026-08-10** (`a1da65f5`), so dir ==
+artifactId everywhere — with one deliberate exception: `inspecto/` is `inspecto-processor`, because a bare
+`inspecto` would collide with the aggregator. The shipped bundle is named `inspecto.jar` (renamed from
+`file-processor.jar` on 2026-08-13, along with the `inspecto-deploy/` bundle dir and the
+`inspecto-oidc.jar` / `inspecto-policy.jar` edition jars); that is the deployment surface, not an
+artifactId:
+
+Reactor = **13 modules** (build order below; WS-D 2026-07-22 added `inspecto-engine`, then split
+`inspecto-etl`, `inspecto-event`, and `inspecto-acquire` out of it the same day, increments 2–4).
+Authoritative shape, version management, and the module-extraction playbook:
+[`okf/product/layer/platform/architecture-modules.md`](architecture-modules.md).
+
+| Dir | Role | artifactId / jar |
+|---|---|---|
+| `platform/inspecto-api/` | dependency-free leaf: the `@PublicApi` annotation | `inspecto-api` |
+| `platform/inspecto-util/` | leaf: DuckDB access + CSV/file/tar helpers + `CronExpression` | `inspecto-util` |
+| `platform/inspecto-config/` | config spec / codec (TOON) / safety | `inspecto-config` |
+| `platform/inspecto-sql/` | sandboxed DuckDB SQL (`SqlSandbox`/`SqlOracle`/`SqlGuard`/`SqlViews`) | `inspecto-sql` |
+| `platform/inspecto-etl/` | `com.gamma.etl` — pipeline config + batch ingest (foundation leaf below engine) | `inspecto-etl` |
+| `platform/inspecto-event/` | `com.gamma.event`+`metrics` — Operational-Intelligence event store + metrics | `inspecto-event` |
+| `platform/inspecto-acquire/` | `com.gamma.acquire` — file/remote acquisition, ledger, stability/gap/retry | `inspecto-acquire` |
+| `platform/inspecto-engine/` | the remaining engine cluster (`pipeline`/`job`/`inspector`/… ) below core | `inspecto-engine` |
+| `inspecto/` | control plane + composition root (lean core), ships the fat JAR | `inspecto-processor` / `inspecto.jar` |
+| `providers/inspecto-connectors/` | remote connectors (SFTP/FTP/FTPS/DB), all network deps | `inspecto-connectors` |
+| `features/inspecto-agent/` | optional AI assist skills (vendored kernel layer + eoiagent transport) | `inspecto-agent` |
+| `providers/inspecto-agent-hosted/` | hosted model providers (omitted from air-gapped builds) | `inspecto-agent-hosted` |
+| `features/inspecto-intelligence/` | embedded-intelligence agent (eoiagent-backed) | `inspecto-intelligence` |
+| `providers/inspecto-oidc/` | Professional/Enterprise OIDC auth, `-Pedition-standard` only (not in default `<modules>`) | `inspecto-oidc` |
+| `providers/inspecto-policy/` | Enterprise ABAC policy engine (`AccessDecider` impl), `-Pedition-advanced` only (= professional + this) | `inspecto-policy` |
+| `inspecto-ui/` | Angular SPA (gamma/Fuse template), serves from the engine | — (npm; dev :4204) |
+
+agent-kernel is GONE (discontinued upstream, replaced 2026-07-07): its reasoning layer is vendored at
+`inspecto-agent … com/gamma/agent/kernel/**`; model transport is **eoiagent** (`com.eoiagent:*:0.1.0-SNAPSHOT`,
+local `.m2` from `C:/sandbox/agent-brainstorm`) — see `docs/archived-documents/plans-archive/agent-kernel-replacement-plan.md`.

@@ -15,7 +15,7 @@ tags: [product-item, solution-pack]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [5G / IoT / cloud / digital service assurance: a plan for a file-fed platform](plan-5g-iot-assurance.md) |
+| plan | current | [5G / IoT / cloud / digital service assurance: a plan for a file-fed platform](plan-5g-iot-assurance.md) · [solution-pack.industry-telecom - board row detail](plan-board-detail.md) |
 | spec | n/a | a Solution pack configures modules — see the hubs of the modules it holds |
 | architecture | current | [Telecom industry pack — architecture](architecture-industry-telecom.md) |
 | features | current | [Telecom industry pack — features](features-industry-telecom.md) |
@@ -34,6 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `PACK-PARTNER-SETTLEMENT-1` | P3 | feature | partner settlement function pack, slices W1…W3 open; S0…S3 (the smallest cut) BUILT 2026-10-20, S4 (netting, positions, roll-forward) BUI… | — |
-| `PACK-RERATING-1` | P3 | feature | re-rating / tariff validation pack | — |
-| `PACK-5G-IOT-ASSURANCE-1` | P3 | feature | 5G / IoT / cloud / digital service assurance industry pack | demand |
+| `PACK-PARTNER-SETTLEMENT-1` | P3 | feature | Partner settlement slices W1…W3 (wholesale, MVNO, roaming) and confirmation of the delegated decisions. | — |
+| `PACK-RERATING-1` | P3 | feature | Re-rating / tariff validation pack slices R4…R7. | — |
+| `PACK-5G-IOT-ASSURANCE-1` | P3 | feature | A 5G / IoT / cloud / digital service assurance industry pack over the existing engines. | demand |

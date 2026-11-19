@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Exchange — requirement of record](plan-exchange.md) |
+| plan | current | [module.exchange - board row detail](plan-board-detail.md) · [Exchange — requirement of record](plan-exchange.md) |
 | spec | current | [Exchange — Cross-Space Sharing](spec-exchange.md) |
 | architecture | current | [Exchange (multi-entity sharing)](architecture-exchange.md) |
 | features | current | [Exchange (multi-entity sharing) — features](features-exchange.md) |

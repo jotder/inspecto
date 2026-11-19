@@ -29,7 +29,7 @@ import java.util.Set;
  * Phase 5 performance pass (REDESIGN.md §6): decode every corpus data file with the new
  * stack (mmap + framing + BER + schema bind) and with the legacy asn2 reader, and report
  * records/sec. Full decode both sides, no transform. Two passes each, second measured
- * (JIT warm). Numbers land in asn-decoders/README.md — rerun after codec changes.
+ * (JIT warm). Numbers land in docs/okf/product/module/asn-decoders/architecture-decoder-modules.md — rerun after codec changes.
  *
  * <p>Usage: {@code Benchmark <base-dir>} (the asn-parser root).
  */

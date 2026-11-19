@@ -369,8 +369,9 @@ Pipeline (read, arrange, write Parquet, then each application's follow-on; Inspe
 1. **Upload a file** (CSV / TSV, Parquet, JSON / NDJSON, Excel when the bundle carries the DuckDB `excel` extension), or
    point at a large file in place, re-checked by size and modified time on every read (DT-3).
 2. **An import inbox**: files dropped there are imported with *Import waiting files* (*Run now*), or, when the person
-   turns on *Watch this folder* on the Dataset card, by a fixed 30 s poll (off by default, not configurable, run by the
-   platform's one poller `InboxWatch`, not a Pipeline trigger: an import's Pipeline stays `trigger: manual`).
+   turns on *Watch this folder* on the Dataset card, by a fixed 30 s poll (off by default, not configurable). Since
+   `BASIC-ELT-PROFILE-1` B1 (2026-11-19, O1 reversing DT-17) the watch is the import Pipeline's own locked schedule
+   (`trigger.every: 30s`, run on its own cadence by the engine's scheduler), not a separate poller.
 3. **Choose a table**: a Postgres table or a read-only `SELECT`, copied as a *replace everything* snapshot. *Refresh
    now* exports the table into a temporary folder and moves the finished file into the Dataset's inbox; a snapshot is
    **never polled** (since 2026-11-05). Read through DuckDB's `postgres` extension, already in every bundle; a
@@ -442,7 +443,7 @@ scheduled or signal-driven Jobs on Basic (DT-16). Upgrade: a Basic import is an 
   Step, Collector kind or trigger (DT-9 narrowed); the older refusals (PII masking, DuckLake, the archive) are unchanged. The breaking changes the plan's §9 listed are not shipped.
 
 Reverses DT-4 (Postgres only), narrows DT-5 / DT-17 to the import inbox, widens DT-10. As built:
-[`okf/product/module/la-core/architecture-data-onboarding.md`](../../module/la-core/architecture-data-onboarding.md) §6.20,
+[`okf/product/module/la-core/architecture-watch-this-folder.md`](../../module/la-core/architecture-watch-this-folder.md) (§6.20),
 [`okf/product/module/processor/api-onboarding-authoring.md`](../../module/processor/api-onboarding-authoring.md);
 plan [`archived-documents/plans-archive/basic-onboard-plan.md`](../../../../archived-documents/plans-archive/basic-onboard-plan.md).
 
@@ -573,7 +574,7 @@ what, is owned by [`okf/product/module/access/plan-security.md`](../../module/ac
 
 ⚠ Keep the row IDs stable once referenced; append new rows at the end of their area. A cell that
 changes state carries the date in Notes. Source of truth for *what* a feature is stays
-[`FEATURE_INVENTORY.md`](../../../../FEATURE_INVENTORY.md) §1; this table only answers *which edition*.
+[`FEATURE_INVENTORY.md`](features-feature-inventory.md) §1; this table only answers *which edition*.
 
 ### Core engine — platform capabilities (identical across editions by construction) [`ING` · `MET` · `PIP`]
 
@@ -585,7 +586,7 @@ changes state carries the date in Notes. Source of truth for *what* a feature is
 
 | ID | Feature | P | S | E | Notes |
 |---|---|---|---|---|---|
-| ING-01 | Multi-pipeline poll cycle (`active:` gate, M..N parallelism, file-pattern glob) | *not stated* | ✅ | ✅ | FEATURE_INVENTORY §A. P cell *not stated* since 2026-11-06 (DATA-TIERS-1 DT-16 / §5.3): Basic runs any configuration it is given, and the product makes no promise either way about Pipelines that run on their own there. What Basic offers is Add data's own arrival: *Run now*, and *Watch this folder* (a fixed 30 s poll of an import inbox, `InboxWatch`, not a Pipeline trigger) — *Data layer by edition* above |
+| ING-01 | Multi-pipeline poll cycle (`active:` gate, M..N parallelism, file-pattern glob) | *not stated* | ✅ | ✅ | FEATURE_INVENTORY §A. P cell *not stated* since 2026-11-06 (DATA-TIERS-1 DT-16 / §5.3): Basic runs any configuration it is given, and the product makes no promise either way about Pipelines that run on their own there. What Basic offers is Add data's own arrival: *Run now*, and *Watch this folder* (a fixed 30 s poll of an import inbox: since B1 the import Pipeline's own locked `every: 30s` schedule) — *Data layer by edition* above |
 | ING-02 | Consignment formation (`collector.consignment: max_files / max_bytes / order`) | ✅ | ✅ | ✅ | moved to the Collector 2026-09-02 (CONSIGNMENT-HOME-1); legacy `processing.batch` dual-read |
 | ING-05 | Unpack stage (zip/tar/gz/bz2/Z) | ✅ | ✅ | ✅ | ⚠ **nested archives are refused by design** (`UnpackLimits.depth` = 1, any other value refused by name) — this row promised them until 2026-09-08; xz/zstd have no codec (BACKLOG §3) |
 | SCH-01 | Schema registry: field types (all DuckDB scalars, fail-closed), rules (`DIRECT`/`EXPR`/`CONCAT_DT`/`FILENAME_DATE`), multi-format dates | ✅ | ✅ | ✅ | fail-closed types = `SchemaFieldTypes` (2026-08-22); the `rules[]` spelling now *loads by conversion* — the engine reads `fields[]` first (`MAPPING-SPELLING-1`, BACKLOG §1). *(This cell pointed at a §C that does not exist until 2026-09-08.)* |

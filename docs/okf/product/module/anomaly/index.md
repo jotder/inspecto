@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Anomaly Detection — plan](plan-anomaly.md) · [Predictive Analytics add-on - design with options (`PREDICTIVE-ANALYTICS-1`)](plan-predictive-analytics.md) |
+| plan | current | [Anomaly Detection — plan](plan-anomaly.md) · [module.anomaly - board row detail](plan-board-detail.md) · [Predictive Analytics add-on - design with options (`PREDICTIVE-ANALYTICS-1`)](plan-predictive-analytics.md) |
 | spec | current | [Anomaly Scores — explainable behavioural anomaly scoring per entity](spec-anomaly-scores.md) |
 | architecture | current | [Anomaly Detection](architecture-anomaly.md) |
 | features | current | [Anomaly Detection — features](features-anomaly.md) |
@@ -34,5 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `ANOMALY-SCORE-MEMORY-LIMIT-1` | P3 | chore | nobody has checked whether a production install gives the anomaly.score bucket query enough DuckDB memory (filed 2026-11-17 from the Anom… | — |
-| `ANOMALY-UI-FINDINGS-1` | P3 | chore | small defects and rough edges found driving the Anomaly Detection UI in a running demo build (2026-10-13; live-verification lane over the… | operator |
+| `ANOMALY-SCORE-MEMORY-LIMIT-1` | P3 | chore | Nobody has checked whether a production install gives the anomaly.score bucket query enough DuckDB memory. | — |
+| `ANOMALY-UI-FINDINGS-1` | P3 | chore | Only the live (h) check of the Anomaly Detection UI remains; it needs a person signed in to the IdP. | operator |

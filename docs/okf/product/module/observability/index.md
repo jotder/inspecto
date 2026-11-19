@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Observability & maintenance (OPS) — capability spec — Specification — Ops Lens screens; decisions and not built](plan-observability-ops-lens-decisions.md) · [Observability & maintenance (OPS) — capability spec — Refused, as-built pointers and verification](plan-observability-refused-verification.md) · [Observability & maintenance (OPS) — capability spec — Purpose, scope and requirements of record](plan-observability-scope.md) · [Observability & maintenance (OPS) — capability spec — Specification](plan-observability-specification.md) · [Observability & maintenance (OPS) — capability spec](plan-observability.md) |
+| plan | current | [module.observability - board row detail](plan-board-detail.md) · [Observability & maintenance (OPS) — capability spec — Specification — Ops Lens screens; decisions and not built](plan-observability-ops-lens-decisions.md) · [Observability & maintenance (OPS) — capability spec — Refused, as-built pointers and verification](plan-observability-refused-verification.md) · [Observability & maintenance (OPS) — capability spec — Purpose, scope and requirements of record](plan-observability-scope.md) · [Observability & maintenance (OPS) — capability spec — Specification](plan-observability-specification.md) · [Observability & maintenance (OPS) — capability spec](plan-observability.md) |
 | spec | current | [Observability — spec](spec-observability.md) |
 | architecture | current | [Observability and backup](architecture-observability.md) |
 | features | current | [Observability and backup — features](features-observability-backup.md) |
@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `DEPLOY-EXPOSURE-KIT-1` | P3 | chore | /metrics and /health/details are fenced only by the network, and the deploy kit the docs assume is unbuilt (filed 2026-11-15, verified fr… | — |
+| `DEPLOY-EXPOSURE-KIT-1` | P3 | chore | Prove the deploy kit (proxy fence for /metrics and /health/details, TLS, upgrade, off-site backup, signature verify) on a real host. | — |

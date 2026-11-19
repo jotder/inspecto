@@ -75,4 +75,4 @@ Work lands on `master` — see [`docs/BRANCHING.md`](docs/BRANCHING.md) and the 
   [Stage-1 ingest design](docs/okf/product/module/elt/architecture-elt.md); configuration:
   [configuration reference](docs/okf/product/module/config/admin-guide-configuration-reference.md).
 - The Assistant and its skill catalog: [`spec-assist-agent.md`](docs/okf/product/module/agent/spec-assist-agent.md).
-- The HTTP API: [`docs/api/`](docs/api/README.md); the web app's dev server: [`inspecto-ui/README.md`](inspecto-ui/README.md).
+- The HTTP API: [`docs/api/`](docs/api/README.md); the web app's dev server: [`architecture-ui-conventions.md`](docs/okf/product/layer/product/architecture-ui-conventions.md).

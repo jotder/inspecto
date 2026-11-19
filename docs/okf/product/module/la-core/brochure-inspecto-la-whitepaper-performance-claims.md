@@ -188,7 +188,7 @@ The whole platform builds and passes its tests before a change ships. At the edi
 | Backend (Java) | 86.08 % of instructions, 73.59 % of branches | 78 % / 64 % | 81.01 % / 67.19 % |
 | Browser (TypeScript) | 81.51 % of statements, 76.64 % of branches | 70 % / 66 % | 73.82 % / 70.04 % |
 
-Both layers rose by five to eight points since the 2026-09-08 baseline. The floors are set below the measured figures on purpose: a ratchet, not a target (`docs/okf/product/layer/platform/tests-guard-coverage.md`, `docs/okf/product/layer/platform/plan-compliance.md`, `docs/PROJECT_NOTES.md`).
+Both layers rose by five to eight points since the 2026-09-08 baseline. The floors are set below the measured figures on purpose: a ratchet, not a target (`docs/okf/product/layer/platform/tests-guard-coverage.md`, `docs/okf/product/layer/platform/plan-compliance.md`, `docs/okf/product/layer/platform/tests-guards-and-claims-gotchas.md`).
 
 ---
 
@@ -254,7 +254,7 @@ Inspecto adheres to an uncompromising engineering standard: **never over-claim**
 | | **111**<!--count:la-routes--> Link Analysis API routes (**104**<!--count:la-api-routes--> in `la-api`, **7**<!--count:geo-link-routes--> in `geo-link`) | **PROVEN** | `LaApiRoutesManifestParityTest`; marker-checked against each `module.toon` |
 | | PostgreSQL Investigation store (Advanced, opt-in) | **PROVEN** | `PgInvestigationStoreContractTest`, `PgInvestigationStoreTwoJvmRaceTest`; `docs/okf/product/solution-pack/la-showcase/admin-guide-variants-runbook.md`. Embed links are not supported on this store |
 | | Whole-product test baseline at the editions commit | **PROVEN** | Full reactor `-Pedition-advanced`, 56 modules, 10,566 tests, 0 failures; SPA 5,913 passed, 5 skipped (commit `f1b64ce03`) |
-| | Coverage measured 2026-10-15 | **MEASURED** | Backend instruction 86.08 % / branch 73.59 % (48 modules); UI statements 81.51 % / branch 76.64 % (553 spec files); recorded in `docs/okf/product/layer/platform/tests-guard-coverage.md` and `docs/PROJECT_NOTES.md` (UI also in `docs/okf/product/layer/product/plan-surfaces.md`) |
+| | Coverage measured 2026-10-15 | **MEASURED** | Backend instruction 86.08 % / branch 73.59 % (48 modules); UI statements 81.51 % / branch 76.64 % (553 spec files); recorded in `docs/okf/product/layer/platform/tests-guard-coverage.md` and `docs/okf/product/layer/platform/tests-guards-and-claims-gotchas.md` (UI also in `docs/okf/product/layer/product/plan-surfaces.md`) |
 | | Multi-host high availability | **NOT YET** | A laptop-scale drill (two server processes, one Postgres) ran 2026-10-10; the two-host drill on plain Linux has not run (`docs/okf/product/layer/platform/admin-guide-ha-dr-drill.md`; backlog `ASSURE-OPERABILITY-1`) |
 | | Native Apache Hive / Kerberos JDBC connector | **NOT YET** | Supported through landed Parquet files via file Collectors (decision `D-ING5`) |
 | | Hosted-AI endpoints cannot be called by the standard distribution | **PROVEN** | `EgressGuardTest` (classpath absence); `compliance/evidence/air-gap-posture.md` — a packaging guarantee, not a network control |

@@ -12,7 +12,7 @@ supersedes-rows: REQUIREMENTS §3.7 OPS-1..OPS-6 (this file corrects them, see �
 # Observability & maintenance (`OPS`)
 
 > **How to read this file.** §1–§2 are the *requirement of record*: where they disagree with
-> `docs/REQUIREMENTS.md` §3.7 or `docs/EDITIONS.md`, **this file wins** and the disagreement is stated
+> `docs/okf/product/layer/platform/spec-requirements.md` §3.7 or `docs/EDITIONS.md`, **this file wins** and the disagreement is stated
 > in place. §3 is the as-built specification, §4 the dated decisions, §5 what is not built (tracked and
 > untracked), §6 what was refused or superseded, §7 the pointers into code and docs, §8 how the whole
 > thing is verified. Everything named in backticks under §3 and §7 was checked against the tree on

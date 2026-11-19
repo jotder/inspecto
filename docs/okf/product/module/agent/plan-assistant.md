@@ -11,7 +11,7 @@ supersedes-rows: REQUIREMENTS §3.13 AGT-1..AGT-6b and §3.14 EOI-1..EOI-7 (this
 # Assistant (`AGT` + `EOI`)
 
 > **How to read this file.** §1–§2 are the *requirement of record*: where they disagree with
-> `docs/REQUIREMENTS.md` §3.13/§3.14 or `docs/EDITIONS.md`, **this file wins** and the disagreement is
+> `docs/okf/product/layer/platform/spec-requirements.md` §3.13/§3.14 or `docs/EDITIONS.md`, **this file wins** and the disagreement is
 > stated in place. §3 is the as-built specification, §4 the dated decisions, §5 what is not built,
 > §6 what was refused or superseded, §7 the pointers, §8 how it is verified.
 >

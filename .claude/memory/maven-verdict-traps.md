@@ -41,3 +41,5 @@ All paid for; each reports success or failure about something other than what yo
     `jdbc:duckdb:` in tests, not the per-family `*.db.url`.
 
 Related: [[stale-sibling-jar-trap]], [[subagent-claims-are-hypotheses]], [[falsify-negative-tests]].
+
+Long form, with the original incidents (from the retired `PROJECT_NOTES.md`, 2026-11-19): [tests-build-verdict-gotchas.md](../../docs/okf/product/layer/platform/tests-build-verdict-gotchas.md).

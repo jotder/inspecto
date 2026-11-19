@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-INDUSTRY-FOLD-1` | P3 | chore | fold la-showcase into *Banking and finance* and la-mobile-money into *Telecom*, so only industry Spaces ship. | — |
+| `LA-INDUSTRY-FOLD-1` | P3 | chore | Fold la-showcase into *Banking and finance* and la-mobile-money into *Telecom*, so only industry Spaces ship. | — |

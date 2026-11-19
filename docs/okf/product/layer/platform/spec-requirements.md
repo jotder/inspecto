@@ -1,3 +1,11 @@
+---
+type: Reference
+title: Platform requirements and MoSCoW
+description: The platform requirements-of-record with their MoSCoW priority; a hub plan §2 overrides it where they differ.
+tags: [requirements, moscow, platform]
+timestamp: 2026-11-19T00:00:00Z
+---
+
 # Inspecto — Platform Requirements & MoSCoW Analysis
 
 > **Status: CURRENT requirements-of-record** · Compiled 2026-07-07 · **Re-reconciled 2026-07-08 after the
@@ -6,10 +14,10 @@
 >
 > This document supersedes the archived requirements snapshot
 > (`archived-documents/consolidated-2026-06-13/02-Product-Requirements.md`) and **reconciles** the planning-time
-> MoSCoW in [`archived-documents/plans-archive/feature-matrix-editions.md`](archived-documents/plans-archive/feature-matrix-editions.md) (2026-07-02)
+> MoSCoW in [`archived-documents/plans-archive/feature-matrix-editions.md`](../../../../archived-documents/plans-archive/feature-matrix-editions.md) (2026-07-02)
 > with what has actually shipped since — several of that matrix's MUST items (security module, Studio
 > persistence, live query path, pipeline-authoring wiring) are now delivered and appear here as baseline.
-> Vocabulary is binding per [`GLOSSARY.md`](GLOSSARY.md).
+> Vocabulary is binding per [`GLOSSARY.md`](../../../../GLOSSARY.md).
 
 ---
 
@@ -28,7 +36,7 @@ Three convictions anchor every requirement:
 3. **Operable by design** — every Run is crash-isolated and idempotent; everything is captured as
    Signals, Metrics, audit, and managed objects.
 
-The north star ([`okf/product/layer/platform/architecture-platform.md`](okf/product/layer/platform/architecture-platform.md))
+The north star ([`okf/product/layer/platform/architecture-platform.md`](architecture-platform.md))
 frames the platform as **seven cooperating networks over one Component metamodel** (Data · Signal ·
 Decision · Execution · Metadata · Presentation · Security), so it can evolve from deterministic rules to
 AI-driven autonomy without redesign.
@@ -98,26 +106,26 @@ AI-driven autonomy without redesign.
 
 | Area | IDs | Requirement of record |
 |---|---|---|
-| `ACQ` — **Acquisition & connectivity** | `ACQ-1` … `ACQ-7` | [`acquisition/acquisition.md`](okf/product/module/elt/plan-elt.md) §ACQ.2 |
-| `ING` — **Ingestion & parsing** | `ING-1` … `ING-6` | [`ingestion/ingestion.md`](okf/product/module/elt/plan-elt.md) §2 |
-| `PIP` — **Pipeline authoring** | `PIP-1` | [`pipeline-authoring/pipeline-authoring.md`](okf/product/module/elt/plan-elt.md) §2 |
-| `PIP` — **Pipeline execution** | `PIP-2` … `PIP-7` | [`pipeline-execution/pipeline-execution.md`](okf/product/module/elt/plan-elt.md) §EXE.2 |
-| `DAT` — **Data plane** | `DAT-1` … `DAT-6` | [`data-plane/data-plane.md`](okf/product/layer/platform/plan-data-plane.md) §2 |
-| `BI · INV` — **Studio** | `BI-1` … `BI-8` · `INV-1` … `INV-4` | [`studio/studio.md`](okf/product/layer/product/plan-studio.md) §2 |
-| `OPS` — **Observability & maintenance** | `OPS-1` … `OPS-6` | [`observability/observability.md`](okf/product/module/observability/plan-observability.md) §2 |
-| `INC` — **Alerts & Incidents** | `INC-1` … `INC-5` | [`incidents/incidents.md`](okf/product/addon/incidents/plan-incidents.md) §2 |
-| `SPC` — **Spaces & tenancy** | `SPC-1` … `SPC-5` | [`spaces/spaces.md`](okf/product/module/config/plan-spaces.md) §2 |
-| `MET` — **Component metamodel & Catalog** | `MET-1` … `MET-5` | [`metamodel/metamodel.md`](okf/product/module/config/plan-metamodel.md) §2 |
-| `API` — **Control API** | `API-1` … `API-7` | [`control-api/control-api.md`](okf/product/module/processor/plan-control-api.md) §2 |
-| `SEC` — **Security** | `SEC-1` … `SEC-9` | [`security/security.md`](okf/product/module/access/plan-security.md) §2 |
-| `AGT · EOI` — **Assistant** | `AGT-1`, `AGT-2`, `AGT-3`, `AGT-4`, `AGT-5`, `AGT-6a`, `AGT-6b` · `EOI-1` … `EOI-7` | [`assistant/assistant.md`](okf/product/module/agent/plan-assistant.md) §2 |
-| `UI` — **Surfaces & Lenses** | `UI-1` … `UI-8` | [`surfaces/surfaces.md`](okf/product/layer/product/plan-surfaces.md) §2 |
-| `PKG` — **Editions & packaging** | `PKG-1` … `PKG-4` | [`editions/editions.md`](okf/product/layer/platform/plan-editions.md) §2 |
+| `ACQ` — **Acquisition & connectivity** | `ACQ-1` … `ACQ-7` | [`acquisition/acquisition.md`](../../module/elt/plan-elt.md) §ACQ.2 |
+| `ING` — **Ingestion & parsing** | `ING-1` … `ING-6` | [`ingestion/ingestion.md`](../../module/elt/plan-elt.md) §2 |
+| `PIP` — **Pipeline authoring** | `PIP-1` | [`pipeline-authoring/pipeline-authoring.md`](../../module/elt/plan-elt.md) §2 |
+| `PIP` — **Pipeline execution** | `PIP-2` … `PIP-7` | [`pipeline-execution/pipeline-execution.md`](../../module/elt/plan-elt.md) §EXE.2 |
+| `DAT` — **Data plane** | `DAT-1` … `DAT-6` | [`data-plane/data-plane.md`](plan-data-plane.md) §2 |
+| `BI · INV` — **Studio** | `BI-1` … `BI-8` · `INV-1` … `INV-4` | [`studio/studio.md`](../product/plan-studio.md) §2 |
+| `OPS` — **Observability & maintenance** | `OPS-1` … `OPS-6` | [`observability/observability.md`](../../module/observability/plan-observability.md) §2 |
+| `INC` — **Alerts & Incidents** | `INC-1` … `INC-5` | [`incidents/incidents.md`](../../addon/incidents/plan-incidents.md) §2 |
+| `SPC` — **Spaces & tenancy** | `SPC-1` … `SPC-5` | [`spaces/spaces.md`](../../module/config/plan-spaces.md) §2 |
+| `MET` — **Component metamodel & Catalog** | `MET-1` … `MET-5` | [`metamodel/metamodel.md`](../../module/config/plan-metamodel.md) §2 |
+| `API` — **Control API** | `API-1` … `API-7` | [`control-api/control-api.md`](../../module/processor/plan-control-api.md) §2 |
+| `SEC` — **Security** | `SEC-1` … `SEC-9` | [`security/security.md`](../../module/access/plan-security.md) §2 |
+| `AGT · EOI` — **Assistant** | `AGT-1`, `AGT-2`, `AGT-3`, `AGT-4`, `AGT-5`, `AGT-6a`, `AGT-6b` · `EOI-1` … `EOI-7` | [`assistant/assistant.md`](../../module/agent/plan-assistant.md) §2 |
+| `UI` — **Surfaces & Lenses** | `UI-1` … `UI-8` | [`surfaces/surfaces.md`](../product/plan-surfaces.md) §2 |
+| `PKG` — **Editions & packaging** | `PKG-1` … `PKG-4` | [`editions/editions.md`](plan-editions.md) §2 |
 
 ⚠ **Two of the seventeen areas have no rows here, and that is correct.** `CMP` (**Compliance**) was
 orphaned across `EDITIONS.md` and `compliance/controls-matrix.md` and never had a `REQUIREMENTS.md`
 section; `TOOL` (**Guards & repository tooling**) owns §4 `NFR-9`/`NFR-10` rather than functional rows.
-Both are areas by [`GLOSSARY.md` §14](GLOSSARY.md#14-capability-areas-the-functional-spine), which is
+Both are areas by [`GLOSSARY.md` §14](../../../../GLOSSARY.md#14-capability-areas-the-functional-spine), which is
 the authority for what an area is called and where it lives — ⛔ never this table.
 
 ⚠ **Citations of the old `§3.1`…`§3.16` subsections resolve HERE.** Roughly thirty-five documents cite
@@ -140,10 +148,10 @@ library. The split is fixed by `GLOSSARY.md` §14, not chosen here.
 | NFR-4 | **Air-gap operation** | Full function without egress; hosted-AI SDKs physically absent; offline basemap/geocoder | SHIPPED |
 | NFR-5 | **Accessibility** | WCAG 2.2 AA; axe-core CI gate | SHIPPED |
 | NFR-6 | **API compatibility** | SemVer; versioned `/api/v1` as the sole business surface (unversioned routes retired 2026-07-25, API-5); `@PublicApi` embedding policy | SHIPPED |
-| NFR-7 | **Compliance posture (Professional)** | SOC2 / ISO27001 / FedRAMP / HIPAA / PCI scope; small SBOM as a deliberate compliance asset | PARTIAL (module shipped; certifications not started) — ⚠ **owner 2026-09-08: [`okf/product/layer/platform/plan-compliance.md`](okf/product/layer/platform/plan-compliance.md)**. This is not one undifferentiated gap: it is **seven named items** in `compliance/controls-matrix.md` §4, six needing an external party or org authorship and **one needing only a named owner and a cadence**; the board's check is a line-anchored count that reads 7 and closes at 0. ⚠ The "small SBOM" claim is qualified by measurement — the reactor resolves **94** third-party artifacts, which is why generation moved per-bundle |
+| NFR-7 | **Compliance posture (Professional)** | SOC2 / ISO27001 / FedRAMP / HIPAA / PCI scope; small SBOM as a deliberate compliance asset | PARTIAL (module shipped; certifications not started) — ⚠ **owner 2026-09-08: [`okf/product/layer/platform/plan-compliance.md`](plan-compliance.md)**. This is not one undifferentiated gap: it is **seven named items** in `compliance/controls-matrix.md` §4, six needing an external party or org authorship and **one needing only a named owner and a cadence**; the board's check is a line-anchored count that reads 7 and closes at 0. ⚠ The "small SBOM" claim is qualified by measurement — the reactor resolves **94** third-party artifacts, which is why generation moved per-bundle |
 | NFR-8 | **Scale ceiling** | Single-node by design; Enterprise distributed tier is the opt-in escape hatch | ACCEPTED CONSTRAINT — escape hatch **design SIGNED 2026-09-10** as T5 partitioned scale-out (Enterprise; its lease + shared state are also Professional's T4 DR) → `superpower/enterprise-scale-out-plan.md` |
-| NFR-9 | **Quality gates** | GAUNTLET (full reactor tests + UI lint/test/build), token lint, ~~a11y gate~~, ~~live smoke~~ | 🟡 SHIPPED — ⚠ **understated and misstated (corrected 2026-09-09; owner [`okf/product/layer/platform/plan-tooling.md`](okf/product/layer/platform/plan-tooling.md) §2)**: there is **no a11y gate step** (axe rides unit specs), and **live smoke exists only in `release.yml`, which has never executed**. The row names none of the **nine repo guards** nor the coverage floors — the substance of what is enforced. ⚠ Load-bearing: `compliance/controls-matrix.md` ISO 8.25–8.31 cites NFR-9 as its only evidence |
-| NFR-10 | **Vocabulary discipline** | One concept → one word; banned synonyms never appear in UI/model/API/docs (GLOSSARY §0) | 🔴 SHIPPED — **both halves of this cell were wrong (corrected 2026-09-09)**. (a) Not "enforced in review": it is `tools/check-vocabulary.mjs`, wired into `ci.yml` **and** `.githooks/pre-push`, and cited by name as CC8 evidence. (b) The scope claim far exceeds the guard — of the **seven** hard bans in `CLAUDE.md`, **three have NO rule at all** (bare *Rule*, *Metric* BI, *Data Source*), *Issue* is enforced only in config KEYS and *Source* only in prose. Owner: [`okf/product/layer/platform/plan-tooling.md`](okf/product/layer/platform/plan-tooling.md) §2 | <!-- vocab-allow: names the banned term in order to state whether a rule covers it -->
+| NFR-9 | **Quality gates** | GAUNTLET (full reactor tests + UI lint/test/build), token lint, ~~a11y gate~~, ~~live smoke~~ | 🟡 SHIPPED — ⚠ **understated and misstated (corrected 2026-09-09; owner [`okf/product/layer/platform/plan-tooling.md`](plan-tooling.md) §2)**: there is **no a11y gate step** (axe rides unit specs), and **live smoke exists only in `release.yml`, which has never executed**. The row names none of the **nine repo guards** nor the coverage floors — the substance of what is enforced. ⚠ Load-bearing: `compliance/controls-matrix.md` ISO 8.25–8.31 cites NFR-9 as its only evidence |
+| NFR-10 | **Vocabulary discipline** | One concept → one word; banned synonyms never appear in UI/model/API/docs (GLOSSARY §0) | 🔴 SHIPPED — **both halves of this cell were wrong (corrected 2026-09-09)**. (a) Not "enforced in review": it is `tools/check-vocabulary.mjs`, wired into `ci.yml` **and** `.githooks/pre-push`, and cited by name as CC8 evidence. (b) The scope claim far exceeds the guard — of the **seven** hard bans in `CLAUDE.md`, **three have NO rule at all** (bare *Rule*, *Metric* BI, *Data Source*), *Issue* is enforced only in config KEYS and *Source* only in prose. Owner: [`okf/product/layer/platform/plan-tooling.md`](plan-tooling.md) §2 | <!-- vocab-allow: names the banned term in order to state whether a rule covers it -->
 
 ---
 
@@ -284,17 +292,17 @@ template gallery + apply).*
 
 | Document | What it grounds |
 |---|---|
-| [`api/README.md`](api/README.md) · [`okf/product/module/processor/api-v1.md`](okf/product/module/processor/api-v1.md) | The `/api/v1` contract as built — envelope, error catalog, OpenAPI, ETag concurrency, `/bootstrap` (API-1…5) |
-| [`okf/product/layer/platform/architecture-platform.md`](okf/product/layer/platform/architecture-platform.md) | Seven-network north star (the R1–R6 rework shipped 2026-07-06; plan archived 2026-09-07) |
-| [`BACKLOG.md`](BACKLOG.md) | Every open row, ranked; §6 the standing refusals; §7 the duplicate map |
-| [`okf/product/module/intelligence/architecture-embedded-intelligence.md`](okf/product/module/intelligence/architecture-embedded-intelligence.md) | The Assistant's autonomy ladder and tool surface as built (AGT-5, complete 2026-07-21) |
-| [`okf/product/layer/platform/plan-roadmap.md`](okf/product/layer/platform/plan-roadmap.md) · [`okf/product/layer/product/brochure-stakeholder-overview.md`](okf/product/layer/product/brochure-stakeholder-overview.md) | Horizons; value proposition; maturity |
-| [`spec-editions.md`](okf/product/layer/platform/spec-editions.md) | Edition capability tiers |
-| [`GLOSSARY.md`](GLOSSARY.md) | Binding vocabulary (§0 rules; §13 rename status) |
-| [`FEATURE_INVENTORY.md`](FEATURE_INVENTORY.md) | Per-feature TOON shapes + runnability constraints |
+| [`api/README.md`](../../../../api/README.md) · [`okf/product/module/processor/api-v1.md`](../../module/processor/api-v1.md) | The `/api/v1` contract as built — envelope, error catalog, OpenAPI, ETag concurrency, `/bootstrap` (API-1…5) |
+| [`okf/product/layer/platform/architecture-platform.md`](architecture-platform.md) | Seven-network north star (the R1–R6 rework shipped 2026-07-06; plan archived 2026-09-07) |
+| [`BACKLOG.md`](../../../../BACKLOG.md) | Every open row, ranked; §6 the standing refusals; §7 the duplicate map |
+| [`okf/product/module/intelligence/architecture-embedded-intelligence.md`](../../module/intelligence/architecture-embedded-intelligence.md) | The Assistant's autonomy ladder and tool surface as built (AGT-5, complete 2026-07-21) |
+| [`okf/product/layer/platform/plan-roadmap.md`](plan-roadmap.md) · [`okf/product/layer/product/brochure-stakeholder-overview.md`](../product/brochure-stakeholder-overview.md) | Horizons; value proposition; maturity |
+| [`spec-editions.md`](spec-editions.md) | Edition capability tiers |
+| [`GLOSSARY.md`](../../../../GLOSSARY.md) | Binding vocabulary (§0 rules; §13 rename status) |
+| [`FEATURE_INVENTORY.md`](features-feature-inventory.md) | Per-feature TOON shapes + runnability constraints |
 
 *Provenance, not authority (2026-09-08):* the planning documents these rows were first derived from —
 `feature-matrix-editions.md` (the 2026-07-02 H/M/S/N ratings), `api-contract-design.md` (the 33 API
 guidelines and the W1–W7 worklog), `backend-backlog.md` and `embedded-intelligence-plan.md` — are in
-`archived-documents/plans-archive/` and are listed in the archived-plans table of [`archived-documents/README.md`](archived-documents/README.md). ⛔ Read them for
+`archived-documents/plans-archive/` and are listed in the archived-plans table of [`archived-documents/README.md`](../../../../archived-documents/README.md). ⛔ Read them for
 *why* a row was written, never for what is built; the archive is not maintained.

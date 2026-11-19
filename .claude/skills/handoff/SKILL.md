@@ -24,7 +24,7 @@ zero questions.
    - **Next steps** — ordered, concrete, with the first command to run.
    - **Blockers / gotchas** — anything the next shift would trip over.
    - Absolute dates only (no "today"/"yesterday"). Never commit this file (gitignored).
-2. **Refresh affected living docs** — `docs/PROJECT_NOTES.md`, the active plan under
+2. **Refresh affected living docs** — the product hub pages the shift touched (gotchas go to `.claude/memory/` or the hub's gotchas page), the active plan under
    `docs/superpower/`. Refactor/dedup in place; don't append changelogs.
    **Doc lifecycle check (root `CLAUDE.md`):** if this shift SHIPPED a plan's work, distill its
    durable as-built facts into the matching `docs/okf/` concept, move still-open items to

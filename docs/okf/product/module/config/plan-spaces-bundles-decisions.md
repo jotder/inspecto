@@ -335,7 +335,7 @@ import was refused too: the bundle covers component kinds, the zip covers the wh
 | Bundle v1 `{kind, id, content}` with both-side ref re-derivation | v2 self-describing subgraph | `metadata-bundle.md` |
 | `schema` as a bundle kind | retired 2026-07-31 (unification W1); kept in the TS type so old bundles parse | `metadata-bundle.md` |
 | `Offer.dataset` (scalar) + four `if ("widget".equals(kind))` blocks | `Offer.datasets` + `Exchange.DERIVED_KINDS`; the scalar is read, never written | `exchange-sharing.md` |
-| `DirSpaceRoot.flowsDir()` as a sibling `spaces/<id>/flows/` | `config().resolve("flows")`; the top-level dir is dead but tolerated | `PROJECT_NOTES.md` |
+| `DirSpaceRoot.flowsDir()` as a sibling `spaces/<id>/flows/` | `config().resolve("flows")`; the top-level dir is dead but tolerated | `module/config/spec-config-gotchas.md` |
 | `config/flows/` | `pipelines/` (dual-read) | `GLOSSARY.md` §13 |
 | Per-store WARN on an unhonourable `postgres` | boot-time `verifySelectable` | `db-layer.md` |
 | Ten string literals for DB-family property names | the `OperationalDb.Family` roster | `db-layer.md` |

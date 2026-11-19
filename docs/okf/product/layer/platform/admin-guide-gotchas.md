@@ -2,7 +2,7 @@
 type: Reference
 title: Cross-Cutting Gotchas
 description: The non-obvious backend pitfalls that are expensive to rediscover — collected from PROJECT_NOTES §4.
-resource: docs/PROJECT_NOTES.md
+resource: docs/archived-documents/project-notes-2026-11-19.md
 tags: [gotchas, pitfalls, toon, duckdb, mdc, deadlock]
 timestamp: 2026-07-16T00:00:00Z
 ---

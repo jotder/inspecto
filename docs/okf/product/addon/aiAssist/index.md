@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `a
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `AGENTIC-INVESTIGATION-1` | P2 | feature | an agent that works an Incident: explains why it fired, gathers evidence, quantifies value at risk and proposes the next action for a hum… | — |
+| `AGENTIC-INVESTIGATION-1` | P2 | feature | An agent that works an Incident and proposes the next action for a human to approve: slices S2-S6 remain. | — |

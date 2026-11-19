@@ -21,3 +21,5 @@ filesystem and a peer's gitignored scratch file refused pushes.
 - A guard wired only into CI cannot PREVENT anything — it runs after the push.
 
 Related: [[doc-guard-traps]], [[new-route-checklist]].
+
+Long form, with the original incidents (from the retired `PROJECT_NOTES.md`, 2026-11-19): [tests-guards-and-claims-gotchas.md](../../docs/okf/product/layer/platform/tests-guards-and-claims-gotchas.md).

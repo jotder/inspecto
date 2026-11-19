@@ -15,8 +15,9 @@ timestamp: 2026-11-15T00:00:00Z
 - [§3 Domain core](architecture-la-core-shape-modules.md#3-domain-core-la-core): op log (§3.1), store port (§3.2), Drafts (§3.3), [masking (§3.4)](architecture-la-core-masking.md#34-masking), entity store (§3.5), Domain Profile and Industry packs (§3.6).
 - [§4 Link index](architecture-la-core-index-http.md#4-link-index-la-storage) · [§5 Graph Run](architecture-la-core-index-http.md#5-graph-run-graph--la-core--la-storage).
 - [§6 HTTP surface](architecture-la-core-index-http.md#6-http-surface-la-api-geo-link) - the route table; §6.1-§6.9 and §6.14 are in
-  [architecture-http-and-ui.md](architecture-http-and-ui.md), §6.10-§6.13 and §6.15-§6.20 in
-  [architecture-data-onboarding.md](architecture-data-onboarding.md).
+  [architecture-http-and-ui.md](architecture-http-and-ui.md), §6.10-§6.13 and §6.15-§6.19 in
+  [architecture-data-onboarding.md](architecture-data-onboarding.md), §6.20 in
+  [architecture-watch-this-folder.md](architecture-watch-this-folder.md).
 - [§7 Host registration, Jobs and live detection](architecture-la-core-host-editions.md#7-host-registration-jobs-and-live-detection) ·
   [§8 Editions and packaging](architecture-la-core-host-editions.md#8-editions-and-packaging) · [§9 Bounds](architecture-la-core-host-editions.md#9-concurrency-and-resource-bounds-summary) ·
   [§10 Seams and residuals](architecture-la-core-host-editions.md#10-known-seams-and-residuals).

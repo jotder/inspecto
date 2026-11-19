@@ -395,7 +395,7 @@ guard exists.
 
 Related: [Job vs Pipeline Step](architecture-processor.md) · [Jobs & Scheduling](spec-jobs.md) ·
 [Signal backbone](../event/spec-signal-backbone.md) · [API stability policy](../api/plan-api-stability.md) ·
-[`PROJECT_NOTES.md`](../../../../PROJECT_NOTES.md) §5
+[`spec-engine-seams.md`](../engine/spec-engine-seams.md)
 
 ### 7f. Job Run deadline (R1, as built 2026-10-06)
 

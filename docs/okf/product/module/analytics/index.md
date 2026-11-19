@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `BI-INSIGHTS-1` | P2 | feature | advanced insights on business data in Widgets and Dashboards — what happened, why it moved, what is unusual, what comes next, who is at r… | — |
+| `BI-INSIGHTS-1` | P2 | feature | Advanced insights on business data in Widgets and Dashboards, authored and tuned as Insight Profiles. | — |

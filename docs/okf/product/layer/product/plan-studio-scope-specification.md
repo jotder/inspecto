@@ -57,7 +57,7 @@ chart, a board, a graph, a map — and where an investigator asks *who connects 
 
 ## 2. Requirements of record
 
-The board rows were `docs/REQUIREMENTS.md` §3.5 (that section was stripped to an index on 2026-09-09 — this file is their only home now) `BI-1`…`BI-8` and §3.6 `INV-1`…`INV-4`, plus
+The board rows were `docs/okf/product/layer/platform/spec-requirements.md` §3.5 (that section was stripped to an index on 2026-09-09 — this file is their only home now) `BI-1`…`BI-8` and §3.6 `INV-1`…`INV-4`, plus
 `EDITIONS.md` `CP-08` and `CP-09`. Below, each row is restated as it actually holds. **Where a cell says
 CORRECTION the board was wrong on 2026-09-08 and has been amended in the same commit as this file.**
 

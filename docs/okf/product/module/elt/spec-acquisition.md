@@ -786,7 +786,7 @@ set the legacy accept-on-connect behaviour is unchanged (and logged at debug):
 
 | Option | Effect |
 |---|---|
-| `host_key` | 🔴 a key **FINGERPRINT** — `SHA256:<base64>` or OpenSSH MD5 colon-hex. The field is literally named `fingerprint` and is handed to sshj's `client.addHostKeyVerifier(fingerprint)`, so a **raw `ssh-rsa AAAA…` key line cannot work**. `connectors-runbook.md`'s host-key table is right and any doc showing a raw key line is wrong. (`docs/FEATURE_INVENTORY.md` once showed one; its host-key row now says a raw key line is rejected.) |
+| `host_key` | 🔴 a key **FINGERPRINT** — `SHA256:<base64>` or OpenSSH MD5 colon-hex. The field is literally named `fingerprint` and is handed to sshj's `client.addHostKeyVerifier(fingerprint)`, so a **raw `ssh-rsa AAAA…` key line cannot work**. `connectors-runbook.md`'s host-key table is right and any doc showing a raw key line is wrong. (`docs/okf/product/layer/platform/features-feature-inventory.md` once showed one; its host-key row now says a raw key line is rejected.) |
 | `known_hosts` | path to an OpenSSH `known_hosts` file; the host must have an entry. Works across hops. |
 | `strict_host_key: true` | when set and neither of the above is configured, **refuse to connect** rather than silently accept any key. |
 

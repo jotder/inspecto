@@ -93,8 +93,8 @@ final class OnboardRoutes implements RouteModule {
         ImportFilterEdit.register(api);   // ADD-DATA-FILTER-EDIT-1
         DatasetCompaction.register(api);   // LA-DATASET-COMPACT-1
         ImportCommitSteps.register(api);   // BASIC-ELT-PROFILE-1 BE-1a: the follow_on step of a commit outside Add data
+        ImportPreRunSteps.register(api);   // BE-1b: inbox judgement and new columns before a run outside Add data
         InboxWatch.registerRoutes(api);   // BASIC-ONBOARD-1 P2
-        InboxWatch.attach(api);
         PostgresSnapshot.register(api);   // BASIC-ONBOARD-1 P3
     }
 

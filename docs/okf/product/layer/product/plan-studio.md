@@ -11,7 +11,7 @@ supersedes-rows: REQUIREMENTS §3.5 BI-1..BI-8 and §3.6 INV-1..INV-4 (this file
 # Studio (`BI` + `INV`)
 
 > **How to read this file.** §1–§2 are the *requirement of record*: where they disagree with
-> `docs/REQUIREMENTS.md` §3.5/§3.6 or `docs/EDITIONS.md`, **this file wins** and the disagreement is
+> `docs/okf/product/layer/platform/spec-requirements.md` §3.5/§3.6 or `docs/EDITIONS.md`, **this file wins** and the disagreement is
 > stated in place. §3 is the as-built specification, §4 the dated decisions, §5 what is not built
 > (tracked + `UNTRACKED`), §6 what was refused or superseded, §7 the pointers into code and docs, §8 how
 > it is verified. Everything in backticks under §3 and §7 was checked against the tree on 2026-09-08.

@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Security (SEC)](plan-security.md) |
+| plan | current | [module.access - board row detail](plan-board-detail.md) · [Security (SEC)](plan-security.md) |
 | spec | current | [Access policy — spec](spec-access.md) |
 | architecture | current | [Identity and Access](architecture-access.md) |
 | features | current | [Identity and Access — features](features-access.md) |
@@ -35,5 +35,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `IMPORT-WHOLE-SPACE-SPLIT-1` | P3 | feature | split a whole-Space export into its kinds' own validated routes on import, if ever asked. | demand |
-| `AGENT-KIT-1` | P2 | feature | the Agent Kit: AI agents (Claude, Gemini, OpenAI, local / offline models) build, ship and manage Apps on a running Inspecto, safely. | — |
-| `SPACE-ADMISSION-FOLLOWUPS-1` | P3 | chore | what the closed-Space change (D5, 91f0af69a) left on purpose. | — |
+| `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
+| `SPACE-ADMISSION-FOLLOWUPS-1` | P3 | chore | Seven follow-ups the closed-Space change (D5) left on purpose. | — |

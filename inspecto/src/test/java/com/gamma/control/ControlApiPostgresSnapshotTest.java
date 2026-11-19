@@ -411,11 +411,10 @@ class ControlApiPostgresSnapshotTest {
         }
     }
 
-    /** Operator 2026-11-05: a snapshot is manual only - Watch is refused and the 30 s tick never copies the table. */
+    /** Operator 2026-11-05: a snapshot is manual only - Watch is refused and the poll cycle never copies the table. */
     @Test
     void aSnapshotIsNeverPolled(@TempDir Path cfg, @TempDir Path root) throws Exception {
         Pg pg = seeded();
-        InboxWatch.pausedForTest = true;   // the test drives InboxWatch.tick() itself
         try (Ctx c = open(cfg, root)) {
             JsonNode d = data(post(c, "/onboard/postgres", "{\"connection\":" + pg.connection(RO)
                     + ",\"schema\":\"" + pg.schema + "\",\"table\":\"transfers\"}", null), 200);
@@ -428,12 +427,11 @@ class ControlApiPostgresSnapshotTest {
             assertEquals(422, on.statusCode(), on.body());
             assertTrue(error(on).contains("not polled"), on.body());
             pg.exec("DELETE FROM " + pg.schema + ".transfers WHERE id <= 5");
-            InboxWatch.tick();
+            ControlApiImportPreRunStepsTest.poll(c.svc());   // the engine's poll cycle (B1: the watch is a schedule)
             assertEquals(40, OnboardImport.countRows(db), "no poll copied the changed table");
             data(post(c, "/datasets/" + id + "/run", null, null), 200);
             assertEquals(35, OnboardImport.countRows(db), "Refresh now does");
         } finally {
-            InboxWatch.pausedForTest = false;
             drop(pg);
         }
     }

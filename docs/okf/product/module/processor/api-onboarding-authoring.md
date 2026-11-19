@@ -736,6 +736,16 @@ an unreadable schema is 409). With `replace` it moves `database/` aside, lands, 
 and drops the old data on success or restores it on failure; `append` adds rows. **Run now** runs whatever waits in
 the inbox. Both answer the run summary with the in-run index and Expectations.
 
+Before either runs, the waiting files are judged by the Dataset's columns (a refused one set aside in `refused/`, named
+in `refused`) and the new columns every file the run takes carries are kept (`keptColumns`, `newColumnsReason`). That
+is ONE list, `ImportPreRunSteps` (`BASIC-ELT-PROFILE-1` BE-1b, 2026-11-19): a run of the import Pipeline that Add data
+did not start (a scheduled poll, `POST /pipelines/{id}/run`) runs the same steps first, as a registered pre-run step,
+and holds the Dataset's claim through the run, so its commit steps still compact, follow on and check Expectations
+([spec-pipeline-execution.md](../elt/spec-pipeline-execution-dry-run-recovery.md#pre-run-steps--the-other-side-of-the-run)). A scheduled
+run of a Dataset Add data holds does not start; the next tick looks again. *Watch this folder* (`PUT
+/datasets/{id}/watch`) is such a scheduled run since B1 (2026-11-19): the import Pipeline's own locked `every: 30s`
+schedule, not a separate poller (la-core `architecture-data-onboarding.md` §6.20).
+
 **Deleting an import Dataset retires its Pipeline** (`LA-ONBOARD-ORPHAN-PIPELINE-1`, 2026-10-23).
 `DELETE /components/dataset/{id}` on an entry with `origin: import` and `importPipeline` equal to its id, whose
 `imports/<id>_pipeline.toon` exists, unregisters that Pipeline and removes `imports/<id>_pipeline.toon`,
