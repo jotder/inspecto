@@ -230,6 +230,16 @@ B (the console's Help entry and `?` screen links, and the bundle shipping the re
   foreign entry in `search.json` — falsified with a renderer made to leak (28 findings, exit 1).
 - **Not in P1:** edition badges (P3); the inventory as reviewed types (P2 / P3 as pages are rewritten); the internal
   render's publication place (D-UE10).
+- **P2 lane C — concepts (2026-11-19):** 14 new pages, each `type: concept`, `audience: external`, filed in the hub of
+  the item it explains as `user-guide-concept-<topic>.md` and placed first in the `understand` chapter (ids
+  `concept_*`): the map (*How the pieces fit*), Space, Space Template (`module/config`); Dataset, Widget and
+  Dashboard, App, Edition and Add-on (`layer/product`); Connection and Collector, Pipeline and Steps, Expectation
+  (`module/elt`); Alert Rule (with Expectation and Decision Rule), Alert / Incident / Case (`addon/incidents`); Roles
+  and Access Policies (`module/access`); Link Analysis and Investigations (`module/la-core`). Each says what it is, why,
+  its neighbours (ASCII diagram), the console path and the edition (from `EDITIONS.md` and `offerings/*.toon`), and
+  links only to external pages. Edition facts are prose, never a Basic / Standard / Advanced table (docs-health
+  `editions` ratchet). The LA training series is named, not linked: its pages are still internal. External render:
+  17 pages.
 
 ## 5. Content — wave 1, all three tracks
 
@@ -374,7 +384,7 @@ downloadable vendor packages, versioned with the product.
 |---|---|---|---|
 | **P0** | D-UE1…D-UE9 signed; the new names in `GLOSSARY.md` — **done 2026-11-19** (D-UE8 left open) | — | days |
 | **P1** | Handbook skeleton: manifest, renderer, `/help` route with screen links, `check-handbook.mjs`, the inventory map of existing pages — **lane A done 2026-11-19 (§4.6); lane B (console and bundle) in its own lane** | P0 | 2–3 weeks |
-| **P2** | Concepts; the worked example's data and Space Template; tutorials T1–T6 with their checks; the Space → App gap filed | P1 | 4–6 weeks |
+| **P2** | Concepts; the worked example's data and Space Template; tutorials T1–T6 with their checks; the Space → App gap filed — **lane C (concepts) done 2026-11-19 (§4.6)** | P1 | 4–6 weeks |
 | **P3** | The first 30 how-tos; generated reference; edition badges on every page; the *On Inspecto* developer pages 5.1–5.6 (§3.1) | P1 | 4–6 weeks, parallel with P2, plus 2–3 weeks for the developer pages |
 | **P4** | Learning paths, the first two labs with checkers, the video series spec on the LA machinery, the instructor kit | P2 | 3–4 weeks |
 | **P5** | The *Inside Inspecto* internal render: the stage × product-area index generated from the Product Map and hub slots, six entry pages 5.7–5.12, the audience guard | P1, D-UE10 | about 1 week |

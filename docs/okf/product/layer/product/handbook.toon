@@ -393,6 +393,76 @@ chapters:
     group: Understand
     summary: The concepts every track shares: Spaces, Datasets, Pipelines, Collectors, Expectations, Alert Rules, Incidents, Cases, Widgets, Space Templates, Apps, editions and Add-ons.
     pages:
+      concept_overview:
+        file: docs/okf/product/layer/product/user-guide-concept-overview.md
+        type: concept
+        tracks[4]: builder,partner,operator,business
+        audience: external
+      concept_space:
+        file: docs/okf/product/module/config/user-guide-concept-space.md
+        type: concept
+        tracks[4]: builder,partner,operator,business
+        audience: external
+      concept_dataset:
+        file: docs/okf/product/layer/product/user-guide-concept-dataset.md
+        type: concept
+        tracks[3]: builder,partner,business
+        audience: external
+      concept_connection_collector:
+        file: docs/okf/product/module/elt/user-guide-concept-connection-collector.md
+        type: concept
+        tracks[3]: builder,partner,operator
+        audience: external
+      concept_pipeline:
+        file: docs/okf/product/module/elt/user-guide-concept-pipeline.md
+        type: concept
+        tracks[3]: builder,partner,operator
+        audience: external
+      concept_expectation:
+        file: docs/okf/product/module/elt/user-guide-concept-expectation.md
+        type: concept
+        tracks[3]: builder,partner,operator
+        audience: external
+      concept_alert_rule:
+        file: docs/okf/product/addon/incidents/user-guide-concept-alert-rule.md
+        type: concept
+        tracks[4]: builder,partner,operator,business
+        audience: external
+      concept_alert_incident_case:
+        file: docs/okf/product/addon/incidents/user-guide-concept-alert-incident-case.md
+        type: concept
+        tracks[3]: builder,operator,business
+        audience: external
+      concept_widget_dashboard:
+        file: docs/okf/product/layer/product/user-guide-concept-widget-dashboard.md
+        type: concept
+        tracks[3]: builder,partner,business
+        audience: external
+      concept_space_template:
+        file: docs/okf/product/module/config/user-guide-concept-space-template.md
+        type: concept
+        tracks[3]: builder,partner,operator
+        audience: external
+      concept_app:
+        file: docs/okf/product/layer/product/user-guide-concept-app.md
+        type: concept
+        tracks[4]: builder,partner,operator,business
+        audience: external
+      concept_edition_addon:
+        file: docs/okf/product/layer/product/user-guide-concept-edition-addon.md
+        type: concept
+        tracks[4]: builder,partner,operator,business
+        audience: external
+      concept_roles_access_policies:
+        file: docs/okf/product/module/access/user-guide-concept-roles-access-policies.md
+        type: concept
+        tracks[3]: builder,partner,operator
+        audience: external
+      concept_link_analysis:
+        file: docs/okf/product/module/la-core/user-guide-concept-link-analysis.md
+        type: concept
+        tracks[2]: builder,business
+        audience: external
       admin_guide_product:
         file: docs/okf/product/layer/product/admin-guide-product.md
         type: unsorted

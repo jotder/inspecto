@@ -7,6 +7,11 @@
 ## The console
 
 - [Catalog](../../layer/product/user-guide-catalog.md)
+- [App](../../layer/product/user-guide-concept-app.md)
+- [Dataset](../../layer/product/user-guide-concept-dataset.md)
+- [Edition and Add-on](../../layer/product/user-guide-concept-edition-addon.md)
+- [How the pieces fit](../../layer/product/user-guide-concept-overview.md)
+- [Widget and Dashboard](../../layer/product/user-guide-concept-widget-dashboard.md)
 - [Dashboard](../../layer/product/user-guide-dashboard.md)
 - [Icon Settings](../../layer/product/user-guide-icon-settings.md)
 - [Journey: from an alert to a closed Case](../../layer/product/user-guide-journey-alert-to-case.md)
@@ -19,6 +24,7 @@
 ## Link Analysis
 
 - [Geo Map Analysis](../../module/geo-link/user-guide-geo-map.md)
+- [Link Analysis and Investigations](../../module/la-core/user-guide-concept-link-analysis.md)
 - [Link Analysis — User Guide](../../module/la-core/user-guide-la-core.md)
 - [Inspecto LA training videos — A · Getting started: narration scripts](../../module/la-core/user-guide-training-a-getting-started.md)
 - [Inspecto LA training videos — B · Building a graph: narration scripts](../../module/la-core/user-guide-training-b-building-a-graph.md)

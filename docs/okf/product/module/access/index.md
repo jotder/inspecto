@@ -20,7 +20,7 @@ tags: [product-item, module]
 | architecture | current | [Identity and Access](architecture-access.md) |
 | features | current | [Identity and Access — features](features-access.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Identity and Access — screens](user-guide-access.md) |
+| user-guide | current | [Identity and Access — screens](user-guide-access.md) · [Roles and Access Policies](user-guide-concept-roles-access-policies.md) |
 | admin-guide | current | [Auth & Security](admin-guide-auth-security.md) |
 | api | current | [Identity and Access — API](api-access.md) |
 | tests | current | [Access policy (roles, grants, row scope, audit trail) — tests inventory](tests-inventory.md) |
