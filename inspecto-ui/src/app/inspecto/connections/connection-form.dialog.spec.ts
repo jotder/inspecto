@@ -476,6 +476,33 @@ describe('ConnectionFormDialog', () => {
         });
     });
 
+    it('BASIC-ELT-PROFILE-1 U2: a Postgres table copy has no Routing section; every other type keeps it', () => {
+        const routing = (el: HTMLElement) =>
+            Array.from(el.querySelectorAll('button')).some((b) => b.textContent?.includes('Routing'));
+        const { fixture, c, api } = create({
+            id: 'sales_postgres',
+            connector: 'postgres',
+            host: 'db.internal',
+            database: 'sales',
+            username: 'reader',
+            password: '${ENV:INSPECTO_PG_SALES}',
+            options: { schema: 'public', table: 'transfers' },
+        });
+        const el = fixture.nativeElement as HTMLElement;
+        expect(routing(el)).toBe(false);
+        expect(el.querySelector('#routing-panel')).toBeNull();
+        // a hop left on from another type is never sent for postgres (the server refuses both)
+        c.tunnelEnabled.set(true);
+        c.form.controls.tunnel.patchValue({ host: 'bastion' });
+        c.submit();
+        expect((api.update.mock.calls[0][1] as ConnectionProfile).tunnel).toBeUndefined();
+        for (const type of ['database', 'ftp', 'ftps', 'local', 'sftp', 'https']) {
+            c.onTypeChange(type);
+            refresh(fixture);
+            expect(routing(el), type).toBe(true);
+        }
+    });
+
     it('BASIC-ELT-PROFILE-1 U2: a postgres Connection’s password must name an INSPECTO_PG_ variable (the server’s rule)', () => {
         const { fixture, c, api } = create({
             id: 'sales_postgres',

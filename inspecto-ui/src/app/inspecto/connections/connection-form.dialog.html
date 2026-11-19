@@ -21,7 +21,8 @@
         <inspecto-locked-action [label]="'Save a ' + connTypeLabel() + ' connection'" [reason]="remoteLock() ?? ''" />
         }
 
-        <!-- Routing (SSH tunnel + proxy) — hidden behind a routing icon, popped open on click -->
+        <!-- Routing (SSH tunnel + proxy) — hidden behind a routing icon, popped open on click; absent where the server refuses both -->
+        @if (routable()) {
         <div>
             <button
                 type="button"
@@ -131,7 +132,7 @@
                 }
             </div>
         </section>
-        }
+        } }
 
         <!-- Per-type attributes -->
         <section aria-label="Connection settings">

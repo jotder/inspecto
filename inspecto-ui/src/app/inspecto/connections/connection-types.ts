@@ -49,6 +49,8 @@ export interface ConnTypeDef {
     attrs: ConnAttr[];
     /** Made elsewhere (Add data's Postgres snapshot), so the dialog offers it only when editing a saved one. */
     editOnly?: boolean;
+    /** The server refuses a tunnel and a proxy for it, so the dialog shows no Routing section. */
+    noRouting?: boolean;
 }
 
 export const SECRET_HINT = 'a ${ENV:VAR} reference, not a raw secret';
@@ -269,6 +271,7 @@ export const CONNECTION_TYPES: ConnTypeDef[] = [
         label: 'Postgres table copy',
         description: 'One read-only Postgres table or query, copied by Add data',
         editOnly: true,
+        noRouting: true,
         attrs: [
             ...POSTGRES_CONNECTION_ATTRS,
             { key: 'schema', label: 'Schema', control: 'text', target: 'option' },

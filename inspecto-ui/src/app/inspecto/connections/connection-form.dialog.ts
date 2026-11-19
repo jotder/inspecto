@@ -124,6 +124,8 @@ export class ConnectionFormDialog {
     );
     readonly attrs = computed(() => attrsFor(this.connType()));
     readonly connTypeLabel = computed(() => connTypeDef(this.connType()).label);
+    /** The chosen type may route through an SSH tunnel or a proxy (the server refuses both for a Postgres table copy). */
+    readonly routable = computed(() => !connTypeDef(this.connType()).noRouting);
 
     /** The routing panel (SSH tunnel + proxy) is hidden behind a routing icon; this pops it open. */
     readonly routingOpen = signal(false);
@@ -265,7 +267,7 @@ export class ConnectionFormDialog {
         if (Object.keys(options).length) profile.options = options;
 
         const t = this.form.getRawValue().tunnel;
-        if (this.tunnelEnabled() && t?.host) {
+        if (this.routable() && this.tunnelEnabled() && t?.host) {
             profile.tunnel = {
                 host: t.host,
                 port: t.port != null ? Number(t.port) : undefined,
@@ -274,7 +276,7 @@ export class ConnectionFormDialog {
             };
         }
         const px = this.form.getRawValue().proxy;
-        if (this.proxyEnabled() && px?.host) {
+        if (this.routable() && this.proxyEnabled() && px?.host) {
             profile.proxy = {
                 type: px.type ?? 'HTTP',
                 host: px.host,
