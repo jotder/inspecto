@@ -176,6 +176,31 @@ class ControlApiStaticAndCorsTest {
     }
 
     @Test
+    void aFolderWithItsOwnIndexIsServedAsASiteAndItsBareNameRedirects(@TempDir Path dir) throws Exception {
+        // USER-HANDBOOK-1: the bundle ships the pre-rendered Handbook under <ui>/help/
+        Path ui = spaDir(dir);
+        Files.createDirectories(ui.resolve("help"));
+        Files.writeString(ui.resolve("help").resolve("index.html"), "<!doctype html><html><body>Handbook home</body></html>");
+        Files.writeString(ui.resolve("help").resolve("start.html"), "<!doctype html><html><body>Start here</body></html>");
+        try (Ctx c = open(ui.toString(), null)) {
+            HttpResponse<String> home = ui(c.port, "/help/");
+            assertEquals(200, home.statusCode());
+            assertTrue(ctype(home).startsWith("text/html"));
+            assertTrue(home.body().contains("Handbook home"), "the folder's own index, not the SPA shell: " + home.body());
+            HttpResponse<String> bare = ui(c.port, "/help");
+            assertEquals(301, bare.statusCode(), "the bare name redirects so relative links resolve inside /help/");
+            assertEquals("/help/", bare.headers().firstValue("Location").orElse(null));
+            HttpResponse<String> page = ui(c.port, "/help/start.html");
+            assertEquals(200, page.statusCode());
+            assertTrue(page.body().contains("Start here"));
+            HttpResponse<String> deep = ui(c.port, "/pipelines");
+            assertTrue(deep.body().contains("Inspecto UI"), "an SPA route with no such folder still gets the shell");
+            HttpResponse<String> folderWithoutIndex = ui(c.port, "/assets/");
+            assertTrue(folderWithoutIndex.body().contains("Inspecto UI"), "a folder without its own index is unchanged");
+        }
+    }
+
+    @Test
     void anEmbedRouteWithADotInItsTokenIsStillAnSpaDeepLinkButADottedAssetPathElsewhereIs404(@TempDir Path dir) throws Exception {
         try (Ctx c = open(spaDir(dir).toString(), null)) {
             HttpResponse<String> embed = ui(c.port, "/embed/inv/AbC123.sEcReT_x-y");   // an embed token is <grantId>.<secret>

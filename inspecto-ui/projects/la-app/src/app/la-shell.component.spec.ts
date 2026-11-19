@@ -103,6 +103,10 @@ describe('la-app shell and landing page', () => {
         expect(el.querySelector('h1')?.textContent?.trim()).toBe('Inspecto LA');
         expect(el.querySelector('main')).toBeTruthy();
         expect(el.querySelector('[data-testid="la-app-switcher"]'), 'one App: no App switcher').toBeNull();
+        // USER-HANDBOOK-1: Help in the rail opens the Handbook the bundle ships at /help/, in a new tab.
+        const help = el.querySelector<HTMLAnchorElement>('[data-testid="la-help"]');
+        expect(help?.getAttribute('href')).toBe('/help/');
+        expect(help?.getAttribute('target')).toBe('_blank');
     });
 
     // PRODUCT-ASSEMBLY-1 PA-5b: a Product with several Apps (Inspecto Telco) gets the App switcher; the rail shows the

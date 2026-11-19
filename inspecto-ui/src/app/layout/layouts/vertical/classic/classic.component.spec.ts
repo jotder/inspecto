@@ -41,6 +41,11 @@ describe('ClassicLayoutComponent', () => {
         expect(root.querySelector('gamma-vertical-navigation')?.getAttribute('role')).toBe('navigation');
         expect(root.querySelector('gamma-vertical-navigation')?.getAttribute('aria-label')).toBe('Main');
         expect(root.querySelector('gamma-loading-bar')?.getAttribute('role')).toBe('status');
+        // USER-HANDBOOK-1: Help opens the Handbook the bundle ships at /help/, in a new tab.
+        const help = root.querySelector<HTMLAnchorElement>('[data-testid="shell-help"]');
+        expect(help?.getAttribute('href')).toBe('/help/');
+        expect(help?.getAttribute('target')).toBe('_blank');
+        expect(help?.getAttribute('aria-label')).toContain('Help');
         // LA-A11Y-AUDIT-1: a skip link is the first focusable element and moves focus into main.
         const skip = root.querySelector('a, button, [tabindex]:not([tabindex="-1"])') as HTMLAnchorElement;
         expect(skip.dataset['testid']).toBe('skip-to-content');

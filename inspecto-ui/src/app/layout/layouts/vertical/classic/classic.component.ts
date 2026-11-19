@@ -13,6 +13,7 @@ import {
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { ActivatedRoute, ActivatedRouteSnapshot, NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { GammaLoadingBarComponent } from '@gamma/components/loading-bar';
 import {
@@ -37,6 +38,7 @@ import { BrandingService, LensService } from 'app/inspecto/api';
 import { allCommands } from 'app/inspecto/commands/command-registry';
 import 'app/inspecto/commands/app-commands';
 import { ShortcutsHelpDialog } from 'app/inspecto/shortcuts-help.dialog';
+import { HELP_HOME } from 'app/inspecto/help/help-chapter';
 import { Subject, filter, takeUntil } from 'rxjs';
 
 @Component({
@@ -50,6 +52,7 @@ import { Subject, filter, takeUntil } from 'rxjs';
         GammaVerticalNavigationComponent,
         MatButtonModule,
         MatIconModule,
+        MatTooltipModule,
         LensSwitcherComponent,
         NotificationBellComponent,
         SearchComponent,
@@ -81,6 +84,8 @@ export class ClassicLayoutComponent implements OnInit, OnDestroy {
     private readonly _gammaNavigationService = inject(GammaNavigationService);
     /** Active-space branding (logo / caption / footer), falling back to the shipped defaults. */
     protected readonly branding = inject(BrandingService);
+    /** The Handbook's home (USER-HANDBOOK-1): the static site every bundle ships at /help/. */
+    protected readonly helpHome = HELP_HOME;
     /** Lens Access Profiles — filters the sidebar per lens (identity when none saved). */
     private readonly _accessState = inject(AccessStateService);
     private readonly _lens = inject(LensService);
