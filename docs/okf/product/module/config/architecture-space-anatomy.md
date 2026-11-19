@@ -5,7 +5,7 @@ description: Machine-checked census of every folder and file in a Space — conf
 item: module.config
 audience: internal
 status: current
-verified: 2026-11-18 last-edit
+verified: 2026-11-20 code-reviewed
 code: [platform/inspecto-config]
 ---
 

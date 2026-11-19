@@ -7,7 +7,7 @@ timestamp: 2026-09-06T00:00:00Z
 item: module.elt
 audience: internal
 status: current
-verified: 2026-11-19 last-edit
+verified: 2026-11-20 code-reviewed
 code: platform/inspecto-etl
 ---
 

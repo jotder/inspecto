@@ -5,7 +5,7 @@ description: What a Pipeline is — a chain of Steps that reads incoming data an
 item: module.elt
 audience: external
 status: current
-verified: 2026-11-19 last-edit
+verified: 2026-11-20 code-reviewed
 code: platform/inspecto-etl
 ---
 

@@ -1,13 +1,13 @@
 ---
 type: Feature
 title: "Standard Edition — features"
-description: "Standard includes Basic and adds sign-in, operations, case, assurance and detection modules plus six content packs."
+description: "Standard includes Basic and adds sign-in, operations, case, assurance and detection modules plus the content packs listed below."
 tags: [standard, edition, features, presales]
 timestamp: 2026-10-19T00:00:00Z
 item: edition.standard
 audience: internal
 status: current
-verified: 2026-11-18 last-edit
+verified: 2026-11-20 code-reviewed
 code: offerings/standard.toon
 ---
 
@@ -17,7 +17,7 @@ code: offerings/standard.toon
 
 ## What it is
 
-Standard includes Basic and adds sign-in, operations, case, assurance and detection modules plus six content packs. For the sales story see [brochure](brochure-standard.md).
+Standard includes Basic and adds sign-in, operations, case, assurance and detection modules plus the content packs listed below. For the sales story see [brochure](brochure-standard.md).
 
 ## Includes
 
@@ -87,6 +87,7 @@ The ASN.1 and telecom decoders (`telecom-asn1`) are not here: Advanced only sinc
 - [telco-bypass](../../solution-pack/telco-bypass/index.md)
 - [partner-settlement](../../solution-pack/partner-settlement/index.md)
 - [telco-rerating](../../solution-pack/telco-rerating/index.md)
+- [order-to-cash](../../solution-pack/order-to-cash/index.md) — the Handbook's worked example
 
 ## Data layer over Basic (DATA-TIERS-1, as built 2026-11-17)
 

@@ -8,7 +8,7 @@ timestamp: 2026-08-17T00:00:00Z
 item: module.processor
 audience: internal
 status: current
-verified: 2026-11-17 last-edit
+verified: 2026-11-20 code-reviewed
 code: inspecto
 ---
 
@@ -251,7 +251,10 @@ oldest pruned beyond the Space's retention. `PipelineHistory` (storage + diff), 
   through `AtomicFiles`, numbering + pruning under one lock. ⚠ No walker mistakes a snapshot for a live
   config: every Pipeline discovery keys on `_pipeline.toon`, and the satellite scan stops at depth 3 while a
   snapshot sits at depth 4. A whole-Space export (`BundleExporter.exportSpace`) walks the config dir, so it
-  carries `.history/` along, as it already did for component history.
+  carries `.history/` along, as it already did for component history. An import Pipeline's schema, which a run
+  may grow by a kept column, keeps its versions one level down in `<pipelineId>/schema/v<N>.toon`
+  (`PipelineHistory.recordSchema`, called by `DatasetFeed.rewriteSchema`); the history routes list only the
+  Pipeline's own versions, and a rename moves the schema's with them.
 - **What is snapshotted** — the bytes on disk AFTER the write, read back, filed under the id the parser
   derives from them (`ConfigReadRoutes.pipelineIdOf`: explicit `id`, else `name` lower-cased with spaces
   underscored). Called after the write on `/config/write` + `/config/patch` (type `pipeline`), `PUT
@@ -289,8 +292,8 @@ oldest pruned beyond the Space's retention. `PipelineHistory` (storage + diff), 
   rename itself is recorded as a version under the new id. Resume's "config already written" branch runs the
   same idempotent move. ⛔ It never merges: an existing `.history/pipelines/<newId>` is left alone and the
   journal says `config history NOT moved`.
-- **Delete purges the history** — `DELETE /config/pipeline/{name}` removes the `v<N>.toon` files and then the
-  directory if that emptied it (never a recursive delete). Decided to match `ComponentStore.delete` (*delete
+- **Delete purges the history** — `DELETE /config/pipeline/{name}` removes the `v<N>.toon` files (its schema's
+  too) and then each directory if that emptied it (never a recursive delete). Decided to match `ComponentStore.delete` (*delete
   means gone, history included*): the history is config-plane state and goes with the config, whereas a
   Pipeline delete keeps its data (unless `?data=true`) and its audit trail, which are what record what
   happened. It also keeps a re-created Pipeline of the same id from inheriting a stranger's versions.

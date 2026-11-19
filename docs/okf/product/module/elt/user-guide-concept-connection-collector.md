@@ -5,7 +5,7 @@ description: What a Connection and a Collector are — how to reach a remote sys
 item: module.elt
 audience: external
 status: current
-verified: 2026-11-19 last-edit
+verified: 2026-11-20 code-reviewed
 code: platform/inspecto-etl
 ---
 

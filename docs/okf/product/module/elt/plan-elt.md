@@ -11,7 +11,7 @@ tags: [acq, ing, pip, capability, acquisition, connections, collectors, connecto
 timestamp: 2026-11-18T00:00:00Z
 item: module.elt
 audience: internal
-verified: 2026-11-19 last-edit
+verified: 2026-11-20 code-reviewed
 code: platform/inspecto-etl
 ---
 

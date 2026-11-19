@@ -5,7 +5,7 @@ description: Draft scripts for 85-second vertical (9:16) collage-style Link Anal
 item: module.la-core
 audience: internal
 status: current
-verified: 2026-11-16 last-edit
+verified: 2026-11-20 code-reviewed
 code: [la/inspecto-la-core]
 ---
 

@@ -8,7 +8,7 @@ timestamp: 2026-07-16T00:00:00Z
 item: module.ops
 audience: internal
 status: current
-verified: 2026-11-10 last-edit
+verified: 2026-11-20 code-reviewed
 code: features/inspecto-ops
 ---
 
@@ -79,7 +79,9 @@ the real ControlApi.
   than storage, and the cross-kind surface lives in the `/tags` pane. The mail pane's tag menu is still the
   only place a tag is *applied*; as-built:
   [`../processor/spec-tags.md`](../processor/spec-tags.md).
-* **Case management** — case **Contents** (member incidents) with **Split & Merge**; variable **Cause
+* **Case management** — case **Contents** (member incidents) with **Split & Merge** (a split of a held Case,
+  a merge of a held source and a link removal touching a held object answer **409** naming the
+  [legal hold](../../layer/platform/admin-guide-operations-reference.md); a hold has no screen); variable **Cause
   Analysis** (`postmortem.causeAnalysis[]` + `causeMethod`); **Findings** (disposition/impact/records,
   soft no-disposition prompt); team `assignees` + `targetDate`. **Rule-raised cases**: `CaseRule`
   (`/cases/rules`, evaluate-on-demand, opens-or-attaches idempotently); **case analytics** via

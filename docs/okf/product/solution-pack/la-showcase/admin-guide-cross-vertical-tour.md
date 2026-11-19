@@ -5,7 +5,7 @@ description: Run of show for a 30-minute Link Analysis tour of three verticals (
 item: solution-pack.la-showcase
 audience: internal
 status: current
-verified: 2026-11-16 last-edit
+verified: 2026-11-20 code-reviewed
 code: [spaces/_templates/la-showcase]
 ---
 
