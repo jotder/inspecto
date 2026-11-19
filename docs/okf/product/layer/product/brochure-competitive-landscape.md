@@ -39,18 +39,16 @@ buyers where heavyweight stacks cannot go**.
 The staging table is derived by `tools/bundle-modules.mjs` from `offerings/<edition>.toon`; the per-capability
 matrix is [`../../../../EDITIONS.md`](../../../../EDITIONS.md); the editions and Add-ons are Product Map Items under
 `product-map/edition/` and `product-map/addon/`. Editions are build flavours of one codebase, never branches.
-*(Refreshed 2026-11-12: the Personal / Professional / Enterprise ladder this section described was replaced by
-Basic / Standard / Advanced on 2026-10-17, `LA-EDITIONS-1`, `f1b64ce03`; Reconciliation had already left the free
-tier on 2026-10-07, `MODULE-REORG-1` P7, `c5cb8ea4f`. A fourth flavour, Preview, takes every module and is not sold.
-Re-derived 2026-11-19 from `offerings/*.toon`: the ASN.1 decoders moved to Advanced and the `la-daily-feed` Space Template
-to Standard on 2026-11-17, `DATA-TIERS-1`; `inspecto-realtime` joined Standard on 2026-11-12, `REALTIME-DECISIONING-1` PA-9d.)*
-
-| | **Basic** | **Standard** | **Advanced** |
-|---|---|---|---|
-| **Buyer situation** (`EDITIONS.md`) | one analyst on one machine | a team | an organisation |
-| **What is in it** | the core platform: acquisition connectors incl. S3 / GCS (`inspecto-connectors`), every parser lane except ASN.1, Pipelines, the Parquet lakehouse, Query Library, Studio dashboards, Spaces, `/api/v1`; *Add data* (upload, an import inbox, a PostgreSQL snapshot); Link Analysis at the Explorer level with Entity Lists; 18 Link Analysis Space Templates plus `orders-starter`. No sign-in | + `inspecto-oidc` (OIDC sign-in, roles, attributed audit, machine clients) · `inspecto-secrets` · `inspecto-connectors-kafka` · `inspecto-ops` (Alerts → Incidents) · `inspecto-case-management` · `inspecto-action-requests` (four-eyes, the Incident Brief) · `inspecto-reconciliation` (→ Breaks) · `inspecto-scoring` · `inspecto-screening` · `inspecto-anomaly` · `inspecto-predictive` · `inspecto-realtime` (Real-time Detection) · `inspecto-regulatory-reporting` · `inspecto-observability` · `inspecto-backup` · `inspecto-notify-channels` · `inspecto-exchange` · `inspecto-agent` (the assistant); the Investigations add-on and the Geo map; 9 domain Space Templates (`telco-ra`, `telco-fraud`, `telco-bypass`, `telco-rerating`, `partner-settlement`, `business-assurance`, `mobile-money`, `aml`, `payment-fraud`) and the `la-daily-feed` Link Analysis Space Template | + `inspecto-policy` (Access Policies, per-Space isolation) · `inspecto-la-store-pg` (Investigations on shared PostgreSQL) · `inspecto-intelligence` (the intelligence agents) · `inspecto-telecom-asn1` (the ASN.1 decoders) |
-| **External dependencies** | none | none (PostgreSQL optional; the driver ships) | PostgreSQL, required for Incidents, Cases, notes, links and tags |
-| **Conversion trigger** | a second person needs to sign in; a feed must stay up to date on a schedule; a Break needs an owner | rows one role may not see; several servers sharing one state | — |
+Which modules and Space Templates each edition carries is in [`EDITIONS.md`](../../../../EDITIONS.md) (the
+generated module list: [`spec-editions.md`](../platform/spec-editions.md#offerings-matrix-generated)).
+What matters for positioning: **Basic** (one analyst on one machine) has no sign-in and no external dependency and
+explores data with Link Analysis at the Explorer level; **Standard** (a team) adds sign-in and the modules that own a
+finding — Incidents, Cases, Reconciliation and its Breaks, four-eyes Action Requests, the assistant, the domain Space
+Templates — with PostgreSQL optional; **Advanced** (an organisation) adds Access Policies, Investigations on shared
+PostgreSQL, the intelligence agents and the ASN.1 decoders, and needs PostgreSQL for Incidents, Cases, notes, links and
+tags. A fourth flavour, Preview, takes every module and is not sold. The conversion triggers: a second person needs to
+sign in, a feed must stay up to date on a schedule, or a Break needs an owner (→ Standard); rows one role may not see,
+or several servers sharing one state (→ Advanced).
 
 ⚠ **Not on the ladder, though the 2026-09-10 version put them there:** fault-tolerant DR (T4) and partitioned
 scale-out on Kubernetes (T5) are a signed design ([`enterprise-scale-out-plan.md`](../../../../superpower/enterprise-scale-out-plan.md));
