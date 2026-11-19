@@ -2,7 +2,10 @@
 
 > **Status: APPROVED 2026-11-19 — the operator: "create a comprehensive … plan and go ahead".** **W1 executed
 > 2026-11-19:** `BACKLOG.md` 577 → 280 KB (28 ledger entries of the last three days kept, 570 moved), `INDEX.md`
-> 111 → 23 KB, the stray board archived — nothing lost, checked line by line against the commit before. W2–W4 open.
+> 111 → 23 KB, the stray board archived — nothing lost, checked line by line against the commit before. **W2 done
+> 2026-11-19:** `tools/docs-health.mjs` (report, `--ratchet`, `--baseline-write`) with `tools/docs-health.baseline.json`,
+> `tools/roll-backlog-ledger.mjs`, 21 tests, a CI guard step the pre-commit hook runs, the link guard over
+> `archived-documents/README.md`, the `handoff` step and a team-memory note; as built in §6.1. W3–W4 open.
 > Board row: `INFO-RESTRUCTURE-1` (§10).
 > **Scope:** all the information Inspecto's people and agents read — the product hubs, the root canon, plans, the
 > archive, `compliance/`, `product-map/`, `.claude/` (rules, team memory, skills, maps), code-adjacent READMEs and
@@ -52,7 +55,8 @@ CodeGraph for code.
    dated *Changes* list where a reader needs it. A deliberate lesson log — the competitive landscape's corrections
    log — stays.
 3. **A page an agent can read whole.** Target 40 KB (about 10k tokens), cap 60 KB.
-4. **Every page carries one header** (D-IR4): `type`, `title`, `description`, `items`, `audience` (external or
+4. **Every page carries one header** (D-IR4): `type`, `title`, `description`, `item` (the key 201 hub pages already
+   use), `audience` (external or
    internal), `status` (current, plan or history), `verified` (date and how), `code` (the paths it describes).
 5. **Generated beats written** wherever a contract exists.
 6. **Moves, not deletions.** Nothing is lost in a restructure: a moved block keeps its words and its links are
@@ -104,12 +108,14 @@ docs). New, all as ratchets that let existing debt only shrink:
 
 | Guard | Fails when |
 |---|---|
-| Size | a page grows past 60 KB, or a page already past it grows |
-| History notes | the count of inline history notes rises |
-| Header | a new or edited page lacks a complete header |
-| Fact home | an edition table is written by hand outside a generated block |
-| Audience | an internal page or link reaches an external render (shared with the Handbook) |
-| Ledger | the board's ledger holds entries older than its retention |
+| Size | a page grows past 60 KB, or a page already past it grows more than 2 KB (the board, glossary and plans exempt) |
+| History notes | a page's count of inline history notes rises |
+| Header | a new hub page lacks its base header, or a header holds an invalid `audience`, `verified` or `code` |
+| Fact home | an edition table is written by hand outside `EDITIONS.md` and `spec-editions.md` |
+| Audience | an internal page or link reaches an external render (with the Handbook manifest, `USER-HANDBOOK-1` P1) |
+| Ledger | the board's ledger passes 60 KB |
+
+*As built in W2, with the reasons for each departure from this table's first draft: §6.1.*
 
 **A health report**, `tools/docs-health.mjs` (W2): size per tier, pages over budget, history notes, header
 completeness, ledger size, and the **drift list** — pages whose `code` paths changed after their `verified` date.
@@ -138,9 +144,36 @@ The rules an agent must follow stay in `CLAUDE.md` and team memory, both small a
 | Wave | Delivers | Size |
 |---|---|---|
 | **W1** | **Mechanical, lossless — done 2026-11-19:** the board ledger rolled to `archived-documents/backlog-ledger-2026.md`, keeping 3 days (570 entries moved, 28 kept; `BACKLOG.md` 577 → 280 KB); the archived-plans table moved from `INDEX.md` to the archive's front page, `archived-documents/README.md`, with 475 links re-pointed (`INDEX.md` 111 → 23 KB); `INDEX.md`'s header made current, its former note kept beside the table; the stray board archived as `archived-documents/backlog-board-2026-10-18.md` | a day |
-| **W2** | **Guards and header:** the header schema and its check; the size, history-note, fact-home, audience and ledger ratchets; `tools/docs-health.mjs`; a ledger-roll tool the `handoff` skill runs; the link guard extended to `archived-documents/README.md`, the archive's one maintained page (its 482 links resolve today but nothing checks them) | about 1 week |
+| **W2** | **Guards and header — done 2026-11-19 (§6.1):** the header schema and its check; the size, history-note, header, edition-table and ledger ratchets; `tools/docs-health.mjs`; the ledger-roll tool the `handoff` skill runs; the link guard extended to `archived-documents/README.md`. The audience check waits for the Handbook manifest (`USER-HANDBOOK-1` P1) | done in a day |
 | **W3** | **Judgment work:** board rows cut to a short summary with their narratives moved into hubs (22 rows run past 2,000 characters); `PROJECT_NOTES.md` split; `REQUIREMENTS.md` and `FEATURE_INVENTORY.md` generated or folded; the 46 oversize pages split, largest first (`tools/docs-relocate.mjs` re-points links); history notes moved out page by page; code-adjacent READMEs cut to pointers; the §13 rename map's finished rows archived | 2–3 weeks; mostly mechanical, suited to low-effort agents with spot checks |
 | **W4** | **Joined with the Handbook's P1 inventory:** one pass over the 858 hub pages fills each header (type, audience, track, `code`) — the same pass the Handbook needs | inside the Handbook's P1 |
+
+### 6.1 W2 as built (2026-11-19)
+
+- **`tools/docs-health.mjs`** measures tracked `docs/**/*.md` minus the archive; generated pages (hub `index.md`,
+  `feature-db.md`, a "generated by tools/" banner) are reported but never ratcheted. Default: a report. `--ratchet`:
+  fails on new debt against `tools/docs-health.baseline.json`. `--baseline-write`: records today's debt (47 pages over
+  60 KB, 95 pages carrying history notes, 119 hub pages without a header, 4 pages with hand-written edition tables).
+  First report: 887 pages, 52 over the cap (with the board, glossary and plans), 273 history notes on ratcheted pages,
+  571 of 690 hand-written hub pages with the base header and none with the full one, the ledger 28.7 KB, drift 0.
+- **Departures from §4, decided while building:**
+  - *Size* gives a baselined page a 2 KB allowance so a fix can land, and exempts pages that grow by design: the board
+    (its ledger has its own cap), the glossary (new terms) and in-flight plans.
+  - *History notes* exempt the board, the glossary, the competitive landscape's corrections log (D-IR7) and plans.
+  - *Header* requires the base header (`type`, `title`, `description`) on new hub pages and validates `audience`,
+    `verified` and `code` wherever present; the full D-IR4 header is reported, not required, until W4.
+  - *Fact home* covers the one restated fact measured as drifting — edition placement tables — outside `EDITIONS.md`
+    and `spec-editions.md`.
+  - *Ledger* caps the ledger at 60 KB instead of failing on entries older than three days, so the calendar alone
+    never turns a commit red; the three days are kept by `tools/roll-backlog-ledger.mjs`, which the `handoff` skill runs.
+  - *Audience* waits for the Handbook's manifest, which is where external and internal renders exist.
+- **`tools/roll-backlog-ledger.mjs [--days 3] [--today …] [--write]`** moves ledger entries before the window, verbatim
+  and newest first, to the top of `archived-documents/backlog-ledger-<year>.md`, links re-pointed; dry run by default.
+- **The link guard** (`tools/check-doc-links.mjs`) checks `archived-documents/README.md` as a current doc: 7,066 → 7,551
+  links checked, all resolving; falsified with one broken front-page link (exit 1).
+- **Wiring:** one CI guard step runs the ratchet and both test files (21 tests), so the pre-commit hook runs it too; the
+  `handoff` skill rolls the ledger and reads the report; `.claude/memory/doc-guard-traps.md` tells the next author what
+  to do when the ratchet fails.
 
 ## 7. Decisions
 

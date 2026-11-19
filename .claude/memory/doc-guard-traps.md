@@ -21,5 +21,11 @@ metadata:
   `$docsRequiredEntries` hard-codes doc paths — packaging breaks only at bundle time. Hub `index.md` is generated
   (`tools/render-product-docs.mjs`).
 - Guards check links and words, not content: missing rows / conflict markers in prose pass every guard.
+- **`tools/docs-health.mjs --ratchet` (pre-commit, 2026-11-19) blocks NEW docs debt only.** A page past 60 KB may grow
+  2 KB at most — split it instead of adding; a new "corrected 2026-…" / "(was …)" / "until 2026-…" note in a hub page
+  fails — say it in git or a short *Changes* list; a new hub page needs a `type`/`title`/`description` header; a new
+  hand-written Basic | Standard | Advanced table fails outside `EDITIONS.md` / `spec-editions.md`; the board's ledger
+  past 60 KB fails — `node tools/roll-backlog-ledger.mjs --write`. After SHRINKING debt run `--baseline-write` in the same
+  commit. The board, glossary and plans are size-exempt. `archived-documents/README.md` is now link-checked.
 
 Related: [[guard-scope-is-a-silent-exemption]].

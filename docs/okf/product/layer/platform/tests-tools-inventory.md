@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-109 test file(s). Run one, or all:
+111 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -55,6 +55,7 @@ node --test tools/
 | `tools/customer-build.test.mjs` | Fixture test for tools/customer-build.mjs. Run: node --test tools/customer-build.test.mjs |
 | `tools/deploy-kit.test.mjs` | The deploy kit (DEPLOY-EXPOSURE-KIT-1, MoSCoW S11): deploy/kit/ is staged into every non-demo bundle by package.ps1 |
 | `tools/dev-doctor.test.mjs` | Fixture test for tools/dev-doctor.mjs. Run: node --test tools/dev-doctor.test.mjs |
+| `tools/docs-health.test.mjs` | Tests for tools/docs-health.mjs. Run: node --test tools/docs-health.test.mjs |
 | `tools/entitle.test.mjs` | tools/entitle.mjs - signed entitlements (PRODUCT-ASSEMBLY-1 PA-7a). |
 | `tools/fetch-duckdb-extensions.test.mjs` | Offline tests for tools/fetch-duckdb-extensions.mjs's --only / --platform selection (D-8, 2026-09-26). |
 | `tools/gen-la-audit-data.test.mjs` | Determinism of tools/gen-la-audit-data.py. Run: node --test tools/gen-la-audit-data.test.mjs |
@@ -102,6 +103,7 @@ node --test tools/
 | `tools/render-product-map.test.mjs` | Fixture test for tools/render-product-map.mjs. Run: node --test tools/render-product-map.test.mjs |
 | `tools/render-space-links.test.mjs` | Tests for tools/render-space-links.mjs (LC-7): the census parse reads every link line and refuses one it cannot |
 | `tools/render-tests-inventory.test.mjs` | Fixture test for tools/render-tests-inventory.mjs. Run: node --test tools/render-tests-inventory.test.mjs |
+| `tools/roll-backlog-ledger.test.mjs` | Tests for tools/roll-backlog-ledger.mjs. Run: node --test tools/roll-backlog-ledger.test.mjs |
 | `tools/sbom-modules.test.mjs` | Fixtures for tools/sbom-modules.mjs (P3f per-module SBOMs). Run: node --test tools/sbom-modules.test.mjs |
 | `tools/seed-la-audit.test.mjs` | node --test tools/seed-la-audit.test.mjs  -  request building of the la-audit seed script against a MOCKED fetch (no server). |
 | `tools/seed-la-benefits.test.mjs` | node --test tools/seed-la-benefits.test.mjs  -  request building of the benefits fraud seed script against a MOCKED fetch (no server). |
