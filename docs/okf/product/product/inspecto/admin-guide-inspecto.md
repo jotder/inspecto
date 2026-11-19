@@ -19,6 +19,9 @@
 
 - [Geo and link adapters — admin guide](../../module/geo-link/admin-guide-geo-link.md)
 - [Link analysis and geo routes - admin guide](../../module/la-api/admin-guide-la-api.md)
+- [Inspecto LA demo kit - runbook and stakeholder Q&A — Pre-flight, day-of checklist and the script](../../module/la-core/admin-guide-demo-preflight-script.md)
+- [Inspecto LA demo kit - runbook and stakeholder Q&A — Short version, claims, rehearsals and requirements](../../module/la-core/admin-guide-demo-short-version-records.md)
+- [Inspecto LA demo kit - runbook and stakeholder Q&A — Stakeholder Q&A](../../module/la-core/admin-guide-demo-stakeholder-qa.md)
 - [Inspecto LA demo kit - runbook and stakeholder Q&A](../../module/la-core/admin-guide-demo.md)
 - [Inspecto LA - administration (LA level, Investigations add-on, masking default, real OIDC sign-in)](../../module/la-core/admin-guide-la-core.md)
 - [Link analysis storage - admin guide](../../module/la-storage/admin-guide-la-storage.md)

@@ -1,3 +1,13 @@
+---
+type: Reference
+title: Doc claim audit — 2026-10-19 (PRODUCT-DOCS-HUB-1)
+description: Audit of how far a seeded sample of 30 agent-written hub docs of 2026-10-19 matched the code: method, results per slot and per doc, the wrong claims found and fixed, patterns, the verdict and a second pass over admin-guide and plan docs.
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+---
+
 # Doc claim audit — 2026-10-19 (PRODUCT-DOCS-HUB-1)
 
 The doc guards (`check-doc-links`, `check-doc-citations`, `check-vocabulary`, …) prove that links, paths and

@@ -4,6 +4,11 @@ title: "Link Analysis card fraud showcase — user guide"
 description: "A five-minute tour of the la-card Space from its four saved views, then one exercise per planted story with a hint and an answer, and the tester's checklist of look-alikes that must not join a story."
 tags: [la-card, user-guide, showcase]
 timestamp: 2026-11-07T00:00:00Z
+item: solution-pack.la-card
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-card
 ---
 
 # Link Analysis card fraud showcase — user guide

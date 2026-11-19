@@ -4,6 +4,11 @@ title: Link Analysis — as-built reference and design records — External refe
 description: Part 5 of 6 of Link Analysis — as-built reference and design records: External references and the Dossier bundle; SPA separation record (D-5); Integration design record (D-6); Platform-layer record (D-1)
 tags: [module, la-core, link-analysis, architecture]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — as-built reference and design records — External references, the Dossier and the separation records

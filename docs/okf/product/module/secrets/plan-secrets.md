@@ -5,6 +5,11 @@ description: SEC-07 requirement for mounted-file and Java KeyStore secret refere
 resource: providers/inspecto-secrets/
 tags: [module, secrets, plan, sec-07]
 timestamp: 2026-10-19T00:00:00Z
+item: module.secrets
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: providers/inspecto-secrets
 ---
 
 # File-keystore secrets provider — plan of record

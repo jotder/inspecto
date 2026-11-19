@@ -1,3 +1,14 @@
+---
+type: Spec
+title: Space lock — the server's signed record of a Space (SE-1a)
+description: The Space lock (.inspecto/space.lock): the server's signed, derived record of a Space's configs with permanent uids and resolved links — format, rename handling, changed-outside detection, the integrity and accept routes, links: mode and activation holds.
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-17 last-edit
+code: [platform/inspecto-config]
+---
+
 # Space lock — the server's signed record of a Space (SE-1a)
 
 **State:** built 2026-11-12 (SE-1a of the Space evolution plan, §4.1 step 1: shadow, report-only). It refuses

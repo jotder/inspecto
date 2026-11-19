@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Spaces
+description: How Spaces work: an isolated project environment with its own config, data, audit and engine, seeded from a Space Template, plus the Installed → Enabled → Permitted module gates, boot modes and lifecycle.
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [platform/inspecto-config]
+---
+
 # Spaces
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.

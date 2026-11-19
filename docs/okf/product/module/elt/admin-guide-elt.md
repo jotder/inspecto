@@ -4,6 +4,11 @@ title: "ELT — admin guide"
 description: "Operating the ELT layer: Pipeline directories and roots, the -D flags for acquisition, intake admission control, ingest retry and lane, Jobs and Job packs, the ledgers and files on disk, quarantine, markers, start-up warnings, health and metrics routes, and one table of common failures."
 tags: [elt, etl, acquire, engine, admin-guide]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # ELT — admin guide

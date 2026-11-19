@@ -4,6 +4,9 @@ title: Link Analysis and Investigations
 description: What Link Analysis is — seeing how the people, accounts and numbers in your data connect — and what an Investigation adds.
 item: module.la-core
 audience: external
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis and Investigations

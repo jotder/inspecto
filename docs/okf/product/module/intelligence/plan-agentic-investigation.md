@@ -1,3 +1,14 @@
+---
+type: Plan
+title: Agentic investigation — design (`AGENTIC-INVESTIGATION-1`)
+description: Design for an agent that works one Incident into a cited Incident Brief — why it fired, evidence, value at risk and a proposed four-eyes action it never runs itself — with slices, seams, risks and the as-built S1 of 2026-11-01.
+item: module.intelligence
+audience: internal
+status: plan
+verified: 2026-11-01 last-edit
+code: [features/inspecto-intelligence]
+---
+
 # Agentic investigation — design (`AGENTIC-INVESTIGATION-1`)
 
 **Status:** 🟢 **S1 BUILT 2026-11-01** (deterministic Incident Brief: why + evidence + declared value at risk, with an optional proposed next action filed as a four-eyes Action Request) — as built in §10; S2…S6 open (`docs/BACKLOG.md`). §8 decisions taken by the assistant under operator delegation (2026-10-18) and the S1 decisions in §10.1 (2026-11-01) are **PENDING OPERATOR CONFIRMATION**.

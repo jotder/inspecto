@@ -4,6 +4,11 @@ title: Config Safety Validator — Allowed roots, data refs and the one save gat
 description: Part 2 of 4 of Config Safety Validator: A Space's allowed roots: declared + its OWN base (tier 3 2026-08-14, narrowed 2026-09-24); Data refs: a second verdict, deliberately not PathJail; One save gate for every door — SaveGate (2026-09-23)
 tags: [config, safety, validation, path-jail, security]
 timestamp: 2026-06-28T00:00:00Z
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-config
 ---
 
 # Config Safety Validator — Allowed roots, data refs and the one save gate

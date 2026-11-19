@@ -4,6 +4,11 @@ title: "Link Analysis showcase (feature off) — admin guide"
 description: "Create and verify the feature-off companion Space."
 tags: [la-showcase-off, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.la-showcase-off
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-showcase-off
 ---
 
 # Link Analysis showcase (feature off) — admin guide

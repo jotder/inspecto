@@ -5,6 +5,10 @@ description: Parameterized rule templates saved from the data-table, persisted s
 resource: inspecto-ui/src/app/inspecto/rule/index.ts
 tags: [design-system, rule, template, params, pro-max]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
 ---
 
 # Rule

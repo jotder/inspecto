@@ -4,6 +4,11 @@ title: Alerts & Incidents (INC) — Refused, as-built pointers and verification
 description: Part 5 of 5 of Alerts & Incidents (INC): Refused & superseded; As-built mechanism (pointers only); Verification
 tags: [inc, capability, alerts, alert-rules, incidents, cases, queues, escalation, sla, notifications, diagnosis, findings, retention]
 timestamp: 2026-09-08T00:00:00Z
+item: addon.incidents
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: features/inspecto-ops
 ---
 
 # Alerts & Incidents (INC) — Refused, as-built pointers and verification

@@ -5,6 +5,10 @@ description: Every optional feature module, what it adds to the host, how it is 
 resource: features/
 tags: [layer, features, modules, editions, architecture]
 timestamp: 2026-10-19T00:00:00Z
+item: layer.features
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # Feature modules layer — architecture

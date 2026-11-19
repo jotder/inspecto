@@ -4,6 +4,11 @@ title: "Analytics Kernel — plan"
 description: "Requirement of record for the Analytics Kernel: what was required, what is built, what is left and what was refused, from BACKLOG row ANALYTICS-CORE-1 and its plan."
 tags: [analytics, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.analytics
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-analytics
 ---
 
 # Analytics Kernel — plan

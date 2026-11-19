@@ -4,6 +4,10 @@ title: Shared checkout and git - gotchas
 description: Traps of the shared team checkout: peer sessions, the shared git index, staging, worktrees and commits.
 tags: [git, shared-checkout, gotchas]
 timestamp: 2026-11-19T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Shared checkout and git - gotchas

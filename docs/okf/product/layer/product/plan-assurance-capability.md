@@ -4,6 +4,10 @@ title: Assurance capability programme — generic product before the project (as
 description: The rule that decided which RA / FM / BA work is product (no customer input) and which waits for a customer, where each of the five shipped waves is documented, and the customer-dependent work that stays parked.
 tags: [plan, revenue-assurance, fraud-management, business-assurance, payment-fraud]
 timestamp: 2026-10-22T00:00:00Z
+item: layer.product
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
 ---
 
 # Assurance capability programme — generic product before the project

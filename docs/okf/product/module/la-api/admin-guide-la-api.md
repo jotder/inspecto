@@ -5,6 +5,11 @@ description: Enable, configure, secure and troubleshoot the Link Analysis HTTP s
 resource: la/inspecto-la-api/
 tags: [module, la-api, link-analysis, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.la-api
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: la/inspecto-la-api
 ---
 
 # Link analysis and geo routes - admin guide

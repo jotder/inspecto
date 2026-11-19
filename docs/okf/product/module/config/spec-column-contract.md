@@ -1,3 +1,14 @@
+---
+type: Spec
+title: Column contract — Schema column changes and what they break (SE-3a, SE-3b)
+description: How the column contract (SE-3a, SE-3b) finds which Schema column changes break which consumers — the published column set, change classes, the warning on Schema save, the opt-in 409 refusal and its kill switch.
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-13 last-edit
+code: [platform/inspecto-config]
+---
+
 # Column contract — Schema column changes and what they break (SE-3a, SE-3b)
 
 **State:** built 2026-11-13. SE-3a (the Space evolution plan, §4.3 steps 1 and 2: the shadow report, then a warning

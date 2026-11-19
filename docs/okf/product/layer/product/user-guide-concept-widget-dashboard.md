@@ -4,6 +4,8 @@ title: Widget and Dashboard
 description: What a Visualization Type, a Widget, a Dashboard and a Report are, and how a Dataset becomes a page of charts.
 item: layer.product
 audience: external
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Widget and Dashboard

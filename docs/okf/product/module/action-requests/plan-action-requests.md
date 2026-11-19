@@ -5,6 +5,11 @@ description: What was required of Action Requests (four-eyes approved outbound A
 resource: features/inspecto-action-requests/
 tags: [action-requests, plan, requirement, four-eyes, egress, decision-rule]
 timestamp: 2026-10-19T00:00:00Z
+item: module.action-requests
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: features/inspecto-action-requests
 ---
 
 # Action Requests — requirement of record

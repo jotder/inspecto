@@ -4,6 +4,11 @@ title: "Partner settlement — user guide"
 description: "How a settlement analyst reads the findings, Breaks and calendar of the Partner settlement pack."
 tags: [partner-settlement, user-guide]
 timestamp: 2026-10-20T00:00:00Z
+item: solution-pack.partner-settlement
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/partner-settlement
 ---
 
 # Partner settlement — user guide

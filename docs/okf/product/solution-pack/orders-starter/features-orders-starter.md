@@ -4,6 +4,11 @@ title: "Orders starter — features"
 description: "A first Space: a feed, a quality check, a Dataset and a dashboard."
 tags: [orders-starter, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.orders-starter
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/orders-starter
 ---
 
 # Orders starter — features

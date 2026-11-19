@@ -4,6 +4,11 @@ title: solution-pack.la-showcase - board row detail
 description: The narrative behind solution-pack.la-showcase's long rows on the board (docs/BACKLOG.md), moved here verbatim so each board row stays a short summary.
 tags: [solution-pack, la-showcase, plan, backlog]
 timestamp: 2026-11-19T00:00:00Z
+item: solution-pack.la-showcase
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: spaces/_templates/la-showcase
 ---
 
 # solution-pack.la-showcase - board row detail

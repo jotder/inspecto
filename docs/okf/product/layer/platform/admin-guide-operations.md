@@ -1,3 +1,13 @@
+---
+type: Guide
+title: Inspecto — Operations & Support Guide (pointer map)
+description: Orientation map for operations and support — how to serve the bundle, put it behind the reverse proxy, watch and operate it, and where to look when something is wrong — pointing into ADVANCED_GUIDE and the admin-guide pages.
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-17 last-edit
+---
+
 # Inspecto — Operations & Support Guide (pointer map)
 
 > Audience: operations & support · Status date: **2026-07-07**

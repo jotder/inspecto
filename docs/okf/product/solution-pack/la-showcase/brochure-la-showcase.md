@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis showcase — brochure
+description: Brochure for the Link Analysis showcase: a mule ring, a shell-company loop and five telecom fraud rings surfacing from plain data in one guided walk-through, with masking, four-eyes and Drafts visible.
+item: solution-pack.la-showcase
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-showcase]
+---
+
 # Link Analysis showcase — brochure
 
 > **Watch a mule ring, a shell-company loop and five telecom fraud rings surface from plain data in one guided walk-through.**

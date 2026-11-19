@@ -5,6 +5,11 @@ description: The offline geographic investigation studio — GeoSource/GeoQuery 
 resource: inspecto-ui/projects/link-analysis/src/geo-map/
 tags: [feature, studio, geo, maplibre, investigation]
 timestamp: 2026-07-07T00:00:00Z
+item: module.geo-link
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-geo-link
 ---
 
 # Geo Map Analysis
@@ -27,7 +32,7 @@ The Builder-lens studio at `/studio/geo-map` for the *where* of an investigation
 Geocoder — never "marker/pin" in model names).
 
 * **Fully offline** — MapLibre GL host (`src/app/inspecto-ui/projects/link-analysis/src/geo/`) over a bundled basemap
-  (`assets/basemap/`, ~2.7 MB). ⚠ **It is NOT PMTiles** (corrected 2026-09-08): a planet extract at z0–6
+  (`assets/basemap/`, ~2.7 MB). ⚠ **It is NOT PMTiles**: a planet extract at z0–6
   would have been ~100 MB, so D2 took **four slimmed Natural Earth GeoJSON layers + glyph fonts**; the
   `pmtiles://` protocol was to stay registered for a customer archive and **no code references it today**.
   The offline place-table **Geocoder** resolves name→point behind a pluggable seam.

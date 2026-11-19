@@ -5,6 +5,11 @@ description: "Requirement of record for Risk Scores (module scoring): what was r
 resource: features/inspecto-scoring/src/main/resources/META-INF/inspecto/module.toon
 tags: [scoring, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.scoring
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: features/inspecto-scoring
 ---
 
 # Scoring — plan

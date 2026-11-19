@@ -5,6 +5,11 @@ description: Consignment addressing (event time at write, the Selector, revision
 resource: platform/inspecto-etl/src/main/java/com/gamma/etl/StreamingFileIngester.java, platform/inspecto-engine/src/main/java/com/gamma/inspector/ConsignmentIngestor.java, platform/inspecto-etl/src/main/java/com/gamma/etl/PipelineConfig.java, platform/inspecto-engine/src/main/java/com/gamma/consignment, platform/inspecto-engine/src/main/java/com/gamma/inspector/ConcurrencyBroker.java, platform/inspecto-etl/src/main/java/com/gamma/etl/DuckDbCsvIngester.java, platform/inspecto-engine/src/main/java/com/gamma/parse/ParserPlugin.java
 tags: [elt, engine, ingestion, spi, streaming, consignment, ingester, duckdb, seam, partitions, contract-test, plugins, segments, quarantine, route, branch, arming, fail-closed, lanes, addressing, revisions, watermark, selector, event-time, concurrency, scheduler, priority, backpressure, operations, parsing, grammar, csv, plugin, read-csv, frontend, options, asn1, xml, decode-profile]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # Consignments — addressing and concurrency
@@ -139,7 +144,7 @@ derived from `declaredSources` rather than parsing the list again, and the previ
 exactly the declarations the writer refuses: none declared, two that disagree, one blank, one that is not a
 plain identifier. Deliberately **not** unified with `PartitionDef.fromSchema` on the ingest side — same config
 word, different contract (`type` required per entry, non-list hard-fails, legacy `partitionKey` fallback; see
-[§3](spec-ingest.md#3-segment-schemas-and-the-partition-declaration) above).
+[§3](spec-ingest-plugin-ingester.md#3-segment-schemas-and-the-partition-declaration) above).
 
 ⚠ An entry declaring **no `column`** (or a blank one) is the single `partitions[]` defect this path refuses
 rather than degrades past. It names no directory segment, so accepting it silently writes the store to a layout

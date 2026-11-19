@@ -4,6 +4,11 @@ title: "Link Analysis showcase — user guide"
 description: "How an investigator works through the la-showcase demo Space."
 tags: [la-showcase, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.la-showcase
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: spaces/_templates/la-showcase
 ---
 
 # Link Analysis showcase — user guide

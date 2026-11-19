@@ -4,6 +4,10 @@ title: "Service contracts (SPI) — features"
 description: "Service contracts (SPI) are the small interfaces — auth, audit, HTTP routes — that optional modules implement."
 tags: [spi, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: layer.spi
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # Service contracts (SPI) — features

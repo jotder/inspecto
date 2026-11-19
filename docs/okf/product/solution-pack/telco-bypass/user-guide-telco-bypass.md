@@ -4,6 +4,11 @@ title: "Telecom bypass (SIM-box) — user guide"
 description: "How an analyst reads the daily SIM-box signals, scores and findings in the Telecom bypass pack."
 tags: [telco-bypass, user-guide]
 timestamp: 2026-10-20T00:00:00Z
+item: solution-pack.telco-bypass
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/telco-bypass
 ---
 
 # Telecom bypass (SIM-box) — user guide

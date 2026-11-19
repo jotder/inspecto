@@ -5,6 +5,11 @@ description: JobService — cron, event-triggered, and manual jobs, with an off-
 resource: platform/inspecto-engine/src/main/java/com/gamma/job/JobService.java
 tags: [control-plane, jobs, scheduling, cron, triggers, async-runs]
 timestamp: 2026-07-07T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: inspecto
 ---
 
 # Jobs & Scheduling

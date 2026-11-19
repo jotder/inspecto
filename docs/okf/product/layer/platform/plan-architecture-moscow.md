@@ -1,3 +1,13 @@
+---
+type: Plan
+title: Architecture work — MoSCoW analysis (2026-11-12)
+description: Dated MoSCoW ranking (2026-11-12, refreshed to 2026-11-17) of the architecture work named by board rows — Must, Should, Could and Won't items, with the operator's decisions of 2026-11-16 and the limits of the analysis.
+item: layer.platform
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+---
+
 # Architecture work — MoSCoW analysis (2026-11-12)
 
 > **Status:** analysis of 2026-11-12, operator-requested. A dated ranking, not a list of open work: the
@@ -5,14 +15,14 @@
 > Items marked *(no row)* were found in the docs and are **not verified in the code**; the board row
 > `ARCH-MOSCOW-UNTRACKED-1` owns checking each one and either filing or refusing it.
 > Re-rank when the next MAJOR is tagged or a first customer deployment is scheduled.
-> **Refreshed 2026-11-16:** the operator decided every Should and Could item in an interview (§8); the Must items
-> were postponed, unchanged. C14 moved to Won't. **Refreshed 2026-11-17:** the Must table checked against the board
-> and code — M1, M2, M3, M6 and M8 closed, M4 complete (release notes re-audited against `v3.12.0`), M5 and M7
-> operator-held. **Operator 2026-11-17:** M5 and M7 stay postponed until the keys, a release date and a host are
-> supplied; D-LC3 confirmed for 4.0.0 — link checks keep the `shadow` default, `refuse` stays opt-in. **Refreshed 2026-11-15:** the nightly CI and UI workflows are green on Linux again (CI at `47c5dc33f`, UI at
-> `16d259204`; red since 2026-11-11 and at least 2026-10-10), and every snapshot reader and writer now takes the swap
-> lock (M8 follow-up). **Refreshed 2026-11-14:** M1, M3, M6 and M8 are closed, as are S5, S13 and the layout half of S14; the
-> tables mark each with the date. The ranking itself was not redone.
+> **Where it stands:** the operator decided every Should and Could item in an interview (§8); the Must items were
+> postponed, unchanged, and C14 moved to Won't. Checked against the board and code: M1, M2, M3, M6 and M8 are closed,
+> M4 is complete (release notes re-audited against `v3.12.0`), M5 and M7 are operator-held — **operator 2026-11-17:**
+> they stay postponed until the keys, a release date and a host are supplied; D-LC3 confirmed for 4.0.0 — link checks
+> keep the `shadow` default, `refuse` stays opt-in. S5, S13 and the layout half of S14 are closed too; the tables mark
+> each closed item with its date. The nightly CI and UI workflows are green on Linux (CI at `47c5dc33f`, UI at
+> `16d259204`), and every snapshot reader and writer takes the swap lock (M8 follow-up). The ranking itself was not
+> redone. Dated updates: *Changes* at the end.
 
 ## 1. What is ranked, and against what
 
@@ -48,7 +58,7 @@ Module-level architecture pages were not read for this ranking, so observability
 | M2 | `ARCH-MOSCOW-UNTRACKED-1` item 1 *(no row of its own)* | Two records of 2026-11-12 disagree on whether master is green. The product-assembly plan records a green full Advanced reactor gate over `6a7d8c20b` plus PA-9b. A run of the whole `inspecto-processor` suite on `fe87aa121` (2,733 tests) had the three failures of M1, and two of them fail alone on `e45b25f9d`. **Settled 2026-11-12:** one full Advanced reactor gate on `f0aa137da` built 57 of 57 modules and ran 12,188 tests with 3 failures, 0 errors and 149 skipped (94 of them Postgres-backed). The failures are exactly the three of M1. | Master is red by M1 only. The gate has to be repeated daily, as the lane workflow says, or this answer goes stale. | **Settled 2026-11-12**, and M1 is closed since; nothing left. |
 | M3 | `JOB-SIGNAL-OVERLAP-SKIP-1` | An `on_signal` Job loses the last landing when a signal arrives while it runs. | A Dataset missed a month of data until another commit; three packs carry a cron workaround. | **Closed 2026-11-13** (board row closed): a coalesced Signal follow-up now waits for the Run in flight. |
 | M4 | Release notes for the next MAJOR (§2 of the board) | Breaking route removals are typed `docs:` in git, so a `feat!:` scan misses them; every `since = "4.0.0"` type is unpublished. | The release notes are generated from commit types; they would be wrong. | The MAJOR tag. **Audited 2026-11-15:** every change since `v3.11.0` checked against the route table, flags, main classes, public types and config keys, not commit types alone; 35 entries added, 2 corrected. **Complete 2026-11-17:** re-audited against `v3.12.0`, the newest tag (everything it shipped is on `master`): seven breaking entries and one deprecation added, and `since = "4.0.0"` types stated as new, not breaking. The §2 row stays open only to take further entries and to be pasted at the tag. |
-| M5 | `RELEASE-PIPELINE-UNRUN-1` (was untracked item 2) and `MODULE-REORG-P3-THIN-JARS` | `release.yml` signing, SBOM and scan have never run on a tag; the keystore, secrets and TSA URL are owed. | Supply-chain claims are unproven and jars would ship unsigned. | Operator: keys and a release date. **Open, operator-held** (2026-11-17). |
+| M5 | `RELEASE-PIPELINE-UNRUN-1` and `MODULE-REORG-P3-THIN-JARS` | `release.yml` signing, SBOM and scan have never run on a tag; the keystore, secrets and TSA URL are owed. | Supply-chain claims are unproven and jars would ship unsigned. | Operator: keys and a release date. **Open, operator-held** (2026-11-17). |
 | M6 | `ARCH-MOSCOW-UNTRACKED-1` item 3 *(no row of its own)* | Columns classed `CONFIDENTIAL` (for example AML `account_id`, `wallet_id`, `msisdn`) sit outside `ColumnClassification.SENSITIVE`, so they are not masked. **Confirmed in code and fixed for the shipped templates 2026-11-14** (`TEMPLATE-CONFIDENTIAL-UNMASKED-1`: eight identifier columns of `aml`, `mobile-money` and `telco-fraud` reclassified). **Closed 2026-11-14** (`CLASSIFICATION-UNMASKED-CLASS-1`): a save now refuses a class the Space does not know, and no shipped template holds `CONFIDENTIAL`. The two masking sets became one rule the same day (`MASKING-TWO-VOCABULARIES-1`, operator-confirmed: fail closed), and the bulk importers refuse an unknown class too (`CLASSIFICATION-BULK-IMPORT-UNGATED-1`). | Exposure of personal data; the maturity assessment calls it a due-diligence finding and sizes it in days. | Done. |
 | M7 | `ASSURE-OPERABILITY-1`, Deployment topology live validation, `DEPLOY-SERVICE-WRAPPER-1` | No recorded restore drill, RPO and RTO unmeasured, the kill -9 and reboot acceptance of the service wrapper unrun, the chart never installed. | The wrapper is the recovery mechanism; recovery that was never exercised is a claim, not a property. | Operator: targets and host access. **Open, operator-held** (2026-11-17). |
 | M8 | `JOB-SNAPSHOT-SWAP-READER-RACE-1` | `SqlTemplateJob.swapIn` deletes the old snapshot while a running reader still reads it. | A dependent Job fails all its retries (seen in `la-banking`). | **Closed 2026-11-14:** the swap RENAMES the pinned file (deletion was not the cause); a per-store `SnapshotSwapLock` makes a publish wait for a `sql.template` reader. Other readers: `SNAPSHOT-SWAP-UNLOCKED-READERS-1` (P3). |
@@ -72,8 +82,8 @@ targets and host access).
 | S8 | `DATA-TIERS-1` · `PRODUCT-ASSEMBLY-1` with `CONTAINER-AIRGAP-PROOFS-1` | ~~The data layer by Edition is unfinished;~~ *data tiers finished 2026-11-17 (§8)*; the Kubernetes install and the air-gapped bundle are unproven. | In flight under their own plans; a Basic or Standard zip install does not depend on them. |
 | S9 | `SPACE-LINK-CENSUS-1` (then `SPACE-EVOLUTION-1`, `PIPELINE-LINK-GAPS-1`) | Link keys are hard-coded in six checks, so rename and impact scans miss links. | **Built 2026-11-16** (§8): LC-1…LC-7 built; the delete and save refusals are ready in `refuse` but stay in shadow by default until the operator's D-LC3 flip. The narrowed row keeps that flip, the component rename route, a duplicate refused at save and the column rename rewrite. |
 | S10 | `LA-PERF-N10-1` | About 3,550 native threads and 1.4 GB at idle with 48 DuckDB files; no thread cap per instance. | Suspected, not proven, as the cause of slow projections. Measure before changing. ✅ Shipped 2026-11-12: the threads were DuckDB 2.0's `async_threads` pool, now capped (5,332 → 1,158 threads, p50 579 → 450 ms); the projection tail was not caused by it (`la-api/spec-server-profile.md`). |
-| S11 | `DEPLOY-EXPOSURE-KIT-1` (was untracked item 6; TLS and backup verify turned out built) | `/metrics` and `/health/details` are unauthenticated by design and fenced only by a proxy; the preflight, proxy and TLS templates, off-site backup, verify and upgrade scripts are unbuilt. *Kit built 2026-11-16 (§8); the real-host run is open.* | Safe behind a correctly set proxy; the scripts make that the default, not an instruction. |
-| S12 | `LEGAL-HOLD-SCOPE-1` (was untracked item 7) | Retention and legal hold cover Incidents only. *Evidence hold built 2026-11-17 (§8); `partition_prune` and a hold screen are open.* | The Advanced brochure promises legal hold; either build it or narrow the claim. |
+| S11 | `DEPLOY-EXPOSURE-KIT-1` (TLS and backup verify turned out built) | `/metrics` and `/health/details` are unauthenticated by design and fenced only by a proxy; the preflight, proxy and TLS templates, off-site backup, verify and upgrade scripts are unbuilt. *Kit built 2026-11-16 (§8); the real-host run is open.* | Safe behind a correctly set proxy; the scripts make that the default, not an instruction. |
+| S12 | `LEGAL-HOLD-SCOPE-1` | Retention and legal hold cover Incidents only. *Evidence hold built 2026-11-17 (§8); `partition_prune` and a hold screen are open.* | The Advanced brochure promises legal hold; either build it or narrow the claim. |
 | S13 | `DEMO-BAKE-WAL-RACE-1` | Closing a busy Space gives up after 10 s and leaves `.wal` files. | Seen while baking demo images; the row itself says it is open for a production stop. **Closed 2026-11-12:** a stop past the close budget now closes the stores anyway. |
 | S14 | core→feature lint-enforced 2026-11-15; feature-to-feature refused (board §6); `LA-PERF-N4-1` for the layouts | UI: "the core never imports a feature" is not lint-enforced, and 48 feature-to-feature imports rest on review. Link Analysis graph layouts run on the main thread (2.3 to 3.6 s at 767 nodes). | The convention holds today; the freeze is a usability cost. The lint is small. The layout half closed 2026-11-13 (`LA-PERF-N4-1`: Force layouts run in time slices). |
 | S15 | `ARCH-DOC-CONTRADICTIONS-1` | Fourteen places (one settled since) where current docs contradict each other (thin-jar count, shading, Postgres multi-user state, D15, old Edition names and more). | Docs, not behaviour; but a reader acting on the wrong page gets the wrong answer. **Closed 2026-11-15** (all fourteen settled against the code). |
@@ -178,3 +188,13 @@ row's `hold:` tag changed to match.
 | C12 | The upstream reports for `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1`, `CODEGRAPH-AFFECTED-UNUSABLE-1` and `AGT-5` before 4.0.0. | `hold: external` removed from all three; what follows each report still waits on the upstream fix. **Filed 2026-11-17** (operator go-ahead): [duckdb/duckdb#28947](https://github.com/duckdb/duckdb/issues/28947), [colbymchenry/codegraph#3320](https://github.com/colbymchenry/codegraph/issues/3320), [jotder/inspect-agent#1](https://github.com/jotder/inspect-agent/issues/1). |
 | C13 | The `LA-SHOWCASE-RELEASE-RESIDUALS-1` Linux zip and `NATIVE-LICENCE-LINUX-MACOS-1` kept on hold for now. | Both `hold: operator`. |
 | C14 | `DOCS-FUNCTIONALITY-HUBS-1` refused. | `functionality/` items stay documented in the module hubs that implement them. Moved to §5 Won't; the board row is closed into board §6. |
+
+## Changes
+
+- 2026-11-14: M1, M3, M6 and M8 closed, with S5, S13 and the layout half of S14.
+- 2026-11-15: the nightly CI and UI workflows green on Linux again (red since 2026-11-11, and at least 2026-10-10); every
+  snapshot reader and writer takes the swap lock.
+- 2026-11-16: the Should and Could items decided in the operator interview (§8); C14 moved to Won't.
+- 2026-11-17: the Must table checked against the board and code.
+- `RELEASE-PIPELINE-UNRUN-1` (M5), `DEPLOY-EXPOSURE-KIT-1` (S11) and `LEGAL-HOLD-SCOPE-1` (S12) were untracked items 2, 6
+  and 7 of the first analysis before they were filed.

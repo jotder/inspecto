@@ -5,6 +5,11 @@ description: The work around a Pipeline run - the ordered registry of commit ste
 resource: inspecto/src/main/java/com/gamma/service/CollectorService.java, inspecto/src/main/java/com/gamma/service/PipelineScheduler.java, inspecto/src/main/java/com/gamma/control/ImportCommitSteps.java, inspecto/src/main/java/com/gamma/control/ImportPreRunSteps.java, platform/inspecto-etl/src/main/java/com/gamma/etl/SchemaDrift.java, inspecto/src/main/java/com/gamma/control/DatasetNewColumns.java
 tags: [elt, engine, scheduler, commit-steps, pre-run-steps, import, cadence, trigger, onboarding, schema-drift, new-columns]
 timestamp: 2026-11-19T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # Pipeline execution — run steps

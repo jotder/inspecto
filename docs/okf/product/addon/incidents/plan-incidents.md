@@ -5,6 +5,11 @@ description: The Alert → Incident → Case chain — Alert Rules and fired Ale
 resource: features/inspecto-ops/, platform/inspecto-engine/src/main/java/com/gamma/alert, platform/inspecto-engine/src/main/java/com/gamma/notify, inspecto-ui/src/app/modules/admin/notification-center/
 tags: [inc, capability, alerts, alert-rules, incidents, cases, queues, escalation, sla, notifications, diagnosis, findings, retention]
 timestamp: 2026-09-08T00:00:00Z
+item: addon.incidents
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: features/inspecto-ops
 ---
 
 # Alerts & Incidents — capability spec (`INC`)

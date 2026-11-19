@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Telecom bypass (SIM-box)
+description: How the telco-bypass Space Template finds SIM-box SIMs from voice CDRs: the nightly Job chain, twelve signals, the explainable Risk Score, findings, the cluster stage and box Incident, Alert Rules and Entity Lists.
+item: solution-pack.telco-bypass
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/telco-bypass]
+---
+
 # Telecom bypass (SIM-box)
 
 > **Level 2 solution page.** Content pack: Space Template `telco-bypass`

@@ -4,6 +4,9 @@ title: Pipeline and Steps
 description: What a Pipeline is — a chain of Steps that reads incoming data and writes clean Datasets — what a Step and a Run are, and how a Pipeline differs from a Job.
 item: module.elt
 audience: external
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # Pipeline and Steps

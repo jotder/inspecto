@@ -4,6 +4,11 @@ title: "Maker-checker (Pending Changes) — screens"
 description: "Where Maker-checker (Pending Changes) lives in the UI and what each screen does."
 tags: [workflow, maker-checker, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.workflow
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-workflow
 ---
 
 # Maker-checker (Pending Changes) — screens

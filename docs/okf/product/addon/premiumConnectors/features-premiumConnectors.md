@@ -4,6 +4,11 @@ title: "Premium Connectors — features"
 description: "Premium Connectors add streaming connectors beyond the file and database schemes."
 tags: [premiumConnectors, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: addon.premiumConnectors
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-connectors-kafka
 ---
 
 # Premium Connectors — features

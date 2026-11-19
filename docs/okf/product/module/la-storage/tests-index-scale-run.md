@@ -1,3 +1,14 @@
+---
+type: Reference
+title: Link Analysis edge index — 10^9 scale run plan (clause 3 of `LA-INDEX-SCALE-MEASURE-1`)
+description: Plan for measuring the Link Analysis edge index at 10^9 edges: what is known from earlier runs, sizing arithmetic, commands, what to record, failure modes seen, a go/no-go checklist and the follow-ups not built.
+item: module.la-storage
+audience: internal
+status: current
+verified: 2026-11-15 last-edit
+code: [la/inspecto-la-storage]
+---
+
 # Link Analysis edge index — 10^9 scale run plan (clause 3 of `LA-INDEX-SCALE-MEASURE-1`)
 
 **Audience:** whoever runs the measurement on a larger machine. **Status:** plan only; nothing in it was run at 10^9 or 5x10^8

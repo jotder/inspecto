@@ -5,6 +5,10 @@ description: The app-wide offline / backend-down strip, mounted once in the layo
 resource: inspecto-ui/src/app/inspecto/components/connectivity-banner.component.ts
 tags: [design-system, connectivity, offline, color-owner]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
 ---
 
 # Connectivity Banner

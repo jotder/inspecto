@@ -6,6 +6,9 @@ description: The requirement-of-record and as-built specification for the repo's
 status: current
 written: 2026-09-09
 supersedes-rows: REQUIREMENTS §4 NFR-9 and NFR-10 (this file corrects them, see §2)
+item: layer.platform
+audience: internal
+verified: 2026-11-19 last-edit
 ---
 
 # Guards & repository tooling (`TOOL`)

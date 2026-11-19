@@ -5,6 +5,11 @@ description: What the link index module is required to do, what is built, what i
 resource: la/inspecto-la-storage/
 tags: [module, la-storage, link-analysis, index, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.la-storage
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: la/inspecto-la-storage
 ---
 
 # Link analysis storage - plan of record

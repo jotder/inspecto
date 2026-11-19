@@ -4,6 +4,11 @@ title: "Storage — screens"
 description: "Where Storage lives in the UI and what each screen does."
 tags: [entity-store, storage, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.entity-store
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-entity-store
 ---
 
 # Storage — screens

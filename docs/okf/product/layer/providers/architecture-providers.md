@@ -5,6 +5,10 @@ description: Every module in the providers layer, the SPI each implements, how i
 resource: providers/
 tags: [layer, providers, spi, editions, architecture]
 timestamp: 2026-10-19T00:00:00Z
+item: layer.providers
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # Providers layer — architecture

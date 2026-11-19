@@ -16,7 +16,7 @@ tags: [product-item, module]
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [Event model and log — plan](plan-event.md) |
-| spec | current | [Events & Metrics](spec-events-metrics.md) · [Signal Backbone (canonical envelope, agent context fabric, gated agentic write)](spec-signal-backbone.md) |
+| spec | current | [Events & Metrics — Authorable notification rules and Alert Rule authoring](spec-events-metrics-alert-rules.md) · [Events & Metrics — Notifications and audit — the audit hash chain onward](spec-events-metrics-audit-chain.md) · [Events & Metrics — Bounce handling, rate-limit classes and unmodelled keys](spec-events-metrics-decisions-keys.md) · [Events & Metrics — Notifications and the audit trail](spec-events-metrics-notifications.md) · [Events & Metrics](spec-events-metrics.md) · [Signal Backbone (canonical envelope, agent context fabric, gated agentic write)](spec-signal-backbone.md) |
 | architecture | current | [Events and event log](architecture-event.md) |
 | features | current | [Events and event log — features](features-events.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |

@@ -4,6 +4,8 @@ title: How the pieces fit
 description: A one-page map of the Inspecto concepts — from a file arriving to a closed Case — and where to read about each.
 item: layer.product
 audience: external
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # How the pieces fit

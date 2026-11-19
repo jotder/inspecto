@@ -4,6 +4,11 @@ title: "Telecom revenue assurance — architecture"
 description: "How the telco-ra Space Template wires Pipelines, Reconciliations, sql.template controls and Alert Rules into a leakage ledger."
 tags: [telco-ra, architecture]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.telco-ra
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/telco-ra
 ---
 
 # Telecom revenue assurance — architecture

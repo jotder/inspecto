@@ -5,6 +5,11 @@ description: Use FILE and KEYSTORE secret references, create the keystore, set t
 resource: providers/inspecto-secrets/
 tags: [module, secrets, admin-guide, keystore]
 timestamp: 2026-10-19T00:00:00Z
+item: module.secrets
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-secrets
 ---
 
 # File-keystore secrets provider — admin guide

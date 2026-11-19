@@ -4,6 +4,11 @@ title: "Reconciliation — API"
 description: "Control-plane routes for Reconciliation, with their gates."
 tags: [reconciliation, reconciliation, api]
 timestamp: 2026-10-19T00:00:00Z
+item: module.reconciliation
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-reconciliation
 ---
 
 # Reconciliation — API

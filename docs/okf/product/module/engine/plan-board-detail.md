@@ -4,6 +4,11 @@ title: module.engine - board row detail
 description: The narrative behind module.engine's long rows on the board (docs/BACKLOG.md), moved here verbatim so each board row stays a short summary.
 tags: [module, engine, plan, backlog]
 timestamp: 2026-11-19T00:00:00Z
+item: module.engine
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-engine
 ---
 
 # module.engine - board row detail

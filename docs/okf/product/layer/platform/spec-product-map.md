@@ -4,6 +4,10 @@ title: Product Map — the commercial tree, its guard, its views and customer bu
 description: How the Product Map (product-map/) is shaped and kept in step with the manifests and Offerings, what the render, import and customer-build tools do, the operator decisions D-PM1 to D-PM8, and the known residuals.
 tags: [product-map, editions, packaging, commercial, tooling]
 timestamp: 2026-10-22T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Product Map — as built

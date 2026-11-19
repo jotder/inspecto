@@ -5,6 +5,11 @@ description: What Entity Lists are required to do, what was built, what is left 
 resource: features/inspecto-entity-list/src/main/java/com/gamma/entitylist/EntityListRoutes.java
 tags: [entity-list, plan, requirements]
 timestamp: 2026-10-19T00:00:00Z
+item: module.entity-list
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: features/inspecto-entity-list
 ---
 
 # Entity Lists — plan of record

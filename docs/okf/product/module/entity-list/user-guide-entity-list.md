@@ -5,6 +5,11 @@ description: Where Entity Lists appear in the UI and how to create a list, edit 
 resource: inspecto-ui/projects/la-app/src/app/entity-lists.page.ts
 tags: [entity-list, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.entity-list
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-entity-list
 ---
 
 # Entity Lists — user guide

@@ -4,6 +4,11 @@ title: "AI Assist & Intelligence — features"
 description: "AI Assist & Intelligence adds the Assistant agent on Standard and the embedded intelligence layer on Advanced."
 tags: [aiAssist, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: addon.aiAssist
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [features/inspecto-agent, features/inspecto-intelligence]
 ---
 
 # AI Assist & Intelligence — features

@@ -2,6 +2,11 @@
 type: Brochure
 title: Inspecto LA short videos — scripts and agency briefs — The series, common brief and the first two videos
 description: Part 1 of 4 of Inspecto LA short videos — scripts and agency briefs: The series in one line; Contents; Common brief (applies to every video); Draft round (480p); · The ring nobody saw (about 1 min 45 s); · Zero to graph (about 1 min 45 s)
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA short videos — scripts and agency briefs — The series, common brief and the first two videos

@@ -5,6 +5,10 @@ description: Versions are branches; editions are not. Merge-forward propagation,
 resource: docs/BRANCHING.md
 tags: [branching, release, semver, conventional-commits, merge-forward]
 timestamp: 2026-06-28T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-12 last-edit
 ---
 
 # Branching & Release Policy

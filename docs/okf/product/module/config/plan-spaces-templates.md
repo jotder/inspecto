@@ -4,6 +4,11 @@ title: Spaces & tenancy (SPC) — Specification — Space Templates
 description: Part 2 of 4 of Spaces & tenancy (SPC): 
 tags: [spc, capability, spaces, tenancy, multi-space, space-root, migrator, templates, metadata-bundle, exchange, isolation]
 timestamp: 2026-09-08T00:00:00Z
+item: module.config
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-config
 ---
 
 # Spaces & tenancy (SPC) — Specification — Space Templates

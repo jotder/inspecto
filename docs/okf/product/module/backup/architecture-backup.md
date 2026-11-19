@@ -4,6 +4,11 @@ title: "Backup and restore — architecture"
 description: "How the optional backup module plugs into the maintenance Job Type and how backup, verify and restore fit together."
 tags: [backup, architecture]
 timestamp: 2026-10-19T00:00:00Z
+item: module.backup
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-backup
 ---
 
 # Backup and restore — architecture
@@ -13,7 +18,7 @@ timestamp: 2026-10-19T00:00:00Z
 The core `maintenance` Job Type (`MaintenanceJob` in `inspecto-engine`) dispatches on its `task` parameter.
 Tasks the core does not own are looked up through the `MaintenanceTaskProvider` ServiceLoader seam;
 `inspecto-backup` is one such provider. Bundles from Standard up carry the jar and Basic does not, so on Basic
-the three task names are unknown and a job naming one fails at run ([spec-editions](../../layer/platform/spec-editions.md) `OPS-06`).
+the three task names are unknown and a job naming one fails at run ([spec-editions-platform-board](../../layer/platform/spec-editions-platform-board.md) `OPS-06`).
 The module has no HTTP routes, screens or settings of its own: everything is a Job, authored and triggered
 through the Jobs surface.
 

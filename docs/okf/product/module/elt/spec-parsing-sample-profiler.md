@@ -5,6 +5,11 @@ description: The engine's sample profiler (com.gamma.parse.SampleProfiler) — t
 resource: platform/inspecto-engine/src/main/java/com/gamma/parse/SampleProfiler.java
 tags: [parsing, sniff, types, sample-profiler, add-data, schema-suggest, decimal-mark]
 timestamp: 2026-11-19T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # P.3.6 The sample profiler — one sniff, one type answer (`BASIC-ELT-PROFILE-1` BE-3)
@@ -76,3 +81,8 @@ almost-all-number columns (numbers only in Add data, the odd values blanked). Th
 (461 rows, one `abc` amount, one `not-a-date` booking time) now reads `amount` as **text** everywhere — one value would
 not survive a number, and its numbers carry no decimal comma, so rule 3 does not apply — and `booked_at` as
 `TIMESTAMP %Y-%m-%dT%H:%M:%S` everywhere (rule 6: 460 of 461 values fit; the odd one is left blank).
+
+## Open rows this concept owns
+
+- **`CONVERT-TYPE-DECIMAL-MARK-1`**: *Change the type* (`convert.type`) casts with a plain `TRY_CAST` and ignores the decimal mark.
+- **`GRAMMAR-NO-QUOTE-1`**: the Grammar editor's *Text quote* takes one character, so `quote: ""` (no quote) cannot be authored there.

@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Business assurance and revenue assurance
+description: How the business-assurance template (seasonal revenue forecast and margin erosion over DuckDB SQL and Alert Rules) and the telco-ra template (eight feeds, Reconciliations and revenue-assurance control Jobs) are built.
+item: solution-pack.business-assurance
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/business-assurance, spaces/_templates/telco-ra]
+---
+
 # Business assurance and revenue assurance
 
 The architecture of the `business-assurance` hub, in two parts, one per Space Template: `business-assurance`

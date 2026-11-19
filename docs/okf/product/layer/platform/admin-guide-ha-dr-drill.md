@@ -1,3 +1,13 @@
+---
+type: Guide
+title: HA/DR drill runbook: two-node active/passive on plain Linux (T4)
+description: Runbook for the two-node active/passive HA/DR drill on PostgreSQL: what has been proven, the topology, lease TTL and fencing, drill scenarios, how to measure RTO and RPO, the 2026-10-10 laptop-scale results and the WAL backup steps.
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
+---
+
 # HA/DR drill runbook: two-node active/passive on plain Linux (T4)
 
 > **Status: runbook; a LAPTOP-SCALE local drill was run 2026-10-10 (two server processes on one Windows

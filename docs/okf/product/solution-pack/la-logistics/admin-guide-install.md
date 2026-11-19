@@ -4,6 +4,11 @@ title: "Link Analysis logistics cargo theft showcase — install"
 description: "Install the la-logistics showcase from its three downloads (product, Space, data) side by side, start it, check that it loaded, drop in the staged month, reset it, and rebuild the downloads."
 tags: [la-logistics, admin-guide, install, showcase]
 timestamp: 2026-11-08T00:00:00Z
+item: solution-pack.la-logistics
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-logistics
 ---
 
 # Link Analysis logistics cargo theft showcase — install

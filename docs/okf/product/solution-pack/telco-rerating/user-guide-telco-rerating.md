@@ -4,6 +4,11 @@ title: "Telecom re-rating (tariff validation) — user guide"
 description: "How an analyst reads the tariff-hygiene findings and the re-rated usage in the Telecom re-rating pack."
 tags: [telco-rerating, user-guide]
 timestamp: 2026-10-21T00:00:00Z
+item: solution-pack.telco-rerating
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/telco-rerating
 ---
 
 # Telecom re-rating (tariff validation) — user guide

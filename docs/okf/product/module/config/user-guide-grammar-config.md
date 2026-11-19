@@ -5,6 +5,11 @@ description: The single shared surface and single store contract behind both Gra
 resource: inspecto-ui/src/app/inspecto/grammar/grammar-editor.component.ts
 tags: [feature, parsing, onboarding, pipelines, grammar]
 timestamp: 2026-09-04T00:00:00Z
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-config
 ---
 
 # Grammar configuration

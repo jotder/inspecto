@@ -4,6 +4,11 @@ title: "Access policy — spec"
 description: "Developer reference for platform/inspecto-access: the eight classes, their request-attribute seams, the per-Space config files they read and the gates they enforce."
 tags: [access, spec]
 timestamp: 2026-10-19T00:00:00Z
+item: module.access
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-access
 ---
 
 # Access policy — spec

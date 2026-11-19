@@ -4,6 +4,11 @@ title: Engine - gotchas
 description: Engine, Pipeline, Job and DuckDB traps: events, the bus, concurrency, partitions, Space MDC, shared-row state.
 tags: [engine, pipeline, jobs, duckdb, gotchas]
 timestamp: 2026-11-19T00:00:00Z
+item: module.engine
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-engine
 ---
 
 # Engine - gotchas

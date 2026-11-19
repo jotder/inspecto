@@ -5,6 +5,10 @@ description: Overview of the three SPI contract modules (audit-spi, auth-spi, ht
 resource: spi/
 tags: [layer, spi, architecture, serviceloader, editions]
 timestamp: 2026-10-19T00:00:00Z
+item: layer.spi
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # Service contracts (SPI) — architecture (`layer.spi`)

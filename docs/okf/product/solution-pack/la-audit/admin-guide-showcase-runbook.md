@@ -1,3 +1,14 @@
+---
+type: Guide
+title: Inspecto LA (Link Analysis) showcase B: Finance and audit (runbook, synthetic data only)
+description: Presenter runbook for the la-audit finance and audit Link Analysis showcase: prerequisites, Demo Users, the data and seven planted stories, a 12-minute version, scenes with beat-level checks and what was verified live.
+item: solution-pack.la-audit
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-audit]
+---
+
 # Inspecto LA (Link Analysis) showcase B: Finance and audit (runbook, synthetic data only)
 
 **Status: BUILT and LIVE-REHEARSED 2026-10-16 on a booted Space (Advanced Demo Auth bundle, port 8141): smoke 30/30, the HTTP routes and the headline browser scenes driven; what was not driven is listed in section 6.** Vertical B of the

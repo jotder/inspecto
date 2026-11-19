@@ -4,6 +4,11 @@ title: "Anomaly Detection — API"
 description: "Control-plane routes for Anomaly Detection, with their gates."
 tags: [anomaly, anomaly, api]
 timestamp: 2026-10-19T00:00:00Z
+item: module.anomaly
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-anomaly
 ---
 
 # Anomaly Detection — API

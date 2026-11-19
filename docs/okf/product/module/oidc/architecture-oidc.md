@@ -5,6 +5,11 @@ description: Professional-edition OIDC resource server behind the Authenticator/
 resource: providers/inspecto-oidc/
 tags: [module, security, oidc, editions, professional, spi]
 timestamp: 2026-07-07T00:00:00Z
+item: module.oidc
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-oidc
 ---
 
 # Security module (inspecto-oidc, with inspecto-secrets and inspecto-geo-country split out by D-MR6)

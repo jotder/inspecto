@@ -4,6 +4,11 @@ title: "Action Requests — features"
 description: "An **Action Request** is an outbound API call raised from an Incident or a Case - by a person, or by a Decision Rule's invoke-api consequence."
 tags: [action-requests, action-requests, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.action-requests
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-action-requests
 ---
 
 # Action Requests — features

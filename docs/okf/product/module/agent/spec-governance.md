@@ -5,6 +5,11 @@ description: Approval gate + dry-run for every mutating action, Role×Capability
 resource: jotder/inspect-agent/docs/specs/approval-governance.md  # upstream GitHub repo; NOT a local path (corrected 2026-09-09)
 tags: [agentic, safety, approval, guardrails, audit, eval]
 timestamp: 2026-07-07T00:00:00Z
+item: module.agent
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
+code: features/inspecto-agent
 ---
 
 # eoiagent governance & safety

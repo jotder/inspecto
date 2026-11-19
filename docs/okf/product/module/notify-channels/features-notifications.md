@@ -4,6 +4,11 @@ title: "Notifications — features"
 description: "Notifications turn platform events into messages for people and systems."
 tags: [notify-channels, notifications, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.notify-channels
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-notify-channels
 ---
 
 # Notifications — features

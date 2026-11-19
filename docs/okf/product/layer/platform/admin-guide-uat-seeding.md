@@ -1,3 +1,13 @@
+---
+type: Guide
+title: UAT Sample-Data Seeding Runbook
+description: Runbook for tools/seed-uat.ps1, which fills a backend Space with deterministic sample data for user acceptance testing by driving the real engine (Pipelines, Jobs, control routes) rather than writing to a database.
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
+---
+
 # UAT Sample-Data Seeding Runbook
 
 **Purpose:** populate a backend space with enough realistic data for user acceptance testing —

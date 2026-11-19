@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis showcase (feature off) — brochure
+description: Brochure for the feature-off showcase Space: proof that Link Analysis switched off for one Space answers module disabled while the rest of the product keeps working.
+item: solution-pack.la-showcase-off
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-showcase-off]
+---
+
 # Link Analysis showcase (feature off) — brochure
 
 > **Proof that a feature switched off for a Space is really off — and everything else keeps working.**

@@ -4,6 +4,8 @@ title: "Tutorial 4 — Present it: a Dashboard for the business user"
 description: "Open the Order-to-cash Dashboard, read what each Widget says about the unmatched value, and put the Dashboard in a menu where a business user finds it."
 item: layer.product
 audience: external
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Tutorial 4 — Present it: a Dashboard for the business user

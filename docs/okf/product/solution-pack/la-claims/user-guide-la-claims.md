@@ -4,6 +4,11 @@ title: "Link Analysis claims showcase — user guide"
 description: "How an SIU investigator works the la-claims Space day to day: Investigations, communities, Geo, identity resolution, Entity profiles and the Case."
 tags: [la-claims, user-guide]
 timestamp: 2026-11-07T00:00:00Z
+item: solution-pack.la-claims
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/la-claims
 ---
 
 # Link Analysis claims showcase — user guide

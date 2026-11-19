@@ -4,6 +4,11 @@ title: "Regulatory Reporting — screens"
 description: "Where Regulatory Reporting lives in the UI and what each screen does."
 tags: [regulatory-reporting, regulatory-reporting, user-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: module.regulatory-reporting
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: features/inspecto-regulatory-reporting
 ---
 
 # Regulatory Reporting — screens

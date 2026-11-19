@@ -2,6 +2,11 @@
 type: Brochure
 title: Inspecto LA whitepaper — Analytical depth, graph algorithms and explainable detection
 description: Part 2 of 6 of Inspecto LA whitepaper: · Analytical depth, graph algorithms & explainable detection
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA whitepaper — Analytical depth, graph algorithms and explainable detection

@@ -4,6 +4,11 @@ title: "OIDC authenticator and token relay — features"
 description: "OIDC sign-in turns an identity provider's JWT into an Inspecto Subject and relays tokens for code exchange, refresh and logout."
 tags: [oidc, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.oidc
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-oidc
 ---
 
 # OIDC authenticator and token relay — features

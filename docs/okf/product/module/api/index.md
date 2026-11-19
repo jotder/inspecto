@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [API stability policy](plan-api-stability.md) |
+| plan | current | [API stability policy — Release notes — breaking configuration and CLI changes onward](plan-api-stability-breaking-config.md) · [API stability policy — The marker, the release baseline and the pending release notes](plan-api-stability-marker-baseline.md) · [API stability policy — The public surface and what is internal](plan-api-stability-public-surface.md) · [API stability policy](plan-api-stability.md) |
 | spec | current | [Public API annotations — spec](spec-api.md) |
 | architecture | current | [Public API annotations — architecture](architecture-api.md) |
 | features | current | [Public API annotations — features](features-api.md) |

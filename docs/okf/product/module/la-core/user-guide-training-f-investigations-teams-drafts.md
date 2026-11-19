@@ -4,6 +4,11 @@ title: Inspecto LA training videos — F · Investigations (Standard): narration
 description: Part 2 of 3 of Inspecto LA training videos — F · Investigations (Standard): narration scripts: F4_Step-log-undo-re-order-and-replay; F5_Teams-members-four-eyes-reviewers-and-outsiders; F6_Drafts-work-in-parallel
 tags: [module, la-core, link-analysis, user-guide, training, video]
 timestamp: 2026-11-16T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Inspecto LA training videos — F · Investigations (Standard): narration scripts — Episodes F4-F6 — step log, teams and Drafts

@@ -4,6 +4,11 @@ title: "Workflow and SLA — features"
 description: "Authored **workflows** (the states and actions an Incident or Case may take), **SLA Policies** (response and resolution targets per priority, on a business calendar) and **Escalation Rules** (what happens on a breach or at an age)."
 tags: [workflow, workflow-sla, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.workflow
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-workflow
 ---
 
 # Workflow and SLA — features

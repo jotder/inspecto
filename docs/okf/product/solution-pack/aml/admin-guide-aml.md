@@ -4,6 +4,11 @@ title: "AML — admin guide"
 description: "Install, enable and verify the AML Solution Pack."
 tags: [aml, admin-guide]
 timestamp: 2026-10-19T00:00:00Z
+item: solution-pack.aml
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spaces/_templates/aml
 ---
 
 # AML — admin guide

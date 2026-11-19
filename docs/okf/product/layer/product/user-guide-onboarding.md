@@ -5,6 +5,10 @@ description: Creating a data origin — the entry point, the draft-is-server-sta
 resource: inspecto-ui/src/app/modules/admin/catalog/onboarding/onboarding-create.dialog.ts
 tags: [feature, onboarding, catalog, acquisition, pipeline]
 timestamp: 2026-07-16T00:00:00Z
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
 ---
 
 # Stream & Reference Onboarding

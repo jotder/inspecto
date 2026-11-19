@@ -4,6 +4,11 @@ title: "Utilities, DuckDB access, TOON helpers, module manifests — architectur
 description: "Why the utility module sits at the bottom of the reactor and how its main seams are shaped."
 tags: [util, architecture]
 timestamp: 2026-10-19T00:00:00Z
+item: module.util
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-util
 ---
 
 # Utilities, DuckDB access, TOON helpers, module manifests — architecture

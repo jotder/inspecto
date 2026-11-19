@@ -6,6 +6,9 @@ description: The requirement-of-record and as-built specification for the compli
 status: current
 written: 2026-09-08
 supersedes-rows: EDITIONS CMP-01..CMP-08 and REQUIREMENTS NFR-7 (this file corrects them, see §2)
+item: layer.platform
+audience: internal
+verified: 2026-11-19 last-edit
 ---
 
 # Compliance (`CMP`)
@@ -67,11 +70,11 @@ actually does, where the boundary is, and whose responsibility the remainder is.
 |---|---|---|---|
 | **CMP-01** | Software bill of materials per bundle, in both common formats, inside the zip | ✅ SHIPPED 2026-09-02. Generated **per packaged bundle, not from the reactor** — a scope correction that matters, because the reactor set includes optional modules an edition does not ship. Both formats come from **one** dependency resolution in the same packaging run, deliberately, so the two documents cannot drift. Each component carries a hash, its declared licence and a package URL; first-party jars are hashed as shipped | All |
 | **CMP-02** | Signed releases with a checksum and a detached signature, fail-closed | ✅ SHIPPED 2026-09-02 — and 🔴 **never executed.** The workflow triggers on a version tag and landed 2026-09-06; twenty-eight version tags exist but the newest is 2026-06-03 on the retired line, so **no tag has been cut since the workflow existed**. The editions row says "unexercised until the first tag" and is right; the gap ledger records it closed without that caveat | All |
-| **CMP-03** | Dependency-review guard in continuous integration | ✅ SHIPPED. ⛔ **It is a review device, not a scanner** — it proves nobody looked, never that a version is safe. ⚠ **Scope corrected 2026-09-07**: until then it resolved with no edition profile, so the security module's cryptography tree — the dependency a security reviewer most wants to see — **was never under review while this row already said closed**. It now resolves the enterprise profile, 25 modules rather than 23 | All |
+| **CMP-03** | Dependency-review guard in continuous integration | ✅ SHIPPED. ⛔ **It is a review device, not a scanner** — it proves nobody looked, never that a version is safe. It resolves the enterprise profile — 25 modules, the security module's cryptography tree included | All |
 | **CMP-04** | Audit retention, a one-year window | ✅ SHIPPED 2026-09-02, **operator-scheduled**. A deployment that never authors the job has stated policy only, and the row says so. ⚠ The window is an *upper bound on the store*; it does not override the decision that a purged incident's own history is retained | All |
 | **CMP-05** | Control matrix + auditor evidence | ✅ SHIPPED | — / ✅ / ✅ — "Basic has no compliance scope by definition". ⚠ **That is a product stance, not a build fact**: the matrix and the evidence pack are plain files in the repository, so nothing withholds them from a Basic deployment. The gating is about who is *promised* the posture |
 | **CMP-06** | Federal cryptography mode | 🔲 Open — gap G9, demand-gated and deliberately sequenced after the matrix existed | — / 🔲 / 🔲 |
-| **CMP-07** | The access-review residual | ✅ SHIPPED. ✅ **Row corrected 2026-09-07 — it had been stale**: it read planned and cited its gap as open, when that gap had closed on 2026-08-28 and the capability it waited on had shipped five weeks earlier | — / ✅ / ✅ |
+| **CMP-07** | The access-review residual | ✅ SHIPPED; its gap closed on 2026-08-28 | — / ✅ / ✅ |
 | **CMP-08** | Certifications | 🔲 Not started, **Advanced only** (operator, 2026-09-02), org-paced | — / — / 🔲 |
 | **NFR-7** | Compliance posture | 🟡 PARTIAL, and the cell's phrasing is right: the module shipped, certifications are not started. ⚠ **CORRECTION to how it is read:** the row is not one undifferentiated gap. It is **seven named items**, six of which need an external party or org authorship, and **one of which needs only a named owner and a cadence** (§3.7) | — |
 
@@ -536,3 +539,9 @@ rather than assumed (§5.3).
 * **Guards** — `node tools/check-vocabulary.mjs`, `node tools/check-doc-links.mjs`,
   `node tools/check-gate-tally.mjs`, from the repo root. ⚠ Stage a new document (`git add -N`) before
   trusting a green vocabulary run.
+
+## Changes
+
+- 2026-09-07: CMP-03's scope corrected — until then it resolved with no edition profile (23 modules), so the security
+  module's cryptography tree was never under review while the row already said closed. CMP-07 corrected — it read
+  planned and cited its gap as open, five weeks after the capability had shipped.

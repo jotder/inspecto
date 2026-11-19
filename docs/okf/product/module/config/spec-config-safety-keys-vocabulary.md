@@ -4,6 +4,11 @@ title: Config Safety Validator — Job config decisions, the accepted-key census
 description: Part 3 of 4 of Config Safety Validator: Decision 2026-09-06 — job configs get a save-time spec; the depth rule stays; The accepted-key census — which config types have one, and why not the rest; The classification vocabulary — a save refuses a class the Space does not know (CLASSIFICATION-UNMASKED-CLASS-1, 2026-11-14); Open rows this concept owns
 tags: [config, safety, validation, path-jail, security]
 timestamp: 2026-06-28T00:00:00Z
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-config
 ---
 
 # Config Safety Validator — Job config decisions, the accepted-key census and the classification vocabulary

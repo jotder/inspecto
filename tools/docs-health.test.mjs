@@ -19,6 +19,7 @@ import {
 const HERE = dirname(fileURLToPath(import.meta.url));
 const HUB = 'docs/okf/product/module/x/spec-x.md';
 const HEAD = '---\ntype: Spec\ntitle: X\ndescription: d\n---\n';
+const FULL = '---\ntype: Spec\ntitle: X\ndescription: d\nitem: module.x\naudience: internal\nstatus: current\nverified: 2026-11-01 last-edit\ncode: x\n---\n';
 const m = (files, tracked = () => true) => measure(Object.keys(files), (p) => files[p], tracked);
 
 test('history notes: the four shapes count, a near miss does not, a fenced quote does not', () => {
@@ -86,7 +87,7 @@ test('size ratchet: a new page over the cap fails; a baselined one may grow by t
     assert.deepEqual(evaluate(m({ [HUB]: big + 'y'.repeat(GROW_ALLOWANCE) }), base).failures, []);
     assert.equal(evaluate(m({ [HUB]: big + 'y'.repeat(GROW_ALLOWANCE + 10) }), base).failures.length, 1);
     const other = 'docs/okf/product/module/x/spec-y.md';
-    assert.equal(evaluate(m({ [HUB]: big, [other]: big }), base).failures.length, 1);
+    assert.equal(evaluate(m({ [HUB]: big, [other]: FULL + 'x'.repeat(CAP) }), base).failures.length, 1);
 });
 
 test('size ratchet: the board, the glossary and in-flight plans are reported, never ratcheted', () => {
@@ -113,6 +114,35 @@ test('header ratchet: a new hub page without a header fails; a baselined one pas
     assert.equal(evaluate(m({ [HUB]: '# no header', 'docs/okf/product/module/x/spec-z.md': '# none' }), base).failures.length, 1);
     assert.equal(evaluate(m({ [HUB]: HEAD }), base).improvements.length, 1);
     assert.deepEqual(evaluate(m({ 'docs/USER_GUIDE.md': '# root canon needs no header' }), baselineOf(m({}))).failures, []);
+});
+
+test('full-header ratchet: a new hub page needs the full header, a full page may not lose it, baselined debt passes', () => {
+    const other = 'docs/okf/product/module/x/spec-y.md';
+    const base = baselineOf(m({ [HUB]: HEAD, [other]: FULL }));
+    assert.deepEqual(base.partialHeader, [HUB]);
+    assert.deepEqual(evaluate(m({ [HUB]: HEAD, [other]: FULL }), base).failures, []);
+    const lost = evaluate(m({ [HUB]: HEAD, [other]: HEAD }), base).failures;
+    assert.equal(lost.length, 1, 'a full page that loses a field fails');
+    assert.match(lost[0], /missing: item, audience, status, verified, code\) — run node tools\/fill-doc-headers\.mjs --write --hub module\/x/);
+    const added = evaluate(m({ [HUB]: HEAD, [other]: FULL, 'docs/okf/product/module/x/spec-new.md': HEAD }), base).failures;
+    assert.equal(added.length, 1, 'a new page with only the base header fails');
+    assert.equal(evaluate(m({ [HUB]: FULL, [other]: FULL }), base).improvements.length, 1, 'a filled page improves');
+    // a page baselined headerless that gains only the base header is progress, not new debt
+    const headerless = baselineOf(m({ [HUB]: '# none' }));
+    assert.deepEqual(evaluate(m({ [HUB]: HEAD }), headerless).failures, []);
+    assert.deepEqual(evaluate(m({ 'docs/USER_GUIDE.md': HEAD }), baselineOf(m({}))).failures, [], 'root canon is not a hub page');
+});
+
+test('full-header ratchet: a layer page needs every field but code; losing one still fails', () => {
+    const layer = 'docs/okf/product/layer/platform/spec-new.md';
+    const noCode = FULL.replace('code: x\n', '');
+    assert.deepEqual(evaluate(m({ [layer]: noCode }), baselineOf(m({}))).failures, [], 'a new layer page without code passes');
+    const base = baselineOf(m({ [layer]: noCode }));
+    assert.deepEqual(base.partialHeader, []);
+    const lost = evaluate(m({ [layer]: noCode.replace(/verified: .*\n/, '') }), base).failures;
+    assert.equal(lost.length, 1);
+    assert.match(lost[0], /missing: verified\)/);
+    assert.equal(evaluate(m({ [HUB]: noCode }), baselineOf(m({}))).failures.length, 1, 'a module page still needs code');
 });
 
 test('editions ratchet: a new hand-written table fails outside its homes, never inside them', () => {

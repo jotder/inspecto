@@ -5,6 +5,11 @@ description: "Requirement of record for the intelligence module (AGT-5, AGT-6a, 
 resource: features/inspecto-intelligence/
 tags: [intelligence, plan, agt-5, agt-6]
 timestamp: 2026-10-19T00:00:00Z
+item: module.intelligence
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: features/inspecto-intelligence
 ---
 
 # AI assist and intelligence — plan

@@ -4,6 +4,11 @@ title: Database / persistence layer — Three data classes and the operational s
 description: Part 1 of 4 of Database / persistence layer: Three data classes; Operational store inventory
 tags: [persistence, duckdb, postgres, schema, topology, stores]
 timestamp: 2026-07-16T00:00:00Z
+item: module.engine
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-engine
 ---
 
 # Database / persistence layer — Three data classes and the operational store inventory

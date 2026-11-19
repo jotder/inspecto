@@ -4,6 +4,11 @@ title: "Telecom industry pack — features"
 description: "The Telecom industry pack adds the ASN.1 BER decoder for telecom CDRs."
 tags: [telecomIndustryPack, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: addon.telecomIndustryPack
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-telecom-asn1
 ---
 
 # Telecom industry pack — features

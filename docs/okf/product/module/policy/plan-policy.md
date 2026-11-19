@@ -5,6 +5,11 @@ description: ABAC workstream A (A1-A5), policy operability and authoring guards,
 resource: providers/inspecto-policy/
 tags: [module, policy, abac, plan]
 timestamp: 2026-10-19T00:00:00Z
+item: module.policy
+audience: internal
+status: plan
+verified: 2026-11-18 last-edit
+code: providers/inspecto-policy
 ---
 
 # Attribute-based access policy — plan of record

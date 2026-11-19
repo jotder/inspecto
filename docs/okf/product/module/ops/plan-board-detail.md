@@ -4,6 +4,11 @@ title: module.ops - board row detail
 description: The narrative behind module.ops's long rows on the board (docs/BACKLOG.md), moved here verbatim so each board row stays a short summary.
 tags: [module, ops, plan, backlog]
 timestamp: 2026-11-19T00:00:00Z
+item: module.ops
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: features/inspecto-ops
 ---
 
 # module.ops - board row detail

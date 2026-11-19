@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Action Requests
+description: How Action Requests work: an outbound API call raised from an Incident or Case (or a Decision Rule invoke-api consequence), held until a different person approves, then sent once to an https Connection with retries under one idempotency key.
+item: module.action-requests
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [features/inspecto-action-requests]
+---
+
 # Action Requests
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.

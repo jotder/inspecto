@@ -4,6 +4,11 @@ title: solution-pack.industry-telecom - board row detail
 description: The narrative behind solution-pack.industry-telecom's long rows on the board (docs/BACKLOG.md), moved here verbatim so each board row stays a short summary.
 tags: [solution-pack, industry-telecom, plan, backlog]
 timestamp: 2026-11-19T00:00:00Z
+item: solution-pack.industry-telecom
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: platform/inspecto-entity-store/src/main/resources/META-INF/inspecto/industry-packs/telecom
 ---
 
 # solution-pack.industry-telecom - board row detail

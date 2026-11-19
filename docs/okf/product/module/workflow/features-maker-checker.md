@@ -4,6 +4,11 @@ title: "Maker-checker (Pending Changes) — features"
 description: "Maker-checker holds a config change for a second person's approval."
 tags: [workflow, maker-checker, features, presales]
 timestamp: 2026-10-19T00:00:00Z
+item: module.workflow
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: platform/inspecto-workflow
 ---
 
 # Maker-checker (Pending Changes) — features

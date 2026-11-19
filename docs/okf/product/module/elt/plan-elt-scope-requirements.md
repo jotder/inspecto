@@ -5,6 +5,10 @@ description: Part 1 of 7 of Acquisition, ingestion and Pipelines (ACQ, ING, PIP)
 status: current
 tags: [acq, ing, pip, capability, acquisition, connections, collectors, connectors, ledger, ingestion, parsing, consignment, grammar, parser-plugin, quarantine, expectation, pipeline, authoring, step-catalog, execution, scheduler, jobs, plan]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+verified: 2026-11-20 last-edit
+code: platform/inspecto-etl
 ---
 
 # Acquisition, ingestion and Pipelines (ACQ, ING, PIP) — plan — Purpose, scope and requirements of record
@@ -152,7 +156,7 @@ both design refusals rather than gaps (§EXE.6).
 ### ACQ.2 Acquisition — seven requirements
 
 Seven requirements, all shipped. ⚠ **The feature × edition matrix in
-[`spec-editions.md`](../../layer/platform/spec-editions.md) (the `SP-ACQ-*` rows) is authoritative for the
+[`spec-editions-step-processors.md`](../../layer/platform/spec-editions-step-processors.md) (the `SP-ACQ-*` rows) is authoritative for the
 Edition column**; this table mirrors it. The wording of the original requirement's 14 numbered areas is
 [spec Part 1](spec-acquisition.md#part-1--the-original-requirement).
 
@@ -182,12 +186,12 @@ against source:
 ⚠ **`ACQ-1` carries an edition nuance the matrix column cannot express.** Connections are `All`, but two
 of `SecretResolver`'s five reference forms — `${FILE:…}` and `${KEYSTORE:…}` — are **Standard +
 Advanced only** (SEC-07): a Basic bundle refuses the scheme *by name* and a connection test surfaces that
-as the failure ([spec](spec-acquisition.md#connection-profiles-secrets-host-keys-tunnels-and-proxies)).
+as the failure ([spec](spec-acquisition-connectors-control.md#connection-profiles-secrets-host-keys-tunnels-and-proxies)).
 
 🔴 **A requirement is not delivered until it is *reachable*.** For 85 days the remote connectors were
 build-available and deploy-absent — no bundle shipped `inspecto-connectors` — until CONNECTORS-BUNDLE-1
 (2026-09-07). "SHIPPED" against a module no bundle carries is the most expensive kind of true statement
-([spec](spec-acquisition.md#the-connector-spi-and-the-resolvable-schemes)).
+([spec](spec-acquisition-connectors-control.md#the-connector-spi-and-the-resolvable-schemes)).
 
 ### 2.1 Ingestion
 

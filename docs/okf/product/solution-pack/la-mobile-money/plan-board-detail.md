@@ -4,6 +4,11 @@ title: solution-pack.la-mobile-money - board row detail
 description: The narrative behind solution-pack.la-mobile-money's long rows on the board (docs/BACKLOG.md), moved here verbatim so each board row stays a short summary.
 tags: [solution-pack, la-mobile-money, plan, backlog]
 timestamp: 2026-11-19T00:00:00Z
+item: solution-pack.la-mobile-money
+audience: internal
+status: plan
+verified: 2026-11-19 last-edit
+code: spaces/_templates/la-mobile-money
 ---
 
 # solution-pack.la-mobile-money - board row detail

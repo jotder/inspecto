@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis provider billing fraud showcase — brochure
+description: Brochure for the Link Analysis provider billing fraud showcase: referral kickbacks, phantom billing, a pill mill and upcoding across claim, stay, referral and prescription data, each beside an innocent look-alike.
+item: solution-pack.la-health
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-health]
+---
+
 # Link Analysis provider billing fraud showcase — brochure
 
 > **Two practices steering their referrals to an imaging centre owned by one doctor's spouse, a clinic billing patients who were in hospital or already dead, a pain clinic whose patients drive 100 km and pay cash, and three clinics under one owner billing the top visit level, hidden among 20 000 members and 80 000 claim lines. Find each one from a saved view in minutes, and see why the innocent look-alikes stay apart.**

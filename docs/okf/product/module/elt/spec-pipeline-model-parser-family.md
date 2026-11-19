@@ -4,6 +4,11 @@ title: Pipeline model — node types, the Step catalog, transforms and the edita
 description: Part 4 of 4 of Pipeline model — node types, the Step catalog, transforms and the editable round-trip: 
 tags: [elt, engine, pipeline, plugins, spi, node-types, catalog, transform, seam, lift, lower, round-trip, authoring, gotcha, pipeline-graph, execution, lanes, ingest, job, scratch, test-run, dry-run, park, drain, post-sync, consignment, output, sink, partition, quarantine, ducklake, export, object-storage, s3, hdfs, job-type, post-action]
 timestamp: 2026-11-18T00:00:00Z
+item: module.elt
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: platform/inspecto-etl
 ---
 
 # Pipeline model — node types, the Step catalog, transforms and the editable round-trip — The editable round-trip — the parser family onward

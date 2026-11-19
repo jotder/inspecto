@@ -1,3 +1,13 @@
+---
+type: Architecture
+title: Platform Services
+description: How Platform Services work: the flat typed PlatformServices lookup a Job or pack Step is granted through its requires: list, the ten service ids, who uses them, configuration, API and limits.
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+---
+
 # Platform Services
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Platform base.

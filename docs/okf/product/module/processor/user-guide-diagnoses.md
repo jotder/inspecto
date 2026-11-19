@@ -5,6 +5,11 @@ description: Diagnostic records in a standard data-table; rows open a detail vie
 resource: inspecto-ui/src/app/modules/admin/diagnoses/diagnoses.routes.ts
 tags: [feature, diagnoses, operations]
 timestamp: 2026-06-28T00:00:00Z
+item: module.processor
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
+code: inspecto
 ---
 
 # Diagnoses

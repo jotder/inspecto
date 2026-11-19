@@ -4,6 +4,10 @@ title: "Platform — the deploy kit: reverse proxy, preflight, upgrade, bundle v
 description: "How to install a bundle behind a reverse proxy that fences /metrics and /health/details, check the host before the first start, upgrade in place with rollback, verify a delivered zip, and copy backups off the host; what each script checks and what has been proven."
 tags: [platform, admin-guide, deploy, proxy, tls, upgrade, backup, install]
 timestamp: 2026-11-16T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
 ---
 
 # Platform — the deploy kit

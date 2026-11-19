@@ -5,6 +5,11 @@ description: How auth-spi keeps the core auth-free — edition providers fill th
 resource: spi/inspecto-auth-spi/
 tags: [module, auth-spi, spi, architecture, security, editions]
 timestamp: 2026-10-19T00:00:00Z
+item: module.auth-spi
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: spi/inspecto-auth-spi
 ---
 
 # Authentication and capability contract — architecture (`module.auth-spi`)

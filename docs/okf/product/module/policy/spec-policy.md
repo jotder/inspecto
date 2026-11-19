@@ -5,6 +5,11 @@ description: PolicyEngine evaluation, context binding, seeds, fail-closed rules 
 resource: providers/inspecto-policy/
 tags: [module, policy, abac, spec]
 timestamp: 2026-10-19T00:00:00Z
+item: module.policy
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: providers/inspecto-policy
 ---
 
 # Attribute-based access policy — implementation spec

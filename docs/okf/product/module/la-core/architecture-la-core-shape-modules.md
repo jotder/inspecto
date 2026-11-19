@@ -4,6 +4,11 @@ title: Link Analysis — architecture — Shape, modules and the domain core
 description: Part 1 of 4 of Link Analysis — architecture: Overview; Shape in one paragraph; Modules and dependency direction; Domain core (la-core)
 tags: [module, la-core, link-analysis, architecture]
 timestamp: 2026-11-15T00:00:00Z
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: la/inspecto-la-core
 ---
 
 # Link Analysis — architecture — Shape, modules and the domain core

@@ -5,6 +5,10 @@ description: The decisions, declined items, deliberate exceptions and offering m
 resource: docs/okf/product/layer/platform/architecture-modules.md
 tags: [architecture, modules, decisions, offering, decision-kernel]
 timestamp: 2026-10-18T00:00:00Z
+item: layer.platform
+audience: internal
+status: current
+verified: 2026-11-17 last-edit
 ---
 
 # Module reorganisation - decision record
