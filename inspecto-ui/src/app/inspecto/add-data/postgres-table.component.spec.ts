@@ -47,19 +47,127 @@ function create() {
 const q = (el: HTMLElement, id: string) => el.querySelector<HTMLElement>(`[data-testid="${id}"]`);
 
 function fill(fixture: ReturnType<typeof create>['fixture'], el: HTMLElement, password = '${ENV:INSPECTO_PG_SALES}') {
-    penEdit(fixture, penByLabel(el, 'Host')!, 'db.internal');
-    penEdit(fixture, penByLabel(el, 'Database')!, 'sales');
-    penEdit(fixture, penByLabel(el, 'User')!, 'reader');
-    penEdit(fixture, penByLabel(el, 'Password')!, password);
+    type(fixture, el, /^Host\b/, 'db.internal');
+    type(fixture, el, /^Database\b/, 'sales');
+    type(fixture, el, /^Username\b/, 'reader');
+    type(fixture, el, /^Password\b/, password);
 }
+
+/** The boxed Password row (a secret reference, never shown in a closed row). */
+const passwordBox = (el: HTMLElement) =>
+    Array.from(el.querySelectorAll<HTMLElement>('mat-form-field')).find(
+        (f) => f.querySelector('mat-label')?.textContent?.trim() === 'Password',
+    );
+
+/**
+ * Type into the connection row a person reads as `label`, whether it is a pen-field row or a boxed field (a secret), and
+ * leave it. BASIC-ELT-PROFILE-1 U2 moved these rows onto the core `connection-fields`; the same typing must send the same
+ * bytes.
+ */
+function type(fixture: ReturnType<typeof create>['fixture'], el: HTMLElement, label: RegExp, value: string) {
+    const pen = Array.from(el.querySelectorAll<HTMLElement>('inspecto-pen-field')).find((h) =>
+        label.test((h.querySelector('span')?.textContent ?? '').trim()),
+    );
+    if (pen) {
+        penEdit(fixture, pen, value);
+        return;
+    }
+    const box = Array.from(el.querySelectorAll<HTMLElement>('mat-form-field')).find((f) =>
+        label.test((f.querySelector('mat-label')?.textContent ?? '').trim()),
+    );
+    if (!box) throw new Error('no connection row reads ' + label);
+    const input = box.querySelector('input')!;
+    input.value = value;
+    input.dispatchEvent(new Event('input'));
+    input.dispatchEvent(new Event('blur'));
+    fixture.detectChanges();
+}
+
+/** The same user actions as before U2: every connection row typed, padded with blanks the screen trims. */
+function typeAll(fixture: ReturnType<typeof create>['fixture'], el: HTMLElement) {
+    type(fixture, el, /^Host\b/, '  db.internal ');
+    type(fixture, el, /^Port\b/, '6543');
+    type(fixture, el, /^Database\b/, ' sales ');
+    type(fixture, el, /^User(name)?(\s|\*|$)/, ' reader ');
+    type(fixture, el, /^Password\b/, ' ${ENV:INSPECTO_PG_SALES} ');
+}
+
+const CONNECTION_JSON =
+    '{"host":"db.internal","port":6543,"database":"sales","user":"reader","password":"${ENV:INSPECTO_PG_SALES}"}';
+
+describe('PostgresTableComponent - request bodies (BASIC-ELT-PROFILE-1 U2 parity, pinned on the pre-U2 form)', () => {
+    afterEach(() => http?.verify());
+
+    it('Test connection, then a table: the two bodies byte for byte', () => {
+        const { fixture, el } = create();
+        typeAll(fixture, el);
+        q(el, 'pg-test')!.click();
+        fixture.detectChanges();
+        const test = http.expectOne(apiUrl('/onboard/postgres/test'));
+        expect(JSON.stringify(test.request.body)).toBe(`{"connection":${CONNECTION_JSON}}`);
+        test.flush(TESTED);
+        fixture.detectChanges();
+        pickerSet(fixture, '[data-testid="pg-table"]', 'sales.daily');
+        q(el, 'pg-read')!.click();
+        fixture.detectChanges();
+        const read = http.expectOne(apiUrl('/onboard/postgres'));
+        expect(JSON.stringify(read.request.body)).toBe(
+            `{"connection":${CONNECTION_JSON},"schema":"sales","table":"daily","kind":"reference"}`,
+        );
+        read.flush({ draftId: 'd1' } as unknown as OnboardDraft);
+    });
+
+    it('a read-only query: the body byte for byte', () => {
+        const { fixture, el } = create();
+        typeAll(fixture, el);
+        q(el, 'pg-test')!.click();
+        fixture.detectChanges();
+        http.expectOne(apiUrl('/onboard/postgres/test')).flush(TESTED);
+        fixture.detectChanges();
+        const radios = q(el, 'pg-by')!.querySelectorAll<HTMLInputElement>('input[type="radio"]');
+        radios[1].click();
+        fixture.detectChanges();
+        penEdit(fixture, q(el, 'pg-query')!, ' SELECT id FROM sales.daily ');
+        q(el, 'pg-read')!.click();
+        fixture.detectChanges();
+        const read = http.expectOne(apiUrl('/onboard/postgres'));
+        expect(JSON.stringify(read.request.body)).toBe(
+            `{"connection":${CONNECTION_JSON},"query":"SELECT id FROM sales.daily","kind":"reference"}`,
+        );
+        read.flush({ draftId: 'd2' } as unknown as OnboardDraft);
+    });
+
+    it('sends nothing while a row is missing or the port is out of range, and a changed row asks for a new test', () => {
+        const { fixture, el } = create();
+        type(fixture, el, /^Host\b/, 'db.internal');
+        q(el, 'pg-test')!.click();
+        fixture.detectChanges();
+        http.expectNone(apiUrl('/onboard/postgres/test'));
+        typeAll(fixture, el);
+        type(fixture, el, /^Port\b/, '70000');
+        q(el, 'pg-test')!.click();
+        fixture.detectChanges();
+        http.expectNone(apiUrl('/onboard/postgres/test'));
+        type(fixture, el, /^Port\b/, '6543');
+        q(el, 'pg-test')!.click();
+        fixture.detectChanges();
+        http.expectOne(apiUrl('/onboard/postgres/test')).flush(TESTED);
+        fixture.detectChanges();
+        expect(q(el, 'pg-read')).not.toBeNull();
+        type(fixture, el, /^Database\b/, 'other');
+        expect(q(el, 'pg-read')).toBeNull();
+    });
+});
 
 describe('PostgresTableComponent - Choose a table (BASIC-ONBOARD-1 P3)', () => {
     afterEach(() => http?.verify());
 
-    it('asks for the connection with the password as a reference (no violations)', async () => {
+    it('asks for the connection on the core Connection rows, the password as a reference (no violations)', async () => {
         const { el } = create();
-        for (const label of ['Host', 'Port', 'Database', 'User', 'Password'])
+        expect(el.querySelector('inspecto-connection-fields')).not.toBeNull();
+        for (const label of ['Host', 'Port', 'Database', 'Username'])
             expect(penByLabel(el, label), label).not.toBeNull();
+        expect(passwordBox(el)!.textContent).toContain('INSPECTO_PG_');
         expect(q(el, 'pg-table')).toBeNull();
         await expectNoA11yViolations(el);
     });
@@ -69,7 +177,8 @@ describe('PostgresTableComponent - Choose a table (BASIC-ONBOARD-1 P3)', () => {
         fill(fixture, el, 'hunter2');
         q(el, 'pg-test')!.click();
         fixture.detectChanges();
-        expect(penError(penByLabel(el, 'Password')!)).toContain('INSPECTO_PG_');
+        expect(passwordBox(el)!.querySelector('mat-error')!.textContent).toContain('Write it as ${ENV:INSPECTO_PG_…}');
+        expect(penError(penByLabel(el, 'Host')!)).toBe('');
         http.expectNone(apiUrl('/onboard/postgres/test'));
     });
 

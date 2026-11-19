@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-114 test file(s). Run one, or all:
+116 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -78,6 +78,7 @@ node --test tools/
 | `tools/gen-la-utility-data.test.mjs` | Determinism and planted facts of tools/gen-la-utility-data.py. Run: node --test tools/gen-la-utility-data.test.mjs |
 | `tools/gen-la-video7-data.test.mjs` | Determinism and planted facts of tools/gen-la-video7-data.mjs. Run: node --test tools/gen-la-video7-data.test.mjs |
 | `tools/gen-order-to-cash-data.test.mjs` | Determinism and planted facts of tools/gen-order-to-cash-data.mjs. Run: node --test tools/gen-order-to-cash-data.test.mjs |
+| `tools/handbook-checks.test.mjs` | Tests for tools/handbook-checks.mjs. Run: node --test tools/handbook-checks.test.mjs |
 | `tools/inspecto-app.test.mjs` | node --test tools/inspecto-app.test.mjs - the App authoring kit (PRODUCT-ASSEMBLY-1 PA-6a, D-PA18 / D-PA19). |
 | `tools/java-closure.test.mjs` | Fixture test for tools/java-closure.mjs — each blind spot that bit the D-1 closure script must now be SEEN. |
 | `tools/jlink-modules.test.mjs` | ── PACKAGE-DEMOAUTH-ADVANCED-1: the demo bundle's module set follows the bundle it really stages ───────────────────────────── |
@@ -107,6 +108,7 @@ node --test tools/
 | `tools/render-space-links.test.mjs` | Tests for tools/render-space-links.mjs (LC-7): the census parse reads every link line and refuses one it cannot |
 | `tools/render-tests-inventory.test.mjs` | Fixture test for tools/render-tests-inventory.mjs. Run: node --test tools/render-tests-inventory.test.mjs |
 | `tools/roll-backlog-ledger.test.mjs` | Tests for tools/roll-backlog-ledger.mjs. Run: node --test tools/roll-backlog-ledger.test.mjs |
+| `tools/run-handbook-checks.test.mjs` | Tests for tools/run-handbook-checks.mjs. Run: node --test tools/run-handbook-checks.test.mjs |
 | `tools/sbom-modules.test.mjs` | Fixtures for tools/sbom-modules.mjs (P3f per-module SBOMs). Run: node --test tools/sbom-modules.test.mjs |
 | `tools/seed-la-audit.test.mjs` | node --test tools/seed-la-audit.test.mjs  -  request building of the la-audit seed script against a MOCKED fetch (no server). |
 | `tools/seed-la-benefits.test.mjs` | node --test tools/seed-la-benefits.test.mjs  -  request building of the benefits fraud seed script against a MOCKED fetch (no server). |

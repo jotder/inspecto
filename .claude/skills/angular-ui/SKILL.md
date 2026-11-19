@@ -286,6 +286,18 @@ src/app/
   until this component started re-seeding). ⚠ On the Collector pane the way to UN-bind a Connection is the
   **mode toggle**, not blanking the text — an empty picker while still in Connection mode is a refusal,
   because a non-local collector with no Connection is the state that used to fail at run time.
+- **Asking where a Connection connects → `<inspecto-connection-fields [group] [attrs]>`** (`inspecto/connections/`,
+  BASIC-ELT-PROFILE-1 U2, 2026-11-19). ONE renderer for a Connection's typed rows (`ConnAttr` in `connection-types.ts`:
+  pen row, option picker, checkbox, or a boxed `form-allow` field for a secret reference). The host owns the form —
+  build it with `connAttrsGroup(attrs, profile?)` (required / `pattern` / `min`–`max` validators from the attr) — and what
+  it sends; the rows re-draw their error lines on the group's `events`, so a host's `markAllAsTouched()` shows them
+  under OnPush. Hosts: the Connection dialog (every type) and Add data's *Choose a table*
+  (`POSTGRES_CONNECTION_ATTRS`: host, port, database, username, password limited to `${ENV:INSPECTO_PG_…}` — the
+  `postgres` scheme's rule; the server decides). Its request bodies are pinned byte for byte in
+  `postgres-table.component.spec.ts` ("U2 parity"). The `postgres` type (a snapshot's `<id>_postgres` Connection) is
+  `editOnly`: the dialog offers it only when editing one. 🔴 The Edition lock for a NEW Connection is ONE rule,
+  `connectorLock(connector, screenLocks)` — remote connectors take `remoteSystems`; `postgres`, `local`, `https` are
+  open — read by the dialog and by Add data's *A Postgres table* (`AddDataAccess.postgresLock`). Never re-roll it.
 - **Authoring how raw bytes become rows → `<inspecto-grammar-editor>`** (`inspecto/grammar/`, 2026-08-04).
   ONE surface for a **Grammar**: the built-in + served-plugin format catalog, the schema form over
   `parsingAttributesFor()`/the served `grammarSchema`, sample + sniff suggestion, Test parse, the

@@ -10,7 +10,11 @@
  * NOTE: only the field NAMES are firm (they match the existing `ConnectionProfile` shape + `*_connection.toon`
  * conventions). The exact per-type option lists are a BEST-GUESS first cut — revisit as each connector's real
  * settings firm up (same caveat as the non-DSV parser types).
+ *
+ * The rows are drawn by `<inspecto-connection-fields>` (BASIC-ELT-PROFILE-1 U2), shared by the dialog and Add data.
  */
+import { AbstractControl, FormControl, FormGroup, ValidatorFn, Validators } from '@angular/forms';
+import type { ConnectionProfile } from 'app/inspecto/api';
 
 /** Control type for a connection attribute field. */
 export type ConnControl = 'text' | 'number' | 'password' | 'checkbox' | 'select';
@@ -28,6 +32,11 @@ export interface ConnAttr {
     options?: string[];
     hint?: string;
     required?: boolean;
+    /** A form the server refuses any other value in, checked on the screen too (the server stays the authority). */
+    pattern?: { regex: RegExp; message: string };
+    /** A number's inclusive bounds. */
+    min?: number;
+    max?: number;
 }
 
 export interface ConnTypeDef {
@@ -38,9 +47,61 @@ export interface ConnTypeDef {
     label: string;
     description: string;
     attrs: ConnAttr[];
+    /** Made elsewhere (Add data's Postgres snapshot), so the dialog offers it only when editing a saved one. */
+    editOnly?: boolean;
+    /** The server refuses a tunnel and a proxy for it, so the dialog shows no Routing section. */
+    noRouting?: boolean;
 }
 
-const SECRET_HINT = 'a ${ENV:VAR} reference, not a raw secret';
+export const SECRET_HINT = 'a ${ENV:VAR} reference, not a raw secret';
+
+/**
+ * The `${ENV:INSPECTO_PG_…}` form the `postgres` scheme accepts for the password (`PostgresCollectorConnector.PASSWORD_REF`):
+ * only a variable an administrator named for a database, never a raw value or another secret.
+ */
+export const PG_PASSWORD_REFERENCE = /^\$\{ENV:INSPECTO_PG_[A-Z0-9_]{1,100}\}$/;
+
+/** The connector of a Postgres snapshot's saved Connection (BASIC-ELT-PROFILE-1 BE-4). */
+export const POSTGRES_CONNECTOR = 'postgres';
+
+/**
+ * Where a `postgres` Connection connects: the part Add data's *Choose a table* asks (U2). What to copy (`options.schema` +
+ * `table`, or `query`) is the rest of the profile; Add data asks it with its own table / query picker.
+ */
+export const POSTGRES_CONNECTION_ATTRS: readonly ConnAttr[] = [
+    { key: 'host', label: 'Host', control: 'text', target: 'host', required: true },
+    {
+        key: 'port',
+        label: 'Port',
+        control: 'number',
+        target: 'port',
+        default: 5432,
+        required: true,
+        min: 1,
+        max: 65535,
+    },
+    { key: 'database', label: 'Database', control: 'text', target: 'database', required: true },
+    {
+        key: 'username',
+        label: 'Username',
+        control: 'text',
+        target: 'username',
+        required: true,
+        hint: 'A read-only login: CONNECT, USAGE on the schema and SELECT on its tables.',
+    },
+    {
+        key: 'password',
+        label: 'Password',
+        control: 'password',
+        target: 'password',
+        required: true,
+        hint: 'The environment variable on the server that holds it, starting INSPECTO_PG_, as ${ENV:INSPECTO_PG_SALES}: never the password itself.',
+        pattern: {
+            regex: PG_PASSWORD_REFERENCE,
+            message: 'Write it as ${ENV:INSPECTO_PG_…}: the variable on the server holding the password.',
+        },
+    },
+];
 
 /** The connection types offered in the dropdown (order as specified; `https` appended 2026-09-23). */
 export const CONNECTION_TYPES: ConnTypeDef[] = [
@@ -202,6 +263,22 @@ export const CONNECTION_TYPES: ConnTypeDef[] = [
             },
         ],
     },
+    // A Postgres snapshot's Connection `<dataset id>_postgres` (BASIC-ELT-PROFILE-1 BE-4): Add data makes it; it shows in
+    // the Connections list, and editing it here keeps its connector and what it copies.
+    {
+        type: 'postgres',
+        connector: POSTGRES_CONNECTOR,
+        label: 'Postgres table copy',
+        description: 'One read-only Postgres table or query, copied by Add data',
+        editOnly: true,
+        noRouting: true,
+        attrs: [
+            ...POSTGRES_CONNECTION_ATTRS,
+            { key: 'schema', label: 'Schema', control: 'text', target: 'option' },
+            { key: 'table', label: 'Table', control: 'text', target: 'option' },
+            { key: 'query', label: 'Query', control: 'text', target: 'option', hint: 'instead of a table: one SELECT' },
+        ],
+    },
 ];
 
 /** The type definition for {@code type}, falling back to the first type for an unknown value. */
@@ -223,4 +300,58 @@ export function attrsFor(type: string): ConnAttr[] {
  * The connectors that reach a remote system (`DATA-TIERS-1` P4): Standard and above, locked in Basic's screens with the
  * `remoteSystems` reason. `local` (a folder on this machine) and `https` (a delivery target, not a Collector) stay open.
  */
-export const REMOTE_CONNECTORS: ReadonlySet<string> = new Set(['db', 'ftp', 'ftps', 'sftp', 's3', 'azure', 'gcs', 'kafka']);
+export const REMOTE_CONNECTORS: ReadonlySet<string> = new Set([
+    'db',
+    'ftp',
+    'ftps',
+    'sftp',
+    's3',
+    'azure',
+    'gcs',
+    'kafka',
+]);
+
+/**
+ * Why this edition withholds a NEW Connection with `connector`, or null: a remote connector takes the `remoteSystems` screen
+ * lock (`screenLocks`, `/bootstrap`). `postgres` is not remote here: a Postgres snapshot is in every edition, Basic included
+ * (BASIC-ONBOARD-1 P3, BASIC-ELT-PROFILE-1 D5), while the general `db` Collector stays locked. The one rule the Connection
+ * dialog and Add data's *A Postgres table* both read.
+ */
+export function connectorLock(connector: string, locks: Readonly<Record<string, string>>): string | null {
+    return REMOTE_CONNECTORS.has(connector) ? (locks['remoteSystems'] ?? null) : null;
+}
+
+/** The validators an attribute's control carries: required, its pattern, its bounds. */
+function attrValidators(a: ConnAttr): ValidatorFn[] {
+    const out: ValidatorFn[] = [];
+    if (a.required) out.push(Validators.required);
+    const p = a.pattern;
+    // Checked trimmed, as it is sent: a pasted reference often carries a blank (a pen row trims; a boxed secret does not).
+    if (p) out.push((c) => (!c.value || p.regex.test(String(c.value).trim()) ? null : { pattern: true }));
+    if (a.min != null) out.push(Validators.min(a.min));
+    if (a.max != null) out.push(Validators.max(a.max));
+    return out;
+}
+
+/** The form for `attrs`, seeded from a saved `profile` (edit) or each attribute's default. */
+export function connAttrsGroup(attrs: readonly ConnAttr[], profile?: ConnectionProfile): FormGroup {
+    const fields = profile as unknown as Record<string, unknown> | undefined;
+    const group: Record<string, FormControl> = {};
+    for (const a of attrs) {
+        const fallback = a.default ?? (a.control === 'checkbox' ? false : '');
+        const stored = profile ? (a.target === 'option' ? profile.options?.[a.key] : fields?.[a.target]) : undefined;
+        let init: unknown = stored ?? fallback;
+        if (a.control === 'checkbox') init = init === true || init === 'true';
+        group[a.key] = new FormControl(init, attrValidators(a));
+    }
+    return new FormGroup(group);
+}
+
+/** What is wrong with an attribute's value, in words, or '' (no `touched` check: the caller decides when it shows). */
+export function connAttrError(a: ConnAttr, c: AbstractControl | null | undefined): string {
+    if (!c) return '';
+    if (c.hasError('required')) return `${a.label} is required.`;
+    if (c.hasError('pattern')) return a.pattern?.message ?? '';
+    if (c.hasError('min') || c.hasError('max')) return `${a.label} is ${a.min} to ${a.max}.`;
+    return '';
+}
