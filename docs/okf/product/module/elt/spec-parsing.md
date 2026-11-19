@@ -255,6 +255,19 @@ mainly for ad-hoc analyst SQL, not the ingest path.
 `FROM sniff_csv('file')` returns the dialect DuckDB *would* pick — invaluable when authoring a new
 profile. Keep the PDF's Recipe C.
 
+**One sniff in the product (`BASIC-ELT-PROFILE-1` BE-3 slice 1, 2026-11-19).** The engine's sample profiler,
+`com.gamma.parse.SampleProfiler.dialect(conn, file, encoding)` (`inspecto-engine`), runs `sniff_csv` with no authored
+options and returns DuckDB's answer under the grammar option names (`delimiter`, `quote`, `escape`, `comment`,
+`has_header`, `skip_header_lines`, `date_format`, `timestamp_format`), unshaped: DuckDB's `(empty)` ("none found") is
+passed through, and an unsettled dialect (mixed line endings) throws. Both readers call it and keep their own shaping:
+the parse preview (`ComponentPreview.parsing`, the `resolved` line) shows the map and shows nothing when the sniff
+fails; Add data (`OnboardDraft`) passes its chosen encoding, reads `(empty)` as its defaults (`,` and `"`), falls back
+to its own delimiter guess when the sniff throws, and adds its evidence and confidence. Column types are not shared
+yet (the next slice). `DialectSniffGoldenTest` pins both readers' answers; three differences are kept as they are and
+named there: a quote not found is `(empty)` in the preview but `"` in Add data; a stray quote the sniff reads as "no
+quote" therefore previews but is refused by Add data; and rows the sniff skips before the header
+(`skip_header_lines`) are shown by the preview but read as data by Add data.
+
 ---
 
 ## P.4 Beyond CSV — the other DuckDB-native readers
