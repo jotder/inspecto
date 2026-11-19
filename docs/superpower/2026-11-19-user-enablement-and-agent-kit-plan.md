@@ -202,6 +202,35 @@ A how-to that cannot be written because the product has no path becomes a board 
 workaround page. The first one is known now: **turning a working Space into a Space Template and an App from the
 console** — today only the App kit CLI can (§1). It goes on the board in plan phase P2, the first phase that needs it.
 
+### 4.6 P1 as built — lane A (2026-11-19)
+
+P1 runs as two parallel lanes against one contract: lane A (the manifest, the renderer, the checker — below) and lane
+B (the console's Help entry and `?` screen links, and the bundle shipping the render at `help/`).
+
+- **The manifest** `docs/okf/product/layer/product/handbook.toon` (D-UE2): the 15 chapters of §3.2 in order — `start`,
+  `understand`, `build_bring_data_in`, `build_shape`, `build_trust`, `build_analyse`, `build_detect`, `build_respond`,
+  `build_present`, `ship`, `manage_app`, `manage_platform`, `develop`, `reference`, `troubleshooting` — each with a
+  title, a nav group and a summary, and its pages keyed by id with `file`, `type` (tutorial, howto, reference, concept,
+  or `unsorted` for an existing page not yet reviewed), `tracks` and `audience`. The ids are a **contract**: the
+  console's help links use them. Seeded with all 187 hub user and admin guides, each `type: unsorted` and
+  `audience: internal`, mapped to a chapter by its hub (66 solution-pack guides under `start`), plus the three
+  root-canon guides the bundle already ships (`EDITIONS.md`, `USER_GUIDE.md` as the screen reference,
+  `ADVANCED_GUIDE.md` as the operations guide) as the only `external` pages.
+- **Why internal by default:** `BUNDLE-LAYOUT-1` (operator, 2026-11-06) ships only operator-facing documents, named one
+  by one, because the hubs are written for the team. Marking a hub page `external` puts it in every bundle at `/help`,
+  so it is a deliberate per-page decision — the review P2 and P3 make page by page as they type and rewrite pages.
+- **`tools/render-handbook.mjs --out <dir> [--internal]`**: a dependency-free Markdown converter (headings, tables,
+  lists, fenced code, blockquotes, links, emphasis; raw HTML escaped, comments and frontmatter dropped, images as alt
+  text) and a static site — home, one page per chapter and per page, `search.json` with inline search, light and dark
+  themes, relative links only. A link to a page outside the render becomes plain text. Today: external 20 files (3
+  pages), internal 207 files (190 pages).
+- **`tools/check-handbook.mjs`** (CI guard, so pre-commit): the contract chapter ids; unique ids, tracked files, each
+  file once, valid type / tracks / audience; every hub user or admin guide placed; the six how-to headings on every
+  `howto` page; and the external render, built in memory, holding no internal page, no dead relative link and no
+  foreign entry in `search.json` — falsified with a renderer made to leak (28 findings, exit 1).
+- **Not in P1:** edition badges (P3); the inventory as reviewed types (P2 / P3 as pages are rewritten); the internal
+  render's publication place (D-UE10).
+
 ## 5. Content — wave 1, all three tracks
 
 ### 5.1 One worked example, start to finish
@@ -344,7 +373,7 @@ downloadable vendor packages, versioned with the product.
 | Phase | Delivers | Depends on | Size |
 |---|---|---|---|
 | **P0** | D-UE1…D-UE9 signed; the new names in `GLOSSARY.md` — **done 2026-11-19** (D-UE8 left open) | — | days |
-| **P1** | Handbook skeleton: manifest, renderer, `/help` route with screen links, `check-handbook.mjs`, the inventory map of existing pages | P0 | 2–3 weeks |
+| **P1** | Handbook skeleton: manifest, renderer, `/help` route with screen links, `check-handbook.mjs`, the inventory map of existing pages — **lane A done 2026-11-19 (§4.6); lane B (console and bundle) in its own lane** | P0 | 2–3 weeks |
 | **P2** | Concepts; the worked example's data and Space Template; tutorials T1–T6 with their checks; the Space → App gap filed | P1 | 4–6 weeks |
 | **P3** | The first 30 how-tos; generated reference; edition badges on every page; the *On Inspecto* developer pages 5.1–5.6 (§3.1) | P1 | 4–6 weeks, parallel with P2, plus 2–3 weeks for the developer pages |
 | **P4** | Learning paths, the first two labs with checkers, the video series spec on the LA machinery, the instructor kit | P2 | 3–4 weeks |

@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-111 test file(s). Run one, or all:
+113 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -32,6 +32,7 @@ node --test tools/
 | `tools/check-engine-names-no-la.test.mjs` | Fixture test for tools/check-engine-names-no-la.mjs. Run: node --test tools/check-engine-names-no-la.test.mjs |
 | `tools/check-entitled-loaders.test.mjs` | Fixture test for tools/check-entitled-loaders.mjs: the real repo is green, and each planted hole turns it red. |
 | `tools/check-family-count.test.mjs` | Negative fixtures for tools/check-family-count.mjs. Run: node --test tools/check-family-count.test.mjs |
+| `tools/check-handbook.test.mjs` | Tests for tools/check-handbook.mjs. Run: node --test tools/check-handbook.test.mjs |
 | `tools/check-jar-signatures.test.mjs` | Fixtures for tools/check-jar-signatures.mjs (P3h per-jar signing). Run: node --test tools/check-jar-signatures.test.mjs |
 | `tools/check-launchers.test.mjs` | Negative fixtures for tools/check-launchers.mjs. Run: node --test tools/check-launchers.test.mjs |
 | `tools/check-module-architecture.test.mjs` | Fixture test for the pure helpers of tools/check-module-architecture.mjs. Run: node --test tools/check-module-architecture.test.mjs |
@@ -98,6 +99,7 @@ node --test tools/
 | `tools/release-notes.test.mjs` | Fixture test for tools/release-notes.mjs. Run: node --test tools/release-notes.test.mjs |
 | `tools/render-api-routes.test.mjs` |  |
 | `tools/render-feature-db.test.mjs` | Fixture test for tools/render-feature-db.mjs. Run: node --test tools/render-feature-db.test.mjs |
+| `tools/render-handbook.test.mjs` | Tests for tools/render-handbook.mjs. Run: node --test tools/render-handbook.test.mjs |
 | `tools/render-offerings-matrix.test.mjs` | Fixture test for tools/render-offerings-matrix.mjs. Run: node --test tools/render-offerings-matrix.test.mjs |
 | `tools/render-product-hosts.test.mjs` | Tests for tools/render-product-hosts.mjs - PRODUCT-ASSEMBLY-1 PA-4. Run: node --test tools/render-product-hosts.test.mjs |
 | `tools/render-product-map.test.mjs` | Fixture test for tools/render-product-map.mjs. Run: node --test tools/render-product-map.test.mjs |

@@ -27,6 +27,10 @@ metadata:
   hand-written Basic | Standard | Advanced table fails outside `EDITIONS.md` / `spec-editions.md`; the board's ledger
   past 60 KB fails — `node tools/roll-backlog-ledger.mjs --write`. After SHRINKING debt, or after a `git mv` of a
   baselined page (the new path reads as new debt), run `--baseline-write` in the same commit. Pages with a generator
-  banner (`> **Generated** by \`tools/…\``) are never ratcheted. The board, glossary and plans are size-exempt. `archived-documents/README.md` is now link-checked.
+  banner (`> **Generated** by \`tools/…\``) are never ratcheted.
+- **A new hub `user-guide-*.md` / `admin-guide-*.md` must be placed in `docs/okf/product/layer/product/handbook.toon`**
+  (`tools/check-handbook.mjs`, pre-commit): add it under the right chapter with `type: unsorted`, a track and
+  `audience: internal`. Only a deliberate product call makes a page `external` — it then ships to customers at /help
+  (BUNDLE-LAYOUT-1). Never rename the 15 chapter ids: the console's help links use them. The board, glossary and plans are size-exempt. `archived-documents/README.md` is now link-checked.
 
 Related: [[guard-scope-is-a-silent-exemption]].

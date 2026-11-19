@@ -474,6 +474,13 @@ jobs:
       - name: Guard — docs stay readable whole, current and in one home (docs-health ratchet)
         run: node tools/docs-health.mjs --ratchet && node --test tools/docs-health.test.mjs tools/roll-backlog-ledger.test.mjs
 
+      # Handbook guard (USER-HANDBOOK-1 P1): docs/okf/product/layer/product/handbook.toon keeps the contract chapter ids
+      # the console's help links use, places every hub user / admin guide (a new guide is placed in the change that adds
+      # it, internal by default), holds how-to pages to the six-heading template, and its EXTERNAL render — the one a
+      # bundle ships at /help — holds no internal page and no dead link. Renders in memory; no build, ~1s.
+      - name: Guard — the Handbook manifest holds together and its external render cannot leak
+        run: node tools/check-handbook.mjs && node --test tools/check-handbook.test.mjs tools/render-handbook.test.mjs
+
       # OpenAPI fragments guard (MODULE-REORG-1 P1): docs/api/openapi-v1.json is GENERATED from the core fragment +
       # each module's META-INF/inspecto/openapi.fragment.json. Reads tracked files only; no build, ~0.3s.
       - name: Guard — the OpenAPI document is the merge of the module fragments
