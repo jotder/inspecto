@@ -34,4 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `e
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `BASIC-ELT-PROFILE-1` | P2 | feature | Basic onboarding as a locked profile of ELT: one implementation, Basic = options locked. | — |
 | `PRODUCT-ASSEMBLY-1` | P2 | feature | assemble finished domain Products and the Platform with chosen Add-ons from definition files, with one tool — PA-0…PA-7 SHIPPED 2026-11-1… | — |

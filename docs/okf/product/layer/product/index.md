@@ -35,6 +35,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `AUTHORING-REDESIGN-1` | P3 | feature | the authoring redesign's still-open letters. | demand |
+| `BASIC-ELT-PROFILE-1` | P2 | feature | Basic onboarding as a locked profile of ELT: one implementation, Basic = options locked. | — |
 | — | P3 | defect | COMPONENT-DELETE-IN-USE-WORDS-1 the Components screen words every refused delete as "referenced by a pipeline" | — |
 | `BI-INSIGHTS-1` | P2 | feature | advanced insights on business data in Widgets and Dashboards — what happened, why it moved, what is unusual, what comes next, who is at r… | — |
 | `AGT-SEGMENT-1` | P3 | chore | the assistant's commercial framing is an unvalidated product read. | — |
