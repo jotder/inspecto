@@ -183,21 +183,30 @@ final class ImportPreRunSteps {
                 Set<String> filesBefore = takes ? fileKeys(cfg) : Set.of();
                 final RunFiles.Scope scope = narrowed;
                 java.util.function.Consumer<Boolean> after = ok -> {
-                    boolean good = false;
                     List<Map<String, String>> setAside = List.of();
+                    boolean unread = false;   // the quarantine folder could not be read: what the run set aside is not known
                     try {
                         setAside = takes ? setAsideSince(cfg, quarantined) : List.of();
-                        // a run that sets a file aside after a column was kept for it did not take what the column was kept for
-                        good = ok && (!kept || setAside.isEmpty());
+                    } catch (RuntimeException unreadable) {
+                        unread = true;
+                        log.warn("Dataset '{}' after its run: its quarantine folder could not be read: {}", id, unreadable.toString());
+                    }
+                    // a run that sets a file aside after a column was kept for it did not take what the column was kept for;
+                    // nor is a column kept when that cannot be told
+                    boolean good = ok && (!kept || !unread && setAside.isEmpty());
+                    try {
                         if (scope != null) scope.close();
-                        if (!good) job.rollback();   // a column kept for a run that failed is not kept
-                        if (takes) recordArrivals(job, cfg, filesBefore, good, summary);
                     } finally {
-                        release(claim);
+                        try {
+                            if (!good) job.rollback();   // a column kept for a run that failed is not kept
+                            if (takes) recordArrivals(job, cfg, filesBefore, good, summary);
+                        } finally {
+                            release(claim);
+                        }
                     }
                     // Data status (watchError): kept until a run that takes a file says otherwise - not cleared by the 30 s
                     // runs that find nothing to take
-                    if (watched && takes) InboxWatch.ran(dataRoot, id, !ok ? InboxWatch.SERVER_FAULT
+                    if (watched && takes) InboxWatch.ran(dataRoot, id, !ok || unread ? InboxWatch.SERVER_FAULT
                             : setAside.isEmpty() ? null : InboxWatch.setAside(setAside, dataRoot, writeRoot));
                 };
                 handedOff = true;
