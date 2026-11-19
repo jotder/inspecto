@@ -1,6 +1,9 @@
 handbook:
   title: Inspecto Handbook
   plan: docs/superpower/2026-11-19-user-enablement-and-agent-kit-plan.md
+  publish:
+    external: none
+    internal: none
 chapters:
   start:
     title: Start here
