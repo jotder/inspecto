@@ -1,3 +1,13 @@
+---
+type: Brochure
+title: Inspecto Standard — brochure
+description: Sales brochure for the Standard edition: what it adds to Basic for a team — kept-up-to-date feeds, OIDC sign-in and roles, masking with audited reveal, Cases, Reconciliations, scoring and Investigations.
+item: edition.standard
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+---
+
 # Inspecto Standard — brochure
 
 > **A governed assurance and investigation platform for a team — sign-in, Cases, Reconciliations, scoring and Investigations with evidence you can defend.**
@@ -39,5 +49,5 @@ Pick the solution pack closest to your problem, and we will run it on your own e
 
 ## Read more
 
-- This Edition's hub: [index](index.md); the full module and Add-on matrix is in [spec-editions.md](../../layer/platform/spec-editions.md)
+- This Edition's hub: [index](index.md); the full module and Add-on matrix is in [spec-editions-placement.md](../../layer/platform/spec-editions-placement.md#add-ons-by-edition)
 - Whole-product sales material: [executive brief](../../layer/product/brochure-executive-brief.md) · [solution overview](../../layer/product/brochure-solution-overview.md) · [enterprise whitepaper](../../layer/product/brochure-enterprise-whitepaper.md) · [competitive landscape](../../layer/product/brochure-competitive-landscape.md)

@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis audit showcase — brochure
+description: Brochure for the Link Analysis audit showcase: procure-to-pay and journal data as a graph exposing a fictitious vendor, a shell cluster and split invoices, ending in a Dossier that fails verification if one byte changes.
+item: solution-pack.la-audit
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-audit]
+---
+
 # Link Analysis audit showcase — brochure
 
 > **Procure-to-pay and the journal as a graph — a fictitious vendor, a shell cluster and split invoices, ending in a Dossier that fails verification if one byte changes.**

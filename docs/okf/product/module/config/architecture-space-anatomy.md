@@ -1,3 +1,14 @@
+---
+type: Reference
+title: Space anatomy — every folder and file in a Space
+description: Machine-checked census of every folder and file in a Space — config tree versus data root, config/, secrets, data/, audit/, duckdb/, what git keeps, templates — with who reads each file and what breaks when you edit one.
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [platform/inspecto-config]
+---
+
 # Space anatomy — every folder and file in a Space
 
 > **Reference page** for Product Map Item `module.config`. Checked against the code and the shipped Spaces

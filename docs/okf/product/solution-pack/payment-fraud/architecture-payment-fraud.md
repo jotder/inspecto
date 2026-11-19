@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Payment fraud
+description: How the payment-fraud Space Template is built: three feeds whose Pipelines quarantine any file carrying a card number, rolling-window feature Datasets, typology Alert Rules, dispute labels, the modules used and its limits.
+item: solution-pack.payment-fraud
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/payment-fraud]
+---
+
 # Payment fraud
 
 > **Level 2 solution page** (`SOLUTION-SUITE-DOCS-1`). Content pack: Space Template `payment-fraud`

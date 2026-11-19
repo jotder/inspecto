@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: AML — brochure
+description: Sales brochure for the AML pack: typology detection (structuring, threshold crossing, smurfing, watch-list traffic), an account Risk Score and Anomaly Model, screening and Link Analysis starters on a bank's ledger.
+item: solution-pack.aml
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/aml]
+---
+
 # AML — brochure
 
 > **Anti-money-laundering typologies, an account Risk Score, screening and Link Analysis starters — ready to run on your ledger.**

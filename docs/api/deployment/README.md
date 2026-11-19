@@ -225,5 +225,4 @@ paths tolerate Nimbus's default bounded clock skew (60 s) on `exp`/`nbf`.
 Case-type/business-function data-scoped grants (rbac-groundwork §4 Q2 — **closed 2026-07-08**, SEC-7d) and the
 `canOnboardConnections` split (Q1 — **closed 2026-07-22**, implemented) both shipped and are simply not modeled in
 this blueprint; Enterprise multi-realm/multi-tenant federation still needs a product decision. Decisions of
-record: `../../okf/product/module/access/plan-security.md` §4. *(Corrected 2026-09-08: this paragraph called both
-questions "still open" for seven weeks after they closed.)*
+record: `../../okf/product/module/access/plan-security.md` §4.

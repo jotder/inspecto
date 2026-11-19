@@ -16,7 +16,7 @@ code: features/inspecto-agent
 
 The assist surface is an SPI in the core, implemented by the optional [agent module](architecture-agent.md).
 
-> **Which bundles ship it (corrected 2026-11-07).** Standard and every higher edition: `offerings/standard.toon` lists
+> **Which bundles ship it.** Standard and every higher edition: `offerings/standard.toon` lists
 > `agent` (add-on `aiAssist`), and `package.ps1` stages the shaded sidecar as `lib/inspecto-agent.jar` (`PKG-5`). A Basic
 > bundle does not carry it, so there `/assist/*` answers **503**. Requirement-of-record:
 > [Assistant capability spec](plan-assistant.md) §3.10.

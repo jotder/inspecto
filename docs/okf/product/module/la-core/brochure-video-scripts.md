@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Inspecto LA short videos — scripts and agency briefs
+description: Front page of the Link Analysis short-video scripts and agency briefs (concept, industry and case videos filmed on the real product over synthetic data), listing the four parts the series is split into.
+item: module.la-core
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+code: [la/inspecto-la-core]
+---
+
 # Inspecto LA short videos — scripts and agency briefs
 
 > **Six concept videos, nine industry videos and twenty case videos, filmed on the real product over synthetic data. Each one is an example that ships with Inspecto LA: it explains the problem, what the graph shows and why it took a graph, and turns raw records into an investigation outcome in a few steps that anyone can repeat on their own data. Each ends by saying that what it showed is in Basic, and what Standard and above add. For each video: a one-page brief for the agency, then a shot-by-shot script with voice-over; a 480p draft round on a Basic install comes before the agency's masters.**

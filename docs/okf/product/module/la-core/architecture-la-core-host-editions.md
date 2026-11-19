@@ -37,19 +37,21 @@ Part 4 of 4 of [Link Analysis — architecture](architecture-la-core.md) · prev
 ## 8. Editions and packaging
 
 Edition names per `LA-EDITIONS-1` ED-2 (2026-10-17; formerly Personal / Professional / Enterprise). Feature placement:
-[`spec-editions.md`](../../layer/platform/spec-editions.md) (*Inspecto LA feature placement*).
+[`spec-editions-placement.md`](../../layer/platform/spec-editions-placement.md) (*Inspecto LA feature placement*).
 
-| | Basic | Standard | Advanced | Preview |
-|---|---|---|---|---|
-| la-core, la-storage, la-api, geo-link, entity-list (the **explorer**) | ✓ | ✓ | ✓ | ✓ |
-| Investigation surface (`investigations` edition feature, declared by `inspecto-ops`, AND the Investigations add-on held) | — (503) | ✓ by default | ✓ by default | ✓ by default |
-| Geo map, routes and co-location (`geoMap` route feature on `GeoRoutes`, declared by `inspecto-ops`; D-LAE5) | — (503) | ✓ | ✓ | ✓ |
-| Entity profile pages (`entityPages` route feature on `EntityPageRoutes`, declared by `inspecto-ops`; D-LAE4) | — (503) | ✓ | ✓ | ✓ |
-| Link analysis and Geo map Widget types (`laWidgets`, a `/bootstrap` UI flag only; D-LAE2) | hidden | ✓ | ✓ | ✓ |
-| Case history beside a node (`CaseHistoryRoutes`, `investigations`; D-LAE1) | — (503) | ✓ | ✓ | ✓ |
-| Sign-in (`inspecto-oidc`; Preview: demo sign-in) | — | ✓ | ✓ | ✓ |
-| la-store-pg (Postgres Investigations) | — | — | ✓ | ✓ |
-| D-E7 PDP (`providers/inspecto-policy`) | — | — | ✓ | ✓ |
+What matters on this page is the gate behind each placement — every edition, Preview included, carries the
+explorer; what Basic lacks it lacks because no installed module declares the feature:
+
+- **Explorer** (la-core, la-storage, la-api, geo-link, entity-list): in every edition.
+- **Investigation surface**: the `investigations` edition feature (declared by `inspecto-ops`) AND the Investigations
+  add-on held; on by default from Standard, `503` in Basic.
+- **Geo map, routes and co-location** (`geoMap` route feature on `GeoRoutes`, declared by `inspecto-ops`; D-LAE5),
+  **entity profile pages** (`entityPages` on `EntityPageRoutes`, declared by `inspecto-ops`; D-LAE4) and **case history
+  beside a node** (`CaseHistoryRoutes`, `investigations`; D-LAE1): from Standard, `503` in Basic.
+- **Link analysis and Geo map Widget types** (`laWidgets`, a `/bootstrap` UI flag only; D-LAE2): from Standard,
+  hidden in Basic.
+- **Sign-in** (`inspecto-oidc`): from Standard; Preview uses demo sign-in.
+- **la-store-pg** (Postgres Investigations) and the **D-E7 PDP** (`providers/inspecto-policy`): Advanced (and Preview).
 
 **Basic = the Link Analysis explorer (phase 3, 2026-10-17).** The five modules are default-reactor modules and ship in
 every bundle. The Investigation surface is the set of route modules whose `featureIds()` names `investigations`

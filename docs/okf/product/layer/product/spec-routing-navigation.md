@@ -15,7 +15,7 @@ verified: 2026-11-18 last-edit
 
 * **Lazy-load every feature route**: `{ path, loadChildren: () => import('app/modules/admin/<f>/<f>.routes') }` in `app.routes.ts` (no auth guard — the core is auth-free). Each `<f>.routes.ts` is `export default [...] as Routes`. Default route → `dashboard`.
 * **Adding a page = two edits**: the lazy route in `app.routes.ts` **and** the nav item in `core/navigation/navigation-data.ts`. ⚠ *(This named `mock-api/common/navigation/data.ts` until 2026-09-08 — a path deleted with the mock backend, so the stated definition of done pointed at a file that could not be edited.)*
-* **Nav groups**: **Operations** · **Platform** (Workbench / Studio / Catalog) · **Settings**, plus Dashboard + Assistant. 🔴 **NOT filtered by the active Lens** — corrected 2026-09-08: a Lens never hides a screen (product owner, 2026-07-03; per-route Lens tagging was declined outright). The only thing that can hide a nav subtree per Lens is an **Access Profile**, whose root default is *allow*. See the [features index](../../index.md) for the screen-to-group mapping.
+* **Nav groups**: **Operations** · **Platform** (Workbench / Studio / Catalog) · **Settings**, plus Dashboard + Assistant. 🔴 **NOT filtered by the active Lens** — a Lens never hides a screen (product owner, 2026-07-03; per-route Lens tagging was declined outright). The only thing that can hide a nav subtree per Lens is an **Access Profile**, whose root default is *allow*. See the [features index](../../index.md) for the screen-to-group mapping.
 * **Lens Access matrix** (Settings ▸ Access): a per-Space **Access Profile** over the **Access Catalog**
   (menu groups → panes → functionalities, derived from the live nav config) grants Inherit/Hidden/Shown
   per Lens, persisted via `/access/*`. It filters the sidebar and re-derives `LensService` capabilities
@@ -57,3 +57,7 @@ state while the detail panel opens (deep links still work). Settings binds its s
 `:section` param the same way. Detail side panes are user-resizable via the shared
 `InspectoSplitDirective` (`inspecto/components/split.directive.ts`,
 `[inspectoSplit]="<stateKey>"` — width persists per key).
+
+## Changes
+
+- 2026-09-08: the nav-groups line corrected — it said the groups are filtered by the active Lens.

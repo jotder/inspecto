@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Partner settlement — brochure
+description: Brochure for the Partner settlement pack: settling with each partner under its own agreement — tolerance, currency, cut-off and cycle — with findings that name the reason for every difference.
+item: solution-pack.partner-settlement
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/partner-settlement]
+---
+
 # Partner settlement — brochure
 
 > **Settle with each partner under its own agreement: the right tolerance, the right currency, the right cycle, and a reason for every difference.**

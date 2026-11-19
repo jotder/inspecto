@@ -1,3 +1,14 @@
+---
+type: Guide
+title: Backup & Restore Runbook (System Maintenance MNT-5/MNT-6)
+description: Runbook for per-Space config (and optional DuckDB) backup, verification and restore through the maintenance Job Type, including restore into a new Space, path containment rules and the Standard-and-above edition requirement.
+item: module.backup
+audience: internal
+status: current
+verified: 2026-10-19 last-edit
+code: [features/inspecto-backup]
+---
+
 # Backup & Restore Runbook (System Maintenance MNT-5/MNT-6)
 
 **Scope:** per-space config (and optionally DuckDB) backup, verification, and restore — including

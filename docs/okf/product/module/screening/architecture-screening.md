@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Screening
+description: How Screening matches subjects against Entity Lists — an ad-hoc check that persists nothing and the screening.run Job that raises reviewable Screening Hits — and how hits are confirmed, dismissed or escalated.
+item: module.screening
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [features/inspecto-screening]
+---
+
 # Screening
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.

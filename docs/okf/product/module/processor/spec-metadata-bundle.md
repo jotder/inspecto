@@ -142,8 +142,7 @@ Closes BUNDLE-AUTHORED-PIPELINE-STORE-1 (the grounding is kept below, struck).
     parses. But `supported()` reuses `ComponentStore.WRITABLE_TYPES`, which still carries `schema`, so
     **the server WRITES a schema item the UI and its offline mock expect skipped**: the same old bundle
     imports differently offline and against a backend. Filed as **BUNDLE-SCHEMA-1** and **FIXED 2026-08-31** (the archived board snapshot records the close; the mock
-    surface was deleted the same day, so only the server and the SPA remain and they agree) — ⚠ this paragraph
-    cited a live `BACKLOG.md` §6 row that does not exist (corrected 2026-09-08).
+    surface was deleted the same day, so only the server and the SPA remain and they agree).
   * **Decision 2026-09-06 (operator) — the word `schema` in a bundle manifest means the REGISTRY id**
     (`registry/schemas/<id>`). A pipeline-owned `<name>_schema.toon` and its `_mapping.csv` / `_structure.csv`
     siblings travel under their own kind (with the pipeline's dependency closure), never as `schema`. This is the
@@ -287,3 +286,7 @@ transfer menus) lives in the frontend bundle. Design history: `docs/archived-doc
     uses it. **Recommended: B or C** — both keep one gated import path. Whichever is chosen, the
     `PipelineStore` write should stop, or at least refuse an id that a registered Pipeline already holds,
     because that is the shadowing hazard above.
+
+## Changes
+
+- 2026-09-08: the BUNDLE-SCHEMA-1 paragraph corrected — it cited a live `BACKLOG.md` §6 row that does not exist.

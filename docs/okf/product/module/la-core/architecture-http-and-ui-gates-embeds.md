@@ -144,7 +144,7 @@ Plan: [`inspecto-la-editions-plan`](../../../../archived-documents/plans-archive
 surface). Outbound (case hand-off, webhooks, client-credentials trust) is a separate lane.
 
 * **Routes** (`InvestigationInboundRoutes`, la-api, geoLink feature):
-  * `POST /inv/inbound/investigations` — gated on `canOpenInboundInvestigation` (was `canManageIncidents` until 2026-11-01). A fraud product or case manager hands over its own record
+  * `POST /inv/inbound/investigations` — gated on `canOpenInboundInvestigation`. A fraud product or case manager hands over its own record
     and the entities it is about; Inspecto LA opens an Investigation seeded with them and answers its id and a link.
   * `POST /inv/deep-links/resolve` — read-shaped (CapabilityManifest exemption): validates an "Open in Inspecto LA" link for the
     SPA's `/open` page.
@@ -206,3 +206,8 @@ surface). Outbound (case hand-off, webhooks, client-credentials trust) is a sepa
   whole history* link). A mixed-type inbound call binds through ONE link mapping that links a column of EVERY type it names; when no
   single mapping does, it is refused 422 naming the types (an Investigation has one mapping), unless the caller sends an explicit
   `binding`. The window bounds are 0001-01-01..9999-12-31 (422 outside). A deep link carries only `from` / `to`: an Investigation window's other settings (slots, day or timezone rules) stay on the Investigation and are not carried to the Entity page. A mapping covering all types is preferred over the first one that covers the first type.
+
+## Changes
+
+- 2026-11-01: the `POST /inv/inbound/investigations` gate renamed from `canManageIncidents` to
+  `canOpenInboundInvestigation`.

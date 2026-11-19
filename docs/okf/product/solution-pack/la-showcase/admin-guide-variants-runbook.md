@@ -1,3 +1,14 @@
+---
+type: Guide
+title: Inspecto LA (Link Analysis) showcase: Postgres store and Basic variants
+description: Runbook for the la-showcase demo on its non-default variants — the Postgres Investigation store and the Basic edition — after the default unzip-and-run demo bundle, with what has not been verified.
+item: solution-pack.la-showcase
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-showcase]
+---
+
 # Inspecto LA (Link Analysis) showcase: Postgres store and Basic variants
 
 **Purpose:** run the `la-showcase` demo (Space Template `spaces/_templates/la-showcase`, seeded by

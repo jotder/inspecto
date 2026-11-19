@@ -69,27 +69,13 @@ Telecom and mobile-money fraud is relational: a SIM box or a mule ring is invisi
 
 Inspecto LA is sold in the same editions as the rest of Inspecto (names fixed by decision `LA-EDITIONS-1`, 2026-10-17: **Basic / Standard / Advanced**, replacing Personal / Professional / Enterprise across the whole product). The principle is that no edition gets weaker analysis or weaker evidence: editions differ by **who** works (one analyst, a team, an organisation), **how much data**, and **how much governance**. **Basic is the explorer**: it has no sign-in and no Investigations. Everything in Sections 2 and 5 that rests on an Investigation — the sealed op log, replay, the Dossier, Drafts, four-eyes approval, audited reveal, embed links, Data Trust, standing detection — is **Standard and above**.
 
-| Capability | Basic | Standard | Advanced | Preview |
-| :--- | :---: | :---: | :---: | :---: |
-| Graph studio, projections from any Dataset, saved views, paths, neighbours, patterns, Value Measures | yes | yes | yes | yes |
-| Entity Lists, identity resolution | yes | yes | yes | yes |
-| Entity profile pages (decision `D-LAE4`) | — | yes | yes | yes |
-| Geo map, routes and co-location (decision `D-LAE5`, 2026-10-20) | — | yes | yes | yes |
-| Getting started, Add data from a file, Start from..., My work, help on every screen (`LA-ONBOARD-1`) | yes | yes | yes | yes |
-| Case history beside a node (decision `D-LAE1`); Link Analysis dashboard Widgets (decision `D-LAE2`) | — | yes | yes | yes |
-| Browser graph algorithms (28 of the 29) | yes | yes | yes | yes |
-| Industry packs (Telecom, Mobile Money), one per Space | yes | yes | yes | yes |
-| Masking | off by default; a mode the Space sets is display only (no sign-in, so anyone may reveal) | enforced, `typed` by default | enforced | enforced |
-| Sign-in | none | OIDC | OIDC | demo sign-in |
-| Investigations: sealed op log, replay, compare, Dossier and bundle, Drafts, templates, external references | — | yes | yes | yes |
-| Four-eyes approval, audited reveal, members and roles, embed links, Case linking | — | yes | yes | yes |
-| Data Trust strip, Files, coverage, delivery Alerts | — | yes | yes | yes |
-| Server Graph Run (29 algorithms), link index and its scheduled build | — | yes | yes | yes |
-| Alert Rules on Investigations, standing detection (`la.detect`) | — | yes | yes | yes |
-| Third-party integration (inbound, deep link, hand-off, webhooks) | — | yes | yes | yes |
-| Investigations on PostgreSQL (`la-store-pg`, opt-in) | — | — | yes | yes |
-| Policy engine (ABAC, can only narrow access) | — | — | yes | yes |
-| Retention, legal hold, residency, scale-out (placed in Advanced by decision) | — | — | decided, not yet in the build | decided, not yet in the build |
+The full placement, capability by capability, is in [`EDITIONS.md`](../../../../EDITIONS.md#inspecto-la-link-analysis-by-edition).
+Beyond the Investigation line above, three things matter here: Basic keeps the whole graph studio, Entity Lists, the
+browser graph algorithms (28 of the 29) and the industry packs, but masking there is display only (no sign-in, so
+anyone may reveal), while Standard enforces it (`typed` by default); entity profile pages, the Geo map, case history
+beside a node and the Link Analysis dashboard Widgets start in Standard; Advanced adds Investigations on PostgreSQL
+(`la-store-pg`, opt-in) and the policy engine (ABAC, can only narrow access), and retention, legal hold, residency and
+scale-out are placed in Advanced by decision but not yet in the build. Preview carries everything, with demo sign-in.
 
 *Basis: `docs/EDITIONS.md` (Inspecto LA feature placement and *Basic — the Link Analysis explorer*), `offerings/basic.toon`, `offerings/standard.toon`, `offerings/advanced.toon`, `offerings/preview.toon`, and the as-built record of the editions plan (`docs/archived-documents/plans-archive/inspecto-la-editions-plan.md`, section 7). All seven phases of that plan shipped on 2026-10-17 (commit `f1b64ce03`).*
 

@@ -30,7 +30,7 @@
 //             hub page needs it (`node tools/fill-doc-headers.mjs --write --hub <kind>/<name>` adds what it can), and a
 //             page that has it may not lose it, so the full-header count only rises (INFO-RESTRUCTURE-1 W4).
 //   editions  a page with more hand-written Basic | Standard | Advanced tables than its baseline. The homes of that fact
-//             (EDITIONS.md and spec-editions.md) are exempt.
+//             (EDITIONS.md and spec-editions.md with its parts spec-editions-*.md) are exempt.
 //   ledger    the board's ledger (BACKLOG.md, between the count line and "## Area index") over LEDGER_CAP (60 KB):
 //             run `node tools/roll-backlog-ledger.mjs --write`. Capped by size, not age, so the calendar alone never
 //             turns a commit red.
@@ -70,7 +70,7 @@ export const HISTORY_EXEMPT = new Set([
     'docs/GLOSSARY.md',
     'docs/okf/product/layer/product/brochure-competitive-landscape.md',
 ]);
-export const EDITION_HOMES = new Set(['docs/EDITIONS.md', 'docs/okf/product/layer/platform/spec-editions.md']);
+export const EDITION_HOMES = { has: (p) => p === 'docs/EDITIONS.md' || /^docs\/okf\/product\/layer\/platform\/spec-editions(-[a-z0-9-]+)?\.md$/.test(p) };
 const ARCHIVE = 'docs/archived-documents/';
 const BASE_KEYS = ['type', 'title', 'description'];
 const FULL_KEYS = ['type', 'title', 'description', 'item', 'audience', 'status', 'verified', 'code'];

@@ -67,8 +67,8 @@ records" contract. A request with no `sampleRows` yields `0/0` (backward-compati
 0-matched stub). The stamp is written non-authoring (`store.write(…, false)`) so simulate cadence
 never churns config versions (MET-5 parity).
 
-The `normalize()` default for an absent `when` was corrected to the canonical
-`{kind:'group', op:'AND', items:[]}` (was `{op:'and', conditions:[]}`) so a filter-less rule reads
+The `normalize()` default for an absent `when` is the canonical
+`{kind:'group', op:'AND', items:[]}`, so a filter-less rule reads
 identically to what the UI authors and `ConditionTree` evaluates.
 
 ## `emit-signal` payload mapping and cross-Space offer (operator, 2026-09-28)
@@ -253,3 +253,8 @@ nothing written (`AlertRoutes.parse`, every write door). Loading stays lenient: 
 Pinned by `AlertRuleUnmodelledKeysTest`.
 
 ⚠ **Unmodelled keys on an Expectation (`MODULE-REORG-P4-2`, 2026-10-07).** `POST|PUT /expectations` rebuilds the stored file from `Expectation.toMap()`, so an author-owned `x-` key used to vanish behind a 200 (any other unknown key was already refused by the census). Now `x-` keys are kept through create, update (PUT replaces), a held save once approved and a bundle import, and returned by GET; the Expectation dialog spreads the stored `x-` keys back on edit (`authorKeys`). Pinned by `RebuiltWritersUnmodelledKeysTest`.
+
+## Changes
+
+- The `normalize()` default for an absent `when` changed from `{op:'and', conditions:[]}` to the canonical
+  group form.

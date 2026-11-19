@@ -277,12 +277,12 @@ scripts. None of these commits is marked `!` except `757add5e`.*
   gains `RESOURCE_KINDS` and the `Warning` record.
 
 **Error-code corrections (`ERRORCODE-DEFAULTED-1`, 2026-09-25)**
-- `POST /rule-templates/{id}/simulate` with no write root bound now answers 503 with `errorCode`
-  **`CONTROL_PLANE_READ_ONLY`** (was the 503 default `CAPABILITY_UNAVAILABLE`), matching every other
+- `POST /rule-templates/{id}/simulate` with no write root bound: the 503's `errorCode` moves from the 503
+  default `CAPABILITY_UNAVAILABLE` to **`CONTROL_PLANE_READ_ONLY`**, matching every other
   write-root refusal. Status and message are unchanged; a client keying on the old code must switch.
 - The per-Space data-source bundle routes (`GET /datasources`, `GET /datasources/{ds}/export`,
-  `GET /export`, `POST /import`, `POST /import/preview`) with no write root bound now answer 503 with
-  `errorCode` **`CONTROL_PLANE_READ_ONLY`** (was `CAPABILITY_UNAVAILABLE`), for the same reason. Status and
+  `GET /export`, `POST /import`, `POST /import/preview`) with no write root bound: the 503's `errorCode`
+  moves from `CAPABILITY_UNAVAILABLE` to **`CONTROL_PLANE_READ_ONLY`**, for the same reason. Status and
   message are unchanged.
 
 **Breaking — Job Packs need a SHA-256 allowlist (2026-09-25, parser-plugins trust design slice P1)**
@@ -343,7 +343,7 @@ scripts. None of these commits is marked `!` except `757add5e`.*
 - Routes renamed, **no alias**: `GET /agent/cases` → `GET /agent/triage-runs` (list key `cases` →
   `triageRuns`), `GET /agent/cases/{id}` → `/agent/triage-runs/{id}`, `GET /agent/cases/{id}/similar` →
   `/agent/triage-runs/{id}/similar`, `POST /agent/cases/{id}/feedback` → `/agent/triage-runs/{id}/feedback`
-  (still `canAdminister`). Feedback views key on `triageRunId` (was `caseId`); the 404 reads
+  (still `canAdminister`). Feedback views key `caseId` → `triageRunId`; the 404 reads
   `unknown triage run: '<id>'`. None of the four existed in `v3.11.0`.
 - Java: package `com.gamma.intelligence.investigation` → `com.gamma.intelligence.triage`; `Case` →
   `TriageRun`, `CaseStore` → `TriageRunStore`, `CaseSimilarity` → `TriageRunSimilarity`. SPI

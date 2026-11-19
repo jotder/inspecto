@@ -1,3 +1,13 @@
+---
+type: Brochure
+title: Inspecto — Executive Brief
+description: Three-minute brief for executives and sponsors: what Inspecto is, why it wins, the editions and business model, where it stands on 2026-11-19, its competitive position and the decisions needed.
+item: layer.product
+audience: internal
+status: current
+verified: 2026-11-19 last-edit
+---
+
 # Inspecto — Executive Brief
 
 > Audience: executives & sponsors · Status date: **2026-11-19** · ~3 minutes · Refreshed from

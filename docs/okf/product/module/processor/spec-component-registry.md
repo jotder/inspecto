@@ -33,7 +33,7 @@ live under `<write-root>/registry/<type>/` as TOON files, addressed by `<type>/<
 * **Optimistic concurrency** (W3): `ContentHash` (mirrors the UI's `content-hash.ts`, parity-pinned by test)
   hashes each component's content; `/components` responses carry an **`ETag`**, reads honour
   `If-None-Match` (304), and writes honour `If-Match` — a stale hash is **`409 CONFLICT_STALE_VERSION`** (`ETags.requireMatch`;
-  not a 412 — corrected 2026-09-08). ⚠ The Components pane sends neither header. **History (MET-5, 2026-07-09):** every write
+  not a 412). ⚠ The Components pane sends neither header. **History (MET-5, 2026-07-09):** every write
   archives the prior copy to `<typeDir>/.history/<id>.v<N>.toon` (a sub-directory, so the registry scan never mis-reads it),
   keep-N `-Dcomponents.history.keep` (default 10); `GET /components/{type}/{id}/versions` + `POST …/versions/{v}/restore`.
   **Integrity:** `ComponentIntegrity` (broken widget→dataset/query, dashboard→widget, reconciliation→dataset refs; duplicates)

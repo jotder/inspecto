@@ -156,7 +156,7 @@ both design refusals rather than gaps (§EXE.6).
 ### ACQ.2 Acquisition — seven requirements
 
 Seven requirements, all shipped. ⚠ **The feature × edition matrix in
-[`spec-editions.md`](../../layer/platform/spec-editions.md) (the `SP-ACQ-*` rows) is authoritative for the
+[`spec-editions-step-processors.md`](../../layer/platform/spec-editions-step-processors.md) (the `SP-ACQ-*` rows) is authoritative for the
 Edition column**; this table mirrors it. The wording of the original requirement's 14 numbered areas is
 [spec Part 1](spec-acquisition.md#part-1--the-original-requirement).
 
