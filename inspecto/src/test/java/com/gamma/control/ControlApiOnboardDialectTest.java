@@ -142,6 +142,37 @@ class ControlApiOnboardDialectTest {
         }
     }
 
+    /** Add a file to import {@code id}: the raw answer (a refusal is not a 200). */
+    private HttpResponse<String> addFile(Ctx c, String id, String name, String content) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1/datasets/" + id + "/files?name=" + name
+                + "&mode=append")).POST(BodyPublishers.ofString(content)).build(), BodyHandlers.ofString());
+    }
+
+    /**
+     * A later file is judged against the lines the import skips: one whose leading lines differ would be read wrongly by
+     * the run (its first row lost, or its header read as a row), so it is refused and nothing lands - both ways round.
+     */
+    @Test
+    void aLaterFileWithOtherLeadingLinesIsRefused(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String skipping = addData(c, "skip.csv", "# exported\na,b\n1,2\n3,4\n");
+            HttpResponse<String> r = addFile(c, skipping, "later.csv", "a,b\n5,6\n7,8\n");
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("it has 0 lines before the header line and '" + skipping + "' skips 1"), r.body());
+            assertEquals(List.of("1|2", "3|4"), rows(skipping, "a", "b"));
+
+            String plain = addData(c, "plain.csv", "a,b\n1,2\n3,4\n");
+            r = addFile(c, plain, "later.csv", "# exported\na,b\n5,6\n7,8\n");
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("it has 1 line before the header line and '" + plain + "' skips 0"), r.body());
+            assertEquals(List.of("1|2", "3|4"), rows(plain, "a", "b"));
+
+            HttpResponse<String> alike = addFile(c, skipping, "alike.csv", "# exported again\na,b\n5,6\n7,8\n");
+            assertEquals(200, alike.statusCode(), alike.body());
+            assertEquals(List.of("1|2", "3|4", "5|6", "7|8"), rows(skipping, "a", "b"));
+        }
+    }
+
     @Test
     void aQuoteTheSniffFoundIsWritten(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

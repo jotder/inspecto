@@ -273,7 +273,10 @@ the sniff. The Pipeline Add data writes reads the file the same way: `skip_heade
 and `csv_settings.quote` as the draft read it - except that no quote (`quote: ""`, see the key table above) is written
 only when the file holds a `"`: a quote-free file reads alike under the engine's default `"`, which keeps a later file's
 quoted fields whole (`ControlApiDecimalColumnTest` adds a later file with `"1,22"` values to an import made from a
-quote-free file). `ControlApiOnboardDialectTest` imports each case. A no-quote import made from a file with a stray
+quote-free file). A later file (Add a file, the inbox) is judged against the lines the import skips: when its own sniff
+skips a different number of lines before the header it is refused (422, "it has N lines before the header line and
+'<id>' skips M") — the run would otherwise lose its first row or read its header as a row.
+`ControlApiOnboardDialectTest` imports each case. A no-quote import made from a file with a stray
 quote reads a later file's quoted fields as text; the quote entry of the fix catalogue offers `"` when a draft's lines
 do not split alike. ⛔ The
 grammar editor cannot author "no quote" (clearing the field removes the key, which means `"`).

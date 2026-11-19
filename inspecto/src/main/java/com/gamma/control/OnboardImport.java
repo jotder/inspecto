@@ -1681,6 +1681,12 @@ final class OnboardImport {
         }
     }
 
+    /** A {@code skip_header_lines} / {@code skipLines} value as a number; {@code 0} when absent or not a count. */
+    private static int skipLines(Object v) {
+        String s = v == null ? "" : String.valueOf(v).trim();
+        return s.matches("\\d{1,9}") ? Integer.parseInt(s) : 0;
+    }
+
     /** Whether {@code file} holds a {@code "} byte anywhere (BE-3: the engine's default quote would read it otherwise than no quote). */
     static boolean holdsDoubleQuote(Path file) throws IOException {
         try (java.io.InputStream in = new java.io.BufferedInputStream(Files.newInputStream(file))) {
@@ -1764,6 +1770,13 @@ final class OnboardImport {
             } catch (OnboardFixes.Refusal notReadable) {   // its fix edits a draft: a later file has none
                 throw new ApiException(notReadable.status, ErrorCodes.CONFIG_VALIDATION_FAILED, notReadable.getMessage());
             }
+            // BASIC-ELT-PROFILE-1 BE-3: the import skips the lines its first file's sniff skipped (skip_header_lines); a
+            // later file with other leading lines would be read wrongly by the run (a row lost, or its header read as one)
+            int skips = skipLines(importSetting(schema, "processing", "csv_settings", "skip_header_lines"));
+            int has = a.format().get("skipLines") instanceof Map<?, ?> sl ? skipLines(sl.get("value")) : 0;
+            if (has != skips)
+                problems.add("it has " + Words.count(has, "line", "lines") + " before the " + (headerless ? "first record" : "header line")
+                        + " and '" + id + "' skips " + skips);
             if (headerless) {
                 if (a.cols().size() <= max)
                     problems.add("it has " + a.cols().size() + " columns and '" + id + "' reads " + (max + 1));
