@@ -254,18 +254,24 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     // ── pre-run steps (BASIC-ELT-PROFILE-1 BE-1b) ──────────────────────────────────────────────────────────────────
 
     /**
-     * What a {@link PreRunStep} answers: whether the run goes ahead ({@code skip} false) and what it wants told once the
-     * run has ended ({@code after}, handed whether the run succeeded; may be null).
+     * What a {@link PreRunStep} answers: whether the run goes ahead ({@code skip} false), whether the step changed the
+     * Pipeline's config files so the run must read them again ({@code reload}: a kept column grows the schema), and what
+     * it wants told once the run has ended ({@code after}, handed whether the run succeeded; may be null).
      */
-    public record PreRun(boolean skip, java.util.function.Consumer<Boolean> after) {
+    public record PreRun(boolean skip, boolean reload, java.util.function.Consumer<Boolean> after) {
         /** Go ahead, nothing to do after. */
-        public static final PreRun GO = new PreRun(false, null);
+        public static final PreRun GO = new PreRun(false, false, null);
         /** Do not start this run (the next tick looks again); nothing to do after. */
-        public static final PreRun SKIP = new PreRun(true, null);
+        public static final PreRun SKIP = new PreRun(true, false, null);
 
         /** Go ahead, and run {@code after} once the run has ended. */
         public static PreRun then(java.util.function.Consumer<Boolean> after) {
-            return new PreRun(false, after);
+            return new PreRun(false, false, after);
+        }
+
+        /** Go ahead reading the Pipeline's config again (this step changed it), and run {@code after} once the run has ended. */
+        public static PreRun reloadThen(java.util.function.Consumer<Boolean> after) {
+            return new PreRun(false, true, after);
         }
     }
 
@@ -308,32 +314,35 @@ public final class CollectorService implements ReadModel, AutoCloseable {
 
     /**
      * One run of {@code pipeline} with both sides of its steps: the pre-run steps, then {@code run} inside
-     * {@link #commitStepRun} (its COMMIT and RUN steps), then each pre-run step's {@code after}, last registered first. A
-     * skipped run answers an empty result. The caller holds the Pipeline's run claim; a dry run does not come here.
+     * {@link #commitStepRun} (its COMMIT and RUN steps) - handed true when a step asked for the config to be read again -
+     * then each pre-run step's {@code after}, last registered first, whatever happened (an {@link Error} in a later step
+     * included). A skipped run answers an empty result. The caller holds the Pipeline's run claim; a dry run does not come here.
      */
     MultiCollectorProcessor.RunResult stepRun(String pipeline, boolean scheduled,
-                                              java.util.function.Supplier<MultiCollectorProcessor.RunResult> run) {
+                                              java.util.function.Function<Boolean, MultiCollectorProcessor.RunResult> run) {
         List<java.util.function.Consumer<Boolean>> after = new ArrayList<>();
-        boolean skip = false;
-        for (NamedPreRunStep s : preRunSteps) {
-            PreRun p;
-            try {
-                p = s.step().run(this, pipeline, scheduled);
-            } catch (Exception | LinkageError failed) {
-                log.warn("pre-run step '{}' failed on {}: {}", s.name(), pipeline, failed.toString());
-                continue;
-            }
-            if (p == null) continue;
-            if (p.after() != null) after.add(p.after());
-            if (p.skip()) {
-                skip = true;
-                break;
-            }
-        }
         boolean ok = false;
         try {
+            boolean skip = false, reload = false;
+            for (NamedPreRunStep s : preRunSteps) {
+                PreRun p;
+                try {
+                    p = s.step().run(this, pipeline, scheduled);
+                } catch (Exception | LinkageError failed) {
+                    log.warn("pre-run step '{}' failed on {}: {}", s.name(), pipeline, failed.toString());
+                    continue;
+                }
+                if (p == null) continue;
+                if (p.after() != null) after.add(p.after());
+                reload |= p.reload();
+                if (p.skip()) {
+                    skip = true;
+                    break;
+                }
+            }
             if (skip) return new MultiCollectorProcessor.RunResult(0, 0);
-            MultiCollectorProcessor.RunResult r = commitStepRun(pipeline, run);
+            final boolean again = reload;
+            MultiCollectorProcessor.RunResult r = commitStepRun(pipeline, () -> run.apply(again));
             ok = r.failed() == 0 && r.cancelled() == 0;
             return r;
         } finally {
@@ -344,6 +353,51 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                     log.warn("pre-run step's after-run on {} failed: {}", pipeline, failed.toString());
                 }
             }
+        }
+    }
+
+    // ── honour each every (BASIC-ELT-PROFILE-1 B1, operator 2026-11-19) ──────────────────────────────────────────
+
+    /**
+     * Wakes when the next interval-scheduled Pipeline ({@code trigger.every}) is due, so its own cadence holds on any host:
+     * the poll tick ({@link #pollSeconds}, default 60 s) alone would run an {@code every: 30s} Pipeline every 60 s. Each
+     * wake runs only the interval-scheduled Pipelines that are due ({@link PipelineScheduler#dispatchCadenceCycle}); the
+     * poll tick still runs everything else. Created by {@link #start}; null for a host that never starts its loop.
+     */
+    private volatile java.util.concurrent.ScheduledExecutorService cadenceWaker;
+    /** The shortest wait between two wakes: a Pipeline that cannot start (running, read-only) is looked at again then. */
+    static final long CADENCE_MIN_WAIT_MS = 1_000L;
+
+    private void armCadence(long delayMs) {
+        var w = cadenceWaker;
+        if (w == null || w.isShutdown()) return;
+        try {
+            w.schedule(this::cadenceWake, Math.max(0, delayMs), java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (java.util.concurrent.RejectedExecutionException closing) {
+            // the host is closing
+        }
+    }
+
+    /** One wake: start what is due, then sleep until the next due one, at least a second, at most a poll tick. */
+    private void cadenceWake() {
+        long pollMs = Math.max(1, pollSeconds) * 1000L;
+        long wait = pollMs;
+        try {
+            long now = System.currentTimeMillis();
+            long next = underSpace((java.util.function.Supplier<Long>) pipelineScheduler::nextCadenceDueMs);
+            if (next <= now) {
+                boolean started = !underSpace((java.util.function.Supplier<List<java.util.concurrent.Future<MultiCollectorProcessor.RunResult>>>)
+                        pipelineScheduler::dispatchCadenceCycle).isEmpty();
+                now = System.currentTimeMillis();
+                next = underSpace((java.util.function.Supplier<Long>) pipelineScheduler::nextCadenceDueMs);
+                // nothing could start (still running, read-only, held): look again in a while, not in a spin
+                if (!started && next <= now) next = now + Math.min(pollMs, 5_000L);
+            }
+            wait = Math.min(pollMs, Math.max(CADENCE_MIN_WAIT_MS, next - now));
+        } catch (RuntimeException e) {
+            log.warn("cadence wake failed: {}", e.toString());
+        } finally {
+            armCadence(wait);
         }
     }
     /** This space's boot-built Platform Service registry (platform-services plan S1-1) — the one
@@ -1495,6 +1549,13 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // blocking path — same runs, awaited. See PipelineScheduler's "Two cycle entry points, one body".
         pollTask = scheduler.everySeconds("poll-all", 0, pollSeconds,
                 () -> underSpace(pipelineScheduler::dispatchCycle));
+        // B1 (operator 2026-11-19, honour each every): an interval-scheduled Pipeline runs on its own cadence, not the tick's
+        cadenceWaker = java.util.concurrent.Executors.newSingleThreadScheduledExecutor(r -> {
+            Thread t = new Thread(r, "inspecto-cadence-" + spaceId);
+            t.setDaemon(true);
+            return t;
+        });
+        armCadence(CADENCE_MIN_WAIT_MS);
         // B3b: acquisition runs on its own timer, independent of the ingest cycle above, so a slow remote
         // fetch never delays ingest of already-landed files. No-op for a local-only registry (nothing to
         // acquire). -Dacquire.pollSeconds overrides the cadence; defaults to the ingest poll interval —
@@ -2242,8 +2303,9 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                         java.util.function.Supplier<MultiCollectorProcessor.RunResult> once = () ->
                                 MultiCollectorProcessor.runAll(List.of(p), 1, bus.sink(), skipPostAction, dryRun);
                         // BE-1b: a dry run changes nothing, so it runs no pre-run step
+                        // the file is read fresh per run, so a config a pre-run step changed is read as it now stands
                         MultiCollectorProcessor.RunResult r = dryRun ? commitStepRun(pipelineName, once)
-                                : stepRun(pipelineName, false, once);
+                                : stepRun(pipelineName, false, reload -> once.get());
                         if (dryRun) {
                             List<com.gamma.inspector.DryRunRejects.MemberRejects> rejects =
                                     com.gamma.inspector.DryRunRejects.take(pipelineName);
@@ -2524,6 +2586,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // triggerWorkers, a tick firing during the drain would submit into a closing executor. The
         // dispatch path handles that rejection, but not generating the work is the correct order.
         scheduler.close();
+        if (cadenceWaker != null) cadenceWaker.shutdownNow();   // B1: the cadence wake is a timer too
         pipelineScheduler.closeStreamLanes();          // the continuous lanes are timers too (ASSURE-PUSH-INGEST-1)
         if (realtime != null) realtime.close();        // PA-9d: after the lanes, so no tick arrives once it closed
         triggerWorkers.close();                        // drain in-flight cycle + event-triggered runs (T13)

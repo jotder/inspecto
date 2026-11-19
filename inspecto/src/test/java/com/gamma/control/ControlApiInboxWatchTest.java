@@ -84,6 +84,16 @@ class ControlApiInboxWatchTest {
     /** The test's pre-run step, made a no-op (the registry is the JVM's; a test cannot remove a name from outside it). */
     private static void noLateStep() {
         CollectorService.preRunStep("t.late", 200, (svc, p, scheduled) -> PreRun.GO);
+        CollectorService.preRunStep("t.fail", 200, (svc, p, scheduled) -> PreRun.GO);
+    }
+
+    private static String wider(int rows) {
+        return ControlApiArrivalNewColumnsTest.withColumn(ControlApiOnboardFilesTest.transfers(rows).replace("T0000", "W0000"),
+                "fee", i -> "1." + i);
+    }
+
+    private static Map<?, ?> fee(Path root, String id) {
+        return ControlApiImportPreRunStepsTest.column(root, id, "fee");
     }
 
     /** A host over {@code cfg}'s fixture Pipeline and {@code more} - as a restart registers what the config root holds. */
@@ -314,6 +324,119 @@ class ControlApiInboxWatchTest {
             poll(c);
             poll(c);
             assertEquals(0, feed(c, id).get("waiting").asInt(), "and the poll cycle runs it");
+        }
+    }
+
+    @Test
+    void aRunThatDoesNotSucceedTakesTheKeptColumnBackAndDataStatusSaysSo(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        EditionFeatures.overrideForTest(Set.of());
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "failing", "stream", ControlApiOnboardFilesTest.transfers(40), null);
+            data(json(c, "PUT", "/datasets/" + id + "/watch", "{\"watch\":true}", null), 200);
+            dropSettled(id, "wider.csv", wider(6));
+            // a step after the import's own stops the run once it kept the column: the run does not succeed
+            CollectorService.preRunStep("t.fail", 200, (svc, p, scheduled) -> id.equals(p) ? PreRun.SKIP : PreRun.GO);
+            poll(c);
+            noLateStep();
+            assertNull(fee(root, id), "the column kept for a run that did not succeed is taken back");
+            assertFalse(Files.readString(root.resolve(OnboardImport.CONFIG_DIR).resolve(id + "_schema.toon")).contains("fee"));
+            JsonNode f = feed(c, id);
+            assertEquals(InboxWatch.SERVER_FAULT, f.path("watchError").asText(), "Data status says the last import failed: " + f);
+            assertEquals(InboxWatch.SERVER_FAULT, data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200)
+                    .at("/feed/watchError").asText());
+
+            poll(c);
+            poll(c);
+            assertEquals(46, OnboardImport.countRows(Path.of("database", id, "database")), "the next runs take it, column and all");
+            assertNotNull(fee(root, id));
+            assertFalse(feed(c, id).has("watchError"), "a run that succeeds clears it");
+        }
+    }
+
+    @Test
+    void aRunThatSetsTheFileAsideTakesTheKeptColumnBack(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        // verifier finding: a quarantined file in a run whose pre-run kept a column is a run that failed
+        EditionFeatures.overrideForTest(Set.of());
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "asided", "stream", ControlApiOnboardFilesTest.transfers(40), null);
+            data(json(c, "PUT", "/datasets/" + id + "/watch", "{\"watch\":true}", null), 200);
+            Path schema = root.resolve(OnboardImport.CONFIG_DIR).resolve(id + "_schema.toon");
+            String before = Files.readString(schema);
+            Path file = inbox(id).resolve("wider.csv");
+            Files.writeString(file, wider(6));
+            poll(c);   // modified just now: not judged; the gate sees it once
+            Files.setLastModifiedTime(file, SETTLED);
+            // after the import's step keeps the column, the schema is put back: the run reads the file with the old one
+            CollectorService.preRunStep("t.fail", 200, (svc, p, scheduled) -> {
+                try {
+                    if (id.equals(p)) Files.writeString(schema, before);
+                } catch (java.io.IOException e) {
+                    throw new java.io.UncheckedIOException(e);
+                }
+                return PreRun.GO;
+            });
+            poll(c);
+            noLateStep();
+            assertFalse(c.svc().statusStore().quarantine(c.svc().configFor(id).orElseThrow()).isEmpty(), "the run set the file aside");
+            assertEquals(40, OnboardImport.countRows(Path.of("database", id, "database")));
+            assertNull(fee(root, id), "the column kept for the file the run set aside is taken back");
+            assertEquals(InboxWatch.SERVER_FAULT, feed(c, id).path("watchError").asText());
+        }
+    }
+
+    @Test
+    void aWatchedInboxWaitsWhileAddDataIsOff(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        EditionFeatures.overrideForTest(Set.of());
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "selfoff", "stream", ControlApiOnboardFilesTest.transfers(40), null);
+            data(json(c, "PUT", "/datasets/" + id + "/watch", "{\"watch\":true}", null), 200);
+            data(json(c, "PUT", "/settings/data", "{\"selfImport\":false}", null), 200);
+            dropSettled(id, "drop.csv", ControlApiOnboardFilesTest.transfers(4));
+            poll(c);
+            poll(c);
+            assertTrue(Files.exists(inbox(id).resolve("drop.csv")), "Add data off in the Space: the watched inbox waits");
+            data(json(c, "PUT", "/settings/data", "{\"selfImport\":true}", null), 200);
+            poll(c);
+            poll(c);
+            assertEquals(0, feed(c, id).get("waiting").asInt(), "on again: taken");
+        }
+    }
+
+    @Test
+    void stoppingTheFeedTurnsTheWatchOff(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        EditionFeatures.overrideForTest(Set.of(OnboardImport.AUTOMATION_FEATURE));
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "stopped", "stream", ControlApiOnboardFilesTest.transfers(40), null);
+            data(json(c, "PUT", "/datasets/" + id + "/watch", "{\"watch\":true}", null), 200);
+            JsonNode stopped = data(json(c, "DELETE", "/datasets/" + id + "/feed", null, null), 200);
+            assertFalse(stopped.get("watch").asBoolean(), stopped.toString());
+            assertNull(new ComponentStore(root.resolve("registry")).get("dataset", id).orElseThrow()
+                    .content().get(InboxWatch.WATCH_KEY), "the Dataset entry no longer says watched");
+            assertTrue(pipelineFile(root, id).contains("manual"));
+        }
+    }
+
+    @Test
+    void aWatchSwitchedOnBeforeB1IsMovedOntoThePipelineAtStartup(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        EditionFeatures.overrideForTest(Set.of());
+        String id;
+        try (Ctx c = open(cfg, root)) {
+            id = imported(c, "legacy", "stream", ControlApiOnboardFilesTest.transfers(40), null);
+            // as the poller left it: the entry says watched, the Pipeline stays manual
+            ComponentStore store = new ComponentStore(root.resolve("registry"));
+            java.util.Map<String, Object> entry = new java.util.LinkedHashMap<>(store.get("dataset", id).orElseThrow().content());
+            entry.remove("name");
+            entry.put(InboxWatch.WATCH_KEY, true);
+            store.write("dataset", id, entry);
+            assertFalse(feed(c, id).get("watch").asBoolean(), "a manual Pipeline is not watched");
+        }
+        try (Ctx c = open(cfg, root, root.resolve(OnboardImport.CONFIG_DIR).resolve(id + "_pipeline.toon"))) {
+            assertTrue(pipelineFile(root, id).contains("every: 30s"), "moved onto the preset at startup");
+            assertTrue(feed(c, id).get("watch").asBoolean(), "and watched again");
+            dropSettled(id, "drop.csv", ControlApiOnboardFilesTest.transfers(4));
+            poll(c);
+            poll(c);
+            assertEquals(0, feed(c, id).get("waiting").asInt());
         }
     }
 

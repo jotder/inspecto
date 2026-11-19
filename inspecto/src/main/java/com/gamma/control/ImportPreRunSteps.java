@@ -154,6 +154,7 @@ final class ImportPreRunSteps {
             OnboardImport.Space s = new OnboardImport.Space(writeRoot, dataRoot, service, "scheduler");
             OnboardImport.Job job = new OnboardImport.Job(s, id, String.valueOf(content.get("kind")), null, null, content, false);
             RunFiles.Scope narrowed = null;
+            boolean handedOff = false;   // the claim and the kept column now belong to the run's after-hook
             try {
                 Set<Path> only = scheduled ? settled(OnboardImport.inbox(dataRoot, id), cfg, content) : null;
                 Run run = new Run(s, id, content, job, only, true);
@@ -161,25 +162,51 @@ final class ImportPreRunSteps {
                 if (only != null) narrowed = RunFiles.only(OnboardImport.inbox(dataRoot, id), only);
                 if (!run.refused.isEmpty() || !job.keptColumns.isEmpty())
                     log.info("Dataset '{}' before its run: refused {}, kept columns {}", id, run.refused, job.keptColumns);
+                boolean kept = !job.keptColumns.isEmpty();
+                // a run that sets a file aside after a column was kept for it did not take what the column was kept for
+                Set<String> quarantined = kept ? quarantined(service, cfg) : Set.of();
+                final RunFiles.Scope scope = narrowed;
+                java.util.function.Consumer<Boolean> after = ok -> {
+                    boolean good = false;
+                    try {
+                        good = ok && (!kept || quarantined.containsAll(quarantined(service, cfg)));
+                        if (scope != null) scope.close();
+                        if (!good) job.rollback();   // a column kept for a run that failed is not kept
+                    } finally {
+                        release(claim);
+                    }
+                    if (watched) InboxWatch.ran(dataRoot, id, good ? null : InboxWatch.SERVER_FAULT);   // Data status: watchError
+                };
+                handedOff = true;
+                // a kept column grew the schema: the run reads the Pipeline's config again, or it would read the file
+                // with the old one and set it aside (field_mismatch)
+                return kept ? PreRun.reloadThen(after) : PreRun.then(after);
             } catch (IOException | RuntimeException failed) {
-                job.rollback();
-                release(claim);
                 log.warn("Dataset '{}' before its run failed: {}", id, failed.toString());
                 if (watched) InboxWatch.ran(dataRoot, id, failed instanceof ApiException a && a.status < 500
                         ? ServerFaults.withoutServerPaths(a.getMessage(), dataRoot, writeRoot) : InboxWatch.SERVER_FAULT);
                 return scheduled ? PreRun.SKIP : PreRun.GO;   // a person's run goes ahead and answers for itself
+            } finally {
+                if (!handedOff) {   // a failure, an Error included: nothing is kept, the claim is not leaked
+                    try {
+                        if (narrowed != null) narrowed.close();
+                        job.rollback();
+                    } finally {
+                        release(claim);
+                    }
+                }
             }
-            final RunFiles.Scope scope = narrowed;
-            return PreRun.then(ok -> {
-                if (scope != null) scope.close();
-                if (!ok) job.rollback();   // a column kept for a run that failed is not kept
-                release(claim);
-                if (watched) InboxWatch.ran(dataRoot, id, ok ? null : InboxWatch.SERVER_FAULT);   // Data status: watchError
-            });
         } finally {
             if (prev == null) MDC.remove(EventLog.SPACE_MDC_KEY);
             else MDC.put(EventLog.SPACE_MDC_KEY, prev);
         }
+    }
+
+    /** The quarantine ledger's entries for {@code cfg}, by path (a file the run set aside). */
+    private static Set<String> quarantined(CollectorService service, PipelineConfig cfg) {
+        Set<String> out = new HashSet<>();
+        for (Map<String, String> q : service.statusStore().quarantine(cfg)) out.add(String.valueOf(q.get("path")));
+        return out;
     }
 
     private static void release(String claim) {

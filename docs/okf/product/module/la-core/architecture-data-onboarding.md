@@ -760,10 +760,14 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
 > the commit steps compact, follow on and check Expectations (`ImportCommitSteps`). `watched` = the entry flag AND
 > the preset; the feed keeps its shape (`watch`, `watchable` true while watched, `feed.kind: uploads`, `watchError`
 > after a failed scheduled run) until the UI's U4-Watch slice. The run waits while `data.self_import` is off, as
-> before. A watch survives a restart because it is the Pipeline. Not carried over: the arrivals sidecar line and
-> `watchError` for a quarantined file (a scheduled run records only the engine's ledger), an entry switched on before
-> B1 with a manual Pipeline (it reads as off until switched on again: the feature never shipped in a release), and a
-> 30 s cadence on a host whose poll tick is longer (the Space tick, default 60 s, bounds it). See
+> before. A watch survives a restart because it is the Pipeline. An entry switched on before B1 (`watchInbox: true`
+> over a manual Pipeline) is moved onto the preset when the control plane starts (`InboxWatch.migrate`, through the
+> same write path; under an approval policy over Pipelines it is logged and reads as off). *Stop the feed*
+> (`DELETE /datasets/{id}/feed`) turns the watch off too. The 30 s holds on any host: the scheduler wakes for each
+> Pipeline's own `every` (operator 2026-11-19, *honour each every*), not only on the Space's poll tick. A run that
+> sets aside a file after its pre-run step kept a column for it takes the column back and sets `watchError`. Not
+> carried over yet (BE-2 / B3, `BASIC-WATCH-ARRIVALS-1`): the arrivals sidecar line and `watchError` for any other
+> quarantined file (a scheduled run records only the engine's ledger). See
 > [spec-pipeline-execution.md](../elt/spec-pipeline-execution.md#pre-run-steps--the-other-side-of-the-run).
 
 | Route | What |
@@ -830,6 +834,9 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
   `watchable`; the inbox text says it is checked every 30 seconds; a refusal flips the toggle back and says why; a
   failed poll import shows as a warning. Data status (`feedSummaryLine`): *Inbox watched, checked every 30 seconds ·
   N files waiting · the last import failed: …*.
-- Tests: `ControlApiInboxWatchTest` (real HTTP; ticks driven directly with the daemon paused (`pausedForTest`): settled import with a refused file set aside, a
-  growing file holding the inbox, off, the restart read-back, refusals, a Reference watched through another door, armed 401/403/200), `dataset-feed.component
-  .spec.ts` (toggle, refusal, schedule hides it, the Data status words).
+- Tests: `ControlApiInboxWatchTest` (real HTTP; since B1 the engine's poll cycle is driven directly
+  (`ControlApiImportPreRunStepsTest.poll`): the preset written and removed, a settled import with a refused file set
+  aside and the follow-on and Expectation after, a file still being written waiting alone, a file that settles after
+  the pre-run check, off and a restart, a kept column taken back after a run that did not succeed or that set the file
+  aside (with `watchError`), Add data off, *Stop the feed*, the startup migration, refusals, armed 401/403/200),
+  `dataset-feed.component.spec.ts` (toggle, refusal, schedule hides it, the Data status words).

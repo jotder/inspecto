@@ -1456,10 +1456,27 @@ last registered first, **after** the run's `RUN` commit steps. `stepRun` wraps `
   unmodified for that window, and takes only those (`RunFiles.only` over the inbox until the run ends): a file written
   between the step and the read is neither judged half-written nor taken unjudged; it waits for a later run. A remote
   Collector's files land during the run, so its run judges what waits before it and is not narrowed.
-- **A failed run** takes a kept column back (`Job.rollback` in the `after`), as Add data's own run does.
+- **The run reads what the step wrote.** A step that changes the Pipeline's config files answers
+  `PreRun.reloadThen(after)`; the poll's run then reads the config again (`PipelineScheduler.reloaded`: a
+  fingerprint-cached registry rebuild) instead of the one selection parsed, so a column kept for a file is read with
+  that file in the same run. `runPipeline` reads the file per run anyway.
+- **A failed run** takes a kept column back (`Job.rollback` in the `after`), as Add data's own run does. A run that
+  sets a file aside (the quarantine ledger grew) after the step kept a column counts as failed for this, though the
+  engine's own result counts no failure. Claims and kept columns are given back on every path, an `Error` included.
 - **Watch this folder** (B1) is a scheduled run of this kind: the import Pipeline's locked `every: 30s` schedule with a
   `local` Collector and `stability {30s, 2}` (`InboxWatch`). For it the step also waits while `data.self_import` is
   off (SKIP) and keeps `watchError` for Data status (cleared by a run that succeeds).
+
+### Honour each every (B1, operator 2026-11-19)
+
+An interval schedule (`trigger: {type: schedule, every: …}`) runs on its own cadence, not only on the Space's poll tick
+(`service.poll.seconds`, default 60 s), which alone would run an `every: 30s` Pipeline every 60 s. `CollectorService`
+keeps a cadence wake beside the poll tick: it sleeps until the next interval-scheduled Pipeline is due
+(`PipelineScheduler.nextCadenceDueMs`: last run plus `every`; a running one is left out), then starts only the
+interval-scheduled Pipelines that are due (`dispatchCadenceCycle`, the same claim and stamping as the tick, so the two
+never run one Pipeline twice). It waits at least a second and at most one poll tick between wakes (a new or edited
+Pipeline is seen by then); when nothing due could start (still running, read-only) it looks again after at most 5 s.
+`DEFAULT_POLL`, cron and event triggers are unchanged. Test: `CollectorServicePreRunStepsTest.anIntervalScheduleRunsOnItsOwnCadenceNotThePollTick`.
 
 ## Failure and recovery, per lane
 

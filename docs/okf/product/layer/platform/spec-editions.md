@@ -371,7 +371,7 @@ Pipeline (read, arrange, write Parquet, then each application's follow-on; Inspe
 2. **An import inbox**: files dropped there are imported with *Import waiting files* (*Run now*), or, when the person
    turns on *Watch this folder* on the Dataset card, by a fixed 30 s poll (off by default, not configurable). Since
    `BASIC-ELT-PROFILE-1` B1 (2026-11-19, O1 reversing DT-17) the watch is the import Pipeline's own locked schedule
-   (`trigger.every: 30s`, the engine's poll cycle; the Space's poll tick bounds the cadence), not a separate poller.
+   (`trigger.every: 30s`, run on its own cadence by the engine's scheduler), not a separate poller.
 3. **Choose a table**: a Postgres table or a read-only `SELECT`, copied as a *replace everything* snapshot. *Refresh
    now* exports the table into a temporary folder and moves the finished file into the Dataset's inbox; a snapshot is
    **never polled** (since 2026-11-05). Read through DuckDB's `postgres` extension, already in every bundle; a

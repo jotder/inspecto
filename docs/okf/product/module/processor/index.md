@@ -36,6 +36,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | — | P3 | feature | Platform Services Stage 2 / 3 | demand |
 | `BASIC-ELT-PROFILE-1` | P2 | feature | Basic onboarding as a locked profile of ELT: one implementation, Basic = options locked. | — |
+| `BASIC-WATCH-ARRIVALS-1` | P3 | defect | A watched inbox's scheduled run leaves no arrivals sidecar line and no watchError for a quarantined file (filed 2026-11-19, BASIC-ELT-PRO… | — |
 | — | P3 | feature | Bundle / Exchange — "load as draft" residuals | — |
 | `ONBOARDING-REMOTE-SYSTEMS-1` | P3 | feature | Connect a system on Standard: Add data and the guided editor's Collect stage offer remote kinds (SFTP, object stores, other databases) wi… | — |
 | `DEPLOY-EXPOSURE-KIT-1` | P3 | chore | /metrics and /health/details are fenced only by the network, and the deploy kit the docs assume is unbuilt (filed 2026-11-15, verified fr… | — |

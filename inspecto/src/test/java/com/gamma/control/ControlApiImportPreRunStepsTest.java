@@ -224,4 +224,23 @@ class ControlApiImportPreRunStepsTest {
             assertTrue(Files.exists(Path.of("database", id, OnboardImport.REFUSED_DIR, "wrong.csv")), "the next tick judges it");
         }
     }
+
+    /** Verifier finding (HIGH): a column the pre-run step keeps is read by the same scheduled run, not set aside. */
+    @Test
+    void aColumnKeptBeforeTheReadIsReadByTheSameScheduledRun(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        EditionFeatures.overrideForTest(Set.of(OnboardImport.AUTOMATION_FEATURE));
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "sametick");
+            data(send(c, "PUT", "/datasets/" + id + "/feed", "{\"kind\":\"folder\"}"));
+            Path wider = drop(id, "wider.csv", ControlApiArrivalNewColumnsTest.withColumn(
+                    ControlApiOnboardFilesTest.transfers(6).replace("T0000", "W0000"), "fee", i -> "1." + i), false);
+            tick(c.svc());   // modified just now: not judged; the stability gate sees it once
+            assertNull(column(root, id, "fee"), "not judged yet");
+            Files.setLastModifiedTime(wider, SETTLED);
+            tick(c.svc());   // settled: judged, its column kept, and the gate's second sighting releases it - one run
+            assertEquals(46, rows(id), "the run read the file with the schema the pre-run step grew");
+            assertNotNull(column(root, id, "fee"), "the column stays kept");
+            assertEquals(0, c.svc().statusStore().quarantine(c.svc().configFor(id).orElseThrow()).size(), "nothing set aside");
+        }
+    }
 }

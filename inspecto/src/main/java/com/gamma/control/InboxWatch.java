@@ -1,12 +1,19 @@
 package com.gamma.control;
 
 import com.gamma.etl.PipelineConfig;
+import com.gamma.event.EventLog;
+import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.PipelineTrigger;
+import com.gamma.service.CollectorService;
+import com.gamma.service.SpaceContext;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
 import com.sun.net.httpserver.HttpExchange;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -36,11 +43,15 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li><b>No half-written file</b>: the engine's per-file stability gate (O1: per file, no longer the whole inbox at once),
  *       and the pre-run steps judge and take only the files unmodified for the window.</li>
  * </ul>
- * The poller this class used to run (one daemon thread, its own whole-inbox settle rule) is retired.
+ * The poller this class used to run (one daemon thread, its own whole-inbox settle rule) is retired. A Dataset switched on
+ * before B1 ({@code watchInbox: true} over a manual Pipeline) is moved onto the preset when the control plane starts
+ * ({@link #migrate}).
  */
 final class InboxWatch {
 
     private InboxWatch() {}
+
+    private static final Logger log = LoggerFactory.getLogger(InboxWatch.class);
 
     /** The poll interval: fixed, not configurable on Basic (§5 Q1). */
     static final String EVERY = "30s";
@@ -105,6 +116,49 @@ final class InboxWatch {
         // ⚠ String LITERAL on purpose (CapabilityManifestTest's scanner).
         api.put("/datasets/([^/]+)/watch", ApiContext.withCapability("canUploadData",
                 (e, m) -> toggle(api, e, ApiContext.name(m), api.body(e))));
+        migrate(api);
+    }
+
+    /**
+     * B1's migration (plan row B1, "migrate watchInbox"), at startup: every Dataset of every Space that says
+     * {@code watchInbox: true} over its own import Pipeline still on {@code trigger: manual} (switched on before B1, when the
+     * poller watched it) gets the preset through the Pipeline write path, so its watch goes on as before. A Reference or a
+     * Postgres snapshot is left alone (never watched); one that cannot be rewritten (an approval policy over Pipelines, a
+     * refused save) is logged and reads as off until switched on again.
+     */
+    static void migrate(ApiContext api) {
+        HostContext host = HostContext.of(api);
+        if (host == null || host.spaces() == null) return;
+        for (SpaceContext ctx : host.spaces().all()) {
+            String prev = MDC.get(EventLog.SPACE_MDC_KEY);
+            MDC.put(EventLog.SPACE_MDC_KEY, ctx.id().value());
+            try {
+                Path writeRoot = api.writeRoot(), dataRoot = api.dataRoot();
+                if (writeRoot == null || dataRoot == null) continue;
+                CollectorService service = ctx.service();
+                for (ComponentRegistry.Component c : new ComponentStore(writeRoot.resolve("registry")).list("dataset")) {
+                    Map<String, Object> content = c.content();
+                    String id = c.name();
+                    if (!Boolean.TRUE.equals(content.get(WATCH_KEY)) || snapshot(content) || "reference".equals(content.get("kind"))
+                            || !OnboardImport.isOurs(writeRoot, id, content, service)) continue;
+                    PipelineConfig cfg = service.configFor(id).orElse(null);
+                    if (cfg == null || PipelineTrigger.of(cfg.triggerConfig()).scheduler() != PipelineTrigger.Scheduler.MANUAL) continue;
+                    Path file = writeRoot.resolve(OnboardImport.CONFIG_DIR).resolve(id + "_pipeline.toon").toAbsolutePath().normalize();
+                    try {
+                        DatasetFeed.rewritePipeline(api, new DatasetFeed.Import(writeRoot, dataRoot, service, id, content, file),
+                                "Watch this folder moves onto the import's Pipeline", InboxWatch::watch, null);
+                        log.info("Dataset '{}': its watched inbox is now its Pipeline's 30 s schedule (B1)", id);
+                    } catch (IOException | RuntimeException e) {
+                        log.warn("Dataset '{}': its watched inbox was not moved onto its Pipeline: {}", id, e.getMessage());
+                    }
+                }
+            } catch (RuntimeException e) {
+                log.warn("Watched inboxes of Space {} were not moved onto their Pipelines: {}", ctx.id().value(), e.toString());
+            } finally {
+                if (prev == null) MDC.remove(EventLog.SPACE_MDC_KEY);
+                else MDC.put(EventLog.SPACE_MDC_KEY, prev);
+            }
+        }
     }
 
     static Object toggle(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
@@ -166,7 +220,7 @@ final class InboxWatch {
     }
 
     /** {@code watchInbox} on the Dataset entry as the toggle says; nothing written when it already says so. */
-    private static void keep(ApiContext api, DatasetFeed.Import imp, String id, boolean on) throws IOException {
+    static void keep(ApiContext api, DatasetFeed.Import imp, String id, boolean on) throws IOException {
         if (on == Boolean.TRUE.equals(imp.content().get(WATCH_KEY))) return;
         Map<String, Object> content = new LinkedHashMap<>(imp.content());
         content.remove("name");

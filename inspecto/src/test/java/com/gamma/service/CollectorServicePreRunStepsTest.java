@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class CollectorServicePreRunStepsTest {
 
-    private static final String[] NAMES = {"p.a", "p.b", "p.c", "p.boom", "p.skip", "p.after"};
+    private static final String[] NAMES = {"p.a", "p.b", "p.c", "p.boom", "p.skip", "p.after", "p.reload"};
     private static final String[] COMMITS = {"p.commit", "p.run"};
     private final List<String> seen = Collections.synchronizedList(new ArrayList<>());
 
@@ -118,6 +118,63 @@ class CollectorServicePreRunStepsTest {
             assertEquals(0, svc.runPipeline("skipped").orElseThrow().total(), "a skipped run is an empty result");
             assertEquals(List.of("a", "a.after:false"), seen, "no later step, no commit; the step before is told it did not run");
             assertTrue(Files.exists(dir.resolve("inbox").resolve("waiting.csv")), "the file waits for the next run");
+        }
+    }
+
+    @Test
+    void anErrorInALaterStepStillTellsTheStepsBeforeIt(@TempDir Path dir) throws Exception {
+        CollectorService.preRunStep("p.a", 10, (svc, p, scheduled) -> {
+            if (!"erring".equalsIgnoreCase(p)) return PreRun.GO;
+            seen.add("a");
+            return PreRun.then(ok -> seen.add("a.after:" + ok));   // e.g. a claim it must give back
+        });
+        CollectorService.preRunStep("p.boom", 20, (svc, p, scheduled) -> {
+            if ("erring".equalsIgnoreCase(p)) throw new AssertionError("an Error, not an Exception");
+            return PreRun.GO;
+        });
+        try (CollectorService svc = new CollectorService(List.of(pipeline(dir, "ERRING", "waiting.csv")), 3600, 1)) {
+            assertThrows(AssertionError.class, () -> svc.runPipeline("erring"));
+            assertEquals(List.of("a", "a.after:false"), seen, "the step before the Error is told the run did not succeed");
+        }
+    }
+
+    @Test
+    void aStepThatChangesTheConfigHasTheScheduledRunReadItAgain(@TempDir Path dir) throws Exception {
+        Path toon = pipeline(dir, "REREAD");
+        Files.writeString(dir.resolve("inbox").resolve("a.txt"), "ID,AMT,EVENT_DATE\na,10,2020-01-01\n");
+        // the step widens file_pattern to the .txt file waiting: only a run that reads the config again takes it
+        CollectorService.preRunStep("p.reload", 10, (svc, p, scheduled) -> {
+            if (!"reread".equalsIgnoreCase(p)) return PreRun.GO;
+            try {
+                Files.writeString(toon, Files.readString(toon).replace("glob:**/*.csv", "glob:**/*.txt"));
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+            return PreRun.reloadThen(ok -> seen.add("after:" + ok));
+        });
+        try (CollectorService svc = new CollectorService(List.of(toon), 3600, 1)) {
+            assertEquals(1, svc.runAllOnce().total());
+            assertEquals(1, svc.statusStore().files(svc.configFor("reread").orElseThrow()).size(),
+                    "the poll's run read the config the step wrote, not the one selection parsed");
+            assertEquals(List.of("after:true"), seen);
+        }
+    }
+
+    @Test
+    void anIntervalScheduleRunsOnItsOwnCadenceNotThePollTick(@TempDir Path dir) throws Exception {
+        // operator 2026-11-19, "honour each every": every: 2s runs about every 2 s although the poll tick is an hour
+        Path toon = pipeline(dir, "CADENCE", "first.csv");
+        Files.writeString(toon, Files.readString(toon) + "trigger:\n  type: schedule\n  every: 2s\n");
+        try (CollectorService svc = new CollectorService(List.of(toon), 3600, 1)) {
+            svc.start();
+            var cfg = svc.configFor("cadence").orElseThrow();
+            long deadline = System.currentTimeMillis() + 15_000L;
+            while (svc.statusStore().files(cfg).size() < 1 && System.currentTimeMillis() < deadline) Thread.sleep(100);
+            assertEquals(1, svc.statusStore().files(cfg).size(), "the first tick at start took the first file");
+            inbox(dir, "second.csv");
+            deadline = System.currentTimeMillis() + 15_000L;
+            while (svc.statusStore().files(cfg).size() < 2 && System.currentTimeMillis() < deadline) Thread.sleep(100);
+            assertEquals(2, svc.statusStore().files(cfg).size(), "the next run came on the Pipeline's own 2 s, not the hour's tick");
         }
     }
 }
