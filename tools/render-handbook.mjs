@@ -55,16 +55,21 @@ export const slug = (s) => s.toLowerCase().replace(/<[^>]+>/g, '').replace(/[`*_
 
 /** Inline markdown → HTML. `link(href)` returns a rewritten href or null (render as text). */
 export function inline(text, link) {
-    const codes = [];
+    const codes = [], opens = [];
     let s = text.replace(/`([^`]+)`/g, (_, c) => `\u0000${codes.push(c) - 1}\u0000`);
+    // an HTML anchor target (`<a id="x"></a>`, `<a name="x">`) keeps working as an anchor; all other raw HTML is escaped
+    s = s.replace(/<a\s+(?:id|name)="([\w-]+)"\s*>\s*<\/a>/g, (_, id) => `\u0002${opens.push(`<span id="${esc(id)}"></span>`) - 1}\u0002`);
     s = esc(s);
     s = s.replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, (_, alt) => alt);
+    // a link's opening tag is set aside so emphasis below can never reach into its href
     s = s.replace(/\[([^\]]+)\]\(([^)\s]+)(?:\s+&quot;[^&]*&quot;)?\)/g, (_, label, href) => {
         const h = link(href.replace(/&amp;/g, '&'));
-        return h ? `<a href="${esc(h)}">${label}</a>` : `<span class="nolink">${label}</span>`;
+        const open = h ? `<a href="${esc(h)}">` : '<span class="nolink">';
+        return `\u0002${opens.push(open) - 1}\u0002${label}${h ? '</a>' : '</span>'}`;
     });
-    s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>').replace(/(^|[^\w*])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>')
+    s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/(^|[^\w*])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>')
         .replace(/(^|[^\w])_([^_\s][^_]*)_(?=[^\w]|$)/g, '$1<em>$2</em>');
+    s = s.replace(/\u0002(\d+)\u0002/g, (_, i) => opens[Number(i)]);
     return s.replace(/\u0000(\d+)\u0000/g, (_, i) => `<code>${esc(codes[Number(i)])}</code>`);
 }
 
@@ -125,7 +130,7 @@ export function markdownToHtml(md, link = () => null) {
             const items = [];
             while (i < lines.length) {
                 const m = lines[i].match(/^(\s*)([-*+]|\d+[.)])\s+(.*)$/);
-                if (m) { items.push({ depth: Math.floor(m[1].length / 2), text: m[3] }); i++; continue; }
+                if (m) { items.push({ depth: Math.floor(m[1].length / 2), ordered: /\d/.test(m[2]), text: m[3] }); i++; continue; }
                 if (lines[i].trim() && /^\s{2,}\S/.test(lines[i]) && items.length) { items[items.length - 1].text += ' ' + lines[i].trim(); i++; continue; }
                 break;
             }
@@ -141,18 +146,23 @@ export function markdownToHtml(md, link = () => null) {
     return { html: out.join('\n'), title, headings };
 }
 
+/** Nested lists; each level takes its list type from the first item at that level. */
 function renderList(items, ordered, link) {
-    const tag = ordered ? 'ol' : 'ul';
+    const tags = [];
     let html = '', depth = -1;
     for (const it of items) {
         const d = Math.min(it.depth, depth + 1);
-        if (d > depth) { html += `<${tag}>`.repeat(d - depth); depth = d; }
-        else { html += '</li>'; while (depth > d) { html += `</${tag}></li>`; depth--; } }
+        if (d > depth) {
+            const tag = it.ordered === undefined ? (ordered ? 'ol' : 'ul') : it.ordered ? 'ol' : 'ul';
+            tags[d] = tag;
+            html += `<${tag}>`;
+            depth = d;
+        } else { html += '</li>'; while (depth > d) { html += `</${tags[depth]}></li>`; depth--; } }
         html += `<li>${inline(it.text, link)}`;
     }
     html += '</li>';
-    while (depth > 0) { html += `</${tag}></li>`; depth--; }
-    return html + `</${tag}>`;
+    while (depth > 0) { html += `</${tags[depth]}></li>`; depth--; }
+    return html + `</${tags[0]}>`;
 }
 
 const CSS = `:root{--bg:#fff;--fg:#1c2128;--muted:#59636e;--line:#d8dee4;--accent:#0b5cad;--soft:#f3f5f7;--code:#f0f2f4}
@@ -203,7 +213,9 @@ export function render(book, read, { internal = false } = {}) {
                 if (/^(https?:|mailto:)/i.test(href)) return href;
                 if (href.startsWith('#')) return href;
                 const [target, frag] = href.split('#');
-                const t = byFile.get(P.normalize(P.join(dir, decodeURIComponent(target))));
+                let decoded = target;
+                try { decoded = decodeURIComponent(target); } catch { /* a malformed escape is read as written */ }
+                const t = byFile.get(P.normalize(P.join(dir, decoded)));
                 return t ? `${t.id}.html${frag ? '#' + slug(frag) : ''}` : null;
             };
             const r = markdownToHtml(read(p.file), link);

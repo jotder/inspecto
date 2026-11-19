@@ -47,6 +47,21 @@ test('how-to: the six template headings are required, and only on how-to pages',
     assert.ok(run([...ALL, page('h', 'docs/A.md', { id: 'h2', type: 'howto' })].filter((p, i) => i !== 0)).some((f) => /how-to: docs\/A\.md lacks/.test(f)));
 });
 
+test('leak: a renderer that emits an internal page or a dead link is caught', () => {
+    const leaky = (b, read, opt) => {
+        const files = new Map([['index.html', '<a href="ux.html">x</a> <a href="ghost.html">y</a>'], ['ux.html', 'team only'], ['search.json', '[{"id":"ux"}]']]);
+        return { files, pages: [] };
+    };
+    const f = findings(book(ALL), TRACKED, (p) => READ[p], leaky);
+    assert.ok(f.some((x) => /holds internal page ux\.html/.test(x)));
+    assert.ok(f.some((x) => /links to 'ghost\.html'/.test(x)));
+    assert.ok(f.some((x) => /search\.json lists internal page 'ux'/.test(x)));
+});
+
+test('pages: the ids index and search are reserved', () => {
+    assert.ok(run([...ALL, page('index', 'docs/H.md')]).some((f) => /'index' is reserved/.test(f)));
+});
+
 test('leak: an internal page never reaches the external render, and its links there are plain text', () => {
     // the admin guide (internal) links to A (external); A is rendered, the guide is not — no finding either way
     assert.deepEqual(run(ALL), []);
