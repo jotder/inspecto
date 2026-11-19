@@ -256,6 +256,16 @@ src/app/
   convention in a host. A host passes only facts it resolved itself, and passes **nothing** when the
   fact is ambiguous — a blank required field is honest, an invented store path reads zero rows and looks
   like it worked. A seed is **one-shot**: re-deriving it while the author edits clobbers the form.
+- **Reviewing columns → `<inspecto-schema-metadata-grid>`** (`inspecto/schema/`). Two modes over one component:
+  `metadata` (default) edits `raw.fields[].{description,unit,classification}` by selector — hosts: the `/design`
+  gallery; `types` (BASIC-ELT-PROFILE-1 U1a, 2026-11-19) is the compact column review — host: Add data's step 2
+  (*Check the columns*). In `types` mode it takes `[typeRows]` (`selector` · mapping `name` · `type` · `leaveOut`),
+  offers only `BASIC_COLUMN_TYPES`, renders the host's evidence/Confirm `[rowDetail]` template under each kept row
+  (`[rowErrors]` / `[rowClasses]` by selector) and emits each edit as `(rowChange)`; the host writes it into its
+  **mapping** (operator ruling O3) — never `raw.fields[]` or `transform.sql`, so Add data's commit body is unchanged
+  (pinned byte for byte in `add-data.component.spec.ts`, "U1a parity"). ⚠ Feed `typeRows` from the host's own state
+  on every change: the same selectors patch in place without an event (no echo, an open name box keeps its caret);
+  other selectors rebuild. Step 3 (Entity Types, roles, link) is NOT this grid (U1b stays an LA panel).
 - **Asking where files come from → `<inspecto-collector-config>`** (`inspecto/collector/`, 2026-08-04).
   ONE shared surface for the `collector:` block: the local-inbox/Connection toggle, the schema form over
   the shared `COLLECTOR_ATTRIBUTES`, Test connection, create-a-Connection in place, and the derived

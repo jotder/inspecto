@@ -1,11 +1,19 @@
-import { Component, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { describe, expect, it } from 'vitest';
 import { Classification, ClassificationsService } from 'app/inspecto/api/classifications.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
+import { penByLabel, penEdit, penText, pickerSet } from 'app/inspecto/testing/pen-field';
+import { InspectoOptionPickerComponent } from '../components/option-picker.component';
+import { BASIC_COLUMN_TYPES } from './basic-column-types';
 import { SchemaFieldRow } from './schema-fields-editor.component';
-import { InspectoSchemaMetadataGridComponent } from './schema-metadata-grid.component';
+import {
+    InspectoSchemaMetadataGridComponent,
+    SchemaTypeRow,
+    SchemaTypeRowChange,
+} from './schema-metadata-grid.component';
 
 @Component({
     standalone: true,
@@ -14,6 +22,41 @@ import { InspectoSchemaMetadataGridComponent } from './schema-metadata-grid.comp
 })
 class HostComponent {
     rows = signal<SchemaFieldRow[]>([]);
+}
+
+@Component({
+    standalone: true,
+    changeDetection: ChangeDetectionStrategy.OnPush,
+    imports: [InspectoSchemaMetadataGridComponent],
+    template: `
+        <inspecto-schema-metadata-grid
+            mode="types"
+            [typeRows]="rows()"
+            [rowErrors]="errors"
+            [rowClasses]="classes"
+            [rowDetail]="detail"
+            (rowChange)="changes.push($event)"
+        />
+        <ng-template #detail let-name
+            ><span data-testid="detail">why {{ name }}</span></ng-template
+        >
+    `,
+})
+class TypesHostComponent {
+    rows = signal<SchemaTypeRow[]>([
+        { selector: 'txn_id', name: 'txn_id', type: 'VARCHAR', leaveOut: false },
+        { selector: 'amount', name: 'amount', type: 'DOUBLE', leaveOut: false },
+    ]);
+    readonly errors = new Map([['txn_id', 'Taken.']]);
+    readonly classes = new Map([['amount', 'guess']]);
+    readonly changes: SchemaTypeRowChange[] = [];
+}
+
+function createTypes() {
+    TestBed.configureTestingModule({ imports: [TypesHostComponent], providers: [provideNoopAnimations()] });
+    const fixture = TestBed.createComponent(TypesHostComponent);
+    fixture.detectChanges();
+    return { fixture, el: fixture.nativeElement as HTMLElement, host: fixture.componentInstance };
 }
 
 const ROWS: SchemaFieldRow[] = [
@@ -171,5 +214,59 @@ describe('InspectoSchemaMetadataGridComponent', () => {
         cls.value = 'INTERNAL';
         cls.dispatchEvent(new Event('input'));
         expect(grid.value().get('0')).toEqual({ classification: 'INTERNAL' });
+    });
+
+    // ── mode="types" (BASIC-ELT-PROFILE-1 U1a): Add data's column review ─────────────────────────────────────────────
+
+    it('types mode: one row per column, Basic types only, the host slot under each kept row, every edit emitted (no violations)', async () => {
+        const { fixture, el, host } = createTypes();
+        expect(el.querySelector('table')).toBeNull(); // the metadata table is not drawn
+        expect(Array.from(el.querySelectorAll('[data-column]')).map((r) => r.getAttribute('data-column'))).toEqual([
+            'txn_id',
+            'amount',
+        ]);
+        expect(penText(penByLabel(el, 'Column 1')!)).toContain('txn_id');
+        const picker = fixture.debugElement.queryAll(By.directive(InspectoOptionPickerComponent))[0]
+            .componentInstance as { options: () => { value: string }[] };
+        expect(picker.options().map((o) => o.value)).toEqual([...BASIC_COLUMN_TYPES]);
+        expect(el.querySelector('[data-column="amount"] [data-testid="detail"]')!.textContent).toBe('why amount');
+        expect(el.querySelector('[data-column="amount"]')!.className).toContain('guess');
+        expect(el.querySelector('[data-column="txn_id"] [role="alert"]')!.textContent).toContain('Taken.');
+        await expectNoA11yViolations(el);
+
+        penEdit(fixture, penByLabel(el, 'Column 1')!, 'transfer_id');
+        pickerSet(fixture, '[data-testid="type-amount"]', 'VARCHAR');
+        (el.querySelector('[data-column="amount"] [data-testid="drop-column"] input') as HTMLInputElement).click();
+        fixture.detectChanges();
+        expect(host.changes).toEqual([
+            { selector: 'txn_id', name: 'transfer_id' },
+            { selector: 'amount', type: 'VARCHAR' },
+            { selector: 'amount', leaveOut: true },
+        ]);
+        // a left-out row: no detail, and its name and type read only
+        expect(el.querySelector('[data-column="amount"] [data-testid="detail"]')).toBeNull();
+        expect(el.querySelector('[data-column="amount"] .pen-pencil')).toBeNull();
+    });
+
+    it('types mode: an update of the same columns from the host applies in place and is never echoed; other columns rebuild', () => {
+        const { fixture, el, host } = createTypes();
+        const row = el.querySelector('[data-column="amount"]');
+        host.rows.set([
+            { selector: 'txn_id', name: 'id', type: 'VARCHAR', leaveOut: false },
+            { selector: 'amount', name: 'amount', type: 'BIGINT', leaveOut: true },
+        ]);
+        fixture.detectChanges();
+        expect(host.changes).toEqual([]);
+        expect(el.querySelector('[data-column="amount"]')).toBe(row); // the same row, updated
+        expect(penText(penByLabel(el, 'Column 1')!)).toContain('id');
+        expect(
+            el.querySelector<HTMLInputElement>('[data-column="amount"] [data-testid="drop-column"] input')!.checked,
+        ).toBe(true);
+        host.rows.set([{ selector: 'other', name: 'other', type: 'DATE', leaveOut: false }]);
+        fixture.detectChanges();
+        expect(Array.from(el.querySelectorAll('[data-column]')).map((r) => r.getAttribute('data-column'))).toEqual([
+            'other',
+        ]);
+        expect(host.changes).toEqual([]);
     });
 });

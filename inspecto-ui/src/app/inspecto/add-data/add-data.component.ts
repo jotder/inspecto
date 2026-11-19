@@ -37,11 +37,12 @@ import {
     entityTypeOptions,
 } from '@inspecto/core/api/entity-type-options';
 import { OnboardingEventsService } from '@inspecto/core/onboarding/onboarding-events.service';
+import { BASIC_COLUMN_TYPE_LABELS, type BasicColumnType } from '@inspecto/core/schema/basic-column-types';
 import {
-    BASIC_COLUMN_TYPES,
-    BASIC_COLUMN_TYPE_LABELS,
-    type BasicColumnType,
-} from '@inspecto/core/schema/basic-column-types';
+    InspectoSchemaMetadataGridComponent,
+    type SchemaTypeRow,
+    type SchemaTypeRowChange,
+} from '@inspecto/core/schema/schema-metadata-grid.component';
 import { AddDataAccess } from './add-data-access';
 import { ADD_DATA_LINK_ANALYSIS } from './add-data-link-analysis';
 import {
@@ -160,6 +161,7 @@ const NONE = '';
         DataTableComponent,
         ImportDatasetCardComponent,
         PostgresTableComponent,
+        InspectoSchemaMetadataGridComponent,
     ],
     host: { class: 'block min-w-0 max-w-full' },
     templateUrl: './add-data.component.html',
@@ -239,10 +241,6 @@ export class AddDataComponent implements OnInit {
     // ── words and options ────────────────────────────────────────────────────────────────────────────────────────────
     protected readonly accept = ACCEPTED_EXTENSIONS;
     protected readonly formats = READ_FORMATS;
-    protected readonly typeOptions: PickerOption[] = BASIC_COLUMN_TYPES.map((t) => ({
-        value: t,
-        label: BASIC_COLUMN_TYPE_LABELS[t],
-    }));
     protected readonly delimiterOptions: PickerOption[] = [',', ';', '\t', '|'].map((d) => ({
         value: d,
         label: delimiterLabel(d),
@@ -285,10 +283,7 @@ export class AddDataComponent implements OnInit {
         return limitsLine({ maxBytes, maxRows, maxImports });
     });
     private readonly maxBytes = computed(
-        () =>
-            this.draft()?.limits.maxBytes ??
-            this.limits().find((i) => i.key === 'import.max_bytes')?.inForce ??
-            null,
+        () => this.draft()?.limits.maxBytes ?? this.limits().find((i) => i.key === 'import.max_bytes')?.inForce ?? null,
     );
 
     protected readonly columnGroups = computed(() => {
@@ -308,6 +303,10 @@ export class AddDataComponent implements OnInit {
             ),
     );
     protected readonly keptColumns = computed(() => this.columnStates().filter((c) => !c.drop));
+    /** Step 2's rows for the grid's types mode: each draft column, the name the mapping gives it, its type, Leave out. */
+    protected readonly reviewRows = computed<SchemaTypeRow[]>(() =>
+        this.columnStates().map((c) => ({ selector: c.name, name: c.rename, type: c.type, leaveOut: c.drop })),
+    );
     protected readonly entityOptions = computed<PickerOption[]>(() => {
         const known = this.entityTypes();
         const ids = new Set(known.map((o) => o.value));
@@ -792,6 +791,17 @@ export class AddDataComponent implements OnInit {
 
     // ── 2. the columns ───────────────────────────────────────────────────────────────────────────────────────────────
 
+    /**
+     * A person's edit in the column review grid, written into this screen's mapping state as the field's own control
+     * would have written it: a stated type is still answered by the server (finding 4), and the commit is unchanged (O3).
+     */
+    protected onReviewChange(change: SchemaTypeRowChange): void {
+        const g = this.form.controls.columns.controls.find((c) => c.controls.name.value === change.selector)!;
+        if ('type' in change) g.controls.type.setValue(change.type);
+        else if ('name' in change) g.controls.rename.setValue(change.name);
+        else g.controls.drop.setValue(change.leaveOut);
+    }
+
     /** A separator, header or quote change re-reads the file with that choice stated (the commit cannot change it). */
     protected reformat(): void {
         const f = this.file();
@@ -854,6 +864,11 @@ export class AddDataComponent implements OnInit {
     protected lowClasses(key: string): string {
         return this.isPending(key) ? `${statusRowClasses('warning')} ${statusEdgeClasses('warning')}` : '';
     }
+
+    /** Each step-2 row's highlight while its type is a guess, by draft column. */
+    protected readonly reviewHighlights = computed(
+        () => new Map(this.columnStates().map((c) => [c.name, this.lowClasses(choiceKey.type(c.name))])),
+    );
 
     protected entityChoice(column: string): Choice<string | null> | undefined {
         return this.draft()?.entityTypes.columns.find((c) => c.column === column)?.entityType;
