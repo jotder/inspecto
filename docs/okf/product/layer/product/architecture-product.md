@@ -97,7 +97,10 @@ the eager bundle: MapLibre and the Link Analysis library must stay in lazy chunk
 **Dev and packaged.** `npm start` serves the console on port 4204; `ng serve la-app` serves the LA host on
 port 4304. Both proxy `/api` unchanged to the control plane on `localhost:8080`
 (`inspecto-ui/proxy.conf.json`). In a packaged install the control plane serves the built application from the
-same origin (`-Dui.dir`), so `apiBaseUrl` is `/api` in both modes. `angular.json` has no environment file
+same origin (`-Dui.dir`), so `apiBaseUrl` is `/api` in both modes. `package.ps1` also renders the user Handbook
+(`tools/render-handbook.mjs`) into the bundle's `ui/help/`, served at `/help/`; the console's top bar and the LA rail
+open it as **Help**, and every page header links to its screen's chapter through the one map in
+`inspecto/help/help-chapter.ts` (USER-HANDBOOK-1). `angular.json` has no environment file
 replacement: `src/environments/environment.ts` is the file that ships.
 
 ## 4. Layering and where things live

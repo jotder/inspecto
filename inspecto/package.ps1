@@ -1458,6 +1458,13 @@ if (Test-Path $uiDist) {
         $uiBundled = $true
         $stale = if ($uiBuilt) { '' } else { ' (pre-existing dist — NOT rebuilt this run)' }
         Write-Host "Bundled UI from $($indexHtml.DirectoryName) → $uiOut$stale" -ForegroundColor Green
+        # USER-HANDBOOK-1: the user Handbook, pre-rendered to static pages, served at /help/ from the same ui/ folder.
+        # Every edition ships it. Never --internal here: internal-audience pages must not reach a bundle.
+        $helpOut = Join-Path $uiOut 'help'
+        & node (Join-Path $sandboxRoot 'tools\render-handbook.mjs') --out $helpOut
+        if ($LASTEXITCODE -ne 0) { throw "render-handbook.mjs failed (see above) - the bundle would ship without its /help Handbook" }
+        if (-not (Test-Path (Join-Path $helpOut 'index.html'))) { throw "render-handbook.mjs wrote no $helpOut\index.html" }
+        Write-Host "  Handbook rendered → $helpOut" -ForegroundColor DarkGray
     } else {
         Write-Host "  (no index.html under $uiDist — skipping UI bundle)" -ForegroundColor Yellow
     }

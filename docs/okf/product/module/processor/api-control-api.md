@@ -26,7 +26,10 @@ suite, not the server — see [build & run](../../layer/platform/admin-guide-lau
 Per request: strip an optional `/api` prefix (Angular dev-proxy); apply CORS if `-Dcontrol.cors` set; answer
 `OPTIONS` preflight; match the `/spaces/{id}/…` seam (extract + validate id, rewrite path, bind the `space`
 MDC — see [multi-space](architecture-processor.md)); match `routes` by pattern+method; fall through to static SPA assets
-for unmatched GETs (`-Dui.dir`); always clear the space MDC in `finally`.
+for unmatched GETs (`-Dui.dir`); always clear the space MDC in `finally`. In that static fallback a folder that holds its
+own `index.html` is a pre-rendered site (the Handbook at `/help/`, USER-HANDBOOK-1): `/help/` answers with
+`help/index.html` and the bare `/help` redirects 301 to `/help/`, so the site's relative links resolve inside it.
+Any other extensionless path still gets the SPA's `index.html`.
 
 ## Request-scoped attributes — never the JDK's exchange map
 

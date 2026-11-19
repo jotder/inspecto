@@ -87,6 +87,17 @@
             <inspecto-space-switcher></inspecto-space-switcher>
             <inspecto-notification-bell></inspecto-notification-bell>
             <search [appearance]="'bar'" [commands]="paletteCommands"></search>
+            <a
+                mat-icon-button
+                data-testid="shell-help"
+                [href]="helpHome"
+                target="_blank"
+                rel="noopener"
+                aria-label="Help (opens the Handbook in a new tab)"
+                matTooltip="Help"
+            >
+                <mat-icon [svgIcon]="'heroicons_outline:book-open'"></mat-icon>
+            </a>
             <user></user>
         </div>
     </div>

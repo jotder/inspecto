@@ -1516,7 +1516,16 @@ public final class ControlApi implements AutoCloseable, HostContext {
         }
         if (!target.startsWith(uiDir)) { logStaticMiss(ex, "outside the ui root"); return false; }
         if (Files.isRegularFile(target)) { writeFile(ex, target); return true; }
-        if (!hasExtension(rel) || path.startsWith("/embed/")) {            // SPA deep link (an embed token is <grantId>.<secret>: the dot is not an extension)
+        // a pre-rendered site under the root (the Handbook at /help/, USER-HANDBOOK-1): a folder with its own index.html
+        // answers with it; without the trailing slash it redirects first, so the site's relative links resolve inside it
+        if (!target.equals(uiDir) && Files.isRegularFile(target.resolve("index.html"))) {
+            if (path.endsWith("/")) { writeFile(ex, target.resolve("index.html")); return true; }
+            ex.getResponseHeaders().set("Location", "/" + uiDir.relativize(target).toString().replace('\\', '/') + "/");
+            ex.sendResponseHeaders(301, -1);
+            ex.close();
+            return true;
+        }
+        if (!hasExtension(rel) || path.startsWith("/embed/")) {           // SPA deep link (an embed token is <grantId>.<secret>: the dot is not an extension)
             Path index = uiDir.resolve("index.html");
             if (Files.isRegularFile(index)) {
                 if (path.startsWith("/embed/")) writeEmbedShell(ex, index);
