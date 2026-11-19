@@ -1,10 +1,13 @@
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ChangeDetectionStrategy, Component, signal, viewChild } from '@angular/core';
-import { TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
+import { ToastrService } from 'ngx-toastr';
 import { afterEach, describe, expect, it } from 'vitest';
 import { apiUrl, LensService } from '@inspecto/core/api';
+import { CollectorConfigComponent } from '@inspecto/core/collector/collector-config.component';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { sessionFacts } from './add-data.testing';
 import { DatasetFeedComponent } from './dataset-feed.component';
@@ -52,8 +55,14 @@ function create(o: { offerKeep?: boolean; canAuthor?: boolean; snapshot?: boolea
             provideHttpClientTesting(),
             {
                 provide: LensService,
-                useValue: { canUploadData: signal(true), canAuthorWorkbench: signal(o.canAuthor ?? true) },
+                useValue: {
+                    canUploadData: signal(true),
+                    canAuthorWorkbench: signal(o.canAuthor ?? true),
+                    // the shared Collector surface of Keep this up to date reads the edition's locks
+                    screenLocks: signal({}),
+                },
             },
+            { provide: ToastrService, useValue: { warning: () => undefined } },
         ],
     });
     sessionFacts({ signIn: true, edition: 'standard' });
@@ -66,6 +75,16 @@ function create(o: { offerKeep?: boolean; canAuthor?: boolean; snapshot?: boolea
 }
 
 const q = (el: HTMLElement, id: string) => el.querySelector<HTMLElement>(`[data-testid="${id}"]`);
+
+/** The Space's Connections, as Keep this up to date's Collector surface reads them (each read answered). */
+function connections(list: { id: string; connector: string }[]): void {
+    http.match((r) => r.url === apiUrl('/connections')).forEach((r) => r.flush(list));
+}
+
+/** The shared Collector surface Keep this up to date hosts. */
+function collectorOf(fixture: ComponentFixture<unknown>): CollectorConfigComponent {
+    return fixture.debugElement.query(By.directive(CollectorConfigComponent)).componentInstance;
+}
 
 describe('DatasetFeedComponent - the inbox and Keep this up to date (LA-ARRIVAL-FEEDS-1)', () => {
     afterEach(() => http?.verify());
@@ -180,11 +199,12 @@ describe('DatasetFeedComponent - the inbox and Keep this up to date (LA-ARRIVAL-
 
     it('Standard: Keep this up to date watches the inbox, then saves the proposed index Job (no violations)', async () => {
         const { fixture, el } = create({ offerKeep: true });
-        http.expectOne(apiUrl('/connections')).flush([
+        http.expectOne(apiUrl('/datasets/calls/feed')).flush(STATE);
+        fixture.detectChanges();
+        connections([
             { id: 'partner_box', connector: 'sftp' },
             { id: 'warehouse', connector: 'db' },
         ]);
-        http.expectOne(apiUrl('/datasets/calls/feed')).flush(STATE);
         fixture.detectChanges();
         expect(q(el, 'keep-form')).not.toBeNull();
         await expectNoA11yViolations(el);
@@ -205,11 +225,76 @@ describe('DatasetFeedComponent - the inbox and Keep this up to date (LA-ARRIVAL-
         expect(fixture.componentInstance.last!.feed.kind).toBe('folder');
     });
 
-    it('Keep after Stop: the index Job already saved (409) is said as kept, not as a failure', () => {
+    it('BASIC-ELT-PROFILE-1 U4-Keep: hosts the shared Collector surface, offering the inbox or an SFTP Connection and a ready marker', async () => {
         const { fixture, el } = create({ offerKeep: true });
-        http.expectOne(apiUrl('/connections')).flush([]);
         http.expectOne(apiUrl('/datasets/calls/feed')).flush(STATE);
         fixture.detectChanges();
+        connections([
+            { id: 'partner_box', connector: 'sftp' },
+            { id: 'warehouse', connector: 'db' },
+        ]);
+        fixture.detectChanges();
+        const cc = collectorOf(fixture);
+        const modes = Array.from(q(el, 'feed-collector')!.querySelectorAll('mat-button-toggle')).map((t) =>
+            (t.textContent ?? '').trim(),
+        );
+        expect(modes).toEqual(['Local inbox', 'Connection']); // never another Dataset
+        expect(cc.visibleSpecs().map((s) => s.key)).toEqual(['stability__ready_marker']);
+        const listed = cc.optionLoaders.connection({});
+        connections([
+            { id: 'partner_box', connector: 'sftp' },
+            { id: 'warehouse', connector: 'db' },
+        ]);
+        expect((await listed).map((o) => o.value)).toEqual(['partner_box']);
+        cc.setMode('connection');
+        fixture.detectChanges();
+        connections([]); // the Connection field's suggestions, if it asked
+        expect(cc.visibleSpecs().map((s) => s.key)).toEqual(['connection', 'stability__ready_marker']);
+    });
+
+    it('an SFTP feed needs its Connection before anything is sent; the server refusal is said in place', () => {
+        const { fixture, el } = create({ offerKeep: true });
+        http.expectOne(apiUrl('/datasets/calls/feed')).flush(STATE);
+        fixture.detectChanges();
+        connections([
+            { id: 'partner_box', connector: 'sftp' },
+            { id: 'warehouse', connector: 'db' },
+        ]);
+        const cc = collectorOf(fixture);
+        cc.setMode('connection');
+        fixture.detectChanges();
+        connections([]); // the Connection field's suggestions, if it asked
+        q(el, 'keep-up-to-date')!.click();
+        fixture.detectChanges();
+        http.expectNone(apiUrl('/datasets/calls/feed'));
+        expect(q(el, 'feed-collector')!.textContent).toContain('Pick a Connection');
+
+        cc.schemaForm.form.get('connection')!.setValue('warehouse'); // a database Connection is not a feed
+        q(el, 'keep-up-to-date')!.click();
+        fixture.detectChanges();
+        http.expectNone(apiUrl('/datasets/calls/feed'));
+        expect(q(el, 'feed-collector')!.textContent).toContain('this takes SFTP Connections only');
+
+        cc.schemaForm.form.get('connection')!.setValue('partner_box');
+        cc.schemaForm.form.get('stability__ready_marker')!.setValue('.done');
+        q(el, 'keep-up-to-date')!.click();
+        const put = http.expectOne(apiUrl('/datasets/calls/feed'));
+        expect(put.request.body).toEqual({
+            kind: 'sftp',
+            every: '15m',
+            connection: 'partner_box',
+            readyMarker: '.done',
+        });
+        put.flush({ error: { message: 'no Connection' } }, { status: 422, statusText: 'Unprocessable' });
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="keep-form"] [role="alert"]')!.textContent).toContain('no Connection');
+    });
+
+    it('Keep after Stop: the index Job already saved (409) is said as kept, not as a failure', () => {
+        const { fixture, el } = create({ offerKeep: true });
+        http.expectOne(apiUrl('/datasets/calls/feed')).flush(STATE);
+        fixture.detectChanges();
+        connections([]);
         q(el, 'keep-up-to-date')!.click();
         http.expectOne(apiUrl('/datasets/calls/feed')).flush({
             ...STATE,
@@ -226,9 +311,9 @@ describe('DatasetFeedComponent - the inbox and Keep this up to date (LA-ARRIVAL-
 
     it('without the right to author, the index Job is not posted: the note says whom to ask', () => {
         const { fixture, el } = create({ offerKeep: true, canAuthor: false });
-        http.expectOne(apiUrl('/connections')).flush([]);
         http.expectOne(apiUrl('/datasets/calls/feed')).flush(STATE);
         fixture.detectChanges();
+        connections([]);
         q(el, 'keep-up-to-date')!.click();
         http.expectOne(apiUrl('/datasets/calls/feed')).flush({
             ...STATE,
@@ -240,34 +325,8 @@ describe('DatasetFeedComponent - the inbox and Keep this up to date (LA-ARRIVAL-
         expect(q(el, 'feed-note')!.textContent).toContain('ask an administrator to add the Job calls_index');
     });
 
-    it('an SFTP feed needs its Connection before anything is sent; the server refusal is said in place', () => {
-        const { fixture, el } = create({ offerKeep: true });
-        http.expectOne(apiUrl('/connections')).flush([{ id: 'partner_box', connector: 'sftp' }]);
-        http.expectOne(apiUrl('/datasets/calls/feed')).flush(STATE);
-        fixture.detectChanges();
-        const feed = fixture.componentInstance.feed()!;
-        (feed as unknown as { kind: { setValue(v: string): void } }).kind.setValue('sftp');
-        fixture.detectChanges();
-        expect(q(el, 'feed-connection')).not.toBeNull();
-        q(el, 'keep-up-to-date')!.click();
-        fixture.detectChanges();
-        http.expectNone(apiUrl('/datasets/calls/feed'));
-        expect(el.querySelector('[data-testid="keep-form"] [role="alert"]')!.textContent).toContain(
-            'Choose the SFTP Connection',
-        );
-
-        (feed as unknown as { connection: { setValue(v: string): void } }).connection.setValue('partner_box');
-        q(el, 'keep-up-to-date')!.click();
-        const put = http.expectOne(apiUrl('/datasets/calls/feed'));
-        expect(put.request.body).toEqual({ kind: 'sftp', every: '15m', connection: 'partner_box' });
-        put.flush({ error: { message: 'no Connection' } }, { status: 422, statusText: 'Unprocessable' });
-        fixture.detectChanges();
-        expect(el.querySelector('[data-testid="keep-form"] [role="alert"]')!.textContent).toContain('no Connection');
-    });
-
     it('a kept-up-to-date Dataset says how, and Stop goes back to uploads', () => {
         const { fixture, el } = create({ offerKeep: true });
-        http.expectOne(apiUrl('/connections')).flush([]);
         http.expectOne(apiUrl('/datasets/calls/feed')).flush({
             ...STATE,
             feed: { kind: 'sftp', connection: 'partner_box', every: '1h' },
@@ -279,6 +338,7 @@ describe('DatasetFeedComponent - the inbox and Keep this up to date (LA-ARRIVAL-
         expect(del.request.method).toBe('DELETE');
         del.flush(STATE);
         fixture.detectChanges();
+        connections([]);
         expect(q(el, 'feed-on')).toBeNull();
         expect(q(el, 'keep-up-to-date')).not.toBeNull();
     });

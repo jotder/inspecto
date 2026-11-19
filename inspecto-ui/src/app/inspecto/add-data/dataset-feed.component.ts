@@ -10,28 +10,40 @@ import {
     output,
     signal,
     untracked,
+    viewChild,
 } from '@angular/core';
-import { takeUntilDestroyed, toSignal } from '@angular/core/rxjs-interop';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSlideToggleChange, MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { Subscription } from 'rxjs';
-import { ConnectionsService, apiErrorMessage } from '@inspecto/core/api';
+import { apiErrorMessage } from '@inspecto/core/api';
+import { CollectorConfigComponent, CollectorMode } from '@inspecto/core/collector/collector-config.component';
+import { COLLECTOR_ATTRIBUTES } from '@inspecto/core/component-model/collector-attributes';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
-import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
-import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
+import { InspectoOptionPickerComponent } from '@inspecto/core/components/option-picker.component';
 import { AddDataAccess } from './add-data-access';
 import {
     DatasetFeedState,
     EVERY_OPTIONS,
-    FEED_KIND_OPTIONS,
     everyWords,
     feedWords,
     waitingFileLine,
     waitingWords,
 } from './dataset-feed.model';
 import { OnboardService } from './onboard.service';
+
+/**
+ * The Collector questions *Keep this up to date* asks (BASIC-ELT-PROFILE-1 U4-Keep): the shared Collector spec's own
+ * entries, limited to what its route saves (`PUT /datasets/{id}/feed`: the Connection and the ready marker). The
+ * server writes the rest of the `collector:` block itself (`DatasetFeed`), so asking more would ask for nothing.
+ */
+const KEEP_KEYS = ['connection', 'stability__ready_marker'];
+const KEEP_SPECS = COLLECTOR_ATTRIBUTES.filter((a) => KEEP_KEYS.includes(a.key));
+/** A feed reads the Dataset's inbox or an SFTP Connection, never another Dataset. */
+const KEEP_MODES: CollectorMode[] = ['local', 'connection'];
+const KEEP_CONNECTORS = ['sftp'];
 
 /**
  * How files reach an import Dataset (`LA-ARRIVAL-FEEDS-1`, plan P3, D-1), inside the Dataset card:
@@ -53,9 +65,9 @@ import { OnboardService } from './onboard.service';
         MatButtonModule,
         MatIconModule,
         MatSlideToggleModule,
+        CollectorConfigComponent,
         InspectoAlertComponent,
         InspectoOptionPickerComponent,
-        PenFieldComponent,
     ],
     host: { class: 'flex flex-col gap-3' },
     template: `
@@ -143,42 +155,21 @@ import { OnboardService } from './onboard.service';
                                 Stop: import only when asked
                             </button>
                         } @else {
-                            <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
-                                <inspecto-option-picker
-                                    label="Files come from"
-                                    data-testid="feed-kind"
-                                    [formControl]="kind"
-                                    [options]="kindOptions"
-                                ></inspecto-option-picker>
-                                <inspecto-option-picker
-                                    label="Check"
-                                    data-testid="feed-every"
-                                    [formControl]="every"
-                                    [options]="everyOptions"
-                                ></inspecto-option-picker>
-                                @if (kindValue() === 'sftp') {
-                                    <inspecto-option-picker
-                                        label="Connection"
-                                        data-testid="feed-connection"
-                                        placeholder="Choose a Connection"
-                                        [formControl]="connection"
-                                        [options]="sftpConnections()"
-                                        [help]="
-                                            sftpConnections().length
-                                                ? ''
-                                                : 'This Space has no SFTP Connection yet: ask an administrator to add one.'
-                                        "
-                                    ></inspecto-option-picker>
-                                }
-                                <inspecto-pen-field
-                                    label="Ready marker"
-                                    data-testid="feed-marker"
-                                    placeholder="none"
-                                    help="Optional: read name.csv only once name.csv.done is there (write .done)."
-                                    [formControl]="marker"
-                                    [maxlength]="40"
-                                ></inspecto-pen-field>
-                            </div>
+                            <!-- the shared Collector surface, limited to what a feed saves (U4-Keep) -->
+                            <inspecto-collector-config
+                                data-testid="feed-collector"
+                                [specs]="keepSpecs"
+                                [modes]="keepModes"
+                                [connectors]="keepConnectors"
+                                [readOnly]="saving() || !!locked()"
+                                (submitted)="keep()"
+                            />
+                            <inspecto-option-picker
+                                label="Check"
+                                data-testid="feed-every"
+                                [formControl]="every"
+                                [options]="everyOptions"
+                            ></inspecto-option-picker>
                             @if (formError()) {
                                 <p class="text-warn m-0 text-xs" role="alert">{{ formError() }}</p>
                             }
@@ -206,7 +197,6 @@ import { OnboardService } from './onboard.service';
 export class DatasetFeedComponent {
     private static nextId = 0;
     private readonly onboard = inject(OnboardService);
-    private readonly connections = inject(ConnectionsService);
     private readonly access = inject(AddDataAccess);
     private readonly destroyRef = inject(DestroyRef);
 
@@ -225,18 +215,16 @@ export class DatasetFeedComponent {
     readonly feedChange = output<DatasetFeedState | null>();
 
     protected readonly ids = `inspecto-feed-${DatasetFeedComponent.nextId++}`;
+    private readonly collector = viewChild(CollectorConfigComponent);
     protected readonly state = signal<DatasetFeedState | null>(null);
     protected readonly saving = signal(false);
     protected readonly formError = signal('');
     protected readonly note = signal<{ variant: 'info' | 'warning' | 'error' | 'success'; text: string } | null>(null);
-    protected readonly kindOptions = FEED_KIND_OPTIONS;
+    protected readonly keepSpecs = KEEP_SPECS;
+    protected readonly keepModes = KEEP_MODES;
+    protected readonly keepConnectors = KEEP_CONNECTORS;
     protected readonly everyOptions = EVERY_OPTIONS;
-    protected readonly kind = new FormControl<string>('folder', { nonNullable: true });
-    protected readonly kindValue = toSignal(this.kind.valueChanges, { initialValue: this.kind.value });
     protected readonly every = new FormControl<string>('15m', { nonNullable: true });
-    protected readonly connection = new FormControl<string | null>(null);
-    protected readonly marker = new FormControl<string | null>(null);
-    protected readonly sftpConnections = signal<PickerOption[]>([]);
     protected readonly shownFiles = computed(() => (this.state()?.files ?? []).slice(0, 5));
     protected readonly waiting = waitingWords;
     protected readonly fileLine = waitingFileLine;
@@ -245,9 +233,6 @@ export class DatasetFeedComponent {
         effect(() => {
             const id = this.datasetId();
             untracked(() => this.load(id));
-        });
-        effect(() => {
-            if (this.offerKeep()) untracked(() => this.loadConnections());
         });
     }
 
@@ -270,21 +255,6 @@ export class DatasetFeedComponent {
         this.feedChange.emit(s);
     }
 
-    private loadConnections(): void {
-        this.connections
-            .list()
-            .pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe({
-                next: (list) =>
-                    this.sftpConnections.set(
-                        list
-                            .filter((c) => (c.connector ?? '').toLowerCase() === 'sftp')
-                            .map((c) => ({ value: c.id, label: c.id })),
-                    ),
-                error: () => this.sftpConnections.set([]),
-            });
-    }
-
     protected words(s: DatasetFeedState): string {
         const every = everyWords(s.feed.every);
         return every ? `${feedWords(s.feed)}, checked ${every}` : feedWords(s.feed);
@@ -293,18 +263,20 @@ export class DatasetFeedComponent {
     protected keep(): void {
         this.formError.set('');
         this.note.set(null);
-        const sftp = this.kind.value === 'sftp';
-        if (sftp && !this.connection.value) {
-            this.formError.set('Choose the SFTP Connection to read.');
-            return;
-        }
-        const marker = (this.marker.value ?? '').trim();
+        const collector = this.collector();
+        if (!collector || !collector.validate()) return;
+        // the local inbox, or the picked SFTP Connection; null = refused, and the Collector surface says why
+        const connector = collector.resolveConnector();
+        if (!connector) return;
+        const sftp = connector !== 'local';
+        const v = collector.value();
+        const marker = String(v['stability__ready_marker'] ?? '').trim();
         this.saving.set(true);
         this.onboard
             .keepUpToDate(this.datasetId(), {
                 kind: sftp ? 'sftp' : 'folder',
                 every: this.every.value,
-                ...(sftp ? { connection: this.connection.value ?? '' } : {}),
+                ...(sftp ? { connection: String(v['connection'] ?? '').trim() } : {}),
                 ...(marker ? { readyMarker: marker } : {}),
             })
             .pipe(takeUntilDestroyed(this.destroyRef))

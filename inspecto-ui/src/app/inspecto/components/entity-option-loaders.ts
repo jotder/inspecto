@@ -91,9 +91,17 @@ export function referenceOptionLoader(): AttributeOptionLoader {
 }
 
 /** Saved Connection profiles (by id) — the collector's `connection:` reference. */
-export function connectionOptionLoader(): AttributeOptionLoader {
+export function connectionOptionLoader(connectors?: () => readonly string[] | null): AttributeOptionLoader {
     const connections = inject(ConnectionsService);
-    return async () => toOptions((await firstValueFrom(connections.list())).map((c) => c.id));
+    return async () => {
+        // Only the Connections of these connector types, when the host names some (null = every type).
+        const only = connectors?.() ?? null;
+        return toOptions(
+            (await firstValueFrom(connections.list()))
+                .filter((c) => !only || only.includes((c.connector ?? '').toLowerCase()))
+                .map((c) => c.id),
+        );
+    };
 }
 
 /** The registry-store kinds a Requirement is plausibly delivered by (see componentRefOptionLoader). */
