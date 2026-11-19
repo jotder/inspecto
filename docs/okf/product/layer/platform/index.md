@@ -37,7 +37,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `NATIVE-LICENCE-LINUX-MACOS-1` | P3 | chore | Two licence calls on the tokenizers natives wait on the operator. | operator |
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
 | `RELEASE-PIPELINE-UNRUN-1` | P2 | chore | No release can be cut today: release.yml has never run and its secrets and scan DB are not configured. | operator |
-| `DEPLOY-EXPOSURE-KIT-1` | P3 | chore | Fence /metrics and /health/details beyond the network, then build the deploy kit the docs assume. | — |
+| `DEPLOY-EXPOSURE-KIT-1` | P3 | chore | Prove the deploy kit (proxy fence for /metrics and /health/details, TLS, upgrade, off-site backup, signature verify) on a real host. | — |
 | `PRODUCT-ASSEMBLY-1` | P2 | feature | Assemble finished domain Products and the Platform with chosen Add-ons from definition files, with one tool. | — |
 | `CONTAINER-AIRGAP-PROOFS-1` | P3 | chore | Run a Kubernetes install of a Product's chart and a complete air-gapped bundle, the proofs that close PA-8. | demand |
 | `APP-KIT-ALERT-RULE-1` | P3 | feature | the App kit's starter (tools/inspecto-app.mjs new) ships no Alert Rule, so a partner App made with it raises no Alert from its findings u… | demand |
@@ -46,7 +46,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | — | P2 | feature | Postgres multi-user | operator |
 | `TOOL-TESTS-UNWIRED-BASELINE-1` | P3 | chore | 46 of 112 tools/*.test.mjs are named by no workflow, so no gate runs them. | demand |
 | `TEST-ENV-PG-ASN-UNRUN-1` | P3 | chore | Two test groups (Postgres and asn-*) cannot run on the shared User profile, so a green reactor does not cover them. | operator |
-| `REALTIME-DECISIONING-1` | P3 | feature | The rest of the Real-time Detection Add-on and the CEP App (card authorisation, pre-call blocking). | demand |
+| `REALTIME-DECISIONING-1` | P3 | feature | PA-9e (the CEP App) and PA-9f (its docs) are open; the Add-on (PA-9a…PA-9d) is built. | demand |
 | `REALTIME-INLINE-DECISION-1` | P3 | feature | inline allow / block decision on each record of a stream | demand |
 | `SCALEOUT-HELM-NPOD-1` | P2 | feature | The only Helm chart is a replicas-1 StatefulSet: no N-pod topology, ingress template or per-pod Space assignment. | operator |
 | `SCALEOUT-D14-D16-DECISIONS-1` | P2 | chore | The scale-out decisions D14, D15 and D16 and the rows they unblock. | operator |

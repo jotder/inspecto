@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `REALTIME-DECISIONING-1` | P3 | feature | The rest of the Real-time Detection Add-on and the CEP App (card authorisation, pre-call blocking). | demand |
+| `REALTIME-DECISIONING-1` | P3 | feature | PA-9e (the CEP App) and PA-9f (its docs) are open; the Add-on (PA-9a…PA-9d) is built. | demand |

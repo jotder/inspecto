@@ -35,7 +35,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LA-SPACE-SWITCHER-NAMES-1` | P3 | defect | the Space switcher still shows near-twin names, no name on a phone, and squeezes a two-line name. | — |
-| `LA-UI-TEXT-PASS-2` | P3 | defect | La-app wording items that each wait on an operator call. | operator |
+| `LA-UI-TEXT-PASS-2` | P3 | defect | La-app wording items that each wait on an operator call, plus wording leftovers that need no decision. | operator |
 | `LA-SHOWCASE-RELEASE-RESIDUALS-1` | P3 | chore | What the 2026-11-09 showcase release and its live proofs did not cover, the Linux product zip included. | operator |
 | `LA-SHOWCASE-COMBINED-DOWNLOAD-1` | P3 | feature | one combined "all showcases" download beside the per-Space downloads? | operator |
 | `LA-INDUSTRY-FOLD-1` | P3 | chore | Fold la-showcase into *Banking and finance* and la-mobile-money into *Telecom*, so only industry Spaces ship. | — |

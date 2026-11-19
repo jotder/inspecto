@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-UI-TEXT-PASS-2` | P3 | defect | La-app wording items that each wait on an operator call. | operator |
+| `LA-UI-TEXT-PASS-2` | P3 | defect | La-app wording items that each wait on an operator call, plus wording leftovers that need no decision. | operator |

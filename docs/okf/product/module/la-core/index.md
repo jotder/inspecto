@@ -40,7 +40,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-EXEC-DEMO-POLISH-1` | P3 | chore | Polish left by the third executive review of Inspecto LA, plus transfer amounts drawn on the links. | — |
 | `SPACE-ADMISSION-FOLLOWUPS-1` | P3 | chore | Seven follow-ups the closed-Space change (D5) left on purpose. | — |
 | `LA-SPACE-SWITCHER-NAMES-1` | P3 | defect | the Space switcher still shows near-twin names, no name on a phone, and squeezes a two-line name. | — |
-| `LA-UI-TEXT-PASS-2` | P3 | defect | La-app wording items that each wait on an operator call. | operator |
+| `LA-UI-TEXT-PASS-2` | P3 | defect | La-app wording items that each wait on an operator call, plus wording leftovers that need no decision. | operator |
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | Two items wave 1 of LA-ONBOARD-1 left: how far no-code row filtering goes in Basic, and a real drag-and-drop of a file onto Add data. | operator |
 | `LA-GROW-EXCLUDE-THINK-ALOUD-1` | P3 | chore | run a think-aloud test of "Grow and clean a graph" with two analysts new to Link Analysis | external |
 | `LA-INVESTIGATION-STORE-DESIGN-1` | P3 | feature | The Postgres mutation checks of the InvestigationStore seam (design 13.4 and 13.5) are the only item left. | operator |
