@@ -623,6 +623,12 @@ nothing said (seen in the 2026-11-15 drive: *Covers* stayed empty). Order:
    the owner is the importer, a full build is allowed. Without a registered follow-on (no Link Analysis) the summary
    has no `index` key and the import ends at its Parquet. Then every enabled Expectation whose target is the Pipeline
    (`expectations:[{name, status, violations}]`). Neither failing undoes the import; both are reported.
+   Compaction, the follow-ons and the Expectations are the Pipeline's `follow_on` step (`import_steps`; a Pipeline
+   without `import_steps` runs it too) and are ONE list, `ImportCommitSteps` (`BASIC-ELT-PROFILE-1` BE-1a,
+   2026-11-19): a run of the import Pipeline that Add data did not start (a kept-up-to-date feed's scheduled poll,
+   `POST /pipelines/{id}/run`) runs the same steps in the same order, once per run, as registered commit steps
+   ([spec-pipeline-execution.md](../elt/spec-pipeline-execution.md#commit-steps--the-work-a-commit-needs-before-it-is-done));
+   Add data's run holds the Dataset's claim, so they run once for it, here.
 
 **A failed commit leaves nothing behind**: every write is undone in reverse (Dataset entry, data and inbox
 directories, registration, Pipeline file, schema file), and the draft keeps its file, so the same draft commits once

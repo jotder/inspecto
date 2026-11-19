@@ -695,6 +695,12 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
   Never throws; a compaction that ran is logged. *Chosen over a `dataset.compact` Job step on `pipeline.commit`* (the row's
   suggestion): two Jobs on the same signal run concurrently, so the index build would race the swap, and the Job would
   have to be authored per Dataset. *Not* the `ImportFollowOn` seam either: a scheduled run never calls it.
+  **Superseded 2026-11-19 (`BASIC-ELT-PROFILE-1` BE-1a):** the one step is now an ordered registry of named commit steps
+  (`CollectorService.commitStep(name, order, phase, step)`), and `ImportCommitSteps` registers the whole follow_on step
+  of the import for such a run: compaction as above (phase `COMMIT`, per commit, before the Jobs), then each
+  `ImportFollowOn` (the link index) and the Expectations once per run, after its last commit and outside ingest (phase
+  `RUN`). Same `isOurs` / `IN_FLIGHT` rules. `DatasetCompaction.afterCommit` is gone. See
+  [spec-pipeline-execution.md](../elt/spec-pipeline-execution.md#commit-steps--the-work-a-commit-needs-before-it-is-done).
 - **The graph after a compaction (`LA-DATASET-COMPACT-2`).** The link index's read gate (`IndexedRead.select`,
   `IndexStaleness.removedInput`) already refuses an index whose input files are gone, so the graph reads the flat Dataset
   after a compaction - but it compared the files through `InputFingerprintCache` (30 s, cleared only by an index build), so

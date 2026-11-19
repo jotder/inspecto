@@ -40,8 +40,11 @@ import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.Optional;
 import java.util.Set;
@@ -153,16 +156,99 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     private final ReportService reports = new ReportService(this);
     /** Config-driven cron/event jobs (v2.8.0); null when none are registered. */
     private volatile JobService jobs;
-    /** LA-DATASET-COMPACT-2: what a committed batch needs before the Space's Jobs see it, set by the control plane (Add data's compaction). */
-    private static volatile java.util.function.BiConsumer<CollectorService, ConsignmentEvent> commitStep = (s, e) -> { };
+    // ── commit steps (LA-DATASET-COMPACT-2; BASIC-ELT-PROFILE-1 BE-1a) ─────────────────────────────────────────────
+
+    /** When a registered {@link CommitStep} runs. */
+    public enum CommitPhase {
+        /**
+         * For every commit of every Space (SUCCESS or FAILED, dry runs included - the step filters), on the publishing thread
+         * and before the Space's Jobs are handed it (LA-DATASET-COMPACT-2's contract). The thread is inside the Consignment's
+         * ingest ({@link com.gamma.util.IngestActivity}) and holds the run's claim: a step must be quick, must not start a run
+         * and must not wait for ingest to end - a Link Analysis index build does, so it would wait for itself.
+         */
+        COMMIT,
+        /**
+         * Once per run of a Pipeline that committed: after the run's last Consignment, outside every ingest scope, while the
+         * run's claim is still held, handed the run's last SUCCESS commit (a dry run's never). A run of N Consignments runs it
+         * once, not N times. The Space's Jobs have already been handed the run's commits. A SUCCESS commit published outside
+         * a run (an enrichment's, or a replay of rejected records - one Consignment each) runs it at once.
+         */
+        RUN
+    }
+
+    /** Work a commit needs before it is done (see {@link CommitPhase}). Must not throw; a throw is logged and skipped. */
+    @FunctionalInterface
+    public interface CommitStep {
+        void run(CollectorService service, ConsignmentEvent event);
+    }
+
+    private record NamedStep(String name, int order, CommitPhase phase, CommitStep step) {}
+
+    /** Every registered commit step of this JVM, sorted by {@code order} then name; replaced whole on each change. */
+    private static volatile List<NamedStep> commitSteps = List.of();
 
     /**
-     * LA-DATASET-COMPACT-2: the work every commit of every Space runs first, on the publishing thread and before the Space's
-     * Jobs are handed it - the control plane's compaction of an Add data import that the scheduler ran. It must not throw
-     * and must not start a run (the thread holds the run's claim).
+     * Register the commit step {@code name}: steps of a phase run in ascending {@code order} (a tie: by name), each one
+     * after the one before has returned. A second registration of the same name replaces the first (a re-attached control
+     * plane re-registers). A step that throws is logged and the next one runs: nothing throws out of the publishing thread.
      */
-    public static void commitStep(java.util.function.BiConsumer<CollectorService, ConsignmentEvent> step) {
-        commitStep = step;
+    public static synchronized void commitStep(String name, int order, CommitPhase phase, CommitStep step) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(phase, "phase");
+        Objects.requireNonNull(step, "step");
+        List<NamedStep> next = new ArrayList<>();
+        for (NamedStep s : commitSteps) if (!s.name().equals(name)) next.add(s);
+        next.add(new NamedStep(name, order, phase, step));
+        next.sort(Comparator.comparingInt(NamedStep::order).thenComparing(NamedStep::name));
+        commitSteps = List.copyOf(next);
+    }
+
+    /** Test seam: forget the commit step {@code name}. */
+    static synchronized void removeCommitStep(String name) {
+        List<NamedStep> next = new ArrayList<>(commitSteps);
+        next.removeIf(s -> s.name().equals(name));
+        commitSteps = List.copyOf(next);
+    }
+
+    /** The runs in progress, by lower-cased Pipeline id, each holding its last SUCCESS commit so far (for {@link CommitPhase#RUN}). */
+    private final Map<String, java.util.concurrent.atomic.AtomicReference<ConsignmentEvent>> openRuns =
+            new java.util.concurrent.ConcurrentHashMap<>();
+
+    private void runCommitSteps(CommitPhase phase, ConsignmentEvent e) {
+        for (NamedStep s : commitSteps) {
+            if (s.phase() != phase) continue;
+            try {
+                s.step().run(this, e);
+            } catch (Exception | LinkageError failed) {
+                log.warn("commit step '{}' failed on {}/{}: {}", s.name(), e.pipeline(), e.consignmentId(), failed.toString());
+            }
+        }
+    }
+
+    /** The bus subscriber: the COMMIT steps now; a SUCCESS commit's RUN steps when its run ends (or now, outside a run). */
+    private void onCommitSteps(ConsignmentEvent e) {
+        runCommitSteps(CommitPhase.COMMIT, e);
+        if (!"SUCCESS".equalsIgnoreCase(e.status()) || e.dryRun()) return;
+        var run = e.pipeline() == null ? null : openRuns.get(e.pipeline().toLowerCase(Locale.ROOT));
+        if (run != null) run.set(e);
+        else runCommitSteps(CommitPhase.RUN, e);
+    }
+
+    /**
+     * {@code run} as one run of {@code pipeline} for the {@link CommitPhase#RUN} steps: they run once when it returns (or
+     * throws), if it committed. The caller holds the Pipeline's run claim, so runs of one Pipeline never overlap here.
+     */
+    <T> T commitStepRun(String pipeline, java.util.function.Supplier<T> run) {
+        String key = pipeline.toLowerCase(Locale.ROOT);
+        var last = new java.util.concurrent.atomic.AtomicReference<ConsignmentEvent>();
+        openRuns.put(key, last);
+        try {
+            return run.get();
+        } finally {
+            openRuns.remove(key, last);
+            ConsignmentEvent e = last.get();
+            if (e != null) runCommitSteps(CommitPhase.RUN, e);
+        }
     }
     /** This space's boot-built Platform Service registry (platform-services plan S1-1) — the one
      *  place engine facilities are bound to grantable service ids. The v1 built-in services
@@ -655,9 +741,9 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         this.eventLog.addSubscriber(indexLagSubscriber);
         alerting.indexLagProbe(indexLag);
         bus.subscribe(this::onConsignmentEvent);
-        // LA-DATASET-COMPACT-2: subscribed HERE, before JobService.start() subscribes, so the step runs on the publishing
-        // thread (under the run's claim) BEFORE this Space's Jobs - the link index build - are handed the commit
-        bus.subscribe(e -> commitStep.accept(this, e));
+        // LA-DATASET-COMPACT-2: subscribed HERE, before JobService.start() subscribes, so the COMMIT steps run on the
+        // publishing thread (under the run's claim) BEFORE this Space's Jobs - the link index build - are handed the commit
+        bus.subscribe(this::onCommitSteps);
         // Notification engine (Phase B2): render operational events into the appUser's in-app feed.
         // Subscribed on the EventLog (the unified event stream, so it sees BATCH_FAILED/SEQUENCE_GAP/…);
         // each match is handed to NotificationService's own virtual-thread executor — never run inline on
@@ -748,6 +834,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                 this.maxConcurrentRuns, maxConcurrentAcquisitions, acquireHighWater,
                 this.pollSeconds * 1000L, this::runPipeline, this::syncStatus);
         this.pipelineScheduler.spaceId(this.spaceId);   // SE-1b: the activation holds are per Space
+        this.pipelineScheduler.runScope(this::commitStepRun);   // BE-1a: a poll's run ends with its RUN-phase commit steps
         if (realtime != null) this.pipelineScheduler.onStreamIdle(realtime::onStreamIdle);   // PA-9d: the clock floor
     }
 
@@ -2055,8 +2142,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                         if (!dryRun)
                             pipelineScheduler.recordManualRun(pipelineName, System.currentTimeMillis());
                         if (dryRun) com.gamma.inspector.DryRunRejects.take(pipelineName);   // no stale slot
-                        MultiCollectorProcessor.RunResult r =
-                                MultiCollectorProcessor.runAll(List.of(p), 1, bus.sink(), skipPostAction, dryRun);
+                        MultiCollectorProcessor.RunResult r = commitStepRun(pipelineName, () ->
+                                MultiCollectorProcessor.runAll(List.of(p), 1, bus.sink(), skipPostAction, dryRun));
                         if (dryRun) {
                             List<com.gamma.inspector.DryRunRejects.MemberRejects> rejects =
                                     com.gamma.inspector.DryRunRejects.take(pipelineName);

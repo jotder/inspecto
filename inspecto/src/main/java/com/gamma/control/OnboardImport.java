@@ -11,7 +11,6 @@ import com.gamma.entitystore.LaLimitValues;
 import com.gamma.entitystore.LinkAnalysisSettings;
 import com.gamma.etl.EditionFeatures;
 import com.gamma.etl.PipelineConfig;
-import com.gamma.expectation.ExpectationRunner;
 import com.gamma.onboard.ImportFollowOn;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
@@ -1235,50 +1234,13 @@ final class OnboardImport {
          * The default Pipeline's fourth step (BASIC-ONBOARD-1 P1, DT-16): the import's follow-on work, inside the user's
          * run - compaction, each application's registered {@link ImportFollowOn} under its key, then the Expectations
          * (DT-15: every edition). No follow-on registered: the import ends at its Parquet. All of it runs in every edition
-         * (operator 2026-11-05): a person's import always gives a fresh graph; files a scheduled feed takes are indexed by
-         * the Space's Job.
+         * (operator 2026-11-05). The same steps a commit of the Pipeline outside Add data runs ({@link ImportCommitSteps},
+         * BASIC-ELT-PROFILE-1 BE-1a); this run holds the Dataset's claim, so they do not run there for it.
          */
         void followOn(Map<String, Object> summary) {
             Map<String, Object> current = new ComponentStore(space.writeRoot().resolve("registry")).get("dataset", id)
                     .map(ComponentRegistry.Component::content).orElse(dataset);
-            // LA-DATASET-COMPACT-1 (D-7): merge the files once there are many, before a follow-on reads them
-            summary.put("compaction", DatasetCompaction.afterImport(space.writeRoot(), space.dataRoot(), id, current, space.actor()));
-            for (ImportFollowOn f : followOns())
-                summary.put(f.key(), runFollowOn(f, current));
-            summary.put("expectations", evaluateExpectations());
-        }
-
-        private Map<String, Object> runFollowOn(ImportFollowOn f, Map<String, Object> content) {
-            try {
-                return f.run(new ImportFollowOn.Context(space.writeRoot(), space.dataRoot(), id, content, space.actor()));
-            } catch (RuntimeException failed) {
-                return outcome("FAILED", "'" + f.key() + "' could not run: " + failed.getMessage());
-            }
-        }
-
-        private List<Map<String, Object>> evaluateExpectations() {
-            List<Map<String, Object>> out = new ArrayList<>();
-            ComponentStore store = new ComponentStore(space.writeRoot().resolve("registry"));
-            ExpectationRunner runner = new ExpectationRunner(space.writeRoot(), space.dataRoot(),
-                    space.service().objects().orElse(null), msg -> msg);
-            for (ComponentRegistry.Component c : store.list(ExpectationRunner.TYPE)) {
-                Map<String, Object> e = c.content();
-                if (!"pipeline".equalsIgnoreCase(String.valueOf(e.get("targetType"))) || !id.equalsIgnoreCase(String.valueOf(e.get("target")))
-                        || "false".equalsIgnoreCase(String.valueOf(e.getOrDefault("enabled", true)))) continue;
-                Map<String, Object> r = new LinkedHashMap<>();
-                r.put("name", e.get("name"));
-                try {
-                    Map<String, Object> next = runner.evaluateOne(e);
-                    Object last = next.get("lastResult");
-                    r.put("status", last instanceof Map<?, ?> lm ? lm.get("status") : null);
-                    r.put("violations", last instanceof Map<?, ?> lm ? lm.get("violations") : null);
-                } catch (IOException | RuntimeException failed) {
-                    r.put("status", "ERROR");
-                    r.put("message", failed.getMessage());
-                }
-                out.add(r);
-            }
-            return out;
+            ImportCommitSteps.runAll(space, id, current, summary);
         }
 
         /** Replace: set the current data aside; {@link #restore} puts it back, {@link #dropAside} discards it. */
@@ -1343,13 +1305,6 @@ final class OnboardImport {
             out.add(m);
         }
         return out;
-    }
-
-    private static Map<String, Object> outcome(String result, String message) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("result", result);
-        m.put("message", message);
-        return m;
     }
 
     private static long parseLong(String s) {
