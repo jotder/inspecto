@@ -45,6 +45,7 @@ data/inbox/orders/ORDERS_<yyyyMMdd>.csv      data/inbox/payments/PAYMENTS_<yyyyM
 | Alert Rule | `config/registry/alert-rules/o2c_unmatched_value.toon` | CRITICAL, so each key is an Incident; a difference under 100 stays a Break only |
 | Case Rule | `config/ops/o2c_collections_caserule.toon` + `config/jobs/o2c_collections_case_job.toon` | `caserule.evaluate`; category `order-to-cash` |
 | Collections workflow | `config/governance/case-workflow.json` | adds `propose_write_off` → `PENDING_APPROVAL` → `approve_write_off` / `send_back`; keeps every built-in Case move; an administrator applies it with `POST /components/workflow` (a Space Template carries no governance) |
+| SLA examples | `config/examples/sla-escalation-examples.md` | inert, labelled examples of an Incident and a Case SLA Policy and two Escalation Rules (every template ships one) |
 | Dashboard | `config/registry/dashboards/o2c_overview.toon` + three Widgets | unmatched value: total (KPI), by status, by customer |
 | Samples | `data/samples/orders/`, `data/samples/payments/` | written by `tools/gen-order-to-cash-data.mjs` |
 
