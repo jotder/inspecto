@@ -52,7 +52,6 @@ class ControlApiSnapshotExportTest {
     @AfterEach
     void cleanUp() {
         Authenticators.forTest(null);
-        InboxWatch.pausedForTest = false;
         Path data = Path.of("database").toAbsolutePath();
         for (String id : ids) {
             OnboardRoutes.deleteTree(data.resolve(id));
@@ -264,7 +263,6 @@ class ControlApiSnapshotExportTest {
             ids.add(id);
             data(send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit",
                     ("{\"name\":\"" + id + "\"}").getBytes(StandardCharsets.UTF_8)), 200);
-            InboxWatch.pausedForTest = true;
             data(send(c, "PUT", "/datasets/" + id + "/watch", "{\"watch\":true}".getBytes(StandardCharsets.UTF_8)), 200);
 
             // where an export is written while it runs: the drafts folder of the data root, a half-written Parquet file
@@ -275,7 +273,7 @@ class ControlApiSnapshotExportTest {
             Files.write(half, java.util.Arrays.copyOf(bytes, bytes.length / 2));
             Files.delete(whole);
 
-            for (int i = 0; i < 3; i++) InboxWatch.tick();
+            for (int i = 0; i < 3; i++) ControlApiImportPreRunStepsTest.poll(c.svc());   // B1: the watch is a schedule
             JsonNode now = data(send(c, "POST", "/datasets/" + id + "/run", null), 200);
             assertEquals(0, now.get("rowsIn").asLong(), "Run now found nothing waiting: " + now);
             assertEquals(30, OnboardImport.countRows(DATA.resolve(id).resolve("database")), "nothing of the half file was imported");

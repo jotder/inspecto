@@ -32,7 +32,7 @@ class CollectorServiceCommitStepsTest {
     }
 
     /** A pipeline named {@code name} under {@code root} with one CSV per entry of {@code files} waiting in its inbox. */
-    private static Path pipeline(Path root, String name, String... files) throws Exception {
+    static Path pipeline(Path root, String name, String... files) throws Exception {
         Files.createDirectories(root.resolve("inbox"));
         Path schema = root.resolve("schema.toon");
         Files.writeString(schema, PipelineConfigBatchTest.miniSchema());
@@ -69,7 +69,7 @@ class CollectorServiceCommitStepsTest {
         return p;
     }
 
-    private static void inbox(Path root, String file) throws Exception {
+    static void inbox(Path root, String file) throws Exception {
         Files.writeString(root.resolve("inbox").resolve(file), "ID,AMT,EVENT_DATE\n" + file + ",10,2020-01-01\n");
     }
 
