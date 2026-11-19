@@ -22,9 +22,11 @@ import { fileURLToPath } from 'node:url';
 import { AUDIENCES, CHAPTER_IDS, HOWTO_HEADINGS, MANIFEST, TRACKS, TYPES, loadManifest, render } from './render-handbook.mjs';
 
 const MIN_PAGES = 50;
+/** Page ids the render writes itself: a page named so would be overwritten by the home page or the search index. */
+const RESERVED = ['index', 'search'];
 
 /** All findings for a manifest. `tracked` is the list of tracked paths; `read(file)` returns text. Pure, for the tests. */
-export function findings(book, tracked, read) {
+export function findings(book, tracked, read, renderSite = render) {
     const out = [];
     const ids = book.chapters.map((c) => c.id);
     if (ids.join(',') !== CHAPTER_IDS.join(',')) out.push(`chapters: [${ids.join(', ')}] must be exactly [${CHAPTER_IDS.join(', ')}]`);
@@ -34,6 +36,7 @@ export function findings(book, tracked, read) {
     for (const p of pages) {
         const at = `${p.chapter}/${p.id}`;
         if (seenId.has(p.id)) out.push(`pages: id '${p.id}' is used twice`);
+        if (RESERVED.includes(p.id)) out.push(`pages: id '${p.id}' is reserved (the render writes ${p.id}.html / ${p.id}.json itself)`);
         seenId.add(p.id);
         if (!p.file || !trackedSet.has(p.file)) out.push(`pages: ${at} file '${p.file}' is not a tracked file`);
         else if (seenFile.has(p.file)) out.push(`pages: ${p.file} is listed twice (${seenFile.get(p.file)}, ${at})`);
@@ -51,7 +54,7 @@ export function findings(book, tracked, read) {
         if (/^docs\/okf\/.*\/(user|admin)-guide-[^/]+\.md$/.test(f) && !seenFile.has(f)) out.push(`coverage: ${f} is not placed in the Handbook manifest`);
     }
     if (!out.some((o) => o.startsWith('pages:'))) {
-        const { files } = render(book, read, { internal: false });
+        const { files } = renderSite(book, read, { internal: false });
         const internalIds = new Set(pages.filter((p) => p.audience !== 'external').map((p) => p.id));
         for (const [name, html] of files) {
             if (internalIds.has(name.replace(/\.html$/, ''))) out.push(`leak: the external render holds internal page ${name}`);

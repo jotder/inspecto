@@ -27,6 +27,21 @@ test('markdown: tables, fenced code, blockquotes, lists and rules', () => {
     assert.ok(r.html.includes('<hr>'));
 });
 
+test('inline: an HTML anchor stays an anchor, bold may hold emphasis, emphasis never reaches an href', () => {
+    const link = (h) => h;
+    assert.equal(inline('<a id="menus"></a>Menus', link), '<span id="menus"></span>Menus');
+    assert.equal(inline('**text *and* color**', link), '<strong>text <em>and</em> color</strong>');
+    assert.equal(inline('[x](a_b_c.md)', link), '<a href="a_b_c.md">x</a>');
+});
+
+test('markdown: a nested level keeps its own list type; a malformed link escape does not throw', () => {
+    assert.ok(markdownToHtml('1. one\n   - sub\n2. two').html.includes('<ol><li>one<ul><li>sub</li></ul></li><li>two</li></ol>'));
+    const { files } = render({ title: 'H', chapters: [{ id: 'start', title: 'S', group: 'G', summary: '', pages: [
+        { id: 'p', chapter: 'start', file: 'docs/A.md', type: 'reference', tracks: ['builder'], audience: 'external' }] }] },
+    () => '# A\n[bad](x%E0.md)');
+    assert.ok(files.get('p.html').includes('<span class="nolink">bad</span>'));
+});
+
 test('inline: raw HTML escaped, code kept literal, images become alt text, links rewritten or dropped', () => {
     const link = (h) => (h === 'ok.md' ? 'ok.html' : h.startsWith('https:') ? h : null);
     assert.equal(inline('<b>x</b> `<i>`', link), '&lt;b&gt;x&lt;/b&gt; <code>&lt;i&gt;</code>');
