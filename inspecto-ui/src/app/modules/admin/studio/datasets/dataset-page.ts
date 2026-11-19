@@ -4,7 +4,7 @@ import {
     ImportKind,
     count,
     editionLock,
-} from '@inspecto/link-analysis/add-data/add-data.model';
+} from '@inspecto/core/add-data/add-data.model';
 import { Dataset } from './dataset-types';
 
 /**

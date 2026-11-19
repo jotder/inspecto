@@ -39,13 +39,14 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { ADD_DATA_ROUTE, AddDataDropComponent } from 'app/modules/admin/add-data/add-data-drop.component';
 import { NgTemplateOutlet } from '@angular/common';
-import { Arrivals, ImportDataset } from '@inspecto/link-analysis/add-data/add-data.model';
-import { AddDataAccess } from '@inspecto/link-analysis/add-data/add-data-access';
-import { ImportDatasetCardComponent } from '@inspecto/link-analysis/add-data/import-dataset-card.component';
+import { Arrivals, ImportDataset } from '@inspecto/core/add-data/add-data.model';
+import { AddDataAccess } from '@inspecto/core/add-data/add-data-access';
+import { ImportDatasetCardComponent } from '@inspecto/core/add-data/import-dataset-card.component';
 import { importDatasetOf } from './dataset-page';
 import { DatasetOffersComponent } from './dataset-offers.component';
 import { DatasetSummaryComponent } from './dataset-summary.component';
 import { ReferenceDetailsComponent } from './reference-details.component';
+import { provideAddDataLinkAnalysis } from '@inspecto/link-analysis/link-analysis/add-data-link-analysis.providers';
 
 /**
  * Studio **Datasets** — the data-source abstractions (physical / virtual / materialized) widgets build on.
@@ -54,6 +55,8 @@ import { ReferenceDetailsComponent } from './reference-details.component';
  */
 @Component({
     selector: 'app-datasets',
+    // Entity Types, import limits and the link index for Add data / the Dataset card (BASIC-ELT-PROFILE-1 UI-0)
+    providers: [provideAddDataLinkAnalysis()],
     standalone: true,
     imports: [
         AddDataDropComponent,

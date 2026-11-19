@@ -5,8 +5,8 @@ import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { afterEach, describe, expect, it } from 'vitest';
 import { apiUrl, LensService } from '@inspecto/core/api';
-import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
+import { sessionFacts } from './add-data.testing';
 import { DatasetFeedComponent } from './dataset-feed.component';
 import { DatasetFeedState, everyWords, feedStatusLine, waitingWords } from './dataset-feed.model';
 import { dataStatusLines } from './add-data.model';
@@ -51,20 +51,12 @@ function create(o: { offerKeep?: boolean; canAuthor?: boolean; snapshot?: boolea
             provideHttpClient(),
             provideHttpClientTesting(),
             {
-                provide: LA_FEATURES,
-                useValue: {
-                    signIn: signal(true),
-                    edition: signal('standard'),
-                    flags: signal({}),
-                    featureReasons: signal({}),
-                },
-            },
-            {
                 provide: LensService,
                 useValue: { canUploadData: signal(true), canAuthorWorkbench: signal(o.canAuthor ?? true) },
             },
         ],
     });
+    sessionFacts({ signIn: true, edition: 'standard' });
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.offerKeep.set(o.offerKeep ?? false);
     fixture.componentInstance.snapshot.set(o.snapshot ?? false);

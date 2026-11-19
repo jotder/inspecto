@@ -5,7 +5,7 @@ import { TestBed } from '@angular/core/testing';
 import { describe, expect, it } from 'vitest';
 import { apiUrl } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
-import { Arrival, Arrivals } from './add-data.model';
+import { Arrival, Arrivals } from '@inspecto/core/add-data/add-data.model';
 import { DataStatusComponent } from './data-status.component';
 
 @Component({

@@ -1,4 +1,4 @@
-import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
+import { ledgerTime } from '@inspecto/core/add-data/add-data.model';
 import { TestBed } from '@angular/core/testing';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it } from 'vitest';
@@ -8,7 +8,7 @@ import { signal } from '@angular/core';
 import { vi } from 'vitest';
 import { LensService } from 'app/inspecto/api';
 import { SessionService } from 'app/inspecto/auth/session.service';
-import { OnboardService } from '@inspecto/link-analysis/add-data/onboard.service';
+import { OnboardService } from '@inspecto/core/add-data/onboard.service';
 import {
     AddDataSettingsComponent,
     durationWords,

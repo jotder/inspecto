@@ -7,13 +7,13 @@ import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { apiUrl, LensService } from '@inspecto/core/api';
-import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
 import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
-import { REMOTE_FALLBACK, SELF_IMPORT_OFF } from '@inspecto/link-analysis/add-data/add-data.model';
+import { REMOTE_FALLBACK, SELF_IMPORT_OFF } from '@inspecto/core/add-data/add-data.model';
 import { AddDataHandoff } from './add-data-drop.component';
-import { AddDataAccess } from '@inspecto/link-analysis/add-data/add-data-access';
+import { AddDataAccess } from '@inspecto/core/add-data/add-data-access';
+import { sessionFacts } from '@inspecto/core/add-data/add-data.testing';
 import { ConsoleAddDataPageComponent } from './add-data.page';
 
 let http: HttpTestingController;
@@ -35,19 +35,6 @@ function create(o: Opts = {}) {
             provideHttpClientTesting(),
             provideRouter([]),
             {
-                provide: LA_FEATURES,
-                useValue: {
-                    ops: signal(false),
-                    exchange: signal(false),
-                    geoLink: signal(true),
-                    investigations: signal(false),
-                    signIn: signal(false),
-                    edition: signal(o.edition ?? 'basic'),
-                    flags: signal({}),
-                    featureReasons: signal({}),
-                },
-            },
-            {
                 provide: LensService,
                 useValue: {
                     canUploadData: signal(true),
@@ -59,6 +46,7 @@ function create(o: Opts = {}) {
             { provide: EntityProfileService, useValue: { entityTypes: () => of({ items: [] }) } },
         ],
     });
+    sessionFacts({ edition: o.edition ?? 'basic' });
     if (o.dropped) {
         TestBed.inject(AddDataHandoff).put(o.dropped);
         // the pane the file was dropped on has already read the Space's switch (the access service is shared)

@@ -1,10 +1,10 @@
 import type { ComponentDef } from '@inspecto/core/api';
-import { RowCondition, rowConditions } from '@inspecto/link-analysis/add-data/add-data.model';
-import { CARRIED_ROLES, ColumnRole, ROLE_LABELS, hintedRole } from '@inspecto/link-analysis/api/column-roles';
-import type { EntityTypeGuide, RecordTypeGuide } from '@inspecto/link-analysis/api/entity-type-options';
+import { RowCondition, rowConditions } from '@inspecto/core/add-data/add-data.model';
+import { CARRIED_ROLES, ColumnRole, ROLE_LABELS, hintedRole } from '@inspecto/core/api/column-roles';
+import type { EntityTypeGuide, RecordTypeGuide } from '@inspecto/core/api/entity-type-options';
 
-export { ROLE_HINTS, ROLE_LABELS } from '@inspecto/link-analysis/api/column-roles';
-export type { ColumnRole } from '@inspecto/link-analysis/api/column-roles';
+export { ROLE_HINTS, ROLE_LABELS } from '@inspecto/core/api/column-roles';
+export type { ColumnRole } from '@inspecto/core/api/column-roles';
 
 /**
  * The **Data** page's pure half (LA-DATA-PAGE-1, plan `docs/superpower/la-data-arrival-plan.md` §8): a Dataset registry

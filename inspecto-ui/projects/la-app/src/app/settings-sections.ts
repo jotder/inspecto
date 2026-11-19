@@ -7,8 +7,8 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { apiErrorMessage, LensService } from 'app/inspecto/api';
 import { SessionService } from 'app/inspecto/auth/session.service';
-import { DataSettings, ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
-import { OnboardService } from '@inspecto/link-analysis/add-data/onboard.service';
+import { DataSettings, ledgerTime } from '@inspecto/core/add-data/add-data.model';
+import { OnboardService } from '@inspecto/core/add-data/onboard.service';
 import { LinkAnalysisLimitsComponent } from 'app/modules/admin/settings/link-analysis-limits.component';
 import { LinkAnalysisSettingsComponent } from 'app/modules/admin/settings/link-analysis-settings.component';
 

@@ -1,3 +1,4 @@
+import type { LinkIndexState } from '@inspecto/core/add-data/add-data-link-analysis';
 import type {
     LinkIndexBuildMode,
     LinkIndexBuildRequest,
@@ -14,7 +15,8 @@ import type {
  * only words it and names the build that makes it current. Before this, the Data page read the outcome its import RECORDED
  * ("graph up to date") while the header read `GET /inv/index` ("index v1 (stale)"): two answers to one question.
  */
-export type LinkIndexState = 'current' | 'out_of_date' | 'unknown';
+// The state union is core's: Add data (core) reads it through `ADD_DATA_LINK_ANALYSIS` (BASIC-ELT-PROFILE-1 UI-0).
+export type { LinkIndexState };
 
 export interface LinkIndexStatus {
     state: LinkIndexState;

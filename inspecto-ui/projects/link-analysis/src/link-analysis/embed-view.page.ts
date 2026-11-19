@@ -1,5 +1,5 @@
 import { Location } from '@angular/common';
-import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
+import { ledgerTime } from '@inspecto/core/add-data/add-data.model';
 import {
     ChangeDetectionStrategy,
     Component,

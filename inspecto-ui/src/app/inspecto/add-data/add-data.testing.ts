@@ -1,5 +1,7 @@
+import { TestBed } from '@angular/core/testing';
+import { SessionService } from '@inspecto/core/auth/session.service';
 import type { Choice, ImportSummary, OnboardDraft } from './add-data.model';
-import type { ColumnRole } from '@inspecto/link-analysis/api/column-roles';
+import type { ColumnRole } from '@inspecto/core/api/column-roles';
 
 /** SPEC-ONLY: drafts shaped like `POST /onboard/files` answered for the walkthrough's `transfers.csv` (2026-10-22, live). */
 const hi = <T>(value: T, evidence = 'every sampled value agrees'): Choice<T> => ({
@@ -185,4 +187,23 @@ export function summary(over: Partial<ImportSummary> = {}): ImportSummary {
         expectations: [],
         ...over,
     };
+}
+
+/**
+ * SPEC-ONLY: the host facts `AddDataAccess` reads from `SessionService`: sign-in (`authMode` oidc), the edition, the
+ * `/bootstrap` feature flags and their reasons. Call after `TestBed.configureTestingModule`, before the first render.
+ */
+export function sessionFacts(
+    o: {
+        signIn?: boolean;
+        edition?: string;
+        flags?: Record<string, boolean>;
+        reasons?: Record<string, string>;
+    } = {},
+): void {
+    const session = TestBed.inject(SessionService);
+    session.authMode.set(o.signIn ? 'oidc' : 'none');
+    session.edition.set(o.edition ?? 'basic');
+    session.features.set(o.flags ?? {});
+    session.featureReasons.set(o.reasons ?? {});
 }

@@ -7,7 +7,7 @@ import {
     domainProfiles,
 } from '@inspecto/link-analysis/graph/domain-profile';
 import type { LaDataset } from '@inspecto/link-analysis/la-host';
-import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
+import { ledgerTime } from '@inspecto/core/add-data/add-data.model';
 import { PendingInvestigation, dayLabel } from './investigate-number';
 import type { LinkAnalysisView } from './link-analysis.service';
 

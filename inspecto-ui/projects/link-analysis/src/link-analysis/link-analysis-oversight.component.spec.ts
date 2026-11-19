@@ -9,7 +9,7 @@ import { InvService, InvestigationLog, PendingExpansion, WorkingSet } from '@ins
 import { LensService, SessionService } from '@inspecto/core/api';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
-import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
+import { ledgerTime } from '@inspecto/core/add-data/add-data.model';
 import { LinkAnalysisOversightComponent } from './link-analysis-oversight.component';
 
 const PENDING: PendingExpansion = {

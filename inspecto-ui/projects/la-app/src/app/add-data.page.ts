@@ -14,17 +14,18 @@ import { apiErrorMessage, LensService } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { ComponentsService } from '@inspecto/core/api/components.service';
-import { AddDataAccess } from '@inspecto/link-analysis/add-data/add-data-access';
-import { AddDataComponent } from '@inspecto/link-analysis/add-data/add-data.component';
+import { AddDataAccess } from '@inspecto/core/add-data/add-data-access';
+import { AddDataComponent } from '@inspecto/core/add-data/add-data.component';
 import {
     ImportDataset,
     ImportKind,
     ImportSummary,
     rowConditions,
-} from '@inspecto/link-analysis/add-data/add-data.model';
-import { ImportDatasetCardComponent } from '@inspecto/link-analysis/add-data/import-dataset-card.component';
-import { OnboardService } from '@inspecto/link-analysis/add-data/onboard.service';
+} from '@inspecto/core/add-data/add-data.model';
+import { ImportDatasetCardComponent } from '@inspecto/core/add-data/import-dataset-card.component';
+import { OnboardService } from '@inspecto/core/add-data/onboard.service';
 import { FirstRun } from './first-run';
+import { provideAddDataLinkAnalysis } from '@inspecto/link-analysis/link-analysis/add-data-link-analysis.providers';
 
 /**
  * **Add data** (`/add-data`; OB-14: the button says *Add data*, the screen title is *Onboard a file*). Hosts the one Add data
@@ -38,6 +39,8 @@ import { FirstRun } from './first-run';
  */
 @Component({
     selector: 'la-app-add-data',
+    // Entity Types, import limits and the link index for Add data / the Dataset card (BASIC-ELT-PROFILE-1 UI-0)
+    providers: [provideAddDataLinkAnalysis()],
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
     imports: [AddDataComponent, ImportDatasetCardComponent, InspectoAlertComponent, MatButtonModule, RouterLink],

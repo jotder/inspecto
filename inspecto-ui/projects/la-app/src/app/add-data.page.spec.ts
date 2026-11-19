@@ -8,12 +8,11 @@ import { of } from 'rxjs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { apiUrl, LensService } from '@inspecto/core/api';
 import { SessionService } from '@inspecto/core/auth/session.service';
-import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
 import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
-import { NO_UPLOAD_RIGHT, SELF_IMPORT_OFF } from '@inspecto/link-analysis/add-data/add-data.model';
-import { AddDataAccess } from '@inspecto/link-analysis/add-data/add-data-access';
+import { NO_UPLOAD_RIGHT, SELF_IMPORT_OFF } from '@inspecto/core/add-data/add-data.model';
+import { AddDataAccess } from '@inspecto/core/add-data/add-data-access';
 import { AddDataPageComponent } from './add-data.page';
 import { FirstRun } from './first-run';
 
@@ -39,19 +38,6 @@ function create(
             provideHttpClient(),
             provideHttpClientTesting(),
             provideRouter([]),
-            {
-                provide: LA_FEATURES,
-                useValue: {
-                    ops: signal(false),
-                    exchange: signal(false),
-                    geoLink: signal(true),
-                    investigations: signal(false),
-                    signIn: signal(!!who.signIn),
-                    edition: signal('basic'),
-                    flags: signal({}),
-                    featureReasons: signal({}),
-                },
-            },
             {
                 provide: LensService,
                 useValue: {

@@ -21,7 +21,7 @@ import { NodeRiskService, ReferenceTable } from './node-risk.service';
 import { NodeReference, detailLines } from './reference-details';
 import { CaseHistoryService, EntityHistory, EntityHistoryStatus } from './case-history.service';
 import { laLimit } from './la-limits';
-import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
+import { ledgerTime } from '@inspecto/core/add-data/add-data.model';
 import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { LinkAnalysisEntitySummaryComponent } from './link-analysis-entity-summary.component';
 

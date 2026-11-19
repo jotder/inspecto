@@ -9,14 +9,12 @@ import { of } from 'rxjs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { apiUrl, LensService } from '@inspecto/core/api';
 import { INSPECTO_GRID_DARK, InspectoGridThemeService } from '@inspecto/core/grid';
-import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { penByLabel, penEdit, pickerSet } from '@inspecto/core/testing/pen-field';
-import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
-import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
 import { AddDataComponent } from './add-data.component';
+import { ADD_DATA_LINK_ANALYSIS } from './add-data-link-analysis';
 import { REMOTE_FALLBACK, SELF_IMPORT_OFF, NO_UPLOAD_RIGHT } from './add-data.model';
-import { accountsDraft, lowDraft, summary, transfersDraft } from './add-data.testing';
+import { accountsDraft, lowDraft, sessionFacts, summary, transfersDraft } from './add-data.testing';
 import type { CommitBody, ImportSummary, OnboardDraft } from './add-data.model';
 
 @Component({
@@ -63,27 +61,19 @@ function create(o: Opts = {}) {
             provideHttpClientTesting(),
             provideRouter([]),
             {
-                provide: LA_FEATURES,
-                useValue: {
-                    ops: signal(false),
-                    exchange: signal(false),
-                    geoLink: signal(true),
-                    investigations: signal(false),
-                    signIn: signal((o.authMode ?? 'none') === 'oidc'),
-                    edition: signal(o.edition ?? 'basic'),
-                    flags: signal(o.features ?? {}),
-                    featureReasons: signal(o.reasons ?? {}),
-                },
-            },
-            {
                 provide: LensService,
                 useValue: { canUploadData: signal(o.canUpload ?? true), canAuthorWorkbench: signal(true) },
             },
-            { provide: LaLimitsService, useValue: { items: signal(o.limits ?? LIMITS) } },
             { provide: InspectoGridThemeService, useValue: { theme: () => INSPECTO_GRID_DARK } },
             {
-                provide: EntityProfileService,
+                // what Link Analysis hands Add data: the limits and the Space's Entity Types (no link index here)
+                provide: ADD_DATA_LINK_ANALYSIS,
                 useValue: {
+                    limits: () => signal(o.limits ?? LIMITS),
+                    indexStatus: () => null,
+                    loadIndexes: () => undefined,
+                    reloadIndexes: () => undefined,
+                    rebuild: null,
                     entityTypes: () =>
                         of({
                             items: [
@@ -105,6 +95,12 @@ function create(o: Opts = {}) {
                 },
             },
         ],
+    });
+    sessionFacts({
+        signIn: (o.authMode ?? 'none') === 'oidc',
+        edition: o.edition ?? 'basic',
+        flags: o.features ?? {},
+        reasons: o.reasons ?? {},
     });
     const fixture = TestBed.createComponent(HostComponent);
     fixture.componentInstance.mode.set(o.mode ?? 'ask');
@@ -160,10 +156,6 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         http
             ?.match((r) => r.url.endsWith('/storage'))
             .forEach((r) => !r.cancelled && r.flush({}, { status: 404, statusText: 'Not Found' }));
-        // LA-FULL-CYCLE-TEST-1 phase 4: the Dataset card reads the link index list for its Graph fact (503 = Basic: the arrivals decide)
-        http
-            ?.match((r) => r.url.endsWith('/inv/index'))
-            .forEach((r) => !r.cancelled && r.flush({}, { status: 503, statusText: 'Unavailable' }));
         http?.verify();
     });
 

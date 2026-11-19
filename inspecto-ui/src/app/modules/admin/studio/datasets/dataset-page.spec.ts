@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { Arrival, Arrivals } from '@inspecto/link-analysis/add-data/add-data.model';
+import { Arrival, Arrivals } from '@inspecto/core/add-data/add-data.model';
 import { Dataset } from './dataset-types';
 import {
     ENRICH_FALLBACK,

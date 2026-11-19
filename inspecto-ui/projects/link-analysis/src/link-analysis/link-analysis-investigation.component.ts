@@ -46,7 +46,7 @@ import { WORKING_SET_PLUGIN } from '@inspecto/core/viz/plugins/view.plugins';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { StatusBadgeComponent } from '@inspecto/core/components/status-badge.component';
-import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
+import { ledgerTime } from '@inspecto/core/add-data/add-data.model';
 import { DEFAULT_MAX_DEGREE, DegreePresets } from '@inspecto/link-analysis/graph/domain-profile';
 import {
     DegreeOutcome,

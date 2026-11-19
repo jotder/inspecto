@@ -11,7 +11,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { Dataset } from './dataset-types';
 import { DatasetsService } from './datasets.service';
-import { AddDataAccess } from '@inspecto/link-analysis/add-data/add-data-access';
+import { AddDataAccess } from '@inspecto/core/add-data/add-data-access';
 import { DatasetsComponent } from './datasets.component';
 
 const D1: Dataset = {

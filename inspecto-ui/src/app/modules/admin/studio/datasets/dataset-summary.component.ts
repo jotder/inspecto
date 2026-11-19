@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Subscription } from 'rxjs';
-import { Arrivals } from '@inspecto/link-analysis/add-data/add-data.model';
+import { Arrivals } from '@inspecto/core/add-data/add-data.model';
 import { Dataset } from './dataset-types';
 import { DatasetFacts, rowsWords, setAsideLines, spanWords, timeColumn } from './dataset-page';
 import { DatasetsService } from './datasets.service';

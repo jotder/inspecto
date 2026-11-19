@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { forkJoin } from 'rxjs';
-import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
+import { ledgerTime } from '@inspecto/core/add-data/add-data.model';
 import { InvService, WorkingSetRelation } from '@inspecto/link-analysis/api/inv.service';
 import { ChipComponent } from '@inspecto/core/components/chip.component';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';

@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { ComponentsService } from '@inspecto/core/api/components.service';
 import { ExclusionCategoriesService } from '@inspecto/core/api/exclusion-categories.service';
 import { environment } from 'environments/environment';
-import { OnboardService } from '../add-data/onboard.service';
+import { OnboardService } from '@inspecto/core/add-data/onboard.service';
 import { InvService } from './inv.service';
 
 const base = environment.apiBaseUrl + '/v1';

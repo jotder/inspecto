@@ -28,7 +28,7 @@ import {
 } from '@inspecto/link-analysis/api/inv.service';
 import { GraphRunsService, LinkIndexSummary } from '@inspecto/link-analysis/api/graph-runs.service';
 import { KIND_TEXT, LinkAnalysisCorrectedDaysComponent } from './link-analysis-corrected-days.component';
-import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
+import { ledgerTime } from '@inspecto/core/add-data/add-data.model';
 import { buildStrip, dayCells, DataTrustFacts, daysWindow, formatDay, outcomeTone } from './data-trust';
 import { IndexRebuildComponent } from './index-rebuild.component';
 import { datasetIndexStatus } from './index-status';

@@ -13,7 +13,7 @@ import { InspectoAlertComponent } from '@inspecto/core/components/alert.componen
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { InspectoConfirmService } from '@inspecto/core/confirm.service';
-import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
+import { ledgerTime } from '@inspecto/core/add-data/add-data.model';
 import { InvService, InvestigationListItem } from '@inspecto/link-analysis/api/inv.service';
 import { LA_LOCKED_REASON_FALLBACK, isCapabilityUnavailable } from '@inspecto/link-analysis/la-host';
 import { INCIDENTS_PERMISSION, needsPermission } from './disabled-reasons';
