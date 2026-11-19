@@ -55,6 +55,12 @@ values as text, takes the first rule every non-blank value meets:
 | 6 | **almost all** (≥ 9 in 10 and ≥ 10 values, `SampleProfiler.mostly`) dates with a time, then dates, in one format | that type and format; `fits`/`of`/`odd` say how many fit and name one that does not, which the import leaves blank (finding 3) |
 | — | anything else, **including a column that is almost all numbers** | `VARCHAR` (ruling 4: a number is proposed only when every value survives) |
 
+**A later file's new column (`BASIC-ELT-PROFILE-1` B5, 2026-11-20).** A column an import keeps from later files is
+typed from this same answer, file by file, and settled across the files of the run by the engine's drift service
+(`SchemaDrift.settle`, see [spec-pipeline-execution-run-steps.md](spec-pipeline-execution-run-steps.md)): so a time of
+day kept from a later file is `TIME`, as it is in a first file. The Dataset entry calls a `TIME` column `date`, the
+temporal type a Dataset read gives it (`ResultSetDescriptor.columnType`).
+
 **The decimal mark (ruling 3).** The preview and suggest read the Grammar's `decimal_separator` (the preview from its
 draft's `csv_settings`, suggest from the body's `decimalSeparator`, which the Pipelines editor sends from the Grammar on
 screen); Add data detects the mark (`DecimalMark.choose`, C1) and passes it. So `3,50` is a number in all three once

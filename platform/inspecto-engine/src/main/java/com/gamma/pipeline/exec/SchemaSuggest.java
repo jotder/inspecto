@@ -1,5 +1,6 @@
 package com.gamma.pipeline.exec;
 
+import com.gamma.etl.SchemaDrift;
 import com.gamma.parse.SampleProfiler;
 import com.gamma.util.DuckDbUtil;
 
@@ -7,11 +8,8 @@ import java.io.File;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * <b>G1 ({@code consignment-chain-plan.md} S4) — draft-schema inference over already-parsed sample
@@ -126,35 +124,23 @@ public final class SchemaSuggest {
      * schema missing and every sample column added ({@code LA-ONBOARD-DRIFT-1}). Any other selector is still a name.
      */
     public static Drift drift(Map<String, Object> draft, List<Field> inferred, boolean byIndex) {
-        Map<String, Field> bySampleColumn = new LinkedHashMap<>();
-        for (Field f : inferred) bySampleColumn.put(f.name(), f);
-
-        List<Field> missing = new ArrayList<>();
-        List<TypeChange> typeChanged = new ArrayList<>();
-        Set<String> claimed = new LinkedHashSet<>();
-
+        // the engine's one comparison (SchemaDrift.diff, BASIC-ELT-PROFILE-1 B5): a sample column is its own selector
+        List<SchemaDrift.Declared> declared = new ArrayList<>();
         for (Map<String, Object> df : ComponentPreview.schemaFields(draft)) {
             String name = text(df.get("name"));
-            if (name.isEmpty()) continue;
-            String selector = text(df.get("selector"));
-            String key = selector.isEmpty() ? name : selector;
-            String declared = text(df.get("type"));
-
-            Field match = byIndex && key.matches("\\d{1,9}")
-                    ? (Integer.parseInt(key) < inferred.size() ? inferred.get(Integer.parseInt(key)) : null)
-                    : bySampleColumn.get(key);
-            if (match == null) {
-                missing.add(new Field(name, declared));
-                continue;
-            }
-            claimed.add(match.name());
-            if (!declared.isEmpty() && !declared.equalsIgnoreCase(match.type()))
-                typeChanged.add(new TypeChange(name, declared, match.type()));
+            if (!name.isEmpty()) declared.add(new SchemaDrift.Declared(text(df.get("selector")), name, text(df.get("type"))));
         }
+        List<SchemaDrift.Observed> sample = new ArrayList<>();
+        for (Field f : inferred) sample.add(new SchemaDrift.Observed(f.name(), f.name(), f.type(), f.format()));
+        SchemaDrift.Diff d = SchemaDrift.diff(declared, sample, byIndex ? SchemaDrift.By.WIDTH : SchemaDrift.By.NAME);
 
+        List<Field> missing = new ArrayList<>();
+        for (SchemaDrift.Declared m : d.missing()) missing.add(new Field(m.name(), m.type()));
+        List<TypeChange> typeChanged = new ArrayList<>();
+        for (SchemaDrift.Placed p : d.typeChanged())
+            typeChanged.add(new TypeChange(p.field().name(), p.field().type(), p.seen().type()));
         List<Field> added = new ArrayList<>();
-        for (Field f : inferred) if (!claimed.contains(f.name())) added.add(f);
-
+        for (SchemaDrift.Observed o : d.added()) added.add(new Field(o.name(), o.type(), o.format()));
         return new Drift(List.copyOf(added), List.copyOf(missing), List.copyOf(typeChanged));
     }
 
