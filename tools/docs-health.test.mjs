@@ -133,6 +133,18 @@ test('full-header ratchet: a new hub page needs the full header, a full page may
     assert.deepEqual(evaluate(m({ 'docs/USER_GUIDE.md': HEAD }), baselineOf(m({}))).failures, [], 'root canon is not a hub page');
 });
 
+test('full-header ratchet: a layer page needs every field but code; losing one still fails', () => {
+    const layer = 'docs/okf/product/layer/platform/spec-new.md';
+    const noCode = FULL.replace('code: x\n', '');
+    assert.deepEqual(evaluate(m({ [layer]: noCode }), baselineOf(m({}))).failures, [], 'a new layer page without code passes');
+    const base = baselineOf(m({ [layer]: noCode }));
+    assert.deepEqual(base.partialHeader, []);
+    const lost = evaluate(m({ [layer]: noCode.replace(/verified: .*\n/, '') }), base).failures;
+    assert.equal(lost.length, 1);
+    assert.match(lost[0], /missing: verified\)/);
+    assert.equal(evaluate(m({ [HUB]: noCode }), baselineOf(m({}))).failures.length, 1, 'a module page still needs code');
+});
+
 test('editions ratchet: a new hand-written table fails outside its homes, never inside them', () => {
     const table = '| | Basic | Standard | Advanced |\n';
     assert.equal(evaluate(m({ [HUB]: HEAD + table }), baselineOf(m({ [HUB]: HEAD }))).failures.length, 1);

@@ -135,6 +135,11 @@ test('CLI: --write fills a real repo, bodies untouched, a second run is a no-op'
             `---\ntype: Spec\ntitle: Ops\ndescription: d\nitem: module.ops\naudience: external\nstatus: current\nverified: ${date} last-edit\ncode: features/inspecto-ops\n---\n` + body);
         assert.equal(readFileSync(join(dir, 'docs/okf/product/module/ops/architecture-ops.md'), 'utf8'), '# headerless\n');
         assert.match(run('--write').stdout, /0 page\(s\) filled/);
+        // a page staged but not committed yet is dated today, so the printed fix leaves nothing missing
+        w('docs/okf/product/module/ops/spec-new.md', '---\ntype: Spec\ntitle: N\ndescription: d\n---\n# N\n');
+        git('add', '.');
+        assert.equal(run('--write').status, 0);
+        assert.match(readFileSync(join(dir, 'docs/okf/product/module/ops/spec-new.md'), 'utf8'), /\nverified: \d{4}-\d{2}-\d{2} last-edit\n/);
     } finally {
         rmSync(dir, { recursive: true, force: true });
     }

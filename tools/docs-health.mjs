@@ -25,8 +25,8 @@
 //   header    a hub page (docs/okf/**) without the base header (`type`, `title`, `description`) that is not in the
 //             baseline list; and, wherever a header carries them, an invalid `audience` (external | internal), `verified`
 //             (starts YYYY-MM-DD) or `code` path (must be tracked). The full header (D-IR4: type, title, description,
-//             item, audience, status, verified, code) is required of every hub page that is not in the baseline's
-//             `partialHeader` list (pages W4 could not fill — a layer links no `code`) or its `headerless` list: a NEW
+//             item, audience, status, verified, code; `code` optional on layer hub pages, which link no code) is required
+//             of every hub page that is not in the baseline's `partialHeader` list or its `headerless` list: a NEW
 //             hub page needs it (`node tools/fill-doc-headers.mjs --write --hub <kind>/<name>` adds what it can), and a
 //             page that has it may not lose it, so the full-header count only rises (INFO-RESTRUCTURE-1 W4).
 //   editions  a page with more hand-written Basic | Standard | Advanced tables than its baseline. The homes of that fact
@@ -74,6 +74,9 @@ export const EDITION_HOMES = new Set(['docs/EDITIONS.md', 'docs/okf/product/laye
 const ARCHIVE = 'docs/archived-documents/';
 const BASE_KEYS = ['type', 'title', 'description'];
 const FULL_KEYS = ['type', 'title', 'description', 'item', 'audience', 'status', 'verified', 'code'];
+/** The full header a page needs: a layer hub links no code of its own (tools/fill-doc-headers.mjs), so `code` is optional
+ *  there — validated when present, never required. */
+export const fullKeysOf = (path) => (path.startsWith('docs/okf/product/layer/') ? FULL_KEYS.filter((k) => k !== 'code') : FULL_KEYS);
 
 /** Is this page generated (exempt from ratchets)? */
 export function isGenerated(path, text) {
@@ -157,8 +160,8 @@ export function measure(paths, read, isTracked) {
             history: historyNotes(text),
             editions: editionTables(text),
             baseHeader: !!fm && BASE_KEYS.every((k) => fm[k] !== undefined && fm[k] !== ''),
-            fullHeader: !!fm && FULL_KEYS.every((k) => fm[k] !== undefined && fm[k] !== ''),
-            missingFull: FULL_KEYS.filter((k) => !fm || fm[k] === undefined || fm[k] === ''),
+            fullHeader: !!fm && fullKeysOf(path).every((k) => fm[k] !== undefined && fm[k] !== ''),
+            missingFull: fullKeysOf(path).filter((k) => !fm || fm[k] === undefined || fm[k] === ''),
             headerProblems: headerProblems(fm, isTracked),
             fm,
         });
@@ -253,7 +256,7 @@ function report(m, d) {
     for (const p of over.slice(0, 10)) lines.push(`    ${Math.round(p.bytes / 1024)} KB  ${p.path}`);
     lines.push(`  inline history notes (ratcheted pages): ${hand.filter(historyScoped).reduce((s, p) => s + p.history, 0)}`);
     const hubs = hand.filter((p) => p.hub);
-    lines.push(`  hub headers: ${hubs.filter((p) => p.baseHeader).length} of ${hubs.length} base, ${hubs.filter((p) => p.fullHeader).length} full (D-IR4)`);
+    lines.push(`  hub headers: ${hubs.filter((p) => p.baseHeader).length} of ${hubs.length} base, ${hubs.filter((p) => p.fullHeader).length} full (D-IR4; code optional on layer pages)`);
     lines.push(`  hand-written edition tables outside their homes: ${hand.filter((p) => !EDITION_HOMES.has(p.path)).reduce((s, p) => s + p.editions, 0)}`);
     if (m.ledgerBytes !== null) lines.push(`  board ledger: ${(m.ledgerBytes / 1024).toFixed(1)} KB (cap 60 KB)`);
     lines.push(`  drift list (code changed after verified): ${d.length}`);

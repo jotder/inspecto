@@ -16,7 +16,7 @@
 //   audience  `external` when docs/okf/product/layer/product/handbook.toon lists the page with audience external,
 //             else `internal`.
 //   status    `plan` for a `plan-*` page, else `current`.
-//   verified  `<date of the page's last git commit> last-edit`. ⚠ HONEST, NOT A REVIEW: it records when the page was
+//   verified  `<date of the page's last git commit> last-edit` (today for a page not committed yet). ⚠ HONEST, NOT A REVIEW: it records when the page was
 //             last touched, not that anyone checked its content against the code. A real review replaces the suffix.
 //   code      the repo paths the item's code lives in, derived ONLY from what the Product Map links — never guessed:
 //               module         the directory whose module manifest (…/META-INF/inspecto/module.toon) declares the item's
@@ -194,7 +194,8 @@ function main() {
     const paths = tracked.filter((p) => hubOf(p) && existsSync(join(root, p)));
     const { changes, noCode, noItem } = planFill({
         paths, read: (p) => readFileSync(join(root, p), 'utf8'), items, audiences,
-        lastEdit: (p) => edits.get(p) ?? null, ctx: { manifests, offerings, apps, industryPacks, isTracked }, hub,
+        // A page never committed is being written now: its last edit is today.
+        lastEdit: (p) => edits.get(p) ?? new Date().toISOString().slice(0, 10), ctx: { manifests, offerings, apps, industryPacks, isTracked }, hub,
     });
     for (const c of changes) {
         console.log(`${c.path}: + ${Object.keys(c.add).join(', ')}`);
