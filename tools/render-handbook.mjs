@@ -49,7 +49,9 @@ export function loadManifest(text) {
             tracks: Array.isArray(p.tracks) ? p.tracks : p.tracks ? [p.tracks] : [], audience: p.audience,
         })),
     }));
-    return { title: t.handbook.title || 'Handbook', chapters };
+    const pub = t.handbook.publish || {};
+    const target = (v) => (v && v !== 'none' ? String(v) : null);
+    return { title: t.handbook.title || 'Handbook', chapters, publish: { external: target(pub.external), internal: target(pub.internal) } };
 }
 
 export const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -259,13 +261,19 @@ function main() {
     if (!existsSync(MANIFEST)) { console.error(`✗ render-handbook: ${MANIFEST} not found — run from the repository root`); process.exit(2); }
     const internal = args.includes('--internal');
     const book = loadManifest(readFileSync(MANIFEST, 'utf8'));
-    const { files, pages } = render(book, (f) => readFileSync(f, 'utf8'), { internal });
+    const { files, pages } = writeRender(out, book, (f) => readFileSync(f, 'utf8'), { internal });
+    console.log(`render-handbook: ${internal ? 'INTERNAL' : 'external'} render, ${pages.length} page(s), ${files.size} file(s) → ${out}`);
+}
+
+/** Render into `out`; a folder this tool wrote before (its `.handbook` marker) loses its old pages first. */
+export function writeRender(out, book, read, { internal = false } = {}) {
+    const result = render(book, read, { internal });
     mkdirSync(out, { recursive: true });
     const marker = path.join(out, '.handbook');
     if (existsSync(marker)) for (const f of readdirSync(out)) if (/\.(html|json)$/.test(f)) rmSync(path.join(out, f));
     writeFileSync(marker, internal ? 'internal\n' : 'external\n');
-    for (const [name, text] of files) writeFileSync(path.join(out, name), text);
-    console.log(`render-handbook: ${internal ? 'INTERNAL' : 'external'} render, ${pages.length} page(s), ${files.size} file(s) → ${out}`);
+    for (const [name, text] of result.files) writeFileSync(path.join(out, name), text);
+    return result;
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();

@@ -36,6 +36,8 @@ zero questions.
    `docs/archived-documents/backlog-ledger-<year>.md`), then `node tools/docs-health.mjs` and name any page on its
    drift list or newly over 40 KB in the hand-off. If this shift shrank docs debt, lock it in with
    `node tools/docs-health.mjs --baseline-write` in the same commit.
+   **Handbook renders (`USER-HANDBOOK-1`):** run `node tools/publish-handbook.mjs` — it rebuilds the external and
+   internal Handbook into `target/handbook/` and publishes to any place set in `handbook.toon` (`handbook.publish`).
    **Shift audit (root `CLAUDE.md`, "origin/master is the only line"):** `git worktree list` must show the
    shared checkout plus lanes listed in `SESSION_STATUS.local.md` only, and `git branch` must show `master` only.
    Anything else pushed → remove it (`git cherry origin/master <branch>` first, bundle what differs into

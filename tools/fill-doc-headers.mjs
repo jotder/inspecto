@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // fill-doc-headers — add the missing D-IR4 header fields to hand-written hub pages that already carry the base header
-// (INFO-RESTRUCTURE-1 wave W4, docs/superpower/2026-11-19-information-restructure-and-maintenance-plan.md §2.4, D-IR4).
+// (INFO-RESTRUCTURE-1 wave W4, docs/okf/product/layer/platform/spec-docs-maintenance.md, D-IR4).
 //
 //   node tools/fill-doc-headers.mjs [--write] [--hub <kind/name>]
 //
