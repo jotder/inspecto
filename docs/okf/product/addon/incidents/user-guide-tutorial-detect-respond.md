@@ -19,7 +19,7 @@ approves.
 ## Before you start
 
 - **Edition:** Standard, Advanced or Preview — Reconciliation, Incidents and Cases start in Standard.
-- **Who:** the builder who created the Space. Step 5 changes the Case workflow, which needs an administrator.
+- **Who:** the builder who created the Space. Step 4 changes the Case workflow, which needs an administrator.
 - **What you need:** the `order-to-cash` Space, with the **o2c_open_items** Job run once
   ([Tutorial 2](../../module/elt/user-guide-tutorial-pipeline-expectations.md), step 4).
 

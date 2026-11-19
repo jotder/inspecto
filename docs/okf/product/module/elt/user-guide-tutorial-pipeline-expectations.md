@@ -43,7 +43,7 @@ missing.
 
 So the files were well-formed — every row had the right columns and types. That does not make the data right: a
 payment of -240 is a perfectly well-formed number. Catching that is the job of Expectations, which read the data that
-landed and count the records that break a rule.
+landed and count the records that break what they state.
 
 ```check
 GET /spaces/{space}/runs/payments/files
