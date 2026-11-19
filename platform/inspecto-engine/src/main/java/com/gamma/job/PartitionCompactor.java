@@ -46,7 +46,7 @@ import java.util.stream.Stream;
  * rather than duplicate. That registry is <b>on by default since 2026-08-10</b> (addressing D1) — this bug is
  * why it was flipped. Where it is explicitly disabled ({@code -Dconsignment.outputs.backend=none}) nothing is
  * decidable and {@code min_age_days} beyond the operational reprocess horizon remains the only mitigation.
- * Recorded in {@code docs/REQUIREMENTS.md} (PIP-7) and the job-library example.
+ * Recorded in {@code docs/okf/product/layer/platform/spec-requirements.md} (PIP-7) and the job-library example.
  */
 final class PartitionCompactor {
 

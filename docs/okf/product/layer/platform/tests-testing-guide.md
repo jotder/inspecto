@@ -66,4 +66,4 @@ Recipe (agents: `SMOKE` invokes `.claude/skills/smoke/`):
 
 Open items go to [`BACKLOG.md`](../../../../BACKLOG.md) (one line + pointer to detail); cross-cutting
 gotchas worth keeping go to the OKF bundle ([`okf/`](../../index.md)) or
-[`PROJECT_NOTES.md`](../../../../PROJECT_NOTES.md). Update at the shift handoff, not in a side channel.
+team memory (`.claude/memory/`). Update at the shift handoff, not in a side channel.

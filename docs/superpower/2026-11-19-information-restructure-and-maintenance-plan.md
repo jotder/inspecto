@@ -80,19 +80,19 @@ The tiers do not change. The entrances do (the companion plan builds them):
 | `BACKLOG.md` | 574 KB | keep; ledger rolled to the archive (keeps 3 days); rows cut to a short summary with the narrative moved into the hub | W1, W3 |
 | `INDEX.md` | 110 KB | keep; archived-plans table moved to the archive's front page; header made current; the hub map generated | W1, W3 |
 | `GLOSSARY.md` | 178 KB | keep (binding); finished rows of the §13 rename map move to the archive | W3 |
-| `PROJECT_NOTES.md` | 176 KB | split: gotchas → `.claude/memory/` or hub pages, decisions → hub specs, its map → `INDEX.md`; then archive (D-IR5) | W3 |
+| `PROJECT_NOTES.md` | 176 KB | split: gotchas → `.claude/memory/` or hub pages, decisions → hub specs, its map → `INDEX.md`; then archive (D-IR5) — **done** (§6.2) | W3 |
 | `USER_GUIDE.md` | 51 KB | keep → the Handbook's screen reference | companion |
 | `ADVANCED_GUIDE.md` | 41 KB | keep → the Handbook's operator track | companion |
-| `FEATURE_INVENTORY.md` | 30 KB | generate from the hubs' feature pages and the examples, or move into the platform hub (D-IR6) | W3 |
-| `REQUIREMENTS.md` | 26 KB | generate the MoSCoW roll-up from hub specs and the Product Map, or archive (D-IR6) | W3 |
+| `FEATURE_INVENTORY.md` | 30 KB | moved into the platform hub as `layer/platform/features-feature-inventory.md` (D-IR6) — **done** | W3 |
+| `REQUIREMENTS.md` | 26 KB | moved into the platform hub as `layer/platform/spec-requirements.md` (D-IR6) — **done** | W3 |
 | `BRANCHING.md`, `EDITIONS.md` | 15 KB, 12 KB | keep; `EDITIONS.md`'s matrix generated from the offerings | W3 |
 | `Inspecto Backlog Board.md` | 3 KB | archive | W1 |
 
 **Elsewhere:** `.claude/` stays the agent layer — `CLAUDE.md` (14 KB, always loaded), team memory, skills, and the
-three locator maps, which stay thin and point into the hubs. Code-adjacent READMEs (1 in `features/`, 3 in
-`providers/`, 5 in `tools/`, a few more) become short pointers to their hub. The other Markdown beside the code stays
+three locator maps, which stay thin and point into the hubs. Code-adjacent READMEs (3 in `providers/`, 5 in
+`tools/`, a few more) become short pointers to their hub. The other Markdown beside the code stays
 where it is but is reviewed in W3: 14 decision records and plans of `features/inspecto-agent` (candidates to fold
-into the agent hub) and 2 runtime prompt files under `features/inspecto-intelligence/src/main/resources/prompts/`,
+into the agent hub; the one `features/` README, `docs/adr/README.md`, is one of the 14) and 2 runtime prompt files under `features/inspecto-intelligence/src/main/resources/prompts/`,
 which are product resources, not docs, and are never cut. Space Template docs (40 under `spaces/_templates/`, plus
 `spaces/demo/config/README.md`) stay with their template: they ship with it.
 
@@ -145,7 +145,7 @@ The rules an agent must follow stay in `CLAUDE.md` and team memory, both small a
 |---|---|---|
 | **W1** | **Mechanical, lossless — done 2026-11-19:** the board ledger rolled to `archived-documents/backlog-ledger-2026.md`, keeping 3 days (570 entries moved, 28 kept; `BACKLOG.md` 577 → 280 KB); the archived-plans table moved from `INDEX.md` to the archive's front page, `archived-documents/README.md`, with 475 links re-pointed (`INDEX.md` 111 → 23 KB); `INDEX.md`'s header made current, its former note kept beside the table; the stray board archived as `archived-documents/backlog-board-2026-10-18.md` | a day |
 | **W2** | **Guards and header — done 2026-11-19 (§6.1):** the header schema and its check; the size, history-note, header, edition-table and ledger ratchets; `tools/docs-health.mjs`; the ledger-roll tool the `handoff` skill runs; the link guard extended to `archived-documents/README.md`. The audience check waits for the Handbook manifest (`USER-HANDBOOK-1` P1) | done in a day |
-| **W3** | **Judgment work:** board rows cut to a short summary with their narratives moved into hubs (22 rows run past 2,000 characters); `PROJECT_NOTES.md` split; `REQUIREMENTS.md` and `FEATURE_INVENTORY.md` generated or folded; the 46 oversize pages split, largest first (`tools/docs-relocate.mjs` re-points links); history notes moved out page by page; code-adjacent READMEs cut to pointers; the §13 rename map's finished rows archived | 2–3 weeks; mostly mechanical, suited to low-effort agents with spot checks |
+| **W3** | **Judgment work** (root canon and READMEs **done 2026-11-19**, §6.2)**:** board rows cut to a short summary with their narratives moved into hubs (22 rows run past 2,000 characters); `PROJECT_NOTES.md` split; `REQUIREMENTS.md` and `FEATURE_INVENTORY.md` generated or folded; the 46 oversize pages split, largest first (`tools/docs-relocate.mjs` re-points links); history notes moved out page by page; code-adjacent READMEs cut to pointers; the §13 rename map's finished rows archived | 2–3 weeks; mostly mechanical, suited to low-effort agents with spot checks |
 | **W4** | **Joined with the Handbook's P1 inventory:** one pass over the 858 hub pages fills each header (type, audience, track, `code`) — the same pass the Handbook needs | inside the Handbook's P1 |
 
 ### 6.1 W2 as built (2026-11-19)
@@ -178,6 +178,36 @@ The rules an agent must follow stay in `CLAUDE.md` and team memory, both small a
   `handoff` skill rolls the ledger and reads the report; `.claude/memory/doc-guard-traps.md` tells the next author what
   to do when the ratchet fails.
 
+### 6.2 W3 root canon and READMEs as built (2026-11-19)
+
+- **`PROJECT_NOTES.md` (D-IR5)** split verbatim, relative links re-pointed, archived as
+  `archived-documents/project-notes-2026-11-19.md`, whose header maps each part to its home. §1 → a section of
+  `layer/platform/architecture-modules.md`; §2 (topic map) and §7 (related sandboxes) → the end of `INDEX.md`; §3 →
+  `layer/platform/spec-platform-decisions.md` (multi-space → `layer/product/spec-multi-space.md`); §4's 161 gotchas by
+  topic → `layer/platform/` `spec-shared-checkout-gotchas.md`, `tests-build-verdict-gotchas.md`,
+  `tests-guards-and-claims-gotchas.md`, `spec-shell-editing-gotchas.md`, `architecture-backend-gotchas.md`;
+  `module/engine/spec-engine-gotchas.md`; `module/config/spec-config-gotchas.md`; UI ones with §6 →
+  `layer/product/architecture-ui-conventions.md`; §5 → `module/engine/spec-engine-seams.md`; DATA-GOV-1 →
+  `module/asn-decoders/spec-asn-decoders.md`. Hub pages rather than one memory file per gotcha: the team-memory
+  lessons already hold the distilled rule, so each matching lesson now ends with a pointer to its long form.
+  Losslessness: every one of the file's 360 content blocks is found, whitespace- and link-normalised, in a current
+  doc; only its preamble, archive header and seven numbered section headings are not.
+- **`REQUIREMENTS.md`, `FEATURE_INVENTORY.md` (D-IR6)** moved with `tools/docs-relocate.mjs`, frontmatter added.
+  `tools/render-feature-db.mjs` keys inventory rows on a link into a module hub, which now reads `../../module/<id>/`;
+  its pattern takes both forms, and every generated `feature-db.md` is identical but for the inventory's path.
+- **Code-adjacent READMEs** cut to a pointer, content moved verbatim: `providers/asn-parser/asn-decoders/README.md` →
+  `module/asn-decoders/architecture-decoder-modules.md`; `providers/asn-parser/corpus{,-synthetic}/README.md` →
+  `module/asn-decoders/tests-corpus.md`; `dev-infra/README.md` → `layer/platform/tests-dev-infra.md`;
+  `product-map/README.md` → a section of `layer/platform/spec-product-map.md`; `inspecto-ui/README.md` → a section of
+  `layer/product/architecture-ui-conventions.md`. **Kept, by design:** the 5 `tools/templates/*/README.md` are scaffold
+  output (`{{placeholders}}`, emitted by `tools/scaffold.mjs`), not docs; `inspecto/README.md` becomes the bundle's
+  root page and `inspecto/examples/README.md` ships with the examples; `inspecto-ui/docs/README.md` was already a
+  pointer; the repo root `README.md` is the engineering front door; test-resource READMEs are fixtures. **The 14
+  `features/inspecto-agent` records stay** — the agent hub's `spec-adr-log.md` logs eoiagent's ADRs, a different
+  set, so none is duplicated: `docs/AGENT_ARCHITECTURE.md`, `docs/AGENT_KERNEL_K0_K1_PLAN.md`,
+  `docs/AGENT_KERNEL_U0_U1_PLAN.md`, `docs/AGENT_KERNEL_R1_PLAN.md`, `docs/adr/README.md` and `docs/adr/adr-0001`…`adr-0009`.
+  `providers/asn-parser/docs/*.md` (7 design notes, not READMEs) were not in scope.
+
 ## 7. Decisions
 
 | # | Question | State |
@@ -186,8 +216,8 @@ The rules an agent must follow stay in `CLAUDE.md` and team memory, both small a
 | **D-IR2** | Board ledger retention | **approved** — the board keeps 3 days; older entries roll verbatim to a yearly archive file |
 | **D-IR3** | Home of the archived-plans table | **approved** — `archived-documents/README.md`, the archive's front page |
 | **D-IR4** | Page header fields | **approved** — as §2.4 |
-| **D-IR5** | `PROJECT_NOTES.md` | recommended: split as §3, then archive — confirmed when W3 starts |
-| **D-IR6** | `REQUIREMENTS.md`, `FEATURE_INVENTORY.md` | **open** — generate from the hubs, or fold into the platform hub |
+| **D-IR5** | `PROJECT_NOTES.md` | **signed 2026-11-19** (operator: "continue with your recommendation") — split as §3, then archive. Done in W3 |
+| **D-IR6** | `REQUIREMENTS.md`, `FEATURE_INVENTORY.md` | **signed 2026-11-19** (operator: "continue with your recommendation") — fold into the platform hub as hub pages, content kept, links re-pointed; no generators. Done in W3 |
 | **D-IR7** | Which history stays inline | **approved** — deliberate lesson logs only (the competitive landscape's corrections log) |
 
 ## 8. Risks

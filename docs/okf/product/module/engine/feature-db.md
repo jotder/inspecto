@@ -9,7 +9,7 @@ tags: [feature-db, module]
 # Execution engine — feature database (`module.engine`)
 
 > **Generated** by `tools/render-feature-db.mjs` from the module manifests, `offerings/*.toon`, the processor catalog
-> contract and `docs/FEATURE_INVENTORY.md` — never edit this table; change its sources and re-run the tool. The whole
+> contract and `docs/okf/product/layer/platform/features-feature-inventory.md` — never edit this table; change its sources and re-run the tool. The whole
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
@@ -17,16 +17,16 @@ tags: [feature-db, module]
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
-| `sink.persistent` | inventory | engine | basic;standard;advanced;preview |  | ga | `store: events` | `docs/FEATURE_INVENTORY.md §1G` |
-| `transform.dedup` | inventory | engine | basic;standard;advanced;preview |  | ga | `key: [call_id]` | `docs/FEATURE_INVENTORY.md §1G` |
-| `transform.derive` | inventory | engine | basic;standard;advanced;preview |  | ga | `fields: [{name,type:EXPR,expr}]` | `docs/FEATURE_INVENTORY.md §1G` |
-| `transform.filter` | inventory | engine | basic;standard;advanced;preview |  | ga | `- { id: keep, type: transform.filter, where: "amount > 0" }` | `docs/FEATURE_INVENTORY.md §1G` |
-| `transform.merge` (fan-in) | inventory | engine | basic;standard;advanced;preview |  | ga | `inputs: [a,b]` / `sql: "SELECT … JOIN … USING(id)"` | `docs/FEATURE_INVENTORY.md §1G` |
-| `transform.route` (case / clone) | inventory | engine | basic;standard;advanced;preview |  | ga | `mode: case` (exclusive) or `mode: clone` (fan-out); `routes: [{rel,where},{rel,default:true}]` | `docs/FEATURE_INVENTORY.md §1G` |
-| `transform.select` | inventory | engine | basic;standard;advanced;preview |  | ga | `columns: [a,b,c]` | `docs/FEATURE_INVENTORY.md §1G` |
-| `transform.split` | inventory | engine | basic;standard;advanced;preview |  | ga | `UNNEST` | `docs/FEATURE_INVENTORY.md §1G` |
-| `transform.validate` | inventory | engine | basic;standard;advanced;preview |  | ga | `check: "amount > 0"` → `valid` + `invalid` edges | `docs/FEATURE_INVENTORY.md §1G` |
-| Fixed-length binary (`record: bytes`) | inventory | engine | basic;standard;advanced;preview |  | live | `processing:` / `  ingester: …FixedWidthRecordIngester` / `  ingester_config: { record_length: 256 }` | `docs/FEATURE_INVENTORY.md §1B` |
+| `sink.persistent` | inventory | engine | basic;standard;advanced;preview |  | ga | `store: events` | `docs/okf/product/layer/platform/features-feature-inventory.md §1G` |
+| `transform.dedup` | inventory | engine | basic;standard;advanced;preview |  | ga | `key: [call_id]` | `docs/okf/product/layer/platform/features-feature-inventory.md §1G` |
+| `transform.derive` | inventory | engine | basic;standard;advanced;preview |  | ga | `fields: [{name,type:EXPR,expr}]` | `docs/okf/product/layer/platform/features-feature-inventory.md §1G` |
+| `transform.filter` | inventory | engine | basic;standard;advanced;preview |  | ga | `- { id: keep, type: transform.filter, where: "amount > 0" }` | `docs/okf/product/layer/platform/features-feature-inventory.md §1G` |
+| `transform.merge` (fan-in) | inventory | engine | basic;standard;advanced;preview |  | ga | `inputs: [a,b]` / `sql: "SELECT … JOIN … USING(id)"` | `docs/okf/product/layer/platform/features-feature-inventory.md §1G` |
+| `transform.route` (case / clone) | inventory | engine | basic;standard;advanced;preview |  | ga | `mode: case` (exclusive) or `mode: clone` (fan-out); `routes: [{rel,where},{rel,default:true}]` | `docs/okf/product/layer/platform/features-feature-inventory.md §1G` |
+| `transform.select` | inventory | engine | basic;standard;advanced;preview |  | ga | `columns: [a,b,c]` | `docs/okf/product/layer/platform/features-feature-inventory.md §1G` |
+| `transform.split` | inventory | engine | basic;standard;advanced;preview |  | ga | `UNNEST` | `docs/okf/product/layer/platform/features-feature-inventory.md §1G` |
+| `transform.validate` | inventory | engine | basic;standard;advanced;preview |  | ga | `check: "amount > 0"` → `valid` + `invalid` edges | `docs/okf/product/layer/platform/features-feature-inventory.md §1G` |
+| Fixed-length binary (`record: bytes`) | inventory | engine | basic;standard;advanced;preview |  | live | `processing:` / `  ingester: …FixedWidthRecordIngester` / `  ingester_config: { record_length: 256 }` | `docs/okf/product/layer/platform/features-feature-inventory.md §1B` |
 | Alert rule dispatcher | processor | engine | basic;standard;advanced;preview |  | partial | `control.alert.dispatch` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | Apache Avro binary decoder | processor | engine | basic;standard;advanced;preview |  | planned | `parser.binary.avro` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | Apache Iceberg append / upsert sink | processor | engine | basic;standard;advanced;preview |  | planned | `sink.lake.iceberg` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |

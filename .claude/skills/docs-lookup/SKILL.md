@@ -54,7 +54,7 @@ live in its `product/<id>` hub). All hubs are listed in `docs/okf/product/index.
 ## Root canon (outside the hubs)
 
 `docs/GLOSSARY.md` (binding vocabulary — check before naming anything) · `docs/INDEX.md` (map) ·
-`docs/BACKLOG.md` (open work) · `docs/REQUIREMENTS.md` · `docs/EDITIONS.md` · `docs/USER_GUIDE.md` ·
+`docs/BACKLOG.md` (open work) · `docs/okf/product/layer/platform/spec-requirements.md` · `docs/EDITIONS.md` · `docs/USER_GUIDE.md` ·
 `docs/api/` (HTTP contract) · `docs/superpower/` (in-flight plans only).
 
 ## Don't

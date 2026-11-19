@@ -52,7 +52,7 @@ test('only §1 inventory rows linking a module hub are taken; the [LIVE] tag is 
     const rs = rows(files(), world()).filter((r) => r.type === 'inventory');
     assert.equal(rs.length, 1);
     assert.equal(rs[0].status, 'live');
-    assert.equal(rs[0].source, 'docs/FEATURE_INVENTORY.md §1A');
+    assert.equal(rs[0].source, 'docs/okf/product/layer/platform/features-feature-inventory.md §1A');
 });
 test('hubs: a module item gets its rows, an add-on item its modules\' rows, an edition none', () => {
     const w = world(), rs = rows(files(), w), h = hubs(files(), w, rs);

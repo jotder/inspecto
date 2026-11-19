@@ -9,7 +9,7 @@ timestamp: 2026-10-19T00:00:00Z
 # Event model and log — plan
 
 The capability-level requirement of record for events, the signal ledger and the audit trail is the
-`OPS` area ([`REQUIREMENTS.md`](../../../../REQUIREMENTS.md) §3.7, `OPS-1` … `OPS-6`), whose
+`OPS` area ([`REQUIREMENTS.md`](../../layer/platform/spec-requirements.md) §3.7, `OPS-1` … `OPS-6`), whose
 authoritative file is the [observability plan](../observability/plan-observability.md). This page
 records what falls to the `inspecto-event` module.
 
@@ -19,7 +19,7 @@ records what falls to the `inspecto-event` module.
   feature; only reading the feed back over HTTP is edition-gated (`EDG-01` cell 6, 2026-09-08, see
   [`spec-editions.md`](../../layer/platform/spec-editions.md) *Audit* and `CP-13`).
 - **A tamper-evident audit chain** — `ASSURE-AUDIT-CHAIN-1` (shipped 2026-09-27) and its residuals
-  `ASSURE-AUDIT-CHAIN-RESIDUALS-1` ([REQUIREMENTS](../../../../REQUIREMENTS.md)).
+  `ASSURE-AUDIT-CHAIN-RESIDUALS-1` ([REQUIREMENTS](../../layer/platform/spec-requirements.md)).
 - **Durable events** — a configured durable backend must not silently lose the trail on restart
   (`EVENTS-DURABLE-1`, cited in `ServiceStores`): a failed open is reported as a degraded store.
 - **Secrets never reach the log** (`SecretScrubber`) and audit rows are masked on read for a caller
@@ -43,6 +43,6 @@ records what falls to the `inspecto-event` module.
 ## Refused or deferred
 
 - **Per-record lineage / replay** (`OPS-6`) — per-batch ancestry is the accepted grain
-  ([REQUIREMENTS](../../../../REQUIREMENTS.md)).
+  ([REQUIREMENTS](../../layer/platform/spec-requirements.md)).
 - Multi-writer audit chains: one chain writer per directory or database; a second writer is refused
   rather than merged.

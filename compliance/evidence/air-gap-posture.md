@@ -4,7 +4,7 @@
 2026-08-30. The posture is a genuine differentiator — but it is a **packaging** guarantee, not a
 runtime network control, and the difference is the whole substance of the claim.
 
-**Requirement:** `docs/REQUIREMENTS.md:262` — *NFR-4 Air-gap operation: "Full function without egress;
+**Requirement:** `docs/okf/product/layer/platform/spec-requirements.md:262` — *NFR-4 Air-gap operation: "Full function without egress;
 hosted-AI SDKs physically absent; offline basemap/geocoder"* (SHIPPED).
 
 ---

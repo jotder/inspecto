@@ -16,7 +16,7 @@ Inspecto — Java 27 build (`release=27`), Maven reactor `inspecto-parent`. UI i
 `C:\maven\apache-maven-3.9.16\bin\mvn.cmd`. **Always build offline (`-o`).**
 
 > Durable project knowledge (module map, gotchas, engine seams & perf, decisions):
-> [docs/PROJECT_NOTES.md](../../../docs/PROJECT_NOTES.md).
+> the `layer/platform` hub — [build verdicts](../../../docs/okf/product/layer/platform/tests-build-verdict-gotchas.md), [module map](../../../docs/okf/product/layer/platform/architecture-modules.md), [decisions](../../../docs/okf/product/layer/platform/spec-platform-decisions.md); engine seams in [module/engine](../../../docs/okf/product/module/engine/spec-engine-seams.md).
 
 ## Verify (authoritative — the source of truth)
 

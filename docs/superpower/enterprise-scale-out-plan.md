@@ -44,7 +44,7 @@
 > [`archived-documents/plans-archive/postgres-multi-user-plan.md`](../archived-documents/plans-archive/postgres-multi-user-plan.md)
 > §5–6 (the connection pool this plan un-parks) ·
 > [`archived-documents/plans-archive/deployment-topology-plan.md`](../archived-documents/plans-archive/deployment-topology-plan.md)
-> §10 (D1–D8 as signed) · [`REQUIREMENTS.md`](../REQUIREMENTS.md) (`NFR-8`).
+> §10 (D1–D8 as signed) · [`REQUIREMENTS.md`](../okf/product/layer/platform/spec-requirements.md) (`NFR-8`).
 
 **Coverage map:** what changes and why §1 · what it amends §2 · the seams, grounded §3 · the scaling
 model §4 · the four workstreams §5 · sequencing §6 · the first test §7 · risks §8 · decisions asked §9 ·

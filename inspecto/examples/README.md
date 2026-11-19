@@ -156,7 +156,7 @@ sentinel — the engine skips marker writes in this mode, so a `markers:` dir is
 examples omit it for clarity.
 
 More config shapes are in
-[`../../docs/FEATURE_INVENTORY.md`](../../docs/FEATURE_INVENTORY.md) §I; jobs, authored flows, and
+[`../../docs/okf/product/layer/platform/features-feature-inventory.md`](../../docs/okf/product/layer/platform/features-feature-inventory.md) §I; jobs, authored flows, and
 Stage-2 enrichment serve examples are landing in subsequent batches.
 
 ## Reference templates — `_reference/` (need external infrastructure)

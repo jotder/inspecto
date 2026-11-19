@@ -16,7 +16,7 @@ tags: [product-item, module]
 | Slot | Status | Document |
 |---|---|---|
 | plan | n/a | documented in the ELT hub module/elt plan-elt.md (part EXE), merged 2026-11-18 (DOCS-ELT-CONSOLIDATE-1) |
-| spec | current | [Database / persistence layer](spec-db-layer.md) · [DuckDB Integration](spec-duckdb.md) |
+| spec | current | [Database / persistence layer](spec-db-layer.md) · [DuckDB Integration](spec-duckdb.md) · [Engine - gotchas](spec-engine-gotchas.md) · [Engine seams and performance](spec-engine-seams.md) |
 | architecture | n/a | documented in the ELT hub module/elt architecture-elt.md (Execution engine internals, sections E1-E7), merged 2026-11-18 |
 | features | n/a | documented in the ELT hub module/elt features-elt.md (Execution engine), merged 2026-11-18 |
 | feature-db | current | [Execution engine — feature database](feature-db.md) |

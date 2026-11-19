@@ -19,9 +19,9 @@ corpus. Design of record: `providers/asn-parser/docs/REDESIGN.md`.
 
 - Phases 0-2 of the redesign: `asn-core`, `asn-schema`, `asn-plugin-api`, `asn-transform`,
   `asn-plugin-vendors`, `asn-facade`, the `legacy-code` harness and the `asn-golden` parity check
-  (`providers/asn-parser/asn-decoders/README.md`).
+  ([architecture-decoder-modules.md](architecture-decoder-modules.md)).
 - Parity on the golden corpus: structural parity on 16/16 data files, content parity 1.0 on 10/16
-  (`providers/asn-parser/asn-decoders/README.md`, `providers/asn-parser/docs/MIGRATION_STATUS.md`).
+  ([architecture-decoder-modules.md](architecture-decoder-modules.md), `providers/asn-parser/docs/MIGRATION_STATUS.md`).
 - Consumed by the Inspecto engine through [telecom-asn1](../telecom-asn1/index.md) (MODULE-REORG-1 P7).
 
 ## Left (open)

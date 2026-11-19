@@ -62,7 +62,7 @@ spec files (§3) and the screens in [the user guide](user-guide-elt.md).
 > sections; **execution** — Run, Job, Trigger, Executable — is the `EXE` part. Of the seven rows in
 > `REQUIREMENTS.md` §3.3, **only `PIP-1` is authoring**; `PIP-2` through `PIP-7` are execution's. "Orchestration"
 > is folded into execution; the word is not a glossary term. Where this file disagrees with
-> `docs/REQUIREMENTS.md` or an `docs/EDITIONS.md` row, **this file wins** and the disagreement is stated in place.
+> `docs/okf/product/layer/platform/spec-requirements.md` or an `docs/EDITIONS.md` row, **this file wins** and the disagreement is stated in place.
 
 ## 1. Purpose & scope
 

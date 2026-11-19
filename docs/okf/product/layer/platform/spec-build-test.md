@@ -510,7 +510,7 @@ build fault**. Both editions pass with `-NoRuntime`. Re-prove jlink on a box wit
 | `docs/archived-documents/**` | 181 | withheld tier |
 | `docs/superpower/**` | 13 | withheld tier |
 | `docs/BACKLOG.md` | 22 | withheld audience — **the first count missed these entirely** |
-| `docs/PROJECT_NOTES.md` | 8 | withheld audience — likewise |
+| `docs/archived-documents/project-notes-2026-11-19.md` | 8 | withheld audience — likewise |
 | a repo path that exists but never ships (`inspecto/**` source citations, `compliance/**`) | 66 | **not** caused by the withholding decision |
 | climbs above the bundle root (`examples/README.md` moved up one level) | 4 | caused by step 4b's relocation |
 | **broken in the repository too** | 29 | pre-existing rot, see below |

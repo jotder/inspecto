@@ -11,7 +11,7 @@ supersedes-rows: REQUIREMENTS §3.16 PKG-1 through PKG-4, and EDITIONS OPS-07 (t
 # Editions & packaging (`PKG`)
 
 > **How to read this file.** §1–§2 are the *requirement of record*: where they disagree with
-> `docs/REQUIREMENTS.md` §3.16 or an `docs/EDITIONS.md` row, **this file wins** and the disagreement is
+> `docs/okf/product/layer/platform/spec-requirements.md` §3.16 or an `docs/EDITIONS.md` row, **this file wins** and the disagreement is
 > stated in place. §3 is the as-built specification, §4 the dated decisions, §5 what is not built, §6 what
 > was refused, §7 the pointers, §8 how it is verified.
 >
@@ -80,7 +80,7 @@ The organising rule is one sentence, and it is the most load-bearing sentence in
 
 ## 2. Requirements of record
 
-`docs/REQUIREMENTS.md` §3.16 carried four rows, all marked `SHIPPED`. **Three of the four overstate what
+`docs/okf/product/layer/platform/spec-requirements.md` §3.16 carried four rows, all marked `SHIPPED`. **Three of the four overstate what
 ships**, and the fourth is accurate about the mechanism while its status is contradicted in three other
 files. The corrections below are the requirement of record.
 
@@ -95,7 +95,7 @@ A **duplicate `postgresql` component**, carrying an invalid `bom-ref` / `SPDXID`
 | **§Matrix packaging row** and **§Assembly module list** (`EDITIONS.md`) | Standard = core plus six named modules | ⚠ **Understated, and the two lists are different sixes.** The build stages **eight** optional modules for Standard and nine for Advanced. The prose in `build-run/build-test.md` has the correct set; the two board sites do not (§3.3). |
 
 **On the Edition column.** `docs/EDITIONS.md` is authoritative for which edition carries a feature, and
-`docs/REQUIREMENTS.md` §3 mirrors it — that direction was settled 2026-09-08 and this spec keeps it. For
+`docs/okf/product/layer/platform/spec-requirements.md` §3 mirrors it — that direction was settled 2026-09-08 and this spec keeps it. For
 `PKG` the corrections run the other way from the usual: the register's *edition* column is right, and the
 defect is in its *status* column.
 

@@ -186,7 +186,7 @@ restated, because each needs a status call rather than a doc edit:
 - ✅ **§2 NOW horizon** — *done 2026-11-15*: N1 and N2 now carry the states below (N4 was corrected
   2026-09-09). They had read as of 2026-06-19:
   N1's live end-to-end verification is recorded as **RESOLVED 2026-07-07** in
-  [`../../../../REQUIREMENTS.md`](../../../../REQUIREMENTS.md) §R1 (seeded `type: pipeline` run,
+  [`spec-requirements.md`](spec-requirements.md) §R1 (seeded `type: pipeline` run,
   `examples/06-serve/pipeline-job`), and N4's edition model shipped as real Maven build flavors
   (`-Pedition-standard` / `-Pedition-advanced`). N2 provenance is genuinely still open — it needs a live
   feed (**OPS-5** in [`../../../../BACKLOG.md`](../../../../BACKLOG.md) §2).

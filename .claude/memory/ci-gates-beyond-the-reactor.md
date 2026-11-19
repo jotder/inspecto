@@ -28,3 +28,5 @@ commit. Known reds the reactor cannot show:
   guards again; put `<!-- prettier-ignore -->` on a binding prettier must not split.
 
 Related: [[new-route-checklist]], [[doc-guard-traps]].
+
+Long form, with the original incidents (from the retired `PROJECT_NOTES.md`, 2026-11-19): [tests-guards-and-claims-gotchas.md](../../docs/okf/product/layer/platform/tests-guards-and-claims-gotchas.md).

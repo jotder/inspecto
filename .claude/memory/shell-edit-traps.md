@@ -27,3 +27,5 @@ Default: use the **Edit tool** for text edits (cannot truncate; bad anchor fails
 - A PowerShell `#` comment between backtick continuations breaks the parse.
 
 Related: [[shared-tree-peer-work]].
+
+Long form, with the original incidents (from the retired `PROJECT_NOTES.md`, 2026-11-19): [spec-shell-editing-gotchas.md](../../docs/okf/product/layer/platform/spec-shell-editing-gotchas.md).
