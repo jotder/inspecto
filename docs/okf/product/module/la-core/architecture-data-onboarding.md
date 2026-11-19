@@ -20,6 +20,16 @@ The route family lives in the **core** (every edition, Basic included, not under
 limits and the commit's write order are in
 [`api-onboarding-authoring.md`](../processor/api-onboarding-authoring.md) ("Add data"). What Link Analysis relies on:
 
+- **Where the screen lives (`BASIC-ELT-PROFILE-1` UI-0, 2026-11-19).** The Add data screen, the Dataset card and their
+  models are core UI (`inspecto-ui/src/app/inspecto/add-data/`, `@inspecto/core/add-data/*`), with Column Roles and the
+  Entity Type picker helpers (`@inspecto/core/api/column-roles`, `.../entity-type-options`). Core never imports the
+  library, so the Link Analysis parts enter through one token, `ADD_DATA_LINK_ANALYSIS` (`add-data-link-analysis.ts`):
+  the Space's Entity Types, the `import.*` limits, the link index status and its Rebuild. The library fills it with
+  `provideAddDataLinkAnalysis()` (`link-analysis/add-data-link-analysis.providers.ts`), listed in the `providers` of
+  each page placing Add data or a Dataset card (console `/add-data` and Datasets, la-app `/add-data` and Data), never
+  in a shell's eager providers (the bundle-shape guard). Without it those parts are absent, not failing. Who may add
+  data (`AddDataAccess`) reads `SessionService` directly. *Data status* stays in the library (below).
+
 - **The draft's `entityTypes` block** proposes, per column, the Entity Type of the Space
   (`LinkAnalysisSettings.effectiveEntityTypes()`) from value shapes and names, the link's from / to / kind / time /
   amount / details, the primary Entity Type, and for a Reference the identifying column. Every proposal is
@@ -493,7 +503,7 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   inbox name is Add data's own `add_<stamp>_<name>` (`DatasetArrivals.ADD_DATA_NAME`), shown as `<name>`; else a
   system's. A refused
   waiting file has only its sidecar line (`status: REFUSED`, `reason`, `setAside`) and is merged in by time.
-- **Data status** is one component, `<inspecto-la-data-status>` (`link-analysis/src/add-data/data-status.component.ts`),
+- **Data status** is one component, `<inspecto-la-data-status>` (`link-analysis/src/link-analysis/data-status.component.ts`),
   under the Start box's Dataset picker and above the Rows dock table: *Received · covers · graph up to date / N files
   behind*. A refused arrival is left out. Extension point: `dataStatusLines()` in `add-data.model.ts`.
 - **The Dataset card** (LA-STREAM-FACTS-1, 2026-11-07) says the same facts under their own labels in a `<dl>`:

@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { SpaceGuideState } from '@inspecto/core/onboarding/space-guide';
 import { SpaceGuideService } from '@inspecto/core/onboarding/space-guide.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
-import { AddDataAccess } from '@inspecto/link-analysis/add-data/add-data-access';
+import { AddDataAccess } from '@inspecto/core/add-data/add-data-access';
 import { FirstRun } from './first-run';
 import { NextStepsDialog } from './next-steps.dialog';
 

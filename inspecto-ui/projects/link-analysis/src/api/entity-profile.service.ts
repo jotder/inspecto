@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl, toParams } from '@inspecto/core/api/api-base';
-import type { EntityFamily, RecordTypeGuide } from './entity-type-options';
+import type { EntityFamily, RecordTypeGuide } from '@inspecto/core/api/entity-type-options';
 
 /**
  * The Entity profile reads (la-entity-profile-plan section 4.5, the contract fixed 2026-10-15). Every section carries

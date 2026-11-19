@@ -9,7 +9,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { ToastrService } from 'ngx-toastr';
 import { AlertsService, EventsService, SessionService } from 'app/inspecto/api';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
-import { LA_FEATURES } from '@inspecto/link-analysis/la-host';
 import { Dataset } from './dataset-types';
 import { DatasetsService } from './datasets.service';
 import { DatasetsComponent } from './datasets.component';
@@ -84,19 +83,6 @@ function create(
                     opsEnabled: () => false,
                     edition: () => 'basic',
                     features: signal(features),
-                    featureReasons: signal(reasons),
-                },
-            },
-            {
-                provide: LA_FEATURES,
-                useValue: {
-                    ops: signal(false),
-                    exchange: signal(false),
-                    geoLink: signal(true),
-                    investigations: signal(false),
-                    signIn: signal(false),
-                    edition: signal('basic'),
-                    flags: signal(features),
                     featureReasons: signal(reasons),
                 },
             },

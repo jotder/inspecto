@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Router, provideRouter } from '@angular/router';
 import { describe, expect, it, vi } from 'vitest';
-import { AddDataAccess } from '@inspecto/link-analysis/add-data/add-data-access';
+import { AddDataAccess } from '@inspecto/core/add-data/add-data-access';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { ADD_DATA_ROUTE, AddDataDropComponent, AddDataHandoff } from './add-data-drop.component';
 

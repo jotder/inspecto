@@ -25,7 +25,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **88<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 13<!--count:backlog-p2--> × P2 · 75<!--count:backlog-p3--> × P3** —
+> **89<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 14<!--count:backlog-p2--> × P2 · 75<!--count:backlog-p3--> × P3** —
+> ⬆ **88 → 89 (P2 13 → 14) on 2026-11-19**: filed P2 feature `BASIC-ELT-PROFILE-1` [items: module.elt, module.processor, layer.product, edition.basic · kind: feature] — the operator asked that Basic onboarding be a subset of ELT that reuses its backend and frontend components; plan `superpower/2026-11-19-basic-elt-profile-plan.md`.
 > ⬇ **90 → 88 (P3 77 → 75) on 2026-11-18**: closed P3 features `SPACE-LOCATIONS-1` [items: module.config · kind: feature] and `SPACE-LOCATIONS-UI-1` [items: module.config · kind: feature] — shipped: launch setting `spaces.allowed.roots` (fail closed), folder checks, attach / detach of a Space folder, *Change data folder* for a Space that holds no data, create into chosen folders, and the Settings ▸ Spaces screens, driven live; moving data a Space already holds stays `SPACE-ROOTED-DATA-ROOT-MIGRATION-1`. Plan archived: `archived-documents/plans-archive/2026-11-18-space-locations-plan.md`.
 > ⬆ **88 → 90 (P3 75 → 77) on 2026-11-18**: filed P3 features `SPACE-LOCATIONS-1` [items: module.config · kind: feature] and `SPACE-LOCATIONS-UI-1` [items: module.config · kind: feature] — the operator asked to pre-create a Space folder and a data folder and wire them to a running server without hand edits or a restart (plan `archived-documents/plans-archive/2026-11-18-space-locations-plan.md`).
 > ⬆ **87 → 88 (P2 12 → 13) on 2026-11-18**: filed P2 feature `BI-INSIGHTS-1` [items: module.engine, module.analytics, layer.product · kind: feature] — advanced insights on business data in Widgets and Dashboards, authored and tuned as Insight Profiles; design approved the same day (D-BI1…D-BI3 signed: names, a new `features/inspecto-insights` add-on, edition placement), slices P0…P5, P0 startable. Plan `superpower/2026-11-18-business-insights-plan.md`; the five new terms are in `GLOSSARY.md` §7.
@@ -642,11 +643,11 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > ⬇ 57 → 56 in this consolidation: `RTDMS-ASN-HARNESS-1` had closed on 2026-09-17 (verdict (c), kept
 > verbatim with a javadoc) and was still ranked; its tree-wide residual already lived in
 > `LEGACY-ASN-SRC-TREE-UNBUILT-1`, which now carries it. No other rank changed.
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 75<!--count:backlog-p3--> P3 rows are mostly a list of things
-> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 13<!--count:backlog-p2--> P2 rows as the owed number** —
+> ⚠ **Report the 0<!--count:backlog-p1--> P1 + 14<!--count:backlog-p2--> P2 rows as the owed number** —
 > §0 defines P3 as demand-gated, so those 75<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 88<!--count:backlog-rows--> as pending work overstates it.
+> deliberately NOT being built, and reading all 89<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -805,6 +806,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Onboarding & bundles
 
+- **P2** · `BASIC-ELT-PROFILE-1` — **Basic onboarding as a locked profile of ELT: one implementation, Basic = options locked.** Basic already runs a registered Pipeline, but a parallel layer of about 6,700 backend lines (own 30 s poller, own follow-on seam, arrival rules, sniff and Postgres path in `inspecto/.../control/`) and about 9,400 UI lines in the LA project duplicate ELT parts. Phases: P0 verify (backend, UI), UI-0 move Add data to the core library, UI-1 reuse the schema / connection / grammar / Collector components, BE-1 poller and follow-on, BE-2 arrival rules as engine Pipeline options, BE-3 sniff, BE-4 Postgres as a connector scheme, then the Edition gate. → `superpower/2026-11-19-basic-elt-profile-plan.md` [items: module.elt, module.processor, layer.product, edition.basic · kind: feature]
 
 #### Datasets & lineage
 

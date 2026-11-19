@@ -1,6 +1,6 @@
 # Inspecto — Competitive Capability Matrix
 
-> Audience: product owner and market/sales · Status date: **2026-10-07**, Inspecto column refreshed **2026-11-12** · Companion to
+> Audience: product owner and market/sales · Status date: **2026-10-07**, Inspecto column refreshed **2026-11-19** · Companion to
 > [`brochure-competitive-landscape.md`](brochure-competitive-landscape.md) (the living two-sided landscape) and to the offering map
 > in [`../platform/spec-module-reorg-decisions.md`](../platform/spec-module-reorg-decisions.md) (offering map)
 > (where every Inspecto gap below is filed as a module or pack).
@@ -38,7 +38,7 @@ backlog row that would.
 | F | Signalling detection (SS7 / Diameter / SIP, probes, firewalls) | Y | P | Y | P | P | N | **N** | out of scope (network probes) |
 | G | Test call generation | Y | Y | Y | N | N | Y | **N** | out of scope (hardware / service) |
 | H | Interconnect / wholesale fraud (Wangiri, IRSF, flash calls, CLI) | Y | Y | Y | Y | P | Y | **P** | IRSF and Wangiri per-subscriber windows (`fraud_irsf`, `fraud_wangiri` Alert Rules) plus recharge, data-bypass and internal fraud typologies in `telco-fraud`; destination-risk, trunk roll-ups and flash-call / CLI patterns not built · `PACK-IRSF-WANGIRI-1` |
-| I | Real-time / pre-call blocking | Y | P | Y | Y | N | N | **N** | the windowed Alert Rule and the `sequence` / `absence` Patterns are built (PA-9b, PA-9c) but not yet evaluated on each stream commit; inline allow / block is a separate row · `REALTIME-DECISIONING-1`, `REALTIME-INLINE-DECISION-1` |
+| I | Real-time / pre-call blocking | Y | P | Y | Y | N | N | **P** | Real-time Detection add-on (Standard, built 2026-11-12): windowed Alert Rules and `sequence` / `absence` Patterns evaluated on each commit of a stream Pipeline, p95 2.4 s at 5,000 events/s in the harness and 1.9 s on a real broker; detection only — inline allow / block before a record is accepted (card authorisation, pre-call blocking) is not built · `REALTIME-DECISIONING-1` (PA-9d done), `REALTIME-INLINE-DECISION-1` |
 | J | Entity risk scoring | Y | P | Y | Y | N | N | **Y** | Scoring & Lists add-on |
 | K | Watch / deny lists | Y | P | P | Y | N | N | **Y** | Scoring & Lists (Entity Lists) |
 | L | Explainable ML anomaly detection | Y | Y | Y | Y | P | P | **Y** | Anomaly Detection add-on (shipped 2026-10-10): per-entity robust baselines with seasonality and peer groups, 0–100 score with a per-feature explanation; an isolation-forest `method` on an Anomaly Model since 2026-10-20 (`AnomalyForestScorer`; the `aml` pack model ships on it) · `ANOMALY-ML-SCORING-1` closed |
@@ -75,7 +75,7 @@ tool.
 | Gap | Who has it | Row |
 |---|---|---|
 | Agentic investigation (an agent that explains and works an alert) | Mobileum RAID Agentic, Subex AI Agent Squads | `AGENTIC-INVESTIGATION-1` — partly closed: the Incident Brief (S1) shipped; the Incident page panel, Consequence proposals and model-written prose are open |
-| Real-time / pre-call decisioning | LATRO, Mobileum, Neural | `REALTIME-DECISIONING-1` (windowed Alert Rules and Patterns built, not yet on the stream commit), `REALTIME-INLINE-DECISION-1` |
+| Real-time / pre-call decisioning | LATRO, Mobileum, Neural | partly closed: detection on each stream commit shipped (`REALTIME-DECISIONING-1` PA-9d, 2026-11-12); inline allow / block open · `REALTIME-INLINE-DECISION-1` |
 | Partner settlement and re-rating | Subex, TEOCO (settlement); LATRO, Mobileum, Neural, Araxxe (re-rating) | partly closed: `PACK-PARTNER-SETTLEMENT-1` (S0 to S8 built; wholesale, MVNO and roaming open), `PACK-RERATING-1` (R1 to R3 built; R4 to R7 open) |
 | Sales / marketing analytics | LATRO, Mobileum | `PACK-SALES-MARKETING-1` — churn, segments and forecasts closed by the Predictive Analytics add-on |
 | Regulator-specific SAR / STR formats | LATRO | `REGULATORY-SAR-STR-TEMPLATES-1` (Report Templates on the shipped `REGULATORY-REPORTING-1` engine) |
@@ -89,7 +89,7 @@ internal fraud).
 **Closed or narrowed since 2026-10-17:** ML anomaly scoring (L, isolation forest, `ANOMALY-ML-SCORING-1`);
 churn, segmentation and forecasting (V, N → P, Predictive Analytics add-on); the CDR half of SIM-box detection (E,
 `telco-bypass`); partner settlement and re-rating (C, Q, still P); agentic investigation (AA, the Incident Brief,
-still P).
+still P); real-time detection (I, N → P, the Real-time Detection add-on, 2026-11-12; inline blocking still open).
 
 **Out of reach unless the product changes direction:** signalling firewalls and probes (F), test call generation
 (G), cybersecurity (Y), identity / digital trust (W) and network inventory (X) — they need network equipment,

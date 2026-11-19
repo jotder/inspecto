@@ -72,7 +72,7 @@ import { PenFieldComponent } from '@inspecto/core/components/pen-field.component
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { ComponentHistoryDialog } from '@inspecto/core/components/component-history.dialog';
 import { LinkAnalysisStartBoxComponent, StartNotice } from './link-analysis-start-box.component';
-import { DataStatusComponent } from '@inspecto/link-analysis/add-data/data-status.component';
+import { DataStatusComponent } from '@inspecto/link-analysis/link-analysis/data-status.component';
 import {
     START_MAX_SEEDS,
     StartDataset,
@@ -270,7 +270,7 @@ import {
 } from '@inspecto/link-analysis/investigation/element-detail.dialog';
 import { PivotService } from '@inspecto/link-analysis/investigation/pivot.service';
 import type { LaDataset } from '@inspecto/link-analysis/la-host';
-import { carriedColumns, columnsOfRole } from '@inspecto/link-analysis/api/column-roles';
+import { carriedColumns, columnsOfRole } from '@inspecto/core/api/column-roles';
 import { timeColumnChoices } from './timeline-playback';
 import {
     LaDisplayOptions,
@@ -389,7 +389,7 @@ import { InspectoConfirmService } from '@inspecto/core/confirm.service';
 import { closedBySpaceSwitchMessage, rememberOpenWork, takeClosedBySpaceSwitch } from './open-work';
 // eslint-disable-next-line no-restricted-imports -- only `actor`, so the Space-switch notice never names another user's item; LA_FEATURES carries module flags, not identity
 import { SessionService } from '@inspecto/core/api';
-import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
+import { ledgerTime } from '@inspecto/core/add-data/add-data.model';
 import { GraphQueryCache, PUSH_FILTER_DEBOUNCE_MS } from './graph-query-cache';
 import { deepEqual } from '@inspecto/link-analysis/api/stable-json';
 import { ViewAccessContext, viewDeleteBlock, viewEditBlock, viewSaveBlock } from './view-access';

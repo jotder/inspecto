@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, Injectable, OnInit, computed, inject, input, signal } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { Router } from '@angular/router';
-import { AddDataAccess } from '@inspecto/link-analysis/add-data/add-data-access';
+import { AddDataAccess } from '@inspecto/core/add-data/add-data-access';
 
 /** The console route that hosts the shared Add data screen. */
 export const ADD_DATA_ROUTE = '/add-data';

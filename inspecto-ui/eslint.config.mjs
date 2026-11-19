@@ -68,6 +68,7 @@ const coreGraphFiles = [
     'graph-sliced-layout', // LA-PERF-N4-1: the Force layouts in time slices, wraps G6 only (no library deps)
     'graph-radial-layout', // LA-RADIAL-LAYOUT-SQUASH-1: the Radial layout per component, wraps G6 only (no library deps)
     'graph-layouts', // layout ids / labels / capped fallback as plain data: la-limits imports it WITHOUT pulling G6 into the entry chunk
+    'value-shape', // Entity Type value shapes, framework-free: core's entity-type-options (Add data's picker) reads it (BASIC-ELT-PROFILE-1 UI-0)
 ];
 const CORE_MSG =
     'Core (app/inspecto/**) must not import Link Analysis / Geo library code: keep the type or function core needs in a core file, or inject it (D-5 step 1).';

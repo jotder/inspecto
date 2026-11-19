@@ -28,7 +28,6 @@ import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/comp
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
 import { statusEdgeClasses, statusRowClasses } from '@inspecto/core/components/status-badge.component';
 import { DataTableComponent } from '@inspecto/core/data-table/data-table.component';
-import { EntityProfileService } from '@inspecto/link-analysis/api/entity-profile.service';
 import {
     EntityFamily,
     EntityTypeGuide,
@@ -36,10 +35,10 @@ import {
     RecordTypeGuide,
     anyRecordOption,
     entityTypeOptions,
-} from '@inspecto/link-analysis/api/entity-type-options';
-import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits.service';
+} from '@inspecto/core/api/entity-type-options';
 import { OnboardingEventsService } from '@inspecto/core/onboarding/onboarding-events.service';
 import { AddDataAccess } from './add-data-access';
+import { ADD_DATA_LINK_ANALYSIS } from './add-data-link-analysis';
 import {
     ACCEPTED_EXTENSIONS,
     COLUMN_NAME,
@@ -94,7 +93,7 @@ import {
     suggestDatasetName,
     roleUnder,
 } from './add-data.model';
-import { ColumnRole, ROLE_HINTS, ROLE_LABELS } from '@inspecto/link-analysis/api/column-roles';
+import { ColumnRole, ROLE_HINTS, ROLE_LABELS } from '@inspecto/core/api/column-roles';
 import { ImportDatasetCardComponent } from './import-dataset-card.component';
 import { PostgresTableComponent } from './postgres-table.component';
 import { ImportRunFailed, OnboardService } from './onboard.service';
@@ -165,8 +164,9 @@ const NONE = '';
 export class AddDataComponent implements OnInit {
     protected readonly access = inject(AddDataAccess);
     private readonly onboard = inject(OnboardService);
-    private readonly entityProfiles = inject(EntityProfileService);
-    private readonly limitsService = inject(LaLimitsService);
+    /** Entity Types and the import limits come from Link Analysis, when the page placing this provides them. */
+    private readonly linkAnalysis = inject(ADD_DATA_LINK_ANALYSIS);
+    private readonly limits = this.linkAnalysis.limits();
     private readonly router = inject(Router);
     private readonly destroyRef = inject(DestroyRef);
     private readonly events = inject(OnboardingEventsService);
@@ -274,7 +274,7 @@ export class AddDataComponent implements OnInit {
     protected readonly excelText = computed(() => excelLine(this.excel()));
     /** This Space's limits before any upload (`import.*` in the Link Analysis limits), else null. */
     protected readonly limitsText = computed(() => {
-        const items = new Map(this.limitsService.items().map((i) => [i.key, i.inForce]));
+        const items = new Map(this.limits().map((i) => [i.key, i.inForce]));
         const maxBytes = items.get('import.max_bytes');
         const maxRows = items.get('import.max_rows');
         const maxImports = items.get('import.max_datasets');
@@ -284,7 +284,7 @@ export class AddDataComponent implements OnInit {
     private readonly maxBytes = computed(
         () =>
             this.draft()?.limits.maxBytes ??
-            this.limitsService.items().find((i) => i.key === 'import.max_bytes')?.inForce ??
+            this.limits().find((i) => i.key === 'import.max_bytes')?.inForce ??
             null,
     );
 
@@ -521,7 +521,7 @@ export class AddDataComponent implements OnInit {
             else if (this.draft()) this.events.stepAbandoned('add_data:columns');
             else if (this.file()) this.events.stepAbandoned('add_data:file');
         });
-        this.entityProfiles
+        this.linkAnalysis
             .entityTypes()
             .pipe(takeUntilDestroyed(this.destroyRef))
             .subscribe({

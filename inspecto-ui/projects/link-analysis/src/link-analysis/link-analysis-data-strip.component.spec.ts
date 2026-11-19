@@ -10,7 +10,7 @@ import { RunsService } from '@inspecto/core/api/runs.service';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
 import { GraphRunsService } from '@inspecto/link-analysis/api/graph-runs.service';
 import { DatasetFilesPage, InvService, InvestigationCoverage } from '@inspecto/link-analysis/api/inv.service';
-import { ledgerTime } from '@inspecto/link-analysis/add-data/add-data.model';
+import { ledgerTime } from '@inspecto/core/add-data/add-data.model';
 import { LinkAnalysisDataStripComponent } from './link-analysis-data-strip.component';
 import { InvestigationSessionStore } from './link-analysis-investigation.store';
 
