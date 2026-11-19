@@ -307,7 +307,7 @@ scripts. None of these commits is marked `!` except `757add5e`.*
   several Pipelines share. Pipeline keys win; `segments` is replaced whole. `GET /parsers` serves the field
   in the ASN.1 `grammarSchema`, `POST /parsers/asn1/preview` honours it (403 on an escaping ref), and a
   Pipeline bundle carries the profile as its own satellite. See
-  [parser-plugins.md](../elt/spec-parsing.md), *Decode Profile*.
+  [parser-plugins.md](../elt/spec-parsing-decode-profile.md), *Decode Profile*.
 
 **Parsers from Job Packs (2026-09-25, parser-plugins trust design slices P2–P4)**
 - A `ParserPlugin` in an allowlisted Job Pack now registers (the fifth pack kind). It appears in

@@ -207,5 +207,5 @@ unless the operator objects.
 ## References
 
 - `archived-documents/plans-archive/basic-onboard-plan.md` (`BASIC-ONBOARD-1`, shipped 2026-11-05)
-- `okf/product/module/processor/api-onboarding-authoring.md`, `okf/product/module/la-core/architecture-watch-this-folder.md` §6.20
+- `okf/product/module/processor/api-onboarding-authoring.md` (Postgres: `api-onboarding-postgres-snapshot.md`), `okf/product/module/la-core/architecture-watch-this-folder.md` §6.20
 - `okf/product/module/elt/spec-acquisition.md`, `spec-ingest.md`, `spec-consignments.md`, `spec-pipeline-execution.md`

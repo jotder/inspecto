@@ -22,7 +22,7 @@ tags: [product-item, module]
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Diagnoses](user-guide-diagnoses.md) · [Jobs](user-guide-jobs.md) |
 | admin-guide | current | [Control plane and processor host — admin guide](admin-guide-processor.md) |
-| api | current | [HTTP Control API](api-control-api.md) · [Jobs and scheduler — API](api-jobs-scheduler.md) · [Onboarding authoring seams (draft lifecycle, previews, register pair)](api-onboarding-authoring.md) · [HTTP routes — module.processor](api-routes.md) · [Versioned API (/api/v1)](api-v1.md) |
+| api | current | [HTTP Control API](api-control-api.md) · [Jobs and scheduler — API](api-jobs-scheduler.md) · [Onboarding authoring seams (draft lifecycle, previews, register pair)](api-onboarding-authoring.md) · [Choose a table — the Postgres snapshot seam](api-onboarding-postgres-snapshot.md) · [HTTP routes — module.processor](api-routes.md) · [Versioned API (/api/v1)](api-v1.md) |
 | tests | current | [Control plane and processor host — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
