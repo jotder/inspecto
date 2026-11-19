@@ -74,6 +74,14 @@ class SampleProfilerTest {
         assertTrue(e.getMessage().contains("Error when sniffing file"), e.getMessage());
     }
 
+    /** BE-3 slice 2: the lines the sniff skips before the header, as a number Add data reads; 0 when none. */
+    @Test
+    void reportsTheLinesItSkipsBeforeTheHeader(@TempDir Path dir) throws Exception {
+        assertEquals(1, sniff(dir, "# exported\na,b\n1,2\n3,4\n", null).skip());
+        assertEquals(0, sniff(dir, "a,b\n1,2\n3,4\n", null).skip());
+        assertEquals(0, new SampleProfiler.Dialect(Map.of()).skip(), "nothing reported is nothing skipped");
+    }
+
     @Test
     void theOptionsCannotBeChanged(@TempDir Path dir) throws Exception {
         Map<String, String> options = sniff(dir, "a,b\n1,2\n", null).options();

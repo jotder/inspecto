@@ -63,6 +63,12 @@ public final class SampleProfiler {
         public boolean header() {
             return Boolean.parseBoolean(options.get("has_header"));
         }
+
+        /** The lines the sniff skips before the header (or the first record); {@code 0} when it reported none. */
+        public int skip() {
+            String s = options.get("skip_header_lines");
+            return s == null || !s.matches("\\d{1,9}") ? 0 : Integer.parseInt(s);
+        }
     }
 
     /**

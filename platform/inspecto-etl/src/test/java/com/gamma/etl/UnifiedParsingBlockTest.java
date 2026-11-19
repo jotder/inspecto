@@ -121,6 +121,26 @@ class UnifiedParsingBlockTest {
         assertNull(cfg.csv().comment());
     }
 
+    /** BE-3 (BASIC-ELT-PROFILE-1): {@code quote: ""} is no quote, in both spellings; absent stays the default. */
+    @Test
+    void anEmptyQuoteIsNoQuote(@TempDir Path dir) throws Exception {
+        PipelineConfig legacy = load(dir, "qn", """
+                  csv_settings:
+                    quote: ""
+                """, "");
+        assertEquals("", legacy.csv().quote());
+        assertNull(legacy.csv().escape(), "the escape follows the quote at read time");
+        assertArrayEquals(new String[] {"1", "\"x", "2"}, CsvIngester.buildParser(legacy.csv()).parseLine("1,\"x,2"),
+                "the Java reader reads a field-opening quote as text (the DuckDB reader: ControlApiOnboardDialectTest)");
+        PipelineConfig unified = load(dir, "qnu", "", """
+                parsing:
+                  frontend: delimited
+                  delimited:
+                    quote: ""
+                """);
+        assertEquals("", unified.csv().quote());
+    }
+
     /** Fail-closed: a value the engine cannot honor must never load looking honored. */
     @Test
     void multiCharDialectCharFailsLoad(@TempDir Path dir) {

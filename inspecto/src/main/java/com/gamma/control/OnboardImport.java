@@ -621,8 +621,11 @@ final class OnboardImport {
             if ("csv".equals(type) || "tsv".equals(type)) {
                 csv.put("delimiter", String.valueOf(formatValue("delimiter")));
                 csv.put("has_header", Boolean.parseBoolean(String.valueOf(formatValue("header"))));
+                // the draft's quote as it read the file, "" included: no quote (absent would be the engine's '"')
                 Object q = formatValue("quote");
-                if (q != null && !String.valueOf(q).isEmpty()) csv.put("quote", String.valueOf(q));
+                if (q != null) csv.put("quote", String.valueOf(q));
+                Object skip = formatValue("skipLines");   // the lines the draft's sniff skipped before the header
+                if (skip != null) csv.put("skip_header_lines", Integer.parseInt(String.valueOf(skip)));
                 Object enc = formatValue("encoding");   // C2: the encoding fix
                 if (enc != null && !"utf-8".equals(enc)) csv.put("encoding", String.valueOf(enc));
             }
@@ -1185,7 +1188,7 @@ final class OnboardImport {
             PipelineConfig.CsvSettings c = cfg.csv();
             try {
                 return OnboardDraft.diagnose(source, fileName, c.delimiter() == null || c.delimiter().isEmpty() ? "," : c.delimiter(),
-                        c.quote() == null ? "" : c.quote(), c.hasHeader(), c.encoding());
+                        c.quote() == null ? "" : c.quote(), c.hasHeader(), c.skipHeaderLines(), c.encoding());
             } catch (IOException unreadable) {
                 return List.of();
             }
