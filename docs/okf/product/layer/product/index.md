@@ -45,6 +45,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `UI-ZONELESS-1` | P3 | chore | the app runs Zone.js on purpose; going zoneless needs a component-by-component audit first (filed 2026-11-15, so the code's pointer has a… | demand |
 | `UI-PICKER-OPTIONS-1` | P3 | feature | <inspecto-option-picker> gains nested options (a parent that opens to its children), a disabled option with its reason, and a per-picker… | demand |
 | `UI-SCHEMA-FORM-EDITOR-1` | P3 | feature | Move <inspecto-schema-form>'s in-row editor onto pen-field, which first needs several new pen-field features. | demand |
+| `UI-BUNDLE-BUDGETS-RED-1` | P3 | defect | The la-app and gamma bundle checks fail on master (seen 2026-11-19). | — |
 | `PACK-SALES-MARKETING-1` | P3 | feature | A Sales & Marketing BI pack: sales, commissions, marketing and churn analytics. | operator |
 | `USER-HANDBOOK-1` | P2 | feature | The Handbook: users learn to build, ship and manage an App from the console's Help, organised by lifecycle for three tracks. | — |
 | `USER-TRAINING-1` | P3 | feature | training on the Handbook's worked example: a Learning Path per track, Labs (lab-* Space Templates with an API checker), a platform video… | — |

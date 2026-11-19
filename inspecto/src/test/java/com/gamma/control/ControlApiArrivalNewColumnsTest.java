@@ -133,6 +133,34 @@ class ControlApiArrivalNewColumnsTest {
         return rows.stream().filter(r -> r.get(column) != null).count();
     }
 
+    /** Version {@code n} of import {@code id}'s schema in its Pipeline's history (BASIC-ELT-PROFILE-1 B5). */
+    private static Path schemaVersion(Path root, String id, int n) {
+        Path v = PipelineHistory.schemaDirFor(root, id).resolve("v" + n + ".toon");
+        assertTrue(Files.isRegularFile(v), "kept in history: " + v);
+        return v;
+    }
+
+    /**
+     * BASIC-ELT-PROFILE-1 U3/B5: a later file's new time-of-day column settles to TIME (it was kept as text), and the
+     * Dataset calls it {@code date}, the temporal type a Dataset read gives a TIME column (it said {@code string}).
+     */
+    @Test
+    void aLaterFilesTimeOfDayColumnIsKeptAsATime(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("timed");
+            commit(c, id, transfers(30), "");
+            JsonNode s = data(send(c, "POST", "/datasets/" + id + "/files?name=timed.csv&mode=append",
+                    withColumn(transfers(12).replace("T000", "M000"), "booked_time", i -> String.format("%02d:%02d:00", 8 + i % 9, i * 7 % 60))), 200);
+            assertEquals("[\"booked_time\"]", s.get("keptColumns").toString(), s.toString());
+            Map<String, Object> schema = com.gamma.util.ToonHelper.load(root.resolve("imports").resolve(id + "_schema.toon").toString());
+            Object field = ((List<?>) ((Map<?, ?>) schema.get("raw")).get("fields")).stream()
+                    .filter(f -> "booked_time".equals(((Map<?, ?>) f).get("name"))).findFirst().orElseThrow();
+            assertEquals("TIME", ((Map<?, ?>) field).get("type"), field.toString());
+            assertEquals("date", column(c, id, "booked_time").get("type"));
+            assertEquals(12, count(rows(c, id), "booked_time"), "the newer file's times are read");
+        }
+    }
+
     private Map<String, Object> column(Ctx c, String id, String name) {
         for (Object o : (List<?>) new ComponentStore(c.root().resolve("registry")).get("dataset", id).orElseThrow().content().get("columns"))
             if (o instanceof Map<?, ?> m && name.equals(m.get("name"))) {
@@ -160,6 +188,9 @@ class ControlApiArrivalNewColumnsTest {
             assertEquals("number", fee.get("type"), "typed by its values (DECIMAL-TEXT-NOT-BIGINT-1, operator 2026-11-06)");
             assertEquals("wider.csv", ((Map<?, ?>) fee.get(DatasetNewColumns.KEPT_FROM)).get("file"), fee.toString());
             assertTrue(Files.readString(root.resolve("imports").resolve(id + "_schema.toon")).contains("fee"), "the schema reads it");
+            // B5: written through the import's schema write path, so the version is kept in the Pipeline's history
+            assertEquals(Files.readString(root.resolve("imports").resolve(id + "_schema.toon")),
+                    Files.readString(schemaVersion(root, id, 1)), "the grown schema is the first kept version");
             JsonNode arrival = data(send(c, "GET", "/datasets/" + id + "/arrivals", null), 200).get("arrivals").get(0);
             assertEquals("[\"fee\"]", arrival.get("keptColumns").toString(), arrival.toString());
 
@@ -279,6 +310,9 @@ class ControlApiArrivalNewColumnsTest {
             assertEquals(422, failed.statusCode(), failed.body());
             assertEquals(before, Files.readString(schema), "the schema is as before");
             assertNull(column(c, id, "fee"), "the Dataset lists no kept column");
+            // B5: the history keeps both writes - the grown schema, then the one put back
+            assertTrue(Files.readString(schemaVersion(root, id, 1)).contains("fee"));
+            assertEquals(before, Files.readString(schemaVersion(root, id, 2)));
             data(send(c, "POST", "/datasets/" + id + "/files?name=plain.csv&mode=append", transfers(6).replace("T000", "P000")), 200);
         }
     }

@@ -1,13 +1,10 @@
 package com.gamma.control;
 
-import com.gamma.config.io.ConfigCodec;
-import com.gamma.etl.PipelineConfig;
+import com.gamma.etl.SchemaDrift;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
-import com.gamma.util.AtomicFiles;
+import com.gamma.spi.auth.ApiException;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -26,6 +23,8 @@ import java.util.regex.Pattern;
  * the same order, since the engine reads by position); the import's schema grows by each (typed by its values, {@link #typed}), and the Dataset
  * gains it with role {@code detail} and {@code keptFrom {file, at}}. Older Parquet files lack the column: every read
  * unions by name, so it reads as empty there. Once kept, a later file without it is refused like any missing column.
+ * Which columns are new, and the type a kept one settles to, are the engine's drift answer ({@link SchemaDrift}); the
+ * schema is written through the import's schema write path ({@link DatasetFeed#rewriteSchema}), {@code BASIC-ELT-PROFILE-1} B5.
  *
  * <p>A new column is left out (as before: delimited text is rewritten with the columns read, and the result and the
  * arrival name it) when the person chose so on Add a file, when another file of the same run lacks it, when its name is
@@ -90,7 +89,7 @@ final class DatasetNewColumns {
             if (!kept.isEmpty()) {
                 List<OnboardDraft.Col> typed = new ArrayList<>();
                 for (OnboardDraft.Col c : kept) typed.add(typed(c, files, delimited));
-                String grownBy = grow(space, id, schemaFile, pipelineFile, registry, dataset, typed, files, delimited, undo);
+                String grownBy = grow(space, id, pipeline, schemaFile, pipelineFile, registry, dataset, typed, files, delimited, undo);
                 if (grownBy != null) {
                     reason = grownBy;
                     kept.clear();
@@ -117,33 +116,23 @@ final class DatasetNewColumns {
     /**
      * {@code c} with the type every file of the run agrees its values have, by the draft's own inference (operator
      * 2026-11-06: {@code 0.50} is a decimal, {@code 47.00} too, never a whole number): the same type (and date format) in
-     * every file; whole and decimal numbers together are DOUBLE; anything else, or a number read through a decimal mark
-     * (that needs a custom mapping), stays text.
+     * every file; whole and decimal numbers together are DOUBLE; a time of day is TIME (U3, 2026-11-20); anything else,
+     * or a number read through a decimal mark (that needs a custom mapping), stays text.
      */
     static OnboardDraft.Col typed(OnboardDraft.Col c, List<Taken> files, boolean delimited) {
-        String type = null, format = null;
-        boolean first = true;
+        // each file's answer is the sample profiler's (OnboardDraft.analyse, BE-3); the engine settles them into one
+        // (SchemaDrift.settle, BASIC-ELT-PROFILE-1 B5), TIME included
+        List<SchemaDrift.Observed> perFile = new ArrayList<>();
         for (Taken t : files) {
             List<OnboardDraft.Col> f = t.check().freshCols();
             OnboardDraft.Col x = delimited ? f.stream().filter(y -> y.name().equals(c.name())).findFirst().orElse(null)
                     : f.stream().filter(y -> y.selector().equals(c.selector())).findFirst().orElse(null);
-            if (x == null || x.decimal() != null) return text(c);
-            if (first) {
-                type = x.type();
-                format = x.format();
-                first = false;
-            } else if (Set.of("BIGINT", "DOUBLE").containsAll(java.util.Arrays.asList(type, x.type()))) {
-                if (!type.equals(x.type())) type = "DOUBLE";
-            } else if (!type.equals(x.type()) || !java.util.Objects.equals(format, x.format())) {
-                return text(c);
-            }
+            perFile.add(x == null ? null : x.decimal() != null   // read through a decimal mark: that needs a custom mapping
+                    ? new SchemaDrift.Observed(x.name(), x.selector(), "VARCHAR", null) : OnboardImport.observed(x));
         }
-        if (type == null || !Set.of("BIGINT", "DOUBLE", "DATE", "TIMESTAMP", "BOOLEAN").contains(type)) return text(c);
-        return new OnboardDraft.Col(c.name(), c.header(), c.selector(), type, format, null, c.fraction());
-    }
-
-    private static OnboardDraft.Col text(OnboardDraft.Col c) {
-        return new OnboardDraft.Col(c.name(), c.header(), c.selector(), "VARCHAR", null, null, c.fraction());
+        SchemaDrift.Observed s = perFile.get(0) == null ? null : SchemaDrift.settle(perFile);
+        return new OnboardDraft.Col(c.name(), c.header(), c.selector(), s == null ? "VARCHAR" : s.type(), s == null ? null : s.format(),
+                null, c.fraction());
     }
 
     private static boolean free(Set<String> taken, String name) {
@@ -168,54 +157,45 @@ final class DatasetNewColumns {
     }
 
     /**
-     * The schema reads each kept column at its type ({@link #typed}) and maps it through; the Pipeline is re-read; the Dataset lists it as a
-     * detail. Answers null, or why nothing was kept (the schema did not load: every write here is put back).
+     * The schema reads each kept column at its type ({@link #typed}) and maps it through, written through the import's
+     * schema write path ({@link DatasetFeed#rewriteSchema}: the schema save's gates, the Pipeline re-read, the version
+     * kept in history); the Dataset lists it as a detail. Answers null, or why nothing was kept (refused, or the schema
+     * did not load: nothing is written).
      */
     @SuppressWarnings("unchecked")
-    private static String grow(OnboardImport.Space space, String id, Path schemaFile, Path pipelineFile, ComponentStore registry,
-                               Map<String, Object> dataset, List<OnboardDraft.Col> kept, List<Taken> files, boolean delimited,
-                               Deque<OnboardImport.Undo> undo) throws IOException {
-        byte[] before = Files.readAllBytes(schemaFile);
-        Map<String, Object> schema;
+    private static String grow(OnboardImport.Space space, String id, String pipeline, Path schemaFile, Path pipelineFile,
+                               ComponentStore registry, Map<String, Object> dataset, List<OnboardDraft.Col> kept, List<Taken> files,
+                               boolean delimited, Deque<OnboardImport.Undo> undo) throws IOException {
+        byte[] before;
         try {
-            schema = new LinkedHashMap<>(com.gamma.util.ToonHelper.load(schemaFile.toString()));
-        } catch (Exception unreadable) {
-            return "the schema of '" + id + "' cannot be read";
+            before = DatasetFeed.rewriteSchema(space.writeRoot(), pipeline, schemaFile, pipelineFile, space.service(), schema -> {
+                Map<String, Object> raw = new LinkedHashMap<>((Map<String, Object>) schema.get("raw"));
+                Map<String, Object> mapping = new LinkedHashMap<>((Map<String, Object>) schema.get("mapping"));
+                List<Object> fields = new ArrayList<>((List<Object>) raw.get("fields"));
+                List<Object> mapped = new ArrayList<>((List<Object>) mapping.get("fields"));
+                int next = fields.size();   // delimited: the fields read are columns 0 .. size-1, the new ones follow
+                for (OnboardDraft.Col c : kept) {
+                    Map<String, Object> f = new LinkedHashMap<>();
+                    f.put("name", c.name());
+                    f.put("selector", delimited ? String.valueOf(next++) : c.selector());
+                    f.put("type", c.type());
+                    if (c.format() != null) f.put("format", c.format());
+                    fields.add(f);
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("name", c.name());
+                    m.put("from", c.name());
+                    m.put("fn", "keep");
+                    mapped.add(m);
+                }
+                raw.put("fields", fields);
+                mapping.put("fields", mapped);
+                schema.put("raw", raw);
+                schema.put("mapping", mapping);
+            });
+        } catch (ApiException refused) {
+            return refused.getMessage();
         }
-        Map<String, Object> raw = new LinkedHashMap<>((Map<String, Object>) schema.get("raw"));
-        Map<String, Object> mapping = new LinkedHashMap<>((Map<String, Object>) schema.get("mapping"));
-        List<Object> fields = new ArrayList<>((List<Object>) raw.get("fields"));
-        List<Object> mapped = new ArrayList<>((List<Object>) mapping.get("fields"));
-        int next = fields.size();   // delimited: the fields read are columns 0 .. size-1, the new ones follow
-        for (OnboardDraft.Col c : kept) {
-            Map<String, Object> f = new LinkedHashMap<>();
-            f.put("name", c.name());
-            f.put("selector", delimited ? String.valueOf(next++) : c.selector());
-            f.put("type", c.type());
-            if (c.format() != null) f.put("format", c.format());
-            fields.add(f);
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("name", c.name());
-            m.put("from", c.name());
-            m.put("fn", "keep");
-            mapped.add(m);
-        }
-        raw.put("fields", fields);
-        mapping.put("fields", mapped);
-        schema.put("raw", raw);
-        schema.put("mapping", mapping);
-        AtomicFiles.write(schemaFile, ConfigCodec.toToon(schema).getBytes(StandardCharsets.UTF_8), ".cfg-");
-        undo.push(() -> {
-            AtomicFiles.write(schemaFile, before, ".cfg-");
-            space.service().refreshConfigs();
-        });
-        try {
-            PipelineConfig.load(pipelineFile.toString());
-        } catch (Exception refused) {
-            AtomicFiles.write(schemaFile, before, ".cfg-");
-            return "the import's schema did not load with it (" + refused.getMessage() + ")";
-        }
-        space.service().refreshConfigs();
+        undo.push(() -> DatasetFeed.restoreSchema(space.writeRoot(), pipeline, schemaFile, before, space.service()));
 
         String file = files.stream().filter(t -> !t.check().freshCols().isEmpty()).map(Taken::name).findFirst().orElse(null);
         String at = Instant.now().toString();

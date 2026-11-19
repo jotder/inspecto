@@ -63,6 +63,9 @@ Root `compliance/` is **not** under `docs/` and has never shipped in the bundle 
 ⚠ Listed here so the concept knows what it owes; the board carries the detail. A pointer from a row to
 this file is a claim, checked by `tools/check-backlog-homes.mjs`.
 
+- **`IMPORT-LOADER-INVENTORY-RED-1`** — `ImportLoaderInventoryTest` red on master since 2026-11-19; cause not yet found.
+- **`UI-BUNDLE-BUDGETS-RED-1`** — the la-app and gamma bundle-size checks red on master since 2026-11-19.
+
 - ~~**`TESTCONFIGS-PREFIX-SUFFIX-TRAP-1`**~~ CLOSED 2026-10-04: `TestConfigs.write()` now emits `<hash>_pipeline.toon`, the SUFFIX every scanning loader matches; pinned by `TestConfigsNameTest`.
 
 - ~~**`LIB-SYSTEM-EXIT-FROM-PUBLIC-API-1`**~~ ✅ **CLOSED 2026-09-20 (`cf40aaf3f`).**

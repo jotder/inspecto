@@ -60,7 +60,7 @@ async function create(node: AuthoredNode) {
                     test: vi.fn(() => of({ reachable: true, detail: 'ok' })),
                 },
             },
-            { provide: LensService, useValue: { canAuthorWorkbench: () => true } },
+            { provide: LensService, useValue: { canAuthorWorkbench: () => true, screenLocks: () => ({}) } },
             { provide: ToastrService, useValue: TOASTR },
         ],
     });
