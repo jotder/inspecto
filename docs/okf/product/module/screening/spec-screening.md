@@ -36,7 +36,7 @@ AML function pack (`PACK-AML-1`) builds on it. Vocabulary: `docs/GLOSSARY.md` §
     equal or the shorter name has two or more tokens. Joined: Jaro-Winkler of the tokens written together, only when
     the counts differ ("Abdul Rahman" = "Abdulrahman"). Symmetric, 0..1, 4 decimals.
   - *the Jaro-Winkler itself* comes from the Analytics Kernel's similarity kit (ANALYTICS-CORE-1 S1,
-    [analytics-kernel § Similarity kit](../analytics/spec-analytics.md#similarity-kit)): `NameMatcher.TOKEN_JARO_WINKLER` =
+    [analytics-kernel § Similarity kit](../analytics/spec-analytics-module-functions.md#similarity-kit)): `NameMatcher.TOKEN_JARO_WINKLER` =
     `JaroWinkler(UTF16_CHAR, HALF, 0.1, 4, boost threshold 0)` — UTF-16 chars, textbook transpositions, prefix scale
     0.1 up to 4, the prefix boost always applied — exactly the arithmetic Screening had before (`NameMatcherGoldenTest`
     pins it bit for bit). Still dependency-free (SCR-D2: the kernel carries no third-party library). The fold,

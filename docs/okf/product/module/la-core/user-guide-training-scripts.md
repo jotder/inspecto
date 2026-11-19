@@ -70,15 +70,15 @@ One file per episode group; render an episode with `--script` set to its group f
 | [D8](user-guide-training-d-analysis-toolbox.md#d8_on-screen-vs-whole-dataset) | On screen vs Whole Dataset: limits and scale | Basic → Standard | 11 | 889 | 7 |
 | [E1](user-guide-training-e-keeping-and-sharing.md#e1_saving-opening-and-exporting) | Saving, opening and exporting | Basic | 12 | 848 | 5 |
 | [E2](user-guide-training-e-keeping-and-sharing.md#e2_entity-lists-and-identity-facts) | Entity Lists and Identity Facts | Standard | 11 | 805 | 6 |
-| [F1](user-guide-training-f-investigations.md#f1_signing-in-roles-and-your-first-investigation) | Signing in, roles and your first Investigation | Standard | 11 | 819 | 6 |
-| [F2](user-guide-training-f-investigations.md#f2_expand-with-intent) | Expand with intent: direction, kinds, time, strength, fan-out | Standard | 11 | 839 | 6 |
-| [F3](user-guide-training-f-investigations.md#f3_recorded-clean-up-and-scope) | Recorded clean-up and scope | Standard | 12 | 896 | 6 |
-| [F4](user-guide-training-f-investigations.md#f4_step-log-undo-re-order-and-replay) | The step log: replay, undo, re-order, more steps | Standard | 11 | 916 | 9 |
-| [F5](user-guide-training-f-investigations.md#f5_teams-members-four-eyes-reviewers-and-outsiders) | Teams: members, four-eyes, reviewers and outsiders | Standard | 11 | 870 | 8 |
-| [F6](user-guide-training-f-investigations.md#f6_drafts-work-in-parallel) | Drafts: work in parallel | Standard | 10 | 748 | 7 |
-| [F7](user-guide-training-f-investigations.md#f7_masked-data-reveal-and-identity-resolution) | Masked data and audited reveal; resolving identities | Standard | 11 | 899 | 8 |
-| [F8](user-guide-training-f-investigations.md#f8_evidence-coverage-dossier-and-sealed-bundle) | Evidence: coverage, Dossier and the sealed bundle | Standard | 11 | 838 | 5 |
-| [F9](user-guide-training-f-investigations.md#f9_from-finding-to-action) | From finding to action: Alert Rules, Cases, widgets and sharing | Standard | 12 | 957 | 10 |
+| [F1](user-guide-training-f-investigations-first-graph.md#f1_signing-in-roles-and-your-first-investigation) | Signing in, roles and your first Investigation | Standard | 11 | 819 | 6 |
+| [F2](user-guide-training-f-investigations-first-graph.md#f2_expand-with-intent) | Expand with intent: direction, kinds, time, strength, fan-out | Standard | 11 | 839 | 6 |
+| [F3](user-guide-training-f-investigations-first-graph.md#f3_recorded-clean-up-and-scope) | Recorded clean-up and scope | Standard | 12 | 896 | 6 |
+| [F4](user-guide-training-f-investigations-teams-drafts.md#f4_step-log-undo-re-order-and-replay) | The step log: replay, undo, re-order, more steps | Standard | 11 | 916 | 9 |
+| [F5](user-guide-training-f-investigations-teams-drafts.md#f5_teams-members-four-eyes-reviewers-and-outsiders) | Teams: members, four-eyes, reviewers and outsiders | Standard | 11 | 870 | 8 |
+| [F6](user-guide-training-f-investigations-teams-drafts.md#f6_drafts-work-in-parallel) | Drafts: work in parallel | Standard | 10 | 748 | 7 |
+| [F7](user-guide-training-f-investigations-evidence.md#f7_masked-data-reveal-and-identity-resolution) | Masked data and audited reveal; resolving identities | Standard | 11 | 899 | 8 |
+| [F8](user-guide-training-f-investigations-evidence.md#f8_evidence-coverage-dossier-and-sealed-bundle) | Evidence: coverage, Dossier and the sealed bundle | Standard | 11 | 838 | 5 |
+| [F9](user-guide-training-f-investigations-evidence.md#f9_from-finding-to-action) | From finding to action: Alert Rules, Cases, widgets and sharing | Standard | 12 | 957 | 10 |
 | [G1](user-guide-training-g-geo-and-entity-pages.md#g1_the-geo-map) | The Geo map | Standard | 11 | 804 | 6 |
 | [G2](user-guide-training-g-geo-and-entity-pages.md#g2_geo-intelligence-and-map-to-graph) | Geo intelligence and pivoting between map and graph | Standard | 10 | 779 | 5 |
 | [G3](user-guide-training-g-geo-and-entity-pages.md#g3_entity-profiles) | Entity profiles | Standard | 11 | 727 | 8 |

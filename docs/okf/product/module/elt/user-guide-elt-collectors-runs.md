@@ -16,14 +16,14 @@ How a person works with Collectors in the console: the **Collectors** screen tha
 lists every configured collection task, the **Connections** screen where endpoints and credentials are
 kept, and the one form used to configure what a Collector does (local inbox, a Connection, or another
 Pipeline's Dataset). It also records the rules that form follows, so the next change to it does not
-re-break them. The engine side is in [the acquisition spec](spec-acquisition.md) and [architecture](architecture-elt.md#collectors).
+re-break them. The engine side is in [the acquisition spec](spec-acquisition.md) and [architecture](architecture-elt-acquisition-parsing.md#collectors).
 *(Merged from the acquire hub's user guide on 2026-11-18; §5 is the short version inside the editor.)*
 
 ### 21.1 The screens
 
 Route `/collectors` (Workbench nav group). Lists configured collection tasks in a **standard**
 [data-table](../../layer/product/spec-ds-data-table.md) (`autoHeight`). Backed by `CollectorsService`.
-Design and internals: [Collectors architecture](architecture-elt.md#collectors).
+Design and internals: [Collectors architecture](architecture-elt-acquisition-parsing.md#collectors).
 
 - **Collectors** — route `collectors`, `inspecto-ui/src/app/modules/admin/collectors/collectors.component.ts`,
   with the detail drawer `collector-detail.dialog.ts`.

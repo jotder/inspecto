@@ -247,8 +247,8 @@ that claim is STALE as of 2026-08-31.
 
 ### References
 [consignment-addressing](spec-consignments.md#part-a--addressing) (Selector, revision model) ·
-[consignment-status-flow](architecture-elt.md) · [node-types](spec-pipeline-model.md#pipeline-node-types--the-node-type-plugin-seam) ·
-[transforms-seams](spec-pipeline-model.md#transforms--modularity-seams) · [plugins](spec-ingest.md#plugin-ingester) ·
+[consignment-status-flow](architecture-elt.md) · [node-types](spec-pipeline-model-node-types.md#pipeline-node-types--the-node-type-plugin-seam) ·
+[transforms-seams](spec-pipeline-model-round-trip.md#transforms--modularity-seams) · [plugins](spec-ingest.md#plugin-ingester) ·
 [step-catalog](spec-step-catalog.md) ·
 [jobs](../processor/spec-jobs.md) · [job-vs-step](../processor/architecture-processor.md)
 

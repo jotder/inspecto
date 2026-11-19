@@ -292,7 +292,7 @@ Enrich → Publish — each with a status word and finding count, each click ope
 
 ## Runs and processing status
 
-Design and internals: [Parsing and ingest architecture](architecture-elt.md#parsing-and-ingest); the Run screens in depth:
+Design and internals: [Parsing and ingest architecture](architecture-elt-acquisition-parsing.md#parsing-and-ingest); the Run screens in depth:
 [§22 Runs and Run Detail](user-guide-elt-collectors-runs.md#22-runs-and-run-detail) below.
 
 - **Pipeline editor, Parse definition** (`inspecto-ui/src/app/modules/admin/pipelines/pipeline-parse-definition.component.ts`):

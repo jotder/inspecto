@@ -12,7 +12,7 @@ Part 2 of 5 of [Step catalog — every Step kind, delivered and pending](spec-st
 
 ## `forecast` → `transform.timeseries.forecast` — Time-series forecaster (Holt-Winters)
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S5, [analytics-kernel § Forecasting](../analytics/spec-analytics.md#forecasting)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S5, [analytics-kernel § Forecasting](../analytics/spec-analytics-cohorts-forecasting.md#forecasting)).*
 
 **Function.** A forecast per key of a regular series — every bucket of the history with its one-step-ahead forecast
 and prediction band, then `horizon` buckets ahead — so a chart, a KPI band or an Alert Rule reads actual, forecast,
@@ -54,7 +54,7 @@ lower and upper side by side.
 
 ## `changepoint` → `transform.timeseries.changepoint` — Change-point, regime & drift detector
 
-*Added 2026-11-01 (ANALYTICS-STEPS-TS-1, [analytics-kernel § Change-point and regime detection](../analytics/spec-analytics.md#change-point-and-regime-detection)).*
+*Added 2026-11-01 (ANALYTICS-STEPS-TS-1, [analytics-kernel § Change-point and regime detection](../analytics/spec-analytics-distribution-time-series.md#change-point-and-regime-detection)).*
 
 **Function.** Flags where a series stops behaving as expected. It reads a **residual** (actual minus expected — a
 forecast's error, a baseline or a peer median) and its scale σ, and every row gains four 0/1 flags: `outside_band` (a
@@ -96,7 +96,7 @@ Business Assurance forecast template's own flags). Defaults are the template's: 
 
 ## `retention` → `transform.cohort.retention` — Cohort retention matrix
 
-*Added 2026-11-01 (ANALYTICS-STEPS-TS-1, [analytics-kernel § Cohort retention and funnel](../analytics/spec-analytics.md#cohort-retention-and-funnel)).*
+*Added 2026-11-01 (ANALYTICS-STEPS-TS-1, [analytics-kernel § Cohort retention and funnel](../analytics/spec-analytics-cohorts-forecasting.md#cohort-retention-and-funnel)).*
 
 **Function.** Summarising: one row per acquisition cohort per period — `cohort` (the bucket start, a `TIMESTAMP`),
 `period` (0 = the cohort's own bucket), `size`, `active`, `rate` — as of a stated date.
@@ -125,7 +125,7 @@ Business Assurance forecast template's own flags). Defaults are the template's: 
 
 ## `funnel` → `transform.cohort.funnel` — Ordered conversion funnel
 
-*Added 2026-11-01 (ANALYTICS-STEPS-TS-1, [analytics-kernel § Cohort retention and funnel](../analytics/spec-analytics.md#cohort-retention-and-funnel)).*
+*Added 2026-11-01 (ANALYTICS-STEPS-TS-1, [analytics-kernel § Cohort retention and funnel](../analytics/spec-analytics-cohorts-forecasting.md#cohort-retention-and-funnel)).*
 
 **Function.** Summarising: one row per funnel step — `step` (1..n), `name`, `entities` that reached it, `from_previous`
 and `from_first` (the conversion rates; empty where the base is 0, and `from_previous` empty for step 1).
@@ -150,7 +150,7 @@ and `from_first` (the conversion rates; empty where the base is 0, and `from_pre
 
 ## `similarity` → `transform.similarity` — Similarity score
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S1, catalog `quality.match.fuzzy`, [analytics-kernel § Similarity kit](../analytics/spec-analytics.md#similarity-kit)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S1, catalog `quality.match.fuzzy`, [analytics-kernel § Similarity kit](../analytics/spec-analytics-module-functions.md#similarity-kit)).*
 
 **Function.** Every row gains a **0..1 score of how alike two of its text columns are** (a customer name and an
 account name, a payee and a beneficiary) and, with a `threshold`, a **true/false candidate flag** for review.
@@ -205,7 +205,7 @@ same `RowShaper` arm · (4) palette `addable` from the regenerated contract · (
 
 ## `rank` → `transform.analytics.rank` — Rank & Top-N pruner
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S4, [analytics-kernel § Ranking, sampling and pivot](../analytics/spec-analytics.md#ranking-sampling-and-pivot)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S4, [analytics-kernel § Ranking, sampling and pivot](../analytics/spec-analytics-cohorts-forecasting.md#ranking-sampling-and-pivot)).*
 
 **Function.** Ranks the rows of each group by a stated order — the top 3 calls per region, the largest invoice per
 customer — and either **keeps the top N** or **adds the rank as a column**.
@@ -249,7 +249,7 @@ ranked 1 and 2 by `CALL_ID`; K07 has no amount and sorts last.
 
 ## `sample` → `transform.sample` — Statistical & reservoir sampler
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S4, catalog `quality.sample.reservoir`, [analytics-kernel § Ranking, sampling and pivot](../analytics/spec-analytics.md#ranking-sampling-and-pivot)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S4, catalog `quality.sample.reservoir`, [analytics-kernel § Ranking, sampling and pivot](../analytics/spec-analytics-cohorts-forecasting.md#ranking-sampling-and-pivot)).*
 
 **Function.** Keeps a **fixed number** or a **share** of the rows of each group — a test extract of a large Dataset, an
 audit sample per region — and keeps the **same rows on every run**.
@@ -292,7 +292,7 @@ selection), `PipelineJobRunnerTest#runsAFlatConfigsRankSampleAndPivotSteps` · (
 
 ## `pivot` → `transform.matrix.pivot` — Pivot (rows to columns)
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S4, [analytics-kernel § Ranking, sampling and pivot](../analytics/spec-analytics.md#ranking-sampling-and-pivot)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S4, [analytics-kernel § Ranking, sampling and pivot](../analytics/spec-analytics-cohorts-forecasting.md#ranking-sampling-and-pivot)).*
 
 **Function.** The reverse of `unpivot`: long rows become a wide table — one row per key, **one column per declared
 value**, each holding one aggregate of that value's rows (usage per subscriber per call type, revenue per month column).
@@ -334,7 +334,7 @@ even with no schema; only the keys and pivoted columns flow on) · (7) `examples
 
 ## `entity_link` → `transform.entity.link` — Entity grouping
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S2, catalog `enrichment.entity.link`, [analytics-kernel § Entity grouping](../analytics/spec-analytics.md#entity-grouping)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S2, catalog `enrichment.entity.link`, [analytics-kernel § Entity grouping](../analytics/spec-analytics-module-functions.md#entity-grouping)).*
 
 **Function.** Every row gains a **resolution group**: rows that agree exactly on a match key — the same email, the
 same phone number — are the same entity, and the links chain (A shares an email with B, B a phone with C: one group).
@@ -400,7 +400,7 @@ same `RowShaper` arm · (4) palette `addable` from the regenerated contract · (
 
 ## `outlier` → `transform.stats.outlier` — Outlier detector & IQR boxplot fencer
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S3, [analytics-kernel § Distribution Steps](../analytics/spec-analytics.md#distribution-steps)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S3, [analytics-kernel § Distribution Steps](../analytics/spec-analytics-distribution-time-series.md#distribution-steps)).*
 
 **Function.** Every row gains its group's outlier figures and a **true/false flag**: is this number unusual for its
 own group (its region, its customer)?

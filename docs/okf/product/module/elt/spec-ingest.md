@@ -35,7 +35,7 @@ how a Pipeline with `route:` branches writes each branch on the ordinary ingest 
 
 > Vocabulary: a Consignment is the unit a Step's token references (data resolved by reference; edges
 > carry no records) — the full runtime edge model converges at Phase 7
-> ([spec-pipeline-model.md](spec-pipeline-model.md#the-token-model--the-design-of-record) § *The token model*). The parse mechanisms and the
+> ([spec-pipeline-model.md](spec-pipeline-model-node-types.md#the-token-model--the-design-of-record) § *The token model*). The parse mechanisms and the
 > `parsing:` block are [Part III](spec-parsing.md) below; acquisition (getting files to the inbox) is
 > [spec-acquisition.md](spec-acquisition.md) and [architecture-elt.md](architecture-elt.md).
 
@@ -52,7 +52,7 @@ Use the plugin ingester when:
 - A single input file emits **multiple event types** (e.g. CALL + SMS interleaved in one CDR file) that must land in separate output tables with different schemas.
 - Partition columns such as `event_type` are **computed by the parser** — they do not exist as raw data columns but are derived from the record structure.
 
-The CSV path is unchanged for all existing Pipelines. Plugin ingester is an opt-in mode activated by adding `processing.ingester:` (or `parsing.plugin.ingester`, see [§P.5](spec-parsing.md#p5-the-parsing-block-live) below) to the pipeline toon.
+The CSV path is unchanged for all existing Pipelines. Plugin ingester is an opt-in mode activated by adding `processing.ingester:` (or `parsing.plugin.ingester`, see [§P.5](spec-parsing-model-block.md#p5-the-parsing-block-live) below) to the pipeline toon.
 
 ### The SPI pair
 
@@ -63,7 +63,7 @@ The CSV path is unchanged for all existing Pipelines. Plugin ingester is an opt-
   **by config** (`processing.ingester` / `parsing.plugin.ingester`, an FQCN instantiated reflectively) —
   this is deliberate and correct for config-chosen implementations; it is *not* a `ServiceLoader`
   candidate, because the config names one class, not a discovered set. (A pack-provided ingester resolves
-  through its parser's loader — [§P.11 *Drop-in parser jars*](spec-parsing.md#p11-drop-in-parser-jars--trust-gate-staging-dir-pack-parsers-ingest-and-preview-gate-shipped-2026-09-25) below.)
+  through its parser's loader — [§P.11 *Drop-in parser jars*](spec-parsing-hierarchical-decode.md#p11-drop-in-parser-jars--trust-gate-staging-dir-pack-parsers-ingest-and-preview-gate-shipped-2026-09-25) below.)
 - **`RecordSink`** (`inspecto-etl`) — `define / emit / reject / junk`, keyed by segment. What a
   wrap implementation calls; it never touches DuckDB directly.
 
@@ -126,7 +126,7 @@ inside a `StreamingFileIngester`.
 **Reference implementation:** `Asn1RecordIngester` (`com.gamma.telecom.asn1`) — Java decodes BER/DER
 records against an X.680 grammar and emits them per segment; everything downstream is the shared
 DuckDB path. This is exactly the operator's "feed Java-parsed records into it". Its rules are in
-[§P.10 *Loading to Tables*](spec-parsing.md#loading-to-tables--asn1recordingester-2026-07-31) below.
+[§P.10 *Loading to Tables*](spec-parsing-hierarchical-decode.md#loading-to-tables--asn1recordingester-2026-07-31) below.
 
 ---
 
@@ -279,7 +279,7 @@ collector:
 | `processing.ingester_config` | no | Free-form map for plugin-specific settings (e.g. `record_length`, `byte_order`). Plugins read it via `cfg.schemas().ingesterConfig().get("key")`. Defaults to empty map. |
 
 (`parsing.plugin.{ingester,ingester_config,segments}` is the newer spelling of the same triple; the
-three-tier precedence is in [§P.5](spec-parsing.md#p5-the-parsing-block-live) below.)
+three-tier precedence is in [§P.5](spec-parsing-model-block.md#p5-the-parsing-block-live) below.)
 
 > `segments:` must be a non-empty map when `ingester:` is set; a missing or empty map throws `IllegalArgumentException` at startup. Each schema file must exist; a missing file throws `FileNotFoundException`.
 >
@@ -356,7 +356,7 @@ For **binary** fixed-length records (no delimiter, no newlines — each record i
 repo ships `com.gamma.ingester.FixedWidthRecordIngester`. (Fixed-width **text**, one record per line, is
 handled natively by the engine — set `frontend: fixedwidth`; see
 [configuration.md](../config/admin-guide-configuration-reference.md#fixed-width-frontend-frontend-fixedwidth) and
-[§P.6.3](spec-parsing.md#p63-fixed-width--fixed-length-records-live) below. Reach for this plugin only when records are not newline-delimited.)
+[§P.6.3](spec-parsing-profiles-plugins.md#p63-fixed-width--fixed-length-records-live) below. Reach for this plugin only when records are not newline-delimited.)
 
 It reads `record_length` bytes per record and carves each field by byte `(start,length)`, decoding with
 the configured `encoding` and trimming per `trim`. Column **names/types** come from the segment schema's
@@ -388,7 +388,7 @@ memory either way.
 
 `XmlRecordIngester` (the tree→segments bridge) and `Asn1RecordIngester` load through the same
 `parsing.plugin` machinery; their selector, segment-key and failure rules are in
-§P.10 below: [*The tree→segments bridge*](spec-parsing.md#the-treesegments-bridge--xmlrecordingester-2026-08-30) and [*Loading to Tables*](spec-parsing.md#loading-to-tables--asn1recordingester-2026-07-31).
+§P.10 below: [*The tree→segments bridge*](spec-parsing-hierarchical-decode.md#the-treesegments-bridge--xmlrecordingester-2026-08-30) and [*Loading to Tables*](spec-parsing-hierarchical-decode.md#loading-to-tables--asn1recordingester-2026-07-31).
 
 ---
 
@@ -419,7 +419,7 @@ Use `<scope>provided</scope>` because the deployment server already has the fat 
 
 - `mvn package` produces `your-ingester-x.y.z.jar`
 - On the server, put your JAR on the classpath alongside the inspecto JAR. The `run.sh` / `run.bat` wrappers shipped by `package.ps1` use `-jar inspecto.jar`; switch them to `-cp "inspecto.jar:your-ingester-*.jar" com.gamma.inspector.CollectorProcessor <pipeline.toon>` (use `;` instead of `:` on Windows).
-- Reference your class by FQCN in the pipeline toon: `processing.ingester: com.acme.events.MyIngester`. The framework loads it by FQCN reflection and `getDeclaredConstructor().newInstance()` — the class must be public with a no-arg constructor. On the classpath it resolves on the engine loader. Shipped in an allowlisted Job Pack instead (no restart), it resolves through the pack's loader when the pack's `ParserPlugin` names it in `ingesterClass()` — see [§P.11 *Drop-in parser jars*](spec-parsing.md#p11-drop-in-parser-jars--trust-gate-staging-dir-pack-parsers-ingest-and-preview-gate-shipped-2026-09-25) below.
+- Reference your class by FQCN in the pipeline toon: `processing.ingester: com.acme.events.MyIngester`. The framework loads it by FQCN reflection and `getDeclaredConstructor().newInstance()` — the class must be public with a no-arg constructor. On the classpath it resolves on the engine loader. Shipped in an allowlisted Job Pack instead (no restart), it resolves through the pack's loader when the pack's `ParserPlugin` names it in `ingesterClass()` — see [§P.11 *Drop-in parser jars*](spec-parsing-hierarchical-decode.md#p11-drop-in-parser-jars--trust-gate-staging-dir-pack-parsers-ingest-and-preview-gate-shipped-2026-09-25) below.
 
 **6. Production health checks.** The framework reports plugin loading at startup:
 
@@ -427,7 +427,7 @@ Use `<scope>provided</scope>` because the deployment server already has the fat 
 [CONFIG] Plugin ingester: com.acme.events.MyIngester  segments: [CALL, SMS]
 ```
 
-If you see `Cannot instantiate streaming ingester: ...` with a `ClassNotFoundException`, your JAR isn't on the classpath. If you see it with a `NoSuchMethodException`, you're missing the public no-arg constructor. A `ClassCastException` means the class doesn't implement `StreamingFileIngester`. (Since slice P3, an ingester that no loaded parser names and the engine loader cannot find fails with the named "is not on the classpath and no loaded parser names it" error instead — [§P.11 *Drop-in parser jars*](spec-parsing.md#p11-drop-in-parser-jars--trust-gate-staging-dir-pack-parsers-ingest-and-preview-gate-shipped-2026-09-25) below.)
+If you see `Cannot instantiate streaming ingester: ...` with a `ClassNotFoundException`, your JAR isn't on the classpath. If you see it with a `NoSuchMethodException`, you're missing the public no-arg constructor. A `ClassCastException` means the class doesn't implement `StreamingFileIngester`. (Since slice P3, an ingester that no loaded parser names and the engine loader cannot find fails with the named "is not on the classpath and no loaded parser names it" error instead — [§P.11 *Drop-in parser jars*](spec-parsing-hierarchical-decode.md#p11-drop-in-parser-jars--trust-gate-staging-dir-pack-parsers-ingest-and-preview-gate-shipped-2026-09-25) below.)
 
 Per-file outcomes appear in `<pipeline>_status_<runTimestamp>.csv`:
 
@@ -459,13 +459,13 @@ Per-file outcomes appear in `<pipeline>_status_<runTimestamp>.csv`:
   landed, is discovered exactly like a locally-pushed one, so `countPending` is now the exact landed backlog
   (no remote approximation).
 * `ConsignmentIngestor` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/ConsignmentIngestor.java`) — a thin, stateless
-  coordinator: pick a `ConsignmentIngestStrategy` ([spec-pipeline-model.md](spec-pipeline-model.md#transforms--modularity-seams), transform seams) (CSV or plugin), run `ingest()` → an
+  coordinator: pick a `ConsignmentIngestStrategy` ([spec-pipeline-model.md](spec-pipeline-model-round-trip.md#transforms--modularity-seams), transform seams) (CSV or plugin), run `ingest()` → an
   `IngestOutcome`, then the path-agnostic tail `commit()` (DuckLake register → manifest → backup originals →
   markers → ledger, in that crash-safe order) and `writeAudit()`. Never throws for a Consignment failure — audit is
   always written (see [quarantine](spec-sinks.md#quarantine-outcomes)). Markers/fingerprints go **last**, so a FAILED
   Consignment leaves no "already processed" record and its files are rediscovered next poll (retry is
   implicit); what is recorded about a Consignment either way — ledgers, provenance, live gauges, and how
-  an operator audits a failed file or record — is [consignment status flow](architecture-elt.md#e5-consignment-status-flow-the-flowfile-question).
+  an operator audits a failed file or record — is [consignment status flow](architecture-elt-graph-consignments.md#e5-consignment-status-flow-the-flowfile-question).
 * `MultiCollectorProcessor` (`platform/inspecto-engine/src/main/java/com/gamma/inspector/MultiCollectorProcessor.java`) — the outer
   orchestrator running many `.toon` Pipelines concurrently in one JVM, bounded by `Semaphore(sources.max)`.
   Total worker pressure = `sources.max × processing.threads × duckdb_threads`.
@@ -552,7 +552,7 @@ strategies rethrow it past their quarantine/FAILED catches), nothing committed, 
   no Job-failed alarm or Incident (before: a cron `la_index_build` logged `FAILED in 0ms — null`). A failure with
   nothing closing is unchanged (`JobShutdownTest`). Claims are released only by the run thread, as above; a Job type
   whose body never reaches a `Scope.JOB` fence check is not interrupted and simply finishes within the deadline.
-  (How the Space close escalates an overrun drain is [architecture-elt.md](architecture-elt.md#e6-stopping-a-space-graceful-stop).)
+  (How the Space close escalates an overrun drain is [architecture-elt.md](architecture-elt-graph-consignments.md#e6-stopping-a-space-graceful-stop).)
 - **End to end:** `GracefulStopHandoverTest` closes a real `CollectorService` over a shared DB lease with a pipeline
   run and a Job run parked mid-flight, asserts the run's checkpoint throws `RunCancelledException`, and that a second
   owner then claims the lease; the parked run thread polls its own `CommitFence.cancelSignal` until `close()` has

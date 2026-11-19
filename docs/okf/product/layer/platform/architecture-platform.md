@@ -154,7 +154,7 @@ module layer; a split-package guard (`tools/check-module-architecture.mjs`) hold
 The contracts a jar can implement include: Collector connectors (`CollectorConnectorFactory`,
 [spec](../../module/connectors/spec-connectors.md)), parser plugins (`ParserPlugin`,
 [spec](../../module/elt/spec-parsing.md)), Pipeline node types (`PipelineNodeType`,
-`PipelineNodeExecutor`, `StepExecutor`; [Pipeline graph](../../module/elt/architecture-elt.md#e4-the-pipeline-graph--the-backend-model)),
+`PipelineNodeExecutor`, `StepExecutor`; [Pipeline graph](../../module/elt/architecture-elt-graph-consignments.md#e4-the-pipeline-graph--the-backend-model)),
 HTTP routes (`RouteModule`), Job Types and maintenance tasks (`JobTypeProvider`,
 `MaintenanceTaskProvider`), Platform Services contributed by a pack (`ServiceProvider`), Decision Rule
 Consequences (`ConsequenceProvider`), operational store families (`StoreFamilyProvider`), boot-time
@@ -183,14 +183,14 @@ Three facts about discovery are worth knowing before adding one:
 
 1. **Collect.** Collectors pull from local directories, SFTP, FTP and FTPS, databases, object stores
    (S3, Azure Blob, GCS) and Kafka, with deduplication and watermark ledgers and a stability gate.
-   See the [acquisition framework](../../module/elt/architecture-elt.md#data-acquisition-framework).
+   See the [acquisition framework](../../module/elt/architecture-elt-acquisition-parsing.md#data-acquisition-framework).
 2. **Parse and ingest.** Stage-1 parsing (M files to N record types) writes typed Parquet into the
-   lakehouse; bad rows are quarantined. See [Stage-1](../../module/elt/architecture-elt.md#e2-design-philosophy--scope) and
+   lakehouse; bad rows are quarantined. See [Stage-1](../../module/elt/architecture-elt-engine-design.md#e2-design-philosophy--scope) and
    [ingestion](../../module/elt/spec-ingest.md).
 3. **Shape.** Pipelines of Steps: enrichment, deduplication, joins, time-series and analytics Steps,
    then partitioned [output](../../module/elt/spec-sinks.md). The authored Pipeline graph and
    its executor are layered on the engine; see
-   [Pipeline graph](../../module/elt/architecture-elt.md#e4-the-pipeline-graph--the-backend-model) and
+   [Pipeline graph](../../module/elt/architecture-elt-graph-consignments.md#e4-the-pipeline-graph--the-backend-model) and
    [live execution](../../module/elt/spec-pipeline-execution.md).
 4. **Analyse.** Measures and KPIs in Studio and BI; scores and baselines through the Analytics Kernel.
 5. **Act.** Alerts, Decision Rules (the Decision Kernel and its condition tree), Incidents, Cases and
@@ -536,7 +536,7 @@ naming rule is held by `node tools/check-product-docs.mjs`.
 | Kafka stream connector (`module.connectors-kafka`) | [architecture](../../module/connectors-kafka/architecture-connectors-kafka.md) |  |
 | Collector and export connectors (`module.connectors`) | [architecture](../../module/connectors/architecture-connectors.md) |  |
 | Demo authenticator (`module.demo-auth`) | [architecture](../../module/demo-auth/architecture-demo-auth.md) |  |
-| ELT — ingestion, Pipelines and step registry (`module.elt`) | [architecture](../../module/elt/architecture-elt.md) |  |
+| ELT — ingestion, Pipelines and step registry (`module.elt`) | [architecture](../../module/elt/architecture-elt.md) | [ELT — architecture — Acquisition, Collectors, parsing and Pipelines](../../module/elt/architecture-elt-acquisition-parsing.md) · [ELT — architecture — Engine code, design scope and how a file becomes Tables](../../module/elt/architecture-elt-engine-design.md) · [ELT — architecture — The Pipeline graph, consignment status and directory layout](../../module/elt/architecture-elt-graph-consignments.md) |
 | Entity lists (`module.entity-list`) | [architecture](../../module/entity-list/architecture-entity-list.md) |  |
 | Entity store (`module.entity-store`) | [architecture](../../module/entity-store/architecture-entity-store.md) |  |
 | Event model and log (`module.event`) | [architecture](../../module/event/architecture-event.md) |  |

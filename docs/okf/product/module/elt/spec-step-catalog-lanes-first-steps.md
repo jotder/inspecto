@@ -69,7 +69,7 @@ consignment caps), not only the served `AttributeSpec`s, because the canvas form
 leaf `ConfigSpecs.pipeline()` declares, so `POST /config/write` and the graph save type-check it. Every
 sub-block is additive: absent means the default in the table. *Remote* = read only on the remote
 acquisition path (`CollectorProcessor.acquire`); a `local` inbox never reaches it, and since 2026-09-24 a save
-warns when one is set on a local inbox (`WARN_COLLECTOR_KEY_INERT`, [config safety](../config/spec-config-safety.md#collector-checks--throttle-breaker-archive-2026-09-24)).
+warns when one is set on a local inbox (`WARN_COLLECTOR_KEY_INERT`, [config safety](../config/spec-config-safety-roots-save-gate.md#collector-checks--throttle-breaker-archive-2026-09-24)).
 
 | Key | Type · default | Form | What it does |
 |---|---|---|---|
@@ -305,7 +305,7 @@ wide `charge_*` keys, unpivoted into `(CHARGE_TYPE, AMOUNT)` rows.
 
 ## `resample` → `transform.timeseries.resample` — Time-grain resampler & gap imputer
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 M5, [analytics-kernel § Time-series primitives](../analytics/spec-analytics.md#time-series-primitives)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 M5, [analytics-kernel § Time-series primitives](../analytics/spec-analytics-distribution-time-series.md#time-series-primitives)).*
 
 **Function.** One row per key per time bucket, **every bucket between the bounds present** — a daily, weekly or
 monthly series ready for a chart, a KPI or a shift, with no missing periods.

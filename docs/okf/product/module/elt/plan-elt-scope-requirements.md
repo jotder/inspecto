@@ -36,7 +36,7 @@ acquisition ledger; the Unpack stage.
 
 ⚠ The boundary that is easy to get wrong: **acquisition never widens to "read from N places at once."**
 Multi-location ingest is composition of existing pieces — see
-[multi-location ingest](architecture-elt.md#multi-location-ingest--the-composition-pattern), which is a `PIP` concern.
+[multi-location ingest](architecture-elt-acquisition-parsing.md#multi-location-ingest--the-composition-pattern), which is a `PIP` concern.
 
 ### 1.1 Ingestion (`ING`)
 

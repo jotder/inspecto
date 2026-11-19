@@ -16,7 +16,7 @@ tags: [product-item, module]
 | Slot | Status | Document |
 |---|---|---|
 | plan | current | [Analytics Kernel — plan](plan-analytics.md) |
-| spec | current | [Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts](spec-analytics.md) |
+| spec | current | [Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts — Cohorts, ranking, motifs, forecasting and model kernels](spec-analytics-cohorts-forecasting.md) · [Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts — Distribution Steps, score contract and time-series primitives](spec-analytics-distribution-time-series.md) · [Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts — The module, definitions, functions and the profiler](spec-analytics-module-functions.md) · [Analytics Kernel — canonical statistics, the column profiler, time-series primitives, the baseline and score output contracts](spec-analytics.md) |
 | architecture | current | [Analytics kernel](architecture-analytics.md) |
 | features | current | [Analytics kernel — features](features-analytics.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |

@@ -201,7 +201,7 @@ optional pack field; no route was added.
   stay under `inspecto-ui/projects/link-analysis/src/graph/`; the Java parity tests read them from there.
 * **Motif search: the matcher is the platform's, the compiler stays** (S6, 2026-10-17). The windowed fan-in / fan-out
   search behind `/inv/pattern/branching` is `com.gamma.graph.TemporalMotifMatcher` in `platform/inspecto-graph`
-  ([Analytics Kernel § Temporal motif matcher](../analytics/spec-analytics.md#temporal-motif-matcher)), so AML, Mobile Money
+  ([Analytics Kernel § Temporal motif matcher](../analytics/spec-analytics-cohorts-forecasting.md#temporal-motif-matcher)), so AML, Mobile Money
   and Fraud can match structuring rings without Link Analysis. LA keeps `PatternQueryCompiler` (stage parsing and its
   422s, the SQL prune over the whole Dataset, key normalisation), its `Stage` with edge kind, node kind and threshold
   band, and `Stage.motif()` — the mapping onto the matcher's neutral stage, where a node kind other than `entity`

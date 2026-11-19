@@ -14,7 +14,7 @@ timestamp: 2026-10-10T00:00:00Z
 > Professional, Enterprise and Preview; not Personal — D-AD4). It depends on `inspecto-entity-list`
 > (`requires.modules: entity-list`) and **not** on `inspecto-scoring`: the pieces it shares with
 > [Risk Scores](../scoring/spec-risk-scores.md) are extracted, never copied (D-AD5, fulfilled 2026-10-17 by ANALYTICS-CORE-1 M7):
-> the score output contract is in the Analytics Kernel (D-AN6, [Score output contract](../analytics/spec-analytics.md#score-output-contract))
+> the score output contract is in the Analytics Kernel (D-AN6, [Score output contract](../analytics/spec-analytics-distribution-time-series.md#score-output-contract))
 > and its writer `com.gamma.alert.ScoreOutputWriter` in the engine. Without the module `/anomaly-scores*` answers 503
 > and an `anomaly-model` component is unknown to the SPA, which then hides every anomaly surface.
 > Built 2026-10-10 in slices S1..S5 (`ANOMALY-DETECTION-1`); the design and its lane notes are archived at

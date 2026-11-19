@@ -45,7 +45,7 @@ ratcheting duplication guard (Must items M1–M10).
   failed to compact or silently dropped the newer columns (`PartitionCompactorSchemaDriftTest`).
 - **Steps for C6 and C9 (2026-11-01, `ANALYTICS-STEPS-TS-1`):** `transform.timeseries.changepoint`,
   `transform.cohort.retention`, `transform.cohort.funnel` (`steps:` kinds `changepoint`, `retention`, `funnel`) —
-  [spec § Change-point and cohort Steps](spec-analytics.md#change-point-and-cohort-steps).
+  [spec § Change-point and cohort Steps](spec-analytics-cohorts-forecasting.md#change-point-and-cohort-steps).
 
 ## Left
 

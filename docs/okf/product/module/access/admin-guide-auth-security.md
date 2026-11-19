@@ -646,7 +646,7 @@ Space `acme` could name `beta`'s data directory by absolute path and pass. Probe
 a Space's allowed roots are **its own base plus the operator-declared `-Dassist.safety.roots`**, keyed on the
 thread's Space binding. This is the path-level twin of the Advanced `space-isolation` policy above — and
 unlike it, it holds in **every** edition. Detail, caveats and pinning tests:
-[Config safety](../config/spec-config-safety.md#a-spaces-allowed-roots-declared--its-own-base-tier-3-2026-08-14-narrowed-2026-09-24).
+[Config safety](../config/spec-config-safety-roots-save-gate.md#a-spaces-allowed-roots-declared--its-own-base-tier-3-2026-08-14-narrowed-2026-09-24).
 
 ## The `sql.template` job runs behind SqlGuard and a sealed connection (`SQL-TEMPLATE-SANDBOX-1`, 2026-09-24)
 
@@ -989,4 +989,4 @@ approving or declining. `canApproveChanges` is seeded to `admin` only (`super` h
   still pending (proven by `PendingChangesMultiPodTest`); a live two-pod test is owed at the first HA deployment** (tracked on `BACKLOG.md` §2, *Deployment topology live validation*).
 - The AI-agent approvals inbox (`/agent/approvals*`) is a different thing and is unchanged.
 
-As-built detail (the hold, the funnels, what is governable): [config safety](../config/spec-config-safety.md#maker-checker--pending-changes-2026-09-26).
+As-built detail (the hold, the funnels, what is governable): [config safety](../config/spec-config-safety-maker-checker.md#maker-checker--pending-changes-2026-09-26).

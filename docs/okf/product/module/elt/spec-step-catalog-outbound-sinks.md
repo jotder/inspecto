@@ -286,7 +286,7 @@ or warned at the save, not at load or run · **(7) demo** — a runnable `inspec
 committed Space config, or, where infrastructure is unavoidable, an `examples/_reference/…` template held
 true by `ShippedExamplesPassTheSaveGateTest`. A processor that cannot meet a point is **PARTIAL**, not
 DELIVERED with a footnote. Earlier gap groups G1, G3–G8 and G11 closed 2026-09-23 (catalog↔docs drift, one
-`SaveGate`, save-time step checks — [config safety](../config/spec-config-safety.md#step-config-checks-g4) —,
+`SaveGate`, save-time step checks — [config safety](../config/spec-config-safety-roots-save-gate.md#step-config-checks-g4) —,
 dry-run blind spots — [pipeline test run](spec-pipeline-execution.md)).
 
 **Verdicts on the seven "questionably delivered" (2026-09-24).** ✓ met · ✗ not met · — no keys to get wrong ·
@@ -307,7 +307,7 @@ The three PARTIALs are a *category* verdict, not a quality one: each is a workin
 own definition of partial is "something real behind it, but not as a chain Step" — the reason
 `transform.diff.compare` and `sink.notify.email` were already partial. Nothing became less addable: all three
 were inactive in the palette before. Save-time checks added for the Collector keys:
-[config safety § Collector checks](../config/spec-config-safety.md#collector-checks--throttle-breaker-archive-2026-09-24).
+[config safety § Collector checks](../config/spec-config-safety-roots-save-gate.md#collector-checks--throttle-breaker-archive-2026-09-24).
 
 **G10 — demos (2026-09-24).** Every DELIVERED processor now has one. Added: `07-steps/profile`,
 `07-steps/dedup-window`, `03-schema-transform/schema-drift`, `05-acquisition/intake-throttle`, and the

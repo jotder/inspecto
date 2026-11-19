@@ -10,15 +10,15 @@ timestamp: 2026-11-19T00:00:00Z
 # P.12 Decode Profile — one vendor's decode settings, kept once (2026-09-25, slices C1–C4)
 
 Section P.12 of the [parsing specification](spec-parsing.md) (parser plugins
-[§P.9](spec-parsing.md#p9-parser-plugins--the-self-describing-parser-framework), drop-in parser jars
-[§P.11](spec-parsing.md#p11-drop-in-parser-jars--trust-gate-staging-dir-pack-parsers-ingest-and-preview-gate-shipped-2026-09-25),
-deferred items [§P.13](spec-parsing.md#p13-deferred-by-decision-the-trust-designs-open-items)), on its own page so each
+[§P.9](spec-parsing-profiles-plugins.md#p9-parser-plugins--the-self-describing-parser-framework), drop-in parser jars
+[§P.11](spec-parsing-hierarchical-decode.md#p11-drop-in-parser-jars--trust-gate-staging-dir-pack-parsers-ingest-and-preview-gate-shipped-2026-09-25),
+deferred items [§P.13](spec-parsing-hierarchical-decode.md#p13-deferred-by-decision-the-trust-designs-open-items)), on its own page so each
 stays readable whole.
 
 Operator decisions 2026-09-25: **D5** a key the Pipeline sets wins, and `segments` is **replaced whole**,
 never merged. **D6** a bundle carries the profile as its own satellite and rewrites the refs inside it,
 refusing basename collisions, and never inlines it. **D9** no explode-style option for repeated children
-until prevalence is measured (since measured and built — [spec-parsing.md §P.13](spec-parsing.md#p13-deferred-by-decision-the-trust-designs-open-items)). **D10** the name is **Decode Profile** (GLOSSARY §5).
+until prevalence is measured (since measured and built — [spec-parsing.md §P.13](spec-parsing-hierarchical-decode.md#p13-deferred-by-decision-the-trust-designs-open-items)). **D10** the name is **Decode Profile** (GLOSSARY §5).
 
 **Shape.** A satellite `.toon` whose one top-level block is `asn1:`, holding the same keys a Pipeline's
 `parsing.asn1` takes. It is not a registry kind and has no routes of its own. It is written, read and
@@ -101,7 +101,7 @@ gate runs. The manifest sha256 is checked against the bytes as shipped.
 
 **Scope.** ASN.1 only. XML's `ingester_config` has the same per-vendor shape but no customer asking. The
 legacy tree operations on repeated children (`flattenList` / `reduce` / `cartesianJoin`) have no home on
-purpose (D9; what was built instead is in [spec-parsing.md §P.13](spec-parsing.md#p13-deferred-by-decision-the-trust-designs-open-items)).
+purpose (D9; what was built instead is in [spec-parsing.md §P.13](spec-parsing-hierarchical-decode.md#p13-deferred-by-decision-the-trust-designs-open-items)).
 
 Proof: `UnifiedParsingBlockTest` (profile-only load with refs beside the profile; Pipeline scalar wins;
 blank is unset; `segments` replaced whole; escape; `.txt` refused; nesting and extra blocks refused),

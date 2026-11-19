@@ -758,6 +758,21 @@ chapters:
         type: unsorted
         tracks[1]: builder
         audience: internal
+      user_guide_training_f_investigations_first_graph:
+        file: docs/okf/product/module/la-core/user-guide-training-f-investigations-first-graph.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_f_investigations_teams_drafts:
+        file: docs/okf/product/module/la-core/user-guide-training-f-investigations-teams-drafts.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_f_investigations_evidence:
+        file: docs/okf/product/module/la-core/user-guide-training-f-investigations-evidence.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
       user_guide_training_g_geo_and_entity_pages:
         file: docs/okf/product/module/la-core/user-guide-training-g-geo-and-entity-pages.md
         type: unsorted

@@ -209,7 +209,7 @@ edge `{rel: "companion", derived: true}` instead of a `data` edge (which `Pipeli
 `ILLEGAL_EMIT` — a sink emits nothing). `parseAndValidateFlow`, shared by the
 candidate dry run and `PUT …/graph`, drops that edge before parsing, so both answer 200; a hand-authored
 sink `data` edge is still refused. As-built in
-[editable-round-trip](spec-pipeline-model.md#derived-companion-edge--display-only-never-saved-2026-09-24) (*Derived companion edge*).
+[editable-round-trip](spec-pipeline-model-round-trip.md#derived-companion-edge--display-only-never-saved-2026-09-24) (*Derived companion edge*).
 
 **A `sink.webhook` branch now refuses the way the job dry run does.** For every webhook sink the walk reaches,
 `PipelineDryRun` calls `WebhookSink.plan`. That is the same resolution `DryRunSinkWriter` uses: config, edition

@@ -21,7 +21,7 @@ Its `_latest` Dataset can be a Risk Score factor (`measure: max(score)`).
 
 **Shared with Anomaly Scores (ANALYTICS-CORE-1 M7, D-AN6; fulfils D-AD5):** the output names, column head and tail,
 0–100 clamp and inclusive `high`, entity cap, run files and retention, and the explanation part are the score output
-contract in the Analytics Kernel ([Score output contract](../analytics/spec-analytics.md#score-output-contract)); the run is
+contract in the Analytics Kernel ([Score output contract](../analytics/spec-analytics-distribution-time-series.md#score-output-contract)); the run is
 written by `com.gamma.alert.ScoreOutputWriter` (engine) and the watch list fed by `WatchListFeed.feedScored`. The
 factor arithmetic, `recompute`, the model spec and the wording stay in `com.gamma.risk`.
 

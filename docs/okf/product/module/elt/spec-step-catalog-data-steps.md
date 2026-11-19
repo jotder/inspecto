@@ -12,7 +12,7 @@ Part 3 of 5 of [Step catalog — every Step kind, delivered and pending](spec-st
 
 ## `binning` → `transform.data.binning` — Histogram & quantile binner
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S3, [analytics-kernel § Distribution Steps](../analytics/spec-analytics.md#distribution-steps)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S3, [analytics-kernel § Distribution Steps](../analytics/spec-analytics-distribution-time-series.md#distribution-steps)).*
 
 **Function.** Every row gains a **bin number** (0 … bins − 1) and a **label** (`[lower, upper)`) for a number column —
 amount bands, age bands, deciles.
@@ -64,7 +64,7 @@ the same `RowShaper` arm · (4) palette `addable` · (5) Base, every edition · 
 
 ## `correlation` → `transform.stats.correlation` — Pearson correlation & linear regression
 
-*Added 2026-10-17 (ANALYTICS-CORE-1 S3, [analytics-kernel § Distribution Steps](../analytics/spec-analytics.md#distribution-steps)).*
+*Added 2026-10-17 (ANALYTICS-CORE-1 S3, [analytics-kernel § Distribution Steps](../analytics/spec-analytics-distribution-time-series.md#distribution-steps)).*
 Catalog `transform.stats.correlation` is **DELIVERED**: Pearson (default) and Spearman (`method: spearman`, 2026-10-18).
 
 **Function.** How strongly two number columns move together, and the straight line that fits them — per group, for
