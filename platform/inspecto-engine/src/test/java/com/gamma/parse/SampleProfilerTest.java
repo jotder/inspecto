@@ -131,6 +131,11 @@ class SampleProfilerTest {
             assertEquals(new SampleProfiler.ColumnType("day", "VARCHAR", "DATE", "%Y-%m-%d", null, 19, 20, "soon"), comma.get(1));
             assertEquals("VARCHAR", comma.get(2).type(), "19 of 20 numbers is text");
             assertEquals("VARCHAR", SampleProfiler.types(conn, rel, 0).get(0).type(), "no mark: '1,5' is text");
+            // under a comma mark the import reads '3.5' as 35: such a column is no number (verification finding 2)
+            String points = "(SELECT * FROM (VALUES ('3.5'), ('47.00'), ('12')) t(x))";
+            assertEquals("VARCHAR", SampleProfiler.types(conn, points, 0, ",").get(0).type());
+            assertEquals("DOUBLE", SampleProfiler.types(conn, points, 0, ".").get(0).type());
+            assertEquals("BIGINT", SampleProfiler.types(conn, "(SELECT * FROM (VALUES ('12'), ('7')) t(x))", 0, ",").get(0).type());
         }
     }
 

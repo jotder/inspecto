@@ -47,7 +47,7 @@ values as text, takes the first rule every non-blank value meets:
 
 | # | Values | Answer |
 |---|---|---|
-| 1 | numbers written with the decimal mark that a plain cast cannot read (`3,50`, `1.234,50`, `1,234.50`) | `DOUBLE` carrying the mark (`ColumnType.decimal`) |
+| 1 | numbers written with the decimal mark that a plain cast cannot read (`3,50`, `1.234,50`, `1,234.50`) | `DOUBLE` carrying the mark (`ColumnType.decimal`). Under a `,` mark a column with a value the mark does not read (`3.5`, which the import would read as `35`) skips rule 2: no number |
 | 2 | whole numbers (never text with `.`/`e`, even `47.00`), then any number | `BIGINT`, then `DOUBLE` |
 | 3 | a bare `TIMESTAMP` cast | `DATE` (all midnight) with its `DATE_FORMATS` entry, else `TIMESTAMP` with the first `TIMESTAMP_FORMATS` entry every value parses with — `2025-03-22T09:30:00` is `TIMESTAMP %Y-%m-%dT%H:%M:%S` (ruling 1) |
 | 4 | one `DATE_FORMATS` entry (ambiguity refused), then one `TIMESTAMP_FORMATS` entry a bare cast cannot read | `DATE` with it (`March 22, 2025` is `DATE %B %d, %Y`, ruling 1), then `TIMESTAMP` with it |

@@ -200,7 +200,8 @@ public final class SampleProfiler {
      * screen's): the first that every non-blank value accepts wins —
      * <ol>
      *   <li>a number written with {@code mark} that a plain cast cannot read ({@code 3,50}, {@code 1.234,50}):
-     *       {@code DOUBLE} carrying the mark ({@link DecimalMarkText#numberType});</li>
+     *       {@code DOUBLE} carrying the mark ({@link DecimalMarkText#numberType}). Under a {@code ,} mark a column with a
+     *       value the mark does not read ({@code 3.5}, which the import would read as 35) is never a number;</li>
      *   <li>{@code BIGINT} (text written with a decimal point or an exponent is never one, even {@code 47.00}, and it is
      *       checked before {@code BOOLEAN} so a {@code 0/1} column stays numeric), then {@code DOUBLE};</li>
      *   <li>a bare {@code TIMESTAMP} cast: {@code DATE} when every value is midnight (the text carried no time), else
@@ -219,6 +220,7 @@ public final class SampleProfiler {
         String nonBlank = col + " IS NOT NULL AND trim(" + col + ") <> ''";
         long n = count(conn, "SELECT count(*) FROM " + SAMPLE + " WHERE " + nonBlank);
         if (n == 0) return all(column, duckdb, "VARCHAR", null, null, 0);   // nothing to vote with
+        boolean numbers = true;   // whether a plain number cast may answer
         if (mark != null) {
             List<String> values = new ArrayList<>();
             try (Statement st = conn.createStatement();
@@ -226,16 +228,20 @@ public final class SampleProfiler {
                 while (rs.next()) values.add(rs.getString(1));
             }
             if (DecimalMarkText.numberType(values, mark) != null) return all(column, duckdb, "DOUBLE", null, mark, n);
+            // under a comma mark the engine reads '3.5' as 35 (the point groups digits): a column the mark does not read
+            // value by value is no number, or the type answer and the import would disagree
+            if (",".equals(mark))
+                for (String v : values) numbers &= DecimalMarkText.reads(v, mark);
         }
         // ⚠ DuckDB's TRY_CAST('1.5' AS BIGINT) SUCCEEDS by rounding, so a bare cast check lets BIGINT swallow every
         // decimal column. The round-trip guard: BIGINT only wins a value whose DOUBLE cast equals its BIGINT cast (no
         // fractional part was lost). And text written with a decimal point or an exponent ('47.00', '1e3') is a decimal
         // even when its fraction is zero (DECIMAL-TEXT-NOT-BIGINT-1): a later '12.25' in that column must not be cut to 12.
-        if (every(conn, nonBlank, "(TRY_CAST(" + col + " AS BIGINT) IS NOT NULL"
+        if (numbers && every(conn, nonBlank, "(TRY_CAST(" + col + " AS BIGINT) IS NOT NULL"
                 + " AND TRY_CAST(" + col + " AS DOUBLE) = TRY_CAST(" + col + " AS BIGINT)"
                 + " AND NOT regexp_matches(" + col + ", '[.eE]'))"))
             return all(column, duckdb, "BIGINT", null, null, n);
-        if (every(conn, nonBlank, "TRY_CAST(" + col + " AS DOUBLE) IS NOT NULL")) return all(column, duckdb, "DOUBLE", null, null, n);
+        if (numbers && every(conn, nonBlank, "TRY_CAST(" + col + " AS DOUBLE) IS NOT NULL")) return all(column, duckdb, "DOUBLE", null, null, n);
         if (every(conn, nonBlank, "TRY_CAST(" + col + " AS TIMESTAMP) IS NOT NULL")) {
             long timed = count(conn, "SELECT count(*) FROM " + SAMPLE + " WHERE " + nonBlank
                     + " AND strftime(TRY_CAST(" + col + " AS TIMESTAMP), '%H:%M:%S') <> '00:00:00'");

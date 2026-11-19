@@ -107,6 +107,8 @@ export function writeParseSchema(configApi: ConfigService, w: ParseSchemaWrite):
                         ...(f.description ? { description: f.description } : {}),
                         ...(f.unit ? { unit: f.unit } : {}),
                         ...(f.classification ? { classification: f.classification } : {}),
+                        // U3: the strptime format a date was read with - a `March 22, 2025` DATE lands NULL without it
+                        ...(f.format ? { format: f.format } : {}),
                     })),
                 },
                 mapping: {
