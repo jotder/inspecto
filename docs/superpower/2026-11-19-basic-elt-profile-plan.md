@@ -185,6 +185,12 @@ Basic-profile declaration, the `postgres` exemption, telling a Basic entry point
 
 ### 5.3 Decisions for the operator
 
+**Ruled 2026-11-19 (operator):** O1 **yes** — *Watch this folder* becomes a scheduled `local` Collector and
+`InboxWatch` retires (DT-17 reversed for import inboxes); O2 **keep DT-9 as narrowed** — the Gate lives in screens and
+Basic's routes, nothing refused on load; O3 **the mapping** — rename and *Leave out* stay in the mapping; O4 **yes** — a
+Postgres snapshot keeps a saved Connection restricted to `INSPECTO_PG_` secrets. O5 not asked: ELT's wording is used
+unless the operator objects.
+
 | # | Decision | Recommendation |
 |---|---|---|
 | O1 | DT-17: may *Watch this folder* become a scheduled `local` Collector (`trigger.every: 30s`), retiring `InboxWatch`? Per-file stability replaces the whole-inbox settle rule. | Yes — it is the only way B1 reuses ELT |
