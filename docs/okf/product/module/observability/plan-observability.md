@@ -12,7 +12,7 @@ supersedes-rows: REQUIREMENTS §3.7 OPS-1..OPS-6 (this file corrects them, see �
 # Observability & maintenance (`OPS`)
 
 > **How to read this file.** §1–§2 are the *requirement of record*: where they disagree with
-> `docs/REQUIREMENTS.md` §3.7 or `docs/EDITIONS.md`, **this file wins** and the disagreement is stated
+> `docs/okf/product/layer/platform/spec-requirements.md` §3.7 or `docs/EDITIONS.md`, **this file wins** and the disagreement is stated
 > in place. §3 is the as-built specification, §4 the dated decisions, §5 what is not built (tracked and
 > untracked), §6 what was refused or superseded, §7 the pointers into code and docs, §8 how the whole
 > thing is verified. Everything named in backticks under §3 and §7 was checked against the tree on
@@ -66,7 +66,7 @@ itself healthy** — without shell scripts, OS cron, or an external monitoring s
 
 ## 2. Requirements of record
 
-The board rows were `docs/REQUIREMENTS.md` §3.7 (that section was stripped to an index on 2026-09-09 — this file is their only home now) `OPS-1`…`OPS-6` plus the `EDITIONS.md` rows `OPS-01`…`OPS-08`,
+The board rows were `docs/okf/product/layer/platform/spec-requirements.md` §3.7 (that section was stripped to an index on 2026-09-09 — this file is their only home now) `OPS-1`…`OPS-6` plus the `EDITIONS.md` rows `OPS-01`…`OPS-08`,
 `JOB-03`, `CP-13`, `SEC-09`. Below, each row is restated as the requirement actually holds, with the
 correction the board needs. **Where a cell below says CORRECTION, the board was wrong on 2026-09-08 and
 has been amended in the same commit as this file.**

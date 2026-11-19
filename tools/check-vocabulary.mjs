@@ -204,7 +204,7 @@ const DOC_ALLOW = {
     'platform/inspecto-engine/src/test/resources/pipeline-document.golden.md::source-acquisition-entity':
         'Different concept, and a GOLDEN FIXTURE: the Map table\'s "Source" column is the mapping\'s input expression (`CAST(AMOUNT AS DOUBLE)`), the data-origin sense. The text is EMITTED by the document generator and must stay byte-exact for its test — if that header is ever renamed, it is renamed in the generator and this file follows, never the reverse.',
 
-    'docs/PROJECT_NOTES.md::bare-flow':
+    'docs/okf/product/layer/platform/tests-guards-and-claims-gotchas.md::bare-flow':
         'Subject matter: the one hit records that CONFIG_ALLOW doubles as the Flow→Pipeline Tier-3 ledger. The other four hits in this file were stale and were fixed 2026-08-29.',
 };
 
@@ -216,7 +216,7 @@ const RULES = [
     // `measure-threshold` (the A2 confusion: alerting on a BI Measure) was RETIRED 2026-09-06 — the operator
     // widened GLOSSARY §4/§8 so an Alert Rule watches a Metric OR a BI Measure (BI-5 shipped exactly that in
     // one `AlertRule` record), so the premise the rule enforced is no longer the glossary's. Its one waiver
-    // (`docs/REQUIREMENTS.md`) went with it.
+    // (`docs/okf/product/layer/platform/spec-requirements.md`) went with it.
     {
         id: 'data-store',
         test: (line) => { const m = line.match(/\bdata stores?\b/i); return m ? m[0] : null; },

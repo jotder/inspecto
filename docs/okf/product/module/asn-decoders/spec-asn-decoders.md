@@ -32,7 +32,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 The legacy byte-to-text logic is ported verbatim into `Decoders` and dispatched by grammar type name in
 `DecoderRegistry.withDefaults()`: uppercase hex fallback, OCTET STRING as ISO-8859-1, TBCD (A-E letters),
-AddressString, TIMESTAMP and the vendor named types listed in `providers/asn-parser/asn-decoders/README.md`.
+AddressString, TIMESTAMP and the vendor named types listed in [architecture-decoder-modules.md](architecture-decoder-modules.md).
 
 ## Framing
 
@@ -55,3 +55,19 @@ compiled only by `legacy-code` for parity; it is kept by decision (BACKLOG `LEGA
 
 - `providers/asn-parser/docs/REDESIGN.md` · `providers/asn-parser/docs/ENCODING_RULES_SEAM.md`
 - [api](api-asn-decoders.md) · [architecture](architecture-asn-decoders.md)
+
+## DATA-GOV-1 decision (2026-09-06)
+
+🔴 **Status 2026-09-15 (operator): NOT DONE.** Neither the encrypted out-of-band archive nor the fetch script exists; the corpus has not moved. Recorded here so the section stops reading as decided-and-handled — the BACKLOG §2 gate closes only when this section carries the dated archive location and the fetch-script path, and today it carries neither. ⚠ Consequence: `asn-parser`'s corpus tests stay opt-in and data-gated, so that lane (compiled by `legacy-code/pom.xml`, not dead) is tested only against synthetic input; and real carrier data without an archive is a data-governance finding in its own right, independent of any other compliance work.
+
+The real carrier corpus (~57 MB, two carriers, only in working trees) moves to an **encrypted out-of-band
+archive on company storage, fetched by script**, access held by the data-agreement owner; the parity harness runs
+wherever the archive is provisioned. A **small synthetic subset is committed for CI smoke** — a complement, not a
+replacement: every parity defect so far came from real files. **The synthetic subset SHIPPED 2026-09-06**
+(`providers/asn-parser/corpus-synthetic/` + `SyntheticCorpusTest` in asn-golden, always-on: two cases — back-to-back records
+with OPTIONAL/SEQUENCE OF/CHOICE, and the Huawei file shape with a 50-byte header, 4-byte record headers and 0x00
+fill; BER as hex text so the `*.ber` ban stands; regenerate with `-Dasn.synthetic.write=true`). It pinned one
+reader rule on the way: fill bytes are skipped BEFORE a record header, so a header must not start with 0x00/0xFF.
+Git LFS is refused unless the data agreement permits
+third-party hosting. ⚠ Never force-push or reset master to fix this. The archive itself is an org action
+(BACKLOG §2); the synthetic subset is BACKLOG §3 `DATA-GOV-SYNTH`.

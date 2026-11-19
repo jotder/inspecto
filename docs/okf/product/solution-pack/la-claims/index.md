@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-SHOWCASE-REHEARSAL-1` | P3 | chore | all three showcases are driven in the browser (2026-10-24, and the items left then on 2026-10-28 on the reorganized Studio); what is left… | — |
+| `LA-SHOWCASE-REHEARSAL-1` | P3 | chore | A spoken showcase run with an audience, the portal on :8140 and the B Alert beat. | — |

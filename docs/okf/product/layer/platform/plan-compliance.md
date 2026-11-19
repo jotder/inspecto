@@ -11,7 +11,7 @@ supersedes-rows: EDITIONS CMP-01..CMP-08 and REQUIREMENTS NFR-7 (this file corre
 # Compliance (`CMP`)
 
 > **How to read this file.** §1–§2 are the *requirement of record*: where they disagree with
-> `docs/EDITIONS.md`'s `CMP-*` rows or `docs/REQUIREMENTS.md` `NFR-7`, **this file wins** and the
+> `docs/EDITIONS.md`'s `CMP-*` rows or `docs/okf/product/layer/platform/spec-requirements.md` `NFR-7`, **this file wins** and the
 > disagreement is stated in place. §3 is the as-built specification, §4 the dated decisions, §5 what is
 > not built, §6 what was refused or superseded, §7 the pointers, §8 how it is verified.
 >

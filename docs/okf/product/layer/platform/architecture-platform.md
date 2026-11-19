@@ -505,8 +505,8 @@ naming rule is held by `node tools/check-product-docs.mjs`.
 |---|---|---|
 | Feature modules (`layer.features`) | [architecture](../../layer/features/architecture-features.md) |  |
 | Link Analysis modules (`layer.la`) | [architecture](../../layer/la/architecture-la.md) |  |
-| Platform (`layer.platform`) | [architecture](../../layer/platform/architecture-platform.md) | [Editions](../../layer/platform/architecture-editions.md) · [Modules](../../layer/platform/architecture-modules.md) · [Platform Services](../../layer/platform/architecture-platform-services.md) |
-| Product host (`layer.product`) | [architecture](../../layer/product/architecture-product.md) | [Studio BI](../../layer/product/architecture-studio-bi.md) |
+| Platform (`layer.platform`) | [architecture](../../layer/platform/architecture-platform.md) | [Control plane, SPIs and packaging - gotchas](../../layer/platform/architecture-backend-gotchas.md) · [Editions](../../layer/platform/architecture-editions.md) · [Modules](../../layer/platform/architecture-modules.md) · [Platform Services](../../layer/platform/architecture-platform-services.md) |
+| Product host (`layer.product`) | [architecture](../../layer/product/architecture-product.md) | [Studio BI](../../layer/product/architecture-studio-bi.md) · [inspecto-ui conventions and gotchas](../../layer/product/architecture-ui-conventions.md) |
 | Providers (`layer.providers`) | [architecture](../../layer/providers/architecture-providers.md) |  |
 | Service contracts (SPI) (`layer.spi`) | [architecture](../../layer/spi/architecture-spi.md) |  |
 
@@ -527,7 +527,7 @@ naming rule is held by `node tools/check-product-docs.mjs`.
 | Analytics Kernel (canonical statistics and baselines) (`module.analytics`) | [architecture](../../module/analytics/architecture-analytics.md) |  |
 | Anomaly Detection (`module.anomaly`) | [architecture](../../module/anomaly/architecture-anomaly.md) |  |
 | Public API annotations (`module.api`) | [architecture](../../module/api/architecture-api.md) |  |
-| ASN.1 decoders (`module.asn-decoders`) | [architecture](../../module/asn-decoders/architecture-asn-decoders.md) |  |
+| ASN.1 decoders (`module.asn-decoders`) | [architecture](../../module/asn-decoders/architecture-asn-decoders.md) | [ASN.1 decoder modules](../../module/asn-decoders/architecture-decoder-modules.md) |
 | Audit contract (`module.audit-spi`) | [architecture](../../module/audit-spi/architecture-audit-spi.md) |  |
 | Authentication and capability contract (`module.auth-spi`) | [architecture](../../module/auth-spi/architecture-auth-spi.md) |  |
 | Backup and restore (`module.backup`) | [architecture](../../module/backup/architecture-backup.md) |  |

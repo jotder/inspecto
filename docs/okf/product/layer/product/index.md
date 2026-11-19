@@ -15,9 +15,9 @@ tags: [product-item, layer]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Assurance capability programme — generic product before the project (as built)](plan-assurance-capability.md) · [Product maturity assessment — every client-facing item](plan-maturity-assessment.md) · [Studio (BI + INV) — capability spec](plan-studio.md) · [Surfaces & Lenses (UI) — capability spec](plan-surfaces.md) |
+| plan | current | [Assurance capability programme — generic product before the project (as built)](plan-assurance-capability.md) · [layer.product - board row detail](plan-board-detail.md) · [Product maturity assessment — every client-facing item](plan-maturity-assessment.md) · [Studio (BI + INV) — capability spec](plan-studio.md) · [Surfaces & Lenses (UI) — capability spec](plan-surfaces.md) |
 | spec | current | [Accessibility (WCAG 2.2 AA)](spec-accessibility.md) · [API & Data Integration](spec-api-and-data.md) · [Components Registry](spec-components.md) · [Design Tokens & Styling](spec-design-tokens.md) · [Alert](spec-ds-alert.md) · [Chart](spec-ds-chart.md) · [Chip](spec-ds-chip.md) · [Connectivity Banner](spec-ds-connectivity-banner.md) · [Data Table (tiered family)](spec-ds-data-table.md) · [Empty State](spec-ds-empty-state.md) · [Design System Gallery](spec-ds-gallery.md) · [Grid (ag-Grid theme & helpers)](spec-ds-grid.md) · [Query (AST, SQL, eval, builder)](spec-ds-query.md) · [Rule (Pro Max templates)](spec-ds-rule.md) · [Skeleton](spec-ds-skeleton.md) · [Status Badge](spec-ds-status-badge.md) · [Tree Table (aligned tree-grid)](spec-ds-tree-table.md) · [Errors & Connectivity](spec-errors-connectivity.md) · [Unified Canvas UI, Docking System & Enterprise Analytics Step Directory](spec-floating-panels.md) · [Forms & State](spec-forms-state.md) · [Handbook docs as tests — the check-block format](spec-handbook-doc-tests.md) · [Multi-Space Scoping](spec-multi-space.md) · [Page chrome — the shared header, filter bar, tiles, tabs and bulk actions](spec-page-chrome.md) · [Routing & Navigation](spec-routing-navigation.md) |
-| architecture | current | [Inspecto UI Architecture](architecture-product.md) · [Studio BI](architecture-studio-bi.md) |
+| architecture | current | [Inspecto UI Architecture](architecture-product.md) · [Studio BI](architecture-studio-bi.md) · [inspecto-ui conventions and gotchas](architecture-ui-conventions.md) |
 | features | current | [Inspecto — Product Capabilities](features-product-capabilities.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Catalog](user-guide-catalog.md) · [App](user-guide-concept-app.md) · [Dataset](user-guide-concept-dataset.md) · [Edition and Add-on](user-guide-concept-edition-addon.md) · [How the pieces fit](user-guide-concept-overview.md) · [Widget and Dashboard](user-guide-concept-widget-dashboard.md) · [Dashboard](user-guide-dashboard.md) · [Icon Settings](user-guide-icon-settings.md) · [Journey: from an alert to a closed Case](user-guide-journey-alert-to-case.md) · [Journey: from a file to a dashboard](user-guide-journey-file-to-dashboard.md) · [Journey: a safe config change](user-guide-journey-safe-config-change.md) · [Stream & Reference Onboarding](user-guide-onboarding.md) · [Spaces](user-guide-spaces.md) · [Studio](user-guide-studio.md) · [Tutorial 4 — Present it: a Dashboard for the business user](user-guide-tutorial-dashboard.md) |
@@ -34,18 +34,18 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `AUTHORING-REDESIGN-1` | P3 | feature | the authoring redesign's still-open letters. | demand |
-| `BASIC-ELT-PROFILE-1` | P2 | feature | Basic onboarding as a locked profile of ELT: one implementation, Basic = options locked. | — |
+| `AUTHORING-REDESIGN-1` | P3 | feature | Only letter (d) of the authoring redesign is left; no CREATE MACRO exists in any main source. | demand |
+| `BASIC-ELT-PROFILE-1` | P2 | feature | Make Basic onboarding a locked profile of ELT, retiring the parallel Basic backend and LA UI layers that duplicate ELT parts. | — |
 | — | P3 | defect | COMPONENT-DELETE-IN-USE-WORDS-1 the Components screen words every refused delete as "referenced by a pipeline" | — |
-| `BI-INSIGHTS-1` | P2 | feature | advanced insights on business data in Widgets and Dashboards — what happened, why it moved, what is unusual, what comes next, who is at r… | — |
-| `SPACE-TO-APP-CONSOLE-1` | P3 | feature | turn a working Space into a Space Template, and into an App, from the console. | — |
+| `BI-INSIGHTS-1` | P2 | feature | Advanced insights on business data in Widgets and Dashboards, authored and tuned as Insight Profiles. | — |
+| `SPACE-TO-APP-CONSOLE-1` | P3 | feature | Turn a working Space into a Space Template, and into an App, from the console. | — |
 | `AGT-SEGMENT-1` | P3 | chore | the assistant's commercial framing is an unvalidated product read. | — |
-| `PRODUCT-ASSEMBLY-1` | P2 | feature | assemble finished domain Products and the Platform with chosen Add-ons from definition files, with one tool — PA-0…PA-7 SHIPPED 2026-11-1… | — |
+| `PRODUCT-ASSEMBLY-1` | P2 | feature | Assemble finished domain Products and the Platform with chosen Add-ons from definition files, with one tool. | — |
 | `ADDON-PICKER-PAGE-1` | P3 | feature | the Add-on picker has no page yet: tools/pick-addons.mjs (PA-6c, 2026-11-11) is a CLI. | demand |
 | `UI-ZONELESS-1` | P3 | chore | the app runs Zone.js on purpose; going zoneless needs a component-by-component audit first (filed 2026-11-15, so the code's pointer has a… | demand |
 | `UI-PICKER-OPTIONS-1` | P3 | feature | <inspecto-option-picker> gains nested options (a parent that opens to its children), a disabled option with its reason, and a per-picker… | demand |
-| `UI-SCHEMA-FORM-EDITOR-1` | P3 | feature | <inspecto-schema-form>'s in-row editor is still a dense boxed Material field, kept with form-allow (the lint:forms allow-list is empty si… | demand |
-| `PACK-SALES-MARKETING-1` | P3 | feature | Sales & Marketing BI pack: sales, commissions, marketing and churn analytics | operator |
-| `INFO-RESTRUCTURE-1` | P2 | chore | the information base is restructured and kept right: one fact one home, current state only, pages an agent can read whole (target 40 KB,… | — |
-| `USER-HANDBOOK-1` | P2 | feature | the Handbook: users learn to build, ship and manage an App from the console's Help, organised by lifecycle (Understand → Build → Ship → M… | — |
+| `UI-SCHEMA-FORM-EDITOR-1` | P3 | feature | Move <inspecto-schema-form>'s in-row editor onto pen-field, which first needs several new pen-field features. | demand |
+| `PACK-SALES-MARKETING-1` | P3 | feature | A Sales & Marketing BI pack: sales, commissions, marketing and churn analytics. | operator |
+| `INFO-RESTRUCTURE-1` | P2 | chore | The information base is restructured and kept right: one fact one home, current state only, pages an agent can read whole. | — |
+| `USER-HANDBOOK-1` | P2 | feature | The Handbook: users learn to build, ship and manage an App from the console's Help, organised by lifecycle for three tracks. | — |
 | `USER-TRAINING-1` | P3 | feature | training on the Handbook's worked example: a Learning Path per track, Labs (lab-* Space Templates with an API checker), a platform video… | — |

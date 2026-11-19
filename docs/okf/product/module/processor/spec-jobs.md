@@ -64,7 +64,7 @@ body straight to `JobConfig.fromMap`, so keys are **snake_case** (`on_pipeline`,
 and type-specific parameters are **flat** alongside them. An unrecognised key is **absorbed as a parameter,
 never rejected** — so a misspelled trigger key yields a job with no trigger and no error anywhere. Pinned by
 `ControlApiJobCrudTest`; the full trap and the read side's deliberate asymmetry are in
-[`PROJECT_NOTES.md`](../../../../PROJECT_NOTES.md) §4.
+[`spec-config-gotchas.md`](../config/spec-config-gotchas.md).
 
 `submit()` binds the `space` MDC (for non-default spaces — see [multi-space](architecture-processor.md)) and runs on a
 virtual thread. `runJob()` uses `runner.runExclusiveOrSkip(name, …)` for a non-overlap guarantee (a job
@@ -249,7 +249,7 @@ Design of record (all phases + resolved decisions + TOON config gallery):
     (count/avg_ms) · `impact` (records_affected) · `impact.<ISO 4217>` (count / suspected / confirmed /
     recovered / prevented / outstanding — one axis per currency, WS-10). `value` is DOUBLE because an impact
     amount isn't a count. `key` is **quoted** in the DDL — a column name deliberately kept, quoted so no dialect's
-    reserved-word list can bite (cf. the `day`/`trigger` gotchas in PROJECT_NOTES).
+    reserved-word list can bite (cf. the `day`/`trigger` gotchas in `module/engine/spec-engine-gotchas.md`).
   * **Append per run, not full-refresh swap** — the `storage_report` catalog idiom (one timestamped file,
     readers glob the dir), *not* `MaterializeTask`'s stage/atomic-swap, because the time dimension is the
     entire gain over the live endpoint. Current-state consumers filter

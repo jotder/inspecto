@@ -36,3 +36,5 @@ from last good + each lane's entry.
 503 stubs and the OpenAPI generator: give them a two-direction parity test where both halves share a classpath.
 
 Related: [[ci-gates-beyond-the-reactor]], [[guard-scope-is-a-silent-exemption]].
+
+Long form, with the original incidents (from the retired `PROJECT_NOTES.md`, 2026-11-19): [architecture-backend-gotchas.md](../../docs/okf/product/layer/platform/architecture-backend-gotchas.md).

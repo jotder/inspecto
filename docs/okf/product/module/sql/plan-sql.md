@@ -14,7 +14,7 @@ timestamp: 2026-10-19T00:00:00Z
 
 Any SQL the platform runs on a user's or an agent's behalf must not reach the host's files, extensions or
 system surface, and must not change state. NFR-4 (air-gap operation) in
-[REQUIREMENTS](../../../../REQUIREMENTS.md) and the "working as designed" gates in
+[REQUIREMENTS](../../layer/platform/spec-requirements.md) and the "working as designed" gates in
 [BACKLOG](../../../../BACKLOG.md) (`SqlGuard` is one of them) depend on it.
 
 ## Built

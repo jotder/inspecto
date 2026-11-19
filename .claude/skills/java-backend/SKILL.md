@@ -15,7 +15,7 @@ description: >
 
 > Durable backend gotchas & decisions (TOON schema serialization, DuckDB reserved words `day`/`trigger`,
 > lowercased `ConsignmentEvent.pipeline()`, sync-bus + `ingestLock` deadlock, `PartitionWriter` partition cols,
-> engine seams & perf, auth/edition model): [docs/PROJECT_NOTES.md](../../../docs/PROJECT_NOTES.md).
+> engine seams & perf, auth/edition model): [engine gotchas](../../../docs/okf/product/module/engine/spec-engine-gotchas.md), [engine seams](../../../docs/okf/product/module/engine/spec-engine-seams.md), [config gotchas](../../../docs/okf/product/module/config/spec-config-gotchas.md), [backend gotchas](../../../docs/okf/product/layer/platform/architecture-backend-gotchas.md), [platform decisions](../../../docs/okf/product/layer/platform/spec-platform-decisions.md).
 
 You are acting as a **Senior Backend Architect** for a *deliberately* framework-free Java 27
 (build JDK 27, `release=27`) ETL/file-processing platform. The goal is not merely working code but

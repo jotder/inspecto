@@ -15,7 +15,7 @@ metadata:
 - **Never `git merge`/pull with a peer's uncommitted work in the tree:** a wrapper stashes and may not pop it back.
   Recover via `git fsck --lost-found` dangling `WIP on master` commits + `git stash apply --index <sha>` (never
   pop); no `git gc` until the owner commits.
-- **Stage shared docs by HUNK** (`BACKLOG.md`, `INDEX.md`, `PROJECT_NOTES.md`): read `git diff -- <file>`, build a
+- **Stage shared docs by HUNK** (`BACKLOG.md`, `INDEX.md`): read `git diff -- <file>`, build a
   patch of my hunks, `git apply --cached`; check `git diff --cached`. Never `git add -A`. Acknowledge peer hunks that
   rode a commit in the next message.
 - **A peer may commit my dirty tree** under its message: re-run `git log --oneline -3` before every commit; never
@@ -26,3 +26,5 @@ metadata:
 - The ~130 local `claude/*` / `worktree-agent-*` branches are stale leftovers, not unpushed work.
 
 Related: [[worktree-location-traps]], [[shell-edit-traps]].
+
+Long form, with the original incidents (from the retired `PROJECT_NOTES.md`, 2026-11-19): [spec-shared-checkout-gotchas.md](../../docs/okf/product/layer/platform/spec-shared-checkout-gotchas.md).

@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | n/a | documented in the ELT hub module/elt plan-elt.md (part ACQ), merged 2026-11-18 (DOCS-ELT-CONSOLIDATE-1) |
+| plan | current | [module.acquire - board row detail](plan-board-detail.md) |
 | spec | n/a | documented in the ELT hub module/elt spec-acquisition.md, merged 2026-11-18 |
 | architecture | n/a | documented in the ELT hub module/elt architecture-elt.md (Collectors part), merged 2026-11-18 |
 | features | n/a | documented in the ELT hub module/elt features-elt.md (Collectors), merged 2026-11-18 |
@@ -35,4 +35,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | — | P3 | feature | Unpack (11) absent codecs | demand |
-| `SCALEOUT-U1-REMOTE-ACQUIRE-1` | P3 | feature | ⏸ POSTPONED 2026-10-23 (operator: the next release ships without Postgres | operator |
+| `SCALEOUT-U1-REMOTE-ACQUIRE-1` | P3 | feature | Remote acquisition (U1) is not distributed: two pods would both fetch the same remote file. | operator |

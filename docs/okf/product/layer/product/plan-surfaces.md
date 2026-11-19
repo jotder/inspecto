@@ -11,7 +11,7 @@ supersedes-rows: REQUIREMENTS §3.15 UI-1..UI-8 (this file corrects them, see §
 # Surfaces & Lenses (`UI`)
 
 > **How to read this file.** §1–§2 are the *requirement of record*: where they disagree with
-> `docs/REQUIREMENTS.md` §3.15 or `docs/EDITIONS.md`, **this file wins** and the disagreement is stated
+> `docs/okf/product/layer/platform/spec-requirements.md` §3.15 or `docs/EDITIONS.md`, **this file wins** and the disagreement is stated
 > in place. §3 is the as-built specification, §4 the dated decisions, §5 what is not built, §6 what was
 > refused or superseded, §7 the pointers, §8 how it is verified.
 >

@@ -25,3 +25,5 @@ never its message), so the failing run says nothing about the cause.
    falsify it.
 
 Related: [[falsify-negative-tests]], [[maven-verdict-traps]].
+
+Long form, with the original incidents (from the retired `PROJECT_NOTES.md`, 2026-11-19): [tests-build-verdict-gotchas.md](../../docs/okf/product/layer/platform/tests-build-verdict-gotchas.md).

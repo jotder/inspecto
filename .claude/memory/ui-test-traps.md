@@ -42,3 +42,5 @@ metadata:
   keep one spec on the REAL services (`keep-alive.strategy.spec.ts`, 2026-10-21).
 
 Related: [[bundle-and-process-traps]].
+
+Long form, with the original incidents (from the retired `PROJECT_NOTES.md`, 2026-11-19): [architecture-ui-conventions.md](../../docs/okf/product/layer/product/architecture-ui-conventions.md).

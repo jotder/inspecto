@@ -574,7 +574,7 @@ what, is owned by [`okf/product/module/access/plan-security.md`](../../module/ac
 
 ⚠ Keep the row IDs stable once referenced; append new rows at the end of their area. A cell that
 changes state carries the date in Notes. Source of truth for *what* a feature is stays
-[`FEATURE_INVENTORY.md`](../../../../FEATURE_INVENTORY.md) §1; this table only answers *which edition*.
+[`FEATURE_INVENTORY.md`](features-feature-inventory.md) §1; this table only answers *which edition*.
 
 ### Core engine — platform capabilities (identical across editions by construction) [`ING` · `MET` · `PIP`]
 

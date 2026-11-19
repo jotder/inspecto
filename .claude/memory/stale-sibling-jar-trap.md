@@ -26,3 +26,5 @@ sibling's PREVIOUS behaviour (a new 422 returned 200). `-rf :<module>` does the 
   (Maven's real local repository on this box is `C:/.m2/repository` via `~/.m2/settings.xml`, not `%USERPROFILE%\.m2`.)
 
 Related: [[maven-verdict-traps]], [[editions-and-toolchain]].
+
+Long form, with the original incidents (from the retired `PROJECT_NOTES.md`, 2026-11-19): [tests-build-verdict-gotchas.md](../../docs/okf/product/layer/platform/tests-build-verdict-gotchas.md).

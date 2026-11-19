@@ -372,7 +372,7 @@ scripts. None of these commits is marked `!` except `757add5e`.*
   nothing is). ⚠ Breaking for configs that **previously saved silently**: `version:` and `source:` — the two
   keys `pipeline-config-keys.md` itself lists under *"appear in docs, read by nothing"* — are now refused,
   and `source:` in particular looked like it still worked. Turning that silent loss into a refusal is the
-  point of the change; see `PROJECT_NOTES` for the silent-config-loss defects it closes.
+  point of the change; see `module/config/spec-config-gotchas.md` for the silent-config-loss defects it closes.
 - Keys prefixed `x-` are accepted and round-trip untouched — that is the escape hatch.
 - ⛔ Granularity is the **block**, not the leaf: `dirs`, `collector`, `parsing`, `output` and `reference` are
   accepted whole, because they carry engine-read keys with no `FieldSpec`. For `pipeline`, only top-level
