@@ -292,50 +292,15 @@
                         </div>
                     }
 
-                    <ul class="m-0 flex list-none flex-col gap-2 p-0" formArrayName="columns" data-testid="column-list">
-                        @for (g of columnGroups(); track g.controls.name.value; let i = $index) {
-                            <li
-                                class="flex flex-col gap-1 rounded-lg border p-2"
-                                [class]="lowClasses(key.type(g.controls.name.value))"
-                                [formGroupName]="i"
-                                [attr.data-column]="g.controls.name.value"
-                            >
-                                <div class="grid grid-cols-1 items-center gap-2 sm:grid-cols-[2fr_2fr_auto]">
-                                    <inspecto-pen-field
-                                        formControlName="rename"
-                                        [label]="'Column ' + (i + 1)"
-                                        [ariaLabel]="'Name of column ' + g.controls.name.value"
-                                        [readOnly]="g.controls.drop.value"
-                                        [error]="renameErrors().get(g.controls.name.value) ?? ''"
-                                    ></inspecto-pen-field>
-                                    <inspecto-option-picker
-                                        label="Type"
-                                        formControlName="type"
-                                        [attr.data-testid]="'type-' + g.controls.name.value"
-                                        [options]="typeOptions"
-                                        [readOnly]="g.controls.drop.value"
-                                    ></inspecto-option-picker>
-                                    <mat-checkbox formControlName="drop" data-testid="drop-column"
-                                        >Leave out</mat-checkbox
-                                    >
-                                </div>
-                                @if (!g.controls.drop.value) {
-                                    <p class="text-secondary m-0 truncate text-xs">
-                                        e.g. {{ sample(g.controls.name.value) }}
-                                    </p>
-                                    <ng-container
-                                        *ngTemplateOutlet="
-                                            evidence;
-                                            context: {
-                                                c: typeChoice(g.controls.name.value),
-                                                k: key.type(g.controls.name.value),
-                                            }
-                                        "
-                                    ></ng-container>
-                                }
-                            </li>
-                        }
-                    </ul>
+                    <!-- BASIC-ELT-PROFILE-1 U1a: the core grid's types mode; its edits are written into the mapping here (O3) -->
+                    <inspecto-schema-metadata-grid
+                        mode="types"
+                        [typeRows]="reviewRows()"
+                        [rowErrors]="renameErrors()"
+                        [rowClasses]="reviewHighlights()"
+                        [rowDetail]="columnDetail"
+                        (rowChange)="onReviewChange($event)"
+                    ></inspecto-schema-metadata-grid>
                     @if (everyColumnDropped()) {
                         <p class="text-warn m-0 text-sm" role="alert">Keep at least one column.</p>
                     }
@@ -709,6 +674,12 @@
             </button>
         </div>
     }
+</ng-template>
+
+<!-- Under each kept column of step 2 (the grid's detail slot): a sample and the reason for its type. -->
+<ng-template #columnDetail let-name>
+    <p class="text-secondary m-0 truncate text-xs">e.g. {{ sample(name) }}</p>
+    <ng-container *ngTemplateOutlet="evidence; context: { c: typeChoice(name), k: key.type(name) }"></ng-container>
 </ng-template>
 
 <!-- One choice's evidence, and its confirm while it is a guess (OF-2). -->
