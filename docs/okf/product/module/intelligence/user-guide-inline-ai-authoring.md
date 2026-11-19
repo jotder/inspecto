@@ -107,11 +107,9 @@ Three gotchas that cost a debug cycle each — do not "clean these up":
 
 ## Offline — GONE, and the gates it mirrored are the server's
 
-🔴 **This section described a subsystem that no longer exists. Corrected 2026-09-09.** The offline mock
-backend was **deleted 2026-08-31**: `mock/handlers/agent.handler.ts`, `mock-api.interceptor.ts`,
-`agent.handler.spec.ts` and the `mockOps` flag are all absent from the tree, and the UI now requires a
-real `ControlApi`. The page had kept describing the mock's gate-reproduction in the present tense, which
-is why the citation guard flags a doc that talks about a file as if it were there.
+🔴 **The offline mock backend no longer exists.** It was **deleted 2026-08-31**:
+`mock/handlers/agent.handler.ts`, `mock-api.interceptor.ts`, `agent.handler.spec.ts` and the `mockOps`
+flag are all absent from the tree, and the UI now requires a real `ControlApi`.
 
 **The gates themselves are real and are the server's.** `AgentRoutes.java` states them in a comment on
 its tool route and implements them in the same handler — module absent → **503**, unknown tool → **404**, a MUTATING tool → **403**, and
@@ -340,7 +338,7 @@ schema kind** (`component-form.dialog`), and *only* that kind: of the dialog's f
 *"no structural spec for kind"*. ⚠ **Do not "complete" the adoption onto a kind with no spec** — as of
 2026-09-25 that is still `grammar` and `sink`; `transform` has one now (below).
 
-⚠ **Removed 2026-07-31 (unification W1) — on a FALSE premise, corrected 2026-09-25.** W1 removed the
+⚠ **Removed 2026-07-31 (unification W1) — on a FALSE premise.** W1 removed the
 component-draft affordance from `component-form.dialog`, saying the `schema` registry component no longer
 existed. 🔴 **It still exists**: `schema` is in `ComponentStore.WRITABLE_TYPES`, the Components pane opens
 it in `SchemaEditorDialog` (not `component-form.dialog`), and `ComponentRoutes.validateKind` gates its save
@@ -513,7 +511,7 @@ real backend, and the repair loop then pushed the model toward a `{raw:{…}}` d
 so Apply silently no-opped. Both outcomes broken: a spurious ERROR, or a dead button.
 
 **As fixed then (2026-07-27), and SUPERSEDED by W1 (2026-07-31):** a `ConfigSpecs.schemaComponent()` spec
-and a `specFor` special case routed `schema` to it. 🔴 **Neither exists any more** (corrected 2026-09-25) —
+and a `specFor` special case routed `schema` to it. 🔴 **Neither exists any more** —
 W1 removed both once both writers spoke the config TOON shape, so `schema` now resolves through
 `ConfigSpecs.forType("schema")` like every other config type, and `config_schema` shares that resolution.
 Only test names still carry the `schemaComponent` word.
@@ -622,3 +620,8 @@ by design here. Runtime validation is revisitable, but only after all 23 schemas
   2026-09-25 as its own row by operator decision D2: it does not answer the `transform` ask (D1), so
   closing it must not close that row.~~ ✅ **SHIPPED 2026-09-25** — as-built under *Its host* above. The
   `transform` row stays open.
+
+## Changes
+
+- 2026-09-09: Offline section corrected — it kept describing the deleted mock backend's gate reproduction in
+  the present tense, so the citation guard flagged it for naming files that were gone.

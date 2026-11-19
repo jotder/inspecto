@@ -214,7 +214,7 @@ modules plus security) remains a possible later promotion, not a decision taken.
 
 The core engine never contains `if (edition == …)` branches; it depends on SPIs (`Authenticator`,
 `SecretsProvider`, …) and the **build** decides which implementation ships. One SemVer version spans all
-editions. 🔴 **No classifier is emitted** (corrected 2026-09-09): all three flavours write the same
+editions. 🔴 **No classifier is emitted**: all three flavours write the same
 `inspecto-deploy-<platform>.zip` path (Since 2026-09-17 the zip is named after the EMBEDDED runtime's platform — `inspecto-deploy-<platform>.zip` (`windows_amd64`, `linux_amd64`), read off the jlink image, never the host OS (`RELEASE-BUNDLE-PLATFORM-MISMATCH-1`).) and `release.yml` **collects** them via `tools/release-collect.sh` as `inspecto-deploy-<edition>-<platform>.zip`, failing when the runner's own platform is missing.
 There is no `-standard` artifact at all and no `-advanced` classifier — the two names this line used
 are exactly the pair the pipeline does not produce.
@@ -287,3 +287,7 @@ Already fits: stateless stage-1 engine, **stateless JWT auth** (no server sessio
 pluggable `DbStatusStore` (Postgres) / `ObjectStore` db backend / `ParquetEventStore`, `SecretsProvider`.
 Will need later (don't preclude now): distributed scheduler coordination, all state on shared backends
 (Postgres + object store for Parquet + shared secrets), work distribution.
+
+## Changes
+
+- 2026-09-09: the assembly model corrected — no Maven classifier is emitted per edition.

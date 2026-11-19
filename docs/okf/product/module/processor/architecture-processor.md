@@ -274,8 +274,8 @@ rows; the Job one makes a *real, destructive* action non-destructive. Do not des
 - **No timeout or cancellation on either side.** → *Partially owned*: the **S2-3** watchdog covers
   `EXECUTED` Steps (plan R1); the Job-side watchdog stays a recorded gap beyond that plan.
 - **`NodeAttribute` lacks `secret`, `pattern`, `group`, `multi` and expression support** that
-  `ParameterDecl` gained in the job-parameter-contract work (re-verified 2026-09-01; it has since
-  gained `dependsOn`, which `ParameterDecl` lacks). → *Fulfilled by* stage 2's widened
+  `ParameterDecl` gained in the job-parameter-contract work (it has `dependsOn`, which
+  `ParameterDecl` lacks). → *Fulfilled by* stage 2's widened
   `StepTypeProvider` descriptor (**S2-1**).
 
 > ⚠ **The §6 gaps have an owner: [Platform Services](spec-platform-services.md).** **Stage 1 is COMPLETE

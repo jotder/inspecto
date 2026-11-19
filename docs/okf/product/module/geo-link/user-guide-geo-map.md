@@ -27,7 +27,7 @@ The Builder-lens studio at `/studio/geo-map` for the *where* of an investigation
 Geocoder — never "marker/pin" in model names).
 
 * **Fully offline** — MapLibre GL host (`src/app/inspecto-ui/projects/link-analysis/src/geo/`) over a bundled basemap
-  (`assets/basemap/`, ~2.7 MB). ⚠ **It is NOT PMTiles** (corrected 2026-09-08): a planet extract at z0–6
+  (`assets/basemap/`, ~2.7 MB). ⚠ **It is NOT PMTiles**: a planet extract at z0–6
   would have been ~100 MB, so D2 took **four slimmed Natural Earth GeoJSON layers + glyph fonts**; the
   `pmtiles://` protocol was to stay registered for a customer archive and **no code references it today**.
   The offline place-table **Geocoder** resolves name→point behind a pluggable seam.

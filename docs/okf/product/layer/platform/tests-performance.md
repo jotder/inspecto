@@ -139,7 +139,7 @@ total rows"* — is met; 12 batches went from 8K to **34.5K rows/s**.
 
 | Knob | Controls | Default |
 |---|---|---|
-| `processing.threads` | how many batches run concurrently (semaphore permits) | **logical cores** (was 4 until 2026-09-14) |
+| `processing.threads` | how many batches run concurrently (semaphore permits) | **logical cores** |
 | `processing.duckdb_threads` | `PRAGMA threads=N` per batch's DuckDB connection | 0 = **auto** (`cores ÷ threads`) |
 
 The inner/outer interaction: each concurrent batch opens its own DuckDB
@@ -437,3 +437,6 @@ readers ~1 min, csv ~1 min, la1m ~3 min, la10m ~8 min (index build each), engine
 (50,000-row keyed inserts run at hundreds of rows/s; `archived-documents/plans-archive/duckdb-2-plan.md` §2a). Leave it out of an A/B run
 (`-Workloads engine,csv,scan,readers`) and time it on its own. The harness reads the DuckDB jar from the Maven local
 repository named in `~/.m2/settings.xml` (`<localRepository>`), else `~/.m2/repository`.
+## Changes
+
+- 2026-09-14: the `processing.threads` default became the logical core count; it was 4.

@@ -70,7 +70,7 @@ full ingest-and-pipeline platform (rather than an assurance tool over someone el
 group-regulator model; air-gapped on-prem editions; installable Space Templates; publication to an external BI
 tool.
 
-**Where Inspecto trails — gaps worth closing (filed in `docs/BACKLOG.md`; refreshed 2026-11-12):**
+**Where Inspecto trails — gaps worth closing (filed in `docs/BACKLOG.md`):**
 
 | Gap | Who has it | Row |
 |---|---|---|
@@ -124,3 +124,7 @@ Read 2026-10-07.
 - Neural Technologies: <https://neuralt.com/>.
 - TEOCO: <https://www.teoco.com/products/>.
 - Araxxe: <https://www.araxxe.com/>.
+
+## Changes
+
+- 2026-11-12: the gaps list re-checked against `docs/BACKLOG.md`.

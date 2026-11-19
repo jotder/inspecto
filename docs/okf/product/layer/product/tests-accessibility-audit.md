@@ -27,10 +27,10 @@ Verified still in place; not re-listed as findings:
 - **1.3.1 status not by color alone** — status badges always render the text token alongside the color.
 - **2.2.2 pause/stop/hide** — the Events live-tail auto-refresh is opt-in via a toggle (not auto-playing).
 - **prefers-reduced-motion** — `<inspecto-skeleton>` disables its pulse under reduced-motion.
-- **1.1.1 chart text alternative (was F1)** — `chart.component.ts` renders the canvas with `role="img"` +
+- **1.1.1 chart text alternative (finding F1)** — `chart.component.ts` renders the canvas with `role="img"` +
   an `altText` summary (chart type plus each category's first-series value, capped at 10). Shipped after
   this audit was written; the F1 row below is retained struck-through for provenance.
-- **4.1.3 status messages (was F2)** — `<inspecto-data-table>` announces its displayed row count through a
+- **4.1.3 status messages (finding F2)** — `<inspecto-data-table>` announces its displayed row count through a
   visually-hidden `role="status" aria-live="polite"` region, fed by the grid's own `rowDataUpdated` /
   `firstDataRendered` / `filterChanged` events. One shared region covers **every** grid host, so async
   loads, live-tail ticks and quick-filter keystrokes are all announced. Blank while `loading`, so a

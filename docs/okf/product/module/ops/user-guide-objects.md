@@ -195,8 +195,7 @@ the real ControlApi.
     team + target date moved to a sibling `teamForm` (they are C6, not Findings), the flat
     `recordsAffected` copy the C4 analytics roll-up sums is written **on every Findings
     save** (by the server since 2026-09-25; the `impactAmount` copy retired with WS-10, 2026-09-26) — as `''` when the section is not configured, so removing that section blanks the roll-up for
-    each Case as it is next saved (corrected 2026-09-25; this line used to say "only while configured",
-    which the code never did) — and the soft no-disposition prompt on resolve **only fires while
+    each Case as it is next saved — and the soft no-disposition prompt on resolve **only fires while
     `disposition` is a configured section**. `CASE_DISPOSITIONS` was removed from `mail-model.ts` — the
     ladder now lives in the backend default, which is its only home *(the offline mock backend was deleted 2026-08-31)*.
 * **Authoring UI — the *Findings fields* dialog (2026-09-25, BUILT; accepted on proxy 2026-09-29).** Design + the ten
@@ -344,3 +343,8 @@ lead would not find). Conditional Notes: **PASS**. Preview: **PASS**. Open a Cas
 
 Screenshots (session scratchpad, not committed): `d6-01` … `d6-12`. The Case-panel steps were checked
 in the DOM, because the pane's capture drew a blank band once the document had scrolled.
+
+## Changes
+
+- 2026-09-25: Findings roll-up copy corrected — it said the copy is written "only while configured", which the
+  code never did.

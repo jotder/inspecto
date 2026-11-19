@@ -25,7 +25,7 @@ Two audiences depend on the framework from outside:
 
 > **Removed in 3.11.0 (breaking):** the whole-file `com.gamma.etl.FileIngester` and its nested `Segment` (both since 1.3.0). The plugin SPI is unified on `StreamingFileIngester`; the framework now runs the same ingester in *union mode* (many small files → one transform/write) or *generation mode* (huge single files → bounded scratch), chosen per batch by `processing.streaming.large_file_bytes`. Port `FileIngester` plugins to `StreamingFileIngester` (see [plugins.md](../elt/spec-ingest.md)). This is a **deliberate exception** to the within-major-version stability promise above, made to consolidate the plugin SPI before it had wide external adoption.
 
-> **Pending major 4.0.0 — NOT YET RELEASED (the agent-module reshape):** the **core ETL `@PublicApi` surface above is unchanged** — Stage-1/Stage-2/control/embedder types and signatures carry over from 3.x untouched. The bump, when 4.0.0 ships, is driven by two things: (1) a **runtime-floor bump for the agent modules**, and (2) the optional `inspecto-agent` module was reshaped onto shared orchestrator primitives (`SyncOrchestrator` / `Capability` / confidence-escalation / `AuditSink`), and `com.gamma.assist.AssistResult.confidence` became a numeric `double` (was a `String`). Only code driving the assist module's result type was affected.
+> **Pending major 4.0.0 — NOT YET RELEASED (the agent-module reshape):** the **core ETL `@PublicApi` surface above is unchanged** — Stage-1/Stage-2/control/embedder types and signatures carry over from 3.x untouched. The bump, when 4.0.0 ships, is driven by two things: (1) a **runtime-floor bump for the agent modules**, and (2) the optional `inspecto-agent` module was reshaped onto shared orchestrator primitives (`SyncOrchestrator` / `Capability` / confidence-escalation / `AuditSink`), and `com.gamma.assist.AssistResult.confidence` changed from a `String` to a numeric `double`. Only code driving the assist module's result type was affected.
 >
 > **Current Java floor (moved 2026-09-17):** the core compiles at `maven.compiler.release=27` and is built and bundled on JDK 27. The **agent modules require a JDK 27 runtime** (their model-transport jars are class-file v69), which a 27 floor clears by construction — so the two-floor split this paragraph documented from 2026-07-07 (core 27 / agent 27+, reconciled only by the bundled runtime) no longer exists. **agent-kernel itself was replaced 2026-07-07**: its reasoning layer is vendored into `inspecto-agent` (`com.gamma.agent.kernel.*`) and the model transport is **eoiagent** (`com.eoiagent:eoiagent-core|-model`) — the assist SPI (`com.gamma.assist.spi.AssistAgent`) is unchanged. The Standard edition adds three control-plane SPIs — `com.gamma.spi.auth.Authenticator` / `Subject` / `TokenRelay` (implemented by the `inspecto-oidc` module) — which follow the same stability policy.
 
@@ -75,10 +75,10 @@ build against an API jar), so wrapping would duplicate data shapes for no payoff
 
 `CsvIngester`, `DuckDbCsvIngester`, `DataTransformer`, `TransformCompiler`,
 `PartitionWriter`, `OutputFormat`, `LineageCollector`, `SchemaSelector`,
-`ConsignmentIngestor`, `ConsignmentPlanner` (was `BatchPlanner`), `MarkerManager`, `QuarantineManager`,
+`ConsignmentIngestor`, `ConsignmentPlanner`, `MarkerManager`, `QuarantineManager`,
 `DuckLakeRegistrar`, `CommitLog`, `ConsignmentAuditWriter`, the `com.gamma.util.*` CLI
 tools, and all of
-`ManifestStore`/`Consignment` (was `Batch`)/`PartitionDef`/`PartitionOutput`/`LineageRow` are
+`ManifestStore`/`Consignment`/`PartitionDef`/`PartitionOutput`/`LineageRow` are
 implementation detail. (The `com.gamma.inspector` batch-ingest strategy seam —
 `ConsignmentIngestStrategy`, `CsvIngestStrategy`, `StreamingPluginIngestStrategy`, `DuckDbRecordSink`,
 `IngestOutcome`, `MemberAudit`, all package-private — is likewise internal.) They are stable enough for the framework's own use but
@@ -108,3 +108,7 @@ commons-*, gson, opencsv). Layering JPMS over that combination is high-risk
 (split packages, automatic-module naming, shade interactions) for little gain
 over the annotation + this policy. The `@PublicApi` marker is the lighter,
 sufficient mechanism. Revisit only if the project ever stops shading.
+
+## Changes
+
+- `BatchPlanner` renamed to `ConsignmentPlanner`, and `Batch` to `Consignment`.

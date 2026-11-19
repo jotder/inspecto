@@ -210,9 +210,8 @@ relative to the bundle root the launchers change to. That is what makes `<parent
   unzipping the data download again resets the showcase; the configuration is untouched.
 - **Version check.** `space.toon` names `min_product_version`; `SpaceVersionCheck` logs a WARN at boot for a Space
   that asks for a newer product, and the Space still boots. A `dev` run checks nothing.
-- **Known limits (accepted 2026-11-07):** renaming a Space in Settings rewrites `space.toon` with its four known
-  fields; an absolute `SPACES_DATA_ROOT` with a space in it splits in `serve.bat` (as `SPACES_ROOT` already does;
-  the documented relative paths avoid it); `4.1.0-rc1` counts as meeting `4.1.0`. ⚠ Corrected 2026-11-14: the rename
+- **Known limits (accepted 2026-11-07):** an absolute `SPACES_DATA_ROOT` with a space in it splits in `serve.bat` (as `SPACES_ROOT` already does;
+  the documented relative paths avoid it); `4.1.0-rc1` counts as meeting `4.1.0`. ⚠ Renaming a Space in Settings
   does NOT drop `min_product_version` or `data_root`. `SpaceManifest.write` owns four keys
   (`display_name`, `description`, `created_at`, `data_root`) and copies every other key through from the file as it
   was, and `SpaceManager.update` carries the existing `data_root` into the record it writes. What DOES drop
@@ -336,3 +335,8 @@ What "inert" means, as seen live on Basic:
 - A product zip attaches no Space, but its template gallery still carries every template's data.
 - On a Preview log, the `alert.evaluate` Job says "no new breach" while an Alert stays open: the rule is edge-triggered,
   so the open Alert is refreshed, not raised again (worded so since 2026-11-15, `ALERT-EVALUATE-NO-BREACH-WORDING-1`).
+
+## Changes
+
+- 2026-11-14: Space rename limit corrected — it listed as a known limit that renaming a Space in Settings rewrites
+  `space.toon` with its four known fields, dropping `min_product_version` and `data_root`.

@@ -126,10 +126,9 @@ Types: `enrich`, `report`, `maintenance`, `pipeline` (`JobConfig.load()` — enu
 
 ### G — Authored Pipelines (`*_pipeline.toon`) [`PIP`]
 
-> 🔴 **Heading corrected 2026-09-09 (step 8).** It read "Authored flows (`*_flow.toon`)" — the banned synonym *and* the retired representation. `*_flow.toon` write routes have answered **405 since W5**; measured today, **one** grandfathered file survives (`sales_rollup_flow.toon`, allowlisted in `tools/check-vocabulary.mjs`) against **35** `*_pipeline.toon`. The authored DAG is a **Pipeline** (`GLOSSARY.md` §5) — ⛔ author no new `*_flow.toon`.
+> 🔴 `*_flow.toon` is the retired representation: its write routes have answered **405 since W5**; measured 2026-09-09, **one** grandfathered file survives (`sales_rollup_flow.toon`, allowlisted in `tools/check-vocabulary.mjs`) against **35** `*_pipeline.toon`. The authored DAG is a **Pipeline** (`GLOSSARY.md` §5) — ⛔ author no new `*_flow.toon`.
 
-Node types from `PipelineNodeTypes.catalog()`. (⚠ **Corrected 2026-08-18**: the `demo` space no longer
-ships an authored-flow example — `orders_rollup_flow.toon` was converted to the canonical at-rest shape
+Node types from `PipelineNodeTypes.catalog()`. (The `demo` space ships no authored-flow example — `orders_rollup_flow.toon` was converted to the canonical at-rest shape
 (`steps:` + `output_store:` in `orders/orders_pipeline.toon`, run via the job's `pipeline_config:`), and
 the unconvertible `regional_orders_merge_flow.toon` was removed. The format stays GRANDFATHERED — readable,
 runnable and deletable, never newly written (the `Pipeline*Routes` modules). The shape now lives only in test Java strings
@@ -163,7 +162,7 @@ runnable and deletable, never newly written (the `Pipeline*Routes` modules). The
 
 ### I — Acquisition (`collector:` block) [`ACQ`]
 
-> 🔴 **Heading corrected 2026-09-09 (step 8).** It read "`source:` block". Measured: **zero** committed `.toon` files carry a `source:` key and **22** carry `collector:` — the acquisition-entity rename to **Collector** (`GLOSSARY.md` §2/§3, 2026-07-14) never reached this heading, so the canon advertised a key the product does not read.
+> Measured 2026-09-09: **zero** committed `.toon` files carry a `source:` key and **22** carry `collector:` — the acquisition entity is the **Collector** (`GLOSSARY.md` §2/§3); the product does not read `source:`.
 
 | Feature | TOON skeleton | Doc |
 |---|---|---|
@@ -323,10 +322,8 @@ not committable), and `hive_partitioning` is **off**, matching `DatasetRelation`
 
 ## 6. Known gaps
 
-- ~~No `*_flow.toon` or `*_rca.toon` example exists in the repo — the shapes live only in tests.~~
-  ~~**Stale, corrected 2026-07-22**: the `demo` sample catalog now ships both.~~
-  **Re-corrected 2026-08-18**: the demo space's authored flows were converted/removed, so only the RCA
-  template (`spaces/demo/config/ops/orders_rca.toon`) still ships. The one remaining `*_flow.toon` in the
+- The demo space ships no authored `*_flow.toon` example; only the RCA template
+  (`spaces/demo/config/ops/orders_rca.toon`) ships. The one remaining `*_flow.toon` in the
   repo is `inspecto/examples/06-serve/pipeline-job/write/flows/sales_rollup_flow.toon` — deliberately
   retained as the live end-to-end proof for PIP-1. The TOON shapes are additionally exercised in tests
   (`ControlApiPipelineCrudTest`, `PipelineJobRunnerTest`).
@@ -344,12 +341,19 @@ not committable), and `hive_partitioning` is **off**, matching `DatasetRelation`
   `ComponentPreview.textRegexSelect` mirrors the same block-mode SQL for UI previews. Default
   (line-per-record) behavior is unchanged. See `platform/inspecto-etl/src/test/java/com/gamma/etl/TextRegexTest.java`
   (`blankLineRecordSplitSpansMultipleLines`, `literalDelimiterRecordSplitIsAccepted`).
-- ~~No subscriber `.dat` / plugin-binary sample data in the repo — synthesize for those examples.~~
-  **Partly stale, corrected 2026-07-22**: subscriber `.dat` samples shipped from then until 2026-09-06, when the
-  four retired corpora (subscriber/events/cdr/gwlog — their pipelines went 2026-08-20) were removed with their
-  seed arms (SAMPLE-1-REMOVE). Only the plugin/CALL **binary** samples remain unsynthesized.
-- ~~`package.ps1` pre-creates inbox/database dirs only for `adjustment` + `voucher`~~ **stale, corrected
-  2026-07-20**: `package.ps1` does not pre-create any adapter inbox/database dirs — the bundle's own
-  comment (line 21) tells the operator to create `inspecto-deploy/inbox/<adapter>/` manually;
-  dir creation was the `ura` CLI's `prepare-inbox` command (retired 2026-11-06). The example suite sidesteps all of this by being self-contained (each example owns its
-  `out/`).
+- No subscriber `.dat` and no plugin/CALL **binary** sample data in the repo — synthesize for those examples.
+- `package.ps1` does not pre-create any adapter inbox/database dirs — the bundle's own comment (line 21) tells
+  the operator to create `inspecto-deploy/inbox/<adapter>/` manually. The example suite sidesteps all of this by
+  being self-contained (each example owns its `out/`).
+
+## Changes
+
+- 2026-07-20: the `package.ps1` gap corrected — it said the script pre-creates inbox/database dirs for `adjustment` +
+  `voucher`; dir creation was the `ura` CLI's `prepare-inbox` command, retired 2026-11-06.
+- 2026-07-22: the sample-data gaps corrected — the demo catalog then shipped `*_flow.toon` and `*_rca.toon` examples
+  and subscriber `.dat` samples.
+- 2026-08-18: the demo space's authored flows converted or removed, leaving only the RCA template.
+- 2026-09-06: subscriber `.dat` samples removed with the four retired corpora (subscriber/events/cdr/gwlog, whose
+  pipelines went 2026-08-20) and their seed arms (SAMPLE-1-REMOVE).
+- 2026-09-09: headings G and I corrected — they read "Authored flows (`*_flow.toon`)" (the banned synonym and the
+  retired representation) and "`source:` block" (the acquisition entity before the rename to Collector, 2026-07-14).

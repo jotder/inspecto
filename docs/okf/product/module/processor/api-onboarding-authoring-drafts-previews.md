@@ -68,7 +68,7 @@ Part 1 of 3 of [Onboarding authoring seams (draft lifecycle, previews, register 
   require a restart; the `POST /jobs type=enrich` workaround does full recomputes and breaks
   by-name refs). Event triggers apply from the next committed batch; schedule timers resolve their
   config **by name at fire time**. `EnrichmentService` is **always constructed** (empty-list tolerant)
-  so a fresh space can register its first job; `GET /enrichment` with no jobs is 200-`[]` (was 404).
+  so a fresh space can register its first job; `GET /enrichment` with no jobs is 200-`[]`.
   Gates mirror `POST /runs`: 503 → 400 → 403 → 404 → 422; replace is the documented upsert (no 409).
 
 **2026-07-20 SHIPPED — the unregister counterpart, for both pipelines and enrichments:**
@@ -317,3 +317,7 @@ note called out as a rule, while the code was already doing it.
   defect, not the remedy. The producer's partition columns and the job's `input.partitions` must agree.
 * Pinned by `EnrichmentServiceTest.eventWhosePartitionsMatchNoJobColumnIsRefusedNotWidenedToFull`
   (mutation-verified: disabling the guard makes it fail on "a refused recompute announces no commit").
+
+## Changes
+
+- `GET /enrichment` with no jobs answered 404 before `EnrichmentService` was always constructed.

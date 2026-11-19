@@ -97,7 +97,7 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   **Navigating it:** `parse()` is a sequence of `// ── section ──` blocks, one per config block, in the
   order the file declares them. The seven largest are named methods — `parseTransformBlocks`,
   `parseParsing`, `parseOutputAndSinks`, `parseSteps`, `parsePlugin`, `parseSchemas`, `parseCollector` —
-  leaving `parse()` itself at ~280 lines (was 801). ⚠ The split is by **state**, not size: a section became
+  leaving `parse()` itself at ~280 lines. ⚠ The split is by **state**, not size: a section became
   a method only when it shares no locals with what follows. The head (identity/gates) and the
   `processing`/`dirs` sections deliberately stay inline because their locals (`proc`, `dirs`) are read
   throughout. `parseCollector` returns a `Collector`; `parseParsing` returns a private `Grammar` record
@@ -109,10 +109,9 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
   beside its pipeline is portable and the server loads it from any launch directory. A legacy
   `spaces/<id>/config/...` value is refused (naming both paths) or not found. `fromMap(map)` has no
   directory, so it keeps the CWD reading.
-  ⚠ **`dirs.*` is still CWD-only** — it was not part of W1b. *(Corrected 2026-09-08: this line used to say
-  `grammar` was CWD-only too. It is not — `resolveGrammarRef` delegates to `resolveSchemaRef(ref, configDir,
-  "grammar")` (`PipelineConfigParser.java`), so a `grammar` ref takes the same config-relative-first
-  branch as `schema_file`, including the `grammar:<id>` registry form.)*
+  ⚠ **`dirs.*` is still CWD-only** — it was not part of W1b. A `grammar` ref resolves like `schema_file`:
+  `resolveGrammarRef` delegates to `resolveSchemaRef(ref, configDir, "grammar")` (`PipelineConfigParser.java`),
+  including the `grammar:<id>` registry form.
   *(Superseded 2026-09-23: `../` now resolves from the config's directory and the one jail judges it.)*
   ⚠ The config-relative branch was contained (a `../` escape was skipped, not resolved); the CWD branch was
   **not** jailed and is explicitly not a security boundary (see [gotchas](../../layer/platform/admin-guide-gotchas.md) and
@@ -128,3 +127,8 @@ All configuration is **TOON** (`.toon`), parsed via JToon. Authoritative key ref
 
 No `#` comments are allowed in any `.toon` file — there is only the strict parser, and it has no comment syntax. Writes go through
 [`ConfigSafetyValidator`](spec-config-safety.md).
+
+## Changes
+
+- `PipelineConfigParser.parse()` split into named section methods — it was 801 lines.
+- 2026-09-08: schema-reference resolution corrected — it said `grammar` was CWD-only like `dirs.*`.

@@ -17,7 +17,7 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
   the **Viz Library** (searchable Widget gallery) with the **Widget Builder**, and the
   **Dashboard Builder** (quick-filter bar, drill-through drawer, time grain, PNG export). The
   investigation studios live alongside: [Geo Map Analysis](../../module/geo-link/user-guide-geo-map.md) and [Link Analysis](../../module/la-core/user-guide-la-core.md).
-  ⚠ **Datasets is NOT a Studio pane** (corrected 2026-09-08): `/studio/datasets` — and the Studio root —
+  ⚠ **Datasets is NOT a Studio pane**: `/studio/datasets` — and the Studio root —
   redirect to `/catalog/datasets`, because a Dataset became a Catalog asset in Phase B.2.
 * **Visualization Types** come from the `VizPlugin` registry (`src/app/inspecto/viz/`) — charts, tables,
   scatter, funnel, …; **Measures** (never "metrics" in the BI sense) drive aggregations in Explore.
@@ -95,7 +95,7 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
   backend was deleted they are **not** offline arms: a backend failure surfaces. They are retained under
   decision `MOCK-DEAD-COMPUTE-1` (2026-08-31) as the **reference folds** the live paths are asserted to
   agree with, and as the vehicle the example graph and geo case studies are pinned through — delete them
-  and the guards go with them (corrected 2026-09-08). They share one `sampleDatasetRows` (there were two divergent copies; the Reconciliation one
+  and the guards go with them. They share one `sampleDatasetRows` (there were two divergent copies; the Reconciliation one
   dropped column metadata and so compared numbers and dates as strings).
 * **A widget's time grain travels on the wire (2026-08-14).** `QuerySpec.grains` (group-by column →
   `day|week|month`) is the ONE source of truth: each plugin's `buildQuery` fills it from the channel
@@ -133,3 +133,8 @@ Design of record (archived):
 [`widget-library-spec.md`](../../../../archived-documents/plans-archive/widget-library-spec.md) ·
 [`studio-implementation-plan.md`](../../../../archived-documents/plans-archive/studio-implementation-plan.md) ·
 [`studio-bi-improvements-plan.md`](../../../../archived-documents/plans-archive/studio-bi-improvements-plan.md).
+
+## Changes
+
+- 2026-09-08: Datasets corrected — it was listed as a Studio pane. The example-graph note corrected — the guards that go
+  with the example Datasets were not named.

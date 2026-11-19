@@ -95,7 +95,7 @@ default, so no wire change: the one 403 is the template store's path-containment
 the one 503 is an absent alert engine (`CAPABILITY_UNAVAILABLE`), and `ComponentAccess`' shared-helper callers keep
 their codes; the `QueryRoutes` / `ParserRoutes` / `ConfigReadRoutes` / `RuleRoutes` / `EnrichmentRoutes` / `RouteErrors` slice —
 58 sites, all the status default but one: `RuleRoutes`' "no write root configured" 503 is now
-`CONTROL_PLANE_READ_ONLY` (was `CAPABILITY_UNAVAILABLE`), a wire change asserted over HTTP by
+`CONTROL_PLANE_READ_ONLY`, a wire change asserted over HTTP by
 `ControlApiRuleTemplateTest` and noted in [api-stability](../api/plan-api-stability.md);
 `RouteErrors`' mappers fix their status per branch, so every caller keeps its code; the
 `SpaceRoutes` / `SchedulerRoutes` / `Roles` / `PipelineRenameRoutes` / `ExpectationRoutes` / `AccessPolicies` /
@@ -396,3 +396,5 @@ handling" — stale since W6d; the handling lives in `auth.interceptor.ts`.
 ## Changes
 
 - 2026-09-13: this passage said the parse editor writes to the write ROOT "on purpose".
+- `RuleRoutes`' "no write root configured" 503 code renamed from `CAPABILITY_UNAVAILABLE` to
+  `CONTROL_PLANE_READ_ONLY`.

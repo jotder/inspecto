@@ -39,8 +39,7 @@ Moved verbatim from the retired `PROJECT_NOTES.md` (D-IR5, 2026-11-19); the arch
   anywhere** — suffix-scanned loaders (`*_pipeline/_job/_connection/_alert/_queue/…`) strict-reject the file
   ("Multiple primitives at root depth"), and even the lenient registry read mangles comment lines into junk
   keys. Some loaders tolerate them today (template/escalation) — do not rely on it.
-  🔴 **A hard reject is the BEST case, and not what happens for a comment between two top-level sections
-  (re-verified 2026-08-18).** There, `JToon.decode` **silently truncates at the comment** and
+  🔴 **A hard reject is the BEST case, and not what happens for a comment between two top-level sections.** There, `JToon.decode` **silently truncates at the comment** and
   `PipelineConfig.load` accepts the result with **no error and no warning** — a 4-line explanatory block added
   to `orders/orders_pipeline.toon` dropped `output_store:`, `steps:` AND the pre-existing `collector:` gap
   detection (9 top-level keys → 6), and the file still "loaded". The job then pointed at a Stage-2 chain that
