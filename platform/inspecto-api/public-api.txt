@@ -2585,7 +2585,7 @@ com.gamma.service.CollectorService | public java.util.Optional<com.gamma.objects
 com.gamma.service.CollectorService | public long acquirePollSeconds()
 com.gamma.service.CollectorService | public long pollSeconds()
 com.gamma.service.CollectorService | public static CollectorService fromArgs(String[]) throws IOException
-com.gamma.service.CollectorService | public static void commitStep(java.util.function.BiConsumer<CollectorService, ConsignmentEvent>)
+com.gamma.service.CollectorService | public static synchronized void commitStep(String, int, CommitPhase, CommitStep)
 com.gamma.service.CollectorService | public static void main(String[]) throws Exception
 com.gamma.service.CollectorService | public synchronized JobService jobServiceOrCreate()
 com.gamma.service.CollectorService | public synchronized String registerPipeline(Path)
@@ -2603,6 +2603,11 @@ com.gamma.service.CollectorService | public void start()
 com.gamma.service.CollectorService | public void unregisterConnection(String)
 com.gamma.service.CollectorService | public void useGovernanceRoot(java.nio.file.Path)
 com.gamma.service.CollectorService | public<T> Optional<T> whileIdle(String, java.util.concurrent.Callable<T>) throws Exception
+com.gamma.service.CollectorService.CommitPhase | constant COMMIT
+com.gamma.service.CollectorService.CommitPhase | constant RUN
+com.gamma.service.CollectorService.CommitPhase | public enum CommitPhase
+com.gamma.service.CollectorService.CommitStep | public interface CommitStep
+com.gamma.service.CollectorService.CommitStep | void run(CollectorService, ConsignmentEvent)
 com.gamma.service.DbStatusStore | public ConnectionSource browseSource()
 com.gamma.service.DbStatusStore | public DbStatusStore(Connection)
 com.gamma.service.DbStatusStore | public DbStatusStore(ConnectionSource)

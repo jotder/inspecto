@@ -2,12 +2,9 @@ package com.gamma.control;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.EditionFeatures;
-import com.gamma.event.EventLog;
 import com.gamma.onboard.ImportFollowOn;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
-import com.gamma.service.CollectorService;
-import com.gamma.service.SpaceContext;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
@@ -17,7 +14,6 @@ import com.gamma.util.SqlIdent;
 import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.slf4j.MDC;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -61,7 +57,7 @@ import java.util.stream.Stream;
  * map. Between the move and the deletes a reader may count both briefly. The link index's next build is a full one (D-10:
  * its inputs were rewritten - the index's own advice).
  * <p>{@code LA-DATASET-COMPACT-2}: a commit of the import Pipeline outside Add data (a feed's scheduled run) compacts too,
- * before the Space's Jobs see it ({@link #afterCommit}); and every compaction tells the installed applications that the
+ * before the Space's Jobs see it (the {@code import.compaction} step of {@link ImportCommitSteps}); and every compaction tells the installed applications that the
  * files were rewritten ({@link ImportFollowOn#filesRewritten}), so the link index stops answering for removed rows at once.
  */
 final class DatasetCompaction {
@@ -83,55 +79,9 @@ final class DatasetCompaction {
         api.put("/datasets/([^/]+)/storage", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> setRetention(api, e, ApiContext.name(m), api.body(e))));
         api.post("/datasets/([^/]+)/compact", ApiContext.withCapability("canUploadData", (e, m) -> compactNow(api, e, ApiContext.name(m))));
-        ATTACHED.add(api);
-        api.onClose(() -> ATTACHED.remove(api));
-        CollectorService.commitStep(DatasetCompaction::afterCommit);
     }
-
-    // ── a run outside Add data (LA-DATASET-COMPACT-2) ──────────────────────────────────────────────────────────
 
     private static final Logger log = LoggerFactory.getLogger(DatasetCompaction.class);
-    /** The control planes whose Spaces' commits are looked at. */
-    private static final java.util.Set<ApiContext> ATTACHED = java.util.concurrent.ConcurrentHashMap.newKeySet();
-
-    /**
-     * A commit of an import Pipeline that did not pass through Add data - the scheduler's run of a watched folder or SFTP
-     * feed (Standard) - compacts the way the import's own follow-on work does (D-7, retention in force included), on the
-     * publishing thread, so the Space's Jobs (the link index build) are handed the commit only after it. Skipped while the
-     * Dataset is claimed in {@link OnboardImport#IN_FLIGHT}: an import, <i>Compact now</i> or a delete holds it, and an
-     * import compacts in its own follow-on. Never throws.
-     */
-    static void afterCommit(CollectorService service, com.gamma.etl.ConsignmentEvent event) {
-        if (!"SUCCESS".equals(event.status()) || event.dryRun()) return;
-        String id = event.pipeline();   // an import's Pipeline is named as its Dataset (lower case, as the event says it)
-        for (ApiContext api : ATTACHED)
-            for (SpaceContext ctx : HostContext.of(api).spaces().all())
-                if (ctx.service() == service) afterCommit(api, ctx.id().value(), service, id);
-    }
-
-    private static void afterCommit(ApiContext api, String space, CollectorService service, String id) {
-        String prev = MDC.get(EventLog.SPACE_MDC_KEY);
-        MDC.put(EventLog.SPACE_MDC_KEY, space);   // the Space's roots, as a request of that Space reads them
-        String key = null;
-        try {
-            Path writeRoot = api.writeRoot(), dataRoot = api.dataRoot();
-            if (writeRoot == null || dataRoot == null) return;
-            Map<String, Object> content = new ComponentStore(writeRoot.resolve("registry")).get("dataset", id)
-                    .map(ComponentRegistry.Component::content).orElse(null);
-            if (content == null || !OnboardImport.isOurs(writeRoot, id, content, service)) return;
-            String claim = writeRoot + "|" + id;
-            if (!OnboardImport.IN_FLIGHT.add(claim)) return;
-            key = claim;
-            Map<String, Object> o = afterImport(writeRoot, dataRoot, id, content, "scheduler");
-            if (!"NOT_NEEDED".equals(o.get("result"))) log.info("Dataset '{}' after its run: {}", id, o.get("message"));
-        } catch (RuntimeException e) {
-            log.warn("Dataset '{}' could not be compacted after its run: {}", id, e.toString());
-        } finally {
-            if (key != null) OnboardImport.IN_FLIGHT.remove(key);
-            if (prev == null) MDC.remove(EventLog.SPACE_MDC_KEY);
-            else MDC.put(EventLog.SPACE_MDC_KEY, prev);
-        }
-    }
 
     // ── the merge map ──────────────────────────────────────────────────────────────────────────────────────────
 

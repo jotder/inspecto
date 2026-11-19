@@ -473,40 +473,15 @@ public final class ComponentPreview {
      * failed sniff returns empty rather than failing the preview. Deliberately no {@code store_rejects}
      * — the sniff must not pollute the reject count the parse above just produced.
      */
-    /** {@code sniff_csv} column → the {@code parsing.delimited.*} option it describes (GrammarResult#resolved). */
-    private static final Map<String, String> SNIFF_OPTIONS = sniffOptions();
-
-    private static Map<String, String> sniffOptions() {
-        Map<String, String> m = new java.util.LinkedHashMap<>();
-        m.put("Delimiter", "delimiter");
-        m.put("Quote", "quote");
-        m.put("Escape", "escape");
-        m.put("Comment", "comment");
-        m.put("HasHeader", "has_header");
-        m.put("SkipRows", "skip_header_lines");
-        m.put("DateFormat", "date_format");
-        m.put("TimestampFormat", "timestamp_format");
-        return java.util.Collections.unmodifiableMap(m);
-    }
-
     /**
-     * What DuckDB's dialect sniff resolves the raw sample to — {@code sniff_csv} over the scratch file with
-     * no authored options, so it is the FILE's answer, not an echo of the grammar. A column this DuckDB does
-     * not report is left out; a NUL character (DuckDB's "none", e.g. no escape) becomes {@code ""}. Advisory
-     * by construction: a failed sniff returns empty rather than failing the preview.
+     * What DuckDB's dialect sniff resolves the raw sample to ({@link com.gamma.parse.SampleProfiler#dialect}, the
+     * same sniff Add data reads) — the FILE's answer, not an echo of the grammar, as {@code parsing.delimited.*}
+     * option names (GrammarResult#resolved). Advisory by construction: a failed sniff returns empty rather than
+     * failing the preview.
      */
     private static Map<String, String> sniffDialect(Connection conn, String path) {
-        Map<String, String> out = new java.util.LinkedHashMap<>();
-        try (java.sql.Statement st = conn.createStatement();
-             java.sql.ResultSet rs = st.executeQuery("SELECT * FROM sniff_csv(" + SqlIdent.sqlStr(path) + ")")) {
-            if (!rs.next()) return Map.of();
-            java.sql.ResultSetMetaData md = rs.getMetaData();
-            for (int i = 1; i <= md.getColumnCount(); i++) {
-                String option = SNIFF_OPTIONS.get(md.getColumnLabel(i));
-                Object v = option == null ? null : rs.getObject(i);
-                if (v != null) out.put(option, v.toString().replace("\0", ""));
-            }
-            return out;
+        try {
+            return com.gamma.parse.SampleProfiler.dialect(conn, java.nio.file.Path.of(path), null).options();
         } catch (Exception sniffFail) {
             return Map.of();
         }

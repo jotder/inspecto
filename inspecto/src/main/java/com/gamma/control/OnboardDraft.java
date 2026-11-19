@@ -1,6 +1,7 @@
 package com.gamma.control;
 
 import com.gamma.etl.ExcelExtension;
+import com.gamma.parse.SampleProfiler;
 import com.gamma.pipeline.exec.SchemaSuggest;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
@@ -251,13 +252,14 @@ final class OnboardDraft {
         java.nio.charset.Charset cs = charset(encoding);
         String encodingArg = "utf-8".equals(encoding) ? "" : ", encoding = " + SqlIdent.sqlStr(encoding);
         if (cs == StandardCharsets.UTF_8) requireUtf8(file, name);
-        try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT Delimiter, Quote, HasHeader FROM sniff_csv(" + SqlIdent.pathStr(file) + encodingArg + ")")) {
-            if (rs.next()) {
+        try {
+            // the engine's sample profiler: the same sniff the parse preview shows (BASIC-ELT-PROFILE-1 BE-3)
+            SampleProfiler.Dialect sniff = SampleProfiler.dialect(conn, file, "utf-8".equals(encoding) ? null : encoding);
+            if (!sniff.options().isEmpty()) {
                 // sniff_csv spells "none found" as "(empty)" (or NUL): keep the safe default then - '"' is harmless when unused
-                delim = oneChar(rs.getString(1), ",");
-                quote = oneChar(rs.getString(2), "\"");
-                header = rs.getBoolean(3);
+                delim = oneChar(sniff.delimiter(), ",");
+                quote = oneChar(sniff.quote(), "\"");
+                header = sniff.header();
             }
         } catch (SQLException unsettled) {
             // DuckDB could not settle the dialect (mixed line endings, ragged lines): guess the delimiter that splits the

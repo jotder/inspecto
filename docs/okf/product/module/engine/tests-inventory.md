@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-417 test class(es): 417 unit, 0 real-HTTP control-plane, 0 IT.
+418 test class(es): 418 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -303,6 +303,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `FindingsSpecTest` | `com.gamma.objects` | unit | `platform/inspecto-engine/src/test/java/com/gamma/objects/FindingsSpecTest.java` | Configurable Findings sections (C3 / BACKLOG D6): the built-in default, the round trip, and every |
 | `RcaTemplateTest` | `com.gamma.objects` | unit | `platform/inspecto-engine/src/test/java/com/gamma/objects/RcaTemplateTest.java` | RCA template parsing — {@code fromMap} validation + a {@code *_rca.toon} round-trip (reuses ConfigCodec). |
 | `ParsersTest` | `com.gamma.parse` | unit | `platform/inspecto-engine/src/test/java/com/gamma/parse/ParsersTest.java` | The {@link Parsers} registry + the built-in adapters: the catalog carries the four engine |
+| `SampleProfilerTest` | `com.gamma.parse` | unit | `platform/inspecto-engine/src/test/java/com/gamma/parse/SampleProfilerTest.java` | {@link SampleProfiler#dialect} ({@code BASIC-ELT-PROFILE-1} BE-3): DuckDB's own dialect answer for a sample file, as |
 | `XmlParserPluginTckTest` | `com.gamma.parse` | unit | `platform/inspecto-engine/src/test/java/com/gamma/parse/XmlParserPluginTckTest.java` | {@link XmlParserPlugin} against the platform's ParserPlugin TCK (MODULE-REORG-1 P5b). |
 | `XmlParserPluginTest` | `com.gamma.parse` | unit | `platform/inspecto-engine/src/test/java/com/gamma/parse/XmlParserPluginTest.java` |  |
 | `ParserPluginTckSelfTest` | `com.gamma.parse.testkit` | unit | `platform/inspecto-engine/src/test/java/com/gamma/parse/testkit/ParserPluginTckSelfTest.java` | Proves the ParserPlugin TCK can fail (MODULE-REORG-1 P5b): broken in-test parsers must go red, a sound one green. |
