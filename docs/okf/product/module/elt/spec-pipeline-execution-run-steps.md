@@ -77,8 +77,10 @@ last registered first, **after** the run's `RUN` commit steps. `stepRun` wraps `
   fingerprint-cached registry rebuild) instead of the one selection parsed, so a column kept for a file is read with
   that file in the same run. `runPipeline` reads the file per run anyway.
 - **A failed run** takes a kept column back (`Job.rollback` in the `after`), as Add data's own run does. A run that
-  sets a file aside (the quarantine ledger grew) after the step kept a column counts as failed for this, though the
-  engine's own result counts no failure. Claims and kept columns are given back on every path, an `Error` included.
+  sets a file aside after the step kept a column counts as failed for this, though the engine's own result counts no
+  failure. The set-aside file is read from the Pipeline's quarantine folder itself (`FileStatusStore.quarantine`), not
+  from the service's status store: the default `status.backend=db` store is a projection that catches up only after
+  the run (the poll's `syncStatus`), so it would not yet hold the file (tested under both stores). Claims and kept columns are given back on every path, an `Error` included.
 - **Watch this folder** (B1) is a scheduled run of this kind: the import Pipeline's locked `every: 30s` schedule with a
   `local` Collector and `stability {30s, 2}` (`InboxWatch`). For it the step also waits while `data.self_import` is
   off (SKIP) and keeps `watchError` for Data status (cleared by a run that succeeds).

@@ -8,6 +8,7 @@ import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.CollectorService;
 import com.gamma.service.CollectorService.PreRun;
+import com.gamma.service.FileStatusStore;
 import com.gamma.service.SpaceContext;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.http.ApiContext;
@@ -164,12 +165,12 @@ final class ImportPreRunSteps {
                     log.info("Dataset '{}' before its run: refused {}, kept columns {}", id, run.refused, job.keptColumns);
                 boolean kept = !job.keptColumns.isEmpty();
                 // a run that sets a file aside after a column was kept for it did not take what the column was kept for
-                Set<String> quarantined = kept ? quarantined(service, cfg) : Set.of();
+                Set<String> quarantined = kept ? quarantined(cfg) : Set.of();
                 final RunFiles.Scope scope = narrowed;
                 java.util.function.Consumer<Boolean> after = ok -> {
                     boolean good = false;
                     try {
-                        good = ok && (!kept || quarantined.containsAll(quarantined(service, cfg)));
+                        good = ok && (!kept || quarantined.containsAll(quarantined(cfg)));
                         if (scope != null) scope.close();
                         if (!good) job.rollback();   // a column kept for a run that failed is not kept
                     } finally {
@@ -202,12 +203,18 @@ final class ImportPreRunSteps {
         }
     }
 
-    /** The quarantine ledger's entries for {@code cfg}, by path (a file the run set aside). */
-    private static Set<String> quarantined(CollectorService service, PipelineConfig cfg) {
+    /**
+     * The files {@code cfg}'s quarantine folder holds, by path: read from the folder itself ({@link FileStatusStore}), not
+     * from the service's status store. The default store ({@code status.backend=db}) is a projection that catches up only
+     * after the run (the poll's {@code syncStatus}), so it would not yet hold a file this run set aside.
+     */
+    private static Set<String> quarantined(PipelineConfig cfg) {
         Set<String> out = new HashSet<>();
-        for (Map<String, String> q : service.statusStore().quarantine(cfg)) out.add(String.valueOf(q.get("path")));
+        for (Map<String, String> q : ON_DISK.quarantine(cfg)) out.add(String.valueOf(q.get("path")));
         return out;
     }
+
+    private static final FileStatusStore ON_DISK = new FileStatusStore();
 
     private static void release(String claim) {
         HELD_BY_RUN.remove(claim);

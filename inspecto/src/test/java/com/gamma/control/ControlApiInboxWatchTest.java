@@ -98,12 +98,18 @@ class ControlApiInboxWatchTest {
 
     /** A host over {@code cfg}'s fixture Pipeline and {@code more} - as a restart registers what the config root holds. */
     private Ctx open(Path cfg, Path writeRoot, Path... more) throws Exception {
+        return openOver(null, cfg, writeRoot, more);
+    }
+
+    /** As above over {@code status} (null: the file-backed store a bare host gets; a deployment's default is the database one). */
+    private Ctx openOver(com.gamma.etl.StatusStore status, Path cfg, Path writeRoot, Path... more) throws Exception {
         Path pipe = PipelineConfigBatchTest.writePipeline(cfg, "");
         System.setProperty("assist.write.root", writeRoot.toString());
         try {
             List<Path> all = new ArrayList<>(List.of(pipe));
             all.addAll(List.of(more));
-            CollectorService svc = new CollectorService(all, 3600, 1);
+            CollectorService svc = status == null ? new CollectorService(all, 3600, 1)
+                    : new CollectorService(all, List.of(), 3600, 1, status);
             ControlApi api = new ControlApi(svc, 0);
             api.start();
             return new Ctx(svc, api, api.port(), writeRoot);
@@ -355,9 +361,20 @@ class ControlApiInboxWatchTest {
 
     @Test
     void aRunThatSetsTheFileAsideTakesTheKeptColumnBack(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        setAsideTakesTheColumnBack(null, cfg, root);
+    }
+
+    /** The default deployment's status store ({@code status.backend=db}): a projection that catches up only after the run. */
+    @Test
+    void aRunThatSetsTheFileAsideTakesTheKeptColumnBackUnderTheDatabaseStatusStore(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        setAsideTakesTheColumnBack(com.gamma.service.DbStatusStore.open("jdbc:duckdb:", null, null), cfg, root);
+    }
+
+    private void setAsideTakesTheColumnBack(com.gamma.etl.StatusStore status, Path cfg, Path root) throws Exception {
         // verifier finding: a quarantined file in a run whose pre-run kept a column is a run that failed
         EditionFeatures.overrideForTest(Set.of());
-        try (Ctx c = open(cfg, root)) {
+        try (Ctx c = openOver(status, cfg, root)) {
             String id = imported(c, "asided", "stream", ControlApiOnboardFilesTest.transfers(40), null);
             data(json(c, "PUT", "/datasets/" + id + "/watch", "{\"watch\":true}", null), 200);
             Path schema = root.resolve(OnboardImport.CONFIG_DIR).resolve(id + "_schema.toon");
@@ -377,7 +394,8 @@ class ControlApiInboxWatchTest {
             });
             poll(c);
             noLateStep();
-            assertFalse(c.svc().statusStore().quarantine(c.svc().configFor(id).orElseThrow()).isEmpty(), "the run set the file aside");
+            assertFalse(new com.gamma.service.FileStatusStore().quarantine(c.svc().configFor(id).orElseThrow()).isEmpty(),
+                    "the run set the file aside");
             assertEquals(40, OnboardImport.countRows(Path.of("database", id, "database")));
             assertNull(fee(root, id), "the column kept for the file the run set aside is taken back");
             assertEquals(InboxWatch.SERVER_FAULT, feed(c, id).path("watchError").asText());

@@ -350,11 +350,6 @@ final class PipelineScheduler {
     }
 
     /**
-     * Pick the pipelines to run on this tick and claim each one. The <em>only</em> part of a cycle that needs
-     * {@link #registryLock}, and it is bounded work — the lock is never held across a run, which is what lets
-     * ticks overlap at all.
-     */
-    /**
      * BE-1b: {@code due}'s config read again after a pre-run step changed its files (a kept column grows the schema), so
      * the run reads what the step wrote; selection parsed it before. The registry rebuild is fingerprint-cached: only the
      * changed files are parsed. Falls back to the selected config when the Pipeline no longer loads.
@@ -407,6 +402,12 @@ final class PipelineScheduler {
         return selectDue(nowMs, false);
     }
 
+    /**
+     * Pick the pipelines to run on this tick and claim each one. The <em>only</em> part of a cycle that needs
+     * {@link #registryLock}, and it is bounded work — the lock is never held across a run, which is what lets
+     * ticks overlap at all.
+     * {@code intervalOnly}: the cadence wake's selection, interval-scheduled Pipelines only (B1).
+     */
     private List<Due> selectDue(long nowMs, boolean intervalOnly) {
         if (frozen()) return List.of();
         List<Due> due = new ArrayList<>();
