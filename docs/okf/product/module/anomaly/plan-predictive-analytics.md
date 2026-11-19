@@ -6,7 +6,7 @@ item: module.anomaly
 audience: internal
 status: plan
 verified: 2026-11-12 last-edit
-code: [features/inspecto-anomaly]
+code: [features/inspecto-predictive]
 ---
 
 # Predictive Analytics add-on - design with options (`PREDICTIVE-ANALYTICS-1`)

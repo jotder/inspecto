@@ -6,7 +6,7 @@ item: solution-pack.business-assurance
 audience: internal
 status: current
 verified: 2026-11-18 last-edit
-code: [spaces/_templates/business-assurance]
+code: [spaces/_templates/business-assurance, spaces/_templates/telco-ra]
 ---
 
 # Business assurance and revenue assurance
