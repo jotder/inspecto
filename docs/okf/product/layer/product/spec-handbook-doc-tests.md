@@ -5,7 +5,7 @@ description: How a Handbook tutorial or how-to declares machine-checkable steps 
 item: layer.product
 audience: internal
 status: current
-verified: 2026-11-19
+verified: 2026-11-20 code-reviewed
 code: [tools/handbook-checks.mjs, tools/run-handbook-checks.mjs, tools/check-handbook.mjs, tools/render-handbook.mjs]
 ---
 
