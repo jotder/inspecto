@@ -1,0 +1,8 @@
+name: payments_amount_non_negative
+description: "Every payment amount is zero or more: a negative payment is a refund keyed into the wrong feed"
+targetType: pipeline
+target: payments
+column: amount
+kind: range
+min: 0
+severity: MAJOR

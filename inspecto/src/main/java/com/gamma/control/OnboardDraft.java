@@ -59,29 +59,11 @@ final class OnboardDraft {
     /** The file types Add data reads (the {@code format.type} value). */
     static final List<String> TYPES = List.of("csv", "tsv", "parquet", "json", "ndjson", "excel");
 
-    private static final List<String> TIMESTAMP_FORMATS = List.of("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S",
-            "%Y-%m-%d %H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M",
-            "%d/%m/%Y %H:%M:%S", "%m/%d/%Y %H:%M:%S", "%d/%m/%Y %H:%M", "%d.%m.%Y %H:%M:%S");
     private static final Pattern NUMBER = Pattern.compile("[+-]?(\\d+\\.?\\d*|\\.\\d+)([eE][+-]?\\d+)?");
 
-    /**
-     * {@code LA-FULL-CYCLE-TEST-1} finding 3: a column whose sampled values are <i>almost all</i> numbers, dates or dates
-     * with a time is proposed as that type at {@code low} confidence, and the values that do not fit are left blank by the
-     * import (and counted in its result). "Almost all" is at least nine in ten, and at least this many fitting values.
-     * <b>Why nine in ten, not the four in five that marks a number column as a guess:</b> this proposal blanks every value
-     * that does not fit, so it may cost at most one value in ten; between four in five and nine in ten a number column
-     * stays text (as before) and a date column is offered through the fix catalogue. <b>Why ten:</b> below ten agreeing
-     * values one stray value is already a tenth of the column, so the share says nothing.
-     */
-    static final int MOSTLY_MIN = 10;
-
-    static boolean mostly(long fits, long of) {
-        return fits >= MOSTLY_MIN && fits * 10 >= of * 9;
-    }
-
     private static final Set<String> NUMBERS = Set.of("BIGINT", "DOUBLE");
-    /** The column types a person may state ({@code OnboardImport.TYPES}). */
-    static final Set<String> COLUMN_TYPES = Set.of("VARCHAR", "BIGINT", "DOUBLE", "DATE", "TIMESTAMP", "BOOLEAN");
+    /** The column types a person may state ({@code OnboardImport.TYPES}); TIME joined 2026-11-19 (operator ruling). */
+    static final Set<String> COLUMN_TYPES = Set.of("VARCHAR", "BIGINT", "DOUBLE", "DATE", "TIMESTAMP", "TIME", "BOOLEAN");
 
     /**
      * How the sampled values of one column read as {@code type}: how many of the {@code of} non-blank values fit, the
@@ -749,15 +731,10 @@ final class OnboardDraft {
     private static Analysis typed(Connection conn, Path file, String relation, Map<String, Object> typeChoice, boolean declaredTypes,
                                   List<String> selectors, String decimal, Map<String, String> stated, boolean positional)
             throws SQLException, IOException {
-        // the engine's sample profiler (BASIC-ELT-PROFILE-1 BE-3 slice 2): each column's DuckDB type (what a file that
-        // declares its types declares) and the vote over its first values as text - the vote schema suggest gives too
-        List<SampleProfiler.ColumnType> profiled = SampleProfiler.types(conn, relation, SAMPLE_ROWS);
-        List<String> headers = new ArrayList<>();
-        List<String> declared = new ArrayList<>();
-        for (SampleProfiler.ColumnType c : profiled) {
-            headers.add(c.name());
-            declared.add(c.duckdb());
-        }
+        // each column's DuckDB type: what a file that declares its types (Parquet) declares
+        Map<String, String> described = SampleProfiler.describe(conn, relation);
+        List<String> headers = new ArrayList<>(described.keySet());
+        List<String> declared = new ArrayList<>(described.values());
         if (headers.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the file has no columns");
         List<String> names = safeNames(headers);
 
@@ -800,6 +777,9 @@ final class OnboardDraft {
         Map<String, Object> markChoice = declaredTypes ? null : DecimalMark.choose(names, valuesOf, decimal);
         if (markChoice != null) format.put("decimalMark", markChoice);
         String mark = markChoice == null ? null : String.valueOf(markChoice.get("value"));
+        // the engine's sample profiler: the one type answer the parse preview and schema suggest give too (operator
+        // rulings 2026-11-19, BASIC-ELT-PROFILE-1), read through the decimal mark this draft chose
+        List<SampleProfiler.ColumnType> profiled = SampleProfiler.types(conn, relation, SAMPLE_ROWS, declaredTypes ? null : mark);
 
         List<Map<String, Object>> columns = new ArrayList<>();
         List<Col> cols = new ArrayList<>();
@@ -807,11 +787,12 @@ final class OnboardDraft {
         for (int i = 0; i < names.size(); i++) {
             String n = names.get(i);
             List<String> values = valuesOf.get(i);
-            String type = declaredTypes ? engineType(declared.get(i)) : profiled.get(i).type();
-            String fmt = declaredTypes ? null : profiled.get(i).format(), colMark = null;
+            SampleProfiler.ColumnType p = profiled.get(i);
+            String type = declaredTypes ? engineType(declared.get(i)) : p.type();
+            String fmt = declaredTypes ? null : p.format(), colMark = null;
             long fits = values.size();
             Map<String, Object> typeCh;
-            String numeric = mark == null ? null : DecimalMark.numberType(values, mark);
+            String numeric = declaredTypes || p.decimal() == null ? null : p.type();   // numbers that need the mark (C1)
             String said = stated.get(positional ? "col_" + (i + 1) : n);
             if (said != null && !(numeric != null && NUMBERS.contains(said))) {
                 // finding 4: the person's own choice, never a guess - how many sampled values it reads, and their format
@@ -838,23 +819,15 @@ final class OnboardDraft {
                 typeCh = choice(type, (values.size() == 1 ? "the sampled value is a whole number" : "the " + values.size() + " sampled values are whole numbers")
                         + ", but the file also has '" + clip(fractions.get(i)) + "', so a decimal number", true);
                 typeCh.put("format", null);
+            } else if (!declaredTypes && p.fits() < p.of()) {
+                // finding 3 (the profiler's): almost all dates or dates with a time - proposed as that, the odd values
+                // left blank. Never numbers: a column with a value that is not a number stays text (operator, 2026-11-19)
+                Fit almost = new Fit(type, fmt, p.fits(), p.of(), p.odd());
+                fits = almost.fits();
+                typeCh = choice(type, oddOnes(almost) + "; " + Words.pick(almost.misfits(), "it", "they") + " will be left blank", false);
+                typeCh.put("format", fmt);
             } else {
-                if ("TIMESTAMP".equals(type) && !declaredTypes) fmt = timestampFormat(conn, n);
-                // finding 3: almost all numbers, dates or dates with a time - proposed as that, the odd values left blank
-                Fit almost = "VARCHAR".equals(type) && !declaredTypes ? almost(conn, n, values.size(), fractions.get(i)) : null;
-                if (almost != null && almost.misfits() > 0) {
-                    type = almost.type();
-                    fmt = almost.format();
-                    fits = almost.fits();
-                    typeCh = choice(type, oddOnes(almost) + "; " + Words.pick(almost.misfits(), "it", "they") + " will be left blank", false);
-                    typeCh.put("format", fmt);
-                } else {
-                    if (almost != null) {   // every value is a date with a time in a format a plain cast does not read
-                        type = almost.type();
-                        fmt = almost.format();
-                    }
-                    typeCh = typeChoice(type, fmt, values, declaredTypes ? declared.get(i) : null);
-                }
+                typeCh = typeChoice(type, fmt, values, declaredTypes ? declared.get(i) : null);
             }
             Map<String, Object> col = new LinkedHashMap<>();
             col.put("name", n);
@@ -942,19 +915,6 @@ final class OnboardDraft {
         return OnboardFixes.dateFormat(column, best, (int) bestCount, n, odd == null ? null : clip(odd), tie);
     }
 
-    /** The one {@link #TIMESTAMP_FORMATS} entry every non-blank sampled value parses with, else {@code null} (a bare cast). */
-    private static String timestampFormat(Connection conn, String column) throws SQLException {
-        String c = SqlIdent.q(column);
-        for (String f : TIMESTAMP_FORMATS) {
-            try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT count(*) FROM onboard_sample WHERE "
-                    + c + " IS NOT NULL AND trim(" + c + ") <> '' AND TRY_STRPTIME(" + c + ", " + SqlIdent.sqlStr(f) + ") IS NULL")) {
-                rs.next();
-                if (rs.getLong(1) == 0) return f;
-            }
-        }
-        return null;
-    }
-
     private static Map<String, Object> typeChoice(String type, String fmt, List<String> values, String declared) {
         int n = values.size();
         Map<String, Object> ch;
@@ -983,59 +943,6 @@ final class OnboardDraft {
         return ch;
     }
 
-    /**
-     * Finding 3: the type a text column almost is ({@link #mostly}), else {@code null}. Numbers first (a decimal number,
-     * or a whole number under a name that says an amount - digits with a few letters among them are more often
-     * identifiers, so any other whole-number column stays text), then dates with a time, then dates. Two formats that
-     * read the values equally well (day first or month first) are never guessed between: the column stays text.
-     */
-    private static Fit almost(Connection conn, String column, long n, String fraction) throws SQLException {
-        if (n < MOSTLY_MIN) return null;
-        String c = SqlIdent.q(column), nonBlank = c + " IS NOT NULL AND trim(" + c + ") <> ''";
-        String d = "TRY_CAST(" + c + " AS DOUBLE)", whole = d + " = TRY_CAST(" + c + " AS BIGINT) AND NOT regexp_matches(" + c + ", '[.eE]')";
-        long numbers, wholes;
-        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT count(*) FILTER (WHERE " + d + " IS NOT NULL), "
-                + "count(*) FILTER (WHERE " + d + " IS NOT NULL AND " + whole + ") FROM onboard_sample WHERE " + nonBlank)) {
-            rs.next();
-            numbers = rs.getLong(1);
-            wholes = rs.getLong(2);
-        }
-        if (numbers * 5 >= n * 4) {   // a number column: a number when almost all are, else text (the caller says why)
-            boolean isWhole = wholes == numbers && fraction == null;
-            if (numbers == n || !mostly(numbers, n) || (isWhole && !EntityShapes.namedAsAmount(column))) return null;
-            return new Fit(isWhole ? "BIGINT" : "DOUBLE", null, numbers, n, odd(conn, c, nonBlank, d + " IS NULL"));
-        }
-        Fit time = bestFormat(conn, c, nonBlank, "TIMESTAMP", TIMESTAMP_FORMATS, n);
-        if (time != null && mostly(time.fits(), n)) return time;
-        Fit date = bestFormat(conn, c, nonBlank, "DATE", DATE_FORMATS, n);
-        return date != null && date.misfits() > 0 && mostly(date.fits(), n) ? date : null;
-    }
-
-    /** The one format of {@code formats} that reads the most values; {@code null} when none reads any or two tie. */
-    private static Fit bestFormat(Connection conn, String c, String nonBlank, String type, List<String> formats, long n) throws SQLException {
-        StringBuilder sql = new StringBuilder("SELECT ");
-        for (int k = 0; k < formats.size(); k++)
-            sql.append(k == 0 ? "" : ", ").append("count(*) FILTER (WHERE TRY_STRPTIME(").append(c).append(", ").append(SqlIdent.sqlStr(formats.get(k)))
-                    .append(") IS NOT NULL)");
-        int best = -1;
-        long bestCount = 0;
-        boolean tie = false;
-        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql + " FROM onboard_sample WHERE " + nonBlank)) {
-            rs.next();
-            for (int k = 0; k < formats.size(); k++) {
-                long count = rs.getLong(k + 1);
-                if (count > bestCount) {
-                    best = k;
-                    bestCount = count;
-                    tie = false;
-                } else if (count == bestCount && count > 0) tie = true;
-            }
-        }
-        if (best < 0 || tie) return null;
-        String f = formats.get(best);
-        return new Fit(type, f, bestCount, n, odd(conn, c, nonBlank, "TRY_STRPTIME(" + c + ", " + SqlIdent.sqlStr(f) + ") IS NULL"));
-    }
-
     /** One non-blank sampled value that meets {@code misfit}, else {@code null}. */
     private static String odd(Connection conn, String c, String nonBlank, String misfit) throws SQLException {
         try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT " + c + " FROM onboard_sample WHERE " + nonBlank
@@ -1053,8 +960,8 @@ final class OnboardDraft {
         String c = SqlIdent.q(column), nonBlank = c + " IS NOT NULL AND trim(" + c + ") <> ''";
         if ("VARCHAR".equals(type) || n == 0) return new Fit(type, null, n, n, null);
         if ("DATE".equals(type) || "TIMESTAMP".equals(type)) {
-            List<String> formats = new ArrayList<>("DATE".equals(type) ? DATE_FORMATS : TIMESTAMP_FORMATS);
-            formats.addAll("DATE".equals(type) ? TIMESTAMP_FORMATS : DATE_FORMATS);
+            List<String> formats = new ArrayList<>("DATE".equals(type) ? DATE_FORMATS : SampleProfiler.TIMESTAMP_FORMATS);
+            formats.addAll("DATE".equals(type) ? SampleProfiler.TIMESTAMP_FORMATS : DATE_FORMATS);
             Fit best = null;
             for (String f : formats) {   // the first format that reads the most values: a tie goes to the earlier one
                 long fits;
@@ -1108,6 +1015,7 @@ final class OnboardDraft {
         if (t.startsWith("DOUBLE") || t.startsWith("FLOAT") || t.startsWith("REAL") || t.startsWith("DECIMAL")) return "DOUBLE";
         if (t.startsWith("TIMESTAMP")) return "TIMESTAMP";
         if (t.equals("DATE")) return "DATE";
+        if (t.equals("TIME")) return "TIME";
         if (t.equals("BOOLEAN")) return "BOOLEAN";
         return "VARCHAR";
     }

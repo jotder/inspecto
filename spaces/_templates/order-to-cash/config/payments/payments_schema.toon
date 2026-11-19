@@ -1,0 +1,33 @@
+partitionKey: payment_date
+raw:
+  name: PAYMENTS
+  format: CSV
+  fields[6]{name,selector,type,description,unit,classification}:
+    PAYMENT_ID,"0",VARCHAR,"Payment identifier from the bank or cash book","","INTERNAL"
+    PAYMENT_DATE,"1",DATE,"Day the payment was received","","INTERNAL"
+    ORDER_ID,"2",VARCHAR,"Order the payment is applied to, as the payer quoted it","","INTERNAL"
+    CUSTOMER_ID,"3",VARCHAR,"Customer who paid","","INTERNAL"
+    AMOUNT,"4",DOUBLE,"Amount received","USD","INTERNAL"
+    METHOD,"5",VARCHAR,"Payment method (card, transfer, cheque)","","INTERNAL"
+mapping:
+  canonicalName: payments
+  rawName: PAYMENTS
+  fields[6]:
+    - name: payment_id
+      from: PAYMENT_ID
+      fn: keep
+    - name: payment_date
+      from: PAYMENT_DATE
+      fn: keep
+    - name: order_id
+      from: ORDER_ID
+      fn: keep
+    - name: customer_id
+      from: CUSTOMER_ID
+      fn: keep
+    - name: amount
+      from: AMOUNT
+      fn: keep
+    - name: method
+      from: METHOD
+      fn: keep

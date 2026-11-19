@@ -1,0 +1,8 @@
+name: orders_amount_non_negative
+description: "Every order amount is zero or more: a credit belongs in its own feed, never as a negative order"
+targetType: pipeline
+target: orders
+column: amount
+kind: range
+min: 0
+severity: MAJOR

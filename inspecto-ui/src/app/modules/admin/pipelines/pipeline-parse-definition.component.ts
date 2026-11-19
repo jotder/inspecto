@@ -48,8 +48,9 @@ import {
     deriveSelector,
     sanitizeIdentifier,
 } from 'app/inspecto/schema';
-import { derivedSchemaRows, inferredSchemaTypes, writeParseSchema } from './parse-output-schema';
+import { derivedSchemaRows, inferredSchemaFormats, inferredSchemaTypes, writeParseSchema } from './parse-output-schema';
 import {
+    decimalMarkOf,
     GrammarEditorComponent,
     ParsingFrontend,
     grammarCsvFilename,
@@ -1025,6 +1026,8 @@ export class PipelineParseDefinitionComponent {
     /** The last parse's INFERRED types by column position, narrowed to the grid's vocabulary; null until
      *  a parse returns them (an old server never does — everything then behaves exactly as before). */
     readonly inferredTypes = signal<string[] | null>(null);
+    /** The format each inferred date / date-with-a-time type was read with, by position (U3); null when not served. */
+    private readonly inferredFormats = signal<(string | undefined)[] | null>(null);
     private typesModeTouched = false;
 
     /** The "Detect column types" property's two choices (R11) — the mockup's wording over `raw.types`. */
@@ -1052,6 +1055,7 @@ export class PipelineParseDefinitionComponent {
     private applyInferredToGrid(): void {
         const inferred = this.inferredTypes();
         if (!inferred) return;
+        const formats = this.inferredFormats();
         const grid = this.schemaGrid;
         if (grid) {
             for (const g of grid.fieldRows.controls) {
@@ -1059,14 +1063,39 @@ export class PipelineParseDefinitionComponent {
                 if (Number.isInteger(pos) && inferred[pos] !== undefined) g.get('type')?.setValue(inferred[pos]);
             }
             grid.form.markAsDirty();
+            // The grid does not model `format`, and re-seeding it would reset the person's edits: the stamped formats
+            // are kept aside and applied on write (withMetadata, by selector) - U3, one type answer with its format.
+            const stamped = new Map<string, string | undefined>();
+            for (const g of grid.fieldRows.controls) {
+                const pos = Number(g.getRawValue()['selector']);
+                if (Number.isInteger(pos) && inferred[pos] !== undefined)
+                    stamped.set(String(pos), stampedFormat(inferred[pos], formats?.[pos]));
+            }
+            this.stampedFormats = stamped;
         } else {
             this.schemaSeed.update((rows) =>
                 rows.map((r) => {
                     const pos = Number(r.selector);
-                    return Number.isInteger(pos) && inferred[pos] !== undefined ? { ...r, type: inferred[pos] } : r;
+                    if (!Number.isInteger(pos) || inferred[pos] === undefined) return r;
+                    const { format: _old, ...rest } = r;
+                    const format = stampedFormat(inferred[pos], formats?.[pos]);
+                    return { ...rest, type: inferred[pos], ...(format ? { format } : {}) };
                 }),
             );
         }
+    }
+
+    /**
+     * The format each row stamped from a parse while the grid was showing is read with, by selector (`undefined`: the
+     * stamped type takes none); null when nothing was stamped since the seed was last derived. Applied over the seed's
+     * own format on write ({@link withMetadata}).
+     */
+    private stampedFormats: Map<string, string | undefined> | null = null;
+
+    /** A new seed (a parse, a load, an import): no stamped format outlives the rows it was stamped on. */
+    private reseed(rows: SchemaFieldRow[]): void {
+        this.stampedFormats = null;
+        this.schemaSeed.set(rows);
     }
     /** How the saved schema differs from what THIS sample suggests (B3) — null until a parse runs. */
     readonly schemaDrift = signal<SchemaDrift | null>(null);
@@ -1196,6 +1225,7 @@ export class PipelineParseDefinitionComponent {
         // U3: keep the parse's inferred types (narrowed to the grid vocabulary), by position.
         // Backward-compatible: an old server serves no columnTypes and everything reads as before.
         this.inferredTypes.set(inferredSchemaTypes(p));
+        this.inferredFormats.set(inferredSchemaFormats(p));
         // ⛔ Never re-derive over a schema read back from disk: the operator's saved names, types and
         // include flags are the truth, and a fresh sample would silently replace them on Apply.
         // Instead, ASK what changed — that is exactly the drift question (B3).
@@ -1217,7 +1247,7 @@ export class PipelineParseDefinitionComponent {
         }
         // R11: the detected types seed the rows in BOTH modes — Auto keeps them read-only, Declared
         // unlocks the menu over the same starting point (what "Apply suggested types" used to do).
-        this.schemaSeed.set(derivedSchemaRows(this.frontend(), p.columns, this.inferredTypes()));
+        this.reseed(derivedSchemaRows(this.frontend(), p.columns, this.inferredTypes(), this.inferredFormats()));
     }
 
     /**
@@ -1419,7 +1449,7 @@ export class PipelineParseDefinitionComponent {
             // rehydrates instead, through [configuredIngester].
             this.pickedPluginId.set(null);
             this.initialSegments.set([]);
-            this.schemaSeed.set([]);
+            this.reseed([]);
             this.partitionSeed.set([]);
             this.schemaHydrated.set(false);
             this.schemaDrift.set(null);
@@ -1484,6 +1514,12 @@ export class PipelineParseDefinitionComponent {
                 if ((out[k] === undefined || out[k] === '') && seed[k] !== undefined && seed[k] !== '')
                     out[k] = seed[k];
             }
+            const sel = String(r.selector);
+            if (this.stampedFormats?.has(sel)) {
+                const f = this.stampedFormats.get(sel);
+                if (f && (out.type === 'DATE' || out.type === 'TIMESTAMP')) out.format = f;
+                else delete out.format;
+            }
             return out;
         });
     }
@@ -1495,7 +1531,8 @@ export class PipelineParseDefinitionComponent {
     private checkDrift(rows: Record<string, unknown>[]): void {
         const fields = this.currentSchemaRows().map((r) => ({ name: r.name, selector: r.selector, type: r.type }));
         if (!fields.length) return;
-        this.configApi.suggestSchema(rows, { raw: { fields } }, this.frontend()).subscribe({
+        const mark = decimalMarkOf(this.editor?.value());
+        this.configApi.suggestSchema(rows, { raw: { fields } }, this.frontend(), mark).subscribe({
             next: (s) => this.schemaDrift.set(s.drift ?? null),
             // Drift is advisory: failing to compute it must not disturb an otherwise working pane.
             error: () => this.schemaDrift.set(null),
@@ -1514,7 +1551,7 @@ export class PipelineParseDefinitionComponent {
         // The reseed rebuilds BOTH grids, so the metadata edits must ride the rows or they vanish.
         const current = this.withMetadata(this.currentSchemaRows());
         const columns = this.previewTable()?.columns ?? [];
-        this.schemaSeed.set([
+        this.reseed([
             ...current,
             ...added.map((f) => {
                 // The selector must address the column the way this frontend does — by POSITION for
@@ -1599,7 +1636,7 @@ export class PipelineParseDefinitionComponent {
                 };
                 const fields = Array.isArray(raw['fields']) ? (raw['fields'] as Record<string, unknown>[]) : [];
                 if (!fields.length) return;
-                this.schemaSeed.set(
+                this.reseed(
                     fields.map((f) => ({
                         include: true,
                         name: String(f['name'] ?? ''),
@@ -1806,7 +1843,7 @@ export class PipelineParseDefinitionComponent {
         this.templateBlock.set(block);
         this.templateDirty = true;
         if (parsed.columns) {
-            this.schemaSeed.set(parsed.columns);
+            this.reseed(parsed.columns);
             this.schemaHydrated.set(false);
         }
         if (parsed.meta.types) this.typesMode.set(parsed.meta.types);
@@ -2053,6 +2090,11 @@ export class PipelineParseDefinitionComponent {
         this.emitDirty();
         this.applied.emit(node);
     }
+}
+
+/** The format a stamped type is read with: a date's or a date-with-a-time's own, else none (U3). */
+function stampedFormat(type: string, format: string | undefined): string | undefined {
+    return type === 'DATE' || type === 'TIMESTAMP' ? format : undefined;
 }
 
 /** The `raw.fields[]` keys the columns table's form does not model — see `withMetadata`. */

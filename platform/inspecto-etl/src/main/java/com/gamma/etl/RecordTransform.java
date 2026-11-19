@@ -334,7 +334,7 @@ public final class RecordTransform {
                 expr = SchemaFieldTypes.castSql(col, type,
                         SchemaFieldTypes.formatsFor(fmt, csv.dateFormats()),
                         SchemaFieldTypes.formatsFor(fmt, csv.tsFormats()),
-                        zones.zoneArg(from, sourceTable));
+                        zones.zoneArg(from, sourceTable), csv.decimalSeparator());
             } else if (CONCAT_PARTS.equals(fn.id()) && !typedSource) {
                 // The CONCAT_DT analogue on the raw table, byte-for-byte what TransformCompiler.concatDt
                 // emitted: COALESCE over the parser's timestamp formats (the row's own `format` first),

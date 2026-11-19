@@ -11,6 +11,7 @@ import { ToastrService } from 'ngx-toastr';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { GrammarEditorComponent, grammarToCsv, parsingAttributesFor } from 'app/inspecto/grammar';
+import { InspectoSchemaFieldsEditorComponent } from 'app/inspecto/schema';
 import { InspectoSegmentsEditorComponent } from 'app/inspecto/segments';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { penByLabel, penEdit, penError, penText } from 'app/inspecto/testing/pen-field';
@@ -1420,6 +1421,50 @@ describe('PipelineParseDefinitionComponent', () => {
             fixture.detectChanges();
 
             expect(pane(fixture).typesMode()).toBe('declared');
+        });
+
+        it('U3: switching to Auto stamps the types (and their date formats) without undoing an edit in the grid', async () => {
+            const fixture = await create(unschemadNode());
+            const p = pane(fixture);
+            p.setTypesMode('declared');
+            p.onPreviewed({
+                ...typedPreview,
+                rows: [{ id: '1', when: 'March 22, 2025', city: 'london' }],
+                columnTypes: [
+                    { name: 'id', type: 'BIGINT' },
+                    { name: 'when', type: 'DATE', format: '%B %d, %Y' },
+                    { name: 'city', type: 'VARCHAR' },
+                ],
+            });
+            fixture.detectChanges();
+            await fixture.whenStable();
+            fixture.detectChanges();
+            const grid = fixture.debugElement.query(By.directive(InspectoSchemaFieldsEditorComponent))
+                .componentInstance as InspectoSchemaFieldsEditorComponent;
+            grid.fieldRows.at(0).get('name')!.setValue('ident');
+            grid.fieldRows.at(1).get('type')!.setValue('VARCHAR');
+            fixture.detectChanges();
+
+            p.setTypesMode('auto');
+            fixture.detectChanges();
+            await fixture.whenStable();
+            fixture.detectChanges();
+            // the person's rename survives; the stamped type is back
+            expect(grid.fieldRows.controls.map((g) => [g.get('name')!.value, g.get('type')!.value])).toEqual([
+                ['ident', 'BIGINT'],
+                ['when', 'DATE'],
+                ['city', 'VARCHAR'],
+            ]);
+
+            p.submit();
+            fixture.detectChanges();
+            const fields = (schemaWrites.at(-1)!.config['raw'] as { fields: { name: string; format?: string }[] })
+                .fields;
+            expect(fields.map((f) => [f.name, f.format])).toEqual([
+                ['ident', undefined],
+                ['when', '%B %d, %Y'],
+                ['city', undefined],
+            ]);
         });
 
         it('switching the mode marks the pane dirty', async () => {

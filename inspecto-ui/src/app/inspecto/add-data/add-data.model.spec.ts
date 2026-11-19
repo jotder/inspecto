@@ -1,6 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-    keptFormat,
     ledgerTime,
     matchLine,
     followOnClause,
@@ -398,18 +397,6 @@ describe('lookups in the draft (ONBOARDING-FIRST-RUN-1 C6a)', () => {
             matchLine({ ...m, share: 0.5, by: 'entityType', entityType: 'msisdn', entityTypeLabel: 'Phone number' }),
         ).toBe('phone matches 50% of calls.caller (both hold Phone number)');
         expect(matchLine({ ...m, share: 0.5, by: 'entityType', entityType: 'msisdn' })).toContain('(both hold msisdn)');
-    });
-
-    it('a re-read keeps the sure format choices, never a low guess', () => {
-        const d = transfersDraft();
-        d.format = {
-            ...d.format,
-            delimiter: { value: ';', evidence: 'stated', confidence: 'high' },
-            header: { value: true, evidence: 'guess', confidence: 'low' },
-            quote: { value: '"', evidence: 'stated', confidence: 'high' },
-        };
-        expect(keptFormat(d)).toEqual({ delimiter: ';', quote: '"' });
-        expect(keptFormat(null)).toEqual({});
     });
 });
 

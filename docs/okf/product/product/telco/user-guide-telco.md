@@ -8,14 +8,20 @@
 
 - [Telecom revenue assurance — user guide](../../solution-pack/telco-ra/user-guide-telco-ra.md)
 - [Alerts](../../addon/incidents/user-guide-alerts.md)
+- [Alert, Incident and Case](../../addon/incidents/user-guide-concept-alert-incident-case.md)
+- [Alert Rule, Expectation and Decision Rule](../../addon/incidents/user-guide-concept-alert-rule.md)
 - [Incidents — screens](../../addon/incidents/user-guide-incidents.md)
+- [Tutorial 3 — Detect and respond: Reconciliation, Alert Rule, Incidents and a Case](../../addon/incidents/user-guide-tutorial-detect-respond.md)
 - [Reconciliation](../../module/reconciliation/user-guide-reconciliation.md)
 - [Incidents & Cases (Objects)](../../module/ops/user-guide-objects.md)
 
 ## Case Management
 
 - [Alerts](../../addon/incidents/user-guide-alerts.md)
+- [Alert, Incident and Case](../../addon/incidents/user-guide-concept-alert-incident-case.md)
+- [Alert Rule, Expectation and Decision Rule](../../addon/incidents/user-guide-concept-alert-rule.md)
 - [Incidents — screens](../../addon/incidents/user-guide-incidents.md)
+- [Tutorial 3 — Detect and respond: Reconciliation, Alert Rule, Incidents and a Case](../../addon/incidents/user-guide-tutorial-detect-respond.md)
 - [Case Management — screens](../../module/case-management/user-guide-case-management.md)
 - [Incidents & Cases (Objects)](../../module/ops/user-guide-objects.md)
 
@@ -24,7 +30,10 @@
 - [Telecom fraud — user guide](../../solution-pack/telco-fraud/user-guide-telco-fraud.md)
 - [Telecom bypass (SIM-box) — user guide](../../solution-pack/telco-bypass/user-guide-telco-bypass.md)
 - [Alerts](../../addon/incidents/user-guide-alerts.md)
+- [Alert, Incident and Case](../../addon/incidents/user-guide-concept-alert-incident-case.md)
+- [Alert Rule, Expectation and Decision Rule](../../addon/incidents/user-guide-concept-alert-rule.md)
 - [Incidents — screens](../../addon/incidents/user-guide-incidents.md)
+- [Tutorial 3 — Detect and respond: Reconciliation, Alert Rule, Incidents and a Case](../../addon/incidents/user-guide-tutorial-detect-respond.md)
 - [Incidents & Cases (Objects)](../../module/ops/user-guide-objects.md)
 - [Case Management — screens](../../module/case-management/user-guide-case-management.md)
 - [Entity Lists — user guide](../../module/entity-list/user-guide-entity-list.md)
@@ -35,6 +44,7 @@
 ## Link Analysis
 
 - [Geo Map Analysis](../../module/geo-link/user-guide-geo-map.md)
+- [Link Analysis and Investigations](../../module/la-core/user-guide-concept-link-analysis.md)
 - [Link Analysis — User Guide](../../module/la-core/user-guide-la-core.md)
 - [Inspecto LA training videos — A · Getting started: narration scripts](../../module/la-core/user-guide-training-a-getting-started.md)
 - [Inspecto LA training videos — B · Building a graph: narration scripts](../../module/la-core/user-guide-training-b-building-a-graph.md)

@@ -113,6 +113,12 @@ describe('GrammarEditorComponent', () => {
         expect(fixture.componentInstance.value()['frontend']).toBe('json');
     });
 
+    it('U3: seeds a Parquet Grammar as Parquet, not as delimited (an Add data Parquet import in the Pipelines editor)', () => {
+        const fixture = create({ frontend: 'parquet' });
+        expect(fixture.componentInstance.frontend()).toBe('parquet');
+        expect(fixture.componentInstance.value()['frontend']).toBe('parquet');
+    });
+
     it('normalizes the engine legacy fixed_width spelling', () => {
         expect(create({ frontend: 'fixed_width' }).componentInstance.frontend()).toBe('fixedwidth');
     });

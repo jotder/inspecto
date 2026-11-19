@@ -1,6 +1,8 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { LensService } from '@inspecto/core/api';
 import { SessionService } from '@inspecto/core/auth/session.service';
+import { POSTGRES_CONNECTOR, connectorLock } from '@inspecto/core/connections/connection-types';
+import { screenLocks } from '@inspecto/core/edition-locks';
 import { AUTOMATION_FALLBACK, NO_UPLOAD_RIGHT, REMOTE_FALLBACK, SELF_IMPORT_OFF, editionLock } from './add-data.model';
 import { OnboardService } from './onboard.service';
 
@@ -42,6 +44,14 @@ export class AddDataAccess {
 
     /** *Read from a database or a remote system*: Standard and above (DT-4). */
     readonly remoteLock = computed(() => this.lock('remoteSystems', REMOTE_FALLBACK));
+    /**
+     * *A Postgres table*: the snapshot's `postgres` Connection, locked by the same rule as a new Connection in the Connection
+     * dialog (`connectorLock` over the core screen locks, BASIC-ELT-PROFILE-1 D5). `postgres` is not a remote connector, so
+     * every edition has it, Basic included; the general `db` Collector stays locked there.
+     */
+    readonly postgresLock = computed(() =>
+        connectorLock(POSTGRES_CONNECTOR, screenLocks(this.session.features(), this.session.featureReasons())),
+    );
     /** *Keep this up to date*: Standard and above; Basic is manual (DT-5, DT-14). */
     readonly automationLock = computed(() => this.lock('pipelineAutomation', AUTOMATION_FALLBACK));
 

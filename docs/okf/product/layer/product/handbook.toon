@@ -13,6 +13,11 @@ chapters:
         type: reference
         tracks[4]: builder,partner,operator,business
         audience: external
+      tutorial_first_space:
+        file: docs/okf/product/module/config/user-guide-tutorial-first-space.md
+        type: tutorial
+        tracks[1]: builder
+        audience: external
       user_guide_journey_alert_to_case:
         file: docs/okf/product/layer/product/user-guide-journey-alert-to-case.md
         type: unsorted
@@ -318,6 +323,11 @@ chapters:
         type: unsorted
         tracks[2]: builder,business
         audience: internal
+      user_guide_order_to_cash:
+        file: docs/okf/product/solution-pack/order-to-cash/user-guide-order-to-cash.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
       admin_guide_orders_starter:
         file: docs/okf/product/solution-pack/orders-starter/admin-guide-orders-starter.md
         type: unsorted
@@ -393,6 +403,76 @@ chapters:
     group: Understand
     summary: The concepts every track shares: Spaces, Datasets, Pipelines, Collectors, Expectations, Alert Rules, Incidents, Cases, Widgets, Space Templates, Apps, editions and Add-ons.
     pages:
+      concept_overview:
+        file: docs/okf/product/layer/product/user-guide-concept-overview.md
+        type: concept
+        tracks[4]: builder,partner,operator,business
+        audience: external
+      concept_space:
+        file: docs/okf/product/module/config/user-guide-concept-space.md
+        type: concept
+        tracks[4]: builder,partner,operator,business
+        audience: external
+      concept_dataset:
+        file: docs/okf/product/layer/product/user-guide-concept-dataset.md
+        type: concept
+        tracks[3]: builder,partner,business
+        audience: external
+      concept_connection_collector:
+        file: docs/okf/product/module/elt/user-guide-concept-connection-collector.md
+        type: concept
+        tracks[3]: builder,partner,operator
+        audience: external
+      concept_pipeline:
+        file: docs/okf/product/module/elt/user-guide-concept-pipeline.md
+        type: concept
+        tracks[3]: builder,partner,operator
+        audience: external
+      concept_expectation:
+        file: docs/okf/product/module/elt/user-guide-concept-expectation.md
+        type: concept
+        tracks[3]: builder,partner,operator
+        audience: external
+      concept_alert_rule:
+        file: docs/okf/product/addon/incidents/user-guide-concept-alert-rule.md
+        type: concept
+        tracks[4]: builder,partner,operator,business
+        audience: external
+      concept_alert_incident_case:
+        file: docs/okf/product/addon/incidents/user-guide-concept-alert-incident-case.md
+        type: concept
+        tracks[3]: builder,operator,business
+        audience: external
+      concept_widget_dashboard:
+        file: docs/okf/product/layer/product/user-guide-concept-widget-dashboard.md
+        type: concept
+        tracks[3]: builder,partner,business
+        audience: external
+      concept_space_template:
+        file: docs/okf/product/module/config/user-guide-concept-space-template.md
+        type: concept
+        tracks[3]: builder,partner,operator
+        audience: external
+      concept_app:
+        file: docs/okf/product/layer/product/user-guide-concept-app.md
+        type: concept
+        tracks[4]: builder,partner,operator,business
+        audience: external
+      concept_edition_addon:
+        file: docs/okf/product/layer/product/user-guide-concept-edition-addon.md
+        type: concept
+        tracks[4]: builder,partner,operator,business
+        audience: external
+      concept_roles_access_policies:
+        file: docs/okf/product/module/access/user-guide-concept-roles-access-policies.md
+        type: concept
+        tracks[3]: builder,partner,operator
+        audience: external
+      concept_link_analysis:
+        file: docs/okf/product/module/la-core/user-guide-concept-link-analysis.md
+        type: concept
+        tracks[2]: builder,business
+        audience: external
       admin_guide_product:
         file: docs/okf/product/layer/product/admin-guide-product.md
         type: unsorted
@@ -463,6 +543,11 @@ chapters:
     group: Build
     summary: Expectations, quarantine and duplicates.
     pages:
+      tutorial_pipeline_expectations:
+        file: docs/okf/product/module/elt/user-guide-tutorial-pipeline-expectations.md
+        type: tutorial
+        tracks[1]: builder
+        audience: external
   build_analyse:
     title: Analyse it
     group: Build
@@ -688,6 +773,11 @@ chapters:
     group: Build
     summary: Incidents, Cases, Workflow & SLA, four-eyes approval and notifications.
     pages:
+      tutorial_detect_respond:
+        file: docs/okf/product/addon/incidents/user-guide-tutorial-detect-respond.md
+        type: tutorial
+        tracks[1]: builder
+        audience: external
       user_guide_alerts:
         file: docs/okf/product/addon/incidents/user-guide-alerts.md
         type: unsorted
@@ -768,6 +858,11 @@ chapters:
     group: Build
     summary: Dashboards, scheduled reports and sharing.
     pages:
+      tutorial_dashboard:
+        file: docs/okf/product/layer/product/user-guide-tutorial-dashboard.md
+        type: tutorial
+        tracks[2]: builder,business
+        audience: external
       user_guide_dashboard:
         file: docs/okf/product/layer/product/user-guide-dashboard.md
         type: unsorted
@@ -788,6 +883,11 @@ chapters:
     group: Ship
     summary: Move a Space, package and install an App, install an edition, deploy and upgrade.
     pages:
+      tutorial_ship_an_app:
+        file: docs/okf/product/layer/platform/user-guide-tutorial-ship-an-app.md
+        type: tutorial
+        tracks[1]: partner
+        audience: external
       admin_guide_apps:
         file: docs/okf/product/layer/platform/admin-guide-apps.md
         type: unsorted
@@ -873,6 +973,11 @@ chapters:
     group: Manage
     summary: Sign-in, Roles, Access Policies, masking, backup and restore, upgrades, monitoring and audit verification.
     pages:
+      tutorial_run_the_platform:
+        file: docs/okf/product/layer/platform/user-guide-tutorial-run-the-platform.md
+        type: tutorial
+        tracks[1]: operator
+        audience: external
       operations_guide:
         file: docs/ADVANCED_GUIDE.md
         title: Operations guide

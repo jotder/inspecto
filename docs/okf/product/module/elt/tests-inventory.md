@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.elt`](../../../../../product-map/module/elt.toon).
 
-105 test class(es): 105 unit, 0 real-HTTP control-plane, 0 IT.
+106 test class(es): 106 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -45,6 +45,7 @@ mvn -o test -pl platform/inspecto-etl -Dtest=AcceptedConfigKeysDocContractTest,C
 | `DataTransformerMissingRawFieldsTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/DataTransformerMissingRawFieldsTest.java` | A schema whose {@code raw} block has no {@code fields[]} — its structure normally comes from a sibling |
 | `DataTransformerRowPredicateTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/DataTransformerRowPredicateTest.java` | {@code processing.csv_settings.where} — the <b>post-parse</b> row predicate applied by |
 | `DataTransformerTransformTypesTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/DataTransformerTransformTypesTest.java` | Covers {@link DataTransformer}'s less-exercised mapping transform types |
+| `DecimalSeparatorTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/DecimalSeparatorTest.java` | {@code BASIC-ELT-PROFILE-1} U3: the Grammar's decimal mark, {@code csv_settings.decimal_separator} (also spelled |
 | `DelimitedGrammarTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/DelimitedGrammarTest.java` | Tests for the 4.1 delimited-grammar work (docs/delimited-grammar-design.md): |
 | `DeriveSpecTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/DeriveSpecTest.java` | {@link DeriveSpec}: the closed-vocabulary derive compiler and evaluator, over hand-built decoded maps. |
 | `DuckDbCsvIngesterTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/DuckDbCsvIngesterTest.java` | Tests for {@link DuckDbCsvIngester} — the native vectorized CSV path. |

@@ -38,7 +38,7 @@ public final class SchemaSuggest {
 
     /**
      * One inferred field of the draft {@code raw.fields} list. {@code format} is the strptime pattern a
-     * {@code DATE} was proven with ({@code raw.fields[].format}, see
+     * {@code DATE} or {@code TIMESTAMP} is read with ({@code raw.fields[].format}, see
      * {@code SchemaFieldTypes.formatsOf}), else {@code null}.
      */
     public record Field(String name, String type, String format) {
@@ -67,6 +67,16 @@ public final class SchemaSuggest {
      */
     public static List<Field> infer(List<Map<String, Object>> sampleRows)
             throws SQLException, java.io.IOException {
+        return infer(sampleRows, null);
+    }
+
+    /**
+     * {@link #infer(List)} reading number columns through {@code decimalMark} ({@code "."} or {@code ","}): the
+     * Grammar's {@code decimal_separator}, so {@code 3,50} under {@code ","} is a {@code DOUBLE} as in the parse preview
+     * and Add data ({@code BASIC-ELT-PROFILE-1} U3). {@code null} = no mark.
+     */
+    public static List<Field> infer(List<Map<String, Object>> sampleRows, String decimalMark)
+            throws SQLException, java.io.IOException {
         if (sampleRows == null || sampleRows.isEmpty())
             throw new IllegalArgumentException("at least one sample row is required");
         List<String> columns = ScratchTables.columnsOf(sampleRows);
@@ -77,7 +87,7 @@ public final class SchemaSuggest {
             ScratchTables.seed(conn, "suggest_input", columns, sampleRows);
             // the vote is the sample profiler's (BASIC-ELT-PROFILE-1 BE-3 slice 2), the one Add data proposes from too
             List<Field> out = new ArrayList<>(columns.size());
-            for (SampleProfiler.ColumnType c : SampleProfiler.types(conn, "suggest_input", 0))
+            for (SampleProfiler.ColumnType c : SampleProfiler.types(conn, "suggest_input", 0, decimalMark))
                 out.add(new Field(c.name(), c.type(), c.format()));
             return out;
         } finally {

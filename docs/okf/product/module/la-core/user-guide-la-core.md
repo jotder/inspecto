@@ -186,12 +186,16 @@ says so and offers no folder action.
 ![Step 2 of Onboard a file: the detected separator, header line and column types](../../assets/la-guide-03-check-columns.png)
 *Check the columns: each detected choice gives its reason; a guess is highlighted with **Confirm**.*
 
-   A column that is *almost all* dates, dates with a time or numbers — at least nine values in ten, and at least ten
-   of them — is proposed as that type, marked **A guess**, and its reason names a value that does not fit (*460 of 461
-   sampled values are dates with a time, but 1 is not (e.g. 'not-a-date'); it will be left blank*). The import leaves
-   such a value blank, keeps its row and counts it in the result. A whole-number column is proposed this way only
-   when its name says an amount (`amount`, `total`, `fee`…); digits with a few letters among them are more often
-   identifiers, so any other such column stays *Text*. Below nine in ten the column stays *Text* too.
+   A column that is *almost all* dates or dates with a time — at least nine values in ten, and at least ten of them —
+   is proposed as that type, marked **A guess**, and its reason names a value that does not fit (*460 of 461 sampled
+   values are dates with a time, but 1 is not (e.g. 'not-a-date'); it will be left blank*). The import leaves such a
+   value blank, keeps its row and counts it in the result. **A number is proposed only when every value is one:** a
+   column with even one value that is not a number stays *Text*, and its reason says so (*460 of 461 sampled values
+   are numbers, but 1 is not (e.g. 'abc'), so it is kept as text*); change its type yourself to read it as a number,
+   and the import leaves the odd value blank. The types are *Text*, *Whole number*, *Decimal number*, *Date*, *Date
+   and time*, *Time of day* (`09:30:00`) and *Yes / no*; a date written in words (`March 22, 2025`) is a *Date*.
+   These are the same types, read from the same rule, that the Pipelines editor's parse preview and *Suggest from
+   sample* propose (2026-11-19).
 
    When you change a column's **Type** or **Role** yourself, the screen asks the server again and everything that
    depends on it follows in that one edit: the reason beside the type (how many values it reads, and one it does

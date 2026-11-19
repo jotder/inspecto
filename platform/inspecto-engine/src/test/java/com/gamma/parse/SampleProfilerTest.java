@@ -97,10 +97,10 @@ class SampleProfilerTest {
             List<SampleProfiler.ColumnType> two = SampleProfiler.types(conn, sniffed, 2);
             assertEquals(List.of(
                     // the vote reads the values as the relation renders them: DuckDB's DOUBLE 1 is the text '1.0'
-                    new SampleProfiler.ColumnType("n", "DOUBLE", "DOUBLE", null),
-                    new SampleProfiler.ColumnType("d", "VARCHAR", "DATE", "%Y-%m-%d"),
-                    new SampleProfiler.ColumnType("t", "VARCHAR", "VARCHAR", null),
-                    new SampleProfiler.ColumnType("w", "VARCHAR", "DATE", "%B %d, %Y")), two,
+                    new SampleProfiler.ColumnType("n", "DOUBLE", "DOUBLE", null, null, 2, 2, null),
+                    new SampleProfiler.ColumnType("d", "VARCHAR", "DATE", "%Y-%m-%d", null, 2, 2, null),
+                    new SampleProfiler.ColumnType("t", "VARCHAR", "TIME", null, null, 2, 2, null),
+                    new SampleProfiler.ColumnType("w", "VARCHAR", "DATE", "%B %d, %Y", null, 2, 2, null)), two,
                     "DuckDB types the whole sample; the vote reads the first two rows");
             assertEquals("VARCHAR", SampleProfiler.types(conn, sniffed, 0).get(1).type(), "every row: 'x' is not a date");
             try (var st = conn.createStatement();
@@ -108,6 +108,34 @@ class SampleProfilerTest {
                 rs.next();
                 assertEquals(0, rs.getLong(1), "the vote's scratch table is dropped");
             }
+        }
+    }
+
+    /**
+     * The operator's rulings (2026-11-19) in the vote itself: a number written with the decimal mark it is given is a
+     * DOUBLE carrying the mark (and text without it); almost all dates are a date that names its one odd value; almost
+     * all numbers stay text.
+     */
+    @Test
+    void theVoteFollowsTheRulings(@TempDir Path dir) throws Exception {
+        DuckDbUtil.loadDriver();
+        StringBuilder csv = new StringBuilder("amount;day;mostly\n");
+        for (int i = 1; i <= 20; i++)
+            csv.append(i).append(",5;").append(i == 3 ? "soon" : "2025-03-" + (10 + i)).append(';').append(i == 4 ? "n/a" : i + ".5").append("\n");
+        Path f = dir.resolve("r.csv");
+        Files.writeString(f, csv.toString());
+        String rel = "read_csv(" + com.gamma.util.SqlIdent.pathStr(f) + ", delim = ';', all_varchar = true)";
+        try (Connection conn = DuckDbUtil.openInMemory(null, List.of(dir), null)) {
+            List<SampleProfiler.ColumnType> comma = SampleProfiler.types(conn, rel, 0, ",");
+            assertEquals(new SampleProfiler.ColumnType("amount", "VARCHAR", "DOUBLE", null, ",", 20, 20, null), comma.get(0));
+            assertEquals(new SampleProfiler.ColumnType("day", "VARCHAR", "DATE", "%Y-%m-%d", null, 19, 20, "soon"), comma.get(1));
+            assertEquals("VARCHAR", comma.get(2).type(), "19 of 20 numbers is text");
+            assertEquals("VARCHAR", SampleProfiler.types(conn, rel, 0).get(0).type(), "no mark: '1,5' is text");
+            // under a comma mark the import reads '3.5' as 35: such a column is no number (verification finding 2)
+            String points = "(SELECT * FROM (VALUES ('3.5'), ('47.00'), ('12')) t(x))";
+            assertEquals("VARCHAR", SampleProfiler.types(conn, points, 0, ",").get(0).type());
+            assertEquals("DOUBLE", SampleProfiler.types(conn, points, 0, ".").get(0).type());
+            assertEquals("BIGINT", SampleProfiler.types(conn, "(SELECT * FROM (VALUES ('12'), ('7')) t(x))", 0, ",").get(0).type());
         }
     }
 

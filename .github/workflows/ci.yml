@@ -400,6 +400,12 @@ jobs:
       - name: Guard — the classpath generator and the showcase packer still behave
         run: node --test tools/offering-classpath.test.mjs tools/package-la-showcase.test.mjs
 
+      # The Handbook's worked example (USER-HANDBOOK-1 P2 lane D, 2026-11-19): the order-to-cash samples and their
+      # ground truth are the generator's byte-for-byte output, and the files hold exactly the planted defects the
+      # tutorials tell the reader to find (~2 s). That the shipped controls report them is OrderToCashGoldenTest.
+      - name: Guard — the order-to-cash worked example data is the generator's and holds its planted defects
+        run: node --test tools/gen-order-to-cash-data.test.mjs
+
       # Bundle-platform guard (RELEASE-BUNDLE-PLATFORM-MISMATCH-1, 2026-09-17). The one zip a tag published
       # was compressed as 'windows_amd64' by a LITERAL at the call site while the jlink image on ubuntu-latest
       # is Linux — a Linux JVM beside Windows-only DuckDB extensions. package.ps1 now reads the platform off the
@@ -477,9 +483,12 @@ jobs:
       # Handbook guard (USER-HANDBOOK-1 P1): docs/okf/product/layer/product/handbook.toon keeps the contract chapter ids
       # the console's help links use, places every hub user / admin guide (a new guide is placed in the change that adds
       # it, internal by default), holds how-to pages to the six-heading template, and its EXTERNAL render — the one a
-      # bundle ships at /help — holds no internal page and no dead link. Renders in memory; no build, ~1s.
+      # bundle ships at /help — holds no internal page and no dead link. Renders in memory; no build, ~1s. Since P2 lane E it
+      # also parses every docs-as-tests check block (routes against openapi-v1.json) and requires one on every tutorial and
+      # how-to. The checks themselves need a live install, so they are NOT run here: tools/run-handbook-checks.mjs runs them
+      # on demand and before each release (spec-handbook-doc-tests.md); its tests below use a stub server.
       - name: Guard — the Handbook manifest holds together and its external render cannot leak
-        run: node tools/check-handbook.mjs && node --test tools/check-handbook.test.mjs tools/render-handbook.test.mjs
+        run: node tools/check-handbook.mjs && node --test tools/check-handbook.test.mjs tools/render-handbook.test.mjs tools/handbook-checks.test.mjs tools/run-handbook-checks.test.mjs
 
       # OpenAPI fragments guard (MODULE-REORG-1 P1): docs/api/openapi-v1.json is GENERATED from the core fragment +
       # each module's META-INF/inspecto/openapi.fragment.json. Reads tracked files only; no build, ~0.3s.

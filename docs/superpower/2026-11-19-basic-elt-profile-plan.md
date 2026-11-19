@@ -75,14 +75,14 @@ Parallel now: P0-BE, P0-UI, UI-0. Each build phase is its own lane, integrated a
 | Order | Phase | First slice | Blocked by |
 |---|---|---|---|
 | 1 | **BE-1a** commit-step registry (B2, B14) | `CollectorService.commitStep` → an ordered, per-run-coalesced list; compaction, follow-ons, Expectations registered; Add data calls the same function in-run | — |
-| 1 | **BE-3** sample profiler (B7) | extract the dialect sniff as a public engine service; `OnboardDraft` calls it, keeping its fallbacks; type unification next, with golden diff tests | — |
+| 1 | **BE-3** sample profiler (B7) | extract the dialect sniff as a public engine service; `OnboardDraft` calls it, keeping its fallbacks; type unification next, with golden diff tests. **Type rulings built 2026-11-19** (`lane/basic-u3-types`): one type answer in the preview, suggest and Add data (`SampleProfiler.types`), Basic gains `TIME` (spec-parsing §P.3.6) | — |
 | 1 | **UI-1 U1-types** | Basic's column types move to `core/schema` as the named subset of `SCHEMA_TYPES` | UI-0 |
 | 2 | **BE-1b** pre-run seam, then B1 | pre-run step runs `judgeInbox` + `settleNewColumns` for scheduled import runs; then *Watch* = locked Keep preset | O1 for B1 |
 | 2 | **UI-1 U4-Keep** | ready marker + size checks into the Collector spec; host `collector-config` for *Keep this up to date* | — |
 | 3 | **BE-2** B6 → B4 → B3 → B5 | B6: engine owns the merge map, `compact mode: arrivals`, registry marking | BE-1a |
-| 3 | **UI-1 U1a, U3** | compact types mode; shared format wording, merged sniff after BE-3 | O3, O5 |
+| 3 | **UI-1 U1a, U3** | compact types mode; shared format wording, merged sniff after BE-3. **U3 built 2026-11-19** (`lane/basic-u3-types`): the Grammar gains `decimal_separator` and a Parquet format (encoding and `records_path` were there; an import's `csv_settings.encoding` now shows on the Encoding row); Add data's format labels come from `parsingAttributesFor('delimited')`; only a picked format value is stated. The server sniff already shows per row ("Sample resolves to"). **Left:** Add data still writes a decimal-comma column as a per-column `EXPR` mapping, not the key (the writer is `OnboardImport.Plan.pipeline`, another lane's file); TIME is not yet a type a later file's new column settles to (`DatasetNewColumns`, BE-1b's file) and the Dataset entry calls a TIME column `string` (`OnboardImport.datasetType`) | O3, O5 |
 | 4 | **BE-4** B8 | `postgres` connector factory called by `refresh`; Pipeline switch after B4. **Part 1 built 2026-11-19** (`lane/basic-be4-postgres`): the scheme (`PostgresConnectorFactory`, engine), test/draft/Run now through it, a saved `postgres` Connection `<id>_postgres` per snapshot, pre-BE-4 inline snapshots read as they are. Left: the Pipeline switch, `ProcessorCatalog`/Gate exemption | O4 |
-| 4 | **UI-1 U2, U4-Watch** | after BE-4 / BE-1b | |
+| 4 | **UI-1 U2, U4-Watch** | after BE-4 / BE-1b. **U2 built 2026-11-19** (`lane/basic-u2-postgres-form`): `inspecto-connection-fields` shared by the Connection dialog and Add data's *Choose a table* (`POSTGRES_CONNECTION_ATTRS`, password `INSPECTO_PG_` only); request bodies pinned byte for byte; the test and copy stay on `/onboard/postgres/*` (probe/explore need a saved Connection, `postgres` has no workbench); the dialog edits a `postgres` Connection as itself, with no Routing | |
 | 5 | **Gate** | one Basic-profile declaration read by screen flags, `ProcessorCatalog` and Basic's routes; a test per Basic entry point; nothing refused on load | O2 |
 
 New rows for later: U1b (step 3 stays LA; converge D2), U5 (UI-only row-filter duplicate), D3/D4 (one scaffold and
@@ -118,7 +118,7 @@ has no Parquet format (`parsing-attributes.ts:115-121`), so an upgraded Parquet 
 | D2 | Three editors for column roles / Entity Types: Add data step 3, Studio `dataset-columns` (own `ROLES`), LA `entity-columns`. |
 | D3 | Two Pipeline scaffolds: server `OnboardImport.Plan.pipeline` and UI `component-model/pipeline-scaffold.ts` (different default inbox). |
 | D4 | Two name rules for one Pipeline id: `DATASET_NAME` (`add-data.model.ts:610`) vs `onboarding-create.dialog.ts:299-306`. |
-| D5 | Two sources for the Edition lock: `AddDataAccess` reads `LA_FEATURES`; core reads `LensService.screenLocks()` — they disagree on Postgres for Basic. |
+| D5 | Two sources for the Edition lock: `AddDataAccess` reads `LA_FEATURES`; core reads `LensService.screenLocks()` — they disagree on Postgres for Basic. **Postgres closed by U2:** one rule, `connectorLock()` in `connection-types.ts`, read by the dialog and `AddDataAccess.postgresLock`. Still open: `AddDataAccess`'s other locks lock a missing `/bootstrap` flag on Basic where core offers it, with different fallback wording. |
 | D6 | The feed's SFTP picker filters `ConnectionsService.list()` by hand instead of `connectionOptionLoader`. |
 
 The catalog `onboarding-create.dialog` is **not** a third implementation: it is the Standard entry into ELT (it

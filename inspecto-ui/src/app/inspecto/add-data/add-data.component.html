@@ -60,8 +60,13 @@
                     data-testid="data-origin"
                 >
                     <mat-radio-button value="file" [disabled]="reading()">A file</mat-radio-button>
-                    <mat-radio-button value="postgres" [disabled]="reading()">A Postgres table</mat-radio-button>
+                    <mat-radio-button value="postgres" [disabled]="reading() || !!access.postgresLock()"
+                        >A Postgres table</mat-radio-button
+                    >
                 </mat-radio-group>
+                @if (access.postgresLock(); as why) {
+                    <inspecto-locked-action label="Copy a Postgres table" [reason]="why"></inspecto-locked-action>
+                }
             }
             @if (draft(); as d) {
                 <div class="flex flex-wrap items-center gap-2 text-sm" data-testid="chosen-file">
@@ -252,7 +257,7 @@
                                 [class]="lowClasses(key.format('delimiter'))"
                             >
                                 <inspecto-option-picker
-                                    label="Separator"
+                                    [label]="formatLabels.delimiter"
                                     formControlName="delimiter"
                                     data-testid="format-delimiter"
                                     [options]="delimiterOptions"
@@ -266,7 +271,7 @@
                             </div>
                             <div class="flex flex-col gap-1 rounded-lg p-2" [class]="lowClasses(key.format('header'))">
                                 <inspecto-option-picker
-                                    label="Header line"
+                                    [label]="formatLabels.header"
                                     formControlName="header"
                                     data-testid="format-header"
                                     [options]="headerOptions"
@@ -280,7 +285,7 @@
                             </div>
                             <div class="flex flex-col gap-1 rounded-lg p-2" [class]="lowClasses(key.format('quote'))">
                                 <inspecto-option-picker
-                                    label="Quote"
+                                    [label]="formatLabels.quote"
                                     formControlName="quote"
                                     data-testid="format-quote"
                                     [options]="quoteOptions"

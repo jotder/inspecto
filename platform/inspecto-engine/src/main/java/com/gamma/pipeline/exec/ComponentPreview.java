@@ -127,9 +127,9 @@ public final class ComponentPreview {
     /**
      * A grammar parse preview: the columns the dialect produced, the parsed rows, and the reject count.
      * {@code columnTypes} (B2, additive — old clients ignore the key) carries a per-column
-     * {@code {name, type}} pair from a second {@code auto_detect=true} sniff of the same sample —
-     * advisory only (production ingest stays all-VARCHAR); empty when the frontend has no sniff
-     * (non-delimited) or the sniff failed.
+     * {@code {name, type}} pair, plus {@code format} for a date read with one: the sample profiler's vote over the parsed
+     * rows, the same type schema suggest and Add data propose — advisory only (production ingest stays all-VARCHAR);
+     * empty when the frontend is not delimited or the vote failed.
      *
      * <p>{@code resolved} (additive, 2026-09-24 — AUTHORING-REDESIGN-1 (i)) is what DuckDB's own dialect
      * sniff ({@code sniff_csv}) resolves the SAMPLE to, keyed by the {@code parsing.delimited.*} option it
@@ -261,7 +261,7 @@ public final class ComponentPreview {
                         ScratchTables.count(conn, "preview_parsed"),
                         ScratchTables.readRows(conn, "preview_parsed", MAX_ROWS),
                         rejectCount(conn),
-                        delimited ? sniffColumnTypes(conn, cfg, path) : List.of(),
+                        delimited ? sniffColumnTypes(conn, cfg) : List.of(),
                         delimited ? sniffDialect(conn, path) : Map.of());
             }
         } finally {
@@ -482,23 +482,23 @@ public final class ComponentPreview {
     }
 
     /**
-     * B2: a second, {@code auto_detect=true} sniff of the same sample — per-column inferred types for
-     * the Data-types Auto mode. The answer is DuckDB's own type per column, through the sample profiler
-     * ({@link com.gamma.parse.SampleProfiler#types}, its {@code duckdb} answer; schema suggest and Add data
-     * give its vote — where the two differ, {@code TypeInferenceGoldenTest} names it). Advisory by
-     * construction: production ingest stays all-VARCHAR, so a failed sniff returns empty rather than failing
-     * the preview. Deliberately no {@code store_rejects} — the sniff must not pollute the reject count the
-     * parse above just produced.
+     * B2: per-column types for the Data-types Auto mode — the sample profiler's one answer
+     * ({@link com.gamma.parse.SampleProfiler#types}, the same answer schema suggest and Add data give: operator rulings
+     * 2026-11-19), voted over the very rows this preview parsed ({@code preview_parsed}, all text, which is also what
+     * schema suggest receives) and read through the Grammar's decimal mark ({@code csv_settings.decimal_separator}).
+     * Each entry is {@code {name, type}} plus {@code format} when a date or a date with a time is read with one.
+     * Advisory by construction: production ingest stays all-VARCHAR, so a failed vote returns empty rather than failing
+     * the preview.
      */
-    private static List<Map<String, String>> sniffColumnTypes(Connection conn, PipelineConfig cfg, String path) {
+    private static List<Map<String, String>> sniffColumnTypes(Connection conn, PipelineConfig cfg) {
         try {
             List<Map<String, String>> out = new java.util.ArrayList<>();
             for (com.gamma.parse.SampleProfiler.ColumnType c : com.gamma.parse.SampleProfiler.types(conn,
-                    "read_csv(" + SqlIdent.sqlStr(path) + delimitedReadOptions(cfg) + ", auto_detect=true, ignore_errors=true)",
-                    MAX_ROWS)) {
+                    "preview_parsed", MAX_ROWS, cfg.csv().decimalSeparator())) {
                 Map<String, String> col = new java.util.LinkedHashMap<>();
                 col.put("name", c.name());
-                col.put("type", c.duckdb());
+                col.put("type", c.type());
+                if (c.format() != null) col.put("format", c.format());
                 out.add(col);
             }
             return out;

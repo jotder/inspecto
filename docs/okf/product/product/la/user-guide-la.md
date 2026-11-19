@@ -7,6 +7,7 @@
 ## Link Analysis
 
 - [Geo Map Analysis](../../module/geo-link/user-guide-geo-map.md)
+- [Link Analysis and Investigations](../../module/la-core/user-guide-concept-link-analysis.md)
 - [Link Analysis — User Guide](../../module/la-core/user-guide-la-core.md)
 - [Inspecto LA training videos — A · Getting started: narration scripts](../../module/la-core/user-guide-training-a-getting-started.md)
 - [Inspecto LA training videos — B · Building a graph: narration scripts](../../module/la-core/user-guide-training-b-building-a-graph.md)

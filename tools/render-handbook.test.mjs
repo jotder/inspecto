@@ -27,6 +27,15 @@ test('markdown: tables, fenced code, blockquotes, lists and rules', () => {
     assert.ok(r.html.includes('<hr>'));
 });
 
+test('markdown: a check block is one quiet folded line naming what is checked, the step escaped under it', () => {
+    const r = markdownToHtml('## Check it worked\n```check\nGET /spaces/{space}/datasets\nas analyst\nexpect data.items[*].id has "<o2c>"\n```\n```check-ui\n{"open":"/data"}\n```');
+    assert.ok(r.html.includes('<details class="check"><summary>Checked on every release · GET /spaces/{space}/datasets as analyst answers 2xx, 1 more expectation</summary>'), r.html);
+    assert.ok(r.html.includes('has &quot;&lt;o2c&gt;&quot;'));
+    assert.ok(r.html.includes('<summary>Checked on every release · In the console: open “/data”</summary>'));
+    assert.ok(!/<\/h2>\s*<pre>/.test(r.html), 'not shown as a plain code block');
+    assert.equal(r.html.match(/<pre>/g).length, r.html.match(/<details class="check">/g).length, 'every step sits inside its fold');
+});
+
 test('inline: an HTML anchor stays an anchor, bold may hold emphasis, emphasis never reaches an href', () => {
     const link = (h) => h;
     assert.equal(inline('<a id="menus"></a>Menus', link), '<span id="menus"></span>Menus');

@@ -1,0 +1,29 @@
+partitionKey: order_date
+raw:
+  name: ORDERS
+  format: CSV
+  fields[5]{name,selector,type,description,unit,classification}:
+    ORDER_ID,"0",VARCHAR,"Order identifier from the order system","","INTERNAL"
+    ORDER_DATE,"1",DATE,"Business date the order was booked","","INTERNAL"
+    CUSTOMER_ID,"2",VARCHAR,"Customer the order is invoiced to","","INTERNAL"
+    CURRENCY,"3",VARCHAR,"Invoice currency (ISO 4217)","","INTERNAL"
+    AMOUNT,"4",DOUBLE,"Invoiced amount of the order","USD","INTERNAL"
+mapping:
+  canonicalName: orders
+  rawName: ORDERS
+  fields[5]:
+    - name: order_id
+      from: ORDER_ID
+      fn: keep
+    - name: order_date
+      from: ORDER_DATE
+      fn: keep
+    - name: customer_id
+      from: CUSTOMER_ID
+      fn: keep
+    - name: currency
+      from: CURRENCY
+      fn: keep
+    - name: amount
+      from: AMOUNT
+      fn: keep

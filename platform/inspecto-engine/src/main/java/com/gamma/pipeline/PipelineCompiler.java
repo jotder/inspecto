@@ -331,6 +331,7 @@ public final class PipelineCompiler {
         if (!c.dateFormats().isEmpty()) m.put("date_formats", c.dateFormats());
         if (!c.tsFormats().isEmpty()) m.put("timestamp_formats", c.tsFormats());
         if (c.encoding() != null) m.put("encoding", c.encoding());
+        if (c.decimalSeparator() != null) m.put("decimal_separator", c.decimalSeparator());
         if (c.inputCompression() != null) m.put("compression", c.inputCompression());
         if (c.strictMode() != null) m.put("strict_mode", c.strictMode());
         if (!c.nullStrings().isEmpty()) m.put("null_strings", c.nullStrings());

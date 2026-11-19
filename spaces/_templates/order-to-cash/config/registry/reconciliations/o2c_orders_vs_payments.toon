@@ -1,0 +1,7 @@
+name: o2c_orders_vs_payments
+datasets[2]: orders,payments
+keyColumns[1]: order_id
+includeRecordCount: false
+cardinality: one_to_many
+compareColumns[1]{column,agg,toleranceType,tolerance}:
+  amount,sum,absolute,0

@@ -230,7 +230,7 @@ describe('SchemaEditorDialog', () => {
         expect((fixture.nativeElement as HTMLElement).textContent).toContain('Suggest from sample');
 
         await c.suggestFromSample();
-        expect(api.suggestSchema).toHaveBeenCalledWith(sample, undefined, undefined);
+        expect(api.suggestSchema).toHaveBeenCalledWith(sample, undefined, undefined, undefined);
         expect(c.rows()).toEqual([
             { name: 'ID', selector: 'ID', type: 'BIGINT', format: '', description: '', unit: '', classification: '' },
             { name: 'AMT', selector: 'AMT', type: 'DOUBLE', format: '', description: '', unit: '', classification: '' },
@@ -259,7 +259,16 @@ describe('SchemaEditorDialog', () => {
         c.data.frontend = 'json';
 
         await c.suggestFromSample();
-        expect(api.suggestSchema).toHaveBeenCalledWith(sample, undefined, 'json');
+        expect(api.suggestSchema).toHaveBeenCalledWith(sample, undefined, 'json', undefined);
+    });
+
+    it("U3: Suggest from sample forwards the Grammar's decimal mark, so 3,50 is the number the preview showed", async () => {
+        const sample = [{ amount: '3,50' }];
+        const { c, api } = create(undefined, {}, sample);
+        c.data.decimalSeparator = ',';
+
+        await c.suggestFromSample();
+        expect(api.suggestSchema).toHaveBeenCalledWith(sample, undefined, undefined, ',');
     });
 
     it('suggesting over already-named rows asks first and keeps them on decline', async () => {

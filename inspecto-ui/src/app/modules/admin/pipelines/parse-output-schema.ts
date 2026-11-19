@@ -21,18 +21,33 @@ export function inferredSchemaTypes(p: Pick<ParserTablePreview, 'columnTypes'>):
     return p.columnTypes ? p.columnTypes.map((ct) => narrowToSchemaType(ct.type)) : null;
 }
 
-/** One output-schema row per parsed column: an identifier-safe name, this frontend's selector, the type. */
+/**
+ * The strptime format the parse read each date or date-with-a-time column with, by column position; `undefined` where
+ * none. The preview serves one with its type (BASIC-ELT-PROFILE-1: one type answer) - a `DATE` of `March 22, 2025`
+ * is only a date WITH `%B %d, %Y` (without it the value lands NULL), so a typed schema row must carry it.
+ */
+export function inferredSchemaFormats(p: Pick<ParserTablePreview, 'columnTypes'>): (string | undefined)[] | null {
+    return p.columnTypes ? p.columnTypes.map((ct) => ct.format || undefined) : null;
+}
+
+/** One output-schema row per parsed column: an identifier-safe name, this frontend's selector, the type and format. */
 export function derivedSchemaRows(
     frontend: string,
     columns: readonly string[],
     inferred: readonly string[] | null,
+    formats: readonly (string | undefined)[] | null = null,
 ): SchemaFieldRow[] {
-    return columns.map((col, i) => ({
-        include: true,
-        name: sanitizeIdentifier(col, i),
-        selector: deriveSelector(frontend, i, col),
-        type: inferred?.[i] ?? 'VARCHAR',
-    }));
+    return columns.map((col, i) => {
+        const type = inferred?.[i] ?? 'VARCHAR';
+        const format = type === 'DATE' || type === 'TIMESTAMP' ? formats?.[i] : undefined;
+        return {
+            include: true,
+            name: sanitizeIdentifier(col, i),
+            selector: deriveSelector(frontend, i, col),
+            type,
+            ...(format ? { format } : {}),
+        };
+    });
 }
 
 /** Everything one output-schema write needs — what the Parse pane knows about the schema it holds. */
@@ -92,6 +107,8 @@ export function writeParseSchema(configApi: ConfigService, w: ParseSchemaWrite):
                         ...(f.description ? { description: f.description } : {}),
                         ...(f.unit ? { unit: f.unit } : {}),
                         ...(f.classification ? { classification: f.classification } : {}),
+                        // U3: the strptime format a date was read with - a `March 22, 2025` DATE lands NULL without it
+                        ...(f.format ? { format: f.format } : {}),
                     })),
                 },
                 mapping: {

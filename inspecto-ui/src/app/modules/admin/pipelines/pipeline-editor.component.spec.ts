@@ -1371,6 +1371,43 @@ describe('PipelineEditorComponent', () => {
                 expect(parsing['delimited']).toEqual({ delimiter: ';', has_header: false });
             });
 
+            it('U3: an Add data import shows its csv_settings encoding on the parsing-level Encoding row', () => {
+                const c = make();
+                c.select('demo');
+                const node = {
+                    id: 'parse',
+                    type: 'parser',
+                    // what Add data writes for a Latin-1 file (OnboardImport.Plan.pipeline)
+                    config: {
+                        csv_settings: { delimiter: ';', has_header: true, encoding: 'latin-1' },
+                        parsing: { frontend: 'delimited' },
+                    },
+                };
+                c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
+                c.openNodeConfig(node);
+                const parsing = c.definitionNode()!.config!['parsing'] as Record<string, unknown>;
+                expect(parsing['encoding']).toBe('latin-1');
+                expect(parsing['delimited']).toEqual({ delimiter: ';', has_header: true });
+            });
+
+            it('U3: a parsing-level encoding wins over the legacy one, as in the engine', () => {
+                const c = make();
+                c.select('demo');
+                const node = {
+                    id: 'parse',
+                    type: 'parser',
+                    config: {
+                        csv_settings: { encoding: 'latin-1' },
+                        parsing: { frontend: 'delimited', encoding: 'utf-16' },
+                    },
+                };
+                c.model.update((m) => ({ ...m!, nodes: [...m!.nodes, node] }));
+                c.openNodeConfig(node);
+                const parsing = c.definitionNode()!.config!['parsing'] as Record<string, unknown>;
+                expect(parsing['encoding']).toBe('utf-16');
+                expect(parsing['delimited']).toBeUndefined();
+            });
+
             it('routes a parsing.frontend=json parser to the drawer as parser.json', () => {
                 const c = make();
                 c.select('demo');

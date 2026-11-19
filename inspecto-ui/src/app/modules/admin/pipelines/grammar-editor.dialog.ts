@@ -28,6 +28,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import {
+    decimalMarkOf,
     GrammarEditorComponent,
     grammarContentAsParsingBlock,
     grammarCsvFilename,
@@ -45,7 +46,13 @@ import {
     pickerOptions,
 } from 'app/inspecto/components/option-picker.component';
 import { companionSchemaName, portableConfigRef } from 'app/inspecto/segments';
-import { ParseSchemaWrite, derivedSchemaRows, inferredSchemaTypes, writeParseSchema } from './parse-output-schema';
+import {
+    ParseSchemaWrite,
+    derivedSchemaRows,
+    inferredSchemaFormats,
+    inferredSchemaTypes,
+    writeParseSchema,
+} from './parse-output-schema';
 
 /**
  * Dialog close payload: the edited node (absent ⇒ the user cancelled). Re-homed here from the retired
@@ -291,6 +298,7 @@ export class GrammarEditorDialog {
                 sampleRows: this.previewRows(),
                 // F-4: the suggested selectors must be the ones this frontend loads (indexes for delimited).
                 frontend: this.plugin() ? 'plugin' : (this.activeFrontend() ?? undefined),
+                decimalSeparator: decimalMarkOf(this.editor?.value()),
                 home: 'config',
                 subdir: this.data.configSubdir,
                 // DERIVED-SCHEMA-PANEL-ORPHAN-1: only this opener knows a pipeline, so only this one
@@ -442,7 +450,12 @@ export class GrammarEditorDialog {
         return {
             name,
             subdir: this.data.configSubdir?.trim() || undefined,
-            fields: derivedSchemaRows(frontend, table.columns, inferredSchemaTypes(table)),
+            fields: derivedSchemaRows(
+                frontend,
+                table.columns,
+                inferredSchemaTypes(table),
+                inferredSchemaFormats(table),
+            ),
             rawName: identity,
             canonicalName: identity,
             mappingRawName: identity,

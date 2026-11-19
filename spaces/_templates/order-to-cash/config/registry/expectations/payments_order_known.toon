@@ -1,0 +1,9 @@
+name: payments_order_known
+description: "Every payment refers to an order the orders feed knows: a payment against an unknown order id is an orphan payment"
+targetType: pipeline
+target: payments
+column: order_id
+kind: referential
+refDataset: orders
+refColumn: order_id
+severity: MAJOR

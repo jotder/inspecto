@@ -281,11 +281,6 @@ final class EntityShapes {
         return known == null ? hint.toLowerCase(Locale.ROOT) : label(known);
     }
 
-    /** Whether a column's name says it is an amount ({@code amount}, {@code total}, {@code fee}, …). */
-    static boolean namedAsAmount(String column) {
-        return hasAny(column, AMOUNT_WORDS);
-    }
-
     /** The classification to write for {@code type}: the detected one when the type claims it, else the type's first. */
     private static String firstClassification(EntityTypes.EntityType type, String detected) {
         for (String c : type.classifications()) if (c.equalsIgnoreCase(detected)) return c;

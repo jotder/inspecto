@@ -115,7 +115,7 @@ From a blank install (P1, CSV file, Basic). ✋ = a manual step the user must kn
 | 2 | ✋ Have a Space | Spaces pane | On a multi-space server with none: *New space* or *New from template* (gallery; a template the edition cannot run shows `missingFeatures`). On a single-tenant server there is nothing to do |
 | 3 | ✋ Start onboarding | Home card → `/catalog?onboard=stream` | Choose Stream or Reference, type a unique name, an optional description; inbox and output folders under *Advanced* |
 | 4 | ✋ Collect stage | Guided editor `/pipelines?guided=1` | Accept the local inbox (default) |
-| 5 | ✋ Parse stage | Guided editor | Upload or paste a sample; **click** the sniff suggestion chip (JSON / NDJSON / delimiter, never applied automatically); check header, quote, date formats against the "Sample resolves to" line |
+| 5 | ✋ Parse stage | Guided editor | Upload or paste a sample; **click** the sniff suggestion chip (JSON / NDJSON / delimiter, never applied automatically); check header, quote, date formats against the "Sample resolves to" line (the server's own dialect sniff, the one Add data reads); numbers written `1.234,50` need **Decimal mark** = comma (*How values are understood*); a Parquet sample is a binary file, chosen with the **Parquet** format |
 | 6 | ✋ Schema stage | Guided editor | Ask for a schema suggestion (`/config/suggest/schema`, TRY_CAST vote); review and **accept** types; fix names |
 | 7 | Enrich stage | Guided editor | Optional; skip |
 | 8 | ✋ Publish stage | Guided editor | Accept the output |
@@ -964,8 +964,11 @@ default, deliberately not flipped (migration, not UI fix). Every `parsing:` key,
 - **Both hand-typed and inferred**: rows can be typed directly, or "Suggest from sample" calls
   `ConfigService.suggestSchema()` (`POST /config/suggest/schema`, TRY_CAST voting) against `data.sampleRows`
   captured by an earlier Test-Parse. Inference only fills the grid as a draft — nothing
-  persists until Save. A suggested DATE fills the **Date format** column (`raw.fields[].format`,
-  a strptime pattern such as `%B %d,%Y`) — without it a non-ISO date lands NULL; see §7.4. For a column holding an
+  persists until Save. A suggested DATE or TIMESTAMP fills the **Date format** column (`raw.fields[].format`,
+  a strptime pattern such as `%B %d,%Y` or `%Y-%m-%dT%H:%M:%S`) — without it a non-ISO date lands NULL; see §7.4.
+  The suggestion is the same answer the parse preview's types and Add data give (one engine vote, `SampleProfiler`,
+  operator rulings 2026-11-19): `09:30:00` is `TIME`, a column with one value that is not a number is `VARCHAR`, and
+  `3,50` is a `DOUBLE` when the Grammar's **Decimal mark** says `,` (the dialog passes it as `decimalSeparator`). For a column holding an
   epoch count (`1700000000`, with `0` for none), declare the type `TIMESTAMP` and type `epoch` (seconds) or
   `epoch_ms` (milliseconds) in **Date format**: it lands as the UTC time and `0` lands empty — no `sql` step needed
   ([ingest spec — parsing](spec-parsing.md)).

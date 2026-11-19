@@ -294,4 +294,30 @@ public final class SchemaFieldTypes {
         }
         return "TRY_CAST(" + col + " AS " + t + ")";
     }
+
+    /**
+     * As {@link #castSql(String, String, List, List, String)}, with the Grammar's <b>decimal mark</b>
+     * ({@code csv_settings.decimal_separator}, {@code BASIC-ELT-PROFILE-1} U3): a number type reads its text through
+     * {@code decimalMark} ({@link DecimalMarkText#sql}: spaces and the other mark as grouping removed, a {@code ,} mark
+     * read as the point), so {@code 1.234,50} under {@code ","} is {@code 1234.5}. Every other type, and a {@code null}
+     * mark, is exactly the five-argument form.
+     *
+     * <p>Applied here, in the typing step, not as DuckDB's {@code read_csv(decimal_separator=…)}: the engine reads every
+     * raw column as {@code VARCHAR} ({@code DuckDbCsvIngester}), where DuckDB's option has nothing to act on, and the
+     * typing step is where every frontend's text becomes a number.
+     */
+    public static String castSql(String col, String type, List<String> dateFormats,
+                                 List<String> tsFormats, String zoneArg, String decimalMark) {
+        if (decimalMark != null && isNumber(type)) return DecimalMarkText.sql(col, normalize(type), decimalMark);
+        return castSql(col, type, dateFormats, tsFormats, zoneArg);
+    }
+
+    /** Whether {@code type} is an honoured number type: the integers, {@code FLOAT}, {@code DOUBLE}, {@code DECIMAL(p,s)}. */
+    public static boolean isNumber(String type) {
+        String t = normalize(type);
+        return isHonored(t) && (NUMBERS.contains(t) || t.startsWith("DECIMAL("));
+    }
+
+    private static final Set<String> NUMBERS = Set.of("TINYINT", "SMALLINT", "INTEGER", "BIGINT", "HUGEINT",
+            "UTINYINT", "USMALLINT", "UINTEGER", "UBIGINT", "FLOAT", "DOUBLE");
 }

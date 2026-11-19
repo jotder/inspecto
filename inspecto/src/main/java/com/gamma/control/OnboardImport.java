@@ -90,7 +90,7 @@ final class OnboardImport {
     static final String CONFIG_DIR = "imports";
     private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_]{0,62}");
     private static final Pattern COLUMN = Pattern.compile("[A-Za-z_][A-Za-z0-9_]{0,63}");
-    private static final Set<String> TYPES = Set.of("VARCHAR", "BIGINT", "DOUBLE", "DATE", "TIMESTAMP", "BOOLEAN");
+    private static final Set<String> TYPES = Set.of("VARCHAR", "BIGINT", "DOUBLE", "DATE", "TIMESTAMP", "TIME", "BOOLEAN");
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmssSSS").withZone(ZoneOffset.UTC);
     /** Pipelines that run on their own (Standard and up): <i>Keep this up to date</i> and a retention policy. */
     static final String AUTOMATION_FEATURE = EditionFeatures.PIPELINE_AUTOMATION;

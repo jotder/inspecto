@@ -47,7 +47,7 @@ final class ImportRowFilter {
     static final int MAX_TEXT = 200;
     private static final Set<String> KEYS = Set.of("column", "op", "value", "min", "max", "matchCase");
     private static final Set<String> NUMBERS = Set.of("BIGINT", "DOUBLE");
-    private static final Set<String> TIMES = Set.of("DATE", "TIMESTAMP");
+    private static final Set<String> TIMES = Set.of("DATE", "TIMESTAMP", "TIME");
     private static final DateTimeFormatter TS_OUT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
     /** One column the filter may name: its draft name (the body's), its Dataset name (the predicate's) and its type. */
@@ -194,6 +194,12 @@ final class ImportRowFilter {
                     String out = TS_OUT.format(t);
                     return typed(out, "TIMESTAMP '" + out + "'", t);
                 }
+                case "TIME" -> {
+                    // a time of day (TIME joined Basic's types 2026-11-19): hh:mm or hh:mm:ss
+                    java.time.LocalTime t = java.time.LocalTime.parse(v);
+                    String out = DateTimeFormatter.ofPattern("HH:mm:ss").format(t);
+                    return typed(out, "TIME '" + out + "'", t);
+                }
                 case "BOOLEAN" -> {
                     String b = v.toLowerCase(java.util.Locale.ROOT);
                     if (!b.equals("true") && !b.equals("false")) throw new IllegalArgumentException();
@@ -212,6 +218,7 @@ final class ImportRowFilter {
                 case "DOUBLE" -> "a number";
                 case "DATE" -> "a date (yyyy-mm-dd)";
                 case "TIMESTAMP" -> "a time (yyyy-mm-dd hh:mm[:ss])";
+                case "TIME" -> "a time of day (hh:mm[:ss])";
                 default -> "true or false";
             });
         }

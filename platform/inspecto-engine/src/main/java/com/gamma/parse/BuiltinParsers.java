@@ -64,6 +64,8 @@ final class BuiltinParsers {
                                 "Accepted TIMESTAMP parse patterns, tried in order."),
                         FieldSpec.of("delimited.null_strings", "Null strings", FieldType.LIST,
                                 "Literal text values read as NULL, e.g. ['', 'NULL', 'N/A']."),
+                        FieldSpec.enumField("delimited.decimal_separator", "Decimal mark", List.of(".", ","), null,
+                                "The mark number columns are written with; , reads 1.234,50 as 1234.5. Blank = a plain cast."),
                         // Robustness
                         FieldSpec.of("delimited.strict_mode", "Strict mode (RFC-4180)", FieldType.BOOL,
                                 "Blank = engine default (true). false tolerates quote/column drift."),
