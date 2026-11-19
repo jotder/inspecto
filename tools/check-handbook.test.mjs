@@ -13,7 +13,8 @@ const READ = {
     'docs/A.md': '# A\ntext',
     'docs/okf/x/user-guide-x.md': '# X',
     'docs/okf/x/admin-guide-x.md': '# Y\nsee [A](../../A.md)',
-    'docs/H.md': '# H\n## Goal\n## Before you start\n## Steps\n## Check it worked\n## What can go wrong\n## Next',
+    'docs/H.md': '# H\n## Goal\n## Before you start\n## Steps\n## Check it worked\n```check\nGET /datasets\n```\n## What can go wrong\n## Next',
+    'docs/api/openapi-v1.json': JSON.stringify({ paths: { '/datasets': { get: {} } } }),
 };
 const TRACKED = Object.keys(READ);
 const run = (pages, tracked = TRACKED) => findings(book(pages), tracked, (f) => READ[f]);
@@ -56,6 +57,21 @@ test('leak: a renderer that emits an internal page or a dead link is caught', ()
     assert.ok(f.some((x) => /holds internal page ux\.html/.test(x)));
     assert.ok(f.some((x) => /links to 'ghost\.html'/.test(x)));
     assert.ok(f.some((x) => /search\.json lists internal page 'ux'/.test(x)));
+});
+
+test('checks: a malformed block, an unknown route and an unsaved variable fail with file:line; tutorials and how-tos need a check', () => {
+    const read = (f) => ({ ...READ,
+        'docs/T.md': '# T\n```check\nGET /datasets\nexpect nonsense\n```\n```check\nGET /nowhere\n```\n```check\nGET /runs/{run}\n```',
+        'docs/U.md': '# U\nno checks here',
+        'docs/V.md': '# V\n```check-ui\n{"open":"/data"}\n```' })[f];
+    const run2 = (pages) => findings(book([...ALL, ...pages]), [...TRACKED, 'docs/T.md', 'docs/U.md', 'docs/V.md'], read);
+    const f = run2([page('t', 'docs/T.md')]);
+    assert.ok(f.some((x) => /^checks: docs\/T\.md:4 check: expect: 'nonsense'/.test(x)), f.join('\n'));
+    assert.ok(f.some((x) => /^checks: docs\/T\.md:6 check: GET \/nowhere is not an operation/.test(x)));
+    assert.ok(f.some((x) => /^checks: docs\/T\.md:9 check: \{run\} is used before/.test(x)));
+    assert.ok(run2([page('u', 'docs/U.md', { type: 'tutorial' })]).some((x) => /docs\/U\.md is a tutorial page with no ```check/.test(x)));
+    assert.deepEqual(run2([page('u', 'docs/U.md', { type: 'concept' })]), [], 'only tutorials and how-tos must carry one');
+    assert.deepEqual(run2([page('v', 'docs/V.md', { type: 'tutorial' })]), [], 'a check-ui block counts');
 });
 
 test('pages: the ids index and search are reserved', () => {

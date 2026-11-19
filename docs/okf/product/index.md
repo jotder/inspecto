@@ -80,7 +80,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (95 open rows
 * [Feature modules](layer/features/index.md) - `layer.features` · 2 doc(s) · 0 open row(s)
 * [Link Analysis modules](layer/la/index.md) - `layer.la` · 2 doc(s) · 1 open row(s)
 * [Platform](layer/platform/index.md) - `layer.platform` · 41 doc(s) · 25 open row(s)
-* [Product host](layer/product/index.md) - `layer.product` · 49 doc(s) · 15 open row(s)
+* [Product host](layer/product/index.md) - `layer.product` · 50 doc(s) · 15 open row(s)
 * [Providers](layer/providers/index.md) - `layer.providers` · 2 doc(s) · 0 open row(s)
 * [Service contracts (SPI)](layer/spi/index.md) - `layer.spi` · 2 doc(s) · 0 open row(s)
 

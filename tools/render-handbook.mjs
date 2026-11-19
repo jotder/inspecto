@@ -16,7 +16,8 @@
 // not in this render becomes plain text, so an external render can neither leak nor dangle.
 //
 // Markdown: a small converter for what these docs use — headings, paragraphs, lists, tables, fenced code,
-// blockquotes, links, emphasis, inline code. Raw HTML is escaped; HTML comments and frontmatter are dropped; images
+// blockquotes, links, emphasis, inline code. A ```check / ```check-ui block (docs as tests, tools/handbook-checks.mjs)
+// renders as one quiet folded line naming what is checked, the step under it. Raw HTML is escaped; HTML comments and frontmatter are dropped; images
 // render as their alt text (hub assets do not ship). No dependency (the repo's dependency set is locked).
 //
 // Tests: tools/render-handbook.test.mjs. Checked by tools/check-handbook.mjs.
@@ -25,6 +26,7 @@ import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseToon } from './toon-subset.mjs';
+import { FENCE_API, FENCE_UI, describe, parseBlock } from './handbook-checks.mjs';
 
 export const MANIFEST = 'docs/okf/product/layer/product/handbook.toon';
 export const CHAPTER_IDS = ['start', 'understand', 'build_bring_data_in', 'build_shape', 'build_trust', 'build_analyse',
@@ -92,6 +94,13 @@ export function markdownToHtml(md, link = () => null) {
             i++;
             while (i < lines.length && !lines[i].trimStart().startsWith(fence[1])) body.push(lines[i++]);
             i++;
+            const info = fence[2].trim().split(/\s+/)[0];
+            if (info === FENCE_API || info === FENCE_UI) {
+                // a docs-as-tests step (tools/handbook-checks.mjs): one quiet line, the step itself folded under it
+                const step = parseBlock({ kind: info === FENCE_API ? 'api' : 'ui', line: 0, lines: body.map((text) => ({ text, line: 0 })) });
+                out.push(`<details class="check"><summary>Checked on every release · ${esc(describe(step))}</summary><pre><code>${esc(body.join('\n'))}</code></pre></details>`);
+                continue;
+            }
             out.push(`<pre><code>${esc(body.join('\n'))}</code></pre>`);
             continue;
         }
@@ -179,6 +188,7 @@ th{background:var(--soft)}blockquote{margin:12px 0;padding:4px 14px;border-left:
 .badges span{display:inline-block;font-size:12px;padding:1px 8px;margin:0 6px 6px 0;border-radius:10px;background:var(--soft);border:1px solid var(--line)}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}.card{border:1px solid var(--line);border-radius:8px;padding:12px 14px}
 .card a{font-weight:600;text-decoration:none}.muted{color:var(--muted)}#results a{display:block}
+details.check{margin:6px 0 12px;font-size:13px;color:var(--muted)}details.check summary{cursor:pointer}details.check pre{font-size:12px}
 @media (max-width:760px){.wrap{display:block}nav{width:auto;border-right:0;border-bottom:1px solid var(--line)}main{padding:16px}}`;
 
 const SEARCH_JS = `const q=document.getElementById('q');let idx=null;q&&q.addEventListener('input',async()=>{const r=document.getElementById('results');
