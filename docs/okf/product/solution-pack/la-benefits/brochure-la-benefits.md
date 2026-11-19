@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis benefits and tax fraud showcase — brochure
+description: Brochure for the Link Analysis benefits and tax fraud showcase: an address farm, pensions paid to the dead, jobseekers on payroll and a tax-preparer refund ring, each beside an innocent look-alike, on synthetic data.
+item: solution-pack.la-benefits
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-benefits]
+---
+
 # Link Analysis benefits and tax fraud showcase — brochure
 
 > **An address farm, pensions still paid to the dead, jobseekers on a payroll, and a tax preparer steering 80 inflated refunds into six accounts, hidden among 12 000 ordinary people. Find each one from a saved view in minutes, and see why the innocent look-alikes stay apart.**

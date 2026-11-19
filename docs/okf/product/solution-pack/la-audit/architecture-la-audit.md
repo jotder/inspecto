@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Link Analysis audit showcase — architecture
+description: How the la-audit Space Template is built: five procure-to-pay and journal feeds, the link Jobs and their Datasets, index build and detection, Link Analysis settings, tiers, saved views and roles.
+item: solution-pack.la-audit
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-audit]
+---
+
 # Link Analysis audit showcase — architecture
 
 The `la-audit` Space Template (`spaces/_templates/la-audit/template.toon`). The studio, index and store seams it runs on are the same as in the [la-showcase architecture](../la-showcase/architecture-la-showcase.md) and the [la-core architecture](../../module/la-core/architecture-la-core.md); this page covers only what is specific to audit.

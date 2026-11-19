@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis logistics cargo theft showcase — brochure
+description: Brochure for the Link Analysis logistics cargo theft showcase: inside jobs, theft hotspots and fictitious carriers found in trip, GPS stop, warehouse scan and loss data, each beside an innocent look-alike.
+item: solution-pack.la-logistics
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-logistics]
+---
+
 # Link Analysis logistics cargo theft showcase — brochure
 
 > **Twelve loads that arrive short, all driven by the same two-driver team and ten of them scanned out by the same night-shift scanner. A lay-by where every high-value truck that stopped for long was robbed. A carrier three weeks old, using a dismissed driver's phone number, whose five high-value loads never arrive. All of it is hidden among about 12 900 trips, 900 drivers and 120 carriers. You can find each one from a saved view in minutes, and see why the innocent look-alikes stay apart.**

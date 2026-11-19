@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis daily feed — brochure
+description: Brochure for the Link Analysis daily feed pack: a monitored one-file-per-day Pipeline and Collector with freshness, index-lag and row-count checks that keep the link index up to date.
+item: solution-pack.la-daily-feed
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-daily-feed]
+---
+
 # Link Analysis daily feed — brochure
 
 > **A ready-made, monitored daily feed for Link Analysis — one file per day in, an up-to-date link index out.**

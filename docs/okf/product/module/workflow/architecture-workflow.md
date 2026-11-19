@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Workflow, SLA and maker-checker
+description: How authored workflows, SLA Policies and Escalation Rules drive Incidents and Cases, and how maker-checker holds a config change as a Pending Change until a second person approves it.
+item: module.workflow
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [platform/inspecto-workflow]
+---
+
 # Workflow, SLA and maker-checker
 
 The architecture of the `workflow` hub, in two parts: authored workflows, SLA Policies and

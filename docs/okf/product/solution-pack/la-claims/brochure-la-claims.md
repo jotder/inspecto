@@ -1,3 +1,14 @@
+---
+type: Brochure
+title: Link Analysis claims showcase — brochure
+description: Brochure for the Link Analysis claims showcase: a staged-accident ring behind one garage, clinic and lawyer found through shared phones, addresses and providers among 520 ordinary claims.
+item: solution-pack.la-claims
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-claims]
+---
+
 # Link Analysis claims showcase — brochure
 
 > **A staged-accident ring behind one garage, one clinic and one lawyer — found among 520 ordinary claims in twelve minutes.**

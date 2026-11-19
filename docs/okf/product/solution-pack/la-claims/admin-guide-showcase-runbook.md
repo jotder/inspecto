@@ -1,3 +1,14 @@
+---
+type: Guide
+title: Inspecto LA (Link Analysis) claims showcase runbook (insurance, Special Investigations Unit)
+description: Presenter runbook for the la-claims insurance (special investigations) Link Analysis showcase: setup and personas, the planted stories, a 12-minute version, algorithm scenes, build decisions, evidence and the 2026-10-16 rehearsal record.
+item: solution-pack.la-claims
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [spaces/_templates/la-claims]
+---
+
 # Inspecto LA (Link Analysis) claims showcase runbook (insurance, Special Investigations Unit)
 
 *Status: written 2026-10-16 with the build of the `la-claims` Space Template and **rehearsed live the same day** on an Advanced Demo Auth bundle
