@@ -380,9 +380,13 @@ public final class CsvIngester {
         return new CsvParser(s);
     }
 
-    /** The configured quote character, defaulting to {@code "} — mirrors DuckDB's default. */
+    /**
+     * The configured quote character, defaulting to {@code "} — mirrors DuckDB's default. A {@code quote} of {@code ""}
+     * is no quote (DuckDB's {@code quote=''}): NUL, which text never holds, so no field ever opens a quote.
+     */
     private static char quoteChar(PipelineConfig.CsvSettings csv) {
-        return csv.quote() != null ? csv.quote().charAt(0) : '"';
+        if (csv.quote() == null) return '"';
+        return csv.quote().isEmpty() ? '\0' : csv.quote().charAt(0);
     }
 
     private static final java.util.regex.Pattern COMPRESS_SUFFIX =

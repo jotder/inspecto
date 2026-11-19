@@ -32,7 +32,9 @@
  *   - **`docs/archived-documents/**` as a SOURCE.** CLAUDE.md defines that tier as never maintained, and
  *     DOCS-LINKS-1 settled that its internal links stay broken BY POLICY (544 of them today). Links
  *     pointing *into* the archive from a current doc ARE checked — the archive is allowed to rot, but a
- *     current doc is not allowed to point at nothing. ⚠ That exemption is PRINTED on every run, pass or
+ *     current doc is not allowed to point at nothing. Its front page, `archived-documents/README.md`, is the
+ *     one exception: it holds the maintained archived-plans table (INFO-RESTRUCTURE-1 W1) and is checked as a
+ *     current doc. ⚠ That exemption is PRINTED on every run, pass or
  *     fail: a guard's scope is a silent exemption, and this repo has been bitten by an unstated one three
  *     times (most recently a "repo-wide" coverage figure that omitted a tenth of the code).
  *   - External URLs (http/https/mailto/tel/ftp/data) — reachability is a network concern, not a repo one.
@@ -84,6 +86,13 @@ const SKIP_DIRS = new Set(['node_modules', '.git', 'worktrees', 'dist', 'target'
 
 /** The archive is exempt AS A SOURCE only — see the header. Kept as a prefix so it reads at the call site. */
 const ARCHIVE_PREFIX = 'docs/archived-documents/';
+/**
+ * ⚠ Except its front page. Since 2026-11-19 (`INFO-RESTRUCTURE-1` W1, D-IR3) `archived-documents/README.md` holds the
+ * archived-plans table — the map from each retired plan to the hub its truth went into — and gains a row every time a
+ * plan retires, so it is the one MAINTAINED page of the history tier (CLAUDE.md doc-lifecycle §3) and its links are
+ * checked like any current doc's.
+ */
+const ARCHIVE_FRONT_PAGE = 'docs/archived-documents/README.md';
 
 /**
  * Emptiness floors. Today: 451 files, ~2,070 repo-relative links. These are set well below that on
@@ -189,7 +198,7 @@ const broken = [];
 
 for (const file of files) {
     const rel = slash(file);
-    const fromArchive = rel.startsWith(ARCHIVE_PREFIX);
+    const fromArchive = rel.startsWith(ARCHIVE_PREFIX) && rel !== ARCHIVE_FRONT_PAGE;
     const lines = readFileSync(file, 'utf8').split('\n');
 
     let inFence = false;
@@ -239,7 +248,8 @@ if (checked < MIN_LINKS) {
 const scopeNote =
     `scope: ${files.length} file(s) — the WHOLE repo minus ${[...SKIP_DIRS].join('/')}; ` +
     `${archiveSourceBroken} broken link(s) inside ${ARCHIVE_PREFIX}** IGNORED (never-maintained tier, ` +
-    `CLAUDE.md doc-lifecycle §3 — links pointing INTO it are still checked)`;
+    `CLAUDE.md doc-lifecycle §3 — links pointing INTO it are still checked, and its front page ` +
+    `${ARCHIVE_FRONT_PAGE} is checked as a current doc)`;
 
 if (broken.length) {
     console.error(`✗ Doc-link guard: ${broken.length} broken link(s) in current docs\n`);

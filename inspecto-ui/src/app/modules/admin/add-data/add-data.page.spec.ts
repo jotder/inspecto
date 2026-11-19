@@ -13,6 +13,7 @@ import { LaLimitsService } from '@inspecto/link-analysis/link-analysis/la-limits
 import { REMOTE_FALLBACK, SELF_IMPORT_OFF } from '@inspecto/core/add-data/add-data.model';
 import { AddDataHandoff } from './add-data-drop.component';
 import { AddDataAccess } from '@inspecto/core/add-data/add-data-access';
+import { ADD_DATA_LINK_ANALYSIS } from '@inspecto/core/add-data/add-data-link-analysis';
 import { sessionFacts } from '@inspecto/core/add-data/add-data.testing';
 import { ConsoleAddDataPageComponent } from './add-data.page';
 
@@ -95,6 +96,13 @@ describe('ConsoleAddDataPageComponent (/add-data, ONBOARDING-FIRST-RUN-1 C3)', (
         expect(el.textContent).not.toMatch(/wizard/i);
         expect(el.querySelector('inspecto-locked-action')!.textContent).toContain(REMOTE_FALLBACK);
         await expectNoA11yViolations(el);
+    });
+
+    it("provides what Link Analysis hands Add data in the page's own providers, not the shell's (BASIC-ELT-PROFILE-1 UI-0)", () => {
+        const { fixture } = create();
+        // the root default (no Link Analysis) has no Rebuild; the page's own provider hands Link Analysis's
+        expect(TestBed.inject(ADD_DATA_LINK_ANALYSIS).rebuild).toBeNull();
+        expect(fixture.debugElement.injector.get(ADD_DATA_LINK_ANALYSIS).rebuild).not.toBeNull();
     });
 
     it('Standard: the remote system is not locked', () => {

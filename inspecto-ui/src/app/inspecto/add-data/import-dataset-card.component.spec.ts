@@ -8,6 +8,7 @@ import { GammaConfigService } from '@gamma/services/config';
 import { DataTableComponent } from '@inspecto/core/data-table';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { provideRouter } from '@angular/router';
+import { ToastrService } from 'ngx-toastr';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { apiUrl, LensService } from '@inspecto/core/api';
 import { expectNoA11yViolations } from '@inspecto/core/testing/a11y';
@@ -74,8 +75,11 @@ function create(o: Opts = {}) {
                     canUploadData: signal(true),
                     canAuthorWorkbench: signal(o.canAuthor ?? true),
                     canBuildLinkIndex: signal(true),
+                    // Keep this up to date hosts the shared Collector surface, which reads the edition's locks
+                    screenLocks: signal({}),
                 },
             },
+            { provide: ToastrService, useValue: { warning: () => undefined } },
         ],
     });
     sessionFacts({ signIn: (o.authMode ?? 'none') === 'oidc', edition: o.edition ?? 'basic', flags: o.features ?? {} });

@@ -117,11 +117,17 @@ class ControlApiSnapshotExportTest {
     }
 
     /**
-     * A committed Parquet import made a snapshot the way a Postgres commit makes one: snapshot settings next to its Pipeline
-     * and {@code importSource: postgres} on its entry. The password is a reference to a variable no environment sets, so a
-     * Run now fails at connecting - before anything is exported.
+     * A committed Parquet import made a snapshot the way a Postgres commit makes one: a saved {@code postgres} Connection
+     * (saved through {@code POST /connections}, so the scheme's own check passes it), snapshot settings naming it next to
+     * its Pipeline, and {@code importSource: postgres} on its entry. The password is a reference to a variable no
+     * environment sets, so a Run now fails at connecting - before anything is exported.
      */
     private String snapshot(Ctx c, Path tmp, List<Map<String, Object>> filter) throws Exception {
+        return snapshot(c, tmp, filter, false);
+    }
+
+    /** {@code legacy}: the shape a snapshot committed before BASIC-ELT-PROFILE-1 BE-4 has - its connection inline. */
+    private String snapshot(Ctx c, Path tmp, List<Map<String, Object>> filter, boolean legacy) throws Exception {
         JsonNode d = data(send(c, "POST", "/onboard/files?name=table.parquet&kind=stream",
                 Files.readAllBytes(parquet(tmp.resolve("first.parquet"), 30, 1))), 200);
         String id = "snapx_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
@@ -132,8 +138,27 @@ class ControlApiSnapshotExportTest {
         data(send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", JSON.writeValueAsBytes(body)), 200);
         Map<String, Object> conn = Map.of("host", "127.0.0.1", "port", 5432, "database", "nowhere", "user", "onboard_snap_ro",
                 "password", "${ENV:INSPECTO_PG_NEVER_SET_" + id.toUpperCase() + "}");
-        PostgresSnapshot.write(PostgresSnapshot.configFile(c.root(), id),
-                PostgresSnapshot.config(Map.of("connection", conn, "schema", "public", "table", "transfers")));
+        Map<String, Object> settings = new LinkedHashMap<>();
+        settings.put("source", PostgresSnapshot.SOURCE);
+        if (legacy) {
+            settings.put("connection", conn);
+            settings.put("schema", "public");
+            settings.put("table", "transfers");
+        } else {
+            String connId = PostgresSnapshot.connectionId(id);
+            Map<String, Object> saved = new LinkedHashMap<>();
+            saved.put("id", connId);
+            saved.put("connector", "postgres");
+            saved.put("host", conn.get("host"));
+            saved.put("port", conn.get("port"));
+            saved.put("database", conn.get("database"));
+            saved.put("username", conn.get("user"));
+            saved.put("password", conn.get("password"));
+            saved.put("options", Map.of("schema", "public", "table", "transfers"));
+            data(send(c, "POST", "/connections", JSON.writeValueAsBytes(saved)), 200);
+            settings.put("connection", connId);
+        }
+        PostgresSnapshot.write(PostgresSnapshot.configFile(c.root(), id), settings);
         ComponentStore registry = new ComponentStore(c.root().resolve("registry"));
         Map<String, Object> entry = new LinkedHashMap<>(registry.get("dataset", id).orElseThrow().content());
         entry.remove("name");
@@ -210,17 +235,20 @@ class ControlApiSnapshotExportTest {
     void aFailedExportLeavesTheInboxTheDataAndNoTemporaryFolderBehind(@TempDir Path cfg, @TempDir Path root, @TempDir Path tmp)
             throws Exception {
         try (Ctx c = open(cfg, root)) {
-            String id = snapshot(c, tmp, null);
-            Path db = DATA.resolve(id).resolve("database");
-            assertEquals(30, OnboardImport.countRows(db));
-            String drafts = listing(DATA.resolve(OnboardRoutes.DRAFTS));
-            HttpResponse<String> run = send(c, "POST", "/datasets/" + id + "/run", null);
-            assertNotEquals(200, run.statusCode(), run.body());
-            assertTrue(error(run).contains("INSPECTO_PG_NEVER_SET"), "the export failed at connecting: " + run.body());
-            assertEquals("[]", listing(OnboardImport.inbox(DATA, id)), "nothing reached the inbox");
-            assertEquals(drafts, listing(DATA.resolve(OnboardRoutes.DRAFTS)), "no temporary export folder left behind");
-            assertEquals(30, OnboardImport.countRows(db), "the data is unchanged");
-            assertFalse(OnboardImport.IN_FLIGHT.contains(root + "|" + id), "the import is free again");
+            // both shapes: a saved Connection (BE-4) and the inline connection of a snapshot committed before it
+            for (boolean legacy : List.of(false, true)) {
+                String id = snapshot(c, tmp, null, legacy);
+                Path db = DATA.resolve(id).resolve("database");
+                assertEquals(30, OnboardImport.countRows(db));
+                String drafts = listing(DATA.resolve(OnboardRoutes.DRAFTS));
+                HttpResponse<String> run = send(c, "POST", "/datasets/" + id + "/run", null);
+                assertEquals(422, run.statusCode(), run.body());
+                assertTrue(error(run).contains("INSPECTO_PG_NEVER_SET"), "the export failed at connecting: " + run.body());
+                assertEquals("[]", listing(OnboardImport.inbox(DATA, id)), "nothing reached the inbox");
+                assertEquals(drafts, listing(DATA.resolve(OnboardRoutes.DRAFTS)), "no temporary export folder left behind");
+                assertEquals(30, OnboardImport.countRows(db), "the data is unchanged");
+                assertFalse(OnboardImport.IN_FLIGHT.contains(root + "|" + id), "the import is free again");
+            }
         }
     }
 

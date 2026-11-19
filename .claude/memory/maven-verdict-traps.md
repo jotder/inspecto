@@ -30,6 +30,12 @@ All paid for; each reports success or failure about something other than what yo
     probes; for JVM props use `-DforkCount=0` + `MAVEN_OPTS`. Postgres tests: pass the URL via env
     `INSPECTO_TEST_PG_URL` (a `&` in `-D` is split by `mvn.cmd`); PG 18 rejects the Windows `Asia/Calcutta` zone —
     use `-Duser.timezone=Asia/Kolkata` (keep the offset, never UTC). Test-scope deps are not transitive.
+    ⚠ **`-DforkCount=0` gives a false red on a real-HTTP test that reaches a `ServiceLoader`** (2026-11-19, BE-4): a
+    Connection save skipped its connector's check (200 where 422) in-process and passed forked — inferred cause: the
+    handler threads' context class loader is not the test classpath, so `EntitledServices.load` finds no provider. For the zone, keep forking and set
+    `JAVA_TOOL_OPTIONS=-Duser.timezone=Asia/Kolkata` (env var; every forked JVM reads it) — but ONLY for the named
+    Postgres test classes: every JVM then prints "Picked up JAVA_TOOL_OPTIONS" on stderr, which a test reading a child
+    JVM's output takes as the answer (`RunSnapshotTest`, 2 false reds). Run whole modules without it.
 11. **`mvn package` without an edition profile omits edition modules**; `target/` mtimes are not proof of what built.
 12. A default-ON operational DB family can mint a real `.db` in the forked module CWD — pin the backend property to
     `jdbc:duckdb:` in tests, not the per-family `*.db.url`.

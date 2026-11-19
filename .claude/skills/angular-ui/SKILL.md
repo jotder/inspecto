@@ -153,7 +153,10 @@ src/app/
   - **`<inspecto-page-header title subtitle [terms] [eyebrow] [backLink] [mono] [hasTabs]>`** — the ONE
     header. It renders the page's only `<h1>` at the shared `text-title` size (22 px / 600), a subtitle
     **clamped to one line** that expands on click, the `<inspecto-ai-explain>` affordance when `terms`
-    are declared, and slots `[badge]`, `[actions]`, `[tabs]`. Rules it exists to enforce: one `<h1>` per
+    are declared, at heading level 1 the book-icon **Help for this screen** link (`<inspecto-help-link>`: the
+    Handbook chapter at `/help/<chapter>.html` from the ONE route-to-chapter map `inspecto/help/help-chapter.ts`
+    — a new screen family gets its row there, never a per-pane link; USER-HANDBOOK-1), and slots `[badge]`,
+    `[actions]`, `[tabs]`. Rules it exists to enforce: one `<h1>` per
     page, ONE filled primary action at the right end (everything else an icon button or a `⋯` menu), and
     refresh is always an icon button. ⚠ Put the essay in the explain dialog, not the subtitle.
     `[headingLevel]="2"` is for the ONE case the header is not the page — the `/design` live example, or a
@@ -256,11 +259,23 @@ src/app/
   convention in a host. A host passes only facts it resolved itself, and passes **nothing** when the
   fact is ambiguous — a blank required field is honest, an invented store path reads zero rows and looks
   like it worked. A seed is **one-shot**: re-deriving it while the author edits clobbers the form.
+- **Reviewing columns → `<inspecto-schema-metadata-grid>`** (`inspecto/schema/`). Two modes over one component:
+  `metadata` (default) edits `raw.fields[].{description,unit,classification}` by selector — hosts: the `/design`
+  gallery; `types` (BASIC-ELT-PROFILE-1 U1a, 2026-11-19) is the compact column review — host: Add data's step 2
+  (*Check the columns*). In `types` mode it takes `[typeRows]` (`selector` · mapping `name` · `type` · `leaveOut`),
+  offers only `BASIC_COLUMN_TYPES`, renders the host's evidence/Confirm `[rowDetail]` template under each kept row
+  (`[rowErrors]` / `[rowClasses]` by selector) and emits each edit as `(rowChange)`; the host writes it into its
+  **mapping** (operator ruling O3) — never `raw.fields[]` or `transform.sql`, so Add data's commit body is unchanged
+  (pinned byte for byte in `add-data.component.spec.ts`, "U1a parity"). ⚠ Feed `typeRows` from the host's own state
+  on every change: the same selectors patch in place without an event (no echo, an open name box keeps its caret);
+  other selectors rebuild. Step 3 (Entity Types, roles, link) is NOT this grid (U1b stays an LA panel).
 - **Asking where files come from → `<inspecto-collector-config>`** (`inspecto/collector/`, 2026-08-04).
   ONE shared surface for the `collector:` block: the local-inbox/Connection toggle, the schema form over
   the shared `COLLECTOR_ATTRIBUTES`, Test connection, create-a-Connection in place, and the derived
-  connector. Adopters: Onboarding's Collection stage and the Pipelines `acquisition` Collector pane —
-  never fork it. Like the enrichment editor it has **no write path** — hosts read `value()`/`resolveConnector()`
+  connector. Adopters: the Pipelines `acquisition` Collector pane and Add data's *Keep this up to date*
+  (BASIC-ELT-PROFILE-1 U4-Keep, 2026-11-19: it passes only the spec entries its route saves, plus
+  `[modes]="['local','connection']"` and `[connectors]="['sftp']"`, which hide the other toggles, filter the
+  Connection list and make `resolveConnector()` refuse another type) — never fork it. Like the enrichment editor it has **no write path** — hosts read `value()`/`resolveConnector()`
   and save through their own route, because the two persisted shapes genuinely differ (a `collector:`
   block vs. a node's raw config plus a `use: connection/<id>` binding). ⚠ **Never ask for `connector`** —
   it is derived (local ⇒ `local`, else the picked Connection's own type) because

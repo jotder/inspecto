@@ -65,15 +65,6 @@ export const EVERY_OPTIONS: PickerOption[] = [
     { value: '1d', label: 'Every day' },
 ];
 
-export const FEED_KIND_OPTIONS: PickerOption[] = [
-    {
-        value: 'folder',
-        label: 'Files written to this inbox',
-        hint: 'Another system copies its files into the inbox shown above.',
-    },
-    { value: 'sftp', label: 'Files on an SFTP server', hint: 'Read through a Connection of this Space.' },
-];
-
 /** `15m` → `every 15 minutes`, `1h` → `every hour`, `1d` → `every day`; the value itself when it is another one. */
 export function everyWords(every: string | undefined): string {
     const m = /^(\d+)([smhd])$/.exec(every ?? '');

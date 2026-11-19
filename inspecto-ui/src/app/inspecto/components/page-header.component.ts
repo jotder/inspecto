@@ -4,6 +4,7 @@ import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
+import { HelpLinkComponent } from 'app/inspecto/help/help-link.component';
 
 /**
  * The ONE page header (UI consolidation plan UI-02, 2026-09-22). Every routed pane renders its title,
@@ -31,7 +32,7 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
 @Component({
     selector: 'inspecto-page-header',
     standalone: true,
-    imports: [NgTemplateOutlet, RouterLink, MatIconModule, MatTooltipModule, AiExplainComponent],
+    imports: [NgTemplateOutlet, RouterLink, MatIconModule, MatTooltipModule, AiExplainComponent, HelpLinkComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     host: { class: 'block' },
     template: `
@@ -64,6 +65,9 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
                 }
                 @if (terms?.length) {
                     <inspecto-ai-explain [screen]="title" [terms]="terms!" />
+                }
+                @if (headingLevel === 1) {
+                    <inspecto-help-link />
                 }
                 <ng-container *ngTemplateOutlet="badgeTpl"></ng-container>
                 @if (subtitle) {
@@ -119,6 +123,9 @@ import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component'
                             }
                             @if (terms?.length) {
                                 <inspecto-ai-explain [screen]="title" [terms]="terms!" />
+                            }
+                            @if (headingLevel === 1) {
+                                <inspecto-help-link />
                             }
                             <ng-container *ngTemplateOutlet="badgeTpl"></ng-container>
                         </div>

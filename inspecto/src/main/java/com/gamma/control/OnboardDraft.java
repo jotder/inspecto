@@ -1,7 +1,7 @@
 package com.gamma.control;
 
 import com.gamma.etl.ExcelExtension;
-import com.gamma.pipeline.exec.SchemaSuggest;
+import com.gamma.parse.SampleProfiler;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.util.DuckDbUtil;
@@ -245,19 +245,23 @@ final class OnboardDraft {
     private static Analysis delimited(Connection conn, Path file, String name, String type, Map<String, String> overrides,
                                       Map<String, String> stated) throws SQLException, IOException {
         String delim = ",", quote = "\"";
+        int skip = 0;   // lines before the header (or the first record) that are not read
         boolean header = true, sniffed = true;
         // C2: the encoding entry - UTF-8 unless the user chose Latin-1 (a fix the catalogue offers when a file is not UTF-8)
         String encoding = overrides.getOrDefault("encoding", "utf-8");
         java.nio.charset.Charset cs = charset(encoding);
         String encodingArg = "utf-8".equals(encoding) ? "" : ", encoding = " + SqlIdent.sqlStr(encoding);
         if (cs == StandardCharsets.UTF_8) requireUtf8(file, name);
-        try (Statement st = conn.createStatement();
-             ResultSet rs = st.executeQuery("SELECT Delimiter, Quote, HasHeader FROM sniff_csv(" + SqlIdent.pathStr(file) + encodingArg + ")")) {
-            if (rs.next()) {
-                // sniff_csv spells "none found" as "(empty)" (or NUL): keep the safe default then - '"' is harmless when unused
-                delim = oneChar(rs.getString(1), ",");
-                quote = oneChar(rs.getString(2), "\"");
-                header = rs.getBoolean(3);
+        try {
+            // the engine's sample profiler: the same sniff the parse preview shows (BASIC-ELT-PROFILE-1 BE-3)
+            SampleProfiler.Dialect sniff = SampleProfiler.dialect(conn, file, "utf-8".equals(encoding) ? null : encoding);
+            if (!sniff.options().isEmpty()) {
+                // the sniff's answer as it is (operator ruling 2026-11-19, "follow the sniff"): "(empty)" - no quote found -
+                // is no quote, and the lines it skips before the header are not read
+                delim = oneChar(sniff.delimiter(), ",");
+                quote = oneChar(sniff.quote(), "");
+                header = sniff.header();
+                skip = sniff.skip();
             }
         } catch (SQLException unsettled) {
             // DuckDB could not settle the dialect (mixed line endings, ragged lines): guess the delimiter that splits the
@@ -280,6 +284,7 @@ final class OnboardDraft {
         try (BufferedReader r = Files.newBufferedReader(file, cs)) {
             String line;
             boolean first = true;
+            for (int s = 0; s < skip && r.readLine() != null; s++) { /* the lines the sniff skips */ }
             while (lines < SAMPLE_ROWS && (line = r.readLine()) != null) {
                 if (first) {
                     first = false;
@@ -311,7 +316,8 @@ final class OnboardDraft {
         };
 
         String relation = "read_csv(" + SqlIdent.pathStr(file) + ", delim = " + SqlIdent.sqlStr(delim) + ", quote = " + SqlIdent.sqlStr(quote)
-                + ", header = " + header + encodingArg + ", all_varchar = true, null_padding = true, ignore_errors = true)";
+                + ", header = " + header + (skip > 0 ? ", skip = " + skip : "") + encodingArg
+                + ", all_varchar = true, null_padding = true, ignore_errors = true)";
         // a file with no header line numbers its columns (col_1 …): a stated type names them that way
         Analysis base = typed(conn, file, relation, null, false, null, overrides.get("decimal"), stated, !header);
 
@@ -325,6 +331,10 @@ final class OnboardDraft {
                 + (allLinesAgree ? "" : "; " + (lines - modeCount) + " do not (they may be rejected)"), allLinesAgree && sniffed && lines >= MIN_SAMPLE));
         format.put("header", overrides.containsKey("header") ? choice(header, "you chose " + (header ? "a header line" : "no header line"), true)
                 : headerChoice(header, base, sniffed ? lines : 0));
+        if (skip > 0)   // only when the sniff skips lines: the Pipeline then reads the file the same way (skip_header_lines)
+            format.put("skipLines", choice(skip, (skip == 1 ? "the first line comes" : "the first " + skip + " lines come") + " before the "
+                    + (header ? "header line" : "first record") + " and " + (skip == 1 ? "is" : "are") + " not read",
+                    allLinesAgree && lines >= MIN_SAMPLE));
         format.put("quote", overrides.containsKey("quote") ? choice(quote, "you chose " + (quote.isEmpty() ? "no quote" : "'" + quote + "'"), true) : choice(quote, quote.isEmpty() ? "no field is quoted" : quotedFields == 0
                 ? "no sampled field is quoted; '" + quote + "' is honoured if one is" : quotedFields + " sampled fields are quoted with '" + quote + "'",
                 allLinesAgree && sniffed && lines >= MIN_SAMPLE));
@@ -444,8 +454,8 @@ final class OnboardDraft {
      * C2: why a run may have set a delimited file aside, as catalogue findings: not UTF-8 text (encoding), or lines that do
      * not split alike under the import's delimiter and quote (delimiter / quote). Empty when none of these explains it.
      */
-    static List<Map<String, Object>> diagnose(Path file, String name, String delim, String quote, boolean header, String encoding)
-            throws IOException {
+    static List<Map<String, Object>> diagnose(Path file, String name, String delim, String quote, boolean header, int skip,
+                                              String encoding) throws IOException {
         java.nio.charset.Charset cs = charset(encoding);
         if (cs == StandardCharsets.UTF_8)   // the whole file: the draft sampled only its first lines
             try (BufferedReader r = Files.newBufferedReader(file, cs)) {
@@ -458,6 +468,7 @@ final class OnboardDraft {
         try (BufferedReader r = Files.newBufferedReader(file, cs)) {
             String line;
             boolean first = true;
+            for (int s = 0; s < skip && r.readLine() != null; s++) { /* the lines the import skips */ }
             while (kept.size() < 200 && (line = r.readLine()) != null) {
                 if (first) {
                     first = false;
@@ -738,13 +749,14 @@ final class OnboardDraft {
     private static Analysis typed(Connection conn, Path file, String relation, Map<String, Object> typeChoice, boolean declaredTypes,
                                   List<String> selectors, String decimal, Map<String, String> stated, boolean positional)
             throws SQLException, IOException {
+        // the engine's sample profiler (BASIC-ELT-PROFILE-1 BE-3 slice 2): each column's DuckDB type (what a file that
+        // declares its types declares) and the vote over its first values as text - the vote schema suggest gives too
+        List<SampleProfiler.ColumnType> profiled = SampleProfiler.types(conn, relation, SAMPLE_ROWS);
         List<String> headers = new ArrayList<>();
         List<String> declared = new ArrayList<>();
-        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("DESCRIBE SELECT * FROM " + relation)) {
-            while (rs.next()) {
-                headers.add(rs.getString(1));
-                declared.add(rs.getString(2));
-            }
+        for (SampleProfiler.ColumnType c : profiled) {
+            headers.add(c.name());
+            declared.add(c.duckdb());
         }
         if (headers.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the file has no columns");
         List<String> names = safeNames(headers);
@@ -772,18 +784,6 @@ final class OnboardDraft {
         }
         if (sample.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the file holds no rows");
 
-        List<SchemaSuggest.Field> voted;
-        if (declaredTypes) {
-            voted = new ArrayList<>();
-            for (int i = 0; i < names.size(); i++) voted.add(new SchemaSuggest.Field(names.get(i), engineType(declared.get(i))));
-        } else {
-            try {
-                voted = SchemaSuggest.infer(sample);
-            } catch (SQLException e) {
-                throw new IOException(e);
-            }
-        }
-
         List<String> fractions = fractions(conn, relation, headers);
 
         List<List<String>> valuesOf = new ArrayList<>();
@@ -806,9 +806,9 @@ final class OnboardDraft {
         List<EntityShapes.Column> sampled = new ArrayList<>();
         for (int i = 0; i < names.size(); i++) {
             String n = names.get(i);
-            SchemaSuggest.Field f = voted.get(i);
             List<String> values = valuesOf.get(i);
-            String type = f.type(), fmt = f.format(), colMark = null;
+            String type = declaredTypes ? engineType(declared.get(i)) : profiled.get(i).type();
+            String fmt = declaredTypes ? null : profiled.get(i).format(), colMark = null;
             long fits = values.size();
             Map<String, Object> typeCh;
             String numeric = mark == null ? null : DecimalMark.numberType(values, mark);

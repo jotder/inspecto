@@ -1089,7 +1089,9 @@ final class PipelineConfigParser {
             b.delimiter       = delimiter != null && !delimiter.toString().isEmpty() ? delimiter.toString() : ",";
             // 5.2 additive dialect chars — validated fail-closed: a key the engine cannot honor
             // must never load looking honored (docs/parsing-options-reference.md §5).
-            b.quote           = singleChar(csv.get("quote"),   "quote");
+            // quote: "" is NO quote (DuckDB's own spelling; Add data writes it when the sniff finds none,
+            // BASIC-ELT-PROFILE-1 BE-3) — only an absent quote takes the engine default '"'
+            b.quote           = "".equals(csv.get("quote")) ? "" : singleChar(csv.get("quote"), "quote");
             b.escape          = singleChar(csv.get("escape"),  "escape");
             b.comment         = singleChar(csv.get("comment"), "comment");
             b.skipHeaderLines = toInt(csv.getOrDefault("skip_header_lines", 0));

@@ -443,7 +443,7 @@ scheduled or signal-driven Jobs on Basic (DT-16). Upgrade: a Basic import is an 
   Step, Collector kind or trigger (DT-9 narrowed); the older refusals (PII masking, DuckLake, the archive) are unchanged. The breaking changes the plan's §9 listed are not shipped.
 
 Reverses DT-4 (Postgres only), narrows DT-5 / DT-17 to the import inbox, widens DT-10. As built:
-[`okf/product/module/la-core/architecture-data-onboarding.md`](../../module/la-core/architecture-data-onboarding.md) §6.20,
+[`okf/product/module/la-core/architecture-watch-this-folder.md`](../../module/la-core/architecture-watch-this-folder.md) (§6.20),
 [`okf/product/module/processor/api-onboarding-authoring.md`](../../module/processor/api-onboarding-authoring.md);
 plan [`archived-documents/plans-archive/basic-onboard-plan.md`](../../../../archived-documents/plans-archive/basic-onboard-plan.md).
 

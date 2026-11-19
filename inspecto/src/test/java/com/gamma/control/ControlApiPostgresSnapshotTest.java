@@ -96,6 +96,11 @@ class ControlApiPostgresSnapshotTest {
         return client.send(b.POST(BodyPublishers.ofString(body == null ? "" : body, StandardCharsets.UTF_8)).build(), BodyHandlers.ofString());
     }
 
+    private HttpResponse<String> get(Ctx c, String path) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + path)).GET().build(),
+                BodyHandlers.ofString());
+    }
+
     private HttpResponse<String> put(Ctx c, String path, String body, String auth) throws Exception {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + path));
         if (auth != null) b.header("Authorization", auth);
@@ -148,6 +153,35 @@ class ControlApiPostgresSnapshotTest {
                 assertFalse(error(r).contains("not set"), "refused by its name, before anything is resolved: " + r.body());
             }
         }
+    }
+
+    /**
+     * BASIC-ELT-PROFILE-1 BE-4 (O4): a snapshot keeps a saved {@code postgres} Connection, and the Connection save itself -
+     * not only Add data's form - takes nothing but an {@code INSPECTO_PG_} reference, on create and on update.
+     */
+    @Test
+    void aPostgresConnectionIsSavedOnlyWithAnInspectoPgReference(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String raw = "Sup3r-Secret-Value";
+            Path file = root.resolve("pgc_connection.toon");
+            for (String pw : List.of("${ENV:PATH}", "${SYS:user.home}", "${ENV:INSPECTO_PG_}", raw)) {
+                HttpResponse<String> r = post(c, "/connections", pgConnection("pgc", pw), null);
+                assertEquals(422, r.statusCode(), pw + " " + r.body());
+                assertTrue(error(r).contains(PostgresSnapshot.ENV_PREFIX), r.body());
+                assertFalse(r.body().contains(raw), "the value is never answered: " + r.body());
+                assertFalse(Files.exists(file), "nothing was saved for " + pw);
+            }
+            data(post(c, "/connections", pgConnection("pgc", "${ENV:" + PASSWORD_ENV + "}"), null), 200);
+            String saved = Files.readString(file);
+            HttpResponse<String> widened = put(c, "/connections/pgc", pgConnection("pgc", "${ENV:PATH}"), null);
+            assertEquals(422, widened.statusCode(), widened.body());
+            assertEquals(saved, Files.readString(file), "a refused update leaves the saved Connection as it was");
+        }
+    }
+
+    private static String pgConnection(String id, String password) throws Exception {
+        return JSON.writeValueAsString(Map.of("id", id, "connector", "postgres", "host", "127.0.0.1", "port", 5432,
+                "database", "db", "username", RO, "password", password, "options", Map.of("schema", "public", "table", "t")));
     }
 
     @Test
@@ -306,9 +340,17 @@ class ControlApiPostgresSnapshotTest {
             assertEquals(40, made.get("rowsAfter").asLong(), made.toString());
             Path snapFile = PostgresSnapshot.configFile(root, id);
             assertTrue(Files.isRegularFile(snapFile));
+            // BE-4 (O4): the connection is a saved postgres Connection; the snapshot settings only name it
+            String connId = PostgresSnapshot.connectionId(id);
             String toon = Files.readString(snapFile);
-            assertTrue(toon.contains(pg.schema) && toon.contains("${ENV:" + PASSWORD_ENV + "}"), toon);
-            assertFalse(toon.contains(pw), "the config holds the reference, never the value");
+            assertTrue(toon.contains(connId) && !toon.contains("${ENV:"), toon);
+            Path connFile = root.resolve(connId + "_connection.toon");
+            String saved = Files.readString(connFile);
+            assertTrue(saved.contains("postgres") && saved.contains(pg.schema) && saved.contains("transfers")
+                    && saved.contains("${ENV:" + PASSWORD_ENV + "}"), saved);
+            assertFalse(saved.contains(pw), "the Connection holds the reference, never the value");
+            JsonNode listed = data(get(c, "/connections/" + connId), 200);
+            assertEquals("postgres", listed.get("connector").asText(), listed.toString());
             Map<String, Object> entry = new com.gamma.pipeline.ComponentStore(root.resolve("registry")).get("dataset", id).orElseThrow().content();
             assertEquals("postgres", entry.get("importSource"));
 
@@ -331,6 +373,8 @@ class ControlApiPostgresSnapshotTest {
                     .DELETE().build();
             assertEquals(200, client.send(del, BodyHandlers.ofString()).statusCode());
             assertFalse(Files.exists(snapFile), "no snapshot settings left behind");
+            assertFalse(Files.exists(connFile), "nor the Connection the commit saved for it");
+            assertEquals(404, get(c, "/connections/" + connId).statusCode());
         } finally {
             drop(pg);
         }
@@ -400,25 +444,67 @@ class ControlApiPostgresSnapshotTest {
         }
     }
 
+    /**
+     * BE-4 compatibility: a snapshot committed before snapshots kept a saved Connection holds its connection inline in
+     * {@code _snapshot.toon}. It is read as it is (validated as a request body), refreshes through the same scheme, and is
+     * never rewritten; deleting its Dataset leaves no file behind. (The session's own read-only test moved with the session
+     * to the engine: {@code PostgresConnectorFactoryTest}.)
+     */
     @Test
-    void theSessionItselfIsReadOnlyEvenForALoginThatCouldWrite(@TempDir Path dir) throws Exception {
+    void aSnapshotCommittedBeforeConnectionsStillRefreshesAsItIs(@TempDir Path cfg, @TempDir Path root) throws Exception {
         Pg pg = seeded();
-        try (PostgresSnapshot.Session s = PostgresSnapshot.Session.open(
-                PostgresSnapshot.Conn.of(JSON.readValue(pg.connection(RW), Map.class)), dir)) {
-            for (String write : List.of("INSERT INTO pg." + pg.schema + ".transfers (id) VALUES (999)",
-                    "CALL postgres_execute('pg', 'INSERT INTO " + pg.schema + ".transfers (id) VALUES (998)')")) {
-                java.sql.SQLException refused = assertThrows(java.sql.SQLException.class, () -> {
-                    try (Statement st = s.conn.createStatement()) {
-                        st.execute(write);
-                    }
-                }, write);
-                assertTrue(refused.getMessage().contains("read-only") || refused.getMessage().contains("read only"), refused.getMessage());
-            }
-            try (Connection sql = pg.open(); Statement st = sql.createStatement();
-                 var rs = st.executeQuery("SELECT count(*) FROM " + pg.schema + ".transfers")) {
-                rs.next();
-                assertEquals(40, rs.getLong(1), "nothing was written");
-            }
+        try (Ctx c = open(cfg, root)) {
+            JsonNode d = data(post(c, "/onboard/postgres", "{\"connection\":" + pg.connection(RO)
+                    + ",\"schema\":\"" + pg.schema + "\",\"table\":\"transfers\"}", null), 200);
+            String id = "snap_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+            ids.add(id);
+            data(post(c, "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            // turn it into the old shape: no saved Connection, the connection inline
+            String connId = PostgresSnapshot.connectionId(id);
+            HttpRequest del = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1/connections/" + connId)).DELETE().build();
+            assertEquals(200, client.send(del, BodyHandlers.ofString()).statusCode());
+            Map<String, Object> legacy = new java.util.LinkedHashMap<>();
+            legacy.put("source", "postgres");
+            legacy.put("connection", JSON.readValue(pg.connection(RO), Map.class));
+            legacy.put("schema", pg.schema);
+            legacy.put("table", "transfers");
+            Path snapFile = PostgresSnapshot.configFile(root, id);
+            PostgresSnapshot.write(snapFile, legacy);
+            String before = Files.readString(snapFile);
+
+            pg.exec("DELETE FROM " + pg.schema + ".transfers WHERE id <= 10");
+            JsonNode run = data(post(c, "/datasets/" + id + "/run", null, null), 200);
+            assertEquals(30, run.get("rowsAfter").asLong(), run.toString());
+            assertEquals(before, Files.readString(snapFile), "an old snapshot is read as it is, never rewritten");
+            assertFalse(Files.exists(root.resolve(connId + "_connection.toon")), "and no Connection is made for it");
+
+            HttpRequest gone = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1/components/dataset/" + id))
+                    .DELETE().build();
+            assertEquals(200, client.send(gone, BodyHandlers.ofString()).statusCode());
+            assertFalse(Files.exists(snapFile));
+        } finally {
+            drop(pg);
+        }
+    }
+
+    /** BE-4: the commit decides before it writes - a Connection already holding the snapshot's name refuses it whole. */
+    @Test
+    void aCommitWhoseConnectionNameIsTakenWritesNothing(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        Pg pg = seeded();
+        try (Ctx c = open(cfg, root)) {
+            JsonNode d = data(post(c, "/onboard/postgres", "{\"connection\":" + pg.connection(RO)
+                    + ",\"schema\":\"" + pg.schema + "\",\"table\":\"transfers\"}", null), 200);
+            String id = "snap_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+            ids.add(id);
+            String connId = PostgresSnapshot.connectionId(id);
+            data(post(c, "/connections", pgConnection(connId, "${ENV:" + PASSWORD_ENV + "}"), null), 200);
+            String theirs = Files.readString(root.resolve(connId + "_connection.toon"));
+            HttpResponse<String> r = post(c, "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null);
+            assertEquals(409, r.statusCode(), r.body());
+            assertTrue(error(r).contains(connId), r.body());
+            assertFalse(Files.exists(PostgresSnapshot.configFile(root, id)), "no snapshot settings");
+            assertFalse(new com.gamma.pipeline.ComponentStore(root.resolve("registry")).exists("dataset", id), "no Dataset");
+            assertEquals(theirs, Files.readString(root.resolve(connId + "_connection.toon")), "their Connection is untouched");
         } finally {
             drop(pg);
         }

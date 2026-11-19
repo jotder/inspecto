@@ -1014,4 +1014,65 @@ describe('AddDataComponent - the one Add data screen (LA-ONBOARD-1 phase 4, OF-1
         fixture.destroy();
         http.expectNone((q) => q.url.endsWith('/onboarding/events'));
     });
+
+    // ── BASIC-ELT-PROFILE-1 U1a: the column review's requests, byte for byte ────────────────────────────────────────
+    // Pinned before the review moved into schema-metadata-grid's types mode: the same clicks send the same bytes.
+
+    /** The name box of a column's row in step 2. */
+    const nameOf = (el: HTMLElement, column: string) =>
+        el.querySelector<HTMLElement>(`[data-column="${column}"] inspecto-pen-field`)!;
+    const leaveOut = (fixture: ComponentFixture<HostComponent>, el: HTMLElement, column: string) => {
+        (el.querySelector(`[data-column="${column}"] [data-testid="drop-column"] input`) as HTMLInputElement).click();
+        fixture.detectChanges();
+    };
+
+    it('U1a parity: type, rename and leave out send the same redraft and commit bytes', () => {
+        const { fixture, el } = create();
+        upload(fixture, el, transfersDraft());
+
+        pickerSet(fixture, '[data-testid="type-amount"]', 'VARCHAR');
+        const first = http.expectOne((r) => r.url.endsWith('/redraft'));
+        expect(JSON.stringify(first.request.body)).toBe('{"columns":[{"name":"amount","type":"VARCHAR"}]}');
+        const answered = transfersDraft();
+        answered.columns[3] = {
+            ...answered.columns[3],
+            type: { value: 'VARCHAR', evidence: 'you chose it', confidence: 'high', format: null },
+        };
+        first.flush(answered);
+        fixture.detectChanges();
+
+        penEdit(fixture, nameOf(el, 'txn_id'), 'transfer_id');
+        leaveOut(fixture, el, 'channel');
+        pickerSet(fixture, '[data-testid="type-from_account"]', 'BIGINT');
+        const second = http.expectOne((r) => r.url.endsWith('/redraft'));
+        expect(JSON.stringify(second.request.body)).toBe(
+            '{"columns":[{"name":"amount","type":"VARCHAR"},{"name":"from_account","type":"BIGINT"}]}',
+        );
+        second.flush({}, { status: 500, statusText: 'Server Error' });
+        fixture.detectChanges();
+
+        const req = commit(fixture, el);
+        expect(JSON.stringify(req.request.body)).toBe(
+            '{"name":"transfers","columns":[{"name":"txn_id","rename":"transfer_id","role":"detail","entityType":null},{"name":"from_account","type":"BIGINT","entityType":"account"},{"name":"to_account","entityType":"account"},{"name":"amount","role":"detail","entityType":null},{"name":"channel","drop":true},{"name":"ts","role":"temporal","entityType":null}],"primaryEntityType":"account","link":{"from":"from_account","to":"to_account","primaryTime":"ts"}}',
+        );
+        req.flush(summary());
+    });
+
+    it('U1a parity: confirmed guesses, a rename and a left-out column (step 3 not opened) send the same commit bytes', () => {
+        const { fixture, el } = create({ mode: 'optional' });
+        upload(fixture, el, lowDraft());
+        (q(el, 'confirm-all-columns') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        penEdit(fixture, nameOf(el, 'amount'), 'value');
+        leaveOut(fixture, el, 'ts');
+        // left out, then kept again: the row is as it was
+        leaveOut(fixture, el, 'to_account');
+        leaveOut(fixture, el, 'to_account');
+        http.expectNone((r) => r.url.endsWith('/redraft'));
+        const req = commit(fixture, el);
+        expect(JSON.stringify(req.request.body)).toBe(
+            '{"name":"transfers","columns":[{"name":"txn_id","entityType":null},{"name":"from_account","entityType":"account"},{"name":"to_account","entityType":"account"},{"name":"amount","rename":"value","entityType":null},{"name":"channel","entityType":null},{"name":"ts","drop":true}],"primaryEntityType":"account","link":null,"eventDate":null}',
+        );
+        req.flush(summary());
+    });
 });

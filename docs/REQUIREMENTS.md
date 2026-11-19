@@ -296,5 +296,5 @@ template gallery + apply).*
 *Provenance, not authority (2026-09-08):* the planning documents these rows were first derived from —
 `feature-matrix-editions.md` (the 2026-07-02 H/M/S/N ratings), `api-contract-design.md` (the 33 API
 guidelines and the W1–W7 worklog), `backend-backlog.md` and `embedded-intelligence-plan.md` — are in
-`archived-documents/plans-archive/` and are listed in [`INDEX.md`](INDEX.md) §Archived plans. ⛔ Read them for
+`archived-documents/plans-archive/` and are listed in the archived-plans table of [`archived-documents/README.md`](archived-documents/README.md). ⛔ Read them for
 *why* a row was written, never for what is built; the archive is not maintained.

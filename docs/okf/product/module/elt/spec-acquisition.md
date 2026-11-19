@@ -617,7 +617,7 @@ enum `STREAM, RANDOM_ACCESS, RESUMABLE, DELETE, MOVE, RENAME, TAG, ETAG, VERSION
 registered via `META-INF/services`) and `ConnectionWorkbench` — lives in the core (`inspecto-acquire`, package
 `com.gamma.acquire`) and is described with the per-scheme libraries in [connectors](../connectors/spec-connectors.md).
 
-⚠ **"Eight connectors" is the count of the optional module, not of the registry.** Verified from `META-INF/services/com.gamma.acquire.CollectorConnectorFactory`: **seven** factories ship in `inspecto-connectors` (`sftp`, `ftp`, `ftps`, `db`, `s3`, `azure`, `gcs`), **one** (`kafka`) in the premium module `inspecto-connectors-kafka` (MODULE-REORG-1 P7, 2026-10-07; Standard and above — Basic has no Kafka), **one** more in `inspecto-engine` (`DatasetCollectorConnectorFactory` → `connector: dataset`, UI-S7), and `local` is the built-in default that needs no jar. So ten values resolve, and a bundle without the sidecar resolves only `local` and `dataset`. *(Two more entries exist under `inspecto/src/test/resources` — `FakeRemoteConnectorFactory` and `FakeOffsetTailConnectorFactory` — and are test-only; do not count them.)*
+⚠ **"Eight connectors" is the count of the optional module, not of the registry.** Verified from `META-INF/services/com.gamma.acquire.CollectorConnectorFactory`: **seven** factories ship in `inspecto-connectors` (`sftp`, `ftp`, `ftps`, `db`, `s3`, `azure`, `gcs`), **one** (`kafka`) in the premium module `inspecto-connectors-kafka` (MODULE-REORG-1 P7, 2026-10-07; Standard and above — Basic has no Kafka), **two** more in `inspecto-engine` (`DatasetCollectorConnectorFactory` → `connector: dataset`, UI-S7; `PostgresConnectorFactory` → `connector: postgres`, BASIC-ELT-PROFILE-1 BE-4, 2026-11-19), and `local` is the built-in default that needs no jar. So eleven values resolve, and a bundle without the sidecar resolves only `local`, `dataset` and `postgres`. *(Two more entries exist under `inspecto/src/test/resources` — `FakeRemoteConnectorFactory` and `FakeOffsetTailConnectorFactory` — and are test-only; do not count them.)*
 
 ⚠ **`https` is a Connection scheme, not a Collector scheme** (2026-09-23). No `CollectorConnectorFactory` serves it: an `https` Connection is the target of the outbound **Webhook sink** (`sink.webhook`, [step-catalog](spec-step-catalog.md#webhook--sinkwebhook--the-outbound-webhook)), onboarded under the same `canOnboardConnections` grant as every other Connection. That grant is what makes a Connection the egress gate. `host`/`port`/`base_path` build the URL, `password` is the bearer-token reference, and the option `timeout_seconds` sets the request timeout. The sink refuses a tunnel or proxy. A Collector bound to an `https` Connection fails as an unknown scheme.
 
@@ -650,6 +650,31 @@ assumption that one is missing.
 implied one.** The closest primitives are the collector poll loop, the stability gate and the high-watermark
 filter — all of which gate **discovery**, not mid-graph Steps. The durable inbox is `dirs.poll` itself, and a
 drain is simply the next poll.
+
+**The `postgres` scheme (BASIC-ELT-PROFILE-1 BE-4, 2026-11-19).** `inspecto-engine` registers
+`com.gamma.inspector.PostgresConnectorFactory`, `scheme() == "postgres"`: one Postgres table (`options.schema` +
+`options.table`) or one read-only query (`options.query`, a single `SELECT` / `WITH`), copied into one typed Parquet
+file per cycle (`<table>.parquet` / `query.parquet`, `STREAM` only, `post` is a no-op). It reads through DuckDB's
+`postgres` extension, so it needs **no JDBC driver and Basic has it**; the JDBC `db` scheme stays the one for
+incremental (`watermark_column`) loads. A time-zoned timestamp lands as its UTC wall time and a type with no import
+column type (UUID, JSON, arrays, intervals) as text.
+- **Fail closed on the profile** (`PostgresCollectorConnector`, run by `validate` at every Connection save — `POST` /
+  `PUT /connections`, bundle import — and again when a connector is built): host, `database` and `username` are
+  plain names, the port 1–65535 (absent = 5432), what to copy is named, and nothing else is accepted (a tunnel, a
+  proxy or any other option is refused).
+- 🔴 **The password is a `${ENV:INSPECTO_PG_…}` reference and nothing else** — no raw value, no `${SYS:…}` /
+  `${FILE:…}`, no other variable. Whoever names the host also names the variable sent to it, and
+  `ConnectionProfile` resolves any reference, so the rule lives in the scheme: an administrator decides which
+  secrets may go to a database by naming the variable. It is resolved only at connect time into a DuckDB
+  `TEMPORARY SECRET`, never logged or put in a connection string, and every error text is scrubbed of it.
+- **Read-only three ways:** the attach is `READ_ONLY` (Postgres runs `transaction_read_only = on`), a query must be
+  one `SELECT`/`WITH`, and every session refuses a login that could write (superuser, or INSERT / UPDATE / DELETE /
+  TRUNCATE on any non-system table).
+- **Add data's Postgres snapshot builds its connector here** (`PostgresSnapshot` → `PostgresConnectorFactory.connector`)
+  and keeps a saved `postgres` Connection, `<dataset id>_postgres` (operator ruling O4). Its Pipeline still takes the
+  export through the inbox; switching it to `collector.connector: postgres` waits for the replace-by-arrival step
+  (plan B4). The `REMOTE_ACQUISITION` edition listing (`ProcessorCatalog`) does not list `postgres` yet: that is the
+  Basic Gate's work.
 
 **Object storage is deliberately SDK-free (ACQ-4).** The auth, profile mapping, capabilities and pagination of
 `s3`, `gcs` and `azure` are in [connectors](../connectors/spec-connectors.md). One detail is recorded only here:

@@ -1,33 +1,25 @@
 package com.gamma.control;
 
-import com.gamma.auth.secrets.SecretResolver;
+import com.gamma.acquire.ConnectionProfile;
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.entitystore.LaLimit;
 import com.gamma.entitystore.LaLimitValues;
-import com.gamma.etl.DuckDbExtension;
+import com.gamma.inspector.PostgresCollectorConnector;
+import com.gamma.inspector.PostgresConnectorFactory;
 import com.gamma.service.CollectorService;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
-import com.gamma.util.SqlIdent;
-import com.gamma.util.DuckDbUtil;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.util.regex.Matcher;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 /**
@@ -39,26 +31,26 @@ import java.util.regex.Pattern;
  *   <li>{@code POST /onboard/postgres/test} {@code {connection}} - connect, refuse a write-capable role, list the tables.</li>
  *   <li>{@code POST /onboard/postgres} {@code {connection, schema+table | query, kind}} - copy the rows into a draft and
  *       answer the same DRAFT as {@code POST /onboard/files}; the commit is the ordinary
- *       {@code POST /onboard/files/{draftId}/commit}, which also writes {@code imports/<id>_snapshot.toon}.</li>
+ *       {@code POST /onboard/files/{draftId}/commit}, which saves the snapshot's Connection and
+ *       {@code imports/<id>_snapshot.toon}.</li>
  *   <li>{@code POST /datasets/{id}/run} (Run now) on a snapshot Dataset re-copies it ({@link #refresh}).</li>
  * </ul>
  *
- * <p><b>Export, then move</b> (operator 2026-11-05): Run now EXPORTS the table with DuckDB {@code COPY (…) TO
- * '<file>.parquet'} into a temporary folder under the data root's drafts folder - never inside the inbox - and only once
- * the file is complete MOVES it atomically into the Dataset's inbox, where the ordinary import path takes it like an
- * uploaded file: name-checked columns, the row filter, the arrival, compaction. A snapshot always replaces everything.
- * <b>A snapshot is manual only:</b> nothing polls it (the 30 s refresh was removed the same day).
+ * <p><b>How it reads</b> ({@code BASIC-ELT-PROFILE-1} BE-4): through the acquisition SPI's {@code postgres} scheme
+ * ({@link PostgresCollectorConnector}, DuckDB's {@code postgres} extension - no JDBC driver on Basic), the same connector a
+ * Collector Pipeline with {@code collector.connector: postgres} uses. It owns the session, the read-only checks, the typed
+ * copy and the {@code ${ENV:INSPECTO_PG_…}} rule; this class is the HTTP edge and Add data's wording.
  *
- * <p><b>How it reads</b> (plan §6.1 V2): DuckDB's {@code postgres} extension, already staged in every bundle - no JDBC
- * driver on Basic. The password is a {@code ${ENV:NAME}} reference, resolved only here, at the moment of connecting,
- * into a {@code TEMPORARY SECRET} of an in-memory DuckDB; it is never stored, answered, logged or put in a URL or a
- * connection string (DuckDB echoes a libpq string - password included - in its connect error; the secret form does
- * not). Every error text is scrubbed of the resolved value anyway.
+ * <p><b>A saved Connection</b> (operator ruling O4, 2026-11-19): the commit saves the snapshot's connection as an ordinary
+ * {@code postgres} Connection, {@code <id>_postgres_connection.toon} under the write root, through the same save as
+ * {@code POST /connections} - so the scheme's check refuses any secret that is not an {@code INSPECTO_PG_} reference - and
+ * {@code _snapshot.toon} only names it. A snapshot committed before this keeps its connection inline in
+ * {@code _snapshot.toon}; it is read as it is (validated exactly as a request body) and never rewritten.
  *
- * <p><b>Read-only, three ways.</b> The database is attached {@code READ_ONLY}, so DuckDB refuses a write and the Postgres
- * session runs {@code transaction_read_only = on}, so Postgres refuses one too (measured); a pasted query must be one
- * {@code SELECT} or {@code WITH}; and the connection test refuses a role that could write (superuser, or INSERT /
- * UPDATE / DELETE / TRUNCATE on any non-system table), so Basic is given a read-only login.
+ * <p><b>Export, then move</b> (operator 2026-11-05): Run now EXPORTS the table into a temporary folder under the data
+ * root's drafts folder - never inside the inbox - and only once the file is complete MOVES it atomically into the
+ * Dataset's inbox, where the ordinary import path takes it like an uploaded file: name-checked columns, the row filter,
+ * the arrival, compaction. A snapshot always replaces everything. <b>A snapshot is manual only:</b> nothing polls it.
  */
 final class PostgresSnapshot {
 
@@ -67,22 +59,15 @@ final class PostgresSnapshot {
     /** The Dataset entry's {@code importSource} for a snapshot (display only; {@link #configFile} is the authority). */
     static final String SOURCE = "postgres";
     static final String SUFFIX = "_snapshot.toon";
+    /** A snapshot's saved Connection is named {@code <dataset id>}{@value}. */
+    static final String CONNECTION_SUFFIX = "_postgres";
     /** At most this many tables are listed by the connection test. */
     static final int LISTED = 500;
-    static final int MAX_QUERY_CHARS = 20_000;
-
-    private static final Pattern HOST = Pattern.compile("[A-Za-z0-9][A-Za-z0-9.:-]{0,252}");
-    private static final Pattern NAME = Pattern.compile("[A-Za-z_][A-Za-z0-9_$.-]{0,62}");
-    private static final Pattern IDENT = Pattern.compile("[A-Za-z_][A-Za-z0-9_$]{0,62}");
-    /**
-     * Only a variable named {@value #ENV_PREFIX}…: the person choosing the host also chooses which variable is resolved and
-     * sent to it, so without the prefix anyone with {@code canUploadData} could hand any server secret (a cloud key, the
-     * keystore password) to a Postgres server they run. The prefix makes "this one may be sent to a database" an
-     * administrator's decision, taken by naming the variable.
-     */
-    static final String ENV_PREFIX = "INSPECTO_PG_";
-    private static final Pattern PASSWORD_REF = Pattern.compile("\\$\\{ENV:(" + ENV_PREFIX + "[A-Z0-9_]{1,100})}");
-    private static final Pattern READ_ONLY_QUERY = Pattern.compile("(?is)\\s*(select|with)\\b.*");
+    static final int MAX_QUERY_CHARS = PostgresCollectorConnector.MAX_QUERY_CHARS;
+    /** Only a variable named {@value}…: see {@link PostgresCollectorConnector}. */
+    static final String ENV_PREFIX = PostgresCollectorConnector.ENV_PREFIX;
+    /** The id an unsaved profile carries while a request is tested or drafted. */
+    private static final String UNSAVED = "add-data-postgres";
 
     static void register(ApiContext api) {
         // ⚠ String LITERALS on purpose (CapabilityManifestTest's scanner).
@@ -98,8 +83,8 @@ final class PostgresSnapshot {
         static Conn of(Object raw) {
             if (!(raw instanceof Map<?, ?> m))
                 throw bad("connection must be {host, port, database, user, password}");
-            String host = text(m, "host", HOST, "host must be a host name or address");
-            int port = 5432;
+            String host = text(m, "host", PostgresCollectorConnector.HOST, "host must be a host name or address");
+            int port = PostgresCollectorConnector.DEFAULT_PORT;
             if (m.get("port") != null) {
                 try {
                     port = Integer.parseInt(String.valueOf(m.get("port")).trim());
@@ -108,12 +93,12 @@ final class PostgresSnapshot {
                 }
                 if (port < 1 || port > 65_535) throw bad("port must be 1-65535");
             }
-            String database = text(m, "database", NAME, "database must be a Postgres database name");
-            String user = text(m, "user", NAME, "user must be a Postgres role name");
+            String database = text(m, "database", PostgresCollectorConnector.NAME, "database must be a Postgres database name");
+            String user = text(m, "user", PostgresCollectorConnector.NAME, "user must be a Postgres role name");
             Object pw = m.get("password");
             String ref = pw instanceof String s ? s.trim() : "";
             // the value is never echoed: only whether it looked like a reference
-            if (!PASSWORD_REF.matcher(ref).matches())
+            if (!PostgresCollectorConnector.PASSWORD_REF.matcher(ref).matches())
                 throw bad("password must be a secret reference such as ${ENV:" + ENV_PREFIX + "SALES} - the name of an environment "
                         + "variable on the server, starting " + ENV_PREFIX + ", that holds it; never the password itself");
             return new Conn(host, port, database, user, ref);
@@ -129,9 +114,10 @@ final class PostgresSnapshot {
             return out;
         }
 
-        String envName() {
-            Matcher m = PASSWORD_REF.matcher(passwordRef);
-            return m.matches() ? m.group(1) : passwordRef;
+        /** This connection as a {@code postgres} Connection; {@code src} (what to copy) is its options, or none for a test. */
+        ConnectionProfile profile(String id, Source src) {
+            return new ConnectionProfile(id, PostgresCollectorConnector.SCHEME, host, port, database, null, user, passwordRef,
+                    src == null ? Map.of() : src.options(), null, null);
         }
     }
 
@@ -146,22 +132,27 @@ final class PostgresSnapshot {
                 if (query.endsWith(";")) query = query.substring(0, query.length() - 1).trim();
                 if (query.length() > MAX_QUERY_CHARS) throw bad("the query is longer than " + MAX_QUERY_CHARS + " characters");
                 if (query.indexOf(';') >= 0) throw bad("the query must be one statement (no ';' inside it)");
-                if (!READ_ONLY_QUERY.matcher(query).matches())
+                if (!PostgresCollectorConnector.READ_ONLY_QUERY.matcher(query).matches())
                     throw bad("the query must be a read-only SELECT (or WITH … SELECT); Add data never writes to your database");
                 return new Source(null, null, query);
             }
-            String schema = text(body, "schema", IDENT, "schema must be a schema name from the connection test");
-            String table = text(body, "table", IDENT, "table must be a table name from the connection test");
+            String schema = text(body, "schema", PostgresCollectorConnector.IDENT, "schema must be a schema name from the connection test");
+            String table = text(body, "table", PostgresCollectorConnector.IDENT, "table must be a table name from the connection test");
             return new Source(schema, table, null);
         }
 
-        /** From a stored draft or {@code _snapshot.toon}: data, not trusted - checked exactly as a request body is. */
+        /** From a stored draft or a pre-Connection {@code _snapshot.toon}: data, not trusted - checked exactly as a request body is. */
         static Source fromMap(Map<String, Object> m) {
             return of(m);
         }
 
         Map<String, Object> toMap() {
-            Map<String, Object> out = new LinkedHashMap<>();
+            return new LinkedHashMap<>(options());
+        }
+
+        /** The Connection's {@code options}: {@code schema} + {@code table}, or {@code query}. */
+        Map<String, String> options() {
+            Map<String, String> out = new LinkedHashMap<>();
             if (query != null) out.put("query", query);
             else {
                 out.put("schema", schema);
@@ -174,11 +165,6 @@ final class PostgresSnapshot {
         String stem() {
             return table != null ? table : "query";
         }
-
-        String relation() {
-            return query != null ? "postgres_query('pg', " + SqlIdent.sqlStr(query) + ")"
-                    : "pg." + SqlIdent.q(schema) + "." + SqlIdent.q(table);
-        }
     }
 
     // ── POST /onboard/postgres/test ───────────────────────────────────────────────────────────────────────────
@@ -187,34 +173,15 @@ final class PostgresSnapshot {
         OnboardRoutes.requireSelfImport(api, "Add data");
         Conn c = Conn.of(body.get("connection"));
         Path scratch = scratch(OnboardRoutes.requireDataRoot(api));
-        try (Session s = Session.open(c, scratch)) {
-            String who = s.requireReadOnlyRole();
-            List<Map<String, Object>> tables = new ArrayList<>();
-            boolean truncated = false;
-            try (Statement st = s.conn.createStatement();
-                 ResultSet r = st.executeQuery("SELECT table_schema, table_name, table_type FROM information_schema.tables "
-                         + "WHERE table_catalog = 'pg' AND table_schema NOT IN ('pg_catalog', 'information_schema') "
-                         + "ORDER BY 1, 2 LIMIT " + (LISTED + 1))) {
-                while (r.next()) {
-                    if (tables.size() == LISTED) {
-                        truncated = true;
-                        break;
-                    }
-                    Map<String, Object> t = new LinkedHashMap<>();
-                    t.put("schema", r.getString(1));
-                    t.put("table", r.getString(2));
-                    t.put("view", !"BASE TABLE".equalsIgnoreCase(r.getString(3)));
-                    tables.add(t);
-                }
-            } catch (SQLException e) {
-                throw s.failed("listing its tables", e);
-            }
+        try {
+            PostgresCollectorConnector.Listing l = answered(() -> PostgresConnectorFactory.forTest(c.profile(UNSAVED, null))
+                    .listTables(scratch, LISTED), 0);
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("connected", true);
-            out.put("user", who);
+            out.put("user", l.user());
             out.put("readOnly", true);
-            out.put("tables", tables);
-            out.put("truncated", truncated);
+            out.put("tables", l.tables());
+            out.put("truncated", l.truncated());
             return out;
         } finally {
             OnboardRoutes.deleteTree(scratch);
@@ -239,7 +206,7 @@ final class PostgresSnapshot {
         boolean kept = false;
         try {
             Files.createDirectories(dir);
-            pull(c, src, dir, file, lim);
+            pull(c.profile(UNSAVED, src), file, lim);
             Map<String, Object> snapshot = new LinkedHashMap<>();
             snapshot.put("source", SOURCE);
             snapshot.put("connection", c.toMap());
@@ -258,16 +225,50 @@ final class PostgresSnapshot {
         return writeRoot.resolve(OnboardImport.CONFIG_DIR).resolve(id + SUFFIX);
     }
 
-    /** The snapshot's config as {@code imports/<id>_snapshot.toon} holds it: the connection (the password as its reference) and what to copy. */
-    @SuppressWarnings("unchecked")
-    static Map<String, Object> config(Map<String, Object> draftSnapshot) {
-        Conn c = Conn.of(draftSnapshot.get("connection"));   // re-validated: the draft file is data, not trusted config
-        Source s = Source.fromMap(draftSnapshot);
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("source", SOURCE);
-        out.put("connection", c.toMap());
-        out.putAll(s.toMap());
-        return out;
+    /** The saved Connection a snapshot of Dataset {@code id} reads through. */
+    static String connectionId(String id) {
+        return id + CONNECTION_SUFFIX;
+    }
+
+    /**
+     * What a commit saves for a snapshot: the Connection, and the {@code _snapshot.toon} that names it. Decided before the
+     * commit writes anything: 409 when a Connection of that id exists, 422 when the Connection save would refuse it.
+     */
+    record Saved(ConnectionProfile connection, Path connectionFile, CollectorService service, Map<String, Object> config) {
+
+        /** Resolved on the request thread: a commit that runs on in the background undoes in the same Space. */
+        static Saved plan(ApiContext api, String id, Map<String, Object> draftSnapshot) {
+            Conn c = Conn.of(draftSnapshot.get("connection"));   // re-validated: the draft file is data, not trusted config
+            Source s = Source.fromMap(draftSnapshot);
+            String connId = connectionId(id);
+            ConnectionProfile p = c.profile(connId, s);
+            CollectorService service = HostContext.of(api).service();
+            Path connectionFile = ConnectionRoutes.connectionFile(api, connId);
+            if (service.connection(connId).isPresent() || Files.exists(connectionFile))
+                throw new ApiException(409, ErrorCodes.CONFLICT, "a Connection '" + connId + "' already exists; choose another name");
+            try {
+                ConnectionRoutes.validateProfile(p);   // the check every Connection save runs, the scheme's INSPECTO_PG_ rule among them
+            } catch (IllegalArgumentException refused) {
+                throw bad(refused.getMessage());
+            }
+            Map<String, Object> config = new LinkedHashMap<>();
+            config.put("source", SOURCE);
+            config.put("connection", connId);
+            return new Saved(p, connectionFile, service, config);
+        }
+
+        /** Save the Connection (as {@code POST /connections} does), then the snapshot settings. On the request thread. */
+        void write(ApiContext api, Path snapshotFile) throws IOException {
+            ConnectionRoutes.persistConnection(api, connection);
+            PostgresSnapshot.write(snapshotFile, config);
+        }
+
+        /** Undo {@link #write}: a failed commit leaves no snapshot settings and no Connection behind. */
+        void undo(Path snapshotFile) throws IOException {
+            Files.deleteIfExists(snapshotFile);
+            Files.deleteIfExists(connectionFile);
+            service.unregisterConnection(connection.id());
+        }
     }
 
     static void write(Path file, Map<String, Object> config) throws IOException {
@@ -283,11 +284,59 @@ final class PostgresSnapshot {
         } catch (IOException | RuntimeException unreadable) {
             // fall through: refused below with the file named
         }
-        throw new ApiException(409, ErrorCodes.CONFLICT, "the snapshot settings of '" + id + "' (" + OnboardImport.CONFIG_DIR + "/"
+        throw unreadable(id);
+    }
+
+    /**
+     * The Connection a snapshot reads through: the saved one {@code _snapshot.toon} names, or - for a snapshot committed
+     * before Connections - its inline {@code connection} block with the table or query beside it, validated exactly as a
+     * request body is. 409 when the named Connection is gone or unreadable.
+     */
+    @SuppressWarnings("unchecked")
+    static ConnectionProfile connectionOf(Path writeRoot, String id, Map<String, Object> config) {
+        Object c = config.get("connection");
+        if (c instanceof Map<?, ?>)   // the pre-Connection shape: read as it is, never rewritten
+            return Conn.of(c).profile(connectionId(id), Source.fromMap(config));
+        if (!(c instanceof String connId) || connId.isBlank()) throw unreadable(id);
+        Path file = ConnectionRoutes.connectionFile(writeRoot, connId.trim());
+        if (!Files.isRegularFile(file))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "the Connection '" + connId.trim() + "' that '" + id
+                    + "' reads through is gone; add the table again");
+        try {
+            return ConnectionProfile.load(file);
+        } catch (IOException | RuntimeException unreadableConnection) {
+            throw new ApiException(409, ErrorCodes.CONFLICT, "the Connection '" + connId.trim() + "' that '" + id + "' reads through cannot be read");
+        }
+    }
+
+    /**
+     * Retire a snapshot's settings with its Dataset: {@code _snapshot.toon}, and the Connection the commit saved for it
+     * ({@link #connectionId}) unless a Pipeline has since been bound to it. A Connection of any other name is left alone.
+     */
+    static void retire(Path writeRoot, String id, CollectorService service) throws IOException {
+        Path f = configFile(writeRoot, id);
+        Object named = null;
+        if (Files.isRegularFile(f)) {
+            try {
+                named = com.gamma.util.ToonHelper.load(f.toString()).get("connection");
+            } catch (IOException | RuntimeException unreadable) {
+                // nothing known to retire beside the file itself
+            }
+        }
+        String connId = connectionId(id);
+        if (connId.equals(named) && !service.connectionInUse(connId)) {
+            Files.deleteIfExists(ConnectionRoutes.connectionFile(writeRoot, connId));
+            service.unregisterConnection(connId);
+        }
+        Files.deleteIfExists(f);
+    }
+
+    private static ApiException unreadable(String id) {
+        return new ApiException(409, ErrorCodes.CONFLICT, "the snapshot settings of '" + id + "' (" + OnboardImport.CONFIG_DIR + "/"
                 + id + SUFFIX + ") cannot be read");
     }
 
-    // ── refresh: Run now, and the poll ────────────────────────────────────────────────────────────────────────
+    // ── refresh: Run now ──────────────────────────────────────────────────────────────────────────────────────
 
     /**
      * Run now on a snapshot: EXPORT the table into a staged Parquet file under the data root's drafts folder (outside the
@@ -296,18 +345,17 @@ final class PostgresSnapshot {
      */
     static Object refresh(OnboardImport.Space space, Map<String, Object> content, String id, Map<String, Object> config,
                           HttpExchange ex) throws IOException {
-        Conn c = Conn.of(config.get("connection"));
-        Source src = Source.fromMap(config);
+        ConnectionProfile profile = connectionOf(space.writeRoot(), id, config);
+        String name = answered(() -> PostgresConnectorFactory.connector(profile, 0).fileName(), 0);   // the profile, checked
         String pipeline = String.valueOf(content.get("importPipeline"));
         LaLimitValues lim = OnboardRoutes.limits(space.writeRoot());
         String key = space.writeRoot() + "|" + pipeline;
         if (!OnboardImport.IN_FLIGHT.add(key)) throw new ApiException(409, ErrorCodes.CONFLICT, "'" + id + "' is being imported right now");
         Path stage = space.dataRoot().resolve(OnboardRoutes.DRAFTS).resolve("a" + UUID.randomUUID().toString().replace("-", ""));
-        String name = src.stem() + ".parquet";
         Path file = stage.resolve(OnboardRoutes.storedName(name));
         try {
             Files.createDirectories(stage);
-            pull(c, src, stage, file, lim);
+            pull(profile, file, lim);
         } catch (IOException | RuntimeException fault) {
             OnboardImport.IN_FLIGHT.remove(key);
             OnboardRoutes.deleteTree(stage);   // a failed or half-written export never reaches the inbox
@@ -319,144 +367,25 @@ final class PostgresSnapshot {
     // ── the copy ──────────────────────────────────────────────────────────────────────────────────────────────
 
     /**
-     * Copy {@code src} into {@code target} as Parquet, typed as the import reads: a time-zoned timestamp becomes its UTC
-     * wall time, a type the import has no column type for (UUID, JSON, arrays, intervals…) becomes text. 413 above the
-     * Space's {@code import.max_rows}.
+     * Copy what {@code profile} names into {@code target} as typed Parquet through the {@code postgres} scheme. 413 above
+     * the Space's {@code import.max_rows}.
      */
-    static long pull(Conn c, Source src, Path dir, Path target, LaLimitValues lim) {
+    static long pull(ConnectionProfile profile, Path target, LaLimitValues lim) {
         long maxRows = lim.get(LaLimit.IMPORT_MAX_ROWS);
-        try (Session s = Session.open(c, dir)) {
-            s.requireReadOnlyRole();   // on every copy: a login granted a write since the test is refused too
-            List<String> cols = new ArrayList<>();
-            try (Statement st = s.conn.createStatement();
-                 ResultSet r = st.executeQuery("DESCRIBE SELECT * FROM " + src.relation())) {
-                while (r.next()) cols.add(projection(r.getString(1), r.getString(2)));
-            } catch (SQLException e) {
-                throw s.failed("reading " + (src.table() != null ? "the table" : "the query"), e);
-            }
-            if (cols.isEmpty()) throw bad("the " + (src.table() != null ? "table" : "query") + " has no columns");
-            String select = "SELECT " + String.join(", ", cols) + " FROM " + src.relation() + " LIMIT " + (maxRows + 1);
-            String path = target.toAbsolutePath().normalize().toString().replace('\\', '/');
-            try (Statement st = s.conn.createStatement()) {
-                st.execute("COPY (" + select + ") TO " + SqlIdent.sqlStr(path) + " (FORMAT parquet)");
-            } catch (SQLException e) {
-                throw s.failed("copying the rows", e);
-            }
-            long rows;
-            try (Statement st = s.conn.createStatement();
-                 ResultSet r = st.executeQuery("SELECT count(*) FROM " + com.gamma.sql.SqlViews.parquetFile(target))) {
-                r.next();
-                rows = r.getLong(1);
-            } catch (SQLException e) {
-                throw s.failed("counting the rows", e);
-            }
-            if (rows > maxRows)
-                throw new ApiException(413, ErrorCodes.PAYLOAD_TOO_LARGE, "the " + (src.table() != null ? "table" : "query")
-                        + " holds more than " + maxRows + " rows; this Space's import.max_rows is " + maxRows);
-            if (rows == 0) throw bad("the " + (src.table() != null ? "table" : "query") + " holds no rows");
-            return rows;
-        }
+        return answered(() -> PostgresConnectorFactory.connector(profile, maxRows).export(target), maxRows);
     }
 
-    /** One column of the copy, cast to a type the import reads. */
-    static String projection(String name, String duckType) {
-        String col = SqlIdent.q(name);
-        String t = duckType == null ? "" : duckType.toUpperCase(Locale.ROOT);
-        if (t.equals("TIMESTAMP WITH TIME ZONE")) return "timezone('UTC', " + col + ") AS " + col;
-        if (t.matches("(U?(TINY|SMALL|BIG|HUGE)?INT(EGER)?|UHUGEINT|DOUBLE|FLOAT|REAL|DECIMAL\\(\\d+,\\d+\\)|DATE|TIMESTAMP|BOOLEAN|VARCHAR)"))
-            return col;
-        return "CAST(" + col + " AS VARCHAR) AS " + col;
-    }
-
-    // ── one connection ────────────────────────────────────────────────────────────────────────────────────────
-
-    /**
-     * An in-memory DuckDB with the database attached read-only through a temporary secret, then sealed to {@code dir}
-     * (the attach happens before the seal; afterwards no other attach and no file outside {@code dir}).
-     */
-    static final class Session implements AutoCloseable {
-        final Connection conn;
-        final String password;
-
-        private Session(Connection conn, String password) {
-            this.conn = conn;
-            this.password = password;
+    /** The connector's refusals as Add data answers them: 413 over the row cap, 422 for everything else. */
+    private static <T> T answered(Supplier<T> work, long maxRows) {
+        try {
+            return work.get();
+        } catch (PostgresCollectorConnector.Refused r) {
+            if (r.tooLarge())
+                throw new ApiException(413, ErrorCodes.PAYLOAD_TOO_LARGE, r.getMessage() + "; this Space's import.max_rows is " + maxRows);
+            throw bad(r.getMessage());
+        } catch (IllegalArgumentException refused) {
+            throw bad(refused.getMessage());
         }
-
-        static Session open(Conn c, Path dir) {
-            String pw = SecretResolver.resolve(c.passwordRef());
-            if (pw == null)
-                throw bad("the password reference " + c.passwordRef() + " is not set on the server: set the environment variable "
-                        + c.envName() + " where Inspecto runs, then restart it");
-            try {
-                Files.createDirectories(dir);
-                Connection conn = DuckDbUtil.openInMemory(null, List.of(dir), x -> {
-                    DuckDbExtension.ensureLoaded(x, "postgres_scanner", "reading a Postgres table (Add data)");
-                    try (Statement st = x.createStatement()) {
-                        st.execute("CREATE TEMPORARY SECRET onboard_pg (TYPE postgres, HOST " + SqlIdent.sqlStr(c.host())
-                                + ", PORT " + c.port() + ", DATABASE " + SqlIdent.sqlStr(c.database())
-                                + ", USER " + SqlIdent.sqlStr(c.user()) + ", PASSWORD " + SqlIdent.sqlStr(pw) + ")");
-                    }
-                    try (Statement st = x.createStatement()) {
-                        st.execute("ATTACH '' AS pg (TYPE postgres, SECRET onboard_pg, READ_ONLY)");
-                    }
-                });
-                return new Session(conn, pw);
-            } catch (SQLException e) {
-                throw PostgresSnapshot.failed(pw, "connecting to " + c.host() + ":" + c.port() + "/" + c.database() + " as " + c.user(), e);
-            } catch (IOException e) {
-                throw new java.io.UncheckedIOException(e);
-            }
-        }
-
-        /** The role's name; 422 when it could write (superuser, or a write grant on any non-system table). */
-        String requireReadOnlyRole() {
-            String sql = "SELECT current_user::text AS who, "
-                    + "(SELECT rolsuper FROM pg_roles WHERE rolname = current_user) AS su, "
-                    + "(SELECT count(*) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
-                    + "WHERE c.relkind IN ('r', 'p', 'f', 'v', 'm') AND n.nspname NOT IN ('pg_catalog', 'information_schema') "
-                    + "AND n.nspname NOT LIKE 'pg\\_%' AND (has_table_privilege(c.oid, 'INSERT') OR has_table_privilege(c.oid, 'UPDATE') "
-                    + "OR has_table_privilege(c.oid, 'DELETE') OR has_table_privilege(c.oid, 'TRUNCATE'))) AS writable";
-            try (Statement st = conn.createStatement();
-                 ResultSet r = st.executeQuery("SELECT * FROM postgres_query('pg', " + SqlIdent.sqlStr(sql) + ")")) {
-                r.next();
-                String who = r.getString(1);
-                boolean su = r.getBoolean(2);
-                long writable = r.getLong(3);
-                if (su)
-                    throw bad("'" + who + "' is a superuser, which could change the database. Add data reads with a read-only "
-                            + "login: create a role with only CONNECT, USAGE on the schema and SELECT on its tables");
-                if (writable > 0)
-                    throw bad("'" + who + "' may change " + writable + " table" + (writable == 1 ? "" : "s")
-                            + " (INSERT, UPDATE, DELETE or TRUNCATE). Add data reads with a read-only login: grant it only "
-                            + "CONNECT, USAGE on the schema and SELECT on the tables");
-                return who;
-            } catch (SQLException e) {
-                throw failed("checking the role's rights", e);
-            }
-        }
-
-        ApiException failed(String doing, SQLException e) {
-            return PostgresSnapshot.failed(password, doing, e);
-        }
-
-        @Override
-        public void close() {
-            try {
-                conn.close();
-            } catch (SQLException ignored) {
-                // an in-memory connection: nothing to keep
-            }
-        }
-    }
-
-    /** 422 naming what failed, the database's own reason scrubbed of the password. */
-    private static ApiException failed(String password, String doing, SQLException e) {
-        String msg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-        if (password != null && !password.isEmpty()) msg = msg.replace(password, "***");
-        msg = msg.replace('\n', ' ').trim();
-        if (msg.length() > 400) msg = msg.substring(0, 400) + "…";
-        return new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "Postgres: " + doing + " failed: " + msg);
     }
 
     private static Path scratch(Path dataRoot) {

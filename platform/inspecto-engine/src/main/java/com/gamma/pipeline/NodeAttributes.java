@@ -79,6 +79,15 @@ public final class NodeAttributes {
                             "EXACTLY_ONCE", "Exactly once"),
             NodeAttribute.of("stability__window", "Stability window", "string", "advanced").placeholder("5s")
                     .help("Wait for a file to stop growing before collecting it."),
+            // Readiness (BASIC-ELT-PROFILE-1 U4-Keep): the two stability keys PipelineConfigParser already reads
+            // (collector.stability.ready_marker / size_checks) and Add data's Keep this up to date already writes
+            // (DatasetFeed). No defaultValue: a seeded key would add a stability: block, and its presence turns
+            // the gate on.
+            NodeAttribute.of("stability__ready_marker", "Ready marker", "string", "advanced").placeholder(".done")
+                    .help("Collect a file only once its marker file is there: a suffix such as .done (orders.csv waits "
+                            + "for orders.csv.done), or a name with {name} such as {name}.ok. The marker itself is never collected."),
+            NodeAttribute.of("stability__size_checks", "Size checks", "number", "advanced").min(1)
+                    .help("Polls in a row a file must be seen at the same size before it is collected. Blank = 2."),
             NodeAttribute.of("post_action__archive_path", "Archive path", "string", "advanced")
                     .help("Target directory when \"After success\" is Move."),
             // Fetch concurrency (collector.fetch.*, RemoteAcquisitionHandler): how many files ONE

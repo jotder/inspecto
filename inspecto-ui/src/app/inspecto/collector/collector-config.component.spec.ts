@@ -230,4 +230,43 @@ describe('CollectorConfigComponent', () => {
             expect(c.mode()).toBe('connection');
         });
     });
+    describe('a host that saves only some modes and connectors (BASIC-ELT-PROFILE-1 U4-Keep)', () => {
+        const SFTP_ONLY = [
+            { id: 'partner_box', connector: 'SFTP' },
+            { id: 'blob_prod', connector: 'azure' },
+        ];
+
+        function restricted() {
+            const fixture = create({}, '', SFTP_ONLY);
+            fixture.componentRef.setInput('modes', ['local', 'connection']);
+            fixture.componentRef.setInput('connectors', ['sftp']);
+            fixture.detectChanges();
+            return fixture;
+        }
+
+        it('offers only the modes the host names (no violations)', async () => {
+            const fixture = restricted();
+            const labels = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('mat-button-toggle')).map(
+                (t) => (t.textContent ?? '').trim(),
+            );
+            expect(labels).toEqual(['Local inbox', 'Connection']);
+            await expectNoA11yViolations(fixture.nativeElement);
+        });
+
+        it('lists only the Connections of the named connector types', async () => {
+            const c = restricted().componentInstance;
+            const options = await c.optionLoaders.connection({});
+            expect(options.map((o) => o.value)).toEqual(['partner_box']);
+        });
+
+        it('refuses a Connection of another connector type, saying which it takes', () => {
+            const c = toConnectionMode(restricted());
+            c.schemaForm.form.get('connection')?.setValue('blob_prod');
+            expect(c.resolveConnector()).toBeNull();
+            expect(c.error()).toBe('"blob_prod" connects through azure; this takes SFTP Connections only.');
+            c.schemaForm.form.get('connection')?.setValue('partner_box');
+            expect(c.resolveConnector()).toBe('SFTP');
+            expect(c.error()).toBeNull();
+        });
+    });
 });

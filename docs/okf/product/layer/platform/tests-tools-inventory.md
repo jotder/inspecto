@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-109 test file(s). Run one, or all:
+113 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -32,6 +32,7 @@ node --test tools/
 | `tools/check-engine-names-no-la.test.mjs` | Fixture test for tools/check-engine-names-no-la.mjs. Run: node --test tools/check-engine-names-no-la.test.mjs |
 | `tools/check-entitled-loaders.test.mjs` | Fixture test for tools/check-entitled-loaders.mjs: the real repo is green, and each planted hole turns it red. |
 | `tools/check-family-count.test.mjs` | Negative fixtures for tools/check-family-count.mjs. Run: node --test tools/check-family-count.test.mjs |
+| `tools/check-handbook.test.mjs` | Tests for tools/check-handbook.mjs. Run: node --test tools/check-handbook.test.mjs |
 | `tools/check-jar-signatures.test.mjs` | Fixtures for tools/check-jar-signatures.mjs (P3h per-jar signing). Run: node --test tools/check-jar-signatures.test.mjs |
 | `tools/check-launchers.test.mjs` | Negative fixtures for tools/check-launchers.mjs. Run: node --test tools/check-launchers.test.mjs |
 | `tools/check-module-architecture.test.mjs` | Fixture test for the pure helpers of tools/check-module-architecture.mjs. Run: node --test tools/check-module-architecture.test.mjs |
@@ -55,6 +56,7 @@ node --test tools/
 | `tools/customer-build.test.mjs` | Fixture test for tools/customer-build.mjs. Run: node --test tools/customer-build.test.mjs |
 | `tools/deploy-kit.test.mjs` | The deploy kit (DEPLOY-EXPOSURE-KIT-1, MoSCoW S11): deploy/kit/ is staged into every non-demo bundle by package.ps1 |
 | `tools/dev-doctor.test.mjs` | Fixture test for tools/dev-doctor.mjs. Run: node --test tools/dev-doctor.test.mjs |
+| `tools/docs-health.test.mjs` | Tests for tools/docs-health.mjs. Run: node --test tools/docs-health.test.mjs |
 | `tools/entitle.test.mjs` | tools/entitle.mjs - signed entitlements (PRODUCT-ASSEMBLY-1 PA-7a). |
 | `tools/fetch-duckdb-extensions.test.mjs` | Offline tests for tools/fetch-duckdb-extensions.mjs's --only / --platform selection (D-8, 2026-09-26). |
 | `tools/gen-la-audit-data.test.mjs` | Determinism of tools/gen-la-audit-data.py. Run: node --test tools/gen-la-audit-data.test.mjs |
@@ -97,11 +99,13 @@ node --test tools/
 | `tools/release-notes.test.mjs` | Fixture test for tools/release-notes.mjs. Run: node --test tools/release-notes.test.mjs |
 | `tools/render-api-routes.test.mjs` |  |
 | `tools/render-feature-db.test.mjs` | Fixture test for tools/render-feature-db.mjs. Run: node --test tools/render-feature-db.test.mjs |
+| `tools/render-handbook.test.mjs` | Tests for tools/render-handbook.mjs. Run: node --test tools/render-handbook.test.mjs |
 | `tools/render-offerings-matrix.test.mjs` | Fixture test for tools/render-offerings-matrix.mjs. Run: node --test tools/render-offerings-matrix.test.mjs |
 | `tools/render-product-hosts.test.mjs` | Tests for tools/render-product-hosts.mjs - PRODUCT-ASSEMBLY-1 PA-4. Run: node --test tools/render-product-hosts.test.mjs |
 | `tools/render-product-map.test.mjs` | Fixture test for tools/render-product-map.mjs. Run: node --test tools/render-product-map.test.mjs |
 | `tools/render-space-links.test.mjs` | Tests for tools/render-space-links.mjs (LC-7): the census parse reads every link line and refuses one it cannot |
 | `tools/render-tests-inventory.test.mjs` | Fixture test for tools/render-tests-inventory.mjs. Run: node --test tools/render-tests-inventory.test.mjs |
+| `tools/roll-backlog-ledger.test.mjs` | Tests for tools/roll-backlog-ledger.mjs. Run: node --test tools/roll-backlog-ledger.test.mjs |
 | `tools/sbom-modules.test.mjs` | Fixtures for tools/sbom-modules.mjs (P3f per-module SBOMs). Run: node --test tools/sbom-modules.test.mjs |
 | `tools/seed-la-audit.test.mjs` | node --test tools/seed-la-audit.test.mjs  -  request building of the la-audit seed script against a MOCKED fetch (no server). |
 | `tools/seed-la-benefits.test.mjs` | node --test tools/seed-la-benefits.test.mjs  -  request building of the benefits fraud seed script against a MOCKED fetch (no server). |

@@ -27,9 +27,6 @@ export interface Choice<T> {
 
 export type ImportKind = 'stream' | 'reference';
 
-/** The column types the commit accepts (`OnboardImport.TYPES`). */
-export type ColumnType = 'VARCHAR' | 'BIGINT' | 'DOUBLE' | 'DATE' | 'TIMESTAMP' | 'BOOLEAN';
-
 export interface DraftColumn {
     /** The draft name - every commit choice names a column by it. */
     name: string;
@@ -525,15 +522,6 @@ function text(v: unknown): string {
 export const READ_FORMATS = 'CSV or TSV, Parquet, JSON or NDJSON';
 /** The `accept` list of the file chooser (the server still decides). */
 export const ACCEPTED_EXTENSIONS = '.csv,.tsv,.tab,.txt,.parquet,.json,.ndjson,.jsonl,.xlsx';
-
-export const TYPE_LABELS: Record<ColumnType, string> = {
-    VARCHAR: 'Text',
-    BIGINT: 'Whole number',
-    DOUBLE: 'Decimal number',
-    DATE: 'Date',
-    TIMESTAMP: 'Date and time',
-    BOOLEAN: 'Yes / no',
-};
 
 /** A delimiter as a person names it. */
 export function delimiterLabel(d: string | null | undefined): string {

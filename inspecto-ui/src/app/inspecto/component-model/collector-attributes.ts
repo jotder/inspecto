@@ -125,6 +125,24 @@ export const COLLECTOR_ATTRIBUTES: AttributeSpec[] = [
         placeholder: '5s',
         help: 'Wait for a file to stop growing before collecting it.',
     },
+    // Readiness (BASIC-ELT-PROFILE-1 U4-Keep): no default, since a seeded key would add a `stability:` block,
+    // and its presence turns the gate on.
+    {
+        key: 'stability__ready_marker',
+        label: 'Ready marker',
+        type: 'string',
+        tier: 'advanced',
+        placeholder: '.done',
+        help: 'Collect a file only once its marker file is there: a suffix such as .done (orders.csv waits for orders.csv.done), or a name with {name} such as {name}.ok. The marker itself is never collected.',
+    },
+    {
+        key: 'stability__size_checks',
+        label: 'Size checks',
+        type: 'number',
+        tier: 'advanced',
+        min: 1,
+        help: 'Polls in a row a file must be seen at the same size before it is collected. Blank = 2.',
+    },
     {
         key: 'post_action__archive_path',
         label: 'Archive path',

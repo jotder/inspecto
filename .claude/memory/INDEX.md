@@ -26,7 +26,7 @@ Add a lesson as a new file here + one line below, in the same change. Personal o
 - [Lane integration workflow](lane-integration-workflow.md) — build lanes in parallel, integrate + push ONE lane at a time from a clean sibling worktree; targeted tests per lane, one full gate per day/release
 
 ## Docs, guards & claims
-- [Doc guard traps](doc-guard-traps.md) — citation headings are "References" (the vocabulary guard bans the acquisition word); git add new docs; absence phrase on the line; docs-relocate
+- [Doc guard traps](doc-guard-traps.md) — citation headings are "References" (the vocabulary guard bans the acquisition word); git add new docs; absence phrase on the line; docs-relocate; docs-health ratchet blocks new docs debt (split pages past 60 KB, no new inline history notes, roll the ledger)
 - [Guard scope = silent exemption](guard-scope-is-a-silent-exemption.md) — audit what files a guard opens; parity tests for mirror lists
 - [Claims are hypotheses](claims-are-hypotheses.md) — BACKLOG causes/status/file lists are often wrong; grep the symbol
 - [Subagent claims are hypotheses](subagent-claims-are-hypotheses.md) — verify attributions and negatives with one command before relaying

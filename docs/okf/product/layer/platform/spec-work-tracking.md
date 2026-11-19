@@ -50,8 +50,9 @@ only the backticked `→` pointer list, and the count markers (`check-doc-counts
 1. **Plan** — write the plan in `docs/superpower/` and file its board rows, each tagged with its item(s).
 2. **Build** — commit with the item's name as the Conventional Commit scope (`feat(reconciliation): …`).
 3. **Ship** — distil the as-built facts into the hub's `plan` / `spec` / `architecture` / guide slots, delete
-   the closed rows from the board (still-open leftovers become new tagged rows), and `git mv` the plan to
-   `docs/archived-documents/plans-archive/`.
+   the closed rows from the board (still-open leftovers become new tagged rows), `git mv` the plan to
+   `docs/archived-documents/plans-archive/` and add its row to the archived-plans table in
+   `docs/archived-documents/README.md` (its in-flight row leaves `docs/INDEX.md`).
 4. **Regenerate** — `node tools/render-product-docs.mjs`; the hub index, its Open work section and the hub list
    refresh themselves. Never hand-edit a hub `index.md`.
 
@@ -89,5 +90,6 @@ only the backticked `→` pointer list, and the count markers (`check-doc-counts
 - **Splitting or merging a page keeps its section numbers.** `module/la-core/architecture-la-core.md` (about 2,500
   lines) was split on 2026-11-12 (`ARCH-DOCS-RESIDUALS-1`) into five pages; on 2026-11-15 the hub was
   consolidated again into `architecture-la-core.md` (§1-§10, masking at §3.4), `architecture-http-and-ui.md` (§6.1 to §6.9,
-  §6.14) and `architecture-data-onboarding.md` (§6.10 to §6.13, §6.15 to §6.20). Every heading kept its number,
+  §6.14) and `architecture-data-onboarding.md` (§6.10 to §6.13, §6.15 to §6.19; §6.20 moved to
+  `architecture-watch-this-folder.md` on 2026-11-19). Every heading kept its number,
   so an old "§6.15" citation still names the right section; `architecture-la-core.md` §6 holds a table from section to page.

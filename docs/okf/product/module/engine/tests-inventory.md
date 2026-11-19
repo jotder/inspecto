@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-417 test class(es): 417 unit, 0 real-HTTP control-plane, 0 IT.
+420 test class(es): 420 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -144,6 +144,8 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `OutputStemCollisionTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/OutputStemCollisionTest.java` | INGEST-MULTIFILE-BATCH-REPLAN-DUP-1 stage 1 (operator decision D3, 2026-10-12): two members of ONE batch that |
 | `PartitionReplaceCharacterizationTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/PartitionReplaceCharacterizationTest.java` | LA-DAILY-INGEST-1 T4 / M03: CHARACTERIZATION of what the real ingest path does to a Hive partition when a |
 | `PipelineTestRunTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/PipelineTestRunTest.java` | Step 5a — a bounded test run over real inbox files must parse through the real ingest path and |
+| `PostgresConnectorFactoryTckTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/PostgresConnectorFactoryTckTest.java` | {@link PostgresConnectorFactory} against the platform's CollectorConnectorFactory TCK (MODULE-REORG-1 P5b). |
+| `PostgresConnectorFactoryTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/PostgresConnectorFactoryTest.java` | The {@code postgres} Collector scheme ({@code BASIC-ELT-PROFILE-1} BE-4). The profile checks every Connection save runs |
 | `RawCopyRetentionTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/RawCopyRetentionTest.java` | INGEST-RAW-SOURCE-COPIES-RETENTION-1: processing.raw_copy_retention_days ages backup/ + quarantine raw copies. <!-- vocab-allow: quoted Javadoc --> |
 | `RecordDedupExecutionTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/RecordDedupExecutionTest.java` | Record-grain dedup is <b>not</b> executed by Stage-1 — the assertion this class used to make, inverted |
 | `RecordReplayTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/RecordReplayTest.java` | EXECUTION-RESIDUALS X4, first slice: replay ONE file's rejected records from its reject sidecar as a new |
@@ -303,6 +305,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `FindingsSpecTest` | `com.gamma.objects` | unit | `platform/inspecto-engine/src/test/java/com/gamma/objects/FindingsSpecTest.java` | Configurable Findings sections (C3 / BACKLOG D6): the built-in default, the round trip, and every |
 | `RcaTemplateTest` | `com.gamma.objects` | unit | `platform/inspecto-engine/src/test/java/com/gamma/objects/RcaTemplateTest.java` | RCA template parsing — {@code fromMap} validation + a {@code *_rca.toon} round-trip (reuses ConfigCodec). |
 | `ParsersTest` | `com.gamma.parse` | unit | `platform/inspecto-engine/src/test/java/com/gamma/parse/ParsersTest.java` | The {@link Parsers} registry + the built-in adapters: the catalog carries the four engine |
+| `SampleProfilerTest` | `com.gamma.parse` | unit | `platform/inspecto-engine/src/test/java/com/gamma/parse/SampleProfilerTest.java` | {@link SampleProfiler#dialect} ({@code BASIC-ELT-PROFILE-1} BE-3): DuckDB's own dialect answer for a sample file, as |
 | `XmlParserPluginTckTest` | `com.gamma.parse` | unit | `platform/inspecto-engine/src/test/java/com/gamma/parse/XmlParserPluginTckTest.java` | {@link XmlParserPlugin} against the platform's ParserPlugin TCK (MODULE-REORG-1 P5b). |
 | `XmlParserPluginTest` | `com.gamma.parse` | unit | `platform/inspecto-engine/src/test/java/com/gamma/parse/XmlParserPluginTest.java` |  |
 | `ParserPluginTckSelfTest` | `com.gamma.parse.testkit` | unit | `platform/inspecto-engine/src/test/java/com/gamma/parse/testkit/ParserPluginTckSelfTest.java` | Proves the ParserPlugin TCK can fail (MODULE-REORG-1 P5b): broken in-test parsers must go red, a sound one green. |

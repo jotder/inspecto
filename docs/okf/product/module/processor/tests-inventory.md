@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-461 test class(es): 187 unit, 274 real-HTTP control-plane, 0 IT.
+464 test class(es): 189 unit, 275 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -207,6 +207,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiNotificationRulesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiNotificationRulesTest.java` | {@code /notifications/rules*} admin CRUD over real HTTP: the empty default, create with defaulted |
 | `ControlApiNotificationsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiNotificationsTest.java` | Integration tests for the in-app notification feed routes ({@code /notifications*}) over real HTTP. |
 | `ControlApiNotificationStreamTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiNotificationStreamTest.java` | Integration test for the SSE real-time stream ({@code GET /notifications/stream}): a notification |
+| `ControlApiOnboardDialectTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOnboardDialectTest.java` | {@code BASIC-ELT-PROFILE-1} BE-3 slice 2, the import half of "Add data follows the sniff" (operator ruling 2026-11-19): |
 | `ControlApiOnboardFilesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOnboardFilesTest.java` | Add data over real HTTP ({@code LA-ONBOARD-1} phase 2, OB-2/OB-3/OB-4/OB-7/OB-8): {@code POST /onboard/files} answers a |
 | `ControlApiOnboardFixesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOnboardFixesTest.java` | {@code ONBOARDING-FIRST-RUN-1} C2, the fix catalogue ({@link OnboardFixes}): for EVERY entry, a file that has the |
 | `ControlApiOnboardFullCycleTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOnboardFullCycleTest.java` | The honest, forgiving import over real HTTP ({@code LA-FULL-CYCLE-TEST-1} phase 3, findings 3, 4, 5 and 10), on the |
@@ -301,6 +302,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `DatasetNewColumnsLocalDayTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetNewColumnsLocalDayTest.java` | DATES-ONE-ZONE-1 (Basic live check 2026-11-06): the arrivals list showed a file received at {@code 2026-11-06 |
 | `DatasetPeriodSwapLockTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetPeriodSwapLockTest.java` | SNAPSHOT-SWAP-UNLOCKED-READERS-1: replacing an upload's period moves each touched Parquet file aside and puts its |
 | `DecisionRuleWritersTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DecisionRuleWritersTest.java` | {@code ASSURE-ACTION-REQUESTS-1} round-2 finding 1c — <b>every writer that can write a {@code decision-rule} runs |
+| `DialectSniffGoldenTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DialectSniffGoldenTest.java` | {@code BASIC-ELT-PROFILE-1} BE-3 slice 1: the dialect (delimiter, quote, header) the two callers of DuckDB's |
 | `EditionFeatureGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/EditionFeatureGateTest.java` | The BASIC half of `PROCESSOR-RELEASE-READINESS-1` G9 (operator decision 2026-09-24, "gate the code"): |
 | `EntitledLoaderFamiliesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/EntitledLoaderFamiliesTest.java` | ENTITLEMENT-SPI-NARROWING-1: each extension-point family skips a provider whose module the signed entitlement leaves out. |
 | `EntityShapesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/EntityShapesTest.java` | ENTITY-TYPE-CATALOG-1 P1: Add data proposes a column's Entity Type from the SPACE's types' value shapes, not from a list |
@@ -390,6 +392,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `TimeBoundsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/TimeBoundsTest.java` | {@code /events} time bounds are anchored in the {@linkplain OperationsZone operations zone}, not the |
 | `TrustedProxiesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/TrustedProxiesTest.java` | SEC review F3: the resolution rules of {@link TrustedProxies}, pinned directly (the HTTP half is |
 | `TypeFlowSaveTimeFindingsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/TypeFlowSaveTimeFindingsTest.java` | {@link ConfigRoutes#routeColumnFindings} and {@link ConfigRoutes#summarizeMeasureFindings} — |
+| `TypeInferenceGoldenTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/TypeInferenceGoldenTest.java` | {@code BASIC-ELT-PROFILE-1} BE-3 slice 2: the column types the three type inferences answer for one file — the parse |
 | `UndeclaredMutatingRouteTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/UndeclaredMutatingRouteTest.java` | <b>The control itself (route-gating plan step 3c, 2026-09-16).</b> A mutating route must declare its |
 | `WriteGateOrderTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/WriteGateOrderTest.java` | The four-stage write gate: <b>its ORDER, and {@link WriteGates} itself</b> — one of |
 | `BaselineEvaluatorGoldenTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/BaselineEvaluatorGoldenTest.java` | Golden figures of the {@code baseline} Expectation kind (ANALYTICS-CORE-1 M4 / M2): every profiled cell over parquet |

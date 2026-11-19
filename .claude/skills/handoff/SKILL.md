@@ -28,8 +28,14 @@ zero questions.
    `docs/superpower/`. Refactor/dedup in place; don't append changelogs.
    **Doc lifecycle check (root `CLAUDE.md`):** if this shift SHIPPED a plan's work, distill its
    durable as-built facts into the matching `docs/okf/` concept, move still-open items to
-   `docs/BACKLOG.md`, `git mv` the plan to `docs/archived-documents/plans-archive/`, and update
-   `docs/INDEX.md`. `docs/superpower/` holds in-flight plans only.
+   `docs/BACKLOG.md`, `git mv` the plan to `docs/archived-documents/plans-archive/`, add its row to the
+   archived-plans table in `docs/archived-documents/README.md`, and drop its in-flight row from `docs/INDEX.md`.
+   `docs/superpower/` holds in-flight plans only.
+   **Docs health (`INFO-RESTRUCTURE-1`):** in the lane that lands this shift's docs, run
+   `node tools/roll-backlog-ledger.mjs --write` (the board keeps three days of ledger; older entries move verbatim to
+   `docs/archived-documents/backlog-ledger-<year>.md`), then `node tools/docs-health.mjs` and name any page on its
+   drift list or newly over 40 KB in the hand-off. If this shift shrank docs debt, lock it in with
+   `node tools/docs-health.mjs --baseline-write` in the same commit.
    **Shift audit (root `CLAUDE.md`, "origin/master is the only line"):** `git worktree list` must show the
    shared checkout plus lanes listed in `SESSION_STATUS.local.md` only, and `git branch` must show `master` only.
    Anything else pushed → remove it (`git cherry origin/master <branch>` first, bundle what differs into

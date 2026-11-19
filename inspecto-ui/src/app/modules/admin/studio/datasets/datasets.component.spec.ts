@@ -12,6 +12,7 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { Dataset } from './dataset-types';
 import { DatasetsService } from './datasets.service';
 import { AddDataAccess } from '@inspecto/core/add-data/add-data-access';
+import { ADD_DATA_LINK_ANALYSIS } from '@inspecto/core/add-data/add-data-link-analysis';
 import { DatasetsComponent } from './datasets.component';
 
 const D1: Dataset = {
@@ -90,6 +91,13 @@ describe('DatasetsComponent', () => {
         (empty.querySelector('button') as HTMLButtonElement).click();
         expect(navigate).toHaveBeenCalledWith('/add-data');
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it("provides what Link Analysis hands the Dataset cards in the page's own providers, not the shell's (BASIC-ELT-PROFILE-1 UI-0)", () => {
+        const { fixture } = create();
+        // the root default (no Link Analysis) has no Rebuild; the page's own provider hands Link Analysis's
+        expect(TestBed.inject(ADD_DATA_LINK_ANALYSIS).rebuild).toBeNull();
+        expect(fixture.debugElement.injector.get(ADD_DATA_LINK_ANALYSIS).rebuild).not.toBeNull();
     });
 
     it('empty but Add data locked here: no drop offer and no Add data button', () => {
