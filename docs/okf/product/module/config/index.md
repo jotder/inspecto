@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Component metamodel & Catalog (MET)](plan-metamodel.md) · [Space evolution — a Space the server understands as a whole, reached without breaking one](plan-space-evolution.md) · [Spaces & tenancy (SPC)](plan-spaces.md) |
+| plan | current | [module.config - board row detail](plan-board-detail.md) · [Component metamodel & Catalog (MET)](plan-metamodel.md) · [Space evolution — a Space the server understands as a whole, reached without breaking one](plan-space-evolution.md) · [Spaces & tenancy (SPC)](plan-spaces.md) |
 | spec | current | [Column contract — Schema column changes and what they break (SE-3a, SE-3b)](spec-column-contract.md) · [Config Safety Validator](spec-config-safety.md) · [Pipeline config keys — the single block census](spec-pipeline-config-keys.md) · [Space lock — the server's signed record of a Space (SE-1a)](spec-space-lock.md) · [Space origin — which template made a Space (SE-5a)](spec-space-origin.md) · [Space promotion — a whole Space applied to an existing Space as a previewed change set (SE-6b)](spec-space-promotion.md) · [Space tests — cases that travel with a Space (SE-6a)](spec-space-tests.md) · [TOON Configuration](spec-toon-config.md) |
 | architecture | current | [Spaces](architecture-config.md) · [Space anatomy — every folder and file in a Space](architecture-space-anatomy.md) |
 | features | current | [Spaces — features](features-spaces.md) |
@@ -38,7 +38,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | defect | COMPONENT-DELETE-IN-USE-WORDS-1 the Components screen words every refused delete as "referenced by a pipeline" | — |
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
-| `SPACE-TO-APP-CONSOLE-1` | P3 | feature | turn a working Space into a Space Template, and into an App, from the console. | — |
-| `SPACE-ROOTED-DATA-ROOT-MIGRATION-1` | P3 | feature | an install whose data_root is rooted (or absent, i.e. -Dspaces.data.root) is still not relocatable, and there is no route that migrates it. | demand |
-| `SPACE-ADMISSION-FOLLOWUPS-1` | P3 | chore | what the closed-Space change (D5, 91f0af69a) left on purpose. | — |
-| `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | ⏸ POSTPONED 2026-11-16 (operator, MoSCoW S7): waits until a multi-Pod deployment is scheduled, together with the postponed scale-out rows… | operator |
+| `SPACE-TO-APP-CONSOLE-1` | P3 | feature | Turn a working Space into a Space Template, and into an App, from the console. | — |
+| `SPACE-ROOTED-DATA-ROOT-MIGRATION-1` | P3 | feature | An install whose data_root is rooted or absent is still not relocatable, and no route migrates it. | demand |
+| `SPACE-ADMISSION-FOLLOWUPS-1` | P3 | chore | Seven follow-ups the closed-Space change (D5) left on purpose. | — |
+| `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | The shapes the object-store ingest lane still refuses (sinks:, produces: reference, the readers). | operator |

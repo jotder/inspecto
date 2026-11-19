@@ -15,7 +15,7 @@ tags: [product-item, layer]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | n/a | a layer groups modules — see the hubs of the modules it holds |
+| plan | current | [layer.la - board row detail](plan-board-detail.md) |
 | spec | n/a | a layer groups modules — see the hubs of the modules it holds |
 | architecture | current | [Link Analysis modules - layer architecture](architecture-la.md) |
 | features | current | [Link Analysis modules — features](features-la.md) |
@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-UI-TEXT-PASS-2` | P3 | defect | la-app wording that waits on an operator call. | operator |
+| `LA-UI-TEXT-PASS-2` | P3 | defect | La-app wording items that each wait on an operator call. | operator |

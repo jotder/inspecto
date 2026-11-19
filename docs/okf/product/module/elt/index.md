@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Acquisition, ingestion and Pipelines (ACQ, ING, PIP) — plan](plan-elt.md) |
+| plan | current | [module.elt - board row detail](plan-board-detail.md) · [Acquisition, ingestion and Pipelines (ACQ, ING, PIP) — plan](plan-elt.md) |
 | spec | current | [The Unpack stage — specification](spec-acquisition-unpack.md) · [Acquisition — specification](spec-acquisition.md) · [Consignments — addressing and concurrency](spec-consignments.md) · [Ingest — the ingestion SPI, ingesters, Consignment coordination and branch-aware ingest](spec-ingest.md) · [Decode Profile — specification](spec-parsing-decode-profile.md) · [Sample profiler — one sniff and one type answer](spec-parsing-sample-profiler.md) · [Parsing — frontends, the parsing block, parser plugins, XML and ASN.1, Decode Profiles](spec-parsing.md) · [Pipeline execution — engines, lanes, test run, dry run, park and drain, post-sync chains](spec-pipeline-execution.md) · [Pipeline model — node types, the Step catalog, transforms and the editable round-trip](spec-pipeline-model.md) · [Sinks — writers, store layout, destinations and object-storage export](spec-sinks.md) · [Step catalog — every Step kind, delivered and pending](spec-step-catalog.md) |
 | architecture | current | [ELT — architecture](architecture-elt.md) |
 | features | current | [Collectors, parsing, ingest and Pipelines — features](features-elt.md) |
@@ -34,9 +34,9 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `AUTHORING-REDESIGN-1` | P3 | feature | the authoring redesign's still-open letters. | demand |
+| `AUTHORING-REDESIGN-1` | P3 | feature | Only letter (d) of the authoring redesign is left; no CREATE MACRO exists in any main source. | demand |
 | — | P3 | feature | Step Processor catalog | — |
 | `PARSING-DERIVE-EDITOR-1` | P3 | feature | slice 4 of Parsing D9: an optional profile editor for ASN.1 derive / children. | operator |
-| `BASIC-ELT-PROFILE-1` | P2 | feature | Basic onboarding as a locked profile of ELT: one implementation, Basic = options locked. | — |
+| `BASIC-ELT-PROFILE-1` | P2 | feature | Make Basic onboarding a locked profile of ELT, retiring the parallel Basic backend and LA UI layers that duplicate ELT parts. | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `DUCKLAKE-REAL-DRIVER-FAILURE-PROOF-1` | P3 | chore | no test proves that a real DuckLake driver's registration failure is non-fatal (filed 2026-11-16; untracked since SPEC-NOPROOF-1 closed o… | external |

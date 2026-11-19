@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Screening — plan](plan-screening.md) |
+| plan | current | [module.screening - board row detail](plan-board-detail.md) · [Screening — plan](plan-screening.md) |
 | spec | current | [Screening — Match Scores against Entity Lists and the review of Screening Hits](spec-screening.md) |
 | architecture | current | [Screening](architecture-screening.md) |
 | features | current | [Screening — features](features-screening.md) |
@@ -34,4 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `SCREENING-1` | P2 | feature | Screening add-on: backend + review pane SHIPPED 2026-10-09 | — |
+| `SCREENING-1` | P2 | feature | Confirm the Screening add-on's D6 and D8 builds; D4, D5 and D7 stand with their triggers. | — |

@@ -34,7 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `a
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LEGAL-HOLD-SCOPE-1` | P3 | feature | a legal hold does not reach a Pipeline's data partitions, and has no screen (narrowed 2026-11-17; filed 2026-11-15 from ARCH-MOSCOW-UNTRA… | — |
+| `LEGAL-HOLD-SCOPE-1` | P3 | feature | A legal hold does not yet protect a Pipeline's data partitions, and holds have no screen. | — |
 | `ALERTS-PAGE-WORDS-1` | P3 | defect | the Alert text the server writes still uses stored ids | — |
-| `MODULE-REORG-P7-INCIDENTS` | P3 | chore | Incidents / Case Management split — one item left (everything else shipped 2026-10-06..09; item 2 declined 2026-10-11). | — |
+| `MODULE-REORG-P7-INCIDENTS` | P3 | chore | Delete AlertMigration (and LegacyAlertObjects) one release after the Alert store ships. | — |
 | `DOCS-SKILLS-ALERTS-AGENTIC-1` | P3 | feature | hub-routed agent skills exist for docs lookup, pipeline authoring, incident investigation and case analysis (.claude/skills/) | demand |
