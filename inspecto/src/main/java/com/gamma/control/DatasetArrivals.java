@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.access.ComponentAccess;
 import com.gamma.access.WriteGates;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.job.ArrivalCompactor;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.CollectorService;
@@ -248,7 +249,7 @@ final class DatasetArrivals {
         java.util.Collections.reverse(rows);   // the ledger is oldest first
         List<Map<String, Object>> arrivals = new ArrayList<>();
         // LA-DATASET-COMPACT-1 (D-8): arrivals a compaction merged keep their period through the merge map
-        Map<String, DatasetCompaction.Segment> merged = DatasetCompaction.merged(dataRoot, pipeline);
+        Map<String, ArrivalCompactor.Segment> merged = ArrivalCompactor.merged(dataRoot, pipeline);
         boolean filters = dataset.get(OnboardImport.IMPORT_FILTER) instanceof List<?> conditions && !conditions.isEmpty();
         try (Connection duck = periodReader(dataRoot, pipeline, eventDate)) {
             for (Map<String, String> r : rows) {
@@ -287,7 +288,7 @@ final class DatasetArrivals {
 
     private static Map<String, Object> arrival(Map<String, String> r, Map<String, Map<String, Object>> extras, Path dataRoot,
                                                String pipeline, String eventDate, Connection duck,
-                                               Map<String, DatasetCompaction.Segment> merged, boolean filters) {
+                                               Map<String, ArrivalCompactor.Segment> merged, boolean filters) {
         String landed = r.getOrDefault("filename", "");
         String batch = r.getOrDefault("consignment_id", "");
         Map<String, Object> extra = extras.get(landed + "|" + batch);
@@ -311,7 +312,7 @@ final class DatasetArrivals {
         a.put("indexMode", extra == null ? null : extra.get("indexMode"));
         a.put("consignment", batch);
         List<Path> outputs = new ArrayList<>();
-        List<DatasetCompaction.Segment> inMerge = new ArrayList<>();
+        List<ArrivalCompactor.Segment> inMerge = new ArrayList<>();
         Path base = dataRoot.resolve(pipeline);
         for (String p : r.getOrDefault("output_paths", "").split(";")) {
             if (p.isBlank()) continue;
@@ -319,7 +320,7 @@ final class DatasetArrivals {
             if (PathJail.contains(base, o) && Files.isRegularFile(o)) outputs.add(o);   // never read outside the Dataset
             else if (PathJail.contains(base, o)) {   // merged by a compaction: the map names it, with its period
                 String rel = base.resolve("database").relativize(o).toString().replace(java.io.File.separatorChar, '/');
-                DatasetCompaction.Segment s = merged.get(rel);
+                ArrivalCompactor.Segment s = merged.get(rel);
                 if (s != null) inMerge.add(s);
             }
         }
@@ -327,7 +328,7 @@ final class DatasetArrivals {
         // false: a later Replace everything set its rows aside
         a.put("kept", !wrote || !outputs.isEmpty() || !inMerge.isEmpty());
         String[] period = period(duck, outputs, eventDate);
-        for (DatasetCompaction.Segment s : inMerge) {   // a rewritten merged file knows no period (null): left unsaid
+        for (ArrivalCompactor.Segment s : inMerge) {   // a rewritten merged file knows no period (null): left unsaid
             if (s.coversFrom() != null && (period[0] == null || s.coversFrom().compareTo(period[0]) < 0)) period[0] = s.coversFrom();
             if (s.coversTo() != null && (period[1] == null || s.coversTo().compareTo(period[1]) > 0)) period[1] = s.coversTo();
         }

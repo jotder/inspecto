@@ -111,7 +111,7 @@ class ImportLoaderInventoryTest {
         ALLOWED.put("inbox", "<data root>/inbox/<id>, an Add data Pipeline's poll directory under the DATA root - not config");
         ALLOWED.put("arrivals.jsonl", "an import Dataset's arrivals ledger (DatasetArrivals, LA-ARRIVAL-LEDGER-1) in "
                 + "<data root>/<id>/ - the DATA root, never the config root an import writes");
-        ALLOWED.put("compaction.json", "an import Dataset's merge map (DatasetCompaction, LA-DATASET-COMPACT-1) in "
+        ALLOWED.put("compaction.json", "an import Dataset's merge map (ArrivalCompactor, LA-DATASET-COMPACT-1) in "
                 + "<data root>/<id>/ - the DATA root, never the config root an import writes");
         ALLOWED.put("parked","backup/parked/ (RawCopyRetention) - unprocessed raw copies under the DATA backup root, "
                 + "outside the config tree; the sweep skips it and no import lands outside <config>");

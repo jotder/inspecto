@@ -33,7 +33,8 @@ its subscribers, but that would skip the remaining steps). There are two phases:
   `IngestActivity.active()`, and that thread is inside its own Consignment's ingest scope, so the build would wait for
   itself until its timeout. `COMMIT` keeps the old guarantee (the work finishes before the Space's Jobs see the commit)
   for quick work such as compaction.
-- **The import's steps** (`ImportCommitSteps`, control plane): `import.compaction` (100, `COMMIT`),
+- **The import's steps** (`ImportCommitSteps`, control plane): `import.compaction` (100, `COMMIT`; the engine's
+  `compact` `mode: arrivals` since B6, [spec-arrival-compaction.md](spec-arrival-compaction.md)),
   `import.follow_on` (200, `RUN`: each `ImportFollowOn`, e.g. Link Analysis's `index`), `import.expectations` (300,
   `RUN`). They act only for a Pipeline Add data wrote for that Dataset (`OnboardImport.isOurs`), whose `import_steps`
   names `follow_on` (a Pipeline with no `import_steps`, written before BASIC-ONBOARD-1 P1, runs all four steps). Each

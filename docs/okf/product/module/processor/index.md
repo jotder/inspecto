@@ -35,6 +35,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | — | P3 | feature | Platform Services Stage 2 / 3 | demand |
+| `REPROCESS-REFUSAL-500-1` | P3 | defect | A reprocess refused because its outputs were compacted away answers 500 INTERNAL, not a conflict with its reason (filed 2026-11-19, BASIC… | — |
 | `BASIC-ELT-PROFILE-1` | P2 | feature | Basic onboarding as a locked profile of ELT: one implementation, Basic = options locked. | — |
 | `BASIC-WATCH-ARRIVALS-1` | P3 | defect | A watched inbox's scheduled run leaves no arrivals sidecar line and no watchError for a quarantined file (filed 2026-11-19, BASIC-ELT-PRO… | — |
 | — | P3 | feature | Bundle / Exchange — "load as draft" residuals | — |

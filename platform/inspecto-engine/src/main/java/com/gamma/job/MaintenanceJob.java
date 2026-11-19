@@ -103,7 +103,10 @@ import java.time.Instant;
  *       already this old are touched, the quiet-window safety), {@code min_files} (default 4 — leave
  *       small partitions alone). Readers glob {@code *.parquet}, so compaction is invisible to queries;
  *       the trade-off is that {@code reprocess} of a compacted-away batch is no longer supported (its
- *       manifest's outputFile is gone) — set {@code min_age_days} beyond your reprocess horizon.</li>
+ *       manifest's outputFile is gone) — set {@code min_age_days} beyond your reprocess horizon.
+ *       {@code mode: arrivals} ({@code BASIC-ELT-PROFILE-1} B6) instead merges the files of ONE import Dataset
+ *       ({@code dataset}, required) into one file in arrival order, keeping its merge map and applying its retention, at
+ *       any count; see {@link ArrivalCompactor}. Both modes mark the merged-away files {@code COMPACTED_AWAY}.</li>
  *   <li>{@code reference_compact} — rewrite an append-only versioned Reference store (a
  *       {@code produces: reference} pipeline with {@code load: upsert|scd2}) to just the rows its read
  *       views can still return, bounding the read amplification of one-file-per-batch appends. Params:
@@ -224,7 +227,7 @@ final class MaintenanceJob implements Job {
             // Safe by default (MNT-1): a task with no preview does NOTHING on a dry run — never falls
             // through to the real action.
             case "retire_superseded"  -> RetireSupersededTask.run(cfg, dryRun);
-            case "compact"            -> dryRun ? noPreview(task) : PartitionCompactor.run(cfg);
+            case "compact"            -> dryRun ? noPreview(task) : compact();
             case "reference_compact"  -> dryRun ? noPreview(task) : ReferenceCompactor.run(cfg);
             // ⚠ `ctx` threaded in for the owning pipeline the dataset.write Signal now carries
             // (DATASET-SELF-TRIGGER-1) — not for the dry run, which is still gated right here.
@@ -283,6 +286,16 @@ final class MaintenanceJob implements Job {
             }
         }
         return java.util.Map.copyOf(byTask);
+    }
+
+    /** {@code compact}'s two modes: {@code partitions} (the default, {@link PartitionCompactor}) or {@code arrivals} ({@link ArrivalCompactor}). */
+    private JobResult compact() throws Exception {
+        String mode = cfg.opt("mode", "partitions").trim().toLowerCase();
+        return switch (mode) {
+            case "partitions" -> PartitionCompactor.run(cfg);
+            case "arrivals"   -> ArrivalCompactor.run(cfg, dataDir);
+            default -> throw new IllegalArgumentException("compact mode must be partitions or arrivals, not '" + mode + "'");
+        };
     }
 
     private static JobResult noPreview(String task) {

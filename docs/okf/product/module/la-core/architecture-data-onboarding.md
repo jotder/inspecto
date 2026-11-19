@@ -648,7 +648,10 @@ for THIS id).
 ## 6.19 Dataset storage: compaction, the merge map and retention (LA-DATASET-COMPACT-1, as built 2026-11-05)
 
 Plan [`la-data-arrival-plan.md`](../../../../archived-documents/plans-archive/la-data-arrival-plan.md) P4, decisions D-5, D-7…D-10 (operator
-2026-11-05). Class `inspecto/.../control/DatasetCompaction.java`, registered from `OnboardRoutes`.
+2026-11-05). Class `inspecto/.../control/DatasetCompaction.java`, registered from `OnboardRoutes`. Since
+`BASIC-ELT-PROFILE-1` B6 the merge, the map, the heal and the retention are the engine's `compact` `mode: arrivals`
+(`ArrivalCompactor`), which also marks the merged-away files `COMPACTED_AWAY` so a reprocess is refused, not doubled;
+`DatasetCompaction` keeps the routes and calls it ([spec-arrival-compaction.md](../elt/spec-arrival-compaction.md)).
 
 | Route | Gate | What |
 |---|---|---|
@@ -667,7 +670,7 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
   segments the previous merged file holds (its map's order), then the loose files by modification time.
 - **The merge map (D-8)** `<dataRoot>/<id>/compaction.json`: `merged`, `at`, `arrivals[{file, received, firstRow, rows,
   coversFrom, coversTo}]` (the arrival's own output name, its row segment, the period of its kept rows),
-  `removed[{file, at, reason}]` (at most 500), `retention`. `DatasetCompaction.merged(dataRoot, id)` answers it ONLY
+  `removed[{file, at, reason}]` (at most 500), `retention`. `ArrivalCompactor.merged(dataRoot, id)` answers it ONLY
   while the merged file exists, so a *Replace everything* (which sets the whole `database` folder aside) silences it.
 - **The swap.** Write the merged file in `<id>/temp`, write `compaction.json.pending` (merged name, inputs, next map),
   move the merged file in, delete the inputs (only inside `database`, never the merged file), commit the map. `heal`
@@ -720,7 +723,7 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
 - **A merged file rewritten since** (*Replace the period*, §6.17, removes days from every older file, the merged one
   included): the map keeps the merged file's `mergedBytes` and `mergedModified` and trusts its row segments only while
   both match. **Replace the period keeps the map true** (`LA-DATASET-COMPACT-2`, as built 2026-11-06): when the file it
-  rewrites IS the map's merged file and the map still holds (`DatasetCompaction.trustedSegments`), it writes the kept
+  rewrites IS the map's merged file and the map still holds (`ArrivalCompactor.trustedSegments`), it writes the kept
   rows in their row order (`file_row_number`), re-counts each arrival's segment and period from the same read
   (`DatasetPeriod.recount`), and commits the map with the new size and time (`segmentsRewritten`; undone with the
   import, `restoreMap`). An arrival left with no row drops out of the map, so the arrivals answer reads it as replaced
