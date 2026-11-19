@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-459 test class(es): 186 unit, 273 real-HTTP control-plane, 0 IT.
+461 test class(es): 187 unit, 274 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -168,6 +168,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiImportCommitStepsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportCommitStepsTest.java` | {@code BASIC-ELT-PROFILE-1} BE-1a over real HTTP: a commit of an import Pipeline outside Add data (a scheduled run) runs |
 | `ControlApiImportConcurrentRollbackTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportConcurrentRollbackTest.java` | `IMPORT-RESIDUALS-1` (3) over real HTTP: a refused {@code POST /spaces/{id}/import} rolls back every file it |
 | `ControlApiImportFilterEditTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportFilterEditTest.java` | {@code ADD-DATA-FILTER-EDIT-1} over real HTTP: {@code PUT /datasets/{id}/filter} rewrites an import's row conditions |
+| `ControlApiImportPreRunStepsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportPreRunStepsTest.java` | {@code BASIC-ELT-PROFILE-1} BE-1b over real HTTP: a scheduled run of an import Pipeline (a kept-up-to-date folder) runs the |
 | `ControlApiImportRefusalAuditTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportRefusalAuditTest.java` | Round 5: the IMPORT doors write Pipeline configs through {@code ImportJournal}, not the write routes — each import |
 | `ControlApiImportReservedPathsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportReservedPathsTest.java` | `SEC-IMPORT-ROLES-ESCALATION-1`, over real HTTP with an ARMED Authenticator (without a Subject |
 | `ControlApiImportRowFilterTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportRowFilterTest.java` | {@code ADD-DATA-ROW-FILTER-1} over real HTTP: a commit's {@code filter: [{column, op, value \| min \| max}]} becomes the |
@@ -417,6 +418,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `CollectorServiceIngestLockTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorServiceIngestLockTest.java` | Characterization tests for {@link PipelineRunGuard} — the <b>per-pipeline</b> ingest exclusion every |
 | `CollectorServicePipelineForgetTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorServicePipelineForgetTest.java` | Regression guard for the S4/E1 map-leak fix: within a single long-lived {@link CollectorService} |
 | `CollectorServicePollStateTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorServicePollStateTest.java` | The polling session's own state on {@code GET /collectors} |
+| `CollectorServicePreRunStepsTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorServicePreRunStepsTest.java` | {@code BASIC-ELT-PROFILE-1} BE-1b: the engine's ordered registry of named pre-run steps, the other side of the commit |
 | `CollectorServiceRcaTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorServiceRcaTest.java` | {@link ServiceBootstrap#loadRcaTemplates} scans {@code *_rca.toon}, registering the valid ones and |
 | `CollectorServiceTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorServiceTest.java` | End-to-end tests for {@link CollectorService} (M1) — registry runs, batch-commit |
 | `CollectorServiceTriggerTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/CollectorServiceTriggerTest.java` | T13 / §3.8 — entry-node triggers driving the live loop. A pipeline with no {@code trigger:} rides the |

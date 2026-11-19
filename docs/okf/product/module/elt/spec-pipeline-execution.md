@@ -1429,6 +1429,35 @@ its subscribers, but that would skip the remaining steps). There are two phases:
   (`LinkIndexFollowOn`, wait budget -1) and re-plans, so the index is not built wrong, only checked twice. It also
   still runs while `import.compaction` merges files, as before. Retiring the Job is BE-1 follow-up work, not done here.
 
+### Pre-run steps — the other side of the run
+
+(`BASIC-ELT-PROFILE-1` BE-1b, as built 2026-11-19.) The matching registry before a run reads its inbox:
+`CollectorService.preRunStep(name, order, step)`, same rules as the commit steps (ascending `order`, a tie by name; a
+second registration of a name replaces it; a step that throws is logged and the run goes ahead without it). A step runs
+on the run's thread, under its run claim, outside every ingest scope and before acquisition, and answers a `PreRun`:
+`GO`, `SKIP` (the run does not start and answers an empty result; the next tick looks again; the steps after it do not
+run) or `then(after)`. Each `after` is told whether the run succeeded (no failed or cancelled source, nothing thrown),
+last registered first, **after** the run's `RUN` commit steps. `stepRun` wraps `commitStepRun`: the poll's `runOne`
+(`scheduled` true) and `runPipeline` (`scheduled` false) both pass through it; a dry run runs no pre-run step.
+
+- **The import's steps** (`ImportPreRunSteps`, control plane): `import.judge_inbox` (100: `OnboardImport.judgeInbox` —
+  every waiting file checked by the Dataset's columns, a refused one moved to `refused/` and recorded as a refused
+  arrival) then `import.settle_new_columns` (200: `DatasetNewColumns.settle` — the new columns every file the run takes
+  carries are kept). ONE engine step, `import.pre_run` (100), runs that list, because the second step reads what the
+  first judged. Add data's in-run paths (Add a file, Run now) call the same list (`ImportPreRunSteps.runAll`), so the
+  order and outcome shapes (`refused`, `keptColumns`, `newColumnsReason`) are one implementation.
+- **The claim.** The engine step acts only for a Pipeline Add data wrote for that Dataset (`isOurs`). It takes the
+  Dataset's `OnboardImport.IN_FLIGHT` claim and **holds it through the run** (released in its `after`); the import's
+  commit steps treat a claim held by the run's own pre-run step as theirs (`ImportPreRunSteps.heldByRun`), so they
+  still compact, follow on and check Expectations, and Add data cannot judge the inbox under the run. When someone else
+  holds the claim (Add data's own run, a rewrite, a delete) a **scheduled** run is skipped and a person's run goes ahead
+  untouched (Add data's own `runPipeline` is such a run: it already did the steps).
+- **A file still being written.** A scheduled run of a `local` Collector with a stability window judges only the files
+  unmodified for that window, and takes only those (`RunFiles.only` over the inbox until the run ends): a file written
+  between the step and the read is neither judged half-written nor taken unjudged; it waits for a later run. A remote
+  Collector's files land during the run, so its run judges what waits before it and is not narrowed.
+- **A failed run** takes a kept column back (`Job.rollback` in the `after`), as Add data's own run does.
+
 ## Failure and recovery, per lane
 
 **One recovery affordance per lane, and they are not interchangeable**: ingest has **reprocess** — which
@@ -1731,6 +1760,7 @@ current citations named classes the 2026-08-31 rename removed (plan §EXE.5.3 it
 | Pipeline triggers | `PipelineTrigger` (6 kinds + a scheduler enum) | ⚠ The glossary's trigger entry omits a shipped kind |
 | The commit bus | `ConsignmentEventBus` | ⚠ Cited under its **old** name in a concept page |
 | Commit steps | `CollectorService.commitStep` / `CommitPhase` / `commitStepRun`; the import's: `ImportCommitSteps` | — |
+| Pre-run steps | `CollectorService.preRunStep` / `PreRun` / `stepRun`; the import's: `ImportPreRunSteps` | — |
 | The lane fork | `ConsignmentIngestStrategy.admittedLift` / `flatReason` | — |
 | The whole-pipeline dry run | `RunRoutes.triggerPipeline`, `CollectorProcessor.run`/`ingest`, `ConsignmentIngestor.process`, `PipelineTestRun.dryIngest`, `EventLog.CONTAINED`, `ConsignmentAuditWriter` | *Whole-pipeline dry run* above — `strategy.ingest` runs contained (member copies, scratch root, throwaway event log), so parsing IS re-validated and reported per member |
 | The graph runner | `ConsignmentGraphRunner` — `engages`, `run`, `dataFedSinkCount` | 🔴 The backlog names a **non-existent** class and denies its callers (§EXE.2.3) |

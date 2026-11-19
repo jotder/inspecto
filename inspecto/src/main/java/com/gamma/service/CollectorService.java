@@ -250,6 +250,102 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             if (e != null) runCommitSteps(CommitPhase.RUN, e);
         }
     }
+
+    // ── pre-run steps (BASIC-ELT-PROFILE-1 BE-1b) ──────────────────────────────────────────────────────────────────
+
+    /**
+     * What a {@link PreRunStep} answers: whether the run goes ahead ({@code skip} false) and what it wants told once the
+     * run has ended ({@code after}, handed whether the run succeeded; may be null).
+     */
+    public record PreRun(boolean skip, java.util.function.Consumer<Boolean> after) {
+        /** Go ahead, nothing to do after. */
+        public static final PreRun GO = new PreRun(false, null);
+        /** Do not start this run (the next tick looks again); nothing to do after. */
+        public static final PreRun SKIP = new PreRun(true, null);
+
+        /** Go ahead, and run {@code after} once the run has ended. */
+        public static PreRun then(java.util.function.Consumer<Boolean> after) {
+            return new PreRun(false, after);
+        }
+    }
+
+    /**
+     * Work a run of a Pipeline needs before it reads its inbox: on the run's thread, under its run claim, outside every
+     * ingest scope, before acquisition. {@code scheduled}: the poll cycle selected the run (its trigger), not a person or a
+     * caller ({@link #runPipeline}). Must not throw; a throw is logged and the run goes ahead without that step.
+     */
+    @FunctionalInterface
+    public interface PreRunStep {
+        PreRun run(CollectorService service, String pipeline, boolean scheduled);
+    }
+
+    private record NamedPreRunStep(String name, int order, PreRunStep step) {}
+
+    /** Every registered pre-run step of this JVM, sorted by {@code order} then name; replaced whole on each change. */
+    private static volatile List<NamedPreRunStep> preRunSteps = List.of();
+
+    /**
+     * Register the pre-run step {@code name}, as {@link #commitStep}: ascending {@code order} (a tie: by name), a second
+     * registration of the same name replaces the first, a step that throws is logged and the next one runs. A step that
+     * answers {@link PreRun#SKIP} ends the list: the run does not start, and the steps before it are told it did not succeed.
+     */
+    public static synchronized void preRunStep(String name, int order, PreRunStep step) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(step, "step");
+        List<NamedPreRunStep> next = new ArrayList<>();
+        for (NamedPreRunStep s : preRunSteps) if (!s.name().equals(name)) next.add(s);
+        next.add(new NamedPreRunStep(name, order, step));
+        next.sort(Comparator.comparingInt(NamedPreRunStep::order).thenComparing(NamedPreRunStep::name));
+        preRunSteps = List.copyOf(next);
+    }
+
+    /** Test seam: forget the pre-run step {@code name}. */
+    static synchronized void removePreRunStep(String name) {
+        List<NamedPreRunStep> next = new ArrayList<>(preRunSteps);
+        next.removeIf(s -> s.name().equals(name));
+        preRunSteps = List.copyOf(next);
+    }
+
+    /**
+     * One run of {@code pipeline} with both sides of its steps: the pre-run steps, then {@code run} inside
+     * {@link #commitStepRun} (its COMMIT and RUN steps), then each pre-run step's {@code after}, last registered first. A
+     * skipped run answers an empty result. The caller holds the Pipeline's run claim; a dry run does not come here.
+     */
+    MultiCollectorProcessor.RunResult stepRun(String pipeline, boolean scheduled,
+                                              java.util.function.Supplier<MultiCollectorProcessor.RunResult> run) {
+        List<java.util.function.Consumer<Boolean>> after = new ArrayList<>();
+        boolean skip = false;
+        for (NamedPreRunStep s : preRunSteps) {
+            PreRun p;
+            try {
+                p = s.step().run(this, pipeline, scheduled);
+            } catch (Exception | LinkageError failed) {
+                log.warn("pre-run step '{}' failed on {}: {}", s.name(), pipeline, failed.toString());
+                continue;
+            }
+            if (p == null) continue;
+            if (p.after() != null) after.add(p.after());
+            if (p.skip()) {
+                skip = true;
+                break;
+            }
+        }
+        boolean ok = false;
+        try {
+            if (skip) return new MultiCollectorProcessor.RunResult(0, 0);
+            MultiCollectorProcessor.RunResult r = commitStepRun(pipeline, run);
+            ok = r.failed() == 0 && r.cancelled() == 0;
+            return r;
+        } finally {
+            for (int i = after.size() - 1; i >= 0; i--) {
+                try {
+                    after.get(i).accept(ok);
+                } catch (Exception | LinkageError failed) {
+                    log.warn("pre-run step's after-run on {} failed: {}", pipeline, failed.toString());
+                }
+            }
+        }
+    }
     /** This space's boot-built Platform Service registry (platform-services plan S1-1) — the one
      *  place engine facilities are bound to grantable service ids. The v1 built-in services
      *  (notifications / incidents / schema / consignment-status) register here at S1-3…S1-6. */
@@ -834,7 +930,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                 this.maxConcurrentRuns, maxConcurrentAcquisitions, acquireHighWater,
                 this.pollSeconds * 1000L, this::runPipeline, this::syncStatus);
         this.pipelineScheduler.spaceId(this.spaceId);   // SE-1b: the activation holds are per Space
-        this.pipelineScheduler.runScope(this::commitStepRun);   // BE-1a: a poll's run ends with its RUN-phase commit steps
+        // BE-1a / BE-1b: a poll's run starts with the pre-run steps and ends with its RUN-phase commit steps
+        this.pipelineScheduler.runScope((id, run) -> stepRun(id, true, run));
         if (realtime != null) this.pipelineScheduler.onStreamIdle(realtime::onStreamIdle);   // PA-9d: the clock floor
     }
 
@@ -2142,8 +2239,11 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                         if (!dryRun)
                             pipelineScheduler.recordManualRun(pipelineName, System.currentTimeMillis());
                         if (dryRun) com.gamma.inspector.DryRunRejects.take(pipelineName);   // no stale slot
-                        MultiCollectorProcessor.RunResult r = commitStepRun(pipelineName, () ->
-                                MultiCollectorProcessor.runAll(List.of(p), 1, bus.sink(), skipPostAction, dryRun));
+                        java.util.function.Supplier<MultiCollectorProcessor.RunResult> once = () ->
+                                MultiCollectorProcessor.runAll(List.of(p), 1, bus.sink(), skipPostAction, dryRun);
+                        // BE-1b: a dry run changes nothing, so it runs no pre-run step
+                        MultiCollectorProcessor.RunResult r = dryRun ? commitStepRun(pipelineName, once)
+                                : stepRun(pipelineName, false, once);
                         if (dryRun) {
                             List<com.gamma.inspector.DryRunRejects.MemberRejects> rejects =
                                     com.gamma.inspector.DryRunRejects.take(pipelineName);

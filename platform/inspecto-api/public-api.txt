@@ -2586,6 +2586,7 @@ com.gamma.service.CollectorService | public long acquirePollSeconds()
 com.gamma.service.CollectorService | public long pollSeconds()
 com.gamma.service.CollectorService | public static CollectorService fromArgs(String[]) throws IOException
 com.gamma.service.CollectorService | public static synchronized void commitStep(String, int, CommitPhase, CommitStep)
+com.gamma.service.CollectorService | public static synchronized void preRunStep(String, int, PreRunStep)
 com.gamma.service.CollectorService | public static void main(String[]) throws Exception
 com.gamma.service.CollectorService | public synchronized JobService jobServiceOrCreate()
 com.gamma.service.CollectorService | public synchronized String registerPipeline(Path)
@@ -2608,6 +2609,12 @@ com.gamma.service.CollectorService.CommitPhase | constant RUN
 com.gamma.service.CollectorService.CommitPhase | public enum CommitPhase
 com.gamma.service.CollectorService.CommitStep | public interface CommitStep
 com.gamma.service.CollectorService.CommitStep | void run(CollectorService, ConsignmentEvent)
+com.gamma.service.CollectorService.PreRun | public record PreRun(boolean skip, java.util.function.Consumer<Boolean> after)
+com.gamma.service.CollectorService.PreRun | public static PreRun then(java.util.function.Consumer<Boolean>)
+com.gamma.service.CollectorService.PreRun | public static final PreRun GO
+com.gamma.service.CollectorService.PreRun | public static final PreRun SKIP
+com.gamma.service.CollectorService.PreRunStep | PreRun run(CollectorService, String, boolean)
+com.gamma.service.CollectorService.PreRunStep | public interface PreRunStep
 com.gamma.service.DbStatusStore | public ConnectionSource browseSource()
 com.gamma.service.DbStatusStore | public DbStatusStore(Connection)
 com.gamma.service.DbStatusStore | public DbStatusStore(ConnectionSource)
