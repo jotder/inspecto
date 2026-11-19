@@ -683,6 +683,21 @@ chapters:
         type: unsorted
         tracks[1]: operator
         audience: internal
+      admin_guide_demo_preflight_script:
+        file: docs/okf/product/module/la-core/admin-guide-demo-preflight-script.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_demo_short_version_records:
+        file: docs/okf/product/module/la-core/admin-guide-demo-short-version-records.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_demo_stakeholder_qa:
+        file: docs/okf/product/module/la-core/admin-guide-demo-stakeholder-qa.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
       admin_guide_la_core:
         file: docs/okf/product/module/la-core/admin-guide-la-core.md
         type: unsorted
@@ -1101,6 +1116,21 @@ chapters:
         audience: internal
       admin_guide_auth_security:
         file: docs/okf/product/module/access/admin-guide-auth-security.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_auth_security_abac_decisions:
+        file: docs/okf/product/module/access/admin-guide-auth-security-abac-decisions.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_auth_security_boot_guards:
+        file: docs/okf/product/module/access/admin-guide-auth-security-boot-guards.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_auth_security_imports_maker_checker:
+        file: docs/okf/product/module/access/admin-guide-auth-security-imports-maker-checker.md
         type: unsorted
         tracks[1]: operator
         audience: internal

@@ -191,7 +191,7 @@ target's at-rest Parquet. A FAILED check opens a deduplicated `expectation:<name
 under `<write-root>/registry` (`ExpectationRoutes`). It is never a chain Step.
 [ingestion § Expectations](plan-elt.md). Parser:
 `Expectation.fromMap`. Spec: `ConfigSpecs.expectation()`, the same twenty-two keys (the last eight are the
-`baseline` kind's — [observability § Baseline Expectations](../observability/plan-observability.md#310-baseline-expectations-duckle-c8-2026-09-24)).
+`baseline` kind's — [observability § Baseline Expectations](../observability/plan-observability-ops-lens-decisions.md#310-baseline-expectations-duckle-c8-2026-09-24)).
 
 | Key | Type · default | What it does |
 |---|---|---|

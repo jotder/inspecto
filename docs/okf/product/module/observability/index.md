@@ -15,7 +15,7 @@ tags: [product-item, module]
 
 | Slot | Status | Document |
 |---|---|---|
-| plan | current | [Observability & maintenance (OPS) — capability spec](plan-observability.md) |
+| plan | current | [Observability & maintenance (OPS) — capability spec — Specification — Ops Lens screens; decisions and not built](plan-observability-ops-lens-decisions.md) · [Observability & maintenance (OPS) — capability spec — Refused, as-built pointers and verification](plan-observability-refused-verification.md) · [Observability & maintenance (OPS) — capability spec — Purpose, scope and requirements of record](plan-observability-scope.md) · [Observability & maintenance (OPS) — capability spec — Specification](plan-observability-specification.md) · [Observability & maintenance (OPS) — capability spec](plan-observability.md) |
 | spec | current | [Observability — spec](spec-observability.md) |
 | architecture | current | [Observability and backup](architecture-observability.md) |
 | features | current | [Observability and backup — features](features-observability-backup.md) |

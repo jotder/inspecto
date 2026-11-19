@@ -13,7 +13,7 @@ Part 4 of 4 of [Config Safety Validator](spec-config-safety.md) · previous: [Jo
 ## Maker-checker — Pending Changes (2026-09-26)
 
 *`ASSURE-MAKER-CHECKER-1` S1–S3.* Glossary: **Pending Change**, **Approval Policy**. Security side:
-[auth & security](../access/admin-guide-auth-security.md#maker-checker-a-held-config-change-needs-a-different-person-assure-maker-checker-1-2026-09-26).
+[auth & security](../access/admin-guide-auth-security-imports-maker-checker.md#maker-checker-a-held-config-change-needs-a-different-person-assure-maker-checker-1-2026-09-26).
 
 **The policy** — `approval.toon` in the Space config root, `GET|PUT /settings/approval`:
 `{approval: {<kind>: {required, approverCapability, fourEyes}}, expiresAfterHours}` (defaults: off, the

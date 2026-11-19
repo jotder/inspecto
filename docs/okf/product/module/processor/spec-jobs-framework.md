@@ -88,7 +88,7 @@ Design of record (all phases + resolved decisions + TOON config gallery):
   parameters are scanned from the SQL itself. 🔴 Its SQL is sandboxed at run time since 2026-09-24
   (`SQL-TEMPLATE-SANDBOX-1`): the substituted text must pass `SqlGuard` (one read-only `SELECT`/`WITH`, the
   `transform.sql` allow-list), and the connection is sealed to the data root — see
-  [Auth & Security](../access/admin-guide-auth-security.md#the-sqltemplate-job-runs-behind-sqlguard-and-a-sealed-connection-sql-template-sandbox-1-2026-09-24).
+  [Auth & Security](../access/admin-guide-auth-security-boot-guards.md#the-sqltemplate-job-runs-behind-sqlguard-and-a-sealed-connection-sql-template-sandbox-1-2026-09-24).
   **Incremental mode by per-day partitions (operator, 2026-10-10; `ASSURE-PACK-TELCO-FRAUD-1` (b)).**
   `incremental: {by: day, column: <date col>, lookback: N, retain: M}` makes a run replace only the last `N` days
   (ending on the trigger's `day` param, declared for incremental Jobs only, else today UTC) of its sink,
