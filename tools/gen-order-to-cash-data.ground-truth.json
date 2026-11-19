@@ -1,0 +1,189 @@
+{
+ "generator": "tools/gen-order-to-cash-data.mjs",
+ "terms_days": 14,
+ "alert_threshold": 100,
+ "counts": {
+  "order_files": 10,
+  "order_rows": 121,
+  "distinct_orders": 120,
+  "payment_files": 23,
+  "payment_rows": 123,
+  "open_items": 122
+ },
+ "planted": {
+  "negative_amount": [
+   {
+    "order_id": "O-1017",
+    "payment_id": "P-50007",
+    "amount": "-240.00"
+   }
+  ],
+  "orphan_payment": [
+   {
+    "order_id": "O-9001",
+    "payment_id": "P-50041",
+    "amount": "310.00"
+   },
+   {
+    "order_id": "O-9002",
+    "payment_id": "P-50064",
+    "amount": "55.00"
+   }
+  ],
+  "duplicate_order": [
+   {
+    "order_id": "O-1050",
+    "copies": 2,
+    "amount": "180.00"
+   }
+  ],
+  "partial_payment": [
+   {
+    "order_id": "O-1022",
+    "ordered": "500.00",
+    "paid": "300.00",
+    "short": "200.00"
+   },
+   {
+    "order_id": "O-1064",
+    "ordered": "99.50",
+    "paid": "95.00",
+    "short": "4.50"
+   }
+  ],
+  "missing_payment": [
+   {
+    "order_id": "O-1041",
+    "ordered": "420.00"
+   },
+   {
+    "order_id": "O-1088",
+    "ordered": "135.00"
+   }
+  ],
+  "late_payment": [
+   {
+    "order_id": "O-1012",
+    "due_date": "2026-07-15",
+    "paid_on": "2026-07-30",
+    "days_late": 15
+   }
+  ]
+ },
+ "look_alikes": {
+  "instalments": [
+   {
+    "order_id": "O-1030",
+    "payments": 2
+   },
+   {
+    "order_id": "O-1075",
+    "payments": 3
+   }
+  ],
+  "paid_on_due_date": [
+   {
+    "order_id": "O-1099",
+    "due_date": "2026-07-23"
+   }
+  ]
+ },
+ "expectations": {
+  "orders_amount_non_negative": 0,
+  "payments_amount_non_negative": 1,
+  "payments_order_known": 2,
+  "orders_id_unique": 1
+ },
+ "reconciliation": {
+  "name": "o2c_orders_vs_payments",
+  "day": "2026-07-01",
+  "missing_right": [
+   "O-1041",
+   "O-1088"
+  ],
+  "missing_left": [
+   "O-9001",
+   "O-9002"
+  ],
+  "value_break": [
+   "O-1017",
+   "O-1022",
+   "O-1050",
+   "O-1064"
+  ],
+  "cardinality_break": [
+   "O-1050"
+  ]
+ },
+ "open_items_status": {
+  "orphan_payment": [
+   "O-9001",
+   "O-9002"
+  ],
+  "unpaid": [
+   "O-1041",
+   "O-1088"
+  ],
+  "duplicate_order": [
+   "O-1050"
+  ],
+  "short_paid": [
+   "O-1017",
+   "O-1022",
+   "O-1064"
+  ],
+  "paid_late": [
+   "O-1012"
+  ]
+ },
+ "incidents": [
+  {
+   "customer_id": "C-016",
+   "order_id": "O-1017",
+   "unmatched_value": "480.00"
+  },
+  {
+   "customer_id": "C-007",
+   "order_id": "O-1022",
+   "unmatched_value": "200.00"
+  },
+  {
+   "customer_id": "C-007",
+   "order_id": "O-1041",
+   "unmatched_value": "420.00"
+  },
+  {
+   "customer_id": "C-010",
+   "order_id": "O-1050",
+   "unmatched_value": "180.00"
+  },
+  {
+   "customer_id": "C-004",
+   "order_id": "O-1088",
+   "unmatched_value": "135.00"
+  },
+  {
+   "customer_id": "C-011",
+   "order_id": "O-9001",
+   "unmatched_value": "310.00"
+  }
+ ],
+ "cases": {
+  "C-004": [
+   "O-1088"
+  ],
+  "C-007": [
+   "O-1022",
+   "O-1041"
+  ],
+  "C-010": [
+   "O-1050"
+  ],
+  "C-011": [
+   "O-9001"
+  ],
+  "C-016": [
+   "O-1017"
+  ]
+ }
+}

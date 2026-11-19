@@ -1,0 +1,7 @@
+job:
+  name: o2c_orders_vs_payments
+  type: recon.run
+  description: "Reconcile the month's orders against the payments applied to them: every order id, its invoiced amount against the sum paid, at tolerance 0"
+  reconciliation: o2c_orders_vs_payments
+  cron: "30 6 * * *"
+  enabled: true

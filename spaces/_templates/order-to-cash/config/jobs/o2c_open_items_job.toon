@@ -1,0 +1,11 @@
+job:
+  name: o2c_open_items
+  type: sql.template
+  description: "Open items: one row per order id seen in either feed, with the invoiced amount, how many times the order arrived, the sum paid, the unmatched value and a status (paid, paid_late, short_paid, over_paid, unpaid, duplicate_order, orphan_payment). The due date is the order date plus terms_days"
+  sql: "WITH o AS (SELECT order_id, any_value(customer_id) AS customer_id, min(order_date) AS order_date, CAST(sum(amount) AS DECIMAL(18,2)) AS order_amount, count(*) AS order_copies FROM orders GROUP BY order_id), p AS (SELECT order_id, any_value(customer_id) AS customer_id, CAST(sum(amount) AS DECIMAL(18,2)) AS paid_amount, count(*) AS payment_count, max(payment_date) AS last_payment_date FROM payments GROUP BY order_id), j AS (SELECT coalesce(o.order_id, p.order_id) AS order_id, coalesce(o.customer_id, p.customer_id) AS customer_id, o.order_date, o.order_date + CAST($terms_days AS INTEGER) AS due_date, coalesce(o.order_amount, CAST(0 AS DECIMAL(18,2))) AS order_amount, coalesce(o.order_copies, 0) AS order_copies, coalesce(p.paid_amount, CAST(0 AS DECIMAL(18,2))) AS paid_amount, coalesce(p.payment_count, 0) AS payment_count, p.last_payment_date, o.order_id IS NULL AS no_order, p.order_id IS NULL AS no_payment FROM o FULL OUTER JOIN p ON o.order_id = p.order_id) SELECT order_id, customer_id, order_date, due_date, order_amount, order_copies, paid_amount, payment_count, last_payment_date, CAST(abs(order_amount - paid_amount) AS DECIMAL(18,2)) AS unmatched_value, CASE WHEN no_order THEN 'orphan_payment' WHEN no_payment THEN 'unpaid' WHEN order_copies > 1 THEN 'duplicate_order' WHEN paid_amount < order_amount THEN 'short_paid' WHEN paid_amount > order_amount THEN 'over_paid' WHEN last_payment_date > due_date THEN 'paid_late' ELSE 'paid' END AS status, CAST(CASE WHEN last_payment_date > due_date THEN date_diff('day', due_date, last_payment_date) ELSE 0 END AS BIGINT) AS days_late, CAST($as_of AS DATE) AS as_of FROM j"
+  sources: "orders,payments"
+  sink_dataset: o2c_open_items
+  cron: "0 6 * * *"
+  as_of: "$today"
+  terms_days: "14"
+  enabled: true

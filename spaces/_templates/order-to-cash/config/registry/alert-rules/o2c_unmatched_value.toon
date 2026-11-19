@@ -1,0 +1,9 @@
+name: o2c_unmatched_value
+dataset: o2c_open_items
+measure: sum(unmatched_value)
+by[2]: customer_id,order_id
+comparator: gte
+threshold: 100
+severity: CRITICAL
+stormCap: 500
+description: "Unmatched value: an order (or an orphan payment) whose invoiced and paid amounts differ by 100 or more. One Incident per order; the Case Rule o2c_collections_case groups the Incidents of one customer into one collections Case. A smaller difference stays a Break on the Reconciliation board and raises nothing"

@@ -58,6 +58,7 @@
 - [Link Analysis trade showcase — user guide](../../solution-pack/la-trade/user-guide-la-trade.md)
 - [Link Analysis utility showcase — user guide](../../solution-pack/la-utility/user-guide-la-utility.md)
 - [Mobile money — user guide](../../solution-pack/mobile-money/user-guide-mobile-money.md)
+- [Order-to-cash assurance — user guide](../../solution-pack/order-to-cash/user-guide-order-to-cash.md)
 - [Orders starter — user guide](../../solution-pack/orders-starter/user-guide-orders-starter.md)
 - [Partner settlement — user guide](../../solution-pack/partner-settlement/user-guide-partner-settlement.md)
 - [Payment fraud starter — user guide](../../solution-pack/payment-fraud/user-guide-payment-fraud.md)

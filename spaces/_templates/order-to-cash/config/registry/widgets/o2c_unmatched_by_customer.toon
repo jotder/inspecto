@@ -1,0 +1,9 @@
+vizType: bar
+datasetId: o2c_open_items
+controls:
+  x[1]{field}:
+    customer_id
+  y[1]{field,agg}:
+    unmatched_value,sum
+options:
+  title: Unmatched value by customer

@@ -1,0 +1,8 @@
+name: orders_id_unique
+description: "No order id arrives twice. Read on the open items the o2c_open_items Job writes, where order_copies counts the rows each order id has in the orders feed"
+targetType: job
+target: o2c_open_items
+column: order_copies
+kind: range
+max: 1
+severity: MAJOR

@@ -1,0 +1,7 @@
+id: solution-pack.order-to-cash
+kind: solution-pack
+title: Order-to-cash assurance
+template: order-to-cash
+billable: false
+status: preview
+docs: docs/okf/product/solution-pack/order-to-cash/index.md

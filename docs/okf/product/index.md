@@ -67,6 +67,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (94 open rows
 * [Link Analysis trade showcase](solution-pack/la-trade/index.md) - `solution-pack.la-trade` · 4 doc(s) · 0 open row(s)
 * [Link Analysis utility showcase](solution-pack/la-utility/index.md) - `solution-pack.la-utility` · 3 doc(s) · 1 open row(s)
 * [Mobile money](solution-pack/mobile-money/index.md) - `solution-pack.mobile-money` · 5 doc(s) · 0 open row(s)
+* [Order-to-cash assurance](solution-pack/order-to-cash/index.md) - `solution-pack.order-to-cash` · 2 doc(s) · 1 open row(s)
 * [Orders starter](solution-pack/orders-starter/index.md) - `solution-pack.orders-starter` · 5 doc(s) · 0 open row(s)
 * [Partner settlement](solution-pack/partner-settlement/index.md) - `solution-pack.partner-settlement` · 6 doc(s) · 1 open row(s)
 * [Payment fraud starter](solution-pack/payment-fraud/index.md) - `solution-pack.payment-fraud` · 5 doc(s) · 0 open row(s)

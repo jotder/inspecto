@@ -1,0 +1,10 @@
+case_rule:
+  name: o2c_collections_case
+  title: "Collections: the unmatched orders of one customer"
+  threshold: 1
+  windowMinutes: 1440
+  category: order-to-cash
+  tags: collections
+  groupBy: customer_id
+  filter:
+    type: INCIDENT

@@ -1,0 +1,4 @@
+physicalRef: payments/database
+dateField: period_start
+calculated[1]{name,expr}:
+  period_start,"CAST(date_trunc('month', payment_date) AS DATE)"

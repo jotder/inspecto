@@ -1,0 +1,7 @@
+job:
+  name: o2c_collections_case
+  type: caserule.evaluate
+  description: "Group the unmatched-value Incidents (o2c_unmatched_value) into one collections Case per customer with the Case Rule o2c_collections_case"
+  rule: o2c_collections_case
+  cron: "0 7 * * *"
+  enabled: true

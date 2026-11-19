@@ -1,0 +1,7 @@
+vizType: kpi
+datasetId: o2c_open_items
+controls:
+  value[1]{field,agg}:
+    unmatched_value,sum
+options:
+  title: Unmatched value (USD)

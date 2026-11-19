@@ -490,6 +490,7 @@ naming rule is held by `node tools/check-product-docs.mjs`.
 | Other Examples (`solution-pack.la-showcase`) | [architecture](../../solution-pack/la-showcase/architecture-la-showcase.md) |  |
 | Link Analysis trade showcase (`solution-pack.la-trade`) | [architecture](../../solution-pack/la-trade/architecture-la-trade.md) |  |
 | Mobile money (`solution-pack.mobile-money`) | [architecture](../../solution-pack/mobile-money/architecture-mobile-money.md) |  |
+| Order-to-cash assurance (`solution-pack.order-to-cash`) | [architecture](../../solution-pack/order-to-cash/architecture-order-to-cash.md) |  |
 | Orders starter (`solution-pack.orders-starter`) | [architecture](../../solution-pack/orders-starter/architecture-orders-starter.md) |  |
 | Partner settlement (`solution-pack.partner-settlement`) | [architecture](../../solution-pack/partner-settlement/architecture-partner-settlement.md) |  |
 | Payment fraud starter (`solution-pack.payment-fraud`) | [architecture](../../solution-pack/payment-fraud/architecture-payment-fraud.md) |  |
