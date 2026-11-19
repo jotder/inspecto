@@ -196,6 +196,44 @@ Each tutorial and how-to carries machine-checkable steps — API calls with expe
 form the LA series already uses — run against a seeded demo install by the same recorder machinery
 (`tools/record-la-live.mjs`). A page whose product changed fails its check instead of rotting silently.
 
+**The format (P2 lane E, built 2026-11-19; specification:
+[`spec-handbook-doc-tests.md`](../okf/product/layer/product/spec-handbook-doc-tests.md)).** One fenced block is one
+step, under the step it proves; a page's blocks run in order and share `save`d values:
+
+````markdown
+```check
+POST /spaces/{space}/jobs/o2c_detect/trigger
+as analyst
+expect status 202
+save data.runId as run
+```
+```check
+GET /spaces/{space}/jobs/runs/{run}
+as analyst
+expect data.status = "SUCCESS"
+retry 30 every 2s
+```
+```check-ui
+{"open":"/data"}
+{"waitText":"o2c_orders"}
+```
+````
+
+- ```` ```check ```` — a Control API call: `METHOD /path` (relative to `/api/v1`), then `as <persona>`, `body <json>`,
+  `expect status …` / `expect <path> <op> [value]` (`=` `!=` `>` `>=` `<` `<=` `has` `matches` `exists` `absent`),
+  `save <path> as <name>`, `retry <n> every <d>`. ```` ```check-ui ```` — console steps, one JSON per line, in the
+  recorder's episode verbs.
+- **Readers** see one quiet folded line (*Checked on every release · …*) with the step under it.
+- **`tools/check-handbook.mjs`** (pre-commit) parses every block, matches its route against `openapi-v1.json`, refuses
+  a variable used before its `save`, and refuses a tutorial or how-to with no block (§4.3).
+- **`tools/run-handbook-checks.mjs --base-url <url> [--page <id>] [--space <id>] [--ui]`** runs them: per page pass or
+  fail with the failing expectation and the answer, exit 1 on any failure; UI steps only with `--ui` (else NOT RUN,
+  counted). Sign-in never comes from the page: a persona's token from `INSPECTO_HANDBOOK_TOKEN_<NAME>` or a
+  credentials file, else the Demo Auth exchange; Basic's 503 means no header.
+- **Where it runs: on demand against a demo install and before every release — not in CI yet.** No CI job boots an
+  install (the reactor jar is thin; the bundle bake is release-only), the checks need a seeded demo build with Demo
+  Users, and no page carries a check yet. A nightly is revisited when T1–T6 carry checks.
+
 ### 4.5 Product gaps found while writing
 
 A how-to that cannot be written because the product has no path becomes a board row (`kind: feature`), never a
@@ -384,7 +422,7 @@ downloadable vendor packages, versioned with the product.
 |---|---|---|---|
 | **P0** | D-UE1…D-UE9 signed; the new names in `GLOSSARY.md` — **done 2026-11-19** (D-UE8 left open) | — | days |
 | **P1** | Handbook skeleton: manifest, renderer, `/help` route with screen links, `check-handbook.mjs`, the inventory map of existing pages — **lane A done 2026-11-19 (§4.6); lane B (console and bundle) in its own lane** | P0 | 2–3 weeks |
-| **P2** | Concepts; the worked example's data and Space Template; tutorials T1–T6 with their checks; the Space → App gap filed — **lane C (concepts) done 2026-11-19 (§4.6)** | P1 | 4–6 weeks |
+| **P2** | Concepts; the worked example's data and Space Template; tutorials T1–T6 with their checks; the Space → App gap filed — **lane E (docs as tests: the check-block format, the guard, the reader's view, the runner) done 2026-11-19 (§4.4)**; **lane C (concepts) done 2026-11-19 (§4.6)** | P1 | 4–6 weeks |
 | **P3** | The first 30 how-tos; generated reference; edition badges on every page; the *On Inspecto* developer pages 5.1–5.6 (§3.1) | P1 | 4–6 weeks, parallel with P2, plus 2–3 weeks for the developer pages |
 | **P4** | Learning paths, the first two labs with checkers, the video series spec on the LA machinery, the instructor kit | P2 | 3–4 weeks |
 | **P5** | The *Inside Inspecto* internal render: the stage × product-area index generated from the Product Map and hub slots, six entry pages 5.7–5.12, the audience guard | P1, D-UE10 | about 1 week |

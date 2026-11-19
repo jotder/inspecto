@@ -14,12 +14,21 @@
 //   4 how-to    a page of type `howto` carries the six template headings (HOWTO_HEADINGS).
 //   5 leak      the EXTERNAL render, built in memory, holds no internal page, and every relative link in it reaches a
 //               file of that render (a link to a page outside the render must already be plain text).
+//   6 checks    every ```check / ```check-ui block on a manifest page parses (tools/handbook-checks.mjs), names an
+//               operation of docs/api/openapi-v1.json, and uses no {variable} before a `save` sets it — statically, no
+//               server (the runner is tools/run-handbook-checks.mjs); and every tutorial and how-to carries at least one
+//               check block (plan §4.3, §4.4).
 // A floor fails a manifest that has almost nothing in it. Tests: tools/check-handbook.test.mjs.
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { AUDIENCES, CHAPTER_IDS, HOWTO_HEADINGS, MANIFEST, TRACKS, TYPES, loadManifest, render } from './render-handbook.mjs';
+import { extractBlocks, validatePage } from './handbook-checks.mjs';
+
+export const OPENAPI = 'docs/api/openapi-v1.json';
+/** Page types whose every page must carry a check block (plan §4.3). */
+const CHECKED_TYPES = ['tutorial', 'howto'];
 
 const MIN_PAGES = 50;
 /** Page ids the render writes itself: a page named so would be overwritten by the home page or the search index. */
@@ -28,6 +37,7 @@ const RESERVED = ['index', 'search'];
 /** All findings for a manifest. `tracked` is the list of tracked paths; `read(file)` returns text. Pure, for the tests. */
 export function findings(book, tracked, read, renderSite = render) {
     const out = [];
+    let openapi = null;
     const ids = book.chapters.map((c) => c.id);
     if (ids.join(',') !== CHAPTER_IDS.join(',')) out.push(`chapters: [${ids.join(', ')}] must be exactly [${CHAPTER_IDS.join(', ')}]`);
     const trackedSet = new Set(tracked);
@@ -48,6 +58,11 @@ export function findings(book, tracked, read, renderSite = render) {
             const heads = [...read(p.file).matchAll(/^#{2,3}\s+(.*?)\s*$/gm)].map((m) => m[1].replace(/[`*_]/g, ''));
             const missing = HOWTO_HEADINGS.filter((h) => !heads.includes(h));
             if (missing.length) out.push(`how-to: ${p.file} lacks the template heading(s): ${missing.join(', ')}`);
+        }
+        if (trackedSet.has(p.file)) {
+            const text = read(p.file);
+            for (const f of validatePage(text, () => (openapi ??= JSON.parse(read(OPENAPI))))) out.push(`checks: ${p.file}:${f.line} ${f.message}`);
+            if (CHECKED_TYPES.includes(p.type) && !extractBlocks(text).length) out.push(`checks: ${p.file} is a ${p.type} page with no \`\`\`check or \`\`\`check-ui block`);
         }
     }
     for (const f of tracked) {
@@ -85,9 +100,10 @@ function main() {
     const f = findings(book, tracked, (p) => readFileSync(p, 'utf8'));
     if (f.length) { console.error(`✗ check-handbook: ${f.length} finding(s)\n` + f.map((x) => '  ' + x).join('\n')); process.exit(1); }
     const ext = pages.filter((p) => p.audience === 'external').length;
+    const checks = pages.reduce((n, p) => n + extractBlocks(readFileSync(p.file, 'utf8')).length, 0);
     const byType = Object.fromEntries(['tutorial', 'howto', 'reference', 'concept', 'unsorted'].map((t) => [t, pages.filter((p) => p.type === t).length]));
     console.log(`✓ check-handbook: ${book.chapters.length} chapters, ${pages.length} pages (${ext} external, ${pages.length - ext} internal; ` +
-        `${Object.entries(byType).map(([k, v]) => `${v} ${k}`).join(', ')}); every hub guide placed; the external render neither leaks nor dangles.`);
+        `${Object.entries(byType).map(([k, v]) => `${v} ${k}`).join(', ')}); every hub guide placed; ${checks} check block(s) parse and name known routes; the external render neither leaks nor dangles.`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();
