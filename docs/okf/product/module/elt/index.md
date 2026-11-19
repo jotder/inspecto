@@ -37,5 +37,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `AUTHORING-REDESIGN-1` | P3 | feature | the authoring redesign's still-open letters. | demand |
 | — | P3 | feature | Step Processor catalog | — |
 | `PARSING-DERIVE-EDITOR-1` | P3 | feature | slice 4 of Parsing D9: an optional profile editor for ASN.1 derive / children. | operator |
+| `BASIC-ELT-PROFILE-1` | P2 | feature | Basic onboarding as a locked profile of ELT: one implementation, Basic = options locked. | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `DUCKLAKE-REAL-DRIVER-FAILURE-PROOF-1` | P3 | chore | no test proves that a real DuckLake driver's registration failure is non-fatal (filed 2026-11-16; untracked since SPEC-NOPROOF-1 closed o… | external |
