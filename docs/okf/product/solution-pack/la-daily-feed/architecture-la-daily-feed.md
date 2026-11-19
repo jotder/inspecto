@@ -31,4 +31,4 @@ Template: `spaces/_templates/la-daily-feed/` (LA-DAILY-INGEST-1 T2).
 
 ## Modules used
 
-[Link Analysis](../../module/la-core/architecture-la-core.md) · [ETL user guide § Daily feeds](../../module/elt/user-guide-elt.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks) (export contract for a database origin).
+[Link Analysis](../../module/la-core/architecture-la-core.md) · [ETL user guide § Daily feeds](../../module/elt/user-guide-elt-enrich-load-test.md#113-daily-feeds--the-template-the-export-contract-and-delivery-checks) (export contract for a database origin).

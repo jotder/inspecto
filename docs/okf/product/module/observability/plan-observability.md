@@ -645,7 +645,7 @@ column `null_count`, `null_rate`, `distinct_count`, `min`, `max`, `mean` — the
 every cell with the **median** of the same cell over the last N **accepted** profiles. One limit pair
 (`maxIncrease` / `maxDecrease`, `percent` of the baseline's magnitude or `absolute`, inclusive) applies to
 every checked cell; an author wanting different limits per measure writes a second baseline Expectation.
-Keys and defaults: [step-catalog § Expectations](../elt/spec-step-catalog.md#qualityconstraintcheck--expectations).
+Keys and defaults: [step-catalog § Expectations](../elt/spec-step-catalog-outbound-sinks.md#qualityconstraintcheck--expectations).
 
 **Storage — built first, because nothing existed.** `BaselineProfileStore` keeps one JSON document per
 Expectation at `<write-root>/expectation-baselines/<name>.json`: every recorded profile (accepted or not)

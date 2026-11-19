@@ -32,7 +32,7 @@ A **Collector** is a configured collection task bound to one **Connection** (a n
 credentials). It reaches a remote system, decides which files are new and complete, fetches them once,
 and lands them in the Pipeline's inbox (`dirs.poll`). Everything after landing is ingest's job
 ([parsing and ingest](#parsing-and-ingest)). The capability spec of record is
-[the ELT plan](plan-elt.md#acq1-acquisition--connectivity-acq); this page is the module summary.
+[the ELT plan](plan-elt-scope-requirements.md#acq1-acquisition--connectivity-acq); this page is the module summary.
 
 Code homes:
 
@@ -82,7 +82,7 @@ casts the columns to the declared Schema, writes partitioned Parquet, and commit
 Consignment atomically. A file that cannot be read goes to the **quarantine** tree; rows that fail
 parsing go to a reject file beside it.
 
-The capability spec of record is [the ELT plan](plan-elt.md#11-ingestion-ing); the design is
+The capability spec of record is [the ELT plan](plan-elt-scope-requirements.md#11-ingestion-ing); the design is
 [the architecture](architecture-elt.md). This page is the module summary.
 
 Code homes:
@@ -103,7 +103,7 @@ rules come from the Schema registry (metamodel); storage layout is described in 
 Every Consignment runs on a virtual thread bounded by `processing.threads`; many Pipelines share one
 JVM under `MultiCollectorProcessor`.
 
-More: [screens](user-guide-elt.md#runs-and-processing-status) · [API](api-elt.md#parsing-and-ingest) · [architecture](architecture-elt.md).
+More: [screens](user-guide-elt-save-surfaces.md#runs-and-processing-status) · [API](api-elt.md#parsing-and-ingest) · [architecture](architecture-elt.md).
 
 ## Pipelines and Steps
 
@@ -128,7 +128,7 @@ Two vocabularies describe Steps:
 
 The as-built references are the [pipeline-graph bundle](../../index.md) and the
 [step catalog](spec-step-catalog.md); the capability spec is [the ELT plan](plan-elt.md) — authoring in
-[§1.2](plan-elt.md#12-pipeline-authoring-pip-1), execution in [§EXE.1](plan-elt.md#exe1-pipeline-execution-pip-2--pip-7).
+[§1.2](plan-elt-scope-requirements.md#12-pipeline-authoring-pip-1), execution in [§EXE.1](plan-elt-scope-requirements.md#exe1-pipeline-execution-pip-2--pip-7).
 
 ### Where it fits
 
@@ -171,4 +171,4 @@ Pipeline authors, operators watching runs, and auditors tracing a failed file or
 
 [acquire](../acquire/index.md) · [engine](../engine/index.md) · [processor](../processor/index.md) · [config](../config/index.md)
 
-Former engine pages and where they now live: [architecture](architecture-elt.md) · [architecture-pipeline-graph](architecture-elt.md) · [architecture-stage1](architecture-elt.md) · [feature-db](../engine/feature-db.md) · [plan-pipeline-execution](plan-elt.md#exe1-pipeline-execution-pip-2--pip-7) · [spec-branch-aware-ingest](spec-ingest.md) · [spec-catalog-vs-executors](spec-pipeline-model.md) · [spec-consignment-addressing](spec-consignments.md) · [spec-consignment-concurrency](spec-consignments.md) · [spec-db-layer](../engine/spec-db-layer.md) · [spec-duckdb](../engine/spec-duckdb.md) · [spec-editable-round-trip](spec-pipeline-model.md) · [spec-execution-lanes](spec-pipeline-model.md) · [spec-ingest-wrap-spi](spec-ingest.md) · [spec-ingestion](spec-ingest.md) · [spec-live-execution](spec-sinks.md) · [spec-node-types](spec-sinks.md) · [spec-object-storage-export](spec-sinks.md) · [spec-output-sinks](spec-sinks.md) · [spec-parser-plugins](spec-parsing.md) · [spec-parsing-grammar](spec-parsing.md) · [spec-parsing-options](spec-parsing.md) · [spec-pipeline-test-run](spec-pipeline-execution.md) · [spec-plugin-ingester](spec-parsing.md) · [spec-post-sync-step-chains](spec-pipeline-execution.md) · [spec-step-park-drain](spec-pipeline-execution.md) · [spec-transforms-seams](spec-pipeline-execution.md) · [user-guide-run-detail](user-guide-elt.md) · [user-guide-runs](user-guide-elt.md)
+Former engine pages and where they now live: [architecture](architecture-elt.md) · [architecture-pipeline-graph](architecture-elt.md) · [architecture-stage1](architecture-elt.md) · [feature-db](../engine/feature-db.md) · [plan-pipeline-execution](plan-elt-scope-requirements.md#exe1-pipeline-execution-pip-2--pip-7) · [spec-branch-aware-ingest](spec-ingest.md) · [spec-catalog-vs-executors](spec-pipeline-model.md) · [spec-consignment-addressing](spec-consignments.md) · [spec-consignment-concurrency](spec-consignments.md) · [spec-db-layer](../engine/spec-db-layer.md) · [spec-duckdb](../engine/spec-duckdb.md) · [spec-editable-round-trip](spec-pipeline-model.md) · [spec-execution-lanes](spec-pipeline-model.md) · [spec-ingest-wrap-spi](spec-ingest.md) · [spec-ingestion](spec-ingest.md) · [spec-live-execution](spec-sinks.md) · [spec-node-types](spec-sinks.md) · [spec-object-storage-export](spec-sinks.md) · [spec-output-sinks](spec-sinks.md) · [spec-parser-plugins](spec-parsing.md) · [spec-parsing-grammar](spec-parsing.md) · [spec-parsing-options](spec-parsing.md) · [spec-pipeline-test-run](spec-pipeline-execution.md) · [spec-plugin-ingester](spec-parsing.md) · [spec-post-sync-step-chains](spec-pipeline-execution.md) · [spec-step-park-drain](spec-pipeline-execution.md) · [spec-transforms-seams](spec-pipeline-execution.md) · [user-guide-run-detail](user-guide-elt.md) · [user-guide-runs](user-guide-elt.md)

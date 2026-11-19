@@ -405,7 +405,7 @@ The list side (attributes, `PUT /entity-lists/{id}/attributes`, `canManageExclus
 
 The analyst side of the plan (archived:
 [`la-grow-exclude-plan.md`](../../../../archived-documents/plans-archive/la-grow-exclude-plan.md); decisions GE-1…GE-12
-built as recommended). How it reads to a user: [user guide §7](user-guide-la-core.md#7-expand-and-clean-up-the-graph) "Expand and clean up the graph".
+built as recommended). How it reads to a user: [user guide §7](user-guide-la-core-analysis.md#7-expand-and-clean-up-the-graph) "Expand and clean up the graph".
 
 - **Seams.** `grow-exclude.ts` is the pure half (wording, the request a Grow sends, lists in force, what they removed,
   the hint store); `GrowExcludeStore` (provided beside `InvestigationSessionStore`) holds the session state and the
@@ -488,8 +488,8 @@ built as recommended). How it reads to a user: [user guide §7](user-guide-la-co
 
 ### 6.9.1 The Investigation tab as one Expand filter (LA-INVESTIGATE-UX-1, SPA, as built 2026-10-31)
 
-How it reads to a user: [user guide §7](user-guide-la-core.md#7-expand-and-clean-up-the-graph) and
-[§11.2](user-guide-la-core.md#112-the-investigation-tab-act-panel). No server change and no new op.
+How it reads to a user: [user guide §7](user-guide-la-core-analysis.md#7-expand-and-clean-up-the-graph) and
+[§11.2](user-guide-la-core-investigations.md#112-the-investigation-tab-act-panel). No server change and no new op.
 
 - **One filter, published.** `LinkAnalysisExpandComponent`, embedded in the tab (the explorer's popup never publishes),
   publishes its request to
@@ -617,7 +617,7 @@ How it reads to a user: [user guide §7](user-guide-la-core.md#7-expand-and-clea
 ## 6.14 Studio UI reorganization (LA-STUDIO-UI-REORG-1, as built 2026-10-28)
 
 The Studio was reorganized without removing a function; the layout is described in
-[user-guide-la-core.md](user-guide-la-core.md#studio-layout-internals-la-studio-ui-reorg-1-phases-1-3-as-built-2026-10-27) *Studio layout*, and the plan with its "nothing removed" map
+[user-guide-la-core.md](user-guide-la-core-reference-notes.md#studio-layout-internals-la-studio-ui-reorg-1-phases-1-3-as-built-2026-10-27) *Studio layout*, and the plan with its "nothing removed" map
 is archived as [`la-studio-ui-reorg-plan`](../../../../archived-documents/plans-archive/la-studio-ui-reorg-plan.md) §6.
 
 - **Decisions (operator interview 2026-10-27, UIR-D1…D16):**

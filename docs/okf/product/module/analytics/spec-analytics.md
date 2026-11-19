@@ -848,7 +848,7 @@ forecast and distribution Steps: one grammar parsed in one place (`TimeSeriesSte
 output columns flowing on to later Steps), so all three refuse the same config with the same words. Registered in
 `BuiltinNodeType` (flat home `steps:`, kinds `changepoint`, `retention`, `funnel`), `PipelineConfig.Step.KINDS`,
 `NodeAttributes`, `ProcessorCatalog` (BI family, DELIVERED) and both UI contract JSONs. Keys, defaults and refusals per
-Step: [step catalog](../elt/spec-step-catalog.md#changepoint--transformtimeserieschangepoint--change-point-regime--drift-detector).
+Step: [step catalog](../elt/spec-step-catalog-analytics-steps.md#changepoint--transformtimeserieschangepoint--change-point-regime--drift-detector).
 
 **Shape decisions (assistant-decided 2026-11-01, pending operator confirmation; the Sales & Marketing pack's plan is
 still not in the repository):**

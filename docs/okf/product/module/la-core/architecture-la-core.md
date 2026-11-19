@@ -81,7 +81,7 @@ extension of the one host process - no LA server, no LA main class (§1).
   `-Daddons.laInvestigations=false` (withholds the Investigations add-on, §8).
 - **Enablement**: Installed (jar) -> Enabled (`geoLink` per Space) -> Permitted (capability, membership, policy).
 
-Screens: [user guide](user-guide-la-core.md#screens). Routes: [Link Analysis — API](api-la-core.md) and §6.
+Screens: [user guide](user-guide-la-core-reference-screens.md#screens). Routes: [Link Analysis — API](api-la-core.md) and §6.
 
 ### Interactions
 

@@ -348,7 +348,7 @@ two industries and is listed under both.
    4. The ordinary transfers are the contrast: they stay outside the ring's group.
 
 For the full exercise on the same data, with figures, see *Find a money-mule ring* in the
-[Link Analysis user guide](../../module/la-core/user-guide-la-core.md#13-worked-examples) (it uses
+[Link Analysis user guide](../../module/la-core/user-guide-la-core-examples-roles.md#13-worked-examples) (it uses
 `la-showcase`, which carries the same corpus).
 
 ### Worked example: `la-utility` (Utilities)

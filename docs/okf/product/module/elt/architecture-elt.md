@@ -221,7 +221,7 @@ JVM switches: `-Dacquire.ledger.backend` (`memory` | `db`), `-Dacquire.pollSecon
 
 ### A6. Screens
 
-Moved to [the user guide, §21](user-guide-elt.md#21-collectors-and-collector-configuration).
+Moved to [the user guide, §21](user-guide-elt-collectors-runs.md#21-collectors-and-collector-configuration).
 
 ### A7. API
 

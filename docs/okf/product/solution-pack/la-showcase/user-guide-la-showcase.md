@@ -52,4 +52,4 @@ Pick a Demo User (`spaces/_templates/la-showcase/config/demo-users.toon`, `roles
 
 ## References
 
-[features](features-la-showcase.md) · [Investigation pivot guide](../../module/la-core/user-guide-la-core.md#63-pivot-between-graph-and-map)
+[features](features-la-showcase.md) · [Investigation pivot guide](../../module/la-core/user-guide-la-core-building-graph.md#63-pivot-between-graph-and-map)

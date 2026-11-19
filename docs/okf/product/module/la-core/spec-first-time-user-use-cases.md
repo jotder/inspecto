@@ -32,7 +32,7 @@ the one verb for creating a data origin (GLOSSARY).
 Related: [DATA-TIERS-1 plan](../../../../archived-documents/plans-archive/data-tier-editions-plan.md) ·
 [LA-ONBOARD-1 plan](../../../../archived-documents/plans-archive/la-onboarding-plan.md) ·
 [ONBOARDING-FIRST-RUN-1 console plan](../../../../archived-documents/plans-archive/first-run-onboarding-plan.md) · [user guide](user-guide-la-core.md) ·
-[Space guide steps](user-guide-la-core.md#31-the-getting-started-page) · [GLOSSARY](../../../../GLOSSARY.md).
+[Space guide steps](user-guide-la-core-getting-started.md#31-the-getting-started-page) · [GLOSSARY](../../../../GLOSSARY.md).
 
 ---
 

@@ -45,6 +45,13 @@
 
 - [Geo Map Analysis](../../module/geo-link/user-guide-geo-map.md)
 - [Link Analysis and Investigations](../../module/la-core/user-guide-concept-link-analysis.md)
+- [Link Analysis — User Guide — Expand, analyse, match patterns and save](../../module/la-core/user-guide-la-core-analysis.md)
+- [Link Analysis — User Guide — The screen, building and looking at a graph](../../module/la-core/user-guide-la-core-building-graph.md)
+- [Link Analysis — User Guide — Worked examples, roles, limits and troubleshooting](../../module/la-core/user-guide-la-core-examples-roles.md)
+- [Link Analysis — User Guide — What Link Analysis is, quick start and signing in](../../module/la-core/user-guide-la-core-getting-started.md)
+- [Link Analysis — User Guide — Investigations, Entity Lists, Alerts and Geo](../../module/la-core/user-guide-la-core-investigations.md)
+- [Link Analysis — User Guide — Reference notes](../../module/la-core/user-guide-la-core-reference-notes.md)
+- [Link Analysis — User Guide — Reference notes (continued) and screens](../../module/la-core/user-guide-la-core-reference-screens.md)
 - [Link Analysis — User Guide](../../module/la-core/user-guide-la-core.md)
 - [Inspecto LA training videos — A · Getting started: narration scripts](../../module/la-core/user-guide-training-a-getting-started.md)
 - [Inspecto LA training videos — B · Building a graph: narration scripts](../../module/la-core/user-guide-training-b-building-a-graph.md)

@@ -43,8 +43,8 @@ framework that lets a new format be deployed and configured with no UI change.
 > How the parsed rows are written (the ingest SPI, union/generation modes, segments) is
 > [spec-ingest.md](spec-ingest.md). Authoring Grammars in the UI is
 > [grammar-config](../config/user-guide-grammar-config.md) and the Parse pane is
-> [the ELT user guide](user-guide-elt.md#61-a-parse-step-is-three-things-and-the-drawer-is-its-one-home-decision-2026-09-06) §6.1;
-> the requirement of record is ING in [the ELT plan](plan-elt.md#21-ingestion) §2.1. (The plan's old
+> [the ELT user guide](user-guide-elt-parse-schema.md#61-a-parse-step-is-three-things-and-the-drawer-is-its-one-home-decision-2026-09-06) §6.1;
+> the requirement of record is ING in [the ELT plan](plan-elt-scope-requirements.md#21-ingestion) §2.1. (The plan's old
 > §3.3 *one `parsing:` block* is §P.5 here; its old §3.9 *Parse pane* is that user-guide §6.1.)
 
 **Status legend** used throughout:
