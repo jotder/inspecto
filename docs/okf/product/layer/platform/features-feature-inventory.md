@@ -20,7 +20,7 @@ timestamp: 2026-11-19T00:00:00Z
 > [`configuration.md`](../../module/config/admin-guide-configuration-reference.md) (all TOON keys), [`parsing-options-reference.md`](../../module/elt/spec-parsing.md)
 > (frontend status), and [`ADVANCED_GUIDE.md`](../../../../ADVANCED_GUIDE.md) (runtime flags, events, metrics, Control API).
 >
-> **Which module ships in which edition** is not tabulated here: the generated *Offerings matrix* in [`spec-editions.md`](spec-editions.md) is the one place (module × edition, add-ons, deployment posture, jar counts).
+> **Which module ships in which edition** is not tabulated here: the generated *Offerings matrix* in [`spec-editions-placement.md`](spec-editions-placement.md#offerings-matrix-generated) is the one place (module × edition, add-ons, deployment posture, jar counts).
 >
 > **Shipped after this snapshot (2026-07-07 addendum)** — not yet folded into the tables below: the
 > versioned **`/api/v1`** contract (envelope, error-code catalog, ETag/`contentHash`, `GET /bootstrap`,

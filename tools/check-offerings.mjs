@@ -45,7 +45,7 @@ export { parseToon };
  * Each is a launcher/classpath fact, not prose: authMode <- `-Dauth.mode`, eventsBackend <- `-Devents.backend`,
  * objectsBackend <- `-Dobjects.backend` (all proved by check-launchers.mjs), postgresSidecar <- postgresql.jar on the classpath
  * (offering-classpath.mjs). `default` = the launcher passes no such flag (the engine default applies). Transport, secrets,
- * compliance scope and HA have no verifiable source yet, so they stay hand-authored in docs/okf/product/layer/platform/spec-editions.md.
+ * compliance scope and HA have no verifiable source yet, so they stay hand-authored in docs/okf/product/layer/platform/spec-editions-platform-board.md.
  */
 export const POSTURE = {
     authMode: ['none', 'oidc'],

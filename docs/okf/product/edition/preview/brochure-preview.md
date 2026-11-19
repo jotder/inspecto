@@ -33,5 +33,5 @@ Ask your Inspecto contact for a Preview build and a guided showcase walk-through
 
 ## Read more
 
-- This Edition's hub: [index](index.md); the full module and Add-on matrix is in [spec-editions.md](../../layer/platform/spec-editions.md)
+- This Edition's hub: [index](index.md); the full module and Add-on matrix is in [spec-editions-placement.md](../../layer/platform/spec-editions-placement.md#add-ons-by-edition)
 - Whole-product sales material: [executive brief](../../layer/product/brochure-executive-brief.md) · [solution overview](../../layer/product/brochure-solution-overview.md) · [enterprise whitepaper](../../layer/product/brochure-enterprise-whitepaper.md) · [competitive landscape](../../layer/product/brochure-competitive-landscape.md)

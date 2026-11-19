@@ -40,7 +40,7 @@ The staging table is derived by `tools/bundle-modules.mjs` from `offerings/<edit
 matrix is [`../../../../EDITIONS.md`](../../../../EDITIONS.md); the editions and Add-ons are Product Map Items under
 `product-map/edition/` and `product-map/addon/`. Editions are build flavours of one codebase, never branches.
 Which modules and Space Templates each edition carries is in [`EDITIONS.md`](../../../../EDITIONS.md) (the
-generated module list: [`spec-editions.md`](../platform/spec-editions.md#offerings-matrix-generated)).
+generated module list: [`spec-editions-placement.md`](../platform/spec-editions-placement.md#offerings-matrix-generated)).
 What matters for positioning: **Basic** (one analyst on one machine) has no sign-in and no external dependency and
 explores data with Link Analysis at the Explorer level; **Standard** (a team) adds sign-in and the modules that own a
 finding — Incidents, Cases, Reconciliation and its Breaks, four-eyes Action Requests, the assistant, the domain Space

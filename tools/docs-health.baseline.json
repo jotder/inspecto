@@ -1,7 +1,6 @@
 {
  "_note": "tools/docs-health.mjs --baseline-write; only debt is kept, and it may only shrink (INFO-RESTRUCTURE-1 W2)",
  "oversize": {
-  "docs/okf/product/layer/platform/spec-editions.md": 125029,
   "docs/okf/product/module/la-core/brochure-video-demo-case-scripts.md": 148376
  },
  "history": {
@@ -15,7 +14,9 @@
   "docs/okf/product/layer/platform/plan-board-detail.md": 2,
   "docs/okf/product/layer/platform/plan-compliance.md": 2,
   "docs/okf/product/layer/platform/plan-roadmap.md": 5,
-  "docs/okf/product/layer/platform/spec-editions.md": 9,
+  "docs/okf/product/layer/platform/spec-editions-feature-matrix.md": 4,
+  "docs/okf/product/layer/platform/spec-editions-platform-board.md": 4,
+  "docs/okf/product/layer/platform/spec-editions-tiers.md": 1,
   "docs/okf/product/layer/platform/spec-requirements.md": 3,
   "docs/okf/product/layer/platform/tests-performance.md": 1,
   "docs/okf/product/layer/product/brochure-competitive-matrix.md": 1,
@@ -172,10 +173,5 @@
   "docs/okf/product/solution-pack/telco-rerating/architecture-telco-rerating.md",
   "docs/okf/product/solution-pack/telco-rerating/brochure-telco-rerating.md"
  ],
- "editions": {
-  "docs/okf/product/layer/product/brochure-competitive-landscape.md": 1,
-  "docs/okf/product/layer/product/brochure-solution-overview.md": 1,
-  "docs/okf/product/module/la-core/architecture-la-core-host-editions.md": 1,
-  "docs/okf/product/module/la-core/brochure-inspecto-la-whitepaper-summary-lifecycle.md": 1
- }
+ "editions": {}
 }

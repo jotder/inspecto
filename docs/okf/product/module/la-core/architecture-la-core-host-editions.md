@@ -32,7 +32,7 @@ Part 4 of 4 of [Link Analysis — architecture](architecture-la-core.md) · prev
 ## 8. Editions and packaging
 
 Edition names per `LA-EDITIONS-1` ED-2 (2026-10-17; formerly Personal / Professional / Enterprise). Feature placement:
-[`spec-editions.md`](../../layer/platform/spec-editions.md) (*Inspecto LA feature placement*).
+[`spec-editions-placement.md`](../../layer/platform/spec-editions-placement.md) (*Inspecto LA feature placement*).
 
 What matters on this page is the gate behind each placement — every edition, Preview included, carries the
 explorer; what Basic lacks it lacks because no installed module declares the feature:
