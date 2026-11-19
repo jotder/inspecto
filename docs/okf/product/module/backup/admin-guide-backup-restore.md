@@ -83,8 +83,8 @@ the SHA-256 of the archive and of every file inside it, appends one row to the
 
 - **The Space's `state/` folder:** a backup of a Space's `config/` also carries the server-written records in
   the `state/` folder beside it, as `../state/<path>` entries under the same secret rule; restoring into a
-  Space's `config/` puts them back under that Space's `state/` and nowhere else. A `state/` folder, or a
-  folder under it, that is a link to outside the Space is left out of the backup and refused on restore.
+  Space's `config/` puts them back under that Space's `state/` and nowhere else. A `state/` folder, or
+  anything under it, reached through a link is left out of the backup and refused on restore.
 - **DuckDB stores:** run `task: db_maintenance` first (CHECKPOINT merges the WAL across the
   acquisition ledger + job-run + provenance stores), then include `duckdb/` in a backup of the
   space root. Never copy a `.duckdb` file while its owning service is writing without a prior
@@ -104,7 +104,8 @@ verification automatically via `on_signal: maintenance.backup.completed`
 ## Restore
 
 `task: restore` is fail-closed: the sidecar manifest must be present and the archive hash must
-match before a single byte is written; extraction is path-jailed under `target_dir`; every
+match before a single byte is written; extraction is path-jailed under `target_dir` (and, for the
+`../state/` entries of a Space backup, under that Space's `state/`); every
 extracted file is re-hashed against the manifest.
 
 1. **Preview first** — `POST /jobs/<restore-job>/trigger?dryRun=true` reports file count, bytes,
