@@ -1,3 +1,14 @@
+---
+type: Spec
+title: Space tests — cases that travel with a Space (SE-6a)
+description: Space tests (SE-6a): case folders under spaces/<id>/tests/ that feed sample files to one Pipeline and assert rows, rejects and checksum — the case format, how a case runs, its routes and the space.test Job type.
+item: module.config
+audience: internal
+status: current
+verified: 2026-11-12 last-edit
+code: [platform/inspecto-config]
+---
+
 # Space tests — cases that travel with a Space (SE-6a)
 
 **State:** built 2026-11-12 (SE-6a of the Space evolution plan, §4.6). Promotion (SE-6b) is not part of this.

@@ -1,3 +1,14 @@
+---
+type: Architecture
+title: Exchange (multi-entity sharing)
+description: How the Exchange lets one Space share a Dataset, Widget, saved Link Analysis view or Signal type with another — opt-in offers, Share Grants, the consumer catalog and shared/ references — for group and regulator setups.
+item: module.exchange
+audience: internal
+status: current
+verified: 2026-11-18 last-edit
+code: [features/inspecto-exchange]
+---
+
 # Exchange (multi-entity sharing)
 
 > **Level 3 module page** (`SOLUTION-SUITE-DOCS-1`). Layer: Add-on.

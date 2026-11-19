@@ -1,3 +1,14 @@
+---
+type: Plan
+title: Predictive Analytics add-on - design with options (`PREDICTIVE-ANALYTICS-1`)
+description: Parked design with options for the Predictive Analytics add-on (segmentation, churn, forecast): the baseline, module shape, determinism and masking rules, MoSCoW slices — S2 to S4 since built — and the operator's open and taken decisions.
+item: module.anomaly
+audience: internal
+status: plan
+verified: 2026-11-12 last-edit
+code: [features/inspecto-anomaly]
+---
+
 # Predictive Analytics add-on - design with options (`PREDICTIVE-ANALYTICS-1`)
 
 > ⏸ **PARKED 2026-10-22 — design only, demand-gated; not in flight.** To resume: move it back to docs/superpower/ and rank its BACKLOG row.
