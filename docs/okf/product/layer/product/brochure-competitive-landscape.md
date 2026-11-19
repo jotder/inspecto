@@ -310,7 +310,7 @@ counts; SSO as a feature (table stakes).
 | **A4** | Publish pricing? | three edition bundles exist (Basic, Standard, Advanced) | Definite shows $250/mo; a buyer who cannot self-serve a price assumes enterprise sales | Open |
 | **A5** | The plugin/services line | **48**<!--count:spi-extension-points--> SPIs, no dead seam (§1.4); Apps ship as signed packages *(facts corrected 2026-11-12, §2.4)* | "we build the rest for you" is a revenue line — price it | Open |
 | **A6** | The Expectation engine | engine + builder UI shipped (`ING-6`, closed 2026-07-07), six check kinds *(corrected 2026-11-12: `baseline` added 2026-09-24)*; absorb GX suites rather than rival them | DQ buyers test this first | Open — product decision |
-| **A7** | Retire the stale stakeholder docs | brief + capabilities dated 2026-07-07 under- and over-sell | a sponsor reading them today gets the wrong product | Open — refresh from `EDITIONS.md` |
+| **A7** | Retire the stale stakeholder docs | brief + capabilities dated 2026-07-07 under- and over-sell | a sponsor reading them today gets the wrong product | Half done — the executive brief was refreshed 2026-11-19 from `EDITIONS.md`; `features-product-capabilities.md` (status 2026-09-23) still names the old Personal / Professional editions |
 | **A8** | Link Analysis backend | projection shipped; the Investigation layer (op log, multi-hop traversal, dossier) landed 2026-09-23; evidential controls (`LA-19`) built 2026-09-24; serves two verticals | the i2-shaped differentiator is worth zero half-built | Open |
 
 ---
