@@ -21,11 +21,11 @@ gone wrong is inside the pages:
 | Finding | Measured | Cost |
 |---|---|---|
 | Pages too big to read whole | 46 hub pages over 60 KB, the largest 211 KB (`user-guide-elt.md`); `BACKLOG.md` 574 KB; `INDEX.md` 110 KB; `GLOSSARY.md` and `PROJECT_NOTES.md` about 178 KB each | an agent reads fragments and misses context; a person gives up |
-| History inside current pages | about 480 inline notes ("corrected …", "(was …)", "until 2026-…", "refreshed …") across the hubs and root canon | current state is blurred; tokens spent on the past |
+| History inside current pages | about 480 inline notes ("corrected …", "(was …)", "until 2026-…", "refreshed …") across the hubs and root canon — one pattern's count; between about 370 and 920 depending on the pattern | current state is blurred; tokens spent on the past |
 | The board's change ledger | 597 entries, 327 KB — 57 % of `BACKLOG.md` | git already holds it; nobody acts on it |
 | The map's archive table | 87 KB of `INDEX.md`'s 110 KB | the map is too heavy to load |
 | Facts restated in many places | edition placement restated across six sales and edition docs, all stale on 2026-11-19 (fixed in `e7fcc8076`, `07bbe2bb8`) | drift, found only by accident |
-| Stale map text | `INDEX.md`'s header names six trees (`stakeholders/`, `ui/`, `ops/`, `roadmap/`, `wiki/`) that no longer exist | the map misleads |
+| Stale map text | `INDEX.md`'s header names six trees, five of which (`stakeholders/`, `ui/`, `ops/`, `roadmap/`, `wiki/`) no longer exist; only `api/` does | the map misleads |
 | Stray root file | `docs/Inspecto Backlog Board.md`, a 63-row snapshot from 2026-10-18 (the board had 94 rows on 2026-11-19) | a second, stale board |
 | No link from a page to its code | 722 of 858 hub pages have a header, none names the code it describes | drift cannot be detected |
 
@@ -82,12 +82,15 @@ The tiers do not change. The entrances do (the companion plan builds them):
 | `FEATURE_INVENTORY.md` | 30 KB | generate from the hubs' feature pages and the examples, or move into the platform hub (D-IR6) | W3 |
 | `REQUIREMENTS.md` | 26 KB | generate the MoSCoW roll-up from hub specs and the Product Map, or archive (D-IR6) | W3 |
 | `BRANCHING.md`, `EDITIONS.md` | 15 KB, 12 KB | keep; `EDITIONS.md`'s matrix generated from the offerings | W3 |
-| `Inspecto Backlog Board.md` | 2 KB | archive | W1 |
+| `Inspecto Backlog Board.md` | 3 KB | archive | W1 |
 
 **Elsewhere:** `.claude/` stays the agent layer — `CLAUDE.md` (14 KB, always loaded), team memory, skills, and the
-three locator maps, which stay thin and point into the hubs. Code-adjacent READMEs (16 in `features/`, 10 in
-`providers/`, 5 in `tools/`, a few more) become short pointers to their hub. Space Template docs (41 in `spaces/`)
-stay with their template: they ship with it.
+three locator maps, which stay thin and point into the hubs. Code-adjacent READMEs (1 in `features/`, 3 in
+`providers/`, 5 in `tools/`, a few more) become short pointers to their hub. The other Markdown beside the code stays
+where it is but is reviewed in W3: 14 decision records and plans of `features/inspecto-agent` (candidates to fold
+into the agent hub) and 2 runtime prompt files under `features/inspecto-intelligence/src/main/resources/prompts/`,
+which are product resources, not docs, and are never cut. Space Template docs (40 under `spaces/_templates/`, plus
+`spaces/demo/config/README.md`) stay with their template: they ship with it.
 
 ## 4. Maintenance — how it stays right
 
@@ -135,8 +138,8 @@ The rules an agent must follow stay in `CLAUDE.md` and team memory, both small a
 | Wave | Delivers | Size |
 |---|---|---|
 | **W1** | **Mechanical, lossless — done 2026-11-19:** the board ledger rolled to `archived-documents/backlog-ledger-2026.md`, keeping 3 days (570 entries moved, 28 kept; `BACKLOG.md` 577 → 280 KB); the archived-plans table moved from `INDEX.md` to the archive's front page, `archived-documents/README.md`, with 475 links re-pointed (`INDEX.md` 111 → 23 KB); `INDEX.md`'s header made current, its former note kept beside the table; the stray board archived as `archived-documents/backlog-board-2026-10-18.md` | a day |
-| **W2** | **Guards and header:** the header schema and its check; the size, history-note, fact-home, audience and ledger ratchets; `tools/docs-health.mjs`; a ledger-roll tool the `handoff` skill runs | about 1 week |
-| **W3** | **Judgment work:** board rows cut to a short summary with their narratives moved into hubs (23 rows run past 2,000 characters); `PROJECT_NOTES.md` split; `REQUIREMENTS.md` and `FEATURE_INVENTORY.md` generated or folded; the 46 oversize pages split, largest first (`tools/docs-relocate.mjs` re-points links); history notes moved out page by page; code-adjacent READMEs cut to pointers; the §13 rename map's finished rows archived | 2–3 weeks; mostly mechanical, suited to low-effort agents with spot checks |
+| **W2** | **Guards and header:** the header schema and its check; the size, history-note, fact-home, audience and ledger ratchets; `tools/docs-health.mjs`; a ledger-roll tool the `handoff` skill runs; the link guard extended to `archived-documents/README.md`, the archive's one maintained page (its 482 links resolve today but nothing checks them) | about 1 week |
+| **W3** | **Judgment work:** board rows cut to a short summary with their narratives moved into hubs (22 rows run past 2,000 characters); `PROJECT_NOTES.md` split; `REQUIREMENTS.md` and `FEATURE_INVENTORY.md` generated or folded; the 46 oversize pages split, largest first (`tools/docs-relocate.mjs` re-points links); history notes moved out page by page; code-adjacent READMEs cut to pointers; the §13 rename map's finished rows archived | 2–3 weeks; mostly mechanical, suited to low-effort agents with spot checks |
 | **W4** | **Joined with the Handbook's P1 inventory:** one pass over the 858 hub pages fills each header (type, audience, track, `code`) — the same pass the Handbook needs | inside the Handbook's P1 |
 
 ## 7. Decisions
@@ -165,7 +168,9 @@ The rules an agent must follow stay in `CLAUDE.md` and team memory, both small a
 `CLAUDE.md`'s documentation lifecycle is unchanged: three tiers, one hub per Product Map Item, `INDEX.md` updated
 when a doc is added or retired. One step moves: a retired plan's row now goes into the archived-plans table in
 `archived-documents/README.md` instead of the bottom of `INDEX.md`; `INDEX.md` still loses the plan's in-flight row
-in the same change.
+in the same change. W1 wrote that step into `CLAUDE.md` (documentation lifecycle), the `handoff` skill and
+`spec-work-tracking.md` (the feature path), and `CLAUDE.md` now names the archive's front page as the one maintained
+file in the history tier.
 
 ## 10. Board row
 

@@ -98,9 +98,10 @@ change that adds or retires a doc:
 2. **Active plans → `docs/superpower/`** — a plan lives here ONLY while its work is in flight.
    **When the work ships: distill the durable as-built facts (decisions, seams, gotchas, deliberate
    deferrals) into the matching product hub (`docs/okf/product/…`), move still-open items to `docs/BACKLOG.md`, then
-   `git mv` the plan to `docs/archived-documents/plans-archive/`.** The `handoff` skill checks this.
-3. **History → `docs/archived-documents/`** — kept for provenance, never maintained, never linked
-   as current.
+   `git mv` the plan to `docs/archived-documents/plans-archive/` and add its row to the archived-plans table in
+   `docs/archived-documents/README.md`.** The `handoff` skill checks this.
+3. **History → `docs/archived-documents/`** — kept for provenance, never maintained (except its front page
+   `README.md`, which holds the archived-plans table), never linked as current.
 
 **Open work = one board, tagged rows.** `docs/BACKLOG.md` is the only list of open work, defects
 included (a row with `kind: defect` — never "Issue", which means Incident). Every new row ends its
