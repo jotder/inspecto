@@ -50,8 +50,9 @@ only the backticked `→` pointer list, and the count markers (`check-doc-counts
 1. **Plan** — write the plan in `docs/superpower/` and file its board rows, each tagged with its item(s).
 2. **Build** — commit with the item's name as the Conventional Commit scope (`feat(reconciliation): …`).
 3. **Ship** — distil the as-built facts into the hub's `plan` / `spec` / `architecture` / guide slots, delete
-   the closed rows from the board (still-open leftovers become new tagged rows), and `git mv` the plan to
-   `docs/archived-documents/plans-archive/`.
+   the closed rows from the board (still-open leftovers become new tagged rows), `git mv` the plan to
+   `docs/archived-documents/plans-archive/` and add its row to the archived-plans table in
+   `docs/archived-documents/README.md` (its in-flight row leaves `docs/INDEX.md`).
 4. **Regenerate** — `node tools/render-product-docs.mjs`; the hub index, its Open work section and the hub list
    refresh themselves. Never hand-edit a hub `index.md`.
 

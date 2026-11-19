@@ -35,6 +35,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `NATIVE-LICENCE-LINUX-MACOS-1` | P3 | chore | two licence calls on the tokenizers natives wait on the operator ((a) accepted 2026-11-01). | operator |
+| `AGENT-KIT-1` | P2 | feature | the Agent Kit: AI agents (Claude, Gemini, OpenAI, local / offline models) build, ship and manage Apps on a running Inspecto, safely. | — |
 | `RELEASE-PIPELINE-UNRUN-1` | P2 | chore | no release can be cut today: release.yml has never run, and nothing it needs is configured (filed 2026-11-15, verified from ARCH-MOSCOW-U… | operator |
 | `DEPLOY-EXPOSURE-KIT-1` | P3 | chore | /metrics and /health/details are fenced only by the network, and the deploy kit the docs assume is unbuilt (filed 2026-11-15, verified fr… | — |
 | `PRODUCT-ASSEMBLY-1` | P2 | feature | assemble finished domain Products and the Platform with chosen Add-ons from definition files, with one tool — PA-0…PA-7 SHIPPED 2026-11-1… | — |
@@ -56,3 +57,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `PRODUCT-MAP-S6-1` | P3 | feature | Product Map slice S6, on demand: | demand |
 | `CUSTOMER-BUILD-DOMAIN-APPS-1` | P3 | feature | a customer of a Domain product must hold every optional App the Product's composed Space Template joins, or the customer build is refused. | demand |
 | `PRODUCT-MAP-APP-EDITION-PRICES-1` | P3 | feature | an App has one Order Code (INS-APP-<ID>), so a price per App × Edition (D-PA6) has no key yet. | demand |
+| `INFO-RESTRUCTURE-1` | P2 | chore | the information base is restructured and kept right: one fact one home, current state only, pages an agent can read whole (target 40 KB,… | — |
+| `USER-HANDBOOK-1` | P2 | feature | the Handbook: users learn to build, ship and manage an App from the console's Help, organised by lifecycle (Understand → Build → Ship → M… | — |

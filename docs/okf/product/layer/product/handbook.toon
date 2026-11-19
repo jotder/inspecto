@@ -1,0 +1,1032 @@
+handbook:
+  title: Inspecto Handbook
+  plan: docs/superpower/2026-11-19-user-enablement-and-agent-kit-plan.md
+chapters:
+  start:
+    title: Start here
+    group: Start here
+    summary: What Inspecto is, the editions, ready-made Space Templates, and walkthroughs from a file to a dashboard or an alert to a closed Case.
+    pages:
+      editions:
+        file: docs/EDITIONS.md
+        title: The editions on one page
+        type: reference
+        tracks[4]: builder,partner,operator,business
+        audience: external
+      user_guide_journey_alert_to_case:
+        file: docs/okf/product/layer/product/user-guide-journey-alert-to-case.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_journey_file_to_dashboard:
+        file: docs/okf/product/layer/product/user-guide-journey-file-to-dashboard.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_inspecto:
+        file: docs/okf/product/product/inspecto/admin-guide-inspecto.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_inspecto:
+        file: docs/okf/product/product/inspecto/user-guide-inspecto.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_la:
+        file: docs/okf/product/product/la/admin-guide-la.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la:
+        file: docs/okf/product/product/la/user-guide-la.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_telco:
+        file: docs/okf/product/product/telco/admin-guide-telco.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_telco:
+        file: docs/okf/product/product/telco/user-guide-telco.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_aml:
+        file: docs/okf/product/solution-pack/aml/admin-guide-aml.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_aml:
+        file: docs/okf/product/solution-pack/aml/user-guide-aml.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      admin_guide_business_assurance:
+        file: docs/okf/product/solution-pack/business-assurance/admin-guide-business-assurance.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_business_assurance:
+        file: docs/okf/product/solution-pack/business-assurance/user-guide-business-assurance.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      admin_guide_industry_mobile_money:
+        file: docs/okf/product/solution-pack/industry-mobile-money/admin-guide-industry-mobile-money.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_industry_mobile_money:
+        file: docs/okf/product/solution-pack/industry-mobile-money/user-guide-industry-mobile-money.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      admin_guide_industry_telecom:
+        file: docs/okf/product/solution-pack/industry-telecom/admin-guide-industry-telecom.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_industry_telecom:
+        file: docs/okf/product/solution-pack/industry-telecom/user-guide-industry-telecom.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      admin_guide_showcase_runbook:
+        file: docs/okf/product/solution-pack/la-audit/admin-guide-showcase-runbook.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_audit:
+        file: docs/okf/product/solution-pack/la-audit/user-guide-la-audit.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      admin_guide_install:
+        file: docs/okf/product/solution-pack/la-benefits/admin-guide-install.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_benefits:
+        file: docs/okf/product/solution-pack/la-benefits/user-guide-la-benefits.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      la_card__admin_guide_install:
+        file: docs/okf/product/solution-pack/la-card/admin-guide-install.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_card:
+        file: docs/okf/product/solution-pack/la-card/user-guide-la-card.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      la_claims__admin_guide_showcase_runbook:
+        file: docs/okf/product/solution-pack/la-claims/admin-guide-showcase-runbook.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_claims:
+        file: docs/okf/product/solution-pack/la-claims/user-guide-la-claims.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      la_crypto__admin_guide_install:
+        file: docs/okf/product/solution-pack/la-crypto/admin-guide-install.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_crypto:
+        file: docs/okf/product/solution-pack/la-crypto/user-guide-la-crypto.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      admin_guide_la_daily_feed:
+        file: docs/okf/product/solution-pack/la-daily-feed/admin-guide-la-daily-feed.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_daily_feed:
+        file: docs/okf/product/solution-pack/la-daily-feed/user-guide-la-daily-feed.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      la_health__admin_guide_install:
+        file: docs/okf/product/solution-pack/la-health/admin-guide-install.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_health:
+        file: docs/okf/product/solution-pack/la-health/user-guide-la-health.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      la_insider__admin_guide_install:
+        file: docs/okf/product/solution-pack/la-insider/admin-guide-install.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_insider:
+        file: docs/okf/product/solution-pack/la-insider/user-guide-la-insider.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      la_logistics__admin_guide_install:
+        file: docs/okf/product/solution-pack/la-logistics/admin-guide-install.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_logistics:
+        file: docs/okf/product/solution-pack/la-logistics/user-guide-la-logistics.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      la_mfs__admin_guide_install:
+        file: docs/okf/product/solution-pack/la-mfs/admin-guide-install.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_mfs:
+        file: docs/okf/product/solution-pack/la-mfs/user-guide-la-mfs.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      la_mobile_money__admin_guide_showcase_runbook:
+        file: docs/okf/product/solution-pack/la-mobile-money/admin-guide-showcase-runbook.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_mobile_money:
+        file: docs/okf/product/solution-pack/la-mobile-money/user-guide-la-mobile-money.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      la_ownership__admin_guide_install:
+        file: docs/okf/product/solution-pack/la-ownership/admin-guide-install.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_ownership:
+        file: docs/okf/product/solution-pack/la-ownership/user-guide-la-ownership.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      la_police__admin_guide_install:
+        file: docs/okf/product/solution-pack/la-police/admin-guide-install.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_police:
+        file: docs/okf/product/solution-pack/la-police/user-guide-la-police.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      la_procurement__admin_guide_install:
+        file: docs/okf/product/solution-pack/la-procurement/admin-guide-install.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_procurement:
+        file: docs/okf/product/solution-pack/la-procurement/user-guide-la-procurement.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      user_guide_la_sample:
+        file: docs/okf/product/solution-pack/la-sample/user-guide-la-sample.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      admin_guide_la_showcase_off:
+        file: docs/okf/product/solution-pack/la-showcase-off/admin-guide-la-showcase-off.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_showcase_off:
+        file: docs/okf/product/solution-pack/la-showcase-off/user-guide-la-showcase-off.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      admin_guide_cross_vertical_tour:
+        file: docs/okf/product/solution-pack/la-showcase/admin-guide-cross-vertical-tour.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_showcase_release:
+        file: docs/okf/product/solution-pack/la-showcase/admin-guide-showcase-release.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_variants_runbook:
+        file: docs/okf/product/solution-pack/la-showcase/admin-guide-variants-runbook.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_showcase:
+        file: docs/okf/product/solution-pack/la-showcase/user-guide-la-showcase.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      user_guide_new_users:
+        file: docs/okf/product/solution-pack/la-showcase/user-guide-new-users.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      user_guide_showcase_catalogue:
+        file: docs/okf/product/solution-pack/la-showcase/user-guide-showcase-catalogue.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      la_telco_ra__admin_guide_install:
+        file: docs/okf/product/solution-pack/la-telco-ra/admin-guide-install.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_telco_ra:
+        file: docs/okf/product/solution-pack/la-telco-ra/user-guide-la-telco-ra.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      la_trade__admin_guide_install:
+        file: docs/okf/product/solution-pack/la-trade/admin-guide-install.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_trade:
+        file: docs/okf/product/solution-pack/la-trade/user-guide-la-trade.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      la_utility__admin_guide_install:
+        file: docs/okf/product/solution-pack/la-utility/admin-guide-install.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_utility:
+        file: docs/okf/product/solution-pack/la-utility/user-guide-la-utility.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      admin_guide_mobile_money:
+        file: docs/okf/product/solution-pack/mobile-money/admin-guide-mobile-money.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_mobile_money:
+        file: docs/okf/product/solution-pack/mobile-money/user-guide-mobile-money.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      admin_guide_orders_starter:
+        file: docs/okf/product/solution-pack/orders-starter/admin-guide-orders-starter.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_orders_starter:
+        file: docs/okf/product/solution-pack/orders-starter/user-guide-orders-starter.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      admin_guide_partner_settlement:
+        file: docs/okf/product/solution-pack/partner-settlement/admin-guide-partner-settlement.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_partner_settlement:
+        file: docs/okf/product/solution-pack/partner-settlement/user-guide-partner-settlement.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      admin_guide_payment_fraud:
+        file: docs/okf/product/solution-pack/payment-fraud/admin-guide-payment-fraud.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_payment_fraud:
+        file: docs/okf/product/solution-pack/payment-fraud/user-guide-payment-fraud.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      admin_guide_telco_bypass:
+        file: docs/okf/product/solution-pack/telco-bypass/admin-guide-telco-bypass.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_telco_bypass:
+        file: docs/okf/product/solution-pack/telco-bypass/user-guide-telco-bypass.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      admin_guide_telco_fraud:
+        file: docs/okf/product/solution-pack/telco-fraud/admin-guide-telco-fraud.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_telco_fraud:
+        file: docs/okf/product/solution-pack/telco-fraud/user-guide-telco-fraud.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      admin_guide_telco_ra:
+        file: docs/okf/product/solution-pack/telco-ra/admin-guide-telco-ra.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_telco_ra:
+        file: docs/okf/product/solution-pack/telco-ra/user-guide-telco-ra.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+      admin_guide_telco_rerating:
+        file: docs/okf/product/solution-pack/telco-rerating/admin-guide-telco-rerating.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_telco_rerating:
+        file: docs/okf/product/solution-pack/telco-rerating/user-guide-telco-rerating.md
+        type: unsorted
+        tracks[2]: builder,business
+        audience: internal
+  understand:
+    title: Understand
+    group: Understand
+    summary: The concepts every track shares: Spaces, Datasets, Pipelines, Collectors, Expectations, Alert Rules, Incidents, Cases, Widgets, Space Templates, Apps, editions and Add-ons.
+    pages:
+      admin_guide_product:
+        file: docs/okf/product/layer/product/admin-guide-product.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_spaces:
+        file: docs/okf/product/layer/product/user-guide-spaces.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+  build_bring_data_in:
+    title: Bring data in
+    group: Build
+    summary: Add a file, watch a folder, connect SFTP, a database or object storage, read a stream.
+    pages:
+      user_guide_onboarding:
+        file: docs/okf/product/layer/product/user-guide-onboarding.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_connectors_kafka:
+        file: docs/okf/product/module/connectors-kafka/admin-guide-connectors-kafka.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_connectors_runbook:
+        file: docs/okf/product/module/connectors/admin-guide-connectors-runbook.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_connections:
+        file: docs/okf/product/module/connectors/user-guide-connections.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_la_storage:
+        file: docs/okf/product/module/la-storage/admin-guide-la-storage.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_telecom_asn1:
+        file: docs/okf/product/module/telecom-asn1/admin-guide-telecom-asn1.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_telecom_asn1:
+        file: docs/okf/product/module/telecom-asn1/user-guide-telecom-asn1.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+  build_shape:
+    title: Shape it
+    group: Build
+    summary: Pipelines, mappings and enrichment.
+    pages:
+      admin_guide_elt:
+        file: docs/okf/product/module/elt/admin-guide-elt.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_elt:
+        file: docs/okf/product/module/elt/user-guide-elt.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+  build_trust:
+    title: Trust it
+    group: Build
+    summary: Expectations, quarantine and duplicates.
+    pages:
+  build_analyse:
+    title: Analyse it
+    group: Build
+    summary: Queries, Studio, Link Analysis, the Geo map and the Assistant.
+    pages:
+      user_guide_catalog:
+        file: docs/okf/product/layer/product/user-guide-catalog.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_agent:
+        file: docs/okf/product/module/agent/admin-guide-agent.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_model_settings:
+        file: docs/okf/product/module/agent/user-guide-model-settings.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_analytics:
+        file: docs/okf/product/module/analytics/admin-guide-analytics.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_analytics_functions:
+        file: docs/okf/product/module/analytics/user-guide-analytics-functions.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_analytics:
+        file: docs/okf/product/module/analytics/user-guide-analytics.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_kpi_reports:
+        file: docs/okf/product/module/analytics/user-guide-kpi-reports.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_entity_store:
+        file: docs/okf/product/module/entity-store/admin-guide-entity-store.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_storage:
+        file: docs/okf/product/module/entity-store/user-guide-storage.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_geo_country:
+        file: docs/okf/product/module/geo-country/admin-guide-geo-country.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_geo_link:
+        file: docs/okf/product/module/geo-link/admin-guide-geo-link.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_geo_map:
+        file: docs/okf/product/module/geo-link/user-guide-geo-map.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_graph:
+        file: docs/okf/product/module/graph/user-guide-graph.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_intelligence:
+        file: docs/okf/product/module/intelligence/admin-guide-intelligence.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_ai_assist:
+        file: docs/okf/product/module/intelligence/user-guide-ai-assist.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_assist:
+        file: docs/okf/product/module/intelligence/user-guide-assist.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_inline_ai_authoring:
+        file: docs/okf/product/module/intelligence/user-guide-inline-ai-authoring.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_la_api:
+        file: docs/okf/product/module/la-api/admin-guide-la-api.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_demo:
+        file: docs/okf/product/module/la-core/admin-guide-demo.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_la_core:
+        file: docs/okf/product/module/la-core/admin-guide-la-core.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_la_core:
+        file: docs/okf/product/module/la-core/user-guide-la-core.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_a_getting_started:
+        file: docs/okf/product/module/la-core/user-guide-training-a-getting-started.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_b_building_a_graph:
+        file: docs/okf/product/module/la-core/user-guide-training-b-building-a-graph.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_c_the_canvas:
+        file: docs/okf/product/module/la-core/user-guide-training-c-the-canvas.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_d_analysis_toolbox:
+        file: docs/okf/product/module/la-core/user-guide-training-d-analysis-toolbox.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_e_keeping_and_sharing:
+        file: docs/okf/product/module/la-core/user-guide-training-e-keeping-and-sharing.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_f_investigations:
+        file: docs/okf/product/module/la-core/user-guide-training-f-investigations.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_g_geo_and_entity_pages:
+        file: docs/okf/product/module/la-core/user-guide-training-g-geo-and-entity-pages.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_h_administering_a_space:
+        file: docs/okf/product/module/la-core/user-guide-training-h-administering-a-space.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_i_advanced_edition:
+        file: docs/okf/product/module/la-core/user-guide-training-i-advanced-edition.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_training_scripts:
+        file: docs/okf/product/module/la-core/user-guide-training-scripts.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+  build_detect:
+    title: Detect
+    group: Build
+    summary: Alert Rules, real-time detection, Reconciliation, scoring, anomaly and screening.
+    pages:
+      admin_guide_anomaly:
+        file: docs/okf/product/module/anomaly/admin-guide-anomaly.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_anomaly:
+        file: docs/okf/product/module/anomaly/user-guide-anomaly.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_entity_list:
+        file: docs/okf/product/module/entity-list/admin-guide-entity-list.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_entity_list:
+        file: docs/okf/product/module/entity-list/user-guide-entity-list.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_reconciliation:
+        file: docs/okf/product/module/reconciliation/admin-guide-reconciliation.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_reconciliation:
+        file: docs/okf/product/module/reconciliation/user-guide-reconciliation.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_scoring:
+        file: docs/okf/product/module/scoring/admin-guide-scoring.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_decision_kernel:
+        file: docs/okf/product/module/scoring/user-guide-decision-kernel.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_scoring_entity_lists:
+        file: docs/okf/product/module/scoring/user-guide-scoring-entity-lists.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_screening:
+        file: docs/okf/product/module/screening/admin-guide-screening.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_screening:
+        file: docs/okf/product/module/screening/user-guide-screening.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+  build_respond:
+    title: Respond
+    group: Build
+    summary: Incidents, Cases, Workflow & SLA, four-eyes approval and notifications.
+    pages:
+      user_guide_alerts:
+        file: docs/okf/product/addon/incidents/user-guide-alerts.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_incidents:
+        file: docs/okf/product/addon/incidents/user-guide-incidents.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_action_requests:
+        file: docs/okf/product/module/action-requests/admin-guide-action-requests.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_action_requests:
+        file: docs/okf/product/module/action-requests/user-guide-action-requests.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_case_management:
+        file: docs/okf/product/module/case-management/admin-guide-case-management.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_case_management:
+        file: docs/okf/product/module/case-management/user-guide-case-management.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_notify_channels:
+        file: docs/okf/product/module/notify-channels/admin-guide-notify-channels.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_notifications:
+        file: docs/okf/product/module/notify-channels/user-guide-notifications.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_ops:
+        file: docs/okf/product/module/ops/admin-guide-ops.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_objects:
+        file: docs/okf/product/module/ops/user-guide-objects.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_regulatory_reporting:
+        file: docs/okf/product/module/regulatory-reporting/admin-guide-regulatory-reporting.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_regulatory_reporting:
+        file: docs/okf/product/module/regulatory-reporting/user-guide-regulatory-reporting.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_workflow:
+        file: docs/okf/product/module/workflow/admin-guide-workflow.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_maker_checker:
+        file: docs/okf/product/module/workflow/user-guide-maker-checker.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_workflow_sla:
+        file: docs/okf/product/module/workflow/user-guide-workflow-sla.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+  build_present:
+    title: Present
+    group: Build
+    summary: Dashboards, scheduled reports and sharing.
+    pages:
+      user_guide_dashboard:
+        file: docs/okf/product/layer/product/user-guide-dashboard.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_icon_settings:
+        file: docs/okf/product/layer/product/user-guide-icon-settings.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_studio:
+        file: docs/okf/product/layer/product/user-guide-studio.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+  ship:
+    title: Ship
+    group: Ship
+    summary: Move a Space, package and install an App, install an edition, deploy and upgrade.
+    pages:
+      admin_guide_apps:
+        file: docs/okf/product/layer/platform/admin-guide-apps.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_container_airgap:
+        file: docs/okf/product/layer/platform/admin-guide-container-airgap.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_deploy_kit:
+        file: docs/okf/product/layer/platform/admin-guide-deploy-kit.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_entitlements:
+        file: docs/okf/product/layer/platform/admin-guide-entitlements.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_exchange:
+        file: docs/okf/product/module/exchange/admin-guide-exchange.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_exchange:
+        file: docs/okf/product/module/exchange/user-guide-exchange.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+  manage_app:
+    title: Run your App
+    group: Manage
+    summary: Runs, data-quality breaches, Incidents and safe changes.
+    pages:
+      user_guide_journey_safe_config_change:
+        file: docs/okf/product/layer/product/user-guide-journey-safe-config-change.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_configuration_reference:
+        file: docs/okf/product/module/config/admin-guide-configuration-reference.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_config:
+        file: docs/okf/product/module/config/user-guide-config.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_grammar_config:
+        file: docs/okf/product/module/config/user-guide-grammar-config.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      config__user_guide_spaces:
+        file: docs/okf/product/module/config/user-guide-spaces.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_event:
+        file: docs/okf/product/module/event/admin-guide-event.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_events:
+        file: docs/okf/product/module/event/user-guide-events.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_observability:
+        file: docs/okf/product/module/observability/admin-guide-observability.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_observability_backup:
+        file: docs/okf/product/module/observability/user-guide-observability-backup.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+  manage_platform:
+    title: Run the platform
+    group: Manage
+    summary: Sign-in, Roles, Access Policies, masking, backup and restore, upgrades, monitoring and audit verification.
+    pages:
+      operations_guide:
+        file: docs/ADVANCED_GUIDE.md
+        title: Operations guide
+        type: reference
+        tracks[1]: operator
+        audience: external
+      admin_guide_gotchas:
+        file: docs/okf/product/layer/platform/admin-guide-gotchas.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_ha_dr_drill:
+        file: docs/okf/product/layer/platform/admin-guide-ha-dr-drill.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_launch_flags:
+        file: docs/okf/product/layer/platform/admin-guide-launch-flags.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_operations_reference:
+        file: docs/okf/product/layer/platform/admin-guide-operations-reference.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_operations:
+        file: docs/okf/product/layer/platform/admin-guide-operations.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_platform:
+        file: docs/okf/product/layer/platform/user-guide-platform.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_auth_security:
+        file: docs/okf/product/module/access/admin-guide-auth-security.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_access:
+        file: docs/okf/product/module/access/user-guide-access.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_backup_restore:
+        file: docs/okf/product/module/backup/admin-guide-backup-restore.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_la_store_pg:
+        file: docs/okf/product/module/la-store-pg/admin-guide-la-store-pg.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_oidc:
+        file: docs/okf/product/module/oidc/admin-guide-oidc.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_policy:
+        file: docs/okf/product/module/policy/admin-guide-policy.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_policy:
+        file: docs/okf/product/module/policy/user-guide-policy.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_secrets:
+        file: docs/okf/product/module/secrets/admin-guide-secrets.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+  develop:
+    title: Develop
+    group: Develop
+    summary: Requirements, architecture, design, build, test and release, for developers on Inspecto and for Inspecto's own engineers.
+    pages:
+      admin_guide_local_testing:
+        file: docs/okf/product/layer/platform/admin-guide-local-testing.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_uat_seeding:
+        file: docs/okf/product/layer/platform/admin-guide-uat-seeding.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_builder_kit:
+        file: docs/okf/product/layer/platform/user-guide-builder-kit.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_agent_hosted:
+        file: docs/okf/product/module/agent-hosted/admin-guide-agent-hosted.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_demo_auth:
+        file: docs/okf/product/module/demo-auth/admin-guide-demo-auth.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_demo_auth:
+        file: docs/okf/product/module/demo-auth/user-guide-demo-auth.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+  reference:
+    title: Reference
+    group: Reference
+    summary: The screen reference, the HTTP API, configuration and the glossary.
+    pages:
+      screen_reference:
+        file: docs/USER_GUIDE.md
+        title: Screen reference
+        type: reference
+        tracks[3]: builder,operator,business
+        audience: external
+      admin_guide_processor:
+        file: docs/okf/product/module/processor/admin-guide-processor.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      user_guide_diagnoses:
+        file: docs/okf/product/module/processor/user-guide-diagnoses.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      user_guide_jobs:
+        file: docs/okf/product/module/processor/user-guide-jobs.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
+      admin_guide_sql:
+        file: docs/okf/product/module/sql/admin-guide-sql.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+      admin_guide_util:
+        file: docs/okf/product/module/util/admin-guide-util.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
+  troubleshooting:
+    title: Troubleshooting
+    group: Troubleshooting
+    summary: Symptom, cause, fix.
+    pages:
+      admin_guide_troubleshooting:
+        file: docs/okf/product/layer/platform/admin-guide-troubleshooting.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal

@@ -11,3 +11,4 @@ export * from './schema-metadata-grid.component';
 export * from './schema-partitions-editor.component';
 export * from './time-zones';
 export * from './derived-schema-panel.component';
+export * from './basic-column-types';

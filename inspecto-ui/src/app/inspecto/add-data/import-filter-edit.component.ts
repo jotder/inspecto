@@ -8,14 +8,13 @@ import { apiErrorMessage } from '@inspecto/core/api';
 import { InspectoAlertComponent } from '@inspecto/core/components/alert.component';
 import { InspectoOptionPickerComponent, PickerOption } from '@inspecto/core/components/option-picker.component';
 import { PenFieldComponent } from '@inspecto/core/components/pen-field.component';
+import { BASIC_COLUMN_TYPE_LABELS, type BasicColumnType } from '@inspecto/core/schema/basic-column-types';
 import {
-    ColumnType,
     ImportFilterState,
     ROW_OP_LABELS,
     RowCondition,
     RowConditionState,
     RowOp,
-    TYPE_LABELS,
     buildFilter,
     conditionProblem,
     conditionState,
@@ -211,7 +210,11 @@ export class ImportFilterEditComponent {
         (this.state()?.columns ?? []).map((c) => ({ name: c.name, type: c.type, drop: false })),
     );
     protected readonly columnOptions = computed<PickerOption[]>(() =>
-        this.columns().map((c) => ({ value: c.name, label: c.name, hint: TYPE_LABELS[c.type as ColumnType] })),
+        this.columns().map((c) => ({
+            value: c.name,
+            label: c.name,
+            hint: BASIC_COLUMN_TYPE_LABELS[c.type as BasicColumnType],
+        })),
     );
     protected readonly problems = computed(() => this.states().map((c) => conditionProblem(c, this.columns())));
     protected readonly keepsLine = computed(() => {
