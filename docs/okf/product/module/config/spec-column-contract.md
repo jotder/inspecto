@@ -5,7 +5,7 @@ description: How the column contract (SE-3a, SE-3b) finds which Schema column ch
 item: module.config
 audience: internal
 status: current
-verified: 2026-11-13 last-edit
+verified: 2026-11-20 code-reviewed
 code: [platform/inspecto-config]
 ---
 

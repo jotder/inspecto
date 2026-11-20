@@ -5,7 +5,7 @@ description: Plan for making a Space something the server understands as a whole
 item: module.config
 audience: internal
 status: plan
-verified: 2026-11-17 last-edit
+verified: 2026-11-20 code-reviewed
 code: [platform/inspecto-config]
 ---
 

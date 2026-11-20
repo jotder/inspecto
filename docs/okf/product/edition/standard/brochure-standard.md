@@ -5,7 +5,7 @@ description: Sales brochure for the Standard edition: what it adds to Basic for 
 item: edition.standard
 audience: internal
 status: current
-verified: 2026-11-18 last-edit
+verified: 2026-11-20 code-reviewed
 code: offerings/standard.toon
 ---
 

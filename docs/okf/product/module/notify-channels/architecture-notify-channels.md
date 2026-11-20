@@ -5,7 +5,7 @@ description: How Notifications turn platform events into messages over three cha
 item: module.notify-channels
 audience: internal
 status: current
-verified: 2026-11-18 last-edit
+verified: 2026-11-20 code-reviewed
 code: [providers/inspecto-notify-channels]
 ---
 

@@ -8,7 +8,7 @@ timestamp: 2026-07-07T00:00:00Z
 item: module.analytics
 audience: internal
 status: current
-verified: 2026-11-16 last-edit
+verified: 2026-11-20 code-reviewed
 code: platform/inspecto-analytics
 ---
 

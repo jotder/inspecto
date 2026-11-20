@@ -5,7 +5,7 @@ description: How Reconciliation compares two or three Datasets at a key-column g
 item: module.reconciliation
 audience: internal
 status: current
-verified: 2026-11-18 last-edit
+verified: 2026-11-20 code-reviewed
 code: [features/inspecto-reconciliation]
 ---
 
