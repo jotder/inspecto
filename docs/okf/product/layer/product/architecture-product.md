@@ -107,7 +107,13 @@ open it as **Help**, and every page header links to its screen's chapter through
 `inspecto/help/help-chapter.ts` (USER-HANDBOOK-1). Outside the bundle, `tools/publish-handbook.mjs` (run by the `handoff`
 skill at shift end) rebuilds the external and internal Handbook into the gitignored `target/handbook/` and renders
 to the web and team places named in `handbook.toon`'s `handbook.publish` (`none` until D-UE8 and D-UE10 are decided);
-the internal render never goes to the external place. `angular.json` has no environment file
+the internal render never goes to the external place. Every Handbook page carries an **edition badge** derived, not
+typed: `tools/handbook-editions.mjs` maps the page's hub to its Product Map Item and reads the Item's first edition
+from `offerings/*.toon` (a page's `edition:` in `handbook.toon` only where nothing derives, or to narrow — never to
+widen; `check-handbook.mjs` refuses a page without one). The Handbook's **Reference** chapter holds three generated
+pages in this hub — `api-reference-http.md`, `api-reference-editions.md`, `api-reference-vocabulary.md` — written by
+`tools/render-handbook-reference.mjs` from `docs/api/openapi-v1.json` with the registering module per route, the
+Product Map and Offerings, and `GLOSSARY.md`; CI fails when they are stale. `angular.json` has no environment file
 replacement: `src/environments/environment.ts` is the file that ships.
 
 ## 4. Layering and where things live

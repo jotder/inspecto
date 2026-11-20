@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { CHAPTER_IDS } from './render-handbook.mjs';
 import { findings } from './check-handbook.mjs';
 
-const page = (id, file, extra = {}) => ({ id, chapter: 'start', file, type: 'reference', tracks: ['builder'], audience: 'external', ...extra });
+const page = (id, file, extra = {}) => ({ id, chapter: 'start', file, type: 'reference', tracks: ['builder'], audience: 'external', edition: 'Basic', ...extra });
 const book = (pages) => ({ title: 'H', chapters: CHAPTER_IDS.map((id) => ({ id, title: id, group: 'G', summary: '', pages: id === 'start' ? pages : [] })) });
 const READ = {
     'docs/A.md': '# A\ntext',
@@ -83,4 +83,13 @@ test('leak: an internal page never reaches the external render, and its links th
     assert.deepEqual(run(ALL), []);
     // making the guide external renders it and its link to A resolves
     assert.deepEqual(run([ALL[0], ALL[1], { ...ALL[2], audience: 'external' }]), []);
+});
+
+test('edition: every page resolves one; a declared one is known and never earlier than the derived one', () => {
+    assert.ok(run([...ALL, page('e', 'docs/H.md', { edition: null })]).some((f) => /edition: start\/e resolves no edition/.test(f)));
+    assert.ok(run([...ALL, page('e', 'docs/H.md', { declaredEdition: 'gold', edition: null })]).some((f) => /edition 'gold' is not one of/.test(f)));
+    assert.ok(run([...ALL, page('e', 'docs/H.md', { declaredEdition: 'basic', edition: 'Basic', derivedEdition: 'Standard' })])
+        .some((f) => /declares Basic, but its hub's Product Map Item first ships in Standard/.test(f)));
+    assert.deepEqual(run([...ALL, page('e', 'docs/H.md', { declaredEdition: 'advanced', edition: 'Advanced', derivedEdition: 'Standard' })]), [], 'narrowing is allowed');
+    assert.deepEqual(run([...ALL, page('e', 'docs/H.md', { declaredEdition: 'basic', edition: 'Basic', derivedEdition: null })]), [], 'declared where nothing derives');
 });

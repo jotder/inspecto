@@ -21,6 +21,7 @@ import { existsSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MANIFEST, loadManifest, writeRender } from './render-handbook.mjs';
+import { editionIndex, gatherFacts, withEditions } from './handbook-editions.mjs';
 
 export const LOCAL = { external: 'target/handbook/external', internal: 'target/handbook/internal' };
 
@@ -53,7 +54,7 @@ export function plan(publish, { exists = existsSync, list = readdirSync, real = 
 
 function main() {
     if (!existsSync(MANIFEST)) { console.error(`✗ publish-handbook: ${MANIFEST} not found — run from the repository root`); process.exit(2); }
-    const book = loadManifest(readFileSync(MANIFEST, 'utf8'));
+    const book = withEditions(loadManifest(readFileSync(MANIFEST, 'utf8')), editionIndex(gatherFacts('.')));
     let runs;
     try { runs = plan(book.publish); } catch (e) { console.error(`✗ publish-handbook: ${e.message}`); process.exit(1); }
     for (const { out, internal } of runs) {
