@@ -42,6 +42,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `AGT-SEGMENT-1` | P3 | chore | the assistant's commercial framing is an unvalidated product read. | — |
 | `PRODUCT-ASSEMBLY-1` | P2 | feature | Assemble finished domain Products and the Platform with chosen Add-ons from definition files, with one tool. | — |
 | `ADDON-PICKER-PAGE-1` | P3 | feature | the Add-on picker has no page yet: tools/pick-addons.mjs (PA-6c, 2026-11-11) is a CLI. | demand |
+| `INDUSTRY-CANONICAL-DATASETS-1` | P3 | feature | No Industry declares its canonical Datasets, though GLOSSARY.md says the Industry pack owns them and every App of the Industry reads them. | — |
 | `UI-ZONELESS-1` | P3 | chore | the app runs Zone.js on purpose; going zoneless needs a component-by-component audit first (filed 2026-11-15, so the code's pointer has a… | demand |
 | `UI-PICKER-OPTIONS-1` | P3 | feature | <inspecto-option-picker> gains nested options (a parent that opens to its children), a disabled option with its reason, and a per-picker… | demand |
 | `UI-SCHEMA-FORM-EDITOR-1` | P3 | feature | Move <inspecto-schema-form>'s in-row editor onto pen-field, which first needs several new pen-field features. | demand |
