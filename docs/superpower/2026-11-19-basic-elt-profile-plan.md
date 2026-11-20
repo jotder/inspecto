@@ -216,6 +216,12 @@ unless the operator objects.
 - **O7:** the recommendation is taken — the snapshot Pipeline's switch to `collector.connector: postgres` and the
   inline-snapshot migration wait for O6; then one idempotent switch function serves the commit and the migration (an
   old snapshot migrates at its first Run now), with Run now passing a run-scoped `replace`.
+- **O6 build:** `output.load` is not refused on a Basic save (O2: nothing refused on load or save; the single-local-
+  Parquet rule still applies); a config-path replacement that fails after the commit keeps the committed rows and
+  logs ERROR (no Incident) rather than deleting rows behind a SUCCESS ledger row.
+- **B3 part 2:** a Basic import's duplicate check stays editable (the Basic profile declares it Basic's); a waiting
+  file reusing a taken name with other bytes goes to `refused/` by default (`on_change: ignore` + the name rule); an
+  import left on `path` still answers Add a file's `409` from the ledger.
 
 | # | Decision | Recommendation |
 |---|---|---|
