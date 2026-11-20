@@ -164,7 +164,7 @@ import com.gamma.access.AuditTrail;
  *   POST /connections/{id}/test               TCP-reachability + secret-resolution test     [v4.2.0]
  *   POST /connections                         body {id,connector,…} — create (write-root gated); 409 if id exists [v4.2.0]
  *   PUT  /connections/{id}                    replace a profile (masked secrets preserved); 404 if unknown [v4.2.0]
- *   DELETE /connections/{id}                  remove a profile; 404 if unknown, 409 if in use by a pipeline [v4.2.0]
+ *   DELETE /connections/{id}                  remove a profile; 404 if unknown, 409 if in use by a pipeline or a Postgres snapshot [v4.2.0]
  * </pre>
  *
  * <p>The {@code /catalog*}, {@code /config/spec/*} and {@code /assist/*} routes require the

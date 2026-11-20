@@ -56,6 +56,7 @@ above.
 | SP-ACQ-18 | 🌐 REST API poller & paged ingest (`acquisition.api.rest`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
 | SP-ACQ-19 | 🪝 HTTP webhook listener endpoint (`acquisition.api.webhook`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
 | SP-ACQ-20 | 🔌 gRPC stream receiver (`acquisition.api.grpc`) | Collectors & Ingestion | 🔲 | 🔲 | 🔲 | — |  |
+| SP-ACQ-21 | 🐘 Postgres table or query copy (`acquisition.db.postgres`) | Collectors & Ingestion | ✅ | ✅ | ✅ | `acquisition` | the `postgres` connector (`connector: postgres`; DuckDB's postgres extension, no driver): one table or read-only query per run, a read-only login, the password an `INSPECTO_PG_` reference only. Every edition, Basic included: Add data's Choose a table (BASIC-ELT-PROFILE-1 BE-4) |
 | SP-PRS-01 | 📄 Delimited / CSV / TSV / PSV parser (`parser.delimited`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.delimited` |  |
 | SP-PRS-02 | 📦 Fixed-width column slicer (`parser.fixedwidth`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.fixedwidth` | text (`record: line`) and fixed-length binary (`record: bytes`) |
 | SP-PRS-03 | 🧬 JSON object & JSON Lines (NDJSON) parser (`parser.json`) | Extraction & Format Parsers | ✅ | ✅ | ✅ | `parser.json` |  |
@@ -159,7 +160,7 @@ above.
 | SP-SNK-14 | 🪝 Outbound webhook dispatcher (`sink.api.webhook`) | Sinks, Storage & Destinations | — | ✅ | ✅ | `sink.webhook` | top-level `webhook:` — JSON batches to an https Connection, at-rest lane, Standard+ |
 | SP-SNK-15 | 🕳️ Dead-letter queue (`sink.dlq`) | Sinks, Storage & Destinations | 🔲 | 🔲 | 🔲 | — |  |
 
-**Count:** 122 processors — 54 delivered, 17 partial, 51 planned.
+**Count:** 123 processors — 55 delivered, 17 partial, 51 planned.
 
 **SP-CTL-07 behaviour change 2026-10-07 (operator, MODULE-REORG-P7-INCIDENTS slice 2): Alert records are durable on EVERY edition, Basic included.** Fired Alerts live in an Alert-owned store (`ALERTS` family, the Space's own `duckdb/inspecto-alerts.db`, `-Dalerts.backend=db` default), not in operational objects: wherever an Alert does fire on Basic (rule authoring is Standard+, so this is the rules a Basic Space was handed), it now remembers its Alerts across a restart — `GET /alerts` history survives and an open Alert is not re-fired. Basic still has NO Incidents, Cases or operational objects (CP-11 unchanged); only the Incident escalation is skipped there. A Basic operator works a stored Alert with `POST /alerts/{id}/ack|resolve` (`canWorkIncidents`, a no-op without a Subject). (Narrative kept here, outside the generated rows: the catalog `note` stays short.)
 

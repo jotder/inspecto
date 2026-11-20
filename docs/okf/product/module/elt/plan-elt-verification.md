@@ -392,7 +392,7 @@ against `git ls-files` and the module tree — and in this area, that check woul
 | The transform guard | `SqlGuard` | on the save path since 2026-09-09 (`PipelineEditable.refuseUnsafeSql`) |
 | The legacy read bridge | `DataTransformer.recordFields` | |
 | The function catalogue | `sql-functions.ts` (23 in 7 categories) | |
-| The processor catalogue | `processor-catalog.contract.json` (122<!--count:processors--> = 34/18/67) | every statement of this number is derived by `tools/check-doc-counts.mjs` |
+| The processor catalogue | `processor-catalog.contract.json` (123<!--count:processors--> = 34/18/67) | every statement of this number is derived by `tools/check-doc-counts.mjs` |
 | The editor, the panes, the palette, unmodelled config, the transform pane | [user-guide-elt.md](user-guide-elt.md) | |
 | Identity & lifecycle | `PipelineSettingsRoutes`, `PipelineRenameRoutes` | [Pipeline identity](../processor/spec-pipeline-identity.md) |
 | The backend graph model | [architecture](architecture-elt.md) · [Pipeline spec — model](spec-pipeline-model.md) | |

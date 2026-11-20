@@ -33,7 +33,8 @@ caller picks both the host and the variable, so any other name would let anyone 
 secret (a cloud key, the keystore password) to a Postgres server they run. Naming the variable `INSPECTO_PG_…` is the
 administrator's statement that it may go to a database. Gates: as Add data (401/403 → 503 → `data.self_import` 403),
 then 422 for a malformed connection, a raw password (never echoed), a reference outside the prefix (refused by its
-name, nothing resolved), an unset variable (named), a query that is not one
+name, nothing resolved), a host the Safety Policy refuses (`EgressGate`, checked before the password is looked up,
+the policy's reason in the answer; BE-4 part 2, also on Run now), an unset variable (named), a query that is not one
 `SELECT` / `WITH` (`;` inside, or another verb), a write-capable login, an empty result; 413 above
 `import.max_rows`. Rate class: the standard bucket. The commit is the ordinary `/onboard/files/{draftId}/commit`;
 for a snapshot draft it also saves a **`postgres` Connection** `<id>_postgres` (`<write root>/<id>_postgres_connection.toon`:
@@ -45,7 +46,9 @@ saved through the same save as `POST /connections` (`ConnectionRoutes.validatePr
 administrator saves or edits a `postgres` Connection by hand. Both are decided before the commit writes anything:
 409 when a Connection `<id>_postgres` or the snapshot file already exists, 422 when the Connection save would refuse
 it; a failed commit removes both. Deleting the Dataset deletes the snapshot file and the Connection it names when
-that is `<id>_postgres` and no Pipeline is bound to it. **Snapshots committed before 2026-11-19** keep their connection
+that is `<id>_postgres` and no Pipeline is bound to it. While the snapshot stands, `DELETE /connections/{id}` refuses
+its Connection: 409 naming the Dataset, no server path in the answer (`PostgresSnapshot.readBy`: the Connection a
+`_snapshot.toon` names, or `<id>_postgres` when that file cannot be read; BE-4 part 2). **Snapshots committed before 2026-11-19** keep their connection
 inline in `_snapshot.toon` (connection map + schema/table or query): Run now reads that shape as it is (validated as a
 request body), refreshes through the same connector, and never rewrites it or makes a Connection for it (read-both,
 not migrate-on-write). Only this commit writes the snapshot file: an import into an existing Space carrying a `*_snapshot.toon` anywhere is refused
@@ -118,6 +121,10 @@ Connection saved only with an `INSPECTO_PG_` reference (create and update), the 
 removal with the Dataset, a pre-BE-4 inline snapshot refreshing unchanged, and a taken Connection name refusing the
 commit whole; `ControlApiSnapshotExportTest` runs its failed-export case on both shapes. 13 + 9 + 6 ran against a
 throwaway `postgres:18` container, 0 skipped.
+BE-4 part 2 (2026-11-20, no database needed): `ControlApiPostgresSnapshotTest` adds the Safety Policy refusing a host
+on the test and the copy before the password lookup, and `DELETE /connections/{id}` on a snapshot's Connection over
+every gate (503, 401, 403, 404, 409 for a named and an unreadable `_snapshot.toon`, 200 once the snapshot is gone);
+`PostgresConnectorFactoryTest` the gate on the export, the table list and a Pipeline's `fetchTo`. Each guard falsified.
 `ControlApiSnapshotExportTest` needs no database:
 - the export handed over as `refresh` does is moved in and imported like an upload; the row filter applies, the
   arrival is recorded and the temporary folder is gone. A watcher thread saw only the complete file in the inbox; it

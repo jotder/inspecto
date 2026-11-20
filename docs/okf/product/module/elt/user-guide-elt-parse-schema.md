@@ -303,7 +303,7 @@ Decided 2026-09-04 after driving the clickable mockup (Artifact *Pipeline Author
 🔴 **What prompted them: the mockup's sample was chosen to flatter the design.** Both boards were drawn
 over a 7-column orders CSV, where "one row per field" reads as clarity. This product's real feeds are not
 that shape — ASN.1, fixed-width and network sources routinely carry hundreds of fields — and at 600 the
-same table is a wall. The evidence was already in the repo (the parser lanes, the **122**<!--count:processors-->-processor catalog)
+same table is a wall. The evidence was already in the repo (the parser lanes, the **123**<!--count:processors-->-processor catalog)
 and was not applied. Both mockup boards now carry 65 columns instead of 7. ⚠ The BACKLOG row `AUTHORING-WIDE-1`
 said "none built" for two days after — a fresh grep, not the row, is the source of truth ([[stale-residuals-in-shipped-rows]]).
 

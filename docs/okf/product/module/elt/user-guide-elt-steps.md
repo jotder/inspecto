@@ -57,7 +57,7 @@ Backend detail: [Pipeline spec — model](spec-pipeline-model.md).
 (`GET /pipelines/processor-catalog`, `ProcessorCatalog` in `inspecto-engine`, pinned by
 `processor-catalog.contract.json`): eight families (Collectors & Ingestion · Extraction & Format Parsers ·
 Data Quality · Transformers & Dimensional Modeling · Analytics/Time-Series · Enrichment & AI/ML · Control &
-Governance · Sinks), **122**<!--count:processors--> processors, **every one visible** *(⚠ this said 121 until 2026-09-09; `processor-catalog.contract.json` carries 122<!--count:processors--> — 54<!--count:processors-delivered--> delivered / 17<!--count:processors-partial--> partial / 51<!--count:processors-planned--> planned)*. A processor whose `addable` flag is true (it maps
+Governance · Sinks), **123**<!--count:processors--> processors, **every one visible** *(⚠ this said 121 until 2026-09-09; `processor-catalog.contract.json` carries 123<!--count:processors--> — 55<!--count:processors-delivered--> delivered / 17<!--count:processors-partial--> partial / 51<!--count:processors-planned--> planned)*. A processor whose `addable` flag is true (it maps
 onto an authorable node type) is an ordinary add/drag entry for THAT node type; a planned processor, or a
 capability that is not a Step (a Collector guarantee, a job type, a Studio surface), renders **inactive** —
 `role=button aria-disabled`, tooltip and accessible name carrying why, a `soon` / `via <capability>` chip —

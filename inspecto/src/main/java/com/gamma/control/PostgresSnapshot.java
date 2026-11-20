@@ -331,6 +331,33 @@ final class PostgresSnapshot {
         Files.deleteIfExists(f);
     }
 
+    /**
+     * The Dataset whose snapshot reads through the saved Connection {@code connId}, or null (BE-4 part 2: what
+     * {@code DELETE /connections/{id}} refuses). A snapshot reads through the Connection its {@code _snapshot.toon} names; one
+     * whose file cannot be read is taken to read through the Connection its commit saves ({@link #connectionId}), so an
+     * unreadable file never lets that Connection go.
+     */
+    static String readBy(Path writeRoot, String connId) throws IOException {
+        Path dir = writeRoot.resolve(OnboardImport.CONFIG_DIR);
+        if (connId == null || !Files.isDirectory(dir)) return null;
+        String wanted = connId.trim();
+        try (var files = Files.list(dir)) {
+            for (Path f : (Iterable<Path>) files.sorted()::iterator) {
+                String name = f.getFileName().toString();
+                if (!name.endsWith(SUFFIX) || !Files.isRegularFile(f)) continue;
+                String id = name.substring(0, name.length() - SUFFIX.length());
+                Object named;
+                try {
+                    named = com.gamma.util.ToonHelper.load(f.toString()).get("connection");
+                } catch (IOException | RuntimeException unreadableFile) {
+                    named = connectionId(id);
+                }
+                if (named instanceof String s && wanted.equals(s.trim())) return id;
+            }
+        }
+        return null;
+    }
+
     private static ApiException unreadable(String id) {
         return new ApiException(409, ErrorCodes.CONFLICT, "the snapshot settings of '" + id + "' (" + OnboardImport.CONFIG_DIR + "/"
                 + id + SUFFIX + ") cannot be read");

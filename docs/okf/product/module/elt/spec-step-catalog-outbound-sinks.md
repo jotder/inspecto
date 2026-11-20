@@ -268,7 +268,7 @@ directory has no owning node, and a save preserves it.
 
 # Part B — the Step Processor catalog (the palette's taxonomy)
 
-The palette lists **122**<!--count:processors--> processors in eight families. A **delivered** processor is a label over a
+The palette lists **123**<!--count:processors--> processors in eight families. A **delivered** processor is a label over a
 Step kind or an engine capability that ships today; the *Maps to* column says which. A **partial**
 processor has something real behind it, but not as a chain Step or not the whole promise — the
 *What exists today* column is the honest boundary. A **planned** processor renders inactive in the

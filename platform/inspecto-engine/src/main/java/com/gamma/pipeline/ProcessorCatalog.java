@@ -74,10 +74,19 @@ public final class ProcessorCatalog {
 
     /**
      * The acquisition processors that collect from a remote system ({@code DATA-TIERS-1} P4): locked in Basic's palette by
-     * {@link com.gamma.etl.EditionFeatures#REMOTE_SYSTEMS}. The local folder and the Dataset entry stay on every edition.
+     * {@link com.gamma.etl.EditionFeatures#REMOTE_SYSTEMS}, all but {@link #BASIC_POSTGRES}. The local folder and the Dataset
+     * entry stay on every edition.
      */
     private static final Set<String> REMOTE_ACQUISITION = Set.of("acquisition.file.sftp", "acquisition.db.jdbc",
-            "acquisition.file.s3", "acquisition.file.azure", "acquisition.file.gcs", "acquisition.stream.kafka");
+            "acquisition.file.s3", "acquisition.file.azure", "acquisition.file.gcs", "acquisition.stream.kafka", "acquisition.db.postgres");
+
+    /**
+     * <b>The Basic exemption</b> ({@code BASIC-ELT-PROFILE-1} BE-4): the one remote acquisition Basic keeps - the {@code postgres}
+     * connector, which Add data's <i>Choose a table</i> reads through (DT-4 reversed for Postgres only). It is remote, so it is
+     * listed in {@link #REMOTE_ACQUISITION}, and {@link #featureOf} answers no lock for it by this name alone. The single
+     * place to change when the Basic-profile declaration (the plan's Gate) takes over the exemptions.
+     */
+    public static final String BASIC_POSTGRES = "acquisition.db.postgres";
 
     /**
      * The Step node types Basic's no-code shaping keeps (DT-7, DT-15): filter rows and dedupe. {@code transform.mask} has its
@@ -87,11 +96,12 @@ public final class ProcessorCatalog {
 
     /**
      * The edition feature a processor needs beyond Basic ({@code DATA-TIERS-1} P4 / P6), or null when every edition offers it: a
-     * remote acquisition needs {@link com.gamma.etl.EditionFeatures#REMOTE_SYSTEMS}; a Step that computes, joins, enriches
+     * remote acquisition needs {@link com.gamma.etl.EditionFeatures#REMOTE_SYSTEMS} (not {@link #BASIC_POSTGRES}); a Step that computes, joins, enriches
      * or summarises - every mapped {@code transform.*} Step but the no-code ones, and reference enrichment - needs
      * {@link com.gamma.etl.EditionFeatures#PIPELINE_TRANSFORM}. A screen gate only (§5.3): the palette locks it, nothing refuses it.
      */
     public static String featureOf(Processor p) {
+        if (BASIC_POSTGRES.equals(p.id())) return null;   // the Basic exemption, named
         if (REMOTE_ACQUISITION.contains(p.id())) return com.gamma.etl.EditionFeatures.REMOTE_SYSTEMS;
         String t = p.nodeType();
         if (t == null) return null;
@@ -136,6 +146,7 @@ public final class ProcessorCatalog {
             p("ACQ", "acquisition.api.rest", "🌐", "heroicons_outline:globe-alt", "REST API poller & paged ingest", Status.PLANNED, null, null, null),
             p("ACQ", "acquisition.api.webhook", "🪝", "heroicons_outline:link", "HTTP webhook listener endpoint", Status.PLANNED, null, null, null),
             p("ACQ", "acquisition.api.grpc", "🔌", "heroicons_outline:bolt", "gRPC stream receiver", Status.PLANNED, null, null, null),
+            p("ACQ", BASIC_POSTGRES, "🐘", "heroicons_outline:circle-stack", "Postgres table or query copy", Status.DELIVERED, "acquisition", null, "the `postgres` connector (`connector: postgres`; DuckDB's postgres extension, no driver): one table or read-only query per run, a read-only login, the password an `INSPECTO_PG_` reference only. Every edition, Basic included: Add data's Choose a table (BASIC-ELT-PROFILE-1 BE-4)"),
             p("PRS", "parser.delimited", "📄", "heroicons_outline:table-cells", "Delimited / CSV / TSV / PSV parser", Status.DELIVERED, "parser.delimited", null, null),
             p("PRS", "parser.fixedwidth", "📦", "heroicons_outline:view-columns", "Fixed-width column slicer", Status.DELIVERED, "parser.fixedwidth", null, "text (`record: line`) and fixed-length binary (`record: bytes`)"),
             p("PRS", "parser.json", "🧬", "heroicons_outline:code-bracket", "JSON object & JSON Lines (NDJSON) parser", Status.DELIVERED, "parser.json", null, null),

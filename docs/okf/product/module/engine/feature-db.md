@@ -13,7 +13,7 @@ tags: [feature-db, module]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-131 row(s).
+132 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
@@ -109,6 +109,7 @@ tags: [feature-db, module]
 | Pearson & Spearman correlation matrix | processor | engine | basic;standard;advanced;preview |  | delivered | `transform.stats.correlation` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | Period-over-period (YoY / MoM / WoW) shift | processor | engine | basic;standard;advanced;preview |  | delivered | `transform.timeseries.shift` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | PII masking & tokenization | processor | engine | basic;standard;advanced;preview |  | delivered | `quality.pii.mask` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
+| Postgres table or query copy | processor | engine | basic;standard;advanced;preview |  | delivered | `acquisition.db.postgres` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | Presorted stream merge joiner | processor | engine | basic;standard;advanced;preview |  | planned | `transform.join.merge` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | Protocol Buffers decoder | processor | engine | basic;standard;advanced;preview |  | planned | `parser.binary.protobuf` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |
 | Quarantine error-log store | processor | engine | basic;standard;advanced;preview |  | partial | `sink.quarantine` | `inspecto-ui/src/app/inspecto/contracts/processor-catalog.contract.json` |

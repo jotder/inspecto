@@ -114,6 +114,9 @@ class ControlApiDataTierScreenGatesTest {
             assertEquals("remoteSystems", procs.get("acquisition.file.sftp"));
             assertEquals("remoteSystems", procs.get("acquisition.db.jdbc"));
             assertNull(procs.get("acquisition.file.local"), "a folder on this machine is every edition's");
+            // BASIC-ELT-PROFILE-1 BE-4: the postgres connector is listed, and is the one remote acquisition Basic keeps
+            assertTrue(procs.containsKey("acquisition.db.postgres"), "the catalog lists the postgres connector: " + procs.keySet());
+            assertNull(procs.get("acquisition.db.postgres"), "Add data's Choose a table reads through it on Basic");
             assertEquals("pipelineTransform", procs.get("transform.join"));
             assertEquals("pipelineTransform", procs.get("transform.record"), "the SQL Step");
             assertEquals("pipelineTransform", procs.get("enrichment.reference"));
