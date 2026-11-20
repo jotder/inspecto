@@ -41,7 +41,7 @@ the console, the API and this Handbook use the same word.
 - **Share** — One entry of a registry component's optional sharing envelope (`shares: [{subjectType: role|user, subjectId, access: view|edit}]`, plus `owner`): an intra-Space, per-subject access grant on that one component.
 - **Access Policy** — An authorable **allow/deny statement over Attributes** (Advanced policy engine): `{name, effect: allow|deny, target: {actions?, resourceKinds?}, when: <condition>}` in a per-space `access-policies.toon` (`GET/PUT /access/policies`); the `when` condition is the shared `Conditions` grammar over `subject.* / resource.* / env.*`.
 - **Safety Policy** — What a Space's **runs may touch**: filesystem roots, network hosts, Connector schemes, DuckDB extensions, output formats, caps and progress-state advances.
-- **Attribute** — A named **subject / resource / environment fact** an Access Policy conditions on: subject = `id`, `capabilities`, `dataScopes`, plus IdP claims allowlisted in `roles.toon` `identity.attributeClaims` (never the raw token); resource = the component/object envelope (`kind`, `space`, `owner`, `tags`, …); environment = `action` (read/write/operate), `route`.
+- **Attribute** — A named **subject / resource / environment fact** an Access Policy conditions on: subject = `id`, `capabilities`, `dataScopesroles.toon` `identity.attributeClaims` (never the raw token); resource = the component/object envelope (`kind`, `space`, `owner`, `tags`, …); environment = `action` (read/write/operate), `route`.
 - **Workbench** — The Builder surface for acquisition + processing authoring: Connections, Collectors, and Pipelines.
 - **Studio** — The Builder surface for BI authoring: Datasets, Widgets, Dashboards, plus the Link Analysis and Geo Map Analysis studios.
 - **Requirement** — A Business-authored request for a deliverable — **KPI | Report | Reconciliation | Rule** — with lifecycle `submitted → accepted | rejected → delivered` (Business submits; Builder triages the intake queue and decides; delivery is recorded against the requirement), linkable to the Component(s) that satisfy it.
@@ -120,7 +120,7 @@ the console, the API and this Handbook use the same word.
 - **Scheduler** — The Operations engine that owns **Triggers** and starts **Executables** (Pipelines or Jobs).
 - **Run** — One execution of an Executable.
 - **Archive** — A **container file** the operator drops in the inbox that holds many inner files: `.zip`, `.tar`, `.tar.gz`.
-- **Entry** — **One inner file of an Archive.** ⛔ **Never call it a "member".** `Batch.Member` already means "a file in a Consignment", and an Entry only *becomes* a Member after the Unpack stage materializes it — using one word for both makes the container↔content boundary unsayable.
+- **Entry** — **One inner file of an Archive.**
 - **Unpack** — The **Collector-level stage** that expands compressed and archived inbox candidates into plain files before freezes the candidate list.
 - **Expression** — A `$`-token an author writes in place of a literal value, **resolved at fire time** against the Run's context: `$today` · `$run.actor` · `$signal.<path>` · `$day(-1)` · `$upstream(<job>).artifact(<name>).<attr>`.
 - **Platform Service** — An engine facility exposed to Jobs, packs and (stage 2) executable Steps through the typed lookup, granted by a declared `requires:` list that **fails closed at registration** (unknown or build-absent service id refuses the type/pack).
@@ -198,7 +198,7 @@ the console, the API and this Handbook use the same word.
 - **Disposition** — The decided outcome an **Incident** or a **Case** resolves with (built-in ladder: confirmed · false-positive · recovered · written-off · inconclusive · duplicate · accepted-risk; wire values `CONFIRMED` … `ACCEPTED_RISK`).
 - **Case Rule** — A saved search that **auto-groups Incidents into a Case** (C5): when ≥ *threshold* Incidents match its filter within a *window*, they are grouped under one Case (opened, or attached to the rule's still-open Case).
 - **Escalation Rule** — What the SLA sweep does to an operational object that **breaches** an SLA target (response or resolution) or reaches an **age**: reassign it, notify (an `OBJECT_ESCALATED` event at WARN, picked up by the built-in `builtin-escalation` notification rule) and/or raise its priority one step (LOW → MINOR → MAJOR → CRITICAL, never past CRITICAL).
-- **Triage / Triage Run** — A **Triage** is the Assistant's **RCA playbook** (the Type: root-cause or impact, `pack.Playbooks`, run by `pack.Investigator`); a **Triage Run** is **one run of a Triage against a single Incident** (the Instance): trigger signal, timeline, hypotheses, outcome and any draft fixes.
+- **Triage / Triage Run** — A **Triage** is the Assistant's **RCA playbook**; a **Triage Run** is **one run of a Triage against a single Incident** (the Instance): trigger signal, timeline, hypotheses, outcome and any draft fixes.
 - **Incident Brief** — What the Assistant's agent produces when it works **one Incident**: why it fired, cited evidence, a *declared* value at risk, and at most one proposed **Consequence** filed as a four-eyes **Action Request**.
 - **Investigation** — The Link Analysis **enquiry object**: an ordered, replayable log of analyst ops (`seed`, `expand`, `exclude`, `hide`, `keep`) over a graph, plus the Working Set it evaluates to.
 - **Graph Run** — One execution of one Link Analysis graph algorithm (of 29) on the server over an Investigation's Working Set, started with `POST /inv/graph/runs`, polled, cancellable, and ending in exactly one of `COMPLETED`, `CANCELLED`, `BUDGET_EXCEEDED` or `FAILED`.
@@ -235,13 +235,13 @@ the console, the API and this Handbook use the same word.
 ## Graphs & Relationships
 
 - **Graph** — A queryable relationship object: **Nodes** + typed **Edges** that can be traversed, analyzed (paths, centrality, communities), and rendered.
-- **Node / Edge** — The *generic rendering* primitives (`G6GraphData {nodes, edges}`) shared by one renderer.
+- **Node / Edge** — The *generic rendering* primitives shared by one renderer.
 - **GraphSource** — Where a Graph's nodes/edges come from.
 - **Lineage vs Provenance** — **Lineage** = the *derived asset graph* (which asset feeds which); design-time, structural.
 - **Entity / Link** — An **Entity** is a business node (a caller, an account); a **Link** is a business edge between Entities (a call, a transaction) carrying typed attributes (call-type, duration).
 - **Entity Projection** — The **mapping** (not a store) that folds a **Dataset**'s rows into an Entity/Link graph: column → source Entity, column → target Entity, optional columns → Link type/attributes.
 - **Inspecto LA** — The **product** that sells Link Analysis: the standalone `la-app` (title, header, sign-in screen, browser tab) and the documents written for its buyers and users.
-- **Link Analysis Studio** — The Builder-lens Studio pane (`/studio/link-analysis`) for graph investigation: pick a **GraphSource** + query, render via the shared G6 host, analyze (paths, neighborhood, centrality, communities).
+- **Link Analysis Studio** — The Builder-lens Studio pane (`/studio/link-analysislink-analysis-view`); when its source is `entity-projection` it is a **Widget** (a Graph Visualization Type bound to a Dataset).
 - **Link Analysis limit** — One configurable bound of Link Analysis (a cap, budget, timeout, page size, pool size or rate), declared once in the catalogue with a default and an allowed range and enforced by the server.
 - **Entity Type** — A named kind of business identifier (`subscriber`, `imsi`, `imei`, `msisdn`, `wallet`, `account`, `agent`, `handset`, `cell`), configured **per Space** in `link-analysis.toon`.
 - **Entity Type family** — The neutral group every **Entity Type** sits under, from a closed core set: *Party · Organisation · Account · Identifier · Device · Place · Document*.
@@ -261,7 +261,7 @@ the console, the API and this Handbook use the same word.
 - **Geo Map Analysis Studio** — The Builder-lens Studio pane (`/studio/geo-map`, Phase 1) for geographic investigation: pick a **GeoSource** + **GeoQuery**, render on the offline MapLibre host, investigate (search, nearby, heatmap, time filter).
 - **GeoSource** — Where a map's points/routes come from — the geo seam parallel to **GraphSource** (one map renderer + one query seam + many sources).
 - **GeoQuery** — A GeoSource's saved query configuration: Dataset + location/entity/kind/time column mapping + filters.
-- **GeoPoint / GeoRoute** — The generic map-rendering primitives (`GeoData {points, routes}`, WGS84), the geo analog of Node/Edge.
+- **GeoPoint / GeoRoute** — The generic map-rendering primitives, the geo analog of Node/Edge.
 - **Geo View** — A saved geo investigation (Component kind `geo-map-view`): GeoSource id + GeoQuery + display options + camera.
 - **Layer** — A toggleable stratum of the map display: the offline **basemap** layers, the data plane (points/routes), and overlays (heatmap; Phase 3 boundaries/custom GeoJSON).
 - **Geocoder** — The pluggable seam that turns a place *name* into candidate coordinates (the "find place" jump), parallel to **GeoSource**.
@@ -277,7 +277,7 @@ the console, the API and this Handbook use the same word.
 
 ## Capability areas (the functional spine)
 
-- **Control API** — The versioned HTTP control plane: the `/api/v1` business contract, its envelope and error-code catalog, the OpenAPI document, ETag concurrency, `GET /bootstrap`, and the Java embedding API's stability policy (`@PublicApi`).
+- **Control API** — The versioned HTTP control plane: the `/api/v1GET /bootstrap`, and the Java embedding API's stability policy.
 - **Edition** — A **build flavour** of one Inspecto version — **Basic** · **Standard** · **Advanced**, plus **Preview** (everything, demo sign-in, never sold) — assembled by `package.ps1` from Maven profiles and modules.
 - **Compliance** — The controls, evidence and packaging obligations that let a deployment pass an external audit (SOC 2 / ISO 27001 / HIPAA / PCI scope): SBOM per bundle, signed releases, the dependency-review baseline, and the controls matrix.
 - **Compliance Control** — **One row of the controls matrix**: an obligation stated by an external framework, mapped to what this product does about it, who is responsible and which evidence file attests to it. 🔴 **Its identifiers are externally owned and there is no product-side control id** — the matrix is keyed on SOC 2 TSC, ISO 27001:2022 Annex A and NIST 800-53 identifiers, and `controlId` appears nowhere in the code.
@@ -311,4 +311,4 @@ the console, the API and this Handbook use the same word.
 - **Decision Kernel** — The base capability every **Decision Engine** (§4) runs on: the **Condition Language**, the when / if / then model and the **Consequence registry**.
 - **Condition Language** — The **condition tree** in which every Decision Engine states its condition.
 - **Consequence registry** — The open contribution point where modules register **Consequences** (§4).
-- **Model Escalation Ladder** — `inspecto-agent`'s: a procedural, synchronous LLM retry ladder triggered by a confidence threshold.
+- **Model Escalation Ladder** — a procedural, synchronous LLM retry ladder triggered by a confidence threshold.

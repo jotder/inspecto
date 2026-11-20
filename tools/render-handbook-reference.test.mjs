@@ -51,6 +51,11 @@ test('firstSentence: stops at the first sentence end outside parentheses and cod
     assert.equal(firstSentence('A gate (e.g. `canX` — `LensService`). X.'), 'A gate.');
     assert.equal(firstSentence('A trail (exports; `okf/a/plan.md` §3). X.'), 'A trail.');
     assert.equal(firstSentence('Rules incl. transforms. X.'), 'Rules incl. transforms.');
+    assert.equal(firstSentence('**One inner file of an Archive.** ⛔ Never a member.'), '**One inner file of an Archive.**');
+    assert.equal(firstSentence('A playbook (the Type, `pack.Playbooks`, run by `pack.Investigator`) for one Incident. X.'), 'A playbook for one Incident.');
+    assert.equal(firstSentence('Points as `GeoData {points, routes}` on a map. X.'), 'Points as on a map.');
+    assert.equal(firstSentence('`inspecto-agent`\'s `EscalationPolicy`: a retry ladder. X.'), 'a retry ladder.');
+    assert.equal(firstSentence('Kinds `MSISDN`, `ACCOUNT` and `link-analysis-view`. X.'), 'Kinds `MSISDN`, `ACCOUNT` and `link-analysis-view`.', 'values stay');
 });
 
 test('vocabulary: **Term** — definition paragraphs under their sections, multi-line bodies joined, tables and lists skipped', () => {
