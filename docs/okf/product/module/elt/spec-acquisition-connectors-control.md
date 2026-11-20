@@ -113,10 +113,9 @@ column type (UUID, JSON, arrays, intervals) as text.
   are gated as a Pipeline's acquisition is (`CollectorConnectors.forConfig` gates that one too). A refused host is the
   connector's `Refused` (Add data answers 422 with the policy's reason; a Pipeline's fetch fails as an
   `AcquisitionException`).
-- **Listed in the processor catalog** as `acquisition.db.postgres` (delivered). It is one of the remote acquisitions
-  (`ProcessorCatalog.REMOTE_ACQUISITION`), and the one Basic keeps: `ProcessorCatalog.BASIC_POSTGRES` is the single, named
-  exemption `featureOf` answers no `remoteSystems` lock for (Add data's *Choose a table*). The plan's later Gate lane
-  moves it into the one Basic-profile declaration.
+- **Listed in the processor catalog** as `acquisition.db.postgres` (delivered), reading through the `postgres` scheme
+  (`ProcessorCatalog.ACQUISITION_SCHEMES`). The Basic profile keeps that scheme (`BasicProfile.SCHEMES`, the Gate lane), so
+  `featureOf` answers no `remoteSystems` lock for it (Add data's *Choose a table*), while every other remote scheme is locked.
 
 **Object storage is deliberately SDK-free (ACQ-4).** The auth, profile mapping, capabilities and pagination of
 `s3`, `gcs` and `azure` are in [connectors](../connectors/spec-connectors.md). One detail is recorded only here:

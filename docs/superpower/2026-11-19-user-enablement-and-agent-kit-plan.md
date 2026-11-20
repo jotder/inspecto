@@ -1,8 +1,10 @@
 # User enablement and the Agent Kit — docs, training and AI agent skills
 
 > **Status: APPROVED 2026-11-19 — D-UE1…D-UE7 and D-UE9 signed (operator, the recommended options); D-UE8 (web
-> hosting) open and not blocking; P0 done (the names are in `GLOSSARY.md` §1-A and §12); nothing built; P1 and AK-1
-> startable.** **Developer track added 2026-11-19 (operator): §3.1, phases P3 and P5, D-UE10 open.** Board rows:
+> hosting) open and not blocking; P0 done (the names are in `GLOSSARY.md` §1-A and §12).** **Built by 2026-11-20:
+> P1 lane A, P2, P3 and AK-1 (§8); P4 in flight; P5 waits on D-UE10; AK-2 next on the Agent Kit; both publish places
+> ready as one manifest line each (`handbook.publish`, D-UE8 / D-UE10).** **Developer track added 2026-11-19
+> (operator): §3.1, phases P3 and P5, D-UE10 open.** Board rows:
 > `USER-HANDBOOK-1`, `USER-TRAINING-1`, `AGENT-KIT-1` (§11).
 > **Operator choices, 2026-11-19 (in chat):** wave 1 serves **all three tracks at once** (console builders, partner
 > developers, operators and admins); users read the docs as **in-app Help plus a static site**, generated from the
@@ -240,7 +242,9 @@ A how-to that cannot be written because the product has no path becomes a board 
 workaround page. The first one is known now: **turning a working Space into a Space Template and an App from the
 console** — today only the App kit CLI can (§1). It goes on the board in plan phase P2, the first phase that needs it.
 
-**Found writing T5 and T6 (2026-11-19), each run on two Standard installs — candidates for the board, not filed:**
+**Found writing T5 and T6 (2026-11-19), each run on two Standard installs — filed 2026-11-20 as `APPS-UPGRADE-CONSOLE-1`,
+`SPACE-EXPORT-CLEAN-1`, `KEYCLOAK-REALM-BLUEPRINT-1`, `SEED-ADMIN-ALERT-RULE-1`, `RESTORE-NEW-SPACE-1` and
+`UPGRADE-BACKUPDIR-RELATIVE-1`; the App kit's reach and the create-time refusal as noted below:**
 
 - **The App kit reaches no customer.** `tools/inspecto-app.mjs` reads the source tree (products, offerings, module
   manifests); no bundle or download carries it. T5 says "run from the Inspecto developer kit folder", which does not

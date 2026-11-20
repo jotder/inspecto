@@ -2,7 +2,7 @@ package com.gamma.job;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.consignment.ConsignmentOutputStores;
-import com.gamma.etl.EditionFeatures;
+import com.gamma.etl.BasicProfile;
 import com.gamma.onboard.ImportFollowOn;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
@@ -593,7 +593,7 @@ public final class ArrivalCompactor {
 
     /** The entry's retention, or null; ignored (null) where the edition has no retention, so Basic never drops rows. */
     public static Retention retentionInForce(Map<String, Object> content) {
-        if (!EditionFeatures.present(EditionFeatures.PIPELINE_AUTOMATION)) return null;
+        if (!BasicProfile.Entry.RETENTION.offered()) return null;
         return retentionOf(content);
     }
 

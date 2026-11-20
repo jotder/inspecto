@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.etl.BasicProfile;
 import com.gamma.etl.EditionFeatures;
 import com.gamma.job.ArrivalCompactor;
 import com.gamma.onboard.ImportFollowOn;
@@ -102,7 +103,7 @@ final class DatasetCompaction {
         out.put("removedArrivals", last.get("removedArrivals"));
         ArrivalCompactor.Retention r = ArrivalCompactor.retentionOf(content);
         out.put(ArrivalCompactor.RETENTION, r == null ? null : r.asMap());
-        out.put("retentionAvailable", EditionFeatures.present(OnboardImport.AUTOMATION_FEATURE));
+        out.put("retentionAvailable", BasicProfile.Entry.RETENTION.offered());
         return out;
     }
 
@@ -137,9 +138,9 @@ final class DatasetCompaction {
         Path writeRoot = OnboardRoutes.requireSelfImport(api, "Retention");
         Path dataRoot = OnboardRoutes.requireDataRoot(api);
         Map<String, Object> current = OnboardImport.importDataset(writeRoot, ex, id, HostContext.of(api).service());
-        if (!EditionFeatures.present(OnboardImport.AUTOMATION_FEATURE))
+        if (!BasicProfile.Entry.RETENTION.offered())   // the Basic profile (BASIC-ELT-PROFILE-1 Gate)
             throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "A retention policy: "
-                    + EditionFeatures.refusal(OnboardImport.AUTOMATION_FEATURE) + "; every file stays, compacted");
+                    + EditionFeatures.refusal(BasicProfile.Entry.RETENTION.feature()) + "; every file stays, compacted");
         if (body == null || !body.containsKey(ArrivalCompactor.RETENTION))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "state retention: {days: N}, {arrivals: N} or null");
         Object raw = body.get(ArrivalCompactor.RETENTION);

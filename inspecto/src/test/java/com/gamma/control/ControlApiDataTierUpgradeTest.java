@@ -1,6 +1,7 @@
 package com.gamma.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.gamma.etl.BasicProfile;
 import com.gamma.etl.EditionFeatures;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.service.CollectorService;
@@ -90,7 +91,7 @@ class ControlApiDataTierUpgradeTest {
     }
 
     private static void assertScreens(JsonNode boot, boolean standard) {
-        for (String flag : EditionFeatures.SCREEN_FLAGS.keySet()) {
+        for (String flag : BasicProfile.SCREEN_FLAGS.keySet()) {
             assertEquals(standard, boot.at("/features/" + flag).asBoolean(!standard), flag + ": " + boot.get("features"));
             assertEquals(!standard, boot.at("/featureReasons").has(flag), flag + ": " + boot.get("featureReasons"));
         }
@@ -119,7 +120,7 @@ class ControlApiDataTierUpgradeTest {
         assertTrue(Files.isRegularFile(importToon), "the import's Pipeline is on disk for the next boot");
 
         // ── Standard on the same Space: the import is an ordinary Pipeline ──────────────────────────────────
-        EditionFeatures.overrideForTest(Set.copyOf(EditionFeatures.SCREEN_FLAGS.values()));
+        EditionFeatures.overrideForTest(Set.copyOf(BasicProfile.SCREEN_FLAGS.values()));
         try (Ctx standard = boot(List.of(sample, importToon), root)) {
             assertScreens(data(send(standard, "GET", "/bootstrap", null), 200), true);
 

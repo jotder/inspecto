@@ -7,7 +7,7 @@ timestamp: 2026-07-16T00:00:00Z
 item: module.api
 audience: internal
 status: plan
-verified: 2026-11-19 last-edit
+verified: 2026-11-20 code-reviewed
 code: platform/inspecto-api
 ---
 

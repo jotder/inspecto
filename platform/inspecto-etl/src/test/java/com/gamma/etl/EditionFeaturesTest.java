@@ -160,7 +160,7 @@ class EditionFeaturesTest {
      */
     @Test
     void theDataTierScreenGatesAreLockedWithAReasonOnBasicAndRefuseNothing(@TempDir Path dir) throws Exception {
-        Map<String, String> flags = EditionFeatures.SCREEN_FLAGS;
+        Map<String, String> flags = BasicProfile.SCREEN_FLAGS;
         assertEquals(List.of("pipelineAutomation", "pipelineTransform", "pipelineEgress", "remoteSystems"), List.copyOf(flags.keySet()));
         assertEquals(List.of(EditionFeatures.PIPELINE_AUTOMATION, EditionFeatures.PIPELINE_TRANSFORM, EditionFeatures.PIPELINE_EGRESS,
                 EditionFeatures.REMOTE_SYSTEMS), List.copyOf(flags.values()));
@@ -171,7 +171,7 @@ class EditionFeaturesTest {
             String feature = e.getValue();
             assertFalse(EditionFeatures.present(feature), feature);
             assertFalse(EditionFeatures.gatesRoutes(feature), feature + " is a screen gate, never a route feature");
-            assertEquals(e.getKey(), EditionFeatures.flagOf(feature));
+            assertEquals(e.getKey(), BasicProfile.flagOf(feature));
             String line = reasons.get(e.getKey());
             assertNotNull(line, e.getKey() + " has a featureReasons line on Basic: " + reasons);
             assertEquals(EditionFeatures.lockedReason(feature), line);
@@ -181,8 +181,8 @@ class EditionFeaturesTest {
                     "the full refusal names the feature and the edition: " + EditionFeatures.refusal(feature));
         }
         assertTrue(reasons.get("remoteSystems").contains("copies Postgres tables"), "Basic keeps the Postgres snapshot (DT-4 as narrowed)");
-        assertNull(EditionFeatures.flagOf(EditionFeatures.GEO_MAP));
-        assertEquals(Set.of("objectstore.export", "publish.postgres"), EditionFeatures.EGRESS_JOB_TYPES);
+        assertNull(BasicProfile.flagOf(EditionFeatures.GEO_MAP));
+        assertEquals(Set.of("objectstore.export", "publish.postgres"), BasicProfile.EGRESS_JOB_TYPES);
 
         // gate in screens, not on load: a remote Collector and a sql Step are not refused on Basic
         Map<String, Object> draft = new LinkedHashMap<>();
