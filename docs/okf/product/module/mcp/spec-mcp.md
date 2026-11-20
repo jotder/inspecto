@@ -219,7 +219,8 @@ the unknown-argument refusal — every one turned a test red).
 ## Deferred to AK-2
 
 - The delegated-person allowlist (`auth.oidc.agentClients`, `agentClient` attribute) and RFC 9728 metadata.
-- Write tools (`validate_config`, `dry_run_pipeline`, `save_draft`, …), `propose_action`, the machine agent
-  capability set, and the endpoint's manifest category for writes.
+- Write tools (`validate_config`, `dry_run_pipeline`, `propose_change`, …), `propose_action`, the machine agent
+  capability set, and the endpoint's manifest category for writes. Design (proposed 2026-11-20):
+  [`2026-11-20-agent-kit-ak2-plan.md`](../../../../superpower/2026-11-20-agent-kit-ak2-plan.md).
 - Prompts, `subscriptions/listen`, progress notifications, the tasks extension, multi round-trip requests.
 - `export_bundle`, `preview_promotion`, `validate_app` (they belong with the Ship tools in AK-2).

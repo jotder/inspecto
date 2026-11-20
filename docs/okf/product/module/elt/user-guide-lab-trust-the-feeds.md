@@ -21,8 +21,9 @@ Here you write three of your own on the same feeds.
 ## Before you start
 
 - **Edition:** Standard, Advanced or Preview (the `order-to-cash` Space Template needs Standard). Labs are training
-  material, kept out of a sold edition's Help (decision D-UE7); render them with
-  `node tools/render-handbook.mjs --out <dir> --training`.
+  material, kept out of a sold edition's Help (decision D-UE7): they are in the Help of a Preview install and of a demo
+  build; for any other install, the [instructor kit](../../layer/product/user-guide-instructor-kit.md) says how to
+  build them.
 - **Who:** a builder who may author Expectations and run checks (`canAuthorWorkbench` and `canOperateRuns`) — the user
   who created the Space in Tutorial 1.
 - **Starting state:** a Space created from the **Order-to-cash assurance** Space Template with its sample files

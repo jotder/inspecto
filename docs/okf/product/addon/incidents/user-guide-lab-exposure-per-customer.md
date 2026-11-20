@@ -21,8 +21,9 @@ work. This page says *what* to build; the checker at the end reads your Space th
 ## Before you start
 
 - **Edition:** Standard, Advanced or Preview — Alert Rules and Incidents start in Standard. Labs are training material,
-  kept out of a sold edition's Help (decision D-UE7); render them with
-  `node tools/render-handbook.mjs --out <dir> --training`.
+  kept out of a sold edition's Help (decision D-UE7): they are in the Help of a Preview install and of a demo
+  build; for any other install, the [instructor kit](../../layer/product/user-guide-instructor-kit.md) says how to
+  build them.
 - **Who:** a builder who may write Alert Rules (`canAuthorAlertRules` — the seed `power` Role has it, `admin` alone does
   not), run them (`canOperateRuns`) and work Incidents (`canWorkIncidents`).
 - **Starting state:** the `order-to-cash` Space with the **o2c_open_items** Job run once

@@ -13,9 +13,10 @@ verified: 2026-11-20 code-reviewed
 This kit is for whoever teaches Inspecto in a room: a partner, a system integrator, or our own team. It holds no
 teaching material of its own — the Handbook's Learning Paths, tutorials and Labs are the material — only what a
 teacher needs around them: formats and timings, the room set-up, a slide outline, the lab guide and the answer keys.
-It and the Labs are `training` pages: never in a sold edition's Help (decision D-UE7). No bundle carries them yet
-(`TRAINING-BUNDLE-1`); build them from the repository with `node tools/render-handbook.mjs --out <dir> --training` and
-hand the folder to the room.
+It and the Labs are `training` pages: never in a sold edition's Help (decision D-UE7). They ship in the Help
+(`/help`) of a Preview install and of a demo build (`-Distribution demo`, Advanced or Preview) — the training
+builds; Basic, Standard and Advanced installs never carry them. For a room on a sold edition, build them from the
+repository with `node tools/render-handbook.mjs --out <dir> --training` and hand the folder to the room.
 
 ## 1. Workshop formats
 
@@ -52,8 +53,9 @@ learner the `admin` Role as well.
 
 ## 2. Room set-up
 
-- **One install for the room**, Standard or higher; the Lab pages come from the `--training` render above. For a room
-  without an identity provider, use a demo build (Advanced or Preview) and its Demo Users.
+- **One install for the room**, Standard or higher. A Preview install or a demo build carries the Lab pages in its Help;
+  on Standard or Advanced they come from the `--training` render above. For a room without an identity provider, use
+  a demo build (Advanced or Preview) and its Demo Users.
 - **One Demo User per learner**, each with the Roles `admin` and `power`: `power` holds `canAuthorAlertRules`, which
   creating a Space from the Order-to-cash template needs — `admin` alone is refused.
 - **One Space per learner**, created by the learner in Tutorial 1 from the **Order-to-cash assurance** template with its

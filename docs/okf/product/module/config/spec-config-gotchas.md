@@ -86,3 +86,7 @@ Moved verbatim from the retired `PROJECT_NOTES.md` (D-IR5, 2026-11-19); the arch
   purpose**: `GET /jobs` is a Java record (camelCase `onPipeline`/`onSignal`) while `GET /jobs/{name}`
   is the config section (snake_case, flat) and carries **no run state** — `lastStatus`/`nextFire` exist
   only on the list, so a detail pane must merge an enable/reschedule response, never replace with it.
+  An **object-valued** key is the one shape the routes do refuse (JOB-PARAMS-NESTED-IGNORED-1, 2026-11-20):
+  `fromMap` would store `{"params": {"dataset": …}}` as one text value and the Job would run with its
+  defaults, so `JobRoutes.refuseNestedSettings` answers 422 for any object other than `args`, `bind` and
+  `incremental`, naming the key.
