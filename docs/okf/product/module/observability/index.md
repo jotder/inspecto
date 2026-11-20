@@ -34,4 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `EXPECTATION-UNIQUE-KIND-1` | P3 | feature | there is no unique Expectation kind: | — |
 | `DEPLOY-EXPOSURE-KIT-1` | P3 | chore | Prove the deploy kit (proxy fence for /metrics and /health/details, TLS, upgrade, off-site backup, signature verify) on a real host. | — |

@@ -34,4 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `RESTORE-NEW-SPACE-1` | P3 | defect | the backup guide's "restore into a new Space" is refused by the path jail | — |
 | `BACKUP-DATA-1` | P3 | feature | the backup maintenance task archives a Space's configuration only; its Datasets (data/, duckdb/) are in no archive and no guide gives a d… | — |
