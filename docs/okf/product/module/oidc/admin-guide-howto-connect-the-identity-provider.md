@@ -37,7 +37,8 @@ Concept: [Roles and Access Policies](../access/user-guide-concept-roles-access-p
    AUTH_OIDC_PROVIDER=keycloak
    ```
 
-   Instead of the discovery address you may give `AUTH_OIDC_ISSUER` and `AUTH_OIDC_JWKS_URI`. `AUTH_OIDC_PROVIDER` is
+   Instead of the discovery address you may give `AUTH_OIDC_ISSUER` and `AUTH_OIDC_JWKS_URI` — the way to name a
+   provider that answers on plain HTTP, such as a test set-up, since a discovery address must be `https`. `AUTH_OIDC_PROVIDER` is
    `generic`, `keycloak` or `wso2`. Set the audience: without it the server starts but warns that audience validation
    is off.
 2. **Say where the roles are.** By default the role names are read from the `roles` claim; the Keycloak preset also
@@ -49,7 +50,9 @@ Concept: [Roles and Access Policies](../access/user-guide-concept-roles-access-p
    Assign them at the provider; Inspecto does not assign Roles to people.
 4. **A private certificate authority:** import its certificate into the bundle's `runtime\lib\security\cacerts`. An
    upgrade replaces the runtime, so do it again after each upgrade.
-5. **Restart** and run `.\bin\preflight.ps1` — the `sign-in` check passes. Open the console and click
+5. **Restart** and run `.\bin\preflight.ps1` — the `sign-in` check passes (its `proxy` check passes once Inspecto
+   is behind a reverse proxy: [Put Inspecto behind a reverse proxy](../../layer/platform/admin-guide-howto-reverse-proxy.md)).
+   Open the console and click
    **Sign in with SSO**.
 
 ## Check it worked
