@@ -162,10 +162,19 @@ switched snapshot's Run now and a run outside Add data each leave one copy).
 ## Not done here
 
 - B13's other half: Add a file's *Replace everything* on a Reference and `reference.load: replace` are still two ways
-  to replace one store.
-- `output.load` in the Pipeline editor (a Standard screen); an edition Gate for it on a Basic build.
-- A heal at start-up, so a crash's mix does not wait for the Dataset's next run.
-- Arrivals mode for a Standard Pipeline's own store (B6's leftover).
+  to replace one store (board `REFERENCE-LOAD-REPLACE-1`).
+- `output.load` in the Pipeline editor, a Standard screen that needs a design (board `PIPELINE-EDITOR-OUTPUT-LOAD-1`).
+- A heal at start-up, so a crash's mix does not wait for the Dataset's next run (board `ARRIVAL-HEAL-AT-START-1`).
+- Arrivals mode for a Standard Pipeline's own store (board `ARRIVALS-STANDARD-STORE-1`, in
+  [spec-arrival-compaction.md](spec-arrival-compaction.md)).
+- Two kinds of run can still commit while Add data's run-scoped choice is open: a run whose pre-run step threw
+  (`CollectorService.stepRun` carries on past a throwing step; `ImportPreRunSteps` falls back to `scheduled ? SKIP :
+  GO`) and `CollectorService.replayRejects`, which never reaches `stepRun`. Any holder of the claim refuses a manual
+  run, so a claim that is not released blocks them until a restart (board `IMPORT-RUN-REFUSAL-GAPS-1`).
+- The registry's other readers ignore `REPLACED`: `dailyVolume` counts `LIVE` rows only, so the rows a rewritten file
+  kept are left out; `supersede` and `supersedeOtherRevisions` move `LIVE` rows only; `SandboxConsignmentReader`
+  reads `LIVE` rows only; the comment on `ConsignmentOutput.state` in `runs.service.ts` lists `LIVE | SUPERSEDED |
+  COMPACTED_AWAY` (board `REPLACED-STATE-READERS-1`).
 
 Tests: `ArrivalReplacerTest` (engine: exact days removed and the drop marks; a failed import restores; a replace that
 fails before its swap still removes the upload's rows; a crash mid-swap heals forward; mid-restore heals back; after

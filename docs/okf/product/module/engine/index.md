@@ -36,6 +36,10 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | `OUTPUT-NAME-OVERWRITE-1` | P3 | defect | A second file with the same file name silently replaces the first file's rows, on any Pipeline (filed 2026-11-20, BASIC-ELT-PROFILE-1 B3… | — |
 | `REPROCESS-ARCHIVE-MEMBER-1` | P3 | defect | Reprocessing ONE Consignment of a zip restores the whole archive under the member's composite name and reads every entry again, so rows d… | — |
+| `ARRIVAL-HEAL-AT-START-1` | P3 | defect | A crash during a replace leaves readers a mix of old and new files until the Dataset's next run, replace or compaction (filed 2026-11-20,… | — |
+| `REFERENCE-LOAD-REPLACE-1` | P3 | chore | reference.load: replace is not on the run-scoped replace: Add a file's *Replace everything* on a Reference and the Reference's own key ar… | — |
+| `ARRIVALS-STANDARD-STORE-1` | P3 | feature | Arrivals mode (the merge map, retention) exists only for an import Dataset; a Standard Pipeline's own store has none, and the run claim s… | — |
+| `REPLACED-STATE-READERS-1` | P3 | defect | Four readers of the Consignment output registry ignore REPLACED (filed 2026-11-20, BASIC-ELT-PROFILE-1 B4 review). | — |
 | — | P2 | feature | SPACE-LINK-CENSUS-1 the link census: the default flip and the plan scope not built | — |
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
 | `LEGAL-HOLD-SCOPE-1` | P3 | feature | A legal hold does not yet protect a Pipeline's data partitions, and holds have no screen. | — |

@@ -87,8 +87,9 @@ is read as it is, with no migration. `ArrivalCompactor` owns every reader and wr
 
 ## Not done here
 
-- Arrivals mode for a Standard Pipeline's Dataset (store at its own `dirs.database`, no merge map yet): later BE-2 work.
-- The claim still lives in the control plane (`IN_FLIGHT`); moving it into the engine is B11.
+- Arrivals mode for a Standard Pipeline's Dataset (store at its own `dirs.database`, no merge map yet), and the claim,
+  which still lives in the control plane (`IN_FLIGHT`; moving it into the engine is B11): board
+  `ARRIVALS-STANDARD-STORE-1`.
 - No reader-side swap lock: between the move and the deletes a reader may count rows twice, as before B6.
 
 Tests: `ArrivalCompactorTest` (engine: a Job merges in arrival order and marks the registry, retention on Standard only,

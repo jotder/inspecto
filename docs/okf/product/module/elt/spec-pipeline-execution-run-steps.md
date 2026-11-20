@@ -49,7 +49,7 @@ its subscribers, but that would skip the remaining steps). There are two phases:
 - ⚠ **A Standard feed's `la.index.build` Job still runs** (`DatasetFeed.indexJob`, offered by *Keep this up to date*).
   It now overlaps the `import.follow_on` step on a scheduled run: the follow-on's build waits for the Job's build
   (`LinkIndexFollowOn`, wait budget -1) and re-plans, so the index is not built wrong, only checked twice. It also
-  still runs while `import.compaction` merges files, as before. Retiring the Job is BE-1 follow-up work, not done here.
+  still runs while `import.compaction` merges files, as before. Retiring the Job (the answer still carries `indexJob`, which the client saves through `POST /jobs`) is board `FEED-INDEX-JOB-ENGINE-1`.
 
 ### Pre-run steps — the other side of the run
 
@@ -84,9 +84,12 @@ last registered first, **after** the run's `RUN` commit steps. `stepRun` wraps `
   out with that reason), the import's Pipeline must load with it, and each version is kept in
   `.history/pipelines/<id>/schema/v<N>.toon` (`PipelineHistory.recordSchema`; a rename moves it with the Pipeline's
   history, a purge removes it; the history routes list only the Pipeline's own versions). A failed run's undo puts the
-  old bytes back and records that version too. The approval-policy check stays the step's own (a held column is left
+  old bytes back and records that version too. The history routes do not show these schema versions: they are not
+  visible or restorable through the API (board `PIPELINE-SCHEMA-HISTORY-ROUTES-1`). The approval-policy check stays the step's own (a held column is left
   out, never a 409). A file whose new column is left out is rewritten with the read columns past the lines the import
-  skips before the header (`skip_header_lines`), which stay in the file (`ControlApiOnboardDialectTest`).
+  skips before the header (`skip_header_lines`), which stay in the file (`ControlApiOnboardDialectTest`). ⚠ `OnboardImport.keepReadColumns` reads that
+  rewrite through DuckDB `read_csv` with no `encoding`, so it ignores `csv_settings.encoding` (board
+  `KEEP-COLUMNS-ENCODING-1`).
 - **The claim.** The engine step acts only for a Pipeline Add data wrote for that Dataset (`isOurs`). It takes the
   Dataset's `OnboardImport.IN_FLIGHT` claim and **holds it through the run** (released in its `after`); the import's
   commit steps treat a claim held by the run's own pre-run step as theirs (`ImportPreRunSteps.heldByRun`), so they

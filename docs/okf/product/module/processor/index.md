@@ -36,7 +36,12 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | — | P3 | feature | Platform Services Stage 2 / 3 | demand |
 | `QUARANTINE-RELEASE-1` | P3 | feature | a quarantined file has no console action: the Quarantine tab lists files per Pipeline (no run, Consignment or time) and offers only *View… | — |
-| `BASIC-ELT-PROFILE-1` | P2 | feature | Make Basic onboarding a locked profile of ELT, retiring the parallel Basic backend and LA UI layers that duplicate ELT parts. | — |
+| `IMPORT-RUN-REFUSAL-GAPS-1` | P3 | defect | Two kinds of run can still commit while Add data's run-scoped choice is open, and a held claim refuses every manual run (filed 2026-11-20… | — |
+| `SNAPSHOT-OUTSIDE-RUN-NOW-1` | P3 | defect | A run of a switched Postgres snapshot outside Run now has no column check, no import.max_rows cap and only the engine's own fetch wording… | — |
+| `BASIC-PROFILE-TIDY-1` | P3 | chore | Three small leftovers of the Basic profile lanes (filed 2026-11-20, BASIC-ELT-PROFILE-1 close). | — |
+| `ADD-DATA-DECIMAL-SEPARATOR-1` | P3 | chore | Add data writes a decimal-comma column as a per-column expression in the mapping, not the Grammar's decimal_separator (filed 2026-11-20,… | — |
+| `PIPELINE-SCHEMA-HISTORY-ROUTES-1` | P3 | feature | An import Pipeline's schema history (.history/pipelines/<id>/schema/, written since B5) is not visible or restorable through the API (fil… | — |
+| `KEEP-COLUMNS-ENCODING-1` | P3 | defect | The rewrite that leaves a new column out of a delimited file ignores csv_settings.encoding (filed 2026-11-20, BASIC-ELT-PROFILE-1 B5 close). | — |
 | — | P3 | feature | Bundle / Exchange — "load as draft" residuals | — |
 | `ONBOARDING-REMOTE-SYSTEMS-1` | P3 | feature | Connect a system on Standard: Add data and the guided editor's Collect stage offer remote kinds (SFTP, object stores, other databases) wi… | — |
 | `DEPLOY-EXPOSURE-KIT-1` | P3 | chore | Prove the deploy kit (proxy fence for /metrics and /health/details, TLS, upgrade, off-site backup, signature verify) on a real host. | — |

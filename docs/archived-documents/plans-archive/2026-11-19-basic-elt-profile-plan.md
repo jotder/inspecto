@@ -1,9 +1,10 @@
 # Basic onboarding as a locked profile of ELT (`BASIC-ELT-PROFILE-1`)
 
-> **Status: APPROVED to start 2026-11-19 (operator: "write the plan and go parallel").** Phase 0 (verify) and UI-0
-> (move Add data into the core UI library) run now, in parallel lanes. The build phases (UI-1, BE-1 … BE-4) start
-> after Phase 0 confirms or corrects their rows below. Shipped predecessor: `BASIC-ONBOARD-1`
-> (`archived-documents/plans-archive/basic-onboard-plan.md`).
+> **Status: DONE 2026-11-20 (`BASIC-ELT-PROFILE-1`).** Every build step shipped on master: BE-1a, BE-1b, BE-2 (B3 to B6,
+> B13, O6), BE-3, BE-4 (with O7), UI-0, UI-1 (U1-types, U1a, U2, U3, U4-Keep, U4-Watch) and the Gate. Its truth now lives in
+> `okf/product/module/elt/spec-basic-profile.md`; the open follow-ups are board rows (see its Open work table). Kept for
+> provenance: the Phase 0 grounding and the per-slice as-built below are history, never maintained. Shipped predecessor:
+> `BASIC-ONBOARD-1` (`archived-documents/plans-archive/basic-onboard-plan.md`).
 
 ## 1. The goal in the operator's words
 

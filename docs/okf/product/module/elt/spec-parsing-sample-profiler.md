@@ -85,4 +85,6 @@ not survive a number, and its numbers carry no decimal comma, so rule 3 does not
 ## Open rows this concept owns
 
 - **`CONVERT-TYPE-DECIMAL-MARK-1`**: *Change the type* (`convert.type`) casts with a plain `TRY_CAST` and ignores the decimal mark.
+- **`ADD-DATA-DECIMAL-SEPARATOR-1`**: Add data writes a decimal-comma column as a per-column `EXPR` mapping
+  (`OnboardImport.Plan.pipeline`, through `DecimalMark.sql`), not the Grammar's `decimal_separator`.
 - **`GRAMMAR-NO-QUOTE-1`**: the Grammar editor's *Text quote* takes one character, so `quote: ""` (no quote) cannot be authored there.

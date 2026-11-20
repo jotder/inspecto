@@ -34,6 +34,10 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `IMPORT-NAME-CHECK-LEFTOVERS-1` | P3 | defect | With output_per_member on, the cross-run name check of an import can miss a file whose path holds a run of 8 or more digits, and each wai… | — |
+| `FEED-INDEX-JOB-ENGINE-1` | P3 | chore | *Keep this up to date* still offers its own la.index.build Job, which overlaps the import.follow_on step on a scheduled run (filed 2026-1… | — |
+| `ADD-DATA-DUPLICATE-CHECK-UI-1` | P3 | feature | Add data cannot set a Basic import's duplicate check (duplicate.mode, on_change); only the Pipelines editor's Collector stage can (filed… | operator |
+| `BASIC-ELT-DUPLICATES-1` | P3 | chore | Basic and ELT duplications Phase 0 found and the build left (filed 2026-11-20, BASIC-ELT-PROFILE-1 close). | — |
 | `WATCH-KEEP-TWO-CONTROLS-1` | P3 | defect | On Standard a watched folder offers two controls for one schedule (filed 2026-11-19, BASIC-ELT-PROFILE-1 U4-Watch review). | — |
 | `LA-FULL-CYCLE-RESIDUALS-1` | P3 | chore | Eight items the LA full-cycle plan left on purpose, plus two environment gaps its drive found. | — |
 | `LA-TRAINING-SERIES-1` | P3 | feature | An Inspecto LA user training video series of 41 episodes. | operator |

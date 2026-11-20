@@ -70,6 +70,12 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   `FileNames.stemKey`, what the engine's `memberStem` and its batch guard `claimOutputStem` use), so `Feed.CSV` is
   `feed.csv`; with `processing.output_per_member` on, the name carries a hash of the path, so only the same path collides.
   The checks against earlier runs (bytes, name) stay before the columns (`import.refuse_duplicates`).
+  ⚠ Open (board `IMPORT-NAME-CHECK-LEFTOVERS-1`): with `output_per_member` on, that cross-run name check can miss a file
+  whose path holds a run of 8 or more digits (the ledger stores the value-masked path, so the path hash the check
+  recomputes differs from the engine's), and each waiting file is hashed twice, in `import.refuse_duplicates` (50) and
+  `import.refuse_twins` (150). Add data cannot set the duplicate check (`duplicate.mode`, `on_change`); a Basic import's
+  Pipeline carries the import's own setting and only the Pipelines editor's Collector stage changes it (board
+  `ADD-DATA-DUPLICATE-CHECK-UI-1`, needs a design).
   Nothing is replaced, nothing silently skipped. `on_change` is the Pipeline's own setting: set to `reprocess`, a reused
   name is read, and ⚠ a same-name file - in the same folder or another one - REPLACES the first file's rows (the person's
   choice; engine defect `OUTPUT-NAME-OVERWRITE-1`). A *Replace everything* run judges its WAITING
