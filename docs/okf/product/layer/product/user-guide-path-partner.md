@@ -77,8 +77,8 @@ Your App runs on someone else's server. Read the operator's side so you can supp
 - **1.1** From the Add-ons it requires (`requires.addons`): the first edition that ships them all. **1.2** The
   template's Roles (`config/roles.toon`). **1.3** A Space Template is the content; an App adds its landing, navigation,
   personas, golden data, required Add-ons and a version, and is packaged and signed.
-- **2.1** The keys of the findings Dataset the golden data must produce; not yet the App's Expectations, Alert Rules,
-  Incidents or Case Rules. **2.2** The test builds its scratch Space by copying files, so it skips the checks
+- **2.1** The keys of the findings Dataset the golden data must produce; not its Expectations, Reconciliations, Alert
+  Rules, Cases or Dashboards. **2.2** The test builds its scratch Space by copying files, so it skips the checks
   `POST /spaces` runs at create time. **2.3** Only `canOpenInboundInvestigation`.
 - **3.1** Space-only files such as `egress.toon`, backup Jobs and the `maintenance_backups` Dataset — the tutorial
   lists them. **3.2** The Control API (`/apps`); there is no console for it yet.

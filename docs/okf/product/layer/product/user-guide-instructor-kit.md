@@ -13,7 +13,9 @@ verified: 2026-11-20 code-reviewed
 This kit is for whoever teaches Inspecto in a room: a partner, a system integrator, or our own team. It holds no
 teaching material of its own — the Handbook's Learning Paths, tutorials and Labs are the material — only what a
 teacher needs around them: formats and timings, the room set-up, a slide outline, the lab guide and the answer keys.
-It ships with the Labs, in the Preview and the training bundle, never in a sold edition's Help.
+It and the Labs are `training` pages: never in a sold edition's Help (decision D-UE7). No bundle carries them yet
+(`TRAINING-BUNDLE-1`); build them from the repository with `node tools/render-handbook.mjs --out <dir> --training` and
+hand the folder to the room.
 
 ## 1. Workshop formats
 
@@ -50,7 +52,7 @@ learner the `admin` Role as well.
 
 ## 2. Room set-up
 
-- **One install for the room**, Standard or higher; the Preview or training bundle carries the Labs. For a room
+- **One install for the room**, Standard or higher; the Lab pages come from the `--training` render above. For a room
   without an identity provider, use a demo build (Advanced or Preview) and its Demo Users.
 - **One Demo User per learner**, each with the Roles `admin` and `power`: `power` holds `canAuthorAlertRules`, which
   creating a Space from the Order-to-cash template needs — `admin` alone is refused.
@@ -111,7 +113,8 @@ Answers to the questions: (1) the first two pass, `lab_orders_over_800` fails; (
 (3) the failure opened one **Incident** of severity **MAJOR**, as Tutorial 2's failures did.
 
 Common mistakes: attaching to a Job instead of the Pipeline; a pattern without `^…$`, which a value such as
-`card-refund` would pass; a **Minimum** of 800 instead of a **Maximum** (it fails with 105 violations — every order
+`card-refund` would pass — the checker cannot catch this one (the sample data holds only the three valid methods),
+so look at each learner's pattern; a **Minimum** of 800 instead of a **Maximum** (it fails with 105 violations — every order
 row below 800).
 
 ## 6. Answer key — Lab 2, Exposure per customer

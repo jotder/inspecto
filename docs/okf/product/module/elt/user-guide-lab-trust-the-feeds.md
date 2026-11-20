@@ -20,8 +20,9 @@ Here you write three of your own on the same feeds.
 
 ## Before you start
 
-- **Edition:** Standard, Advanced or Preview (the `order-to-cash` Space Template needs Standard). Labs ship in the
-  Preview and the training bundle (decision D-UE7).
+- **Edition:** Standard, Advanced or Preview (the `order-to-cash` Space Template needs Standard). Labs are training
+  material, kept out of a sold edition's Help (decision D-UE7); render them with
+  `node tools/render-handbook.mjs --out <dir> --training`.
 - **Who:** a builder who may author Expectations and run checks (`canAuthorWorkbench` and `canOperateRuns`) — the user
   who created the Space in Tutorial 1.
 - **Starting state:** a Space created from the **Order-to-cash assurance** Space Template with its sample files
@@ -110,7 +111,8 @@ A step that fails names the expectation it could not meet and what it found inst
 
 ## What you learned
 
-- An Expectation is attached to the **Pipeline that writes the data**, and names one column.
+- An Expectation is attached to the **Pipeline or Job that writes the data** — here the Pipelines — and names one
+  column.
 - A pattern check must say what *all* of the value looks like, or a value that merely contains a good word passes.
 - A business limit is a data-quality check too: it fails without anything being malformed, and the failure becomes an
   **Incident** someone has to work.

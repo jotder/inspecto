@@ -18,8 +18,8 @@ assurance*, orders against payments — so you finish with one complete thing ra
 **Edition:** the worked example needs Standard, Advanced or Preview; the Basic pieces are marked on each page.
 
 Every page carries a type: a **tutorial** teaches by doing, a **how-to** does one task, a **concept** explains, a
-**reference** lists. A **Lab** is an exercise with a checker that grades your Space through the Control API; Labs ship
-in the Preview and the training bundle.
+**reference** lists. A **Lab** is an exercise with a checker that grades your Space through the Control API; Labs are
+training material, given to you by whoever runs your training, and not part of this Help.
 
 ## Stage 1 — Understand (about 2 hours)
 
