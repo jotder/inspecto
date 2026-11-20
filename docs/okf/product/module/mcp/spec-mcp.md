@@ -1,7 +1,7 @@
 ---
 type: Spec
-title: The MCP endpoint (inspecto-mcp) — AK-1 design and as-built
-description: How the optional inspecto-mcp module serves the Model Context Protocol on the Control API — transport and pinned revision, the read MCP Tools and resources, why every call goes through the existing auth, Space and route gates (an in-process replay, never a side door), the audit row naming the person and the agent client, the identity modes and what AK-1 leaves for AK-2.
+title: The MCP endpoint (inspecto-mcp) — AK-1 and AK-2a design and as-built
+description: How the optional inspecto-mcp module serves the Model Context Protocol on the Control API — transport and pinned revision, the read MCP Tools and resources, why every call goes through the existing auth, Space and route gates (an in-process replay, never a side door), the audit row naming the person and the verified agent client, the agent-client allowlist, protected-resource metadata and the host's agent gate (AK-2a), and what is left for AK-2b and later.
 tags: [agent-kit, mcp, agents, security, audit, identity]
 timestamp: 2026-11-20T00:00:00Z
 item: module.mcp
@@ -15,8 +15,10 @@ code: features/inspecto-mcp
 
 Phase AK-1 of the Agent Kit (`AGENT-KIT-1`, plan
 [`2026-11-19-user-enablement-and-agent-kit-plan.md`](../../../../superpower/2026-11-19-user-enablement-and-agent-kit-plan.md) §7).
-AK-1 is **read-only**: no MCP Tool changes anything. Writes (validate → dry-run → Draft), `propose_action`
-and the machine agent capability set are AK-2.
+AK-1 is **read-only**: no MCP Tool changes anything. **AK-2a** (identity first, 2026-11-20) adds the
+agent-client allowlist, the agent marker on every audit row, protected-resource metadata and the host's agent gate
+([Identity](#identity), [The agent gate](#the-agent-gate-ak-2a)); still no write tool. Write tools (validate →
+dry-run → Pending Change), `propose_action` and the machine agent capability set are AK-2b and later.
 
 **On this page**
 
@@ -25,8 +27,9 @@ and the machine agent capability set are AK-2.
 - [No side door](#no-side-door) — how every call reuses the Control API's own gates.
 - [MCP Tools and resources](#mcp-tools-and-resources) — the AK-1 list and the route each one replays.
 - [Audit](#audit) — the row each call leaves.
-- [Identity](#identity) — the delegated-person and machine modes, and what AK-1 ships of each.
-- [Deferred to AK-2](#deferred-to-ak-2)
+- [Identity](#identity) — the delegated-person and machine modes, and what is built of each.
+- [The agent gate (AK-2a)](#the-agent-gate-ak-2a) — held writes, default deny, the never-list.
+- [Deferred](#deferred)
 
 ## Placement
 
@@ -146,8 +149,8 @@ Every `tools/call` and `resources/read` leaves **one `AUDIT` row**, action `mcp.
   replay's), the IP, User-Agent and correlation id;
 - **the agent client:** `mcpClient` = `clientInfo.name/version` from the request `_meta` (legacy: none —
   `initialize` is not remembered, so the User-Agent is all there is). It is **self-declared**, which the
-  attribute name `mcpClientDeclared: true` says; a verified client id arrives with the delegated-person
-  allowlist (below) as `agentClient`.
+  attribute name `mcpClientDeclared: true` says. Since AK-2a the **verified** client rides beside it as
+  `agent_client` ([The agent gate](#the-agent-gate-ak-2a)) — the one an audit reader may trust.
 
 The replay additionally stamps `via: "mcp"`, `mcpTool` and `mcpClient` onto its audit attributes, which the
 replayed route's own `AUDIT` row carries (an export today, a write in AK-2). A refusal the replayed route
@@ -165,16 +168,29 @@ on `/mcp`.
 Per §7.3 and D-UE5 (signed: both modes, delegated first).
 
 - **Delegated person — the target for interactive agents** (Claude Code, Gemini CLI, Codex). Design:
-  1. `-Dauth.oidc.agentClients=<client ids>` (planned, not built in AK-1) — an allowlist of agent clients that **stay persons**. A token
-     whose `azp` / `client_id` is listed is admitted like the SPA client's (signature, issuer, audience,
-     expiry), is never classed a machine (`MachineTrust.machineClient` skips it), holds exactly the
-     person's Roles, and carries the client id as Subject attribute `agentClient`, which the audit row
-     records as a verified `agentClient`. Boot refuses a client listed in both `auth.oidc.clients` and
-     `auth.oidc.agentClients`.
-  2. The MCP authorization model: Protected Resource Metadata (RFC 9728) at
-     `/.well-known/oauth-protected-resource` naming the customer's IdP, and a `401` from `/mcp` carrying
-     `WWW-Authenticate: Bearer resource_metadata="…"`, so an MCP client runs authorization code with PKCE
-     against the IdP itself. The token's audience must be the install (`auth.oidc.audience`).
+  1. `-Dauth.oidc.agentClients=<client ids>` (**built in AK-2a**) — an allowlist of agent clients that **stay
+     persons**. A token whose `azp` (else `client_id`) is listed and that is **not** a client-credentials token
+     (`gty`) is admitted like the SPA client's (signature, issuer, audience, expiry — no new trust root), is not
+     refused by the machine client pin (`auth.oidc.clients`), holds the person's Roles **less
+     `Roles.AGENT_NEVER_CAPABILITIES`** (`canApproveChanges`, `canApproveLinkExpansions`,
+     `canRevealLinkEntities` — an agent never approves and never reveals a masked value), and carries the
+     client id as `Subject.agentClient()`. The actor stays the person. A client-credentials token from a listed
+     client stays a machine's, judged as before — **when `gty` says so**: Keycloak sets no `gty`, so the admin guide
+     forbids a service account on an agent client, and an IdP naming the client only in `cid` / `appid` needs a
+     mapper to `azp` (else the token is unmarked; security review 2026-11-20, below confidence 8). Boot refuses: a client in both `auth.oidc.clients` and
+     `auth.oidc.agentClients`; the SPA client (`auth.oidc.clientId`) as an agent client; an allowlist without
+     `auth.oidc.audience`. Bearer path only — a gateway assertion is never an agent's.
+  2. The MCP authorization model (**built in AK-2a**): Protected Resource Metadata (RFC 9728) at
+     `GET /api/v1/.well-known/oauth-protected-resource` (and `/api/v1/spaces/{id}/…`), public (an exact-match
+     host public path), answering `resource` (the endpoint's URL: `-Dmcp.publicOrigin`, else the request's scheme
+     and validated `Host`, plus the request's own `/api/v1[/spaces/{id}]` prefix), `authorization_servers`
+     (`Authenticator.issuer()` — the OIDC bearer issuer), `scopes_supported` (`-Dauth.oidc.scopes`, else
+     `openid`) and `bearer_methods_supported: [header]`; 404 when no Authenticator names an issuer. The host
+     serves nothing outside `/api/v1`, so the RFC's root path needs a reverse-proxy alias
+     ([admin guide](admin-guide-mcp.md)). A `401` from `/mcp` — only from `/mcp`, through the auth SPI's
+     `AuthChallenges` registry — carries `WWW-Authenticate: Bearer resource_metadata="<origin>/api/v1/.well-known/oauth-protected-resource"`,
+     so an MCP client runs authorization code with PKCE against the IdP itself. The token's audience must be
+     the install (`auth.oidc.audience`).
   3. Client registration: the agent client is registered in the customer's IdP by its administrator (the
      specification's Client ID Metadata Documents and the deprecated dynamic registration are the IdP's
      business, not Inspecto's).
@@ -183,10 +199,63 @@ Per §7.3 and D-UE5 (signed: both modes, delegated first).
   (operator 2026-09-15), so an admitted machine can use the AK-1 tools today. The **agent capability set**
   (read plus Draft authoring, never approve, never reveal) widens `Roles.MACHINE_CAPABILITIES` and lands
   with AK-2's write tools.
-- **What AK-1 ships:** the endpoint accepts any Subject the host's `Authenticator` resolves — a person's own
-  token (today's SPA client) or an admitted machine. The delegated allowlist and the protected-resource
-  metadata are **not built in AK-1**; they are the first item of AK-2, before any write tool, because a
-  verified agent client must be on the row before an agent can author anything.
+- **What is built:** the endpoint accepts any Subject the host's `Authenticator` resolves — a person's own
+  token (the SPA client), a person through an allowlisted agent client (AK-2a), or an admitted machine. The
+  machine agent capability set is phase 2 (AK-2c).
+
+## The agent gate (AK-2a)
+
+Plan §4.1: **an agent's write is held because of who is writing, not because it came through `/mcp`** — the same
+agent token calling a route directly is treated the same.
+
+- **The marker** is `Subject.agentClient()`, set only by `OidcAuthenticator` (above). Every audit row of that
+  request carries it as `agent_client` (`AuditAttrs.AGENT_CLIENT`, also a column of the audit CSV export): rows
+  written through `AuditTrail` take it from the Subject (`located`), every other emitter's from the request MDC key
+  `agentClient`, which the host sets at authentication and clears when the request ends (`EventLog.emit` stamps a
+  chained row that lacks it).
+- **The identity-keyed hold:** `PendingChanges.hold` and `holdSet` hold a marked Subject's write **always**
+  (`PendingChanges.agentRule`): with the kind's policy rule its approver applies, else
+  `ApprovalPolicy.DEFAULT_APPROVER` (`canApproveChanges`); **four eyes always** (D-AK1 — neither the agent's token
+  nor the person it acts for may approve; the single-administrator alternative is not built). The Pending Change
+  records `agentClient` and, through the MCP endpoint, `mcpTool`; the Pending Changes screen shows "Proposed by
+  *person* via agent client *client*" and the list's Author column "*person* via *client*".
+- **Default deny at the host** (`AgentGate`, applied in `ControlApi.routeDispatch` after the policy stage and in
+  every `ControlApi.replay`, so the MCP tools and an approved agent change replayed as its author pass it too).
+  Every route is in exactly one bucket, by its registered method and pattern:
+  1. **held** — on `PendingChanges.REPLAYABLE` (the routes that reach the hold), not on the never-list and not on
+     `AgentGate.NOT_HELD`: `POST /origin/upgrade` (a Space Template upgrade that adds and updates nothing rewrites the
+     origin record with no hold) and `POST /pipelines/{id}/save-as-template` (copies schema files before its hold
+     and leaves them on a 422) are refused to an agent instead. A sweep of every other `REPLAYABLE` route
+     (2026-11-20) found each reaches the hold before it persists anything; one more fast path that skipped it (an
+     add-only Entity List change expiring within 24 h) now holds an agent's change. Residual, by design: an approved
+     Dataset delete retires an imported Dataset's Pipeline, and an approved rename rewrites dependents, as they do
+     for a person — the guards that refuse those under a policy (`holdRefusing*`) read the policy only;
+  2. **allowed** — reads (GET), and `POST /mcp`, `/validate`, `/pipelines/authored/{id}/dry-run`,
+     `/bundle/export`, `/promotion/preview`, `/pending-changes/{id}/withdraw`, `/action-requests` (held by its
+     own design), `/db/query` (the read the AK-1 `query_dataset` tool replays) and `/pipelines/authored/{id}/run`
+     (D-AK2: a delegated person only, never a machine);
+  3. **refused (403)** — everything else: every route that only calls `holdRefusing*` (bundle import, onboarding
+     imports, Dataset registration — they do not hold when no policy covers the kind), every other read-shaped
+     POST, and the never-list.
+  `AgentGateParityTest` pins every non-GET `CapabilityManifest` entry and exemption to one bucket, the held bucket
+  to `REPLAYABLE` less the never-list, and the allowed list to real routes in non-writing categories.
+- **The never-list** overrides the other buckets, on every method: any `…/approve`, `…/decline`, `…/decision`;
+  every route gated by an `AGENT_NEVER_CAPABILITIES` capability (the Action Request approver's retry and
+  mark-failed, `GET /screening/hits/{id}/reveal`, the reveal and link-expansion approval routes, the triage-run
+  reads); `/promotion/apply`; every `/apps` and `/access/*` write; `/agent/approvals/{id}/decision`.
+  `POST /pending-changes/{id}/approve|decline` also refuses a marked Subject in the route itself.
+- **An approved agent change replays as what proposed it:** `PendingChanges.authorNow` reads the record's
+  `agentClient`, sets the marker on the rebuilt author Subject and removes `AGENT_NEVER_CAPABILITIES`, so approval
+  never widens what the change runs with. (The machine `MACHINE_CAPABILITIES` filter joins with AK-2c.)
+- **Tests** (real HTTP unless noted): `ControlApiAgentClientTest` (a direct write held with no policy while the
+  person's own token writes; bundle import and a settings write 403; reads open; neither the agent nor its person
+  approves; another person's approval applies it and the applied row names the agent client; every audit row of
+  an agent request names it; an agent withdraws its own proposal), `AgentGateParityTest` (unit, over the
+  manifest), `OidcAgentClientTest` (the marker, the dropped capabilities, the client-credentials case, the pin, the
+  boot refusals, `issuer()`), `ControlApiMcpDiscoveryTest` (the metadata, the 401 challenge on `/mcp` only, the
+  pinned origin, no issuer → no metadata). Nine mutants each turned a test red: the hold ignoring the marker; the
+  gate off; the gate and the approve check off together; `authorNow` dropping the marker; the MDC stamp off; the
+  OIDC capability drop off; the pin refusing an agent client; the boot overlap check off; the 401 challenge off.
 - **Basic:** no module (D-UE4).
 
 ## Security review (2026-11-20)
@@ -216,9 +285,25 @@ the direct route already does, under the same gates. The negative tests were eac
 the Subject check, replay-as-caller, the Origin check, the header check, the audit row, the id pattern and
 the unknown-argument refusal — every one turned a test red).
 
-## Deferred to AK-2
+## Security review, AK-2a (2026-11-20)
 
-- The delegated-person allowlist (`auth.oidc.agentClients`, `agentClient` attribute) and RFC 9728 metadata.
+An independent review of the AK-2a change found **no vulnerability at confidence 8 or above**. It checked: the gate
+keying on the matched route (Space prefixes, encodings, HEAD → 405, no method override, one listener); the replay
+door and `authorNow`; the MAC over the Pending Change record (`agentClient` included); every allowed POST; approval
+and reveal (four eyes against the person, the dropped capabilities failing closed in every handler that checks
+them); Idempotency-Key replays (after the gate, never re-executing); `requireCapabilityIn` and Space admission
+re-authenticating (the marker and the drop re-applied); the MDC key's life; the metadata route's Host and path
+handling. Before it, the verification pass found one unheld write (an agent's short-lived Entity List add, fixed
+and tested) and a sweep of every `REPLAYABLE` route found two more paths that write without or before the hold
+(refused to agents: `AgentGate.NOT_HELD`; defects `ORIGIN-UPGRADE-UNHELD-1`, `SAVE-AS-TEMPLATE-LEFTOVER-1`).
+Below confidence 8 and handled: the IdP rules in the admin guide (no service account on an agent client; the client
+named in `azp` / `client_id`), and rows from emitters other than `AuditTrail` during an approved agent replay now
+carry `agent_client` too (`ControlApi.replay` sets the MDC key for an agent Subject). Accepted: an agent may withdraw
+its person's own proposals and writes the reason text the approver reads; the Host header is reflected into the
+metadata's `resource` when `-Dmcp.publicOrigin` is unset.
+
+## Deferred
+
 - Write tools (`validate_config`, `dry_run_pipeline`, `propose_change`, …), `propose_action`, the machine agent
   capability set, and the endpoint's manifest category for writes. Design (approved for phase 1 on 2026-11-20):
   [`2026-11-20-agent-kit-ak2-plan.md`](../../../../superpower/2026-11-20-agent-kit-ak2-plan.md).

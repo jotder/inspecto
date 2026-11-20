@@ -16,12 +16,12 @@ tags: [product-item, module]
 | Slot | Status | Document |
 |---|---|---|
 | plan | missing | |
-| spec | current | [The MCP endpoint (inspecto-mcp) — AK-1 design and as-built](spec-mcp.md) |
+| spec | current | [The MCP endpoint (inspecto-mcp) — AK-1 and AK-2a design and as-built](spec-mcp.md) |
 | architecture | current | [MCP endpoint (inspecto-mcp)](architecture-mcp.md) |
 | features | missing | |
 | feature-db | current | [MCP endpoint — feature database](feature-db.md) |
 | user-guide | missing | |
-| admin-guide | missing | |
+| admin-guide | current | [MCP endpoint — administrator guide](admin-guide-mcp.md) |
 | api | current | [HTTP routes — module.mcp](api-routes.md) |
 | tests | current | [MCP endpoint — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

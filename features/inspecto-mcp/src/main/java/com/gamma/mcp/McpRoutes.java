@@ -7,6 +7,9 @@ import com.gamma.audit.Event;
 import com.gamma.audit.EventSink;
 import com.gamma.audit.EventType;
 import com.gamma.spi.auth.ApiException;
+import com.gamma.spi.auth.AuthChallenges;
+import com.gamma.spi.auth.Authenticator;
+import com.gamma.spi.auth.Authenticators;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.auth.RequestAttrs;
 import com.gamma.spi.auth.Subject;
@@ -55,9 +58,73 @@ public final class McpRoutes implements RouteModule {
     static final int PARSE_ERROR = -32700, INVALID_REQUEST = -32600, METHOD_NOT_FOUND = -32601,
             INVALID_PARAMS = -32602, HEADER_MISMATCH = -32020, UNSUPPORTED_VERSION = -32022;
 
+    /** The RFC 9728 protected-resource metadata route (AK-2a), public: the host lists it in its exact-match public paths. */
+    static final String METADATA = "/.well-known/oauth-protected-resource";
+
     @Override
     public void register(ApiContext api) {
         api.post("/mcp", (ex, m) -> handle(api, ex));
+        api.get(METADATA, (ex, m) -> metadata(ex));
+        AuthChallenges.register("/mcp", McpRoutes::challenge);
+    }
+
+    // ── discovery: OAuth protected-resource metadata (RFC 9728, AGENT-KIT-1 AK-2a) ──────────────────
+
+    /**
+     * {@code GET /.well-known/oauth-protected-resource} under {@code /api/v1} (and {@code /api/v1/spaces/{id}}): which
+     * authorization server issues the tokens this MCP endpoint accepts, so an MCP client runs authorization code with
+     * PKCE against the customer's IdP itself. 404 when no Authenticator names an issuer (sign-in off). The host serves
+     * nothing outside {@code /api/v1}, so the RFC's root path needs a reverse-proxy alias (admin guide).
+     */
+    private static Object metadata(HttpExchange ex) throws IOException {
+        String issuer = issuer();
+        if (issuer == null)
+            return send(ex, 404, Map.of("error", "no OAuth sign-in is configured on this install, so the MCP endpoint "
+                    + "names no authorization server"));
+        String origin = origin(ex);
+        if (origin == null) return send(ex, 400, Map.of("error", "the request names no valid Host"));
+        Map<String, Object> doc = new LinkedHashMap<>();
+        doc.put("resource", origin + prefix(ex, METADATA) + "/mcp");
+        doc.put("authorization_servers", List.of(issuer));
+        doc.put("scopes_supported", scopes());
+        doc.put("bearer_methods_supported", List.of("header"));
+        doc.put("resource_name", "Inspecto MCP endpoint");
+        return send(ex, 200, doc);
+    }
+
+    /** The {@code WWW-Authenticate} value on the host's 401 for {@code /mcp}: where the metadata lives (RFC 9728 §5.1). */
+    static String challenge(HttpExchange ex) {
+        String origin = origin(ex);
+        if (issuer() == null || origin == null) return null;
+        return "Bearer resource_metadata=\"" + origin + prefix(ex, "/mcp") + METADATA + "\"";
+    }
+
+    private static String issuer() {
+        return Authenticators.active().flatMap(Authenticator::issuer).filter(i -> !i.isBlank()).orElse(null);
+    }
+
+    /** {@code -Dmcp.publicOrigin} (behind a TLS-terminating proxy), else the request's own scheme and Host. */
+    private static String origin(HttpExchange ex) {
+        String pinned = System.getProperty("mcp.publicOrigin");
+        if (pinned != null && !pinned.isBlank()) return pinned.trim().replaceAll("/+$", "");
+        String host = ex.getRequestHeaders().getFirst("Host");
+        if (host == null || !HOST.matcher(host).matches()) return null;
+        return (ex instanceof com.sun.net.httpserver.HttpsExchange ? "https" : "http") + "://" + host;
+    }
+
+    private static final java.util.regex.Pattern HOST = java.util.regex.Pattern.compile("[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?|\\[[0-9A-Fa-f:.]{2,45}](:[0-9]{1,5})?");
+
+    /** The raw request path before {@code route} — {@code /api/v1} or {@code /api/v1/spaces/{id}}. */
+    private static String prefix(HttpExchange ex, String route) {
+        String raw = ex.getRequestURI().getRawPath();
+        return raw.endsWith(route) ? raw.substring(0, raw.length() - route.length()) : "/api/v1";
+    }
+
+    /** {@code -Dauth.oidc.scopes} (space-separated, as the SPA's sign-in uses it), else {@code openid}. */
+    private static List<String> scopes() {
+        String raw = System.getProperty("auth.oidc.scopes");
+        if (raw == null || raw.isBlank()) return List.of("openid");
+        return java.util.Arrays.stream(raw.trim().split("[ ,]+")).filter(x -> !x.isEmpty()).toList();
     }
 
     @Override
@@ -364,6 +431,8 @@ public final class McpRoutes implements RouteModule {
                 b.attr("mcpClientDeclared", true);
             }
             RequestAttrs.subject(ex).filter(Subject::machine).ifPresent(s -> b.attr(AuditAttrs.IDP_SUBJECT, s.machineSub()));
+            // AK-2a: the VERIFIED agent client (the self-declared mcpClient above is a label only).
+            RequestAttrs.subject(ex).filter(Subject::agent).ifPresent(s -> b.attr(AuditAttrs.AGENT_CLIENT, s.agentClient()));
             EventSink.current().emit(b);
         } catch (RuntimeException ignore) {
             // best effort: the audit trail must never break the request (as AuditTrail)

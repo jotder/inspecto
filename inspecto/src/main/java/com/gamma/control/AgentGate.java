@@ -1,0 +1,118 @@
+package com.gamma.control;
+
+import com.gamma.access.CapabilityManifest;
+import com.gamma.access.Roles;
+import com.gamma.spi.auth.Subject;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * The host's gate for an agent Subject ({@link Subject#agent()}, AGENT-KIT-1 AK-2a, plan
+ * {@code docs/superpower/2026-11-20-agent-kit-ak2-plan.md} §4.1): <b>default deny</b>. Every route falls in exactly one
+ * {@link Bucket}, decided by its registered method and pattern — the same strings {@link CapabilityManifest} lists, so
+ * {@code AgentGateParityTest} can pin every non-GET manifest entry to one bucket:
+ * <ol>
+ *   <li>{@link Bucket#HELD} — the route reaches {@code PendingChanges.hold} / {@code holdSet} ({@link PendingChanges#REPLAYABLE}),
+ *       where an agent's write always becomes a Pending Change;</li>
+ *   <li>{@link Bucket#ALLOWED} — reads, and the few writes that change nothing governed ({@link #ALLOWED});</li>
+ *   <li>{@link Bucket#REFUSED} — everything else (403), including every route that only calls {@code holdRefusing*}
+ *       (those do not hold when no policy covers the kind) and the never-list ({@link #never}), which overrides the
+ *       other two: an agent never approves, reveals, promotes, administers Apps or changes access.</li>
+ * </ol>
+ * Applied on every door: a direct request ({@code ControlApi.routeDispatch}) and every in-process replay
+ * ({@code ControlApi.replay}) — so the MCP endpoint's tools and an approved agent change replayed as its author pass it too.
+ */
+final class AgentGate {
+
+    private AgentGate() {}
+
+    enum Bucket { HELD, ALLOWED, REFUSED }
+
+    /**
+     * Writes an agent may make that change nothing governed: the MCP endpoint itself, validation and dry runs, the Ship
+     * reads, taking back its own proposal, an Action Request (held for approval by its own design), {@code POST /db/query}
+     * (the read the AK-1 {@code query_dataset} tool replays; SqlGuard and masking run as for the person) and a Pipeline
+     * run (D-AK2: a delegated person only — {@link #PERSON_ONLY}).
+     */
+    static final Set<String> ALLOWED = Set.of(
+            "POST /mcp",
+            "POST /validate",
+            "POST /pipelines/authored/([^/]+)/dry-run",
+            "POST /bundle/export",
+            "POST /promotion/preview",
+            "POST /pending-changes/([^/]+)/withdraw",
+            "POST /action-requests",
+            "POST /db/query",
+            "POST /pipelines/authored/([^/]+)/run");
+
+    /** {@link #ALLOWED} routes a machine agent may not call (D-AK2: never a run for a machine). */
+    static final Set<String> PERSON_ONLY = Set.of("POST /pipelines/authored/([^/]+)/run");
+
+    /** Named never-list routes the capability and suffix rules of {@link #never} do not already cover. */
+    static final Set<String> NEVER = Set.of(
+            "POST /promotion/apply",
+            "POST /agent/approvals/(.+)/decision");
+
+    /**
+     * On {@link PendingChanges#REPLAYABLE} but refused to an agent, because a path of theirs writes WITHOUT or BEFORE the
+     * hold (AK-2a held-route sweep, 2026-11-20): a Space Template upgrade that adds and updates nothing rewrites the
+     * Space origin record with no {@code holdSet} ({@code SpaceOriginRoutes}); save-as-template copies schema files into
+     * the write root before its hold and leaves them on a 422 ({@code PipelineSettingsRoutes}). Neither is developer
+     * work; a person does them.
+     */
+    static final Set<String> NOT_HELD = Set.of(
+            "POST /origin/upgrade",
+            "POST /pipelines/([^/]+)/save-as-template");
+
+    /** Method + pattern → the capability its manifest entry demands. */
+    private static final Map<String, String> CAPABILITY = new HashMap<>();
+    static {
+        for (CapabilityManifest.Entry e : CapabilityManifest.ENTRIES) CAPABILITY.put(e.method() + " " + e.pattern(), e.capability());
+    }
+
+    /**
+     * The never-list (§4.1): any {@code …/approve}, {@code …/decline} or {@code …/decision}; any route gated by a capability
+     * an agent never holds ({@link Roles#AGENT_NEVER_CAPABILITIES} — the Action Request approver's retry / mark-failed, the
+     * reveal routes, link-expansion approval); {@code /promotion/apply}; every {@code /apps} and {@code /access/*} write;
+     * the Assistant's approval decision.
+     */
+    static boolean never(String method, String pattern) {
+        String key = method + " " + pattern;
+        if (NEVER.contains(key)) return true;
+        String capability = CAPABILITY.get(key);   // null for an ungated route (Set.of refuses a null probe)
+        if (capability != null && Roles.AGENT_NEVER_CAPABILITIES.contains(capability)) return true;
+        if (pattern.endsWith("/approve") || pattern.endsWith("/decline") || pattern.endsWith("/decision")) return true;
+        boolean write = !"GET".equals(method) && !"HEAD".equals(method);
+        return write && (pattern.equals("/apps") || pattern.startsWith("/apps/") || pattern.startsWith("/access/"));
+    }
+
+    /** The bucket of the route registered as {@code method pattern} (pattern without {@code ^…$}). */
+    static Bucket bucket(String method, String pattern) {
+        if (never(method, pattern)) return Bucket.REFUSED;
+        if ("GET".equals(method) || "HEAD".equals(method)) return Bucket.ALLOWED;
+        String key = method + " " + pattern;
+        if (PendingChanges.REPLAYABLE.contains(key) && !NOT_HELD.contains(key)) return Bucket.HELD;
+        if (ALLOWED.contains(key)) return Bucket.ALLOWED;
+        return Bucket.REFUSED;
+    }
+
+    /**
+     * Why {@code subject} may not call the route registered as {@code method routeRegex}, or {@code null} when it may.
+     * Every non-agent Subject passes untouched.
+     */
+    static String refusal(Subject subject, String method, String routeRegex) {
+        if (subject == null || !subject.agent()) return null;
+        String pattern = routeRegex.startsWith("^") && routeRegex.endsWith("$")
+                ? routeRegex.substring(1, routeRegex.length() - 1) : routeRegex;
+        Bucket b = bucket(method, pattern);
+        if (b == Bucket.ALLOWED && subject.machine() && PERSON_ONLY.contains(method + " " + pattern))
+            return "an agent machine client may not run a Pipeline — a delegated person may";
+        if (b != Bucket.REFUSED) return null;
+        return never(method, pattern)
+                ? "an agent client never approves, reveals, promotes, or changes Apps or access — a person must"
+                : "an agent client may not call " + method + " " + pattern + " — an agent proposes config changes (held "
+                        + "for approval), validates, dry-runs and reads; sign in without the agent client for anything else";
+    }
+}

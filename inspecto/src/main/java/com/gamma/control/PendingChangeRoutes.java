@@ -260,6 +260,11 @@ final class PendingChangeRoutes implements RouteModule {
         if (subject.isEmpty())
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "approving a change needs an authenticated "
                     + "Subject — without one, the author and the approver cannot be told apart");
+        // AGENT-KIT-1 AK-2a (plan §4.1): an agent's token never decides a Pending Change, whatever its person may do. The
+        // host's AgentGate refuses it first; this is the route's own door.
+        if (subject.get().agent())
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "an agent client ('" + subject.get().agentClient()
+                    + "') never approves or declines a change — a person must, signed in without the agent client");
         Path root = WriteGates.requireWriteRoot(api, "pending change decision");
         String reason = ApiContext.str(body, "reason");
         if (reason != null && reason.length() > PendingChanges.MAX_REASON)

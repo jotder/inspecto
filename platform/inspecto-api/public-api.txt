@@ -14,6 +14,7 @@ com.gamma.access.Roles | public static Map<String, Def> effective(Path)
 com.gamma.access.Roles | public static Map<String, Def> validate(Object)
 com.gamma.access.Roles | public static Subject admitMachine(Path, Subject)
 com.gamma.access.Roles | public static final Map<String, Def> SEED
+com.gamma.access.Roles | public static final Set<String> AGENT_NEVER_CAPABILITIES
 com.gamma.access.Roles | public static final Set<String> KNOWN_CAPABILITIES
 com.gamma.access.Roles | public static final Set<String> MACHINE_CAPABILITIES
 com.gamma.access.Roles | public static final String ATTR_CONFIG_ROOT
@@ -1097,6 +1098,7 @@ com.gamma.event.EventLog | public static EventLog current()
 com.gamma.event.EventLog | public static EventLog global()
 com.gamma.event.EventLog | public static String currentSpaceId()
 com.gamma.event.EventLog | public static final ScopedValue<EventLog> CONTAINED
+com.gamma.event.EventLog | public static final String AGENT_CLIENT_MDC_KEY
 com.gamma.event.EventLog | public static final String DEFAULT_SPACE_ID
 com.gamma.event.EventLog | public static final String SPACE_MDC_KEY
 com.gamma.event.EventLog | public static int tapCount()
@@ -2728,6 +2730,7 @@ com.gamma.spi.auth.ApiException | public final String errorCode
 com.gamma.spi.auth.ApiException | public final class ApiException extends RuntimeException
 com.gamma.spi.auth.ApiException | public final int status
 com.gamma.spi.auth.Authenticator | Optional<Subject> authenticate(HttpExchange)
+com.gamma.spi.auth.Authenticator | default Optional<String> issuer()
 com.gamma.spi.auth.Authenticator | default Optional<java.util.Map<String, java.util.List<String>>> principals(java.nio.file.Path)
 com.gamma.spi.auth.Authenticator | public interface Authenticator
 com.gamma.spi.auth.GeoCountryResolver | Optional<Geo> resolve(String)

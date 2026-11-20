@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.oidc`](../../../../../product-map/module/oidc.toon).
 
-10 test class(es): 9 unit, 1 real-HTTP control-plane, 0 IT.
+11 test class(es): 10 unit, 1 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -27,6 +27,7 @@ mvn -o test -pl providers/inspecto-oidc -Dtest=AuthenticatorDiscoveryFailClosedT
 |---|---|---|---|---|
 | `AuthenticatorDiscoveryFailClosedTest` | `com.gamma.oidc` | unit | `providers/inspecto-oidc/src/test/java/com/gamma/oidc/AuthenticatorDiscoveryFailClosedTest.java` | What SPI discovery does when this module is on the classpath but <b>misconfigured</b> — the case a |
 | `OidcAgainstRealProviderTest` | `com.gamma.oidc` | unit | `providers/inspecto-oidc/src/test/java/com/gamma/oidc/OidcAgainstRealProviderTest.java` | {@link OidcAuthenticator} against a <b>real OpenID provider over real HTTPS</b> — the one path this |
+| `OidcAgentClientTest` | `com.gamma.oidc` | unit | `providers/inspecto-oidc/src/test/java/com/gamma/oidc/OidcAgentClientTest.java` | The delegated-person agent-client allowlist ({@code -Dauth.oidc.agentClients}, AGENT-KIT-1 AK-2a, plan §4.2): a person's |
 | `OidcAuthenticatorTckTest` | `com.gamma.oidc` | unit | `providers/inspecto-oidc/src/test/java/com/gamma/oidc/OidcAuthenticatorTckTest.java` | {@link OidcAuthenticator} against the platform's Authenticator TCK (MODULE-REORG-1 P5b): an in-memory JWKS, no network. |
 | `OidcAuthenticatorTest` | `com.gamma.oidc` | real-HTTP control-plane test | `providers/inspecto-oidc/src/test/java/com/gamma/oidc/OidcAuthenticatorTest.java` | Offline (no network) tests for {@link OidcAuthenticator}: a self-signed RSA key pair stands in for |
 | `OidcKeycloakAgainstRealProviderTest` | `com.gamma.oidc` | unit | `providers/inspecto-oidc/src/test/java/com/gamma/oidc/OidcKeycloakAgainstRealProviderTest.java` | {@link OidcAuthenticator} with {@code auth.oidc.provider=keycloak} + {@code auth.oidc.discoveryUrl} |

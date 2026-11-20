@@ -1362,6 +1362,11 @@ chapters:
         type: unsorted
         tracks[1]: operator
         audience: internal
+      admin_guide_mcp:
+        file: docs/okf/product/module/mcp/admin-guide-mcp.md
+        type: unsorted
+        tracks[1]: operator
+        audience: internal
       admin_guide_auth_security_abac_decisions:
         file: docs/okf/product/module/access/admin-guide-auth-security-abac-decisions.md
         type: unsorted

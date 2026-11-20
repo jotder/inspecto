@@ -7,6 +7,7 @@ import com.gamma.spi.auth.Authenticator;
 import com.gamma.spi.auth.Authenticators;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.auth.PublicPaths;
+import com.gamma.spi.auth.AuthChallenges;
 import com.gamma.spi.auth.Subject;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.http.Envelope;
@@ -218,7 +219,10 @@ public final class ControlApi implements AutoCloseable, HostContext {
      *  cookie. Everything else requires a valid {@link Authenticator} result. */
     private static final java.util.Set<String> PUBLIC_PATHS = java.util.Set.of(
             "/health", "/ready", "/metrics", "/bootstrap",
-            "/auth/exchange", "/auth/refresh", "/auth/logout");
+            "/auth/exchange", "/auth/refresh", "/auth/logout",
+            // AGENT-KIT-1 AK-2a: OAuth protected-resource metadata (RFC 9728) is public by definition — it is how an MCP
+            // client learns where to sign in. Served by the inspecto-mcp module only; elsewhere no route answers it.
+            "/.well-known/oauth-protected-resource");
 
     private final HttpServer http;
     private final SpaceManager spaces;
@@ -844,6 +848,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
             next.proceed(ex);
         } finally {
             MDC.remove("correlationId");
+            MDC.remove(EventLog.AGENT_CLIENT_MDC_KEY);
             ex.close();
             ApiContext.dropAttrScope(ex);   // the scope must not outlive the request (see clearRequestScope)
         }
@@ -1166,6 +1171,11 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 throw ae;
             }
             authorize(ex, method, path);
+            String agentRefused = agentRefusal(ex, method, r);
+            if (agentRefused != null) {
+                AuditTrail.accessDenied(ex, method, path, 403);
+                throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, agentRefused);
+            }
             requireModuleEnabled(r);   // after authenticate + authorize, so a refused caller learns nothing about the Space
             requireWritable(method, r);   // PA-7b: an expired entitlement past its grace leaves reads only
             if (idempotency(ex, method, path)) return;   // after every gate, before the handler's side effects
@@ -1229,11 +1239,18 @@ public final class ControlApi implements AutoCloseable, HostContext {
         ApiContext.attr(rx, ApiContext.ATTR_SELF_PATH, "/api/v1" + routePath);
         path = routePath;
         setPath(rx, path);
+        // AK-2a: a replay as an agent (an approved agent change, run by its approver's request) names the agent client on
+        // every row it leaves, as the agent's own request would; the outer request's value is restored after.
+        String outerAgent = MDC.get(EventLog.AGENT_CLIENT_MDC_KEY);
+        if (ApiContext.attr(rx, ApiContext.ATTR_SUBJECT) instanceof Subject rs && rs.agent())
+            MDC.put(EventLog.AGENT_CLIENT_MDC_KEY, rs.agentClient());
         try {
             for (Route r : routes) {
                 Matcher m = r.pattern.matcher(path);
                 if (!r.method.equals(method) || !m.matches()) continue;
                 authorize(rx, method, path);
+                String agentRefused = agentRefusal(rx, method, r);   // every door: a replay as an agent is gated too
+                if (agentRefused != null) throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, agentRefused);
                 requireModuleEnabled(r);
                 Object result = r.handler.handle(rx, m);
                 if (result != HANDLED) respond(rx, 200, result);
@@ -1248,6 +1265,8 @@ public final class ControlApi implements AutoCloseable, HostContext {
             respond(rx, ae.status, Map.of("error", ae.getMessage()));
             return new Replayed(ae.status, rx.body());
         } finally {
+            if (outerAgent == null) MDC.remove(EventLog.AGENT_CLIENT_MDC_KEY);
+            else MDC.put(EventLog.AGENT_CLIENT_MDC_KEY, outerAgent);
             ApiContext.dropAttrScope(rx);
         }
     }
@@ -1308,15 +1327,29 @@ public final class ControlApi implements AutoCloseable, HostContext {
                     if (required) {   // audited under its client id, holding nothing
                         Subject s = subject.get();
                         ApiContext.attr(ex, ApiContext.ATTR_SUBJECT, new Subject(s.id(), java.util.Set.of(), s.dataScopes(),
-                                s.attributes(), s.email(), s.displayName(), s.machineSub()));
+                                s.attributes(), s.email(), s.displayName(), s.machineSub(), s.agentClient()));
                         throw refused;
                     }
                     subject = java.util.Optional.empty();
                 }
             }
-            if (subject.isPresent()) ApiContext.attr(ex, ApiContext.ATTR_SUBJECT, subject.get());
-            else if (required) throw new ApiException(401, ErrorCodes.UNAUTHENTICATED, "authentication required");
+            if (subject.isPresent()) {
+                ApiContext.attr(ex, ApiContext.ATTR_SUBJECT, subject.get());
+                // AGENT-KIT-1 AK-2a: every audit row this request leaves names the verified agent client (EventLog.emit).
+                if (subject.get().agent()) MDC.put(EventLog.AGENT_CLIENT_MDC_KEY, subject.get().agentClient());
+            } else if (required) {
+                // RFC 9728 §5.1: a module may say where to sign in for its route (the MCP endpoint: resource_metadata).
+                String challenge = AuthChallenges.challenge(path, ex);
+                if (challenge != null) ex.getResponseHeaders().set("WWW-Authenticate", challenge);
+                throw new ApiException(401, ErrorCodes.UNAUTHENTICATED, "authentication required");
+            }
         });
+    }
+
+    /** {@link AgentGate#refusal} for the route {@code r} this request matched, as the request's Subject (AK-2a). */
+    private static String agentRefusal(HttpExchange ex, String method, Route r) {
+        return ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s
+                ? AgentGate.refusal(s, method, r.pattern.pattern()) : null;
     }
 
     /** Route-level PEP (ABAC A3): consult the edition's {@link AccessDecider} — a no-op when none is

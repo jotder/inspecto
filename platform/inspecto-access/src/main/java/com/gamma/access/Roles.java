@@ -222,6 +222,15 @@ public final class Roles {
      */
     public static final Set<String> MACHINE_CAPABILITIES = Set.of(CAN_OPEN_INBOUND_INVESTIGATION);
 
+    /**
+     * What an agent Subject ({@link Subject#agent()}, AGENT-KIT-1 AK-2a) never holds, whatever its person's roles grant:
+     * approving (a Pending Change, an Action Request, a Report, a link expansion) and revealing a masked value. Dropped
+     * where the agent marker is set ({@code OidcAuthenticator}) and when an approved agent change replays
+     * ({@code PendingChanges.authorNow}), so every in-handler check fails closed too, not only the host's route gate.
+     */
+    public static final Set<String> AGENT_NEVER_CAPABILITIES =
+            Set.of(CAN_APPROVE_CHANGES, CAN_APPROVE_LINK_EXPANSIONS, CAN_REVEAL_LINK_ENTITIES);
+
     /** The capability vocabulary = exactly what the route gates demand ({@link CapabilityManifest},
      *  R4) — the 422 validation set for authored roles and Access-Catalog action nodes. */
     public static final Set<String> KNOWN_CAPABILITIES = Set.copyOf(CapabilityManifest.capabilities());
@@ -381,7 +390,7 @@ public final class Roles {
         Set<String> kept = new LinkedHashSet<>(subject.capabilities());
         kept.retainAll(MACHINE_CAPABILITIES);
         return new Subject(subject.id(), Set.copyOf(kept), subject.dataScopes(), subject.attributes(), subject.email(),
-                subject.displayName(), subject.machineSub());
+                subject.displayName(), subject.machineSub(), subject.agentClient());
     }
 
     // ── validation (shared by the PUT route and the file parser — one grammar) ──────

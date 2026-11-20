@@ -1,7 +1,11 @@
 # Agent Kit AK-2 — agents propose changes, people approve them, one role at a time (plan)
 
 > **Status: APPROVED for phase 1 on 2026-11-20 — D-AK1…D-AK4 signed (operator, "Sign recommended"); D-AK5 and
-> D-AK6 open, needed before phase 2 (§8); nothing built; phase 1 (AK-2a, then AK-2b) startable. Built phase by phase, one agent role per
+> D-AK6 open, needed before phase 2 (§8); AK-2a built 2026-11-20 (§6); AK-2b next.
+> As built, beyond the text below: the allowed bucket also holds `POST /db/query` (the read the AK-1
+> `query_dataset` tool replays, which the gate would otherwise refuse), and an agent token drops
+> `canApproveChanges`, `canApproveLinkExpansions` and `canRevealLinkEntities` at authentication, so every
+> in-handler check fails closed too, not only the route gate (§1: "an agent never … reveals a masked value"). Built phase by phase, one agent role per
 > phase (§1.1, operator 2026-11-20).** Phase AK-2 of
 > [`2026-11-19-user-enablement-and-agent-kit-plan.md`](2026-11-19-user-enablement-and-agent-kit-plan.md) (§7, §8),
 > on top of AK-1 as built ([`spec-mcp.md`](../okf/product/module/mcp/spec-mcp.md)). Board row: `AGENT-KIT-1`.
@@ -193,7 +197,7 @@ and a security review of what it added.
 
 | Step | Phase | Delivers | Proof |
 |---|---|---|---|
-| **AK-2a** identity first | 1 | `auth.oidc.agentClients`, the Subject's agent marker on every audit row, RFC 9728 metadata and the 401 header, the identity-keyed hold in `PendingChanges.hold`/`holdSet`, the three-bucket default deny and never-list at the host gate, `authorNow` keeping the marker, `agentClient` on the Pending Change and its screen | real-HTTP tests: an agent-client token's direct `PUT` is held (202); the SPA client's is not; a `holdRefusing`-only write (bundle import) is 403 for the agent; the agent token's approve is 403; approval per D-AK1; falsified (remove the marker check → the direct `PUT` writes) |
+| **AK-2a** identity first — **built 2026-11-20** ([spec-mcp.md § The agent gate](../okf/product/module/mcp/spec-mcp.md#the-agent-gate-ak-2a)) | 1 | `auth.oidc.agentClients`, the Subject's agent marker on every audit row, RFC 9728 metadata and the 401 header, the identity-keyed hold in `PendingChanges.hold`/`holdSet`, the three-bucket default deny and never-list at the host gate, `authorNow` keeping the marker, `agentClient` on the Pending Change and its screen | real-HTTP tests: an agent-client token's direct `PUT` is held (202); the SPA client's is not; a `holdRefusing`-only write (bundle import) is 403 for the agent; the agent token's approve is 403; approval per D-AK1; falsified (remove the marker check → the direct `PUT` writes) |
 | **AK-2b** write tools | 1 | the §4.4 tools, the endpoint refusal list, the manifest category, tool definitions and the `openapi.fragment.json` | end to end on a Standard install with Keycloak: validate → dry-run → propose → a second person approves → the change is live; `propose_action` → approve → sent |
 | **AK-2c** machines | 2 | `auth.oidc.agentMachineClients` and the agent capability set | a machine in the set proposes and is held; one outside it keeps one capability; an approval attempt is 403 |
 | **AK-2d** operational actions | 2 | the operations rows of §4.6, the held-action record per D-AK6, the operations MCP Tools and Skills | an agent re-runs a failed run (low); its reprocess is held until a person approves; a machine's resume is held |

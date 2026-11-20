@@ -414,6 +414,7 @@ In the OpenAPI contract, **registered by no module's `api.<method>("…")` call*
 
 | Method | Path | Summary |
 |---|---|---|
+| GET | `/.well-known/oauth-protected-resource` | OAuth protected-resource metadata for the MCP endpoint |
 | GET | `/health` | Liveness |
 | GET | `/health/details` | Per-subsystem health |
 | GET | `/openapi.json` | The OpenAPI contract |

@@ -18,6 +18,10 @@ export interface PendingChange {
     operation: 'create' | 'update' | 'delete';
     status: PendingChangeStatus;
     author: string;
+    /** The verified agent client that proposed it for its author (AGENT-KIT-1 AK-2a); absent / null for a person's own write. */
+    agentClient?: string | null;
+    /** The MCP Tool it came through, when an agent proposed it through the MCP endpoint. */
+    mcpTool?: string | null;
     reason: string | null;
     createdAt: string;
     expiresAt: string;

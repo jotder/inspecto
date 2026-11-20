@@ -116,6 +116,25 @@ describe('PendingChangesComponent', () => {
         await expectNoA11yViolations(el);
     });
 
+    it("an agent's proposal names the person and the verified agent client", async () => {
+        const agent = { ...DETAIL, agentClient: 'claude-code', mcpTool: 'propose_change' };
+        const { fixture } = await create({ get: vi.fn(() => of(agent)) });
+        fixture.componentInstance.open({ id: CHANGE.id });
+        fixture.detectChanges();
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.querySelector('#pc-title + p')?.textContent?.replace(/\s+/g, ' ')).toContain(
+            'Proposed by author-1 via agent client claude-code (MCP Tool propose_change)',
+        );
+        await expectNoA11yViolations(el);
+    });
+
+    it("a person's own proposal names no agent client", async () => {
+        const { fixture } = await create();
+        fixture.componentInstance.open({ id: CHANGE.id });
+        fixture.detectChanges();
+        expect(fixture.nativeElement.textContent).not.toContain('via agent client');
+    });
+
     it('offers no decision without canApproveChanges', async () => {
         const { fixture } = await create({}, false);
         fixture.componentInstance.open({ id: CHANGE.id });

@@ -107,7 +107,13 @@ export class PendingChangesComponent implements OnInit {
         { field: 'kind', headerName: 'Kind', minWidth: 140 },
         { field: 'name', headerName: 'Name', flex: 1 },
         { field: 'operation', headerName: 'Change', minWidth: 110 },
-        { field: 'author', headerName: 'Author', minWidth: 150 },
+        {
+            field: 'author',
+            headerName: 'Author',
+            minWidth: 150,
+            // AK-2a: an agent's proposal names the person and the verified agent client acting for them
+            valueFormatter: (p) => (p.data?.agentClient ? `${p.value} via ${p.data.agentClient}` : p.value),
+        },
         {
             field: 'status',
             headerName: 'Status',

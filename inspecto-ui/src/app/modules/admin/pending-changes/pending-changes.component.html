@@ -46,7 +46,14 @@
                 <div class="min-w-0 flex-1">
                     <h2 id="pc-title" class="text-lg font-semibold">{{ c.operation }} {{ c.kind }} '{{ c.name }}'</h2>
                     <p class="text-secondary text-sm">
-                        Proposed by {{ c.author }} on {{ c.createdAt | date: 'medium' }} · expires
+                        Proposed by {{ c.author }}
+                        @if (c.agentClient) {
+                            via agent client {{ c.agentClient }}
+                            @if (c.mcpTool) {
+                                (MCP Tool {{ c.mcpTool }})
+                            }
+                        }
+                        on {{ c.createdAt | date: 'medium' }} · expires
                         {{ c.expiresAt | date: 'medium' }}
                         @if (c.fourEyes) {
                             · a different person must decide

@@ -63,6 +63,10 @@ public final class EventLog implements EventSink {
      *  {@link #currentSpaceId()}). Do not re-inline the literal here. */
     public static final String SPACE_MDC_KEY = CurrentSpace.SPACE_MDC_KEY;
 
+    /** MDC key carrying the verified agent client of the request in hand (AGENT-KIT-1 AK-2a), set by the host for the
+     *  life of a request whose Subject is an agent's; {@link #emit} stamps it on every audit row that lacks it. */
+    public static final String AGENT_CLIENT_MDC_KEY = "agentClient";
+
     /** Id of the default space — the {@linkplain #global() global log}'s space, and {@code SpaceRoot.legacy().id()}.
      *  By reference to {@link CurrentSpace#DEFAULT_SPACE_ID} for the same reason. */
     public static final String DEFAULT_SPACE_ID = CurrentSpace.DEFAULT_SPACE_ID;
@@ -306,6 +310,21 @@ public final class EventLog implements EventSink {
         }
     }
 
+    /**
+     * AGENT-KIT-1 AK-2a: an audit row emitted while the thread serves an agent's request names the verified agent
+     * client ({@link AuditAttrs#AGENT_CLIENT}) — every emitter's row, not only {@code AuditTrail}'s. A row that already
+     * names one (an approved agent change replayed as its author) keeps its own.
+     */
+    static Event withAgentClient(Event e) {
+        if (!AuditChain.chained(e) || e.attributes().containsKey(AuditAttrs.AGENT_CLIENT)) return e;
+        String agent = MDC.get(AGENT_CLIENT_MDC_KEY);
+        if (agent == null || agent.isBlank()) return e;
+        Map<String, String> attrs = new java.util.LinkedHashMap<>(e.attributes());
+        attrs.put(AuditAttrs.AGENT_CLIENT, agent);
+        return new Event(e.eventId(), e.ts(), e.level(), e.type(), e.source(), e.pipeline(), e.correlationId(),
+                e.message(), attrs, e.payload());
+    }
+
     /** Append one event and bump the {@code inspecto_events_total{level,type}} counter. Never throws. */
     public void emit(Event event) {
         if (event == null) return;
@@ -318,7 +337,7 @@ public final class EventLog implements EventSink {
         }
         // Single scrub seam: redact any secret in the message/attributes before it is ever persisted
         // or handed to a subscriber. Cheap (same reference) for the clean common case; never throws.
-        event = SecretScrubber.scrub(event);
+        event = SecretScrubber.scrub(withAgentClient(event));
         try {
             if (AuditChain.chained(event)) {
                 // ASSURE-AUDIT-CHAIN-1: linked AFTER the scrub (the hash covers what is stored) and appended under

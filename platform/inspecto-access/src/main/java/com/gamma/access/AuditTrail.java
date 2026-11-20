@@ -142,6 +142,9 @@ public final class AuditTrail {
     static Event.Builder located(HttpExchange ex, Event.Builder b) {
         // OIDC-CC-MACHINE-ACTOR-1: a machine actor is named by its client id; keep the IdP's own handle beside it.
         RequestAttrs.subject(ex).filter(Subject::machine).ifPresent(s -> b.attr(AuditAttrs.IDP_SUBJECT, s.machineSub()));
+        // AGENT-KIT-1 AK-2a: the verified agent client rides every row of a request its token made — the Subject's own,
+        // so an approved agent change replayed as its author carries it too.
+        RequestAttrs.subject(ex).filter(Subject::agent).ifPresent(s -> b.attr(AuditAttrs.AGENT_CLIENT, s.agentClient()));
         String ip = RequestAttrs.ip(ex);
         b.ip(ip);
         if (ip == null) return b;

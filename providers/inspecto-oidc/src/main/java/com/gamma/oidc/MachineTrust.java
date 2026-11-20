@@ -105,6 +105,48 @@ final class MachineTrust {
         return "client_credentials".equals(gty) || "client-credentials".equals(gty) ? client : null;
     }
 
+    /**
+     * The allowlisted agent client a PERSON's token came from (AGENT-KIT-1 AK-2a, {@code -Dauth.oidc.agentClients}), or
+     * {@code null}. A client-credentials token ({@code gty}) is never an agent's person token: it stays a machine's, judged
+     * by {@link #machineClient} as before. {@code agents} never shares a client with {@code auth.oidc.clients} (a boot
+     * refusal), so a listed agent client cannot also be classed a machine through the pin.
+     */
+    static String agentClient(JWTClaimsSet claims, Set<String> agents) {
+        if (agents.isEmpty()) return null;
+        String client = client(claims);
+        if (client == null || !agents.contains(client)) return null;
+        Object gty = claims.getClaim("gty");
+        return "client_credentials".equals(gty) || "client-credentials".equals(gty) ? null : client;
+    }
+
+    /**
+     * {@code -Dauth.oidc.agentClients} (comma list), checked at boot: it needs {@code auth.oidc.audience} (an agent token
+     * must be minted for this install, as a machine's must), and no client may be both an agent client and a machine
+     * client ({@code auth.oidc.clients}) or be the SPA client ({@code auth.oidc.clientId}) — each would make one token two
+     * kinds of caller.
+     */
+    static Set<String> agentClientsFromSystemProperties() {
+        Set<String> agents = csv(System.getProperty("auth.oidc.agentClients", ""));
+        if (agents.isEmpty()) return Set.of();
+        String audience = System.getProperty("auth.oidc.audience");
+        if (audience == null || audience.isBlank())
+            throw new IllegalStateException("inspecto-oidc: -Dauth.oidc.agentClients requires -Dauth.oidc.audience");
+        Set<String> both = new java.util.TreeSet<>(agents);
+        both.retainAll(csv(System.getProperty("auth.oidc.clients", "")));
+        if (!both.isEmpty())
+            throw new IllegalStateException("inspecto-oidc: " + both + " listed in both -Dauth.oidc.clients (machines) and "
+                    + "-Dauth.oidc.agentClients (agents acting as a person) — a client is one or the other");
+        String spa = System.getProperty("auth.oidc.clientId", "inspecto-spa");
+        if (agents.contains(spa))
+            throw new IllegalStateException("inspecto-oidc: the SPA client '" + spa + "' cannot be an agent client "
+                    + "(-Dauth.oidc.agentClients) — register a separate client for agents");
+        return Set.copyOf(agents);
+    }
+
+    private static Set<String> csv(String raw) {
+        return Arrays.stream(raw.split(",")).map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toSet());
+    }
+
     /** {@code azp}, else {@code client_id}; {@code null} when neither is a non-blank string. */
     private static String client(JWTClaimsSet claims) {
         if (claims.getClaim("azp") instanceof String azp && !azp.isBlank()) return azp;

@@ -43,7 +43,7 @@ class ControlApiEntityListAssuranceTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String MAKER = "Bearer maker", CHECKER = "Bearer checker", SELF = "Bearer self",
-            ADMIN = "Bearer admin", VIEWER = "Bearer viewer";
+            ADMIN = "Bearer admin", VIEWER = "Bearer viewer", AGENT = "Bearer agent";
     private static final String BLOCK = "{\"id\":\"bl\",\"title\":\"Fraud blocks\",\"purpose\":\"block\","
             + "\"entityType\":\"msisdn\",\"reason\":\"FR-9\"}";
     private final HttpClient client = HttpClient.newHttpClient();
@@ -73,7 +73,7 @@ class ControlApiEntityListAssuranceTest {
             String h = String.valueOf(ex.getRequestHeaders().getFirst("Authorization"));
             if (VIEWER.equals(h)) return Optional.of(new Subject("viewer-1", Set.of()));
             String[] who = switch (h) {
-                case MAKER -> new String[] {"maker-1", "operations"};
+                case MAKER, AGENT -> new String[] {"maker-1", "operations"};
                 case CHECKER -> new String[] {"checker-1", "admin"};
                 case SELF -> new String[] {"maker-1", "admin"};
                 case ADMIN -> new String[] {"admin-1", "admin"};
@@ -82,7 +82,8 @@ class ControlApiEntityListAssuranceTest {
             if (who == null) return Optional.empty();
             Roles.Def def = Roles.effective(ex).get(who[1]);
             ComponentAccess.heldRoles(ex, Set.of(who[1]));
-            return Optional.of(new Subject(who[0], def.capabilities(), def.dataScopes()));
+            return Optional.of(new Subject(who[0], def.capabilities(), def.dataScopes(), java.util.Map.of(), null, null,
+                    null, AGENT.equals(h) ? "claude-code" : null));
         });
     }
 
@@ -294,6 +295,29 @@ class ControlApiEntityListAssuranceTest {
             assertFalse(data(send(c, "GET", "/entity-lists/bl", null, VIEWER), 200).get("retired").asBoolean());
             data(send(c, "POST", "/pending-changes/" + retire + "/approve", "{}", CHECKER), 200);
             assertTrue(data(send(c, "GET", "/entity-lists/bl", null, VIEWER), 200).get("retired").asBoolean());
+        }
+    }
+
+    /**
+     * AGENT-KIT-1 AK-2a (verification finding): the 24 h fast path is a person's. An agent's add-only, short-lived change
+     * is held like any other, with no approval policy at all, and writes no fact.
+     */
+    @Test
+    void anAgentsShortLivedAddIsHeldLikeAnyOtherChange(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        Path root = Files.createDirectories(tmp.resolve("config"));
+        try (Ctx c = open(cfg, root)) {
+            noMasking(root);
+            data(send(c, "POST", "/entity-lists", BLOCK, MAKER), 201);
+            int before = facts(c);
+            String quick = "{\"add\":[\"+447700900002\"],\"expiresAt\":\"" + Instant.now().plusSeconds(6 * 3600)
+                    + "\",\"reason\":\"hot\"}";
+            JsonNode held = data(send(c, "POST", "/entity-lists/bl/members", quick, AGENT), 202);
+            assertEquals("claude-code", held.at("/pendingChange/agentClient").asText(), held.toString());
+            assertEquals(before, facts(c), "an agent's held change writes no fact");
+            assertEquals(List.of(false), matched(match(c, "+447700900002")));
+            data(send(c, "POST", "/pending-changes/" + held.at("/pendingChange/id").asText() + "/withdraw", "{}", AGENT), 200);
+            data(send(c, "POST", "/entity-lists/bl/members", quick, MAKER), 200);   // the person's own token keeps the fast path
+            assertEquals(List.of(true), matched(match(c, "+447700900002")));
         }
     }
 

@@ -140,6 +140,7 @@ public final class PendingChanges {
         ApprovalPolicy.Rule mandatory = JobWriteGuard.mandatory(proposed, attachFingerprint, root);
         if (mandatory != null)
             rule = rule == null ? mandatory : new ApprovalPolicy.Rule(true, rule.approverCapability(), true);
+        rule = agentRule(ex, rule);
         if (rule == null) {
             JobWriteGuard.revokeOnDelete(kind, proposed, current, root);
             return;
@@ -164,9 +165,11 @@ public final class PendingChanges {
             return;
         }
         ApprovalPolicy policy = ApprovalPolicy.forRoot(api.writeRoot());
-        if (!policy.holdsAnything()) return;
+        boolean agent = ApiContext.subject(ex).map(Subject::agent).orElse(false);
+        if (!policy.holdsAnything() && !agent) return;
         ApprovalPolicy.Rule rule = null;
         for (String p : relPaths) {
+            if (!policy.holdsAnything()) break;
             String k = kindOfConfigPath(p);
             ApprovalPolicy.Rule r = k == null ? new ApprovalPolicy.Rule(true, ApprovalPolicy.DEFAULT_APPROVER, true) : policy.ruleFor(k);
             if (r == null) continue;
@@ -176,8 +179,20 @@ public final class PendingChanges {
                         + kind + ", so it cannot be one Pending Change — apply the files in groups that share an approver");
             rule = rule == null ? r : new ApprovalPolicy.Rule(true, rule.approverCapability(), rule.fourEyes() || r.fourEyes());
         }
+        rule = agentRule(ex, rule);
         if (rule == null) return;
         propose(api, ex, kind, name, proposed, current, policy, rule, null, null, null);
+    }
+
+    /**
+     * AGENT-KIT-1 AK-2a (plan §4.1, D-AK1): an agent Subject's write is held ALWAYS — because of who writes, not the door
+     * it came through, so the same token calling the route directly is held too. With the kind's policy rule its approver
+     * applies; without one, {@link ApprovalPolicy#DEFAULT_APPROVER}. Four eyes always: neither the person the agent acts
+     * for (the author) nor the agent's token may approve. A non-agent Subject's rule is returned unchanged.
+     */
+    static ApprovalPolicy.Rule agentRule(HttpExchange ex, ApprovalPolicy.Rule rule) {
+        if (!ApiContext.subject(ex).map(Subject::agent).orElse(false)) return rule;
+        return new ApprovalPolicy.Rule(true, rule == null ? ApprovalPolicy.DEFAULT_APPROVER : rule.approverCapability(), true);
     }
 
     /** Record the Pending Change for a held write and unwind the request with {@link Held} (202). */
@@ -205,6 +220,12 @@ public final class PendingChanges {
         rec.put("authorRoles", ApiContext.attr(ex, ComponentAccess.ATTR_HELD_ROLES) instanceof Set<?> held
                 ? held.stream().map(String::valueOf).sorted().toList() : List.of());
         rec.put("authorCapabilities", author == null ? List.of() : author.capabilities().stream().sorted().toList());
+        // AK-2a: the verified agent client that proposed it for its person (null for a person's own write), and the MCP
+        // Tool when it came through the MCP endpoint — what the approver sees, and what an approved replay runs as.
+        rec.put("agentClient", author == null ? null : author.agentClient());
+        rec.put("mcpTool", author != null && author.agent()
+                && ApiContext.attr(ex, ApiContext.ATTR_AUDIT_ATTRS) instanceof Map<?, ?> via && via.get("mcpTool") instanceof String t
+                ? t : null);
         rec.put("reason", reason == null || reason.isBlank() ? null : reason.trim());
         rec.put("createdAt", now.toString());
         rec.put("expiresAt", now.plus(policy.expiresAfterHours(), ChronoUnit.HOURS).toString());
@@ -314,7 +335,11 @@ public final class PendingChanges {
             else scopes.addAll(d.dataScopes());
         }
         caps.removeAll(AccessGrants.deniedCapabilities(configRoot, roles));
-        return new Subject(String.valueOf(rec.get("author")), caps, unscoped ? null : scopes);
+        // AK-2a (plan §4.1): an agent's change replays as what proposed it — the agent marker and its never-capabilities
+        // removed — so approval never widens what the change runs with.
+        String agent = rec.get("agentClient") instanceof String a && !a.isBlank() ? a : null;
+        if (agent != null) caps.removeAll(Roles.AGENT_NEVER_CAPABILITIES);
+        return new Subject(String.valueOf(rec.get("author")), caps, unscoped ? null : scopes, Map.of(), null, null, null, agent);
     }
 
     /**

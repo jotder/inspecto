@@ -59,6 +59,8 @@ public final class OidcAuthenticator implements Authenticator {
     private final String rolesClaim;
     private final RoleMapper.Keycloak keycloak;   // null = not the keycloak preset (or rolesClaim set explicitly)
     private final MachineTrust machineTrust;      // null = no -Dauth.oidc.clients: every client of the issuer
+    private final Set<String> agentClients;       // -Dauth.oidc.agentClients (AK-2a); empty = no agent clients
+    private final String issuer;
 
     /** No-arg constructor required by {@code ServiceLoader}; reads {@code -Dauth.oidc.*}. */
     public OidcAuthenticator() {
@@ -71,7 +73,8 @@ public final class OidcAuthenticator implements Authenticator {
                 System.getProperty("auth.oidc.gateway.audience"),
                 System.getProperty("auth.oidc.gateway.header", "X-JWT-Assertion"),
                 keycloakRoles(),
-                MachineTrust.fromSystemProperties());
+                MachineTrust.fromSystemProperties(),
+                MachineTrust.agentClientsFromSystemProperties());
     }
 
     /** Explicit-config seam (tests use an in-memory {@code ImmutableJWKSet} — no network dependency). */
@@ -99,6 +102,17 @@ public final class OidcAuthenticator implements Authenticator {
     OidcAuthenticator(JWKSource<SecurityContext> jwkSource, String issuer, String audience, String rolesClaim,
                       JWKSource<SecurityContext> gatewayJwkSource, String gatewayIssuer, String gatewayAudience,
                       String gatewayHeader, RoleMapper.Keycloak keycloak, MachineTrust machineTrust) {
+        this(jwkSource, issuer, audience, rolesClaim, gatewayJwkSource, gatewayIssuer, gatewayAudience,
+                gatewayHeader, keycloak, machineTrust, Set.of());
+    }
+
+    /** Full seam plus the agent-client allowlist (AGENT-KIT-1 AK-2a; empty = none, as before). */
+    OidcAuthenticator(JWKSource<SecurityContext> jwkSource, String issuer, String audience, String rolesClaim,
+                      JWKSource<SecurityContext> gatewayJwkSource, String gatewayIssuer, String gatewayAudience,
+                      String gatewayHeader, RoleMapper.Keycloak keycloak, MachineTrust machineTrust,
+                      Set<String> agentClients) {
+        this.issuer = issuer;
+        this.agentClients = Set.copyOf(agentClients);
         this.rolesClaim = rolesClaim;
         this.keycloak = keycloak;
         this.machineTrust = machineTrust;
@@ -171,7 +185,12 @@ public final class OidcAuthenticator implements Authenticator {
             if (subjectId == null || subjectId.isBlank()) return Optional.empty();
             // OIDC-CC-CLIENT-PIN-1 / -LIFETIME-REPLAY-1: only after the signature is verified, so a forged
             // token can never fill the replay cache. Bearer path only: a gateway assertion is the gateway's.
-            if (proc == processor && machineTrust != null && !machineTrust.admits(claims, java.time.Instant.now()))
+            // AGENT-KIT-1 AK-2a: an allowlisted agent client's PERSON token (bearer path only — a gateway assertion is the
+            // gateway's). It passed the same signature, issuer, audience and expiry checks as the SPA client's; the client
+            // pin below is for machine clients, so a listed agent client is not refused by it.
+            String agent = proc == processor ? MachineTrust.agentClient(claims, agentClients) : null;
+            if (proc == processor && agent == null && machineTrust != null
+                    && !machineTrust.admits(claims, java.time.Instant.now()))
                 return Optional.empty();
             // RBAC R1: the role → grant table is per-request — the bound space's authored roles.toon
             // overlaid on the seed (ControlApi stamps the config root on the exchange pre-auth).
@@ -182,6 +201,7 @@ public final class OidcAuthenticator implements Authenticator {
             var held = RoleMapper.roles(claims, rolesClaim, keycloak).stream()
                     .map(r -> r.toLowerCase(java.util.Locale.ROOT)).filter(defs::containsKey).toList();
             capabilities.removeAll(AccessGrants.deniedCapabilities(ex, held));
+            if (agent != null) capabilities.removeAll(Roles.AGENT_NEVER_CAPABILITIES);   // an agent never approves or reveals
             // RBAC R3: expose the recognised role names server-internally so component sharing can
             // match `subjectType: role` shares — the Subject itself stays capabilities-only.
             ComponentAccess.heldRoles(ex, Set.copyOf(held));
@@ -191,10 +211,16 @@ public final class OidcAuthenticator implements Authenticator {
             return Optional.of(new Subject(machine == null ? subjectId : "client:" + machine, Set.copyOf(capabilities),
                     RoleMapper.dataScopesFor(claims, rolesClaim, defs, keycloak),
                     attributes(claims, Roles.attributeClaims(ex)), verifiedEmail(claims), displayName(claims),
-                    machine == null ? null : subjectId));
+                    machine == null ? null : subjectId, agent));
         } catch (Exception e) {
             return Optional.empty();   // bad signature, wrong issuer/audience, expired, malformed — all 401
         }
+    }
+
+    /** The configured bearer issuer — what RFC 9728 metadata names as the authorization server. */
+    @Override
+    public Optional<String> issuer() {
+        return Optional.ofNullable(issuer);
     }
 
     /** ses-sns §7: the {@code email} claim ONLY when the IdP asserts {@code email_verified: true} — the one

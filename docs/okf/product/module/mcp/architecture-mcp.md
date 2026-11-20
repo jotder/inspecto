@@ -34,7 +34,12 @@ agent ──POST /mcp──▶ host: authenticate · rate limit · access policy
 
 - **Phase AK-1 (2026-11-20): read-only.** Nineteen read MCP Tools, three resources, the audit row, the pinned
   transport. Design and as-built: [spec-mcp.md](spec-mcp.md).
-- **Next (AK-2):** the delegated-person allowlist and protected-resource metadata, then write tools through
-  validate → dry-run → Pending Change, `propose_action` through Action Requests, the machine agent capability set.
+- **Phase AK-2a (2026-11-20): identity first.** The agent-client allowlist (`-Dauth.oidc.agentClients`), the
+  verified `agent_client` on every audit row, RFC 9728 protected-resource metadata and the `/mcp` 401 challenge,
+  and the host's agent gate: an agent's config write is always a Pending Change for another person, every other
+  write is refused, and an agent never approves or reveals. [spec-mcp.md § The agent gate](spec-mcp.md#the-agent-gate-ak-2a);
+  keys: [admin-guide-mcp.md](admin-guide-mcp.md).
+- **Next (AK-2b):** write tools through validate → dry-run → Pending Change, `propose_action` through Action
+  Requests; then (phase 2) the machine agent capability set.
   Design (approved for phase 1 on 2026-11-20, D-AK1…D-AK4 signed): [`2026-11-20-agent-kit-ak2-plan.md`](../../../../superpower/2026-11-20-agent-kit-ak2-plan.md).
 - **Plan:** [`2026-11-19-user-enablement-and-agent-kit-plan.md`](../../../../superpower/2026-11-19-user-enablement-and-agent-kit-plan.md) §7.

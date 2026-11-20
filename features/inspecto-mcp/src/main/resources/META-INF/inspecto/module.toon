@@ -6,4 +6,4 @@ bindingTime: boot
 absentMessage: "The MCP endpoint is not installed in this bundle - AI agents reach Inspecto through the optional inspecto-mcp module (Standard edition and above; Basic has no sign-in)."
 provides:
   features[1]: mcp
-  routes[1]: "POST /mcp"
+  routes[2]: "POST /mcp","GET /.well-known/oauth-protected-resource"

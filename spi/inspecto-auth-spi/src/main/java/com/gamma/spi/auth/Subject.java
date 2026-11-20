@@ -37,15 +37,28 @@ import java.util.Set;
  * its {@link #id()} is {@code client:<client id>}, so the audit trail and every owner field name the integration
  * rather than a service-account UUID, and {@link #machineSub()} keeps the token's {@code sub} for the audit row.
  * {@code null} for a person, whose id already is the {@code sub}.
+ *
+ * <p><b>Agent client (AGENT-KIT-1 AK-2a).</b> {@link #agentClient()} is the verified client id of an allowlisted
+ * agent client ({@code -Dauth.oidc.agentClients}) whose token this person's request carries — an AI agent acting
+ * as the person. {@code null} for every other caller. A marked Subject's every config write is held for another
+ * person to approve, the host refuses it every route outside the agent allowlist, and it never approves.
  */
 public record Subject(String id, Set<String> capabilities, Set<String> dataScopes,
-                      Map<String, Object> attributes, String email, String displayName, String machineSub) {
+                      Map<String, Object> attributes, String email, String displayName, String machineSub,
+                      String agentClient) {
 
     public Subject {
         attributes = attributes == null ? Map.of() : Map.copyOf(attributes);
         email = email == null || email.isBlank() ? null : email.trim();
         displayName = displayName == null || displayName.isBlank() ? null : displayName.trim();
         machineSub = machineSub == null || machineSub.isBlank() ? null : machineSub;
+        agentClient = agentClient == null || agentClient.isBlank() ? null : agentClient;
+    }
+
+    /** No agent client — every pre-AK-2 caller. */
+    public Subject(String id, Set<String> capabilities, Set<String> dataScopes, Map<String, Object> attributes,
+                   String email, String displayName, String machineSub) {
+        this(id, capabilities, dataScopes, attributes, email, displayName, machineSub, null);
     }
 
     /** A person — every pre-machine caller. */
@@ -83,6 +96,11 @@ public record Subject(String id, Set<String> capabilities, Set<String> dataScope
     /** Whether this caller is a machine (a client-credentials token), not a person. */
     public boolean machine() {
         return machineSub != null;
+    }
+
+    /** Whether an allowlisted agent client acts for this caller (AK-2a): its writes are held, never applied. */
+    public boolean agent() {
+        return agentClient != null;
     }
 
     /** Record which issuer minted the token this request's Subject came from - the namespace its {@link #id()}

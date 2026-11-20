@@ -13,9 +13,10 @@ tags: [feature-db, module]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`module.mcp`](../../../../../product-map/module/mcp.toon).
 
-2 row(s).
+3 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
 | mcp | feature | mcp | standard;advanced;preview |  | preview | `mcp` | `features/inspecto-mcp/src/main/resources/META-INF/inspecto/module.toon` |
+| "GET /.well-known/oauth-protected-resource" | route | mcp | standard;advanced;preview |  | preview | `"GET /.well-known/oauth-protected-resource"` | `features/inspecto-mcp/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /mcp" | route | mcp | standard;advanced;preview |  | preview | `"POST /mcp"` | `features/inspecto-mcp/src/main/resources/META-INF/inspecto/module.toon` |

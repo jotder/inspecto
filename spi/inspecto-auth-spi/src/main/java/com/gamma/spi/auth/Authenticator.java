@@ -27,4 +27,10 @@ public interface Authenticator {
     default Optional<java.util.Map<String, java.util.List<String>>> principals(java.nio.file.Path configRoot) {
         return Optional.empty();
     }
+
+    /** The issuer whose tokens this Authenticator accepts — the authorization server an MCP client signs in at
+     *  (RFC 9728 {@code authorization_servers}, AGENT-KIT-1 AK-2a). Empty (the default) ⇒ no OAuth sign-in to name. */
+    default Optional<String> issuer() {
+        return Optional.empty();
+    }
 }

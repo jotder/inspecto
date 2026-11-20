@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-468 test class(es): 189 unit, 279 real-HTTP control-plane, 0 IT.
+470 test class(es): 190 unit, 280 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -30,6 +30,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `AbsentModuleRoutesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AbsentModuleRoutesTest.java` | MODULE-REORG-1 P3b: the known-modules copy the processor ships, and the stub surface read from it. The 503 bodies and |
 | `AccessGrantsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AccessGrantsTest.java` | RBAC R2 grant resolution ({@link AccessGrants}): nearest-ancestor inheritance over the Access |
 | `ActivationHoldsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ActivationHoldsTest.java` | SE-1b (D-SE12): the activation check's decision for each opt-in, from the lock's facts of one object. |
+| `AgentGateParityTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AgentGateParityTest.java` | The agent gate's three buckets against the capability manifest (AGENT-KIT-1 AK-2a, plan §4.1, §7 "a write route that |
 | `AgentRoutesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/AgentRoutesTest.java` | Integration tests for the AGT-5 (P0) {@code /agent/*} routes over real HTTP, against a fake {@link IntelligenceAgent}. |
 | `AlertRoutesWindowGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/AlertRoutesWindowGateTest.java` | PA-9b: the save gates of a windowed Alert Rule ({@link AlertRoutes#requireWindow}), each 422 paired with the accepted |
 | `AlertRuleUnmodelledKeysTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/AlertRuleUnmodelledKeysTest.java` | {@code MODULE-REORG-P4-2} - the Alert Rule unmodelled-key policy, over real HTTP with a real Subject. |
@@ -65,6 +66,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiAccessRolesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAccessRolesTest.java` | Role settings over real HTTP ({@code GET/PUT /access/roles} — RBAC R1, |
 | `ControlApiAccessTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAccessTest.java` | Lens access configuration over real HTTP ({@code AccessRoutes} — |
 | `ControlApiActivationHoldsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiActivationHoldsTest.java` | SE-1b (D-SE12) over real HTTP: the activation holds, end to end — the Space lock reports, {@link ActivationHolds} |
+| `ControlApiAgentClientTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAgentClientTest.java` | The agent marker over real HTTP (AGENT-KIT-1 AK-2a, plan {@code 2026-11-20-agent-kit-ak2-plan.md} §4.1, D-AK1): an |
 | `ControlApiAgentInvokeTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAgentInvokeTest.java` | Real-HTTP tests for the S6 "gated agentic write" round-trip: an A2UI {@code invoke} action against |
 | `ControlApiAlertAckTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAlertAckTest.java` | MODULE-REORG-P7-INCIDENTS slice 3 — {@code POST /alerts/{id}/ack\|resolve} over real HTTP. Rule-fired Alerts live in |
 | `ControlApiAlertFromEventTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAlertFromEventTest.java` | MODULE-REORG-P7 ALERT residue retirement - a {@code SEQUENCE_GAP} / conservation-imbalance Event is an Alert on |

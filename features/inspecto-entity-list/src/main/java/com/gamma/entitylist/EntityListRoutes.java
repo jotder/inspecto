@@ -342,7 +342,9 @@ public final class EntityListRoutes implements RouteModule {
                 // D-P5: an add-only change whose every entry expires within 24 h applies at once and is reviewed after.
                 boolean shortLived = toRemove.isEmpty() && rangesRemove.isEmpty() && expiresAt != null
                         && !Instant.parse(expiresAt).isAfter(now.plus(SHORT_LIVED));
-                if (shortLived) {
+                // AGENT-KIT-1 AK-2a: an agent's change is held whatever its shape — the 24 h fast path is a person's.
+                boolean agent = ApiContext.subject(ex).map(com.gamma.spi.auth.Subject::agent).orElse(false);
+                if (shortLived && !agent) {
                     reviewAfter = PendingChanges.governs(root, KIND);
                 } else {
                     Map<String, Object> proposed = new LinkedHashMap<>();
