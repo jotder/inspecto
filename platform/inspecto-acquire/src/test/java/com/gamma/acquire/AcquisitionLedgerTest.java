@@ -118,7 +118,6 @@ class AcquisitionLedgerTest {
         }
     }
 
-    /** ACQ-7 in-place migration: a ledger DB created before the etag/version columns gains them on open. */
     /** B3 verifier note: findByChecksum's (source_id, checksum) lookup has its own index, made on open (and on an existing file). */
     @Test
     void duckDbIndexesTheChecksumLookup(@TempDir Path dir) throws Exception {
@@ -138,6 +137,7 @@ class AcquisitionLedgerTest {
         }
     }
 
+    /** ACQ-7 in-place migration: a ledger DB created before the etag/version columns gains them on open. */
     @Test
     void duckDbMigratesPreEtagSchema(@TempDir Path dir) throws Exception {
         String url = "jdbc:duckdb:" + dir.resolve("old-ledger.db").toString().replace('\\', '/');

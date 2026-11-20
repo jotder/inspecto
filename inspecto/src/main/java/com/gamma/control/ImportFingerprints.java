@@ -36,8 +36,9 @@ import java.util.Set;
  *   <li><b>Add a file</b> answers 409 for bytes the ledger holds ({@link #imported}); the upload's own bytes become its
  *       fingerprint ({@link #recordUpload}), also when a new column was left out of the landed copy.</li>
  *   <li><b>A waiting file</b> (Run now, <i>Watch this folder</i>, the files Add a file's run takes along) with bytes the
- *       ledger holds, or the bytes of an earlier waiting file or of the upload, is set aside in {@code refused/} with its
- *       reason, as a file of the wrong columns is ({@link #refuseDuplicates}, the pre-run step {@value #STEP}).</li>
+ *       ledger holds, a file name the import took with other bytes, or the bytes of an earlier waiting file or of the
+ *       upload, is set aside in {@code refused/} with its reason, as a file of the wrong columns is
+ *       ({@link #refuseDuplicates}, the pre-run step {@value #STEP}).</li>
  *   <li><b>Rows set aside are forgotten</b>: <i>Replace everything</i> forgets every fingerprint of the import
  *       ({@link #forgetAll}), <i>Replace the period</i> those of the arrivals whose rows the Dataset no longer holds
  *       ({@link #forgetGone}); a new import forgets what an earlier Dataset of the same id left; each is put back when the
@@ -55,11 +56,16 @@ final class ImportFingerprints {
     /** The pre-run step's name: before the columns are judged, so a duplicate is never judged or kept a column for. */
     static final String STEP = "import.refuse_duplicates";
 
-    /** The import Pipeline's duplicate block: the bytes under any name ({@code DuplicatePolicy.Mode.CONTENT}). */
+    /**
+     * The import Pipeline's duplicate block: the bytes under any name ({@code DuplicatePolicy.Mode.CONTENT}); a name the
+     * import took with other bytes is never read over the old one ({@code on_change: ignore} in the engine, and set aside
+     * by {@link #refuseDuplicates}). Both are the Pipeline's own settings, so they can be changed there.
+     */
     static Map<String, Object> duplicate() {
         Map<String, Object> d = new LinkedHashMap<>();
         d.put("mode", "content");
         d.put("algorithm", "SHA256");
+        d.put("on_change", "ignore");
         return d;
     }
 
@@ -77,10 +83,20 @@ final class ImportFingerprints {
         return cfg.collector().id();
     }
 
-    /** The fingerprint of the import with these bytes (sha256, hex), or null; null too when the import does not hash. */
+    /**
+     * The fingerprint of the import with these bytes (sha256, hex), or null. Asked whatever the Pipeline's duplicate mode
+     * (operator 2026-11-20): an import left on {@code path} still answers for the uploads Add data recorded
+     * ({@link #recordUpload}) and the fingerprints seeded at start.
+     */
     static LedgerEntry imported(PipelineConfig cfg, String sha256) {
-        if (sha256 == null || !checked(cfg)) return null;
+        if (sha256 == null) return null;
         return ledger().findByChecksum(source(cfg), sha256).orElse(null);
+    }
+
+    /** Whether a waiting file under a name the import took with other bytes is set aside: on_change ignore, or no hashing. */
+    private static boolean refusesRenamedContent(PipelineConfig cfg) {
+        PipelineConfig.Duplicate d = cfg.collector().duplicate();
+        return !checked(cfg) || DuplicatePolicy.OnChange.from(d.onChange()) == DuplicatePolicy.OnChange.IGNORE;
     }
 
     /** The name a person knows a fingerprinted file by: Add data's landed name without its stamp, else the name. */
@@ -97,26 +113,39 @@ final class ImportFingerprints {
 
     /**
      * After Add a file's run: the upload's bytes as uploaded ({@code sha256}) are the landed file's fingerprint - the engine
-     * hashed the landed copy, which differs when a new column was left out of it.
+     * hashed the landed copy, which differs when a new column was left out of it; a Pipeline that does not hash recorded
+     * nothing, so the fingerprint is recorded here.
      */
     static void recordUpload(PipelineConfig cfg, Path landed, String sha256) {
-        if (landed == null || sha256 == null || !checked(cfg)) return;
+        if (landed == null || sha256 == null) return;
         String key = FileNames.safe(cfg, landed.getFileName().toString());
-        ledger().find(source(cfg), key).filter(e -> !sha256.equals(e.checksum()))
-                .ifPresent(e -> ledger().record(new LedgerEntry(e.sourceId(), e.relativePath(), e.name(), e.size(), sha256,
-                        e.etag(), e.version(), e.lastModified(), e.processedAt(), e.status())));
+        LedgerEntry e = ledger().find(source(cfg), key).orElse(null);
+        if (e == null)
+            ledger().record(new LedgerEntry(source(cfg), key, key, 0L, sha256, null, null, 0L, System.currentTimeMillis(),
+                    LedgerEntry.PROCESSED));
+        else if (!sha256.equals(e.checksum()))
+            ledger().record(new LedgerEntry(e.sourceId(), e.relativePath(), e.name(), e.size(), sha256,
+                    e.etag(), e.version(), e.lastModified(), e.processedAt(), e.status()));
     }
 
     // ── the pre-run step ────────────────────────────────────────────────────────────────────────────────────────
 
     /**
      * Set aside in {@code refused/} every waiting file (of the run's {@code only}, when narrowed) whose bytes the import
-     * already took, or that an earlier waiting file or the upload being added carries, recorded as a refused arrival with
-     * the reason. Nothing for an import whose Pipeline does not hash.
+     * already took, whose NAME it took with other bytes (unless the Pipeline says {@code on_change} other than
+     * {@code ignore}: then the engine reads the new bytes), or that an earlier waiting file or the upload being added
+     * carries - recorded as a refused arrival with the reason. Nothing is replaced, nothing silently skipped. A
+     * <i>Replace everything</i> run judges only the twins: the rows the fingerprints stand for are being replaced.
      */
     static void refuseDuplicates(ImportPreRunSteps.Run r) throws IOException {
         PipelineConfig cfg = r.space.service().configFor(r.pipeline()).orElse(null);
-        if (cfg == null || !checked(cfg)) return;
+        if (cfg == null) return;
+        boolean held = !r.job.replace;   // a replace sets every held row aside: only the run's own twins count
+        // by FILE name, whatever the folder: the engine writes one output per file name, so a second feed.csv - even in
+        // another folder - would be written over the first one's rows
+        Map<String, LedgerEntry> named = new HashMap<>();
+        if (held && refusesRenamedContent(cfg))
+            for (LedgerEntry e : ledger().entries(source(cfg))) named.merge(e.name(), e, (a, b) -> a.processedAt() >= b.processedAt() ? a : b);
         Path dataRoot = r.space.dataRoot();
         Path in = OnboardImport.inbox(dataRoot, r.pipeline());
         Map<String, String> seen = new HashMap<>();   // sha256 → the file of this run that carries it
@@ -127,12 +156,16 @@ final class ImportFingerprints {
             String sha = DatasetArrivals.sha256(f);
             if (sha == null) continue;   // unreadable: left for the run, which sets it aside as before
             String name = f.getFileName().toString();
-            LedgerEntry first = ledger().findByChecksum(source(cfg), sha).orElse(null);
+            LedgerEntry first = held ? ledger().findByChecksum(source(cfg), sha).orElse(null) : null;
+            LedgerEntry took = first == null ? named.get(FileNames.safe(cfg, name)) : null;
             String twin = seen.putIfAbsent(sha, name);
-            if (first == null && twin == null) continue;
+            if (first == null && took == null && twin == null) continue;
             String reason = first != null
                     ? "the same content was already imported on " + day(first) + " as '" + shown(first) + "'; its rows are in '"
                             + r.id + "', so adding it again would count them twice"
+                    : took != null
+                    ? "a file named '" + name + "' was already imported" + (took.processedAt() > 0 ? " on " + day(took) : "")
+                            + " with other content; it is not read over the first one - rename it to import it"
                     : "it has the same content as '" + twin + "', which this run takes";
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("file", name);
@@ -160,17 +193,18 @@ final class ImportFingerprints {
     /**
      * <i>Replace the period</i>: forget the fingerprints of the arrivals whose rows the Dataset no longer holds - every
      * output Parquet file of the arrival is gone (moved aside by the replacement) and no compaction merged it. An arrival
-     * with rows left keeps its fingerprint: sending it again would count those rows twice.
+     * with rows left keeps its fingerprint: sending it again would count those rows twice. A fingerprint stands for the
+     * NEWEST arrival under its name (the ledger keeps one row per name, the latest take's), so only that arrival is judged:
+     * an older arrival of a reused name losing its rows never forgets a newer one that still has them.
      */
     static void forgetGone(OnboardImport.Job job, PipelineConfig cfg) {
         Path dataRoot = job.space.dataRoot();
         Path base = dataRoot.resolve(job.id).toAbsolutePath().normalize();
         Map<String, com.gamma.job.ArrivalCompactor.Segment> merged = com.gamma.job.ArrivalCompactor.merged(dataRoot, job.id);
-        Set<String> gone = new java.util.HashSet<>();
-        for (Map<String, String> r : job.space.service().statusStore().files(cfg)) {
+        Map<String, Boolean> newestGone = new HashMap<>();   // the ledger's spelling of a name → its newest arrival lost its rows
+        for (Map<String, String> r : job.space.service().statusStore().files(cfg)) {   // oldest first: the newest wins
             String paths = r.getOrDefault("output_paths", "");
-            if (paths.isBlank()) continue;   // wrote nothing: no rows to have lost
-            boolean held = false;
+            boolean held = paths.isBlank();   // wrote nothing: no rows to have lost
             for (String p : paths.split(";")) {
                 if (p.isBlank()) continue;
                 Path o = Path.of(p.trim()).toAbsolutePath().normalize();
@@ -178,12 +212,11 @@ final class ImportFingerprints {
                 String rel = base.resolve("database").relativize(o).toString().replace(java.io.File.separatorChar, '/');
                 held |= Files.isRegularFile(o) || merged.containsKey(rel);
             }
-            if (!held) gone.add(FileNames.safe(cfg, String.valueOf(r.get("filename"))));   // the ledger's spelling
+            newestGone.put(FileNames.safe(cfg, String.valueOf(r.get("filename"))), !held);
         }
-        if (gone.isEmpty()) return;
         List<LedgerEntry> forget = new ArrayList<>();
         for (LedgerEntry e : ledger().entries(source(cfg)))
-            if (gone.contains(e.name()) || gone.contains(e.relativePath())) forget.add(e);
+            if (Boolean.TRUE.equals(newestGone.get(e.name()))) forget.add(e);
         forget(job, cfg, forget);
     }
 
@@ -192,12 +225,12 @@ final class ImportFingerprints {
      * the engine may have committed it), or a replace or period run that is undone takes them out again.
      */
     static void forgetLanded(OnboardImport.Job job, PipelineConfig cfg) {
-        if (job.landed == null || !checked(cfg)) return;
+        if (job.landed == null) return;
         ledger().forget(source(cfg), FileNames.safe(cfg, job.landed.getFileName().toString()));
     }
 
     private static void forget(OnboardImport.Job job, PipelineConfig cfg, List<LedgerEntry> entries) {
-        if (entries.isEmpty() || !checked(cfg)) return;
+        if (entries.isEmpty()) return;
         AcquisitionLedger ledger = ledger();
         for (LedgerEntry e : entries) ledger.forget(e.sourceId(), e.relativePath());
         job.undo.push(() -> {
@@ -210,9 +243,11 @@ final class ImportFingerprints {
     /**
      * Once per start, every Space: an import Pipeline still on the {@code path} default (made before B3 part 2) is moved
      * onto {@link #duplicate()} through the Pipeline write path (an approval policy over Pipelines or a refused save is
-     * logged, and that import keeps refusing nothing by content); then an import the ledger holds no fingerprint of is
-     * seeded from its arrivals sidecar - each upload's sha256 whose rows no later <i>Replace everything</i> set aside.
-     * Idempotent: a seeded import has fingerprints, so it is not seeded again.
+     * logged: that import stays on {@code path}, and Add a file and the pre-run step still ask the ledger); then an import
+     * the ledger holds no fingerprint of is seeded - each upload's sha256 from its arrivals sidecar whose rows no later
+     * <i>Replace everything</i> set aside, and, by NAME only (no hash was ever kept), every file its old processed markers
+     * name, so a file the path check held back is set aside as already imported instead of read. Idempotent: a seeded
+     * import has fingerprints, so it is not seeded again.
      */
     static void migrate(ApiContext api) {
         HostContext host = HostContext.of(api);
@@ -249,19 +284,24 @@ final class ImportFingerprints {
         if (cfg == null) return;
         if (DuplicatePolicy.Mode.from(cfg.collector().duplicate().mode()) == DuplicatePolicy.Mode.PATH) {
             Path file = writeRoot.resolve(OnboardImport.CONFIG_DIR).resolve(id + "_pipeline.toon").toAbsolutePath().normalize();
-            DatasetFeed.rewritePipeline(api, new DatasetFeed.Import(writeRoot, dataRoot, service, id, content, file),
-                    "the import's duplicate check moves onto the fingerprint ledger", p -> {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> collector = p.get("collector") instanceof Map<?, ?> m
-                                ? new LinkedHashMap<>((Map<String, Object>) m) : new LinkedHashMap<>();
-                        collector.put("duplicate", duplicate());
-                        p.put("collector", collector);
-                    }, null);
+            try {
+                DatasetFeed.rewritePipeline(api, new DatasetFeed.Import(writeRoot, dataRoot, service, id, content, file),
+                        "the import's duplicate check moves onto the fingerprint ledger", p -> {
+                            @SuppressWarnings("unchecked")
+                            Map<String, Object> collector = p.get("collector") instanceof Map<?, ?> m
+                                    ? new LinkedHashMap<>((Map<String, Object>) m) : new LinkedHashMap<>();
+                            collector.put("duplicate", duplicate());
+                            p.put("collector", collector);
+                        }, null);
+                log.info("Dataset '{}': its import refuses the same bytes by the fingerprint ledger (B3)", id);
+            } catch (IOException | RuntimeException refused) {
+                log.warn("Dataset '{}': its Pipeline stays on the path check ({}); Add data still refuses by the fingerprint ledger",
+                        id, refused.getMessage());
+            }
             cfg = service.configFor(id).orElse(null);
             if (cfg == null) return;
-            log.info("Dataset '{}': its import refuses the same bytes by the fingerprint ledger (B3)", id);
         }
-        if (!checked(cfg) || !ledger().entries(source(cfg)).isEmpty()) return;
+        if (!ledger().entries(source(cfg)).isEmpty()) return;
         Map<String, Map<String, Object>> held = new LinkedHashMap<>();   // landed name → its upload line
         for (Map<String, Object> m : DatasetArrivals.sidecarLines(dataRoot, id)) {
             if ("system".equals(m.get("sender")) || DatasetArrivals.REFUSED.equals(m.get("status"))) continue;
@@ -280,7 +320,40 @@ final class ImportFingerprints {
             ledger().record(new LedgerEntry(source(cfg), key, key, 0L, String.valueOf(e.getValue().get("sha256")),
                     null, null, 0L, at, LedgerEntry.PROCESSED));
         }
-        if (!held.isEmpty()) log.info("Dataset '{}': {} fingerprint(s) seeded from its arrivals (B3)", id, held.size());
+        int named = seedMarkers(cfg, held.keySet());
+        if (!held.isEmpty() || named > 0)
+            log.info("Dataset '{}': {} fingerprint(s) seeded from its arrivals, {} name(s) from its markers (B3)", id, held.size(), named);
+    }
+
+    /**
+     * A name-only fingerprint (no checksum: the path check never kept one) for every file the import's processed markers
+     * name, but the {@code seeded} ones; answers how many. Recorded at the marker's time.
+     */
+    private static int seedMarkers(PipelineConfig cfg, Set<String> seeded) throws IOException {
+        String markers = cfg.dirs().markers();
+        if (markers == null || markers.isBlank()) return 0;
+        Path root = Path.of(markers).toAbsolutePath().normalize();
+        if (!Files.isDirectory(root)) return 0;
+        String ext = cfg.processing().markerExtension();
+        List<Path> found;
+        try (var w = Files.walk(root)) {
+            found = w.filter(Files::isRegularFile).filter(p -> {
+                String n = p.getFileName().toString();
+                return n.endsWith(ext) && !n.endsWith(".logical" + ext) && n.length() > ext.length();
+            }).toList();
+        }
+        int n = 0;
+        for (Path m : found) {
+            String rel = root.relativize(m).toString().replace(java.io.File.separatorChar, '/');
+            rel = rel.substring(0, rel.length() - ext.length());
+            if (seeded.contains(rel)) continue;
+            String key = FileNames.safe(cfg, rel);
+            ledger().record(new LedgerEntry(source(cfg), key, FileNames.safe(cfg, m.getFileName().toString()
+                    .substring(0, m.getFileName().toString().length() - ext.length())), 0L, null, null, null, 0L,
+                    Files.getLastModifiedTime(m).toMillis(), LedgerEntry.PROCESSED));
+            n++;
+        }
+        return n;
     }
 
     /**

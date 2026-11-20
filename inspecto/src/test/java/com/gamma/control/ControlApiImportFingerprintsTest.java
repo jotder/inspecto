@@ -345,16 +345,121 @@ class ControlApiImportFingerprintsTest {
         String toon = Files.readString(pipeline);
         assertTrue(toon.contains("mode: content"), toon);
         Files.writeString(pipeline, toon.replace("mode: content", "mode: path"));
+        // a drop the path check took: its processed marker is all that is left of it (no hash was ever kept)
+        Path marker = Path.of("database", id, "markers", "drop.csv.processed");
+        Files.createDirectories(marker.getParent());
+        Files.writeString(marker, "");
         AcquisitionLedgers.use(new InMemoryAcquisitionLedger());
         try (Ctx c = open(cfg, root, pipeline)) {
             assertTrue(Files.readString(pipeline).contains("mode: content"), "moved onto the ledger at start");
-            assertEquals(1, AcquisitionLedgers.shared().entries(id).size(), "seeded from the arrivals sidecar");
+            assertEquals(2, AcquisitionLedgers.shared().entries(id).size(), "seeded from the arrivals sidecar and the marker");
             HttpResponse<String> again = add(c, id, "copy.csv", "append", transfers(40));
             assertEquals(409, again.statusCode(), again.body());
             assertTrue(error(again).contains("as 'transfers.csv'"), again.body());
+            // the drop sent again under its name: set aside as already imported, not read now that the marker no longer counts
+            dropSettled(id, "drop.csv", transfers(3));
+            JsonNode run = data(send(c, "POST", "/datasets/" + id + "/run", null), 200);
+            assertEquals("drop.csv", run.at("/refused/0/file").asText(), run.toString());
+            assertTrue(run.at("/refused/0/reason").asText().contains("named 'drop.csv' was already imported"), run.toString());
+            assertEquals(40, rows(id));
         }
         try (Ctx c = open(cfg, root, pipeline)) {
-            assertEquals(1, AcquisitionLedgers.shared().entries(id).size(), "seeded once: an import with fingerprints is left alone");
+            assertEquals(2, AcquisitionLedgers.shared().entries(id).size(), "seeded once: an import with fingerprints is left alone");
+        }
+    }
+
+    // ── a name taken with other bytes; the Pipeline's own settings; an import kept on path ──────────────────────
+
+    /** Reviewer's probe (B3 part 2): a second file under a name the import took is set aside, never read over the first. */
+    @Test
+    void aNameTakenWithOtherBytesIsSetAsideNotReadOverTheFirst(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "renamed", transfers(40));
+            assertTrue(Files.readString(pipelineOf(root, id)).contains("on_change: ignore"), "the Pipeline's own setting");
+            dropSettled(id, "feed.csv", transfers(7));
+            assertEquals(47, data(send(c, "POST", "/datasets/" + id + "/run", null), 200).get("rowsAfter").asLong());
+            dropSettled(id, "feed.csv", transfers(5));
+            JsonNode run = data(send(c, "POST", "/datasets/" + id + "/run", null), 200);
+            assertEquals(47, rows(id), "the first feed.csv keeps its 7 rows: " + run);
+            assertEquals("feed.csv", run.at("/refused/0/file").asText(), run.toString());
+            String reason = run.at("/refused/0/reason").asText();
+            assertTrue(reason.contains("named 'feed.csv' was already imported") && reason.contains("rename it"), reason);
+            assertTrue(Files.exists(Path.of("database", id, OnboardImport.REFUSED_DIR, "feed.csv")), "set aside, not lost");
+            assertEquals(0, data(send(c, "GET", "/datasets/" + id + "/feed", null), 200).get("waiting").asInt(), "nor left waiting");
+            JsonNode arrival = data(send(c, "GET", "/datasets/" + id + "/arrivals", null), 200).get("arrivals").get(0);
+            assertEquals(DatasetArrivals.REFUSED, arrival.get("status").asText(), arrival.toString());
+            assertEquals("feed.csv", arrival.get("file").asText(), arrival.toString());
+        }
+    }
+
+    /** {@code on_change} is the Pipeline's own setting: set to {@code reprocess}, a reused name's new bytes are read. */
+    @Test
+    void onChangeReprocessSetInThePipelineReadsAReusedName(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        String id;
+        try (Ctx c = open(cfg, root)) {
+            id = imported(c, "reprocess", transfers(40));
+        }
+        Path pipeline = pipelineOf(root, id);
+        Files.writeString(pipeline, Files.readString(pipeline).replace("on_change: ignore", "on_change: reprocess"));
+        try (Ctx c = open(cfg, root, pipeline)) {
+            dropSettled(id, "feed.csv", transfers(7));
+            data(send(c, "POST", "/datasets/" + id + "/run", null), 200);
+            dropSettled(id, "feed.csv", transfers(5));
+            JsonNode run = data(send(c, "POST", "/datasets/" + id + "/run", null), 200);
+            assertEquals(5, run.get("rowsIn").asLong(), run.toString());
+            assertFalse(run.has("refused"), "the person chose to read it: " + run);
+        }
+    }
+
+    /**
+     * The engine writes one output per file name, so {@code later/feed.csv} would be written over {@code feed.csv}'s rows
+     * (found building this lane: 112 rows became 106): a taken name is refused in any folder.
+     */
+    @Test
+    void aTakenNameIsSetAsideInAnotherFolderToo(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "folders", transfers(40));
+            dropSettled(id, "feed.csv", transfers(7));
+            assertEquals(47, data(send(c, "POST", "/datasets/" + id + "/run", null), 200).get("rowsAfter").asLong());
+            Files.createDirectories(Path.of("database", "inbox", id, "later"));
+            dropSettled(id, "later/feed.csv", transfers(5));
+            JsonNode run = data(send(c, "POST", "/datasets/" + id + "/run", null), 200);
+            assertEquals(47, rows(id), "the first feed.csv keeps its rows: " + run);
+            assertTrue(run.at("/refused/0/reason").asText().contains("named 'feed.csv' was already imported"), run.toString());
+        }
+    }
+
+    /** Operator 2026-11-20: an import its approval policy keeps on the path check still refuses the same bytes. */
+    @Test
+    void anImportKeptOnThePathCheckStillRefusesTheSameBytes(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        String id;
+        try (Ctx c = open(cfg, root)) {
+            id = imported(c, "kept", transfers(40));
+        }
+        Path pipeline = pipelineOf(root, id);
+        Files.writeString(pipeline, Files.readString(pipeline).replace("mode: content", "mode: path"));
+        Files.writeString(root.resolve(ApprovalPolicy.FILE), "approval:\n  pipeline:\n    required: true\n");
+        try (Ctx c = open(cfg, root, pipeline)) {
+            assertTrue(Files.readString(pipeline).contains("mode: path"), "the policy kept the Pipeline as it was");
+            assertEquals(409, add(c, id, "first.csv", "append", transfers(40)).statusCode(), "the engine's fingerprint");
+            data(add(c, id, "october.csv", "append", transfers(12)), 200);
+            HttpResponse<String> again = add(c, id, "copy.csv", "append", transfers(12));
+            assertEquals(409, again.statusCode(), again.body());
+            assertTrue(error(again).contains("as 'october.csv'"), again.body());
+            assertEquals(52, rows(id));
+        }
+    }
+
+    /** A Replace everything run takes a waiting file with the bytes of an arrival it replaces: those rows are going. */
+    @Test
+    void replaceEverythingTakesAWaitingFileWithTheBytesItReplaces(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "rewaiting", transfers(30));
+            data(add(c, id, "october.csv", "append", transfers(12)), 200);
+            dropSettled(id, "resent.csv", transfers(12));
+            JsonNode s = data(add(c, id, "november.csv", "replace", transfers(9)), 200);
+            assertEquals(21, s.get("rowsAfter").asLong(), s.toString());
+            assertFalse(s.has("refused"), s.toString());
         }
     }
 

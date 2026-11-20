@@ -318,7 +318,8 @@ Dataset). A Dataset that Mappings read cannot be deleted until they are.
   the same days are removed; every other day stays. Send a corrected week this way and you get exactly that week again.
 
 The same file twice is refused ("already imported on …"), whatever its name, so its rows are never counted twice; a copy
-another system puts in the inbox is set aside in `refused/` and listed with that reason. To load it again, replace
+another system puts in the inbox is set aside in `refused/` and listed with that reason, and so is a different file under
+a name already imported (rename it to import it). To load it again, replace
 everything; a file whose every row a later *replace the days it covers* replaced may also come back. A file must have the Dataset's columns, by name: a missing column, or one moved to another place, refuses
 the file and says which. A new column is kept as a detail of the Dataset: the result says "New column fee: kept as a
 detail", and older files read it as empty. Untick *Keep new columns as details* before you add the file to leave it out
