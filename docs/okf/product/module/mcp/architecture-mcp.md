@@ -1,7 +1,7 @@
 ---
 type: Concept
 title: MCP endpoint (inspecto-mcp)
-description: Entry page of the mcp hub — the optional module that lets AI agents (Claude, Gemini, OpenAI, local models) read a running Inspecto through the Model Context Protocol, as the signed-in person, through the Control API's own gates.
+description: Entry page of the mcp hub — the optional module that lets AI agents (Claude, Gemini, OpenAI, local models) read a running Inspecto and propose changes to it through the Model Context Protocol, as the signed-in person, through the Control API's own gates; every agent write waits for another person's approval.
 tags: [agent-kit, mcp, agents, module]
 timestamp: 2026-11-20T00:00:00Z
 item: module.mcp
@@ -39,7 +39,10 @@ agent ──POST /mcp──▶ host: authenticate · rate limit · access policy
   and the host's agent gate: an agent's config write is always a Pending Change for another person, every other
   write is refused, and an agent never approves or reveals. [spec-mcp.md § The agent gate](spec-mcp.md#the-agent-gate-ak-2a);
   keys: [admin-guide-mcp.md](admin-guide-mcp.md).
-- **Next (AK-2b):** write tools through validate → dry-run → Pending Change, `propose_action` through Action
-  Requests; then (phase 2) the machine agent capability set.
+- **Phase AK-2b (2026-11-20): write tools.** `validate_config`, `dry_run_pipeline`, `propose_change` (Pipeline,
+  Expectation, Alert Rule, Job, Widget, Dashboard → a Pending Change another person approves), the Pending Change
+  reads, `withdraw_change`, `propose_action`, `export_bundle`, `preview_promotion`, `run_pipeline_now`; write tools
+  need a verified agent client; the endpoint is `replay-gated`. [spec-mcp.md § Write tools](spec-mcp.md#write-tools-ak-2b).
+- **Next (phase 2):** the machine agent capability set and operational actions (D-AK5, D-AK6 open).
   Design (approved for phase 1 on 2026-11-20, D-AK1…D-AK4 signed): [`2026-11-20-agent-kit-ak2-plan.md`](../../../../superpower/2026-11-20-agent-kit-ak2-plan.md).
 - **Plan:** [`2026-11-19-user-enablement-and-agent-kit-plan.md`](../../../../superpower/2026-11-19-user-enablement-and-agent-kit-plan.md) §7.

@@ -154,9 +154,10 @@ class ControlApiMcpTest {
             HttpResponse<String> res = modern(c.port, OPS, "tools/list", Map.of());
             assertEquals(200, res.statusCode(), res.body());
             JsonNode tools = body(res).path("result").path("tools");
-            assertEquals(McpTools.TOOLS.size(), tools.size());
+            assertEquals(McpTools.ALL_TOOLS.size(), tools.size());
             for (JsonNode t : tools) {
-                assertTrue(t.path("annotations").path("readOnlyHint").asBoolean(), "AK-1 is read-only: " + t);
+                assertEquals(!McpTools.tool(t.path("name").asText()).write(), t.path("annotations").path("readOnlyHint").asBoolean(),
+                        "only an AK-2b write tool is not read-only: " + t);
                 assertEquals("object", t.path("inputSchema").path("type").asText());
             }
             assertEquals("edition_and_modules", tools.get(0).path("name").asText(), "a deterministic order");
@@ -272,7 +273,7 @@ class ControlApiMcpTest {
             HttpResponse<String> list = post(c.port, OPS, Map.of("MCP-Protocol-Version", "2025-11-25"),
                     Map.of("jsonrpc", "2.0", "id", 2, "method", "tools/list"));
             assertEquals(200, list.statusCode(), list.body());
-            assertEquals(McpTools.TOOLS.size(), body(list).path("result").path("tools").size());
+            assertEquals(McpTools.ALL_TOOLS.size(), body(list).path("result").path("tools").size());
             assertTrue(body(list).path("result").path("resultType").isMissingNode(), "legacy results keep the legacy shape");
         }
     }

@@ -1,7 +1,7 @@
 ---
 type: Spec
-title: The MCP endpoint (inspecto-mcp) — AK-1 and AK-2a design and as-built
-description: How the optional inspecto-mcp module serves the Model Context Protocol on the Control API — transport and pinned revision, the read MCP Tools and resources, why every call goes through the existing auth, Space and route gates (an in-process replay, never a side door), the audit row naming the person and the verified agent client, the agent-client allowlist, protected-resource metadata and the host's agent gate (AK-2a), and what is left for AK-2b and later.
+title: The MCP endpoint (inspecto-mcp) — AK-1 and AK-2 phase 1 design and as-built
+description: How the optional inspecto-mcp module serves the Model Context Protocol on the Control API — transport and pinned revision, the read MCP Tools and resources, why every call goes through the existing auth, Space and route gates (an in-process replay, never a side door), the audit row naming the person and the verified agent client, the agent-client allowlist, protected-resource metadata and the host's agent gate (AK-2a), the write MCP Tools that propose Pending Changes (AK-2b), and what is left for phases 2 and 3.
 tags: [agent-kit, mcp, agents, security, audit, identity]
 timestamp: 2026-11-20T00:00:00Z
 item: module.mcp
@@ -18,7 +18,8 @@ Phase AK-1 of the Agent Kit (`AGENT-KIT-1`, plan
 AK-1 is **read-only**: no MCP Tool changes anything. **AK-2a** (identity first, 2026-11-20) adds the
 agent-client allowlist, the agent marker on every audit row, protected-resource metadata and the host's agent gate
 ([Identity](#identity), [The agent gate](#the-agent-gate-ak-2a)); still no write tool. Write tools (validate →
-dry-run → Pending Change), `propose_action` and the machine agent capability set are AK-2b and later.
+dry-run → Pending Change) and `propose_action` are **AK-2b** (2026-11-20, [Write tools](#write-tools-ak-2b)); the
+machine agent capability set is phase 2.
 
 **On this page**
 
@@ -29,6 +30,7 @@ dry-run → Pending Change), `propose_action` and the machine agent capability s
 - [Audit](#audit) — the row each call leaves.
 - [Identity](#identity) — the delegated-person and machine modes, and what is built of each.
 - [The agent gate (AK-2a)](#the-agent-gate-ak-2a) — held writes, default deny, the never-list.
+- [Write tools (AK-2b)](#write-tools-ak-2b) — validate, dry-run, propose, withdraw, Ship reads, run.
 - [Deferred](#deferred)
 
 ## Placement
@@ -97,9 +99,12 @@ route's own message, never as a JSON-RPC protocol error. A `resources/read` whos
 unknown resource, is a JSON-RPC `-32602` error carrying the status and the route's message (the 2026-07-28
 code for a resource that cannot be read).
 
-`POST /mcp` itself is listed in `CapabilityManifest.EXEMPTIONS` as **`read-shaped`** in AK-1: it persists
-nothing, and every route it reaches carries its own gate. AK-2 revisits the category when write tools land
-(each write tool will replay a gated write route, so the endpoint still needs no capability of its own).
+`POST /mcp` itself is listed in `CapabilityManifest.EXEMPTIONS` as **`replay-gated`** (AK-2b; `read-shaped` in
+AK-1): it persists nothing itself, and every route it reaches carries its own gate, so the endpoint needs no
+capability of its own. Like `read-shaped`, the category is not audited (the endpoint and each replayed route write
+their own rows) and stays open on a read-only install — where every replayed **write** now meets the host's
+read-only check itself (`ControlApi.replay` runs `requireWritable`). A replayed write that the hold turns into a
+Pending Change answers **202** inside the replay, as a direct request does.
 
 ## MCP Tools and resources
 
@@ -136,8 +141,52 @@ A tool whose route belongs to a module this bundle lacks (Incidents need `ops`, 
 build time — the canonical vocabulary every agent should use), `inspecto://catalog` (replays `GET /catalog`)
 and `inspecto://modules` (replays `GET /modules`).
 
-**Not exposed, on purpose:** connections, secrets, settings, access and role administration, exports and
-bundles, raw files, the `ops:*` SQL groups. No tool returns a secret.
+**Not exposed, on purpose:** connections, secrets, settings, access and role administration, bundle import,
+raw files, the `ops:*` SQL groups. No tool returns a secret.
+
+## Write tools (AK-2b)
+
+Plan §4.4. Every tool replays one existing route; none is a new write path. The **write** tools are annotated
+`readOnlyHint: false`, `destructiveHint: false` (a proposal changes nothing until a person approves it) and need an
+**agent Subject** (D-AK3): with a token from the console's own client they return `isError` with HTTP 403 "needs
+sign-in through an agent client", while the read tools stay open. An `OBJECT` argument (`body`, `config`, `content`)
+is passed on as the replayed route's JSON body, unchanged.
+
+| MCP Tool | Kind | Arguments | Replays |
+|---|---|---|---|
+| `validate_config` | read | `type`, `config` | `POST /validate` (`{type, config}`); refusal findings come back as data |
+| `dry_run_pipeline` | read | `pipeline`, `body?` | `POST /pipelines/authored/{pipeline}/dry-run` |
+| `propose_change` | write | `kind`, `operation`, `id?`, `content?`, `reason?` | the kind's own write route, below; `reason` rides as `X-Change-Reason` |
+| `list_pending_changes` | read | `status?` | `GET /pending-changes` |
+| `get_pending_change`, `diff_pending_change` | read | `change` | `GET /pending-changes/{change}`, `…/diff` |
+| `withdraw_change` | write | `change` | `POST /pending-changes/{change}/withdraw` (author only) |
+| `propose_action` | write | `body` | `POST /action-requests` (`canWorkIncidents`; held for approval by design) |
+| `export_bundle` | read | `body` | `POST /bundle/export` |
+| `preview_promotion` | read | `body` | `POST /promotion/preview` (`canAdminister`) |
+| `run_pipeline_now` | write | `pipeline`, `body?` | `POST /pipelines/authored/{pipeline}/run` (`canAuthorWorkbench`; D-AK2: a person, never a machine) |
+
+**`propose_change` allowlist** (`McpTools.CHANGE_ROUTES`, the builder tutorials' kinds, each route on
+`PendingChanges.REPLAYABLE`): `pipeline` (create and update `PUT /pipelines/{id}/graph`, delete
+`DELETE /config/pipeline/{id}`), `expectation` (`POST /expectations`, `PUT|DELETE /expectations/{id}`), `alert-rule`
+(`/alerts/rules`), `job` (`/jobs`), `widget` and `dashboard` (`POST /components/{kind}`, `PUT|DELETE /components/{kind}/{id}`).
+An update or delete needs `id`, a create or update needs `content`, a delete takes none; anything else is a
+`-32602` before any replay. The answer is the route's own: for an agent, always the **202 Pending Change** (the
+identity-keyed hold), carrying `agentClient` and `mcpTool: propose_change`.
+
+**The endpoint's refusal list** (`McpTools.REFUSED`): a replay whose method and path look like the never-list
+(`…/approve|decline|decision|reveal|retry|mark-failed`, `/promotion/apply`, `/apps` and `/access` writes) is refused
+403 before it is dispatched, whoever asks — beside the host's agent gate. `McpToolRoutesTest` asserts no router can
+produce such a path for any allowlisted kind and operation, and that every non-GET route a tool replays is in
+`CapabilityManifest` (the §4.7 parity).
+
+**Deferred:** `validate_app` (no route; `APP-KIT-DELIVERY-1`).
+
+**Tests:** `ControlApiMcpWriteToolsTest` (real HTTP: the tools listed and annotated; an agent's `propose_change` is a
+202 Pending Change naming the agent client, the tool and the reason, that another person's approval applies; a
+console token refused every write tool but keeping the reads; validate, dry-run and run reach their routes;
+withdraw; malformed proposals are `-32602`), `McpToolRoutesTest` (unit). Mutants that turned a test red: D-AK3 off,
+the refusal list off, the reason header dropped, the replay not answering a hold, the replay skipping the
+read-only check (on a read-only install `propose_change` is a 423 and no Pending Change is recorded; the reads answer).
 
 ## Audit
 
@@ -302,10 +351,25 @@ carry `agent_client` too (`ControlApi.replay` sets the MDC key for an agent Subj
 its person's own proposals and writes the reason text the approver reads; the Host header is reflected into the
 metadata's `resource` when `-Dmcp.publicOrigin` is unset.
 
+## Security review, AK-2b (2026-11-20)
+
+An independent review of the write tools found **no vulnerability at confidence 8 or above**. Checked: no argument
+chooses a route (`kind` and `operation` are enums over fixed tables; every path argument matches the id pattern and
+is URL-encoded, so no `/`, `%`, `?`, `&` or leading `.`); the `reason` header (now at most 500 characters and one
+line, refused `-32602` otherwise); body size (256 KiB at the endpoint); every `propose_change` route lands in the
+held bucket and holds before it writes; a console token writes through no tool; a replay inherits only the fixed
+attributes, so an approval marker never reaches an MCP replay, and the approve replay never raises `Held`; the
+`replay-gated` category changes no audit row and makes a write tool on a read-only install a 423, stricter than
+before. Accepted, below confidence 8: `export_bundle` replays an ungated read-shaped route, as the person could call
+directly; whether an agent's person may approve its Action Request is the Action Request policy's question.
+
 ## Deferred
 
-- Write tools (`validate_config`, `dry_run_pipeline`, `propose_change`, …), `propose_action`, the machine agent
-  capability set, and the endpoint's manifest category for writes. Design (approved for phase 1 on 2026-11-20):
-  [`2026-11-20-agent-kit-ak2-plan.md`](../../../../superpower/2026-11-20-agent-kit-ak2-plan.md).
+- Phase 2 and 3 of the plan ([`2026-11-20-agent-kit-ak2-plan.md`](../../../../superpower/2026-11-20-agent-kit-ak2-plan.md)
+  §1.1, §6): the machine agent capability set (AK-2c), operational actions (AK-2d), case actions (AK-2e); D-AK5 and
+  D-AK6 open.
+- `validate_app` (no route; `APP-KIT-DELIVERY-1`).
+- The plan's AK-2b end-to-end proof on a Standard install with Keycloak (validate → dry-run → propose → a second
+  person approves; `propose_action` → approve → sent): the real-HTTP tests prove the same chain with an in-test
+  Authenticator; the Keycloak run belongs with the phase's golden tasks (AK-4).
 - Prompts, `subscriptions/listen`, progress notifications, the tasks extension, multi round-trip requests.
-- `export_bundle`, `preview_promotion`, `validate_app` (they belong with the Ship tools in AK-2).

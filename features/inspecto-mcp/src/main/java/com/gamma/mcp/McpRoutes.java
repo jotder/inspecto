@@ -202,7 +202,7 @@ public final class McpRoutes implements RouteModule {
                 case "server/discover" -> modern ? discover() : null;
                 case "initialize" -> initialize(version);
                 case "ping" -> modern ? null : new LinkedHashMap<>();   // legacy only: removed in 2026-07-28
-                case "tools/list" -> listResult("tools", McpTools.TOOLS.stream().map(McpTools.Tool::definition).toList(), modern);
+                case "tools/list" -> listResult("tools", McpTools.ALL_TOOLS.stream().map(McpTools.Tool::definition).toList(), modern);
                 case "resources/list" -> listResult("resources",
                         McpTools.RESOURCES.stream().map(McpTools.Resource::definition).toList(), modern);
                 case "tools/call" -> callTool(api, ex, params, version, client);
@@ -268,10 +268,12 @@ public final class McpRoutes implements RouteModule {
         return c;
     }
 
-    private static final String INSTRUCTIONS = "Inspecto MCP endpoint (read-only in this release). Every tool acts as "
-            + "the signed-in person, in the Space this URL names, and sees only what that person may see; classified "
-            + "values come back masked. Read the inspecto://glossary resource and use its canonical terms. Call "
-            + "edition_and_modules before relying on a feature.";
+    private static final String INSTRUCTIONS = "Inspecto MCP endpoint. Every tool acts as the signed-in person, in the "
+            + "Space this URL names, and sees only what that person may see; classified values come back masked. A change "
+            + "is never applied by you: validate_config and dry_run_pipeline first, then propose_change, which holds it "
+            + "as a Pending Change for another person to approve. Write tools need sign-in through an agent client. Read "
+            + "the inspecto://glossary resource and use its canonical terms. Call edition_and_modules before relying on "
+            + "a feature.";
 
     private static Map<String, Object> discover() {
         Map<String, Object> r = new LinkedHashMap<>();
@@ -314,7 +316,18 @@ public final class McpRoutes implements RouteModule {
         Map<String, Object> args = tool.validate(argsNode.isObject()
                 ? ApiContext.JSON.convertValue(argsNode, Map.class) : Map.of());
         McpTools.Call call = tool.router().route(args);
-        ApiContext.Replayed r = replay(api, ex, call, "mcpTool", name, client);
+        ApiContext.Replayed r;
+        if (McpTools.refused(call)) {
+            // The endpoint's own refusal list (plan §4.4): never replayed, whoever asks. No router produces such a path.
+            r = new ApiContext.Replayed(403, jsonText(Map.of("error", "the MCP endpoint never offers " + call.method() + " "
+                    + call.path() + " — approving, revealing, promoting and changing Apps or access are a person's acts")));
+        } else if (tool.write() && !RequestAttrs.subject(ex).map(Subject::agent).orElse(false)) {
+            // D-AK3: every write names a verified agent client — a token from the console's own client keeps the reads.
+            r = new ApiContext.Replayed(403, jsonText(Map.of("error", "'" + name + "' needs sign-in through an agent client "
+                    + "(-Dauth.oidc.agentClients), so that every write names a verified client; the read tools stay open")));
+        } else {
+            r = replay(api, ex, call, "mcpTool", name, client);
+        }
         audit(ex, "mcp.tool.called", "mcpTool", name, call, r.status(), version, client);
         return toolResult(r);
     }
@@ -360,7 +373,7 @@ public final class McpRoutes implements RouteModule {
 
     private static ApiContext.Replayed replay(ApiContext api, HttpExchange ex, McpTools.Call call, String kind,
                                               String name, Map<String, Object> client) {
-        Map<String, String> headers = new LinkedHashMap<>();
+        Map<String, String> headers = new LinkedHashMap<>(call.headers());   // a tool's own fixed headers (X-Change-Reason)
         String ua = ex.getRequestHeaders().getFirst("User-Agent");
         if (ua != null) headers.put("User-Agent", ua);
         // Ride on the replayed route's own AUDIT row (an export, a write in AK-2), so it names the tool too.

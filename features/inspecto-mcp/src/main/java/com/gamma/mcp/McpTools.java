@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * The AK-1 MCP Tools and resources: a FIXED table mapping each one to the existing Control API route it replays
+ * The MCP Tools and resources (AK-1 reads, AK-2b writes and Ship reads): a FIXED table mapping each one to the existing Control API route it replays
  * (spec-mcp.md "MCP Tools and resources"). Nothing here touches data — a tool only names a route and builds its path
  * from validated arguments; {@link McpRoutes} replays it as the caller, so the route's own gates decide.
  *
@@ -29,12 +29,21 @@ final class McpTools {
     /** A {@code query_dataset} statement. */
     static final int MAX_SQL = 65_536;
 
-    enum Kind { ID, TEXT, SQL, INT }
+    /** {@code ENUM}: one of {@link Arg#values}; {@code OBJECT}: a JSON object, passed on as the replayed route's body. */
+    enum Kind { ID, TEXT, SQL, INT, ENUM, OBJECT }
 
-    record Arg(String name, Kind kind, boolean required, String description) {}
+    record Arg(String name, Kind kind, boolean required, String description, List<String> values) {
+        Arg(String name, Kind kind, boolean required, String description) {
+            this(name, kind, required, description, List.of());
+        }
+    }
 
-    /** The request a tool replays: method, route-table path (with an optional {@code ?query}) and body. */
-    record Call(String method, String path, byte[] body) {}
+    /** The request a tool replays: method, route-table path (with an optional {@code ?query}), body and headers. */
+    record Call(String method, String path, byte[] body, Map<String, String> headers) {
+        Call(String method, String path, byte[] body) {
+            this(method, path, body, Map.of());
+        }
+    }
 
     /** Thrown for an argument the tool refuses — a JSON-RPC {@code -32602 Invalid params}. */
     static final class BadArgs extends RuntimeException {
@@ -46,7 +55,15 @@ final class McpTools {
         Call route(Map<String, Object> args);
     }
 
-    record Tool(String name, String title, String description, List<Arg> args, Router router) {
+    /**
+     * {@code write}: the tool changes something once a person approves it (a proposal, a withdrawal, an Action Request, a
+     * Pipeline run) — D-AK3: only an agent Subject (a verified agent client) may call it; MCP annotations say so.
+     */
+    record Tool(String name, String title, String description, List<Arg> args, Router router, boolean write) {
+
+        Tool(String name, String title, String description, List<Arg> args, Router router) {
+            this(name, title, description, args, router, false);
+        }
 
         /** The validated arguments, by name; refuses an unknown, missing, mistyped or oversized one. */
         Map<String, Object> validate(Map<String, Object> raw) {
@@ -74,6 +91,15 @@ final class McpTools {
                             throw new BadArgs("'" + a.name() + "' must be an id (letters, digits, . _ : @ -; at most 200)");
                         yield s;
                     }
+                    case ENUM -> {
+                        if (!(v instanceof String s) || !a.values().contains(s))
+                            throw new BadArgs("'" + a.name() + "' must be one of " + a.values());
+                        yield s;
+                    }
+                    case OBJECT -> {
+                        if (!(v instanceof Map<?, ?> m)) throw new BadArgs("'" + a.name() + "' must be a JSON object");
+                        yield m;
+                    }
                     case TEXT, SQL -> {
                         if (!(v instanceof String s) || s.isBlank())
                             throw new BadArgs("'" + a.name() + "' must be a non-empty string");
@@ -97,6 +123,8 @@ final class McpTools {
                     case ID -> { p.put("type", "string"); p.put("pattern", "^" + ID.pattern() + "$"); }
                     case TEXT -> { p.put("type", "string"); p.put("maxLength", MAX_TEXT); }
                     case SQL -> { p.put("type", "string"); p.put("maxLength", MAX_SQL); }
+                    case ENUM -> { p.put("type", "string"); p.put("enum", a.values()); }
+                    case OBJECT -> p.put("type", "object");
                 }
                 p.put("description", a.description());
                 props.put(a.name(), p);
@@ -112,8 +140,10 @@ final class McpTools {
             d.put("title", title);
             d.put("description", description);
             d.put("inputSchema", schema);
-            d.put("annotations", Map.of("readOnlyHint", true, "destructiveHint", false,
-                    "idempotentHint", true, "openWorldHint", false));
+            // AK-2b: a write tool is not read-only, and not destructive either — a proposal changes nothing until a person
+            // approves it (plan §4.4).
+            d.put("annotations", Map.of("readOnlyHint", !write, "destructiveHint", false,
+                    "idempotentHint", !write, "openWorldHint", false));
             return d;
         }
     }
@@ -214,6 +244,144 @@ final class McpTools {
                     a -> new Call("GET", "/lineage" + query(a, "dataset", "store"), null)),
             new Tool("health", "Health", "Per-subsystem health of this server.", List.of(), get("/health/details")));
 
+    // ── AK-2b: write tools and Ship reads (plan §4.4) ────────────────────────────────────────────
+
+    /**
+     * The kinds {@code propose_change} may write — the ones the Handbook's builder tutorials use (plan §7) — each to its OWN
+     * write route, every one on {@code PendingChanges.REPLAYABLE}, so an agent's write is always held as a Pending Change.
+     * {@code kind → [create, update, delete]} route templates; {@code {id}} is the URL-encoded target id. A Pipeline's
+     * create and update are both its graph save (a new id creates it).
+     */
+    static final Map<String, List<String>> CHANGE_ROUTES = Map.of(
+            "pipeline", List.of("PUT /pipelines/{id}/graph", "PUT /pipelines/{id}/graph", "DELETE /config/pipeline/{id}"),
+            "expectation", List.of("POST /expectations", "PUT /expectations/{id}", "DELETE /expectations/{id}"),
+            "alert-rule", List.of("POST /alerts/rules", "PUT /alerts/rules/{id}", "DELETE /alerts/rules/{id}"),
+            "job", List.of("POST /jobs", "PUT /jobs/{id}", "DELETE /jobs/{id}"),
+            "widget", List.of("POST /components/widget", "PUT /components/widget/{id}", "DELETE /components/widget/{id}"),
+            "dashboard", List.of("POST /components/dashboard", "PUT /components/dashboard/{id}",
+                    "DELETE /components/dashboard/{id}"));
+
+    static final List<String> OPERATIONS = List.of("create", "update", "delete");
+
+    /**
+     * The endpoint's own refusal list (plan §4.4 "Never offered"): a call whose method and path look like the never-list is
+     * refused here, before any replay — beside the host's agent gate, which refuses the same to an agent on every door.
+     * No tool router can produce such a path ({@code McpWriteToolsTest} asserts it); this is the belt to that brace.
+     */
+    static final List<Pattern> REFUSED = List.of(
+            Pattern.compile("[A-Z]+ .*/(approve|decline|decision|reveal|retry|mark-failed)(\\?.*)?"),
+            Pattern.compile("[A-Z]+ /promotion/apply(\\?.*)?"),
+            Pattern.compile("(POST|PUT|PATCH|DELETE) /(apps|access)(/.*)?"),
+            Pattern.compile("[A-Z]+ /pending-changes/[^/]+/(approve|decline)(\\?.*)?"));
+
+    static boolean refused(Call c) {
+        String line = c.method() + " " + c.path();
+        for (Pattern p : REFUSED) if (p.matcher(line).matches()) return true;
+        return false;
+    }
+
+    private static Arg body(String what, boolean required) { return new Arg("body", Kind.OBJECT, required, what); }
+
+    @SuppressWarnings("unchecked")
+    private static Call proposeChange(Map<String, Object> a) {
+        String kind = (String) a.get("kind"), op = (String) a.get("operation");
+        Object id = a.get("id");
+        Map<String, Object> content = (Map<String, Object>) a.get("content");
+        if (!"create".equals(op) && id == null) throw new BadArgs("'id' is required to " + op + " a " + kind);
+        if ("pipeline".equals(kind) && id == null) throw new BadArgs("'id' names the Pipeline to create");
+        if (!"delete".equals(op) && content == null) throw new BadArgs("'content' is required to " + op + " a " + kind);
+        if ("delete".equals(op) && content != null) throw new BadArgs("a delete takes no 'content'");
+        String template = CHANGE_ROUTES.get(kind).get(OPERATIONS.indexOf(op));
+        int sp = template.indexOf(' ');
+        String path = template.substring(sp + 1).replace("{id}", id == null ? "" : seg(id));
+        Map<String, String> headers = new LinkedHashMap<>();
+        if (a.get("reason") instanceof String reason) {
+            // the route's own limit (PendingChanges.MAX_REASON), and one line: it travels as a header
+            if (reason.length() > 500) throw new BadArgs("'reason' is at most 500 characters");
+            if (reason.indexOf('\r') >= 0 || reason.indexOf('\n') >= 0) throw new BadArgs("'reason' is one line");
+            headers.put("X-Change-Reason", reason);
+        }
+        return new Call(template.substring(0, sp), path, content == null ? null : McpRoutes.jsonBytes(content), headers);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static byte[] bodyOf(Map<String, Object> a) {
+        Object b = a.get("body");
+        return McpRoutes.jsonBytes(b == null ? Map.of() : (Map<String, Object>) b);
+    }
+
+    static final List<Tool> WRITE_TOOLS = List.of(
+            new Tool("validate_config", "Validate a config",
+                    "Check a config draft against the server's own save gate WITHOUT writing it: the findings a save would "
+                            + "refuse it on come back as data. Run it before propose_change.",
+                    List.of(new Arg("type", Kind.ID, true, "The config type, e.g. pipeline, schema, job, enrichment."),
+                            new Arg("config", Kind.OBJECT, true, "The draft config map.")),
+                    a -> new Call("POST", "/validate", McpRoutes.jsonBytes(Map.of("type", a.get("type"), "config", a.get("config"))))),
+            new Tool("dry_run_pipeline", "Dry-run a Pipeline",
+                    "Run a Pipeline over sample rows in memory and return what each step produces; writes nothing. Pass a "
+                            + "draft graph in the body to dry-run a change before proposing it.",
+                    List.of(id("pipeline", "The Pipeline id."),
+                            body("The dry-run request: optional sample rows and an optional draft graph, as POST "
+                                    + "/pipelines/authored/{id}/dry-run takes them.", false)),
+                    a -> new Call("POST", "/pipelines/authored/" + seg(a.get("pipeline")) + "/dry-run", bodyOf(a))),
+            new Tool("propose_change", "Propose a config change",
+                    "Propose creating, updating or deleting a Pipeline, Expectation, Alert Rule, Job, Widget or Dashboard. "
+                            + "The change is NOT applied: it becomes a Pending Change that another person must approve. "
+                            + "'content' is the kind's own write body (for a Pipeline, its graph). Validate and dry-run first.",
+                    List.of(new Arg("kind", Kind.ENUM, true, "What to change.", List.copyOf(new java.util.TreeSet<>(CHANGE_ROUTES.keySet()))),
+                            new Arg("operation", Kind.ENUM, true, "create, update or delete.", OPERATIONS),
+                            new Arg("id", Kind.ID, false, "The target id (required to update or delete, and to create a Pipeline)."),
+                            new Arg("content", Kind.OBJECT, false, "The proposed content (not for a delete)."),
+                            text("reason", "Why — shown to the approver.")),
+                    McpTools::proposeChange, true),
+            new Tool("list_pending_changes", "List Pending Changes",
+                    "The Pending Changes of this Space, newest first; optionally only those in one status (pending, approved, "
+                            + "declined, withdrawn, expired).",
+                    List.of(text("status", "Only Pending Changes in this status.")),
+                    a -> new Call("GET", "/pending-changes" + query(a, "status", "status"), null)),
+            new Tool("get_pending_change", "Get a Pending Change",
+                    "One Pending Change: what it changes, who proposed it (and through which agent client), its status.",
+                    List.of(id("change", "The Pending Change id (pc-…).")),
+                    a -> new Call("GET", "/pending-changes/" + seg(a.get("change")), null)),
+            new Tool("diff_pending_change", "Diff a Pending Change",
+                    "The line diff of what a Pending Change would change — what the approver reads.",
+                    List.of(id("change", "The Pending Change id (pc-…).")),
+                    a -> new Call("GET", "/pending-changes/" + seg(a.get("change")) + "/diff", null)),
+            new Tool("withdraw_change", "Withdraw a Pending Change",
+                    "Take back a Pending Change your person proposed, while it is still waiting. Only its author may.",
+                    List.of(id("change", "The Pending Change id (pc-…).")),
+                    a -> new Call("POST", "/pending-changes/" + seg(a.get("change")) + "/withdraw", McpRoutes.jsonBytes(Map.of())),
+                    true),
+            new Tool("propose_action", "Propose an Action Request",
+                    "Propose an outbound action (an Action Request) for a person to approve; nothing is sent until they do. "
+                            + "Needs canWorkIncidents.",
+                    List.of(body("The Action Request, as POST /action-requests takes it.", true)),
+                    a -> new Call("POST", "/action-requests", bodyOf(a)), true),
+            new Tool("export_bundle", "Export a bundle",
+                    "Export components of this Space as a bundle (a read): their content and provenance. Body "
+                            + "{items:[{kind,id}]}.",
+                    List.of(body("The export request, as POST /bundle/export takes it.", true)),
+                    a -> new Call("POST", "/bundle/export", bodyOf(a))),
+            new Tool("preview_promotion", "Preview a promotion",
+                    "What promoting this Space's config into another Space would change, without changing it. Needs "
+                            + "canAdminister.",
+                    List.of(body("The promotion request, as POST /promotion/preview takes it.", true)),
+                    a -> new Call("POST", "/promotion/preview", bodyOf(a))),
+            new Tool("run_pipeline_now", "Run a Pipeline now",
+                    "Run a Pipeline once, now (D-AK2: a delegated person within their own rights, never a machine). Dry-run "
+                            + "it first. Needs canAuthorWorkbench.",
+                    List.of(id("pipeline", "The Pipeline id."),
+                            body("The run request, as POST /pipelines/authored/{id}/run takes it.", false)),
+                    a -> new Call("POST", "/pipelines/authored/" + seg(a.get("pipeline")) + "/run", bodyOf(a)), true));
+
+    /** Every tool: AK-1's reads, then AK-2b's. */
+    static final List<Tool> ALL_TOOLS;
+    static {
+        List<Tool> all = new ArrayList<>(TOOLS);
+        all.addAll(WRITE_TOOLS);
+        ALL_TOOLS = List.copyOf(all);
+    }
+
     static final List<Resource> RESOURCES = List.of(
             new Resource("inspecto://glossary", "glossary", "Glossary",
                     "The canonical vocabulary: what every Inspecto concept is called, and the words never to use.",
@@ -224,7 +392,7 @@ final class McpTools {
                     "The modules this install carries and their state in this Space.", "application/json", null, "/modules"));
 
     static Tool tool(String name) {
-        for (Tool t : TOOLS) if (t.name().equals(name)) return t;
+        for (Tool t : ALL_TOOLS) if (t.name().equals(name)) return t;
         return null;
     }
 

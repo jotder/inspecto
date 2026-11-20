@@ -88,7 +88,7 @@ class AgentGateParityTest {
             assertFalse(PendingChanges.REPLAYABLE.contains(key), key + " reaches the hold — it belongs in HELD");
             String where = m.get(key);
             if (where.startsWith("exempt:"))
-                assertTrue(Set.of("exempt:read-shaped", "exempt:self-service", "exempt:group-gated").contains(where), key + " " + where);
+                assertTrue(Set.of("exempt:read-shaped", "exempt:self-service", "exempt:group-gated", "exempt:replay-gated").contains(where), key + " " + where);
             else gatedButAllowed.add(key);
         }
         // the three capability-gated writes the plan allows: an Action Request (held by its own design), the promotion

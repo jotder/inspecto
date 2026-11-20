@@ -541,7 +541,9 @@ public final class CapabilityManifest {
      * {@code stateless-compute} · {@code collaboration} · {@code provenance-gated} (gated in the handler by where the
      * addressed component came from — a Job Pack parser, operator D4 2026-09-25) · {@code group-gated} (a read
      * gated in the handler by the addressed store group — operational {@code ops:*} rows, DB-QUERY-UNGATED-1,
-     * operator 2026-10-03; not audited, like {@code read-shaped}). Together with {@link #ENTRIES} and
+     * operator 2026-10-03; not audited, like {@code read-shaped}) · {@code replay-gated} (a route that persists nothing
+     * itself and acts only by replaying existing routes as the caller, each with its own gates — the MCP endpoint,
+     * AGENT-KIT-1 AK-2b; not audited itself: the endpoint and every replayed route write their own rows). Together with {@link #ENTRIES} and
      * {@link #PENDING_OPERATOR_CALLS} this makes "ungated" a RECORDED state rather than an absence:
      * {@code CapabilityManifestTest} scans every {@code api.post|put|patch|delete} registration in every
      * module and fails the build on a mutating route that is in none of the three tables.
@@ -610,7 +612,7 @@ public final class CapabilityManifest {
             // AGENT-KIT-1 AK-1 (2026-11-20): the MCP endpoint of the optional inspecto-mcp module. Every MCP Tool is an
             // in-process replay of an existing route as the caller (ApiContext.replay), so that route's own gates decide;
             // the endpoint itself persists nothing. AK-2 revisits the category when write tools land (spec-mcp.md).
-            new Exemption("POST", "/mcp", "read-shaped", "the MCP endpoint (read-only in AK-1): each tool call replays an existing route as the caller, whose own policy, capability and masking gates decide; persists nothing"),
+            new Exemption("POST", "/mcp", "replay-gated", "the MCP endpoint (AGENT-KIT-1): it persists nothing itself — every MCP Tool replays one existing route as the caller (ApiContext.replay), so that route's own policy, capability, module, agent-gate and masking checks decide, and a write tool's write is held as a Pending Change; the endpoint needs no capability of its own"),
             // Operator D4 2026-09-25 (parser-plugins-trust-design.md slice P4): the gate depends on the PARSER, so
             // it lives IN the handler and the manifest (all-or-nothing per route) records it here, as /spaces does.
             new Exemption("POST", "/parsers/([^/]+)/preview", "provenance-gated",

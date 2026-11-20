@@ -1252,7 +1252,16 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 String agentRefused = agentRefusal(rx, method, r);   // every door: a replay as an agent is gated too
                 if (agentRefused != null) throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, agentRefused);
                 requireModuleEnabled(r);
-                Object result = r.handler.handle(rx, m);
+                requireWritable(method, r);   // AK-2b: a replayed write on a read-only install is refused as a direct one is
+                Object result;
+                try {
+                    result = r.handler.handle(rx, m);
+                } catch (PendingChanges.Held held) {
+                    // AK-2b: a replayed write that became a Pending Change answers 202, exactly as routeDispatch does
+                    respond(rx, 202, held.body());
+                    AuditTrail.record(rx, method, path, 202);
+                    return new Replayed(202, rx.body());
+                }
                 if (result != HANDLED) respond(rx, 200, result);
                 AuditTrail.record(rx, method, path, rx.status() > 0 ? rx.status() : 200);
                 return new Replayed(rx.status(), rx.body());
@@ -1915,7 +1924,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
      * of a message already sent.
      */
     static final java.util.Set<String> READ_ONLY_OPEN = java.util.Set.of("read-shaped", "group-gated", "stateless-compute", "identity-flow",
-            "self-verifying-public");
+            "self-verifying-public", "replay-gated");   // replay-gated: each replay passes requireWritable itself (AK-2b)
 
     /** PA-7b: refuse a write with 423 while the install is read-only; GET and HEAD, and {@link #READ_ONLY_OPEN} routes, pass. */
     private static void requireWritable(String method, Route r) {

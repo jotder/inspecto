@@ -294,12 +294,13 @@ public final class AuditTrail {
         return new Action(resource(path) + "." + verb, category);
     }
 
-    /** The {@code read-shaped} and {@code group-gated} (a read gated by store group, {@code /db/query}) entries
+    /** The {@code read-shaped}, {@code group-gated} (a read gated by store group, {@code /db/query}) and {@code replay-gated} ({@code /mcp}) entries
      *  of {@link CapabilityManifest#EXEMPTIONS}, their route patterns
      *  compiled once. Matched against the same prefix-stripped path the route table (and so the
      *  manifest) uses, as a FULL match — {@code /bi/query} matches, a persisting sibling does not. */
     private static final List<ReadShaped> READ_SHAPED = CapabilityManifest.EXEMPTIONS.stream()
-            .filter(e -> "read-shaped".equals(e.category()) || "group-gated".equals(e.category()))
+            .filter(e -> "read-shaped".equals(e.category()) || "group-gated".equals(e.category())
+                    || "replay-gated".equals(e.category()))
             .map(e -> new ReadShaped(e.method(), Pattern.compile(e.pattern())))
             .toList();
 
