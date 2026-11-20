@@ -7,7 +7,7 @@ timestamp: 2026-09-06T00:00:00Z
 item: module.elt
 audience: internal
 status: current
-verified: 2026-11-19 last-edit
+verified: 2026-11-20 code-reviewed
 code: platform/inspecto-etl
 ---
 
@@ -90,8 +90,8 @@ warns when one is set on a local inbox (`WARN_COLLECTOR_KEY_INERT`, [config safe
 | `stability.size_checks` | number · `2` | — | Consecutive polls the size must hold (minimum 1). |
 | `stability.ready_marker` | string | — | A sibling marker (`{name}.done`) that releases the file at once. |
 | `stability.exclude_temp_files` / `exclude_temp_patterns` | boolean · `true` / list | — | Drop `*.tmp`-style partial files (`Stability.DEFAULT_TEMP_PATTERNS` unless listed). |
-| `duplicate.mode` | `path` · `metadata` · `checksum` · `etag` · `path` | `duplicate__mode` | How a re-seen file is recognised. `path` = the marker; the others use the fingerprint ledger. An unknown value reads as `path` (`DuplicatePolicy.Mode.from`). |
-| `duplicate.algorithm` | string · `SHA256` | — | Checksum algorithm for `checksum` mode. |
+| `duplicate.mode` | `path` · `metadata` · `checksum` · `etag` · `content` · `path` | `duplicate__mode` | How a re-seen file is recognised. `path` = the marker; the others use the fingerprint ledger. `content` (B3) matches the bytes under any name, so a file re-sent under a new name is a duplicate. The save refuses any other value (`ConfigSpecs`); the engine reads an unknown value as `path` (`DuplicatePolicy.Mode.from`). |
+| `duplicate.algorithm` | string · `SHA256` | — | Checksum algorithm for `checksum` and `content` modes. |
 | `duplicate.on_change` | `reprocess` · `ignore` · `alert` · `archive_old_version` · `reprocess` | `duplicate__on_change` | What a changed known file does. ⚠ An unknown value reads as `reprocess` (`DuplicatePolicy.OnChange.from`). The form offers exactly the four enum values — it once offered `skip`, which silently reprocessed; `NodeAttributesContractTest#everyOnChangeOptionNamesADuplicatePolicyValue` now pins every option to an `OnChange` value (`COLLECTOR-ON-CHANGE-SKIP-IS-REPROCESS-1`, 2026-09-23). |
 | `guarantee` | `BEST_EFFORT` · `AT_LEAST_ONCE` · `EXACTLY_ONCE` · `BEST_EFFORT` | `guarantee` | The two stronger values need a content-based `duplicate.mode`; over `path` the parser warns and behaves best-effort. |
 | `gap_detection.sequence` / `.enabled` | string / boolean · `true` | — (the `gap` node) | Numbered-series template (`ORDERS_{yyyyMMdd}`); a hole raises `SEQUENCE_GAP`. Authored on its own node. |

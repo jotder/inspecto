@@ -5,7 +5,7 @@ description: Space promotion (SE-6b): applying one Space's whole configuration t
 item: module.config
 audience: internal
 status: current
-verified: 2026-11-15 last-edit
+verified: 2026-11-20 code-reviewed
 code: [platform/inspecto-config]
 ---
 

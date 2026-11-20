@@ -7,7 +7,7 @@ timestamp: 2026-10-19T00:00:00Z
 item: module.processor
 audience: internal
 status: current
-verified: 2026-11-18 last-edit
+verified: 2026-11-20 code-reviewed
 code: inspecto
 ---
 
@@ -25,7 +25,7 @@ operation is [admin-guide-operations](../../layer/platform/admin-guide-operation
 | `-Dcontrol.bind` | every interface | Listen address; an unresolvable value fails the boot. Set `127.0.0.1` on any install without an Authenticator |
 | `-Dhttps.keystore` / `-Dhttps.keystore.password` | unset | Serve TLS from this keystore; a wrong password fails the boot naming the property |
 | `-Dcontrol.cors` | unset | The single allowed CORS origin (a string, not a list; unset disables CORS) |
-| `-Dui.dir` | unset | Directory of the built UI to serve |
+| `-Dui.dir` | unset | Directory of the built UI to serve. A sub-folder holding its own `index.html` is served as a site (`/x` redirects to `/x/`); every bundle ships the user Handbook there at `/help/` |
 | `-Dassist.write.root` | unset | Enables config write-back; without it mutating routes answer `503` |
 | `-Dspaces.root` | unset | Multi-space root; unset means one `default` Space from the CLI config args ([architecture](architecture-processor.md)) |
 

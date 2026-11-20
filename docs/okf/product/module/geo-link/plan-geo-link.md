@@ -8,7 +8,7 @@ timestamp: 2026-10-19T00:00:00Z
 item: module.geo-link
 audience: internal
 status: plan
-verified: 2026-11-18 last-edit
+verified: 2026-11-20 code-reviewed
 code: la/inspecto-geo-link
 ---
 

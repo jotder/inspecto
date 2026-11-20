@@ -62,7 +62,8 @@ public final class NodeAttributes {
                     .options("poll", "Poll", "watch", "Watch (filesystem events)"),
             NodeAttribute.of("duplicate__mode", "Duplicate detection", "select", "optional").defaultValue("path")
                     .options("path", "By path", "metadata", "By metadata (size + mtime)",
-                            "checksum", "By checksum", "etag", "By remote ETag")
+                            "checksum", "By checksum", "etag", "By remote ETag",
+                            "content", "By content (also under a new name)")
                     .help("File-level duplicate policy — how a re-seen file is recognised."),
             NodeAttribute.of("post_action__on_success", "After success", "select", "optional").defaultValue("RETAIN")
                     .options("RETAIN", "Retain", "DELETE", "Delete", "MOVE", "Move to archive",

@@ -37,9 +37,10 @@ import java.util.concurrent.ConcurrentHashMap;
  *       preset's stability block removed, the entry key removed. Gates as Add a file ({@link DatasetFeed#gate}); a
  *       Reference 422 (a watched inbox adds rows); a Postgres snapshot 422; a Dataset whose Pipeline already runs on
  *       another schedule ({@code Keep this up to date}) 409. Answers the feed read.</li>
- *   <li><b>The feed keeps its shape</b> until the UI's U4-Watch slice: a watched import answers {@code watch: true},
- *       {@code watchable: true} and {@code feed.kind: uploads} ({@link #feedOf}); {@code watchError} after a scheduled run
- *       of it failed ({@link #ran}).</li>
+ *   <li><b>The feed keeps its shape</b> (U4-Watch, 2026-11-19, kept it: the switch is a run switch over server state): a
+ *       watched import answers {@code watch: true}, {@code watchable: true} and {@code feed.kind: uploads}
+ *       ({@link #feedOf}); {@code watchError} after a scheduled run of it that took a file failed or set a file aside
+ *       ({@link #ran}).</li>
  *   <li><b>No half-written file</b>: the engine's per-file stability gate (O1: per file, no longer the whole inbox at once),
  *       and the pre-run steps judge and take only the files unmodified for the window.</li>
  * </ul>
@@ -108,6 +109,17 @@ final class InboxWatch {
     static void ran(Path dataRoot, String id, String error) {
         if (error == null) LAST_ERROR.remove(errorKey(dataRoot, id));
         else LAST_ERROR.put(errorKey(dataRoot, id), error);
+    }
+
+    /**
+     * What Data status says after a scheduled run set files aside (BASIC-WATCH-ARRIVALS-1; its quarantine entries
+     * {@code {file, reason}}, at least one): the first file and the engine's reason, with the server's paths taken out.
+     */
+    static String setAside(List<Map<String, String>> files, Path dataRoot, Path writeRoot) {
+        Map<String, String> first = files.get(0);
+        int more = files.size() - 1;
+        String what = "'" + first.get("file") + "'" + (more == 0 ? " was" : " and " + more + (more == 1 ? " more file were" : " more files were"));
+        return ServerFaults.withoutServerPaths(what + " set aside (" + first.get("reason") + ")", dataRoot, writeRoot);
     }
 
     // ── PUT /datasets/{id}/watch ────────────────────────────────────────────────────────────────────────────

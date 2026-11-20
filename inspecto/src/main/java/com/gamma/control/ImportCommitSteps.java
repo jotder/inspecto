@@ -122,6 +122,7 @@ final class ImportCommitSteps {
             if (!followsOn(writeRoot, id)) return;
             Map<String, Object> out = new LinkedHashMap<>();
             step.work().run(new OnboardImport.Space(writeRoot, dataRoot, service, "scheduler"), id, content, out);
+            if (key == null) ImportPreRunSteps.outcome(claim, out);   // the run's arrivals line (BASIC-WATCH-ARRIVALS-1)
             if (!quiet(out)) log.info("Dataset '{}' after its run ({}): {}", id, step.name(), out);
         } catch (RuntimeException e) {
             log.warn("Dataset '{}' after its run ({}) failed: {}", id, step.name(), e.toString());

@@ -5,7 +5,7 @@ description: Draft script for the Link Analysis product demo video — the real 
 item: module.la-core
 audience: internal
 status: current
-verified: 2026-11-16 last-edit
+verified: 2026-11-20 code-reviewed
 code: [la/inspecto-la-core]
 ---
 

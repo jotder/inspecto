@@ -5,7 +5,7 @@ description: What an Expectation is — a data-quality check on the records of a
 item: module.elt
 audience: external
 status: current
-verified: 2026-11-19 last-edit
+verified: 2026-11-20 code-reviewed
 code: platform/inspecto-etl
 ---
 

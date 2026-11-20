@@ -5,7 +5,7 @@ description: Draft scripts for two Telecom demo videos that continue the Basic w
 item: module.la-core
 audience: internal
 status: current
-verified: 2026-11-16 last-edit
+verified: 2026-11-20 code-reviewed
 code: [la/inspecto-la-core]
 ---
 

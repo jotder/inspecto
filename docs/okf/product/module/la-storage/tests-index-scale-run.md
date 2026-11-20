@@ -5,7 +5,7 @@ description: Plan for measuring the Link Analysis edge index at 10^9 edges: what
 item: module.la-storage
 audience: internal
 status: current
-verified: 2026-11-15 last-edit
+verified: 2026-11-20 code-reviewed
 code: [la/inspecto-la-storage]
 ---
 

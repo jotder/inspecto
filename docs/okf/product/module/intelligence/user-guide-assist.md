@@ -8,13 +8,14 @@ timestamp: 2026-06-28T00:00:00Z
 item: module.intelligence
 audience: internal
 status: current
-verified: 2026-10-19 last-edit
+verified: 2026-11-20 code-reviewed
 code: features/inspecto-intelligence
 ---
 
 # Assistant
 
-Route `/assistant` (plus the shared `assist-panel` / `assist.dialog` components in `inspecto/components`).
+Route `/assist` (plus the shared `assist-panel` component in `inspecto/components`, and the `ai-explain` / `ai-status`
+dialogs in `inspecto/ai-assist`).
 The AI assistant surface, backed by `AssistService`. When assist is disabled the backend returns a
 per-screen `503` (surfaced via an [alert](../../layer/product/spec-ds-alert.md), not the connectivity banner). Model/provider
 configured in [model settings](../agent/user-guide-model-settings.md).

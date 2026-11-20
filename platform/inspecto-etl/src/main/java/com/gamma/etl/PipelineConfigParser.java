@@ -532,7 +532,7 @@ final class PipelineConfigParser {
         if (guarantee.requiresLedger() && !duplicate.contentBased())
             log.warn("[CONFIG] collector.guarantee={} needs a fingerprint ledger, but collector.duplicate.mode "
                     + "is 'path' (marker-only) — behaving as best-effort + commit-log replay. Set "
-                    + "collector.duplicate.mode to metadata, checksum or etag to enforce it.", guarantee);
+                    + "collector.duplicate.mode to metadata, checksum, etag or content to enforce it.", guarantee);
 
         // ── retrieval tuning: parallel fetch + rate limit (Phase E/F; additive, absent ⇒ sequential/unthrottled) ──
         Fetch fetch = Fetch.DEFAULT;
@@ -581,7 +581,7 @@ final class PipelineConfigParser {
             log.warn("[CONFIG] collector.incremental.watermark is set but collector.duplicate.mode is 'path' "
                     + "(marker-only) — the watermark is derived from the fingerprint ledger, which path mode "
                     + "does not populate, so incremental filtering will not engage. Set collector.duplicate.mode "
-                    + "to metadata, checksum or etag.");
+                    + "to metadata, checksum, etag or content.");
 
         return new Collector(id, connector, includes, excludes, recursiveDepth, stability, connection,
                 dataset, duplicate, guarantee, gapDetection, fetch, retry, circuitBreaker, postAction,

@@ -5,7 +5,7 @@ description: How Case Management works: a Case is an operational object of type 
 item: module.case-management
 audience: internal
 status: current
-verified: 2026-11-18 last-edit
+verified: 2026-11-20 code-reviewed
 code: [features/inspecto-case-management]
 ---
 

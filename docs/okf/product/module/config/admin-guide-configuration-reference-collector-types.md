@@ -47,7 +47,7 @@ collector:
     ready_marker: "{name}.done"
     exclude_temp_files: true      # also drops *.tmp,*.partial,*.filepart,.~lock.*
   duplicate:                      # dedup / change policy
-    mode: CHECKSUM                # PATH (default = today's markers) | METADATA | CHECKSUM
+    mode: CHECKSUM                # PATH (default = today's markers) | METADATA | CHECKSUM | ETAG | CONTENT
     algorithm: SHA256             # MD5 | SHA256 | CRC32
     on_change: REPROCESS          # IGNORE | REPROCESS | ALERT | ARCHIVE_OLD_VERSION
   incremental:                    # only re-examine the recent frontier each scan
@@ -91,7 +91,8 @@ never steals a hot file's progress.
 
 **`duplicate`** — `PATH` (default) is today's `.processed` marker. `METADATA` keys on name+size+mtime (a cheap
 `stat`, no read). `CHECKSUM` hashes content (catches re-uploads that size+mtime hide; one extra read per file, so
-it is opt-in). `on_change` decides what happens when a known path's content changed. The fingerprint lives in a
+it is opt-in). `CONTENT` hashes too and matches the bytes under any name, so a file re-sent under a new name is
+skipped as well. `on_change` decides what happens when a known path's content changed. The fingerprint lives in a
 dedicated DuckDB ledger (its own file, single-writer).
 
 **`incremental`** — the high-watermark optimisation: `watermark: last_modified` makes each scan skip any file

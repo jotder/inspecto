@@ -247,6 +247,93 @@ class CollectorProcessorPollTest {
                 "the quarantined empty file must not be rediscovered and reprocessed");
     }
 
+    /**
+     * BASIC-ELT-PROFILE-1 B3: {@code duplicate.mode: content} skips the same bytes re-sent under a new name - also
+     * two copies dropped in one cycle - and still takes a known path's new bytes; {@code checksum} (keyed by path,
+     * the behaviour of every existing Pipeline) takes the renamed copy.
+     */
+    @Test
+    void contentModeSkipsTheSameBytesUnderANewName(@TempDir Path dir) throws Exception {
+        AcquisitionLedgers.use(new InMemoryAcquisitionLedger());   // isolate the process-wide ledger
+        String v1 = "ID,AMT,EVENT_DATE\nr0,1.0,2020-04-03\n";
+
+        PipelineConfig content = dedupPipeline(dir.resolve("content"), "content");
+        Path in = Path.of(content.dirs().poll());
+        Files.writeString(in.resolve("ORDERS.csv"), v1);
+        CollectorProcessor.run(content);
+        assertEquals(2, batchLineCount(content), "header + the first file");
+
+        Files.writeString(in.resolve("ORDERS_resent.csv"), v1);   // the same bytes, a new name
+        CollectorProcessor.run(content);
+        assertEquals(2, batchLineCount(content), "the same bytes under a new name are a duplicate");
+        assertTrue(Files.exists(in.resolve("ORDERS_resent.csv")), "skipped, not taken");
+
+        String twin = "ID,AMT,EVENT_DATE\nr7,7.0,2020-04-04\n";
+        Files.writeString(in.resolve("TWIN_A.csv"), twin);
+        Files.writeString(in.resolve("TWIN_B.csv"), twin);
+        CollectorProcessor.run(content);
+        assertEquals(3, batchLineCount(content), "two copies in one cycle are one file");
+
+        Files.writeString(in.resolve("ORDERS.csv"), v1 + "r1,2.0,2020-04-03\n");   // a known path, new bytes
+        CollectorProcessor.run(content);
+        assertEquals(4, batchLineCount(content), "on_change: reprocess takes a known path's new bytes");
+
+        AcquisitionLedgers.use(new InMemoryAcquisitionLedger());
+        PipelineConfig checksum = dedupPipeline(dir.resolve("checksum"), "checksum");
+        Path in2 = Path.of(checksum.dirs().poll());
+        Files.writeString(in2.resolve("ORDERS.csv"), v1);
+        CollectorProcessor.run(checksum);
+        Files.writeString(in2.resolve("ORDERS_resent.csv"), v1);
+        CollectorProcessor.run(checksum);
+        assertEquals(3, batchLineCount(checksum), "checksum mode is keyed by path: the renamed copy is taken");
+    }
+
+    private static PipelineConfig dedupPipeline(Path dir, String mode) throws Exception {
+        Files.createDirectories(dir);
+        Path schema = dir.resolve("mini_schema.toon");
+        Files.writeString(schema, com.gamma.etl.PipelineConfigBatchTest.miniSchema());
+        String d = dir.toString().replace("\\", "/");
+        String toon = """
+            name: DEDUP_%s_ETL
+            active: true
+            version: 1
+            dirs:
+              poll: %s/inbox
+              database: %s/db
+              backup: %s/backup
+              temp: %s/temp
+              errors: %s/errors
+              quarantine: %s/quarantine
+              markers: %s/markers
+              status_dir: %s/status
+              log_dir: %s/logs
+            output:
+              format: CSV
+            processing:
+              threads: 1
+              file_pattern: "glob:**/*.csv"
+              duplicate_check:
+                enabled: true
+                marker_extension: .processed
+              schema_file: "%s"
+              csv_settings:
+                delimiter: ","
+                skip_header_lines: 0
+                date_formats[1]: "%%Y-%%m-%%d"
+                timestamp_formats[1]: "%%Y-%%m-%%d"
+            collector:
+              duplicate:
+                mode: %s
+                algorithm: SHA256
+                on_change: reprocess
+            """.formatted(mode.toUpperCase(), d, d, d, d, d, d, d, d, d, schema.toString().replace("\\", "/"), mode);
+        Path toonP = dir.resolve("dedup_pipeline.toon");
+        Files.writeString(toonP, toon);
+        PipelineConfig cfg = PipelineConfig.load(toonP.toString());
+        Files.createDirectories(Path.of(cfg.dirs().poll()));
+        return cfg;
+    }
+
     private static int batchLineCount(PipelineConfig cfg) throws java.io.IOException {
         Path f = Path.of(cfg.dirs().batchesFilePath());
         return Files.exists(f) ? Files.readString(f).split("\n").length : 0;

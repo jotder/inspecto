@@ -7,7 +7,7 @@ timestamp: 2026-10-19T00:00:00Z
 item: addon.linkAnalysis
 audience: internal
 status: current
-verified: 2026-11-18 last-edit
+verified: 2026-11-20 code-reviewed
 code: [la/inspecto-geo-link, la/inspecto-la-api, la/inspecto-la-core, la/inspecto-la-storage, la/inspecto-la-store-pg]
 ---
 

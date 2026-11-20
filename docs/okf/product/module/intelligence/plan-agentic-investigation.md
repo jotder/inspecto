@@ -5,7 +5,7 @@ description: Design for an agent that works one Incident into a cited Incident B
 item: module.intelligence
 audience: internal
 status: plan
-verified: 2026-11-01 last-edit
+verified: 2026-11-20 code-reviewed
 code: [features/inspecto-intelligence]
 ---
 

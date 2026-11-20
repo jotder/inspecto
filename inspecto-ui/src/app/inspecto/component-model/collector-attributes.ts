@@ -67,6 +67,7 @@ export const COLLECTOR_ATTRIBUTES: AttributeSpec[] = [
             { value: 'metadata', label: 'By metadata (size + mtime)' },
             { value: 'checksum', label: 'By checksum' },
             { value: 'etag', label: 'By remote ETag' },
+            { value: 'content', label: 'By content (also under a new name)' },
         ],
         help: 'File-level duplicate policy — how a re-seen file is recognised.',
     },

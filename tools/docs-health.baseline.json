@@ -1,8 +1,6 @@
 {
  "_note": "tools/docs-health.mjs --baseline-write; only debt is kept, and it may only shrink (INFO-RESTRUCTURE-1 W2)",
- "oversize": {
-  "docs/okf/product/module/la-core/brochure-video-demo-case-scripts.md": 148826
- },
+ "oversize": {},
  "history": {
   "docs/okf/product/module/agent/architecture-agent.md": 1,
   "docs/okf/product/module/agent/spec-adr-log.md": 1,

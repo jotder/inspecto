@@ -26,6 +26,17 @@ public interface AcquisitionLedger extends AutoCloseable {
     void record(LedgerEntry entry);
 
     /**
+     * The newest fingerprint ({@link LedgerEntry#processedAt()}) of {@code sourceId} whose content checksum is
+     * {@code checksum}, under any path, or empty - the lookup of {@link DuplicatePolicy.Mode#CONTENT}
+     * ({@code BASIC-ELT-PROFILE-1} B3): bytes re-sent under a new name match it. Only rows recorded in a hashing mode
+     * carry a checksum. A {@code null} checksum never matches. The default finds nothing, which degrades
+     * {@code CONTENT} to {@code CHECKSUM} for a ledger that does not track it.
+     */
+    default Optional<LedgerEntry> findByChecksum(String sourceId, String checksum) {
+        return Optional.empty();
+    }
+
+    /**
      * The source's <b>high-watermark</b> for incremental discovery (Data Acquisition roadmap Phase C4): the
      * greatest {@link LedgerEntry#lastModified()} recorded for {@code sourceId}, or empty if the source has no
      * recorded files yet. The engine ({@code source.incremental.watermark: last_modified}) skips any

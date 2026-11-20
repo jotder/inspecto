@@ -35,6 +35,23 @@ class AcquisitionLedgerTest {
 
         dbWatermarkContract(ledger);
         renameSourceContract(ledger);
+        checksumContract(ledger);
+    }
+
+    /** B3: the newest fingerprint with these bytes under any path of the source; never another source's, never a null checksum. */
+    private static void checksumContract(AcquisitionLedger ledger) {
+        assertTrue(ledger.findByChecksum("C", "same").isEmpty(), "nothing recorded ⇒ empty");
+        ledger.record(new LedgerEntry("C", "in/a.csv", "a.csv", 10, "same", null, null, 100L, 1000L, LedgerEntry.PROCESSED));
+        ledger.record(new LedgerEntry("C", "in/b.csv", "b.csv", 10, "same", null, null, 100L, 3000L, LedgerEntry.PROCESSED));
+        ledger.record(new LedgerEntry("C", "in/c.csv", "c.csv", 10, "other", null, null, 100L, 4000L, LedgerEntry.PROCESSED));
+        ledger.record(new LedgerEntry("C", "in/d.csv", "d.csv", 10, null, null, null, 100L, 5000L, LedgerEntry.PROCESSED));
+        assertEquals("in/b.csv", ledger.findByChecksum("C", "same").orElseThrow().relativePath(), "the newest of the same bytes");
+        assertEquals("in/c.csv", ledger.findByChecksum("C", "other").orElseThrow().relativePath());
+        assertTrue(ledger.findByChecksum("OTHER", "same").isEmpty(), "keyed by source");
+        assertTrue(ledger.findByChecksum("C", null).isEmpty(), "a null checksum never matches a row recorded without one");
+        // upsert: the path's new bytes replace its old ones, so the old bytes are found only where they still are
+        ledger.record(new LedgerEntry("C", "in/b.csv", "b.csv", 12, "newer", null, null, 200L, 6000L, LedgerEntry.PROCESSED));
+        assertEquals("in/a.csv", ledger.findByChecksum("C", "same").orElseThrow().relativePath());
     }
 
     /** A pipeline rename's identity migration (T3, plan §3.2): fingerprints AND the DB watermark move together. */

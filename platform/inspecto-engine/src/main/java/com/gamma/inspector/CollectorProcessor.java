@@ -742,7 +742,9 @@ public class CollectorProcessor {
      * cycle and the read-only {@code countPending} scan. <b>CHECKSUM</b> must read the file to hash it; that
      * happens <em>only on the run path</em> ({@code emitSignals}), and the hash is stashed for the post-commit
      * record so the file isn't hashed twice. On {@code countPending} CHECKSUM degrades to a metadata
-     * approximation, so a dashboard poll never hashes. <b>ETAG</b> (ACQ-7) compares the connector's listing
+     * approximation, so a dashboard poll never hashes. <b>CONTENT</b> (B3) hashes as CHECKSUM does and first asks the
+     * ledger for the same bytes under any name ({@code findByChecksum}), so a file re-sent under a new name is a
+     * DUPLICATE; two candidates of one cycle with the same bytes are one file. <b>ETAG</b> (ACQ-7) compares the connector's listing
      * etag/version (free — carried on the {@link RemoteFile}) and degrades to size+mtime when neither side has
      * one; the listing identity is stashed alongside the checksum for the post-commit record.
      */
@@ -753,7 +755,10 @@ public class CollectorProcessor {
         AcquisitionLedger ledger = AcquisitionLedgers.shared();
         DuplicatePolicy.Mode mode = DuplicatePolicy.Mode.from(dup.mode());
         DuplicatePolicy.OnChange onChange = DuplicatePolicy.OnChange.from(dup.onChange());
-        boolean checksum = mode == DuplicatePolicy.Mode.CHECKSUM;
+        boolean checksum = mode.hashes();
+        boolean content = mode == DuplicatePolicy.Mode.CONTENT;
+        // CONTENT (B3): two candidates of one cycle with the same bytes are one file - the first is taken (checksum → its key)
+        java.util.Map<String, String> takenThisCycle = content ? new java.util.HashMap<>() : java.util.Map.of();
 
         List<File> out = new ArrayList<>(ready.size());
         for (RemoteFile rf : ready) {
@@ -787,7 +792,22 @@ public class CollectorProcessor {
                 if (emitSignals) cs = Checksums.of(p, dup.algorithm());
                 else decideMode = DuplicatePolicy.Mode.METADATA;
             }
-            switch (DuplicatePolicy.decide(decideMode, prior, size, mtime, cs, rf.etag(), rf.version())) {
+            // CONTENT: the same bytes under any name - recorded by an earlier run, or taken earlier in this cycle
+            LedgerEntry sameContent = null;
+            if (content && cs != null) {
+                sameContent = ledger.findByChecksum(src.id(), cs).orElse(null);
+                String twin = takenThisCycle.get(cs);
+                if (sameContent == null && twin != null)
+                    sameContent = new LedgerEntry(src.id(), twin, twin, size, cs, null, null, mtime, 0L, LedgerEntry.PROCESSED);
+                if (sameContent != null && !sameContent.relativePath().equals(verbatim))
+                    log.info("[DEDUP] {} has the same content as '{}': skipped as a duplicate", verbatim, sameContent.name());
+            }
+            DuplicatePolicy.Decision decision = DuplicatePolicy.decide(decideMode, prior, sameContent, size, mtime, cs,
+                    rf.etag(), rf.version());
+            if (content && cs != null && (decision == DuplicatePolicy.Decision.NEW
+                    || decision == DuplicatePolicy.Decision.CHANGED && DuplicatePolicy.reprocessOnChange(onChange)))
+                takenThisCycle.putIfAbsent(cs, verbatim);   // taken below
+            switch (decision) {
                 case NEW -> {
                     if (checksum && emitSignals) AcquisitionLedgers.stashChecksum(p, cs);
                     if (emitSignals) AcquisitionLedgers.stashListing(p, rf.etag(), rf.version());

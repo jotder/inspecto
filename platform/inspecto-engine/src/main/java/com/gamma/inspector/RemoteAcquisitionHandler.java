@@ -403,8 +403,8 @@ final class RemoteAcquisitionHandler {
      * Would this remote file be skipped as a known duplicate <em>before</em> spending bandwidth to fetch it?
      * PATH dedup: a marker for its staging location already exists. METADATA dedup: the listing's size+mtime
      * match the ledger fingerprint. ETAG dedup (ACQ-7): the listing's etag/version matches the fingerprint
-     * (falling back to size+mtime when the connector supplies neither). CHECKSUM can't decide without the
-     * bytes, so it never pre-skips (the file is fetched and {@code ledgerFilter} decides on content). Dedup
+     * (falling back to size+mtime when the connector supplies neither). CHECKSUM and CONTENT can't decide without the
+     * bytes, so they never pre-skip (the file is fetched and {@code ledgerFilter} decides on content). Dedup
      * off ⇒ never a duplicate.
      */
     private static boolean isKnownDuplicate(PipelineConfig cfg, RemoteFile rf, Path pollRoot) {

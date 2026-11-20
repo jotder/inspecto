@@ -68,6 +68,23 @@ class DuplicatePolicyTest {
         assertEquals(Decision.CHANGED,   DuplicatePolicy.decide(Mode.ETAG, bare, 101, 10, null, null, null));
     }
 
+    /** B3: the same bytes under ANY name are a duplicate; a known path with new bytes is judged as CHECKSUM. */
+    @Test
+    void contentModeMatchesTheBytesUnderAnyName() {
+        LedgerEntry elsewhere = new LedgerEntry("S", "other.csv", "other.csv", 100, "abc", null, null, 10, 0L, LedgerEntry.PROCESSED);
+        assertEquals(Decision.DUPLICATE, DuplicatePolicy.decide(Mode.CONTENT, null, elsewhere, 100, 99, "abc", null, null),
+                "re-sent under a new name");
+        assertEquals(Decision.NEW, DuplicatePolicy.decide(Mode.CONTENT, null, null, 100, 99, "abc", null, null));
+        LedgerEntry samePath = prior(100, "abc", 10);
+        assertEquals(Decision.DUPLICATE, DuplicatePolicy.decide(Mode.CONTENT, samePath, null, 100, 10, "abc", null, null));
+        assertEquals(Decision.CHANGED, DuplicatePolicy.decide(Mode.CONTENT, samePath, null, 100, 10, "xyz", null, null),
+                "a known path with new bytes");
+        // every other mode ignores a same-content hit: CHECKSUM stays keyed by path (the default behaviour is unchanged)
+        assertEquals(Decision.NEW, DuplicatePolicy.decide(Mode.CHECKSUM, null, elsewhere, 100, 99, "abc", null, null));
+        assertTrue(Mode.CONTENT.hashes() && Mode.CHECKSUM.hashes());
+        assertFalse(Mode.PATH.hashes() || Mode.METADATA.hashes() || Mode.ETAG.hashes());
+    }
+
     @Test
     void onChangePolicyDrivesReprocessAndAlert() {
         assertFalse(DuplicatePolicy.reprocessOnChange(OnChange.IGNORE));
@@ -83,6 +100,7 @@ class DuplicatePolicyTest {
         assertEquals(Mode.CHECKSUM, Mode.from("checksum"));
         assertEquals(Mode.METADATA, Mode.from("METADATA"));
         assertEquals(Mode.ETAG, Mode.from("etag"));
+        assertEquals(Mode.CONTENT, Mode.from("Content"));
         assertEquals(Mode.PATH, Mode.from("anything-else"));
         assertEquals(Mode.PATH, Mode.from(null));
         assertEquals(OnChange.ARCHIVE_OLD_VERSION, OnChange.from("archive_old_version"));

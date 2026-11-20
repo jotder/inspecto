@@ -41,9 +41,18 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
 > same write path; under an approval policy over Pipelines it is logged and reads as off). *Stop the feed*
 > (`DELETE /datasets/{id}/feed`) turns the watch off too. The 30 s holds on any host: the scheduler wakes for each
 > Pipeline's own `every` (operator 2026-11-19, *honour each every*), not only on the Space's poll tick. A run that
-> sets aside a file after its pre-run step kept a column for it takes the column back and sets `watchError`. Not
-> carried over yet (BE-2 / B3, `BASIC-WATCH-ARRIVALS-1`): the arrivals sidecar line and `watchError` for any other
-> quarantined file (a scheduled run records only the engine's ledger). See
+> sets aside a file after its pre-run step kept a column for it takes the column back. **After the run (B3,
+> `BASIC-WATCH-ARRIVALS-1`, 2026-11-20)** the pre-run step's after-hook writes the arrivals sidecar lines of every
+> engine run of an import, as Run now does (`Job.recordArrival`: one `sender: system` line per file the run added to
+> the per-file ledger, with the follow-on's index outcome, which `ImportCommitSteps` hands to the run that holds the
+> claim, and the columns the run kept, none when they were taken back), and for a watched inbox sets `watchError`
+> after a run that took a file: `InboxWatch.SERVER_FAULT` when the run failed, `'<file>' was set aside (<reason>)`
+> (`InboxWatch.setAside`, the engine's quarantine reason, server paths taken out) when it set a file aside, cleared
+> when it set none aside. The ledger rows and the quarantine entries are read on disk (`FileStatusStore`), so it holds
+> under the database status store too. A run that finds nothing to take neither reads them nor touches `watchError`:
+> it stays until the next run that takes a file (before B3 the 30 s run that found nothing cleared it at once). Not
+> written for a scheduled run: `rowsFilteredOut` (Run now counts it with a pre-scan before the run), so the arrivals
+> list says `rowsLeftOut: null` (not known) for such a file of an import with a row filter. See
 > [spec-pipeline-execution.md](../elt/spec-pipeline-execution-run-steps.md#pre-run-steps--the-other-side-of-the-run).
 
 | Route | What |
@@ -114,6 +123,8 @@ Basic import inbox may poll; still no user-defined schedule). Class `inspecto/..
   (`ControlApiImportPreRunStepsTest.poll`): the preset written and removed, a settled import with a refused file set
   aside and the follow-on and Expectation after, a file still being written waiting alone, a file that settles after
   the pre-run check, off and a restart, a kept column taken back after a run that did not succeed or that set the file
-  aside (with `watchError`), Add data off, *Stop the feed*, the startup migration, refusals, armed 401/403/200),
+  aside (with `watchError` naming the file), Add data off, *Stop the feed*, the startup migration, refusals, armed
+  401/403/200; B3: a scheduled run's arrivals line with its index outcome and kept column, and a file set aside said
+  in `watchError` and kept until a run that takes a file, each under the file and the database status stores),
   `dataset-feed.component.spec.ts` (toggle, refusal, schedule hides it, the Data status words; since U4-Watch both bodies
   the switch sends, `{"watch":true}` and `{"watch":false}`, pinned byte for byte, and B1's watched answer switched off).

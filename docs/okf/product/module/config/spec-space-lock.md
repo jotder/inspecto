@@ -5,7 +5,7 @@ description: The Space lock (.inspecto/space.lock): the server's signed, derived
 item: module.config
 audience: internal
 status: current
-verified: 2026-11-17 last-edit
+verified: 2026-11-20 code-reviewed
 code: [platform/inspecto-config]
 ---
 

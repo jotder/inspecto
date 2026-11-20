@@ -5,7 +5,7 @@ description: Space tests (SE-6a): case folders under spaces/<id>/tests/ that fee
 item: module.config
 audience: internal
 status: current
-verified: 2026-11-12 last-edit
+verified: 2026-11-20 code-reviewed
 code: [platform/inspecto-config]
 ---
 
