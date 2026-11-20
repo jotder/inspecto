@@ -83,7 +83,7 @@ Declares: **spec** = `FieldSpec` in `ConfigSpecs.pipeline()`; **parser-only** = 
 | `collector` | spec block (a few leaves only — `collector.consignment.max_files`, and since 2026-09-23 `collector.fetch.rate_limit`, `collector.retry.*`, `collector.circuit_breaker.*`, and since 2026-09-24 `collector.post_action.*`; see the census caveat) | `parseCollector` → `Collector` → acquisition framework (connectors, stability gate, dedup ledger, gap detection, `connector: dataset`) | collector drawer (one component, one write route) |
 | `parsing` | spec, partially (`parsing.grammar` is the canonical grammar ref; `source_timezone` / `delimited.*` are rule-only) | `mergeParsing` / `resolveGrammarRef` → format frontends | Parse drawer; New-pipeline writes `parsing.frontend` (D3) |
 | `processing` | spec block (see next table) | ingest runtime | Parse drawer + per-key surfaces below |
-| `output` | spec (`format`/`compression`/`filename_column`) | ingest strategies / `PartitionWriter` | sink node config |
+| `output` | spec (`format`/`compression`/`filename_column`/`load`/`period_column`) | ingest strategies / `PartitionWriter`; `load` + `period_column`: the `output.load` commit step (`ArrivalLoadStep`, O6) | sink node config |
 | `output_store` | spec (since 2026-08-31, gap 8) | `PipelineConfig.prepare()` **arming condition** for `steps:`/`dedup`/`summarize`/`join`/`webhook`/`excel`; `PipelineLift.stageTwo`; `SchedulerAuditTask` orphan report | hand / schema form; required to arm a Stage-2 chain (`stage-two-blocks-require-output-store`, ERROR at save) |
 | `sinks` | spec — a list of objects: `FieldSpec.listOf` with an item spec (`database` required; `format`/`compression`/`filename_column`/`ducklake.*` optional, since an omitted key inherits `output:`), so a non-list, a non-map entry or an entry with no `database` is a 422 at save rather than a load-time throw ([output-sinks](../elt/spec-sinks.md)) | `IngestSinkWriter` / `ConsignmentGraphRunner` — `database` is the branch↔sink join key | canvas (multiple destinations) |
 | `route` | parser-only | `ConsignmentGraphRunner` — branch-aware **ingest lane only**; refused inside `steps:` by both paths | canvas route node + branch predicates |
@@ -265,6 +265,8 @@ against, round-tripped untouched.
 | `output.ducklake` | spec |
 | `output.filename_column` | spec |
 | `output.format` | spec |
+| `output.load` | spec |
+| `output.period_column` | spec |
 | `output_store` | spec |
 | `parsing` | spec |
 | `parsing.grammar` | spec |

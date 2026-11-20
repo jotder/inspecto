@@ -829,6 +829,7 @@ com.gamma.etl.ConsignmentEvent | public record ConsignmentEvent(String pipeline,
 com.gamma.etl.EditionFeatureProvider | Set<String> features()
 com.gamma.etl.EditionFeatureProvider | public interface EditionFeatureProvider
 com.gamma.etl.IngestResult | public record IngestResult(long parsedRows, long errorRows, long junkCandidateRows)
+com.gamma.etl.PipelineConfig | public ArrivalLoad arrivalLoad()
 com.gamma.etl.PipelineConfig | public Chunking chunking()
 com.gamma.etl.PipelineConfig | public Collector collector()
 com.gamma.etl.PipelineConfig | public CommitRetryPolicy commitRetry()
@@ -864,6 +865,7 @@ com.gamma.etl.PipelineConfig | public Reference reference()
 com.gamma.etl.PipelineConfig | public Refusal refusal()
 com.gamma.etl.PipelineConfig | public RejectMode rejectMode()
 com.gamma.etl.PipelineConfig | public Schemas schemas()
+com.gamma.etl.PipelineConfig | public String arrivalLoadRefusal()
 com.gamma.etl.PipelineConfig | public String description()
 com.gamma.etl.PipelineConfig | public String outputStore()
 com.gamma.etl.PipelineConfig | public String stream()
@@ -886,6 +888,13 @@ com.gamma.etl.PipelineConfig | public static PipelineConfig loadForValidation(St
 com.gamma.etl.PipelineConfig | public static boolean selectsByColumnIndex(String)
 com.gamma.etl.PipelineConfig | public void prepare() throws IOException
 com.gamma.etl.PipelineConfig | public void requireRunnable()
+com.gamma.etl.PipelineConfig.ArrivalLoad | public record ArrivalLoad(Mode mode, String periodColumn)
+com.gamma.etl.PipelineConfig.ArrivalLoad | public static final ArrivalLoad APPEND
+com.gamma.etl.PipelineConfig.ArrivalLoad.Mode | constant APPEND
+com.gamma.etl.PipelineConfig.ArrivalLoad.Mode | constant PERIOD
+com.gamma.etl.PipelineConfig.ArrivalLoad.Mode | constant REPLACE
+com.gamma.etl.PipelineConfig.ArrivalLoad.Mode | public enum Mode
+com.gamma.etl.PipelineConfig.ArrivalLoad.Mode | public static Mode from(String)
 com.gamma.etl.PipelineConfig.Chunking | public boolean appliesTo(long)
 com.gamma.etl.PipelineConfig.Chunking | public long effectiveChunkBytes()
 com.gamma.etl.PipelineConfig.Chunking | public record Chunking(long maxFileBytes, long targetChunkBytes)

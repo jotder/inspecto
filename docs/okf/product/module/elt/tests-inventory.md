@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.elt`](../../../../../product-map/module/elt.toon).
 
-106 test class(es): 106 unit, 0 real-HTTP control-plane, 0 IT.
+107 test class(es): 107 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -84,6 +84,7 @@ mvn -o test -pl platform/inspecto-etl -Dtest=AcceptedConfigKeysDocContractTest,C
 | `PartitionWriterTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/PartitionWriterTest.java` |  |
 | `PhaseFConfigTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/PhaseFConfigTest.java` | Phase F config: additive {@code source.fetch / retry / circuit_breaker / post_action} parsing + defaults. <!-- vocab-allow: quoted Javadoc --> |
 | `PipelineCommitRetryConfigTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/PipelineCommitRetryConfigTest.java` | The per-pipeline {@code processing.retry} block (X1 deferral, 2026-09-25) — the bounded COMMIT retry's cap |
+| `PipelineConfigArrivalLoadTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/PipelineConfigArrivalLoadTest.java` | {@code BASIC-ELT-PROFILE-1} O6: the {@code output.load} arrival mode ({@code append \| replace \| period} with |
 | `PipelineConfigBatchTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/PipelineConfigBatchTest.java` |  |
 | `PipelineConfigCollectorMessageTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/PipelineConfigCollectorMessageTest.java` | COLLECTOR-ERRMSG-1 (authoring-residuals R1): the parser's refusal messages must cite |
 | `PipelineConfigDraftTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/PipelineConfigDraftTest.java` | Schema-less draft parsing (v5.1.0, the stream-onboarding draft lifecycle): a minimal config |

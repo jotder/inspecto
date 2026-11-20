@@ -67,6 +67,15 @@ Tests: `DatasetRelationTest.physicalRefWithDatabaseSubtreeReadsMappedOutputOnly`
 `sinkNestedInsideAnotherStoreFailsClosed`, `slashedSinkStoreNameFailsClosed`,
 `externalDataDirStaysAllowed`).
 
+### How rows arrive: `output.load` (O6, 2026-11-20)
+
+`output.load: append | replace | period` (with `output.period_column` for `period`) says what each committed
+Consignment does to the rest of the store: `append` (the default) adds its rows; `replace` then removes every other file;
+`period` then removes the rows on the days it covers. Only a single local, unpartitioned, one-schema Parquet store may
+set `replace` or `period`: more than one destination, DuckLake, an object store, CSV output and `route:` are refused at
+save and at load. Mechanics, crash safety and Add a file's run-scoped choice:
+[spec-arrival-replace.md](spec-arrival-replace.md).
+
 ### Multi-destination `sinks:` (shipped 2026-08-02 — `0cdc9dff` + `79dcb3e6`)
 
 A `*_pipeline.toon` may declare a top-level plural **`sinks:`** list — one `{database, format,

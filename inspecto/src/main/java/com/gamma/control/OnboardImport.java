@@ -779,29 +779,45 @@ final class OnboardImport {
         List<String> keptColumns = List.of();
         /** Why a new column was left out; null when none was. */
         String newColumnsReason;
-        private com.gamma.job.ArrivalReplacer periodAside;
+        /** Replace the period's run-scoped arrival mode (O6), open from the run until {@link #dropAside} or a rollback. */
+        private com.gamma.job.ArrivalLoadStep.RunLoad periodLoad;
 
         String mode() {
             return replace ? "replace" : period ? PERIOD : "append";
         }
 
         /**
-         * Replace the period: remove, from every older Parquet file, the rows on a day this upload's own output covers
-         * (the engine's {@link com.gamma.job.ArrivalReplacer}, BASIC-ELT-PROFILE-1 B4). Undone by {@link #rollback} (the
-         * originals come back, then the upload's own rows go); made final by {@link #dropAside}. Answers {@code {days, from,
-         * to, rowsReplaced, filesRewritten}}.
+         * Replace the period, as the run's own arrival mode (BASIC-ELT-PROFILE-1 O6): the engine's {@code output.load}
+         * commit step, at the upload's Consignment, removes from every older Parquet file the rows on a day the upload
+         * covers ({@link com.gamma.job.ArrivalReplacer}, B4); the run's other files append. Undone by {@link #rollback}
+         * (the originals come back, then the upload's own rows go); made final by {@link #dropAside}. Open before the run.
          */
-        Map<String, Object> replacePeriod(String eventDate) throws IOException {
-            List<Path> covering = new ArrayList<>(), fresh = new ArrayList<>();
-            String landedName = landed == null ? null : landed.getFileName().toString();
-            for (Map<String, String> r : taken) {
-                List<Path> out = ledgerOutputs(r);
-                fresh.addAll(out);
-                if (String.valueOf(r.get("filename")).equals(landedName)) covering.addAll(out);
-            }
-            periodAside = new com.gamma.job.ArrivalReplacer(space.dataRoot(), id, STAMP.format(Instant.now()));
-            undo.push(periodAside::restore);   // a no-op once dropAside made it final
-            com.gamma.job.ArrivalReplacer.Result r = periodAside.replacePeriod(covering, fresh, eventDate);
+        void periodLoad(String eventDate) {
+            periodLoad = com.gamma.job.ArrivalLoadStep.override(database(), new PipelineConfig.ArrivalLoad(
+                    PipelineConfig.ArrivalLoad.Mode.PERIOD, eventDate), landed.getFileName().toString());
+            com.gamma.job.ArrivalLoadStep.RunLoad load = periodLoad;
+            undo.push(() -> {   // a no-op restore once dropAside made it final
+                try {
+                    load.restore();
+                } finally {
+                    load.close();
+                }
+            });
+        }
+
+        /** The rows the run's replacement removed (0 without one): {@link #runChecked} judges the rows the run added. */
+        long rowsReplaced() {
+            com.gamma.job.ArrivalReplacer.Result r = periodLoad == null ? null : periodLoad.result();
+            return r == null ? 0 : r.rowsRemoved();
+        }
+
+        /** What Replace the period did, after the run: {@code {days, from, to, rowsReplaced, filesRewritten}}. */
+        Map<String, Object> replacedPeriod() throws IOException {
+            Exception failed = periodLoad.failure();
+            if (failed instanceof IOException io) throw io;
+            if (failed instanceof RuntimeException re) throw re;
+            com.gamma.job.ArrivalReplacer.Result r = periodLoad.result();
+            if (r == null) r = new com.gamma.job.ArrivalReplacer.Result(List.of(), 0, 0);   // the upload wrote no file
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("days", r.days().size());
             m.put("from", r.days().isEmpty() ? null : r.days().get(0));
@@ -961,7 +977,8 @@ final class OnboardImport {
             s.put("rowsAfter", after);
             s.put("rowsChanged", after - before);
             s.put("replaced", replace);
-            if (landed != null && (!quarantined.isEmpty() || after <= (replace ? 0 : before))) {
+            // a Replace the period removed rows inside the run (O6): the rows the run added are judged without that
+            if (landed != null && (!quarantined.isEmpty() || after + rowsReplaced() <= (replace ? 0 : before))) {
                 String why = filteredAway ? "the row filter kept none of its " + byFile.get(landedName) + " rows"
                         : !quarantined.isEmpty() ? "the file was set aside (" + quarantined.get(0).get("reason") + ")"
                         : filtered > 0 && filtered + rejected >= parsed ? "the row filter kept none of its " + parsed + " rows"
@@ -1273,8 +1290,8 @@ final class OnboardImport {
                 OnboardRoutes.deleteTree(aside);
             }
             aside = null;
-            if (periodAside != null) periodAside.drop();
-            periodAside = null;
+            if (periodLoad != null) periodLoad.close();   // final: the files it replaced are marked REPLACED
+            periodLoad = null;
         }
     }
 
@@ -1569,11 +1586,12 @@ final class OnboardImport {
                     Map<String, Object> s;
                     // ADD-FILE-FEED-1: the upload is whole (landFromDraft moves it in complete), so a feed's stability window does
                     // not hold it back from the person's own run; every other waiting file is gated as before
+                    if (period) j.periodLoad(eventDate);
                     try (com.gamma.inspector.RunFiles.Scope whole = com.gamma.inspector.RunFiles.complete(Set.of(j.landed))) {
                         s = j.runChecked(replace ? 0 : before);
                     }
                     if (period) {
-                        s.put("period", j.replacePeriod(eventDate));
+                        s.put("period", j.replacedPeriod());
                         s.put("rowsAfter", countRows(j.database()));
                     }
                     if (!newColumns.isEmpty()) s.put("newColumns", newColumns);

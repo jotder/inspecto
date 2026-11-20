@@ -210,6 +210,25 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         commitSteps = List.copyOf(next);
     }
 
+    // BASIC-ELT-PROFILE-1 O6: output.load (and a run's own choice) replaces at each commit, before the import's
+    // compaction (order 100) and the Space's Jobs see it
+    static {
+        commitStep("output.load", 50, CommitPhase.COMMIT, (service, e) -> service.arrivalLoad(e));
+    }
+
+    private void arrivalLoad(ConsignmentEvent e) {
+        if (!"SUCCESS".equalsIgnoreCase(e.status()) || e.dryRun() || e.pipeline() == null) return;
+        PipelineConfig cfg = configFor(e.pipeline()).orElse(null);
+        if (cfg == null)
+            for (PipelineConfig c : loadConfigs())
+                if (e.pipeline().equalsIgnoreCase(c.identity().pipelineName())) cfg = c;
+        if (cfg == null) return;
+        PipelineConfig run = cfg;
+        // the files the Consignment took, from the on-disk ledger written before the commit was published
+        com.gamma.job.ArrivalLoadStep.commit(cfg, e, () -> fileStatus.files(run).stream()
+                .filter(r -> e.consignmentId().equals(r.get("consignment_id"))).map(r -> r.get("filename")).toList());
+    }
+
     /** The runs in progress, by lower-cased Pipeline id, each holding its last SUCCESS commit so far (for {@link CommitPhase#RUN}). */
     private final Map<String, java.util.concurrent.atomic.AtomicReference<ConsignmentEvent>> openRuns =
             new java.util.concurrent.ConcurrentHashMap<>();

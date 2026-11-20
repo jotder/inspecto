@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-422 test class(es): 422 unit, 0 real-HTTP control-plane, 0 IT.
+423 test class(es): 423 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -178,6 +178,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `ApprovalFingerprintTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ApprovalFingerprintTest.java` | The shared approval mechanism: every fail-closed branch of {@link ApprovalFingerprint}. |
 | `ApprovalGoldenVectorTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ApprovalGoldenVectorTest.java` | GOLDEN VECTORS: fingerprints of fixed inputs, recorded from the code as it stood BEFORE |
 | `ArrivalCompactorTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ArrivalCompactorTest.java` | {@code BASIC-ELT-PROFILE-1} B6: the {@code compact} maintenance task's {@code mode: arrivals} ({@link ArrivalCompactor}) |
+| `ArrivalLoadStepTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ArrivalLoadStepTest.java` | {@code BASIC-ELT-PROFILE-1} O6: the {@code output.load} commit step ({@link ArrivalLoadStep}) on a Standard Pipeline's |
 | `ArrivalReplacerTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ArrivalReplacerTest.java` | {@code BASIC-ELT-PROFILE-1} B4: <i>Replace the period</i> in the engine ({@link ArrivalReplacer}) - the plan's data-loss |
 | `AttachApprovalsTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/AttachApprovalsTest.java` | ASSURE-XLSX-ATTACHMENTS-1 round 5: what the attachment fingerprint hashes. |
 | `BenefitsLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/BenefitsLinksJobGoldenTest.java` | The {@code la-benefits} Space Template (Basic tier) RUN end to end from a verbatim copy: the seven Pipelines land the shipped |
