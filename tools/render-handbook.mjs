@@ -20,6 +20,10 @@
 // renders as one quiet folded line naming what is checked, the step under it. Raw HTML is escaped; HTML comments and frontmatter are dropped; images
 // render as their alt text (hub assets do not ship). No dependency (the repo's dependency set is locked).
 //
+// EDITION BADGE (P3): each page shows the sold editions it applies to, derived from its hub's Product Map Item and the
+// Offerings by tools/handbook-editions.mjs (a page's `edition:` in the manifest only where nothing derives, or to
+// narrow). render() reads `page.edition`; main() and publish-handbook.mjs attach it with withEditions().
+//
 // Tests: tools/render-handbook.test.mjs. Checked by tools/check-handbook.mjs.
 
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
@@ -27,6 +31,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseToon } from './toon-subset.mjs';
 import { FENCE_API, FENCE_UI, describe, parseBlock } from './handbook-checks.mjs';
+import { editionIndex, editionLabel, gatherFacts, withEditions } from './handbook-editions.mjs';
 
 export const MANIFEST = 'docs/okf/product/layer/product/handbook.toon';
 export const CHAPTER_IDS = ['start', 'understand', 'build_bring_data_in', 'build_shape', 'build_trust', 'build_analyse',
@@ -47,6 +52,7 @@ export function loadManifest(text) {
         pages: Object.entries(c.pages || {}).map(([pid, p]) => ({
             id: pid, chapter: id, file: p.file, title: p.title || null, type: p.type,
             tracks: Array.isArray(p.tracks) ? p.tracks : p.tracks ? [p.tracks] : [], audience: p.audience,
+            declaredEdition: p.edition || null,
         })),
     }));
     const pub = t.handbook.publish || {};
@@ -188,6 +194,7 @@ pre{background:var(--code);padding:12px;border-radius:6px;overflow:auto}pre code
 .table{overflow-x:auto}table{border-collapse:collapse;margin:12px 0}th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
 th{background:var(--soft)}blockquote{margin:12px 0;padding:4px 14px;border-left:3px solid var(--line);color:var(--muted)}
 .badges span{display:inline-block;font-size:12px;padding:1px 8px;margin:0 6px 6px 0;border-radius:10px;background:var(--soft);border:1px solid var(--line)}
+.badges span.edition{border-color:var(--accent);color:var(--accent)}
 .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}.card{border:1px solid var(--line);border-radius:8px;padding:12px 14px}
 .card a{font-weight:600;text-decoration:none}.muted{color:var(--muted)}#results a{display:block}
 details.check{margin:6px 0 12px;font-size:13px;color:var(--muted)}details.check summary{cursor:pointer}details.check pre{font-size:12px}
@@ -232,7 +239,9 @@ export function render(book, read, { internal = false } = {}) {
             };
             const r = markdownToHtml(read(p.file), link);
             const title = p.title || r.title || p.id;
-            const badges = `<div class="badges"><span>${esc(p.type)}</span>${p.tracks.map((t) => `<span>${esc(t)}</span>`).join('')}` +
+            const ed = editionLabel(p.edition);
+            const badges = `<div class="badges">${ed ? `<span class="edition" title="Editions this page applies to">${esc(ed)}</span>` : ''}` +
+                `<span>${esc(p.type)}</span>${p.tracks.map((t) => `<span>${esc(t)}</span>`).join('')}` +
                 (internal ? `<span>${esc(p.audience)}</span>` : '') + '</div>';
             const crumb = `<p class="muted"><a href="${c.id}.html">${esc(c.title)}</a></p>`;
             files.set(`${p.id}.html`, shell(book, chapters, c.id, title, crumb + badges + r.html));
@@ -260,7 +269,7 @@ function main() {
     if (!out) { console.error('usage: node tools/render-handbook.mjs --out <dir> [--internal]'); process.exit(2); }
     if (!existsSync(MANIFEST)) { console.error(`✗ render-handbook: ${MANIFEST} not found — run from the repository root`); process.exit(2); }
     const internal = args.includes('--internal');
-    const book = loadManifest(readFileSync(MANIFEST, 'utf8'));
+    const book = withEditions(loadManifest(readFileSync(MANIFEST, 'utf8')), editionIndex(gatherFacts('.')));
     const { files, pages } = writeRender(out, book, (f) => readFileSync(f, 'utf8'), { internal });
     console.log(`render-handbook: ${internal ? 'INTERNAL' : 'external'} render, ${pages.length} page(s), ${files.size} file(s) → ${out}`);
 }

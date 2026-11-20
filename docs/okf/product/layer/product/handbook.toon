@@ -16,11 +16,13 @@ chapters:
         type: reference
         tracks[4]: builder,partner,operator,business
         audience: external
+        edition: basic
       tutorial_first_space:
         file: docs/okf/product/module/config/user-guide-tutorial-first-space.md
         type: tutorial
         tracks[1]: builder
         audience: external
+        edition: standard
       user_guide_journey_alert_to_case:
         file: docs/okf/product/layer/product/user-guide-journey-alert-to-case.md
         type: unsorted
@@ -251,11 +253,13 @@ chapters:
         type: unsorted
         tracks[1]: operator
         audience: internal
+        edition: preview
       user_guide_la_showcase_off:
         file: docs/okf/product/solution-pack/la-showcase-off/user-guide-la-showcase-off.md
         type: unsorted
         tracks[2]: builder,business
         audience: internal
+        edition: preview
       admin_guide_cross_vertical_tour:
         file: docs/okf/product/solution-pack/la-showcase/admin-guide-cross-vertical-tour.md
         type: unsorted
@@ -471,6 +475,7 @@ chapters:
         type: concept
         tracks[3]: builder,partner,operator
         audience: external
+        edition: standard
       concept_link_analysis:
         file: docs/okf/product/module/la-core/user-guide-concept-link-analysis.md
         type: concept
@@ -586,6 +591,7 @@ chapters:
         type: tutorial
         tracks[1]: builder
         audience: external
+        edition: standard
   build_analyse:
     title: Analyse it
     group: Build
@@ -821,6 +827,7 @@ chapters:
         type: unsorted
         tracks[1]: builder
         audience: internal
+        edition: advanced
       user_guide_training_scripts:
         file: docs/okf/product/module/la-core/user-guide-training-scripts.md
         type: unsorted
@@ -971,6 +978,7 @@ chapters:
         type: unsorted
         tracks[1]: builder
         audience: internal
+        edition: standard
   build_present:
     title: Present
     group: Build
@@ -981,6 +989,7 @@ chapters:
         type: tutorial
         tracks[2]: builder,business
         audience: external
+        edition: standard
       user_guide_dashboard:
         file: docs/okf/product/layer/product/user-guide-dashboard.md
         type: unsorted
@@ -1006,6 +1015,7 @@ chapters:
         type: tutorial
         tracks[1]: partner
         audience: external
+        edition: standard
       admin_guide_apps:
         file: docs/okf/product/layer/platform/admin-guide-apps.md
         type: unsorted
@@ -1106,12 +1116,14 @@ chapters:
         type: tutorial
         tracks[1]: operator
         audience: external
+        edition: standard
       operations_guide:
         file: docs/ADVANCED_GUIDE.md
         title: Operations guide
         type: reference
         tracks[1]: operator
         audience: external
+        edition: basic
       admin_guide_gotchas:
         file: docs/okf/product/layer/platform/admin-guide-gotchas.md
         type: unsorted
@@ -1272,16 +1284,19 @@ chapters:
         type: unsorted
         tracks[1]: operator
         audience: internal
+        edition: standard
       admin_guide_demo_auth:
         file: docs/okf/product/module/demo-auth/admin-guide-demo-auth.md
         type: unsorted
         tracks[1]: operator
         audience: internal
+        edition: advanced
       user_guide_demo_auth:
         file: docs/okf/product/module/demo-auth/user-guide-demo-auth.md
         type: unsorted
         tracks[1]: builder
         audience: internal
+        edition: advanced
   reference:
     title: Reference
     group: Reference
@@ -1292,6 +1307,22 @@ chapters:
         title: Screen reference
         type: reference
         tracks[3]: builder,operator,business
+        audience: external
+        edition: basic
+      reference_http_api:
+        file: docs/okf/product/layer/product/api-reference-http.md
+        type: reference
+        tracks[2]: partner,operator
+        audience: external
+      reference_editions:
+        file: docs/okf/product/layer/product/api-reference-editions.md
+        type: reference
+        tracks[4]: builder,partner,operator,business
+        audience: external
+      reference_vocabulary:
+        file: docs/okf/product/layer/product/api-reference-vocabulary.md
+        type: reference
+        tracks[4]: builder,partner,operator,business
         audience: external
       admin_guide_processor:
         file: docs/okf/product/module/processor/admin-guide-processor.md

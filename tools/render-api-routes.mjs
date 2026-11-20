@@ -99,6 +99,21 @@ export function render({ routes, manifests, items, openapi }) {
     return { pages, unowned };
 }
 
+/** `METHOD /path` of each OpenAPI operation → the module id whose Maven module registers it (the rule render() uses). */
+export function routeModules({ routes, manifests, openapi }) {
+    const dirs = Object.keys(manifests).sort((a, b) => b.length - a.length);
+    const owner = new Map();
+    for (const r of routes) {
+        const file = posix(r.file);
+        const dir = dirs.find((d) => file.startsWith(d + '/src/main/'));
+        if (dir) owner.set(`${r.method} ${norm(r.pattern)}`, manifests[dir]);
+    }
+    const out = new Map();
+    for (const [path, byMethod] of Object.entries(openapi.paths ?? {}))
+        for (const m of METHODS) if (byMethod[m] && owner.has(`${m.toUpperCase()} ${norm(path)}`)) out.set(`${m.toUpperCase()} ${path}`, owner.get(`${m.toUpperCase()} ${norm(path)}`));
+    return out;
+}
+
 /** Reads the world from a repo root. */
 export function gather(root) {
     const ls = (spec) => execFileSync('git', ['ls-files', spec], { cwd: root, encoding: 'utf8' }).split('\n').filter(Boolean);
