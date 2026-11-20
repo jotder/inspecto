@@ -47,13 +47,23 @@ Concept: [Alert, Incident and Case](../../addon/incidents/user-guide-concept-ale
 
 ## Check it worked
 
-Take an open Case into investigation — the same step as **Investigate** — and see its new state:
+Open a Case by hand, linked to one of the worked example's Incidents — the API call **New case** makes — then take it
+into investigation, the same step as **Investigate**:
 
 ```check
-GET /spaces/{space}/objects?type=CASE&status=OPEN&limit=1
+GET /spaces/{space}/objects?type=INCIDENT&limit=1
 as builder
 expect status 200
-save data[0].id as case
+save data[0].id as incident
+```
+
+```check
+POST /spaces/{space}/objects
+as builder
+body {"type": "CASE", "title": "Collections follow-up", "links": [{"to": "{incident}", "relationship": "contains"}]}
+expect status 200
+expect data.status = "OPEN"
+save data.id as case
 ```
 
 ```check

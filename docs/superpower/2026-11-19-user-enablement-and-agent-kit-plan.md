@@ -425,8 +425,8 @@ upgrade an App, Roles and Access Policies.
   shows the configuration or API way: windowed real-time rules, re-assigning a Case, turning four-eyes on, a database
   Collector (console: the PostgreSQL snapshot only). A scheduled report is a Dataset export (CSV or Excel), not a
   Dashboard.
-- **The checks, run (2026-11-20): 29 of 30 pages pass, twice in a row** (every create answers 200 or 409, so a
-  page re-runs). Install: an Advanced demo bundle built from origin/master 43410b8e3
+- **The checks, run (2026-11-20): 29 of 30 pages pass, twice in a row** (a create answers 200 or 409, and the Case
+  page opens a new Case each run, so every page re-runs). Install: an Advanced demo bundle built from origin/master 43410b8e3
   (`package.ps1 -Edition Advanced -Product inspecto -Distribution demo -NoBakeDemo -SkipBootCheck`) on :8093, a
   roster-only Space whose Demo Users `builder` and `admin` hold `admin;power` (what the pages tell readers to hold),
   and `POST /spaces` of `order-to-cash` with samples; T1–T4 run first, as a reader would. Each page makes what it
@@ -439,7 +439,9 @@ upgrade an App, Roles and Access Policies.
   the refusal on the worked example (no stream there); the parser page checks the built-in catalog.
 - **Fixed by the run:** the parser page named `/jobs/packs` and `/parsers` without the Space prefix; the upgrade
   page had no check for applying the Space upgrade; the report page now says where the file lands
-  (`config\exports\<id>`); the screening page says a different legal form (*Ltd* / *Limited*) scores about 0.66.
+  (`config\exports\<id>`); the screening page says a different legal form (*Ltd* / *Limited*) scores about 0.66; the Case page opens
+  its own Case instead of using up one T3 left open. The parser, real-time and Connection checks prove the route
+  and its answer, not the reader's own outcome (no pack jar, no stream, no SFTP server on the test machine).
 
 ### 5.4 Concepts (about fifteen) and migration
 
