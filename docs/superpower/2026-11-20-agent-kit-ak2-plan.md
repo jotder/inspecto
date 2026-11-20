@@ -1,6 +1,7 @@
 # Agent Kit AK-2 — agents propose changes, people approve them, one role at a time (plan)
 
-> **Status: PROPOSED 2026-11-20 — D-AK1…D-AK6 open (§8); nothing built. Built phase by phase, one agent role per
+> **Status: APPROVED for phase 1 on 2026-11-20 — D-AK1…D-AK4 signed (operator, "Sign recommended"); D-AK5 and
+> D-AK6 open, needed before phase 2 (§8); nothing built; phase 1 (AK-2a, then AK-2b) startable. Built phase by phase, one agent role per
 > phase (§1.1, operator 2026-11-20).** Phase AK-2 of
 > [`2026-11-19-user-enablement-and-agent-kit-plan.md`](2026-11-19-user-enablement-and-agent-kit-plan.md) (§7, §8),
 > on top of AK-1 as built ([`spec-mcp.md`](../okf/product/module/mcp/spec-mcp.md)). Board row: `AGENT-KIT-1`.
@@ -214,7 +215,11 @@ notifications and the tasks extension stay deferred to AK-3 / AK-4.
 - **Client self-description.** `clientInfo` stays a label only; the verified `agentClient` is what audit and the
   Pending Change trust.
 
-## 8. Decisions — open
+## 8. Decisions
+
+**D-AK1…D-AK4 signed 2026-11-20** (operator, "Sign recommended"): each as its *Recommended* column says. For D-AK1 that
+is **four-eyes always**; the single-administrator alternative is not signed and is not built unless the operator asks.
+**D-AK5 and D-AK6 stay open**; they are needed before phase 2.
 
 | # | Question | Recommended |
 |---|---|---|
