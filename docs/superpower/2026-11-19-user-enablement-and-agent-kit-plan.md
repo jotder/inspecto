@@ -263,6 +263,13 @@ console** — today only the App kit CLI can (§1). It goes on the board in plan
 - **`upgrade.ps1` takes a relative `-BackupDir` from the wrong folder.** It changes to the bundle's parent before
   checking the backup, so `.\spaces\…` is not found and nothing is upgraded; it also leaves the shell there. T6 gives a
   full path and changes back.
+- **Filed 2026-11-20 by the developer-pages lane (P3, 5.1–5.6):** the App kit's reach above, as
+  `APP-KIT-DELIVERY-1` (with the Java scaffolds `tools/scaffold.mjs`, also source-tree only), and the create-time
+  refusal above folded into `APP-CONFORMANCE-BEYOND-FINDINGS-1` — conformance holds only findings-Dataset keys, never an
+  App's Expectations, Alert Rules, Incidents or Case Rules; and `INDUSTRY-CANONICAL-DATASETS-1` — no Industry declares
+  the canonical Datasets `GLOSSARY.md` says it owns (`industry.toon` is id, title, pack), so pages 5.1 and 5.3 tell
+  authors to name Datasets after the Industry pack's record types. `app.toon` has no edition and no persona key; the
+  pages say the editions follow from `requires.addons` and the personas are the template's `config/roles.toon` — no gap.
 - **Not proven live:** the reverse proxy itself (no nginx or Caddy on the test machine; the preflight's config check
   passed), the OS-service install and the service-mode upgrade, and the Linux `.sh` scripts.
 
@@ -449,7 +456,7 @@ downloadable vendor packages, versioned with the product.
 | **P0** | D-UE1…D-UE9 signed; the new names in `GLOSSARY.md` — **done 2026-11-19** (D-UE8 left open) | — | days |
 | **P1** | Handbook skeleton: manifest, renderer, `/help` route with screen links, `check-handbook.mjs`, the inventory map of existing pages — **lane A done 2026-11-19 (§4.6); lane B (console and bundle) in its own lane** | P0 | 2–3 weeks |
 | **P2** | Concepts; the worked example's data and Space Template; tutorials T1–T6 with their checks; the Space → App gap filed — **lane E (docs as tests: the check-block format, the guard, the reader's view, the runner) done 2026-11-19 (§4.4)**; **lane C (concepts) done 2026-11-19 (§4.6)**; **lane D (the worked example) done 2026-11-19: Space Template `order-to-cash`, its generator and ground truth, golden tests; version 2 and the gaps in the hub `solution-pack/order-to-cash`**; **T5 *Ship it* and T6 *Run it* done 2026-11-19 (hub `layer/platform`, chapters `ship` and `manage_platform`; gaps in §4.5)**; **tutorials T1–T4 (builder track) done 2026-11-19: `tutorial_first_space` (chapter *Start here* — the first page a new builder reads), `tutorial_pipeline_expectations`, `tutorial_detect_respond`, `tutorial_dashboard`; external, every step's console label driven in a live console, 31 check blocks green against a seeded demo install** | P1 | 4–6 weeks |
-| **P3** | The first 30 how-tos; generated reference; edition badges on every page; the *On Inspecto* developer pages 5.1–5.6 (§3.1) | P1 | 4–6 weeks, parallel with P2, plus 2–3 weeks for the developer pages |
+| **P3** | The first 30 how-tos; generated reference; edition badges on every page; the *On Inspecto* developer pages 5.1–5.6 (§3.1) — **developer pages done 2026-11-20: six external pages in hub `layer/platform` (`user-guide-develop-{requirements,architecture,design,build,test,release}.md`), first in chapter `develop` (ids `develop_*`, track partner): 5.1–5.3 `concept`, 5.4–5.6 `howto` with the six headings; 14 check blocks (the reused o2c ones were green in the T1–T4 and T5 runs; the new `/openapi.json`, `/bootstrap`, `/modules`, `/pipelines` and `/datasets/o2c_open_items/rows` ones are grounded in the route code, not yet run live); three gaps filed (§4.5). `user-guide-builder-kit.md` stays an internal page, not yet retired into 5.4–5.5** | P1 | 4–6 weeks, parallel with P2, plus 2–3 weeks for the developer pages |
 | **P4** | Learning paths, the first two labs with checkers, the video series spec on the LA machinery, the instructor kit | P2 | 3–4 weeks |
 | **P5** | The *Inside Inspecto* internal render: the stage × product-area index generated from the Product Map and hub slots, six entry pages 5.7–5.12, the audience guard | P1, D-UE10 | about 1 week |
 | **AK-1** | `inspecto-mcp`: transport, read tools, resources, audit; the delegated-identity design and a security review | P0 | 3–4 weeks, parallel with P1 |
