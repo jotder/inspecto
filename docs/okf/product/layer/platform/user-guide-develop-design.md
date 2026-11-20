@@ -44,7 +44,7 @@ ingest.
 
 The logic that finds — the **Function pack** — is written against the Datasets' column names, not against one
 customer's file layout. A customer's own layout is mapped onto those names in the Pipeline (its schema and Steps), so
-the same Jobs and rules work for every customer. Pick, for each piece of logic, the lowest tool that does it:
+the same Jobs, Expectations and Alert Rules work for every customer. Pick, for each piece of logic, the lowest tool that does it:
 
 | The logic | Use | Needs |
 |---|---|---|
@@ -97,7 +97,8 @@ roles[3]:
 ```
 
 Your customer's identity provider then maps their own groups onto these Roles. Grant the least each person needs: a
-user who creates a Space from a template holding an Alert Rule needs the capability to author Alert Rules. See
+user who creates a Space needs the administer capability, and from a template holding an Alert Rule also the
+capability to author Alert Rules. See
 [Roles and Access Policies](../../module/access/user-guide-concept-roles-access-policies.md).
 
 The App's menu entries (`nav` in `app.toon`) choose the screens users land on; a `feature` on an entry keys it to a feature,

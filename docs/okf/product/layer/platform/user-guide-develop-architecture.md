@@ -52,7 +52,8 @@ and no code at all, unless it needs a new kind of Step, parser or connector (bel
 Everything the console does goes through the **Control API**, served under `/api/v1`. Your scripts and integrations
 use the same API.
 
-- **One envelope.** Every answer is JSON with `data`, and `metadata`, `links` and `diagnostics` where they apply.
+- **One envelope.** Every answer is JSON with `data`, and `metadata`, `links` and `diagnostics` where they apply —
+  except the contract document itself, below, which is served as is.
 - **Per Space.** A Space's routes are addressed as `/api/v1/spaces/{id}/…`.
 - **Safe writes.** Every configuration write passes the same safety check the console uses; a write with an error is
   refused with the finding, and `validate` reports the findings without saving. Versioned resources carry an `ETag`,

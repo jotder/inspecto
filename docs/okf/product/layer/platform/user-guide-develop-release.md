@@ -71,8 +71,8 @@ An administrator adds your key to the server once: append the line from `acme-si
 plan without changing anything:
 
 ```bash
-curl -X POST "$API/apps?dryRun=true" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/zip" --data-binary @dist/acme-spend-0.1.0.zip
-curl -X POST "$API/apps"             -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/zip" --data-binary @dist/acme-spend-0.1.0.zip
+curl -X POST "$API/apps?dryRun=true" -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/zip" --data-binary @../acme-spend/dist/acme-spend-0.1.0.zip
+curl -X POST "$API/apps"             -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/zip" --data-binary @../acme-spend/dist/acme-spend-0.1.0.zip
 ```
 
 `$API` is the server's `/api/v1` address and `$TOKEN` an administrator's access token. The answer is the plan — the
@@ -101,7 +101,8 @@ of the Platform product, with its templates staged from your folder. That build 
 
 ## Check it worked
 
-The server lists your App as installed and your key among its trusted signers:
+`GET /apps` lists your App under `installed` (its id, version and `signedBy`) and your key under `signers`. On the
+worked example's server, the call answers with both lists:
 
 ```check
 GET /apps
@@ -110,6 +111,8 @@ expect status 200
 expect data.installed exists
 expect data.signers exists
 ```
+
+[Tutorial: ship it](user-guide-tutorial-ship-an-app.md) checks a named App and signer the same way.
 
 and a Space made from a template records which template and version it came from:
 

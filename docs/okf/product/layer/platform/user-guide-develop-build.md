@@ -21,7 +21,7 @@ whose Space Template runs on a development server — adding Java only where con
 |---|---|
 | your App's design | the finding and its key, the Datasets, the logic, the template tree, the Roles, the golden data |
 | the **App kit** (`inspecto-app.mjs`) and Node.js | run from the Inspecto developer kit folder; today the kit is not shipped in customer bundles |
-| a **development server** you can create Spaces on, as a builder | any edition your App's Add-ons reach; Standard or above if it needs Incidents, Cases or Reconciliation |
+| a **development server** where you work as a builder, and an administrator who creates Spaces there | any edition your App's Add-ons reach; Standard or above if it needs Incidents, Cases or Reconciliation |
 | for Java extensions only: JDK and Maven | the scaffolds build offline |
 
 The examples use the App id `acme-spend` in the folder `../acme-spend`; replace both with yours.
@@ -148,7 +148,7 @@ retry 30 every 2s
 |---|---|---|
 | `validate`: *requires Add-on 'x', which no Offering names* | a misspelt Add-on id | use the id the editions name, such as `caseManagement`, not `case-management` |
 | `validate`: *nav entry … keys on feature …, which no module of its Add-ons provides* | a menu entry needs an Add-on the App does not require | add the Add-on to `requires.addons`, or drop the entry's `feature` |
-| `validate`: *template 'x' … is already a first-party template* | the template id clashes with a shipped one | rename the template folder and every reference to it |
+| `validate`: *template 'x' … is a first-party template* | the template id clashes with a shipped one | rename the template folder and every reference to it |
 | a Pipeline is listed with a `loadError` | the file does not load | read the message: it names the file and, where it can, the line |
 | creating the Space is refused for an Alert Rule | the Alert Rule reads a Dataset no Job has written yet | ship the Dataset's zero-row `seed.parquet` (step 2) |
 | a pack jar is not loaded | its SHA-256 is not in the allowlist | add it to the allowlist file |

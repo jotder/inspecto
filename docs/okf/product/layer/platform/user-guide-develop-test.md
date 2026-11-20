@@ -23,7 +23,7 @@ claims, and that a Space created from its template works — not just that its f
 | golden data and its ground truth in `conformance.toon` | [Design](user-guide-develop-design.md) §7 |
 | the **App kit** and Node.js | run from the Inspecto developer kit folder |
 | one **built bundle folder per edition you claim** (unzipped, not running) | for the boot test |
-| a **development server**, as a builder | for the Space test and the checks the kit does not run |
+| a **development server**, as a builder, and an administrator there | for the Space test and the checks the kit does not run; creating a Space needs the administer capability |
 
 ## Steps
 
@@ -58,12 +58,12 @@ per edition you claim, each with that edition's bundle.
 ### 3. Create a real Space from the template
 
 The boot test builds its scratch Space by copying files, so it does not pass through the checks a server makes when a
-Space is created from a template. Create one on your development server too — **Settings → Spaces → New from
-template**, with sample data — or over the API:
+Space is created from a template. Have an administrator create one on your development server too — **Settings →
+Spaces → New from template**, with sample data — or over the API:
 
 ```check
 POST /spaces
-as builder
+as admin
 body {"id": "{space}", "template": "order-to-cash", "loadSamples": true}
 expect status 200|409
 ```
