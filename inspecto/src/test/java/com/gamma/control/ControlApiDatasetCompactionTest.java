@@ -327,10 +327,13 @@ class ControlApiDatasetCompactionTest {
             assertFalse(outputs.isEmpty(), "the first arrival's output was recorded");
             assertTrue(outputs.stream().allMatch(o -> o.state() == com.gamma.consignment.ConsignmentOutput.State.COMPACTED_AWAY), outputs.toString());
 
-            // ReprocessCommand refuses (its message names server paths, so the route answers it as an internal error)
+            // ReprocessCommand refuses, answered as a conflict whose reason names no server path (REPROCESS-REFUSAL-500-1)
             HttpResponse<String> r = json(c, "POST", "/runs/" + id + "/reprocess", "{\"batchId\":\"" + before.get(0) + "\"}", null);
             assertEquals(10, OnboardImport.countRows(Path.of("database", id, "database")), "no row put in twice: " + r.body());
-            assertNotEquals(200, r.statusCode(), r.body());
+            assertEquals(409, r.statusCode(), r.body());
+            assertTrue(error(r).contains("merged away by compaction") && error(r).contains(before.get(0)), r.body());
+            assertFalse(r.body().contains(".parquet") || r.body().contains(Path.of("database").toAbsolutePath().toString().replace("\\", "\\\\")),
+                    "no server path: " + r.body());
         }
     }
 

@@ -65,27 +65,29 @@ reader still holds open, **before** deleting them: the merged file is in by then
 by retention) and a reprocess must be refused even while the old file is still on disk. A crash between the marking and
 the map commit leaves the pending map, so the next `heal` marks again (idempotent) and finishes. The previous merged file
 is never in the registry (no Consignment wrote it), so marking it is a no-op. Without a registry
-(`-Dconsignment.outputs.backend=none`) nothing is marked and nothing is decidable, as for `partitions`.
+(`-Dconsignment.outputs.backend=none`) nothing is marked and nothing is decidable, as for `partitions`. *Replace
+the period* and *Replace everything* mark the files whose rows they replaced `REPLACED` (B4,
+[spec-arrival-replace.md](spec-arrival-replace.md)); a later compaction of such a file marks it `COMPACTED_AWAY`, still
+refused.
 
 **The defect this fixes.** Before B6 the arrival compaction marked nothing: `POST /runs/{id}/reprocess` of an Add data
 arrival whose file was merged found its output path absent, restored the member from `backup/`, and re-ingested it
 beside the merged file — 10 rows became 15
 (`ControlApiDatasetCompactionTest#aReprocessOfAMergedArrivalIsRefusedNotDoubled`, red before the change). Now the
-reprocess is refused and the rows stay. ⚠ The route answers the refusal as `500 INTERNAL` with a correlation id: the
-engine's message names server paths. A `409` with a path-free reason is not done (board `REPROCESS-REFUSAL-500-1`).
+reprocess is refused and the rows stay: the route answers `409` with a reason that names no server path
+(`ReprocessCommand.Refused`, see [spec-arrival-replace.md](spec-arrival-replace.md#the-reprocess-refusal)).
 
 ## The merge map moved, not changed
 
 Same file (`<dataRoot>/<id>/compaction.json` and its `.pending`), same fields, same reader rules: a map written before B6
 is read as it is, with no migration. `ArrivalCompactor` owns every reader and writer: `merged`, `trustedSegments`,
-`segmentsRewritten` / `restoreMap` (*Replace the period*, `DatasetPeriod`), `summary` (the storage answer), `heal`,
+`segmentsRewritten` / `restoreMap` (*Replace the period*, `ArrivalReplacer`), `summary` (the storage answer), `heal`,
 `parquetFiles`, `retentionInForce` / `retentionOf`. The Dataset entry keys it reads: `retention`, `eventDate`
 (`ArrivalCompactor.EVENT_DATE_KEY`, which `DatasetRoutes.EVENT_DATE_KEY` now names).
 
 ## Not done here
 
 - Arrivals mode for a Standard Pipeline's Dataset (store at its own `dirs.database`, no merge map yet): later BE-2 work.
-- *Replace everything* and *Replace the period* do not change registry rows (B4, B13).
 - The claim still lives in the control plane (`IN_FLIGHT`); moving it into the engine is B11.
 - No reader-side swap lock: between the move and the deletes a reader may count rows twice, as before B6.
 

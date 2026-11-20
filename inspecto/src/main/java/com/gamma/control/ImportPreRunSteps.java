@@ -107,6 +107,7 @@ final class ImportPreRunSteps {
 
     /** Every step, in order: Add data's in-run path, and the engine step's. */
     static void runAll(Run run) throws IOException {
+        com.gamma.job.ArrivalReplacer.heal(run.space.dataRoot(), run.id);   // B4: a Replace the period a crash interrupted
         for (Step step : STEPS) step.work().run(run);
     }
 

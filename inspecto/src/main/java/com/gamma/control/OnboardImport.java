@@ -779,40 +779,29 @@ final class OnboardImport {
         List<String> keptColumns = List.of();
         /** Why a new column was left out; null when none was. */
         String newColumnsReason;
-        private DatasetPeriod periodAside;
+        private com.gamma.job.ArrivalReplacer periodAside;
 
         String mode() {
             return replace ? "replace" : period ? PERIOD : "append";
         }
 
         /**
-         * Replace the period: remove, from every older Parquet file, the rows on a day this upload's own output covers.
-         * Undone by {@link #rollback}; the originals are discarded by {@link #dropAside}. Answers {@code {days, from, to,
-         * rowsReplaced, filesRewritten}}.
+         * Replace the period: remove, from every older Parquet file, the rows on a day this upload's own output covers
+         * (the engine's {@link com.gamma.job.ArrivalReplacer}, BASIC-ELT-PROFILE-1 B4). Undone by {@link #rollback} (the
+         * originals come back, then the upload's own rows go); made final by {@link #dropAside}. Answers {@code {days, from,
+         * to, rowsReplaced, filesRewritten}}.
          */
         Map<String, Object> replacePeriod(String eventDate) throws IOException {
             List<Path> covering = new ArrayList<>(), fresh = new ArrayList<>();
             String landedName = landed == null ? null : landed.getFileName().toString();
             for (Map<String, String> r : taken) {
-                List<Path> out = DatasetPeriod.outputs(r);
+                List<Path> out = ledgerOutputs(r);
                 fresh.addAll(out);
                 if (String.valueOf(r.get("filename")).equals(landedName)) covering.addAll(out);
             }
-            periodAside = new DatasetPeriod(space.dataRoot(), id, STAMP.format(Instant.now()));
-            final DatasetPeriod p = periodAside;
-            // undone in this order: the originals come back, then the upload's own rows go - no day is left doubled. Only
-            // the upload's output: another file this run took is already marked processed, so its rows must stay. Once
-            // the import succeeded (dropAside discarded the originals) this undo does nothing.
-            final List<Path> added = List.copyOf(covering);
-            undo.push(() -> {
-                if (periodAside != p) return;
-                for (Path f : added) {
-                    Path abs = f.toAbsolutePath().normalize();
-                    if (com.gamma.config.safety.PathJail.contains(database().toAbsolutePath().normalize(), abs)) Files.deleteIfExists(abs);
-                }
-            });
-            undo.push(p::restore);
-            DatasetPeriod.Result r = p.replace(covering, fresh, eventDate);
+            periodAside = new com.gamma.job.ArrivalReplacer(space.dataRoot(), id, STAMP.format(Instant.now()));
+            undo.push(periodAside::restore);   // a no-op once dropAside made it final
+            com.gamma.job.ArrivalReplacer.Result r = periodAside.replacePeriod(covering, fresh, eventDate);
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("days", r.days().size());
             m.put("from", r.days().isEmpty() ? null : r.days().get(0));
@@ -1138,7 +1127,7 @@ final class OnboardImport {
             Path base = space.dataRoot().resolve(id).toAbsolutePath().normalize();
             List<Path> outputs = new ArrayList<>();
             for (Map<String, String> r : taken)
-                for (Path p : DatasetPeriod.outputs(r)) {
+                for (Path p : ledgerOutputs(r)) {
                     Path abs = p.toAbsolutePath().normalize();
                     if (com.gamma.config.safety.PathJail.contains(base, abs) && Files.isRegularFile(abs)) outputs.add(abs);
                 }
@@ -1278,7 +1267,11 @@ final class OnboardImport {
         }
 
         void dropAside() {
-            if (aside != null) OnboardRoutes.deleteTree(aside);
+            if (aside != null) {
+                // B4/B13: the rows set aside were replaced; a reprocess of their Consignments must not bring them back
+                com.gamma.job.ArrivalReplacer.everythingReplaced(aside, database());
+                OnboardRoutes.deleteTree(aside);
+            }
             aside = null;
             if (periodAside != null) periodAside.drop();
             periodAside = null;
@@ -1331,6 +1324,14 @@ final class OnboardImport {
         } catch (NumberFormatException e) {
             return 0;
         }
+    }
+
+    /** The output files a per-file ledger row names ({@code output_paths}, {@code ;}-separated). */
+    private static List<Path> ledgerOutputs(Map<String, String> ledgerRow) {
+        List<Path> out = new ArrayList<>();
+        for (String p : ledgerRow.getOrDefault("output_paths", "").split(";"))
+            if (!p.isBlank()) out.add(Path.of(p.trim()));
+        return out;
     }
 
     /** Rows in a Parquet store directory; 0 when it holds none. */
