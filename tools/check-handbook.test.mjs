@@ -85,6 +85,14 @@ test('leak: an internal page never reaches the external render, and its links th
     assert.deepEqual(run([ALL[0], ALL[1], { ...ALL[2], audience: 'external' }]), []);
 });
 
+test('audience: training is known and stays out of the external render; anything else is refused (D-UE7)', () => {
+    assert.deepEqual(run([ALL[0], { ...ALL[1], audience: 'training' }, ALL[2]]), []);
+    const leaky = () => ({ files: new Map([['index.html', ''], ['ux.html', 'answers'], ['search.json', '[]']]), pages: [] });
+    const f = findings(book([ALL[0], { ...ALL[1], audience: 'training' }, ALL[2]]), TRACKED, (p) => READ[p], leaky);
+    assert.ok(f.some((x) => /holds internal page ux\.html/.test(x)), 'a training page in the external render is a leak');
+    assert.ok(run([ALL[0], { ...ALL[1], audience: 'partners' }, ALL[2]]).some((x) => /audience 'partners' is not one of external, internal, training/.test(x)));
+});
+
 test('edition: every page resolves one; a declared one is known and never earlier than the derived one', () => {
     assert.ok(run([...ALL, page('e', 'docs/H.md', { edition: null })]).some((f) => /edition: start\/e resolves no edition/.test(f)));
     assert.ok(run([...ALL, page('e', 'docs/H.md', { declaredEdition: 'gold', edition: null })]).some((f) => /edition 'gold' is not one of/.test(f)));

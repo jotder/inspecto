@@ -126,8 +126,8 @@ export const editionTables = (text) => countOutsideFences(text, (l) => (EDITION_
 export function headerProblems(fm, isTracked) {
     const out = [];
     if (!fm) return out;
-    if (fm.audience !== undefined && !['external', 'internal'].includes(fm.audience))
-        out.push(`audience '${fm.audience}' is not external or internal`);
+    if (fm.audience !== undefined && !['external', 'internal', 'training'].includes(fm.audience))
+        out.push(`audience '${fm.audience}' is not external, internal or training`);
     if (fm.verified !== undefined && !/^\d{4}-\d{2}-\d{2}/.test(String(fm.verified)))
         out.push(`verified '${fm.verified}' does not start with a YYYY-MM-DD date`);
     if (fm.code !== undefined) {
