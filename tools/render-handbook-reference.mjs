@@ -98,15 +98,20 @@ export function editionsReference(items, itemEdition) {
 /** An italic dated note `*( … )*`, one level of parentheses inside. */
 const NOTE = /\*\(([^()]|\([^()]*\))*\)\*/g;
 /** A code span that names the repository, not the product: a Java package, a source file or doc path, a class. */
-const REPO_CODE = /`(?:(?:com|org)\.[^`]*|[^`]*\.(?:md|java|ts|mjs|js)\b[^`]*|[^`]*\b(?:okf|docs|superpower)\/[^`]*|[^`]*\b[A-Z][a-z0-9]+[A-Z][A-Za-z0-9]*[^`]*|[^`]*\b[A-Za-z]\w*\.[A-Z]\w*[^`]*)`/;
+/** Is a code span's CONTENT a repository name? Tested per span, so a match can never run across prose. */
+export const isRepoCode = (c) => /^(?:com|org)\./.test(c) || /\.(?:md|java|ts|mjs|js)\b/.test(c) ||
+    /\b(?:okf|docs|superpower)\//.test(c) || /\b[A-Z][a-z0-9]+[A-Z][A-Za-z0-9]*/.test(c) || /\b[A-Za-z]\w*\.[A-Z]\w*/.test(c);
+/** The code spans of a text, in order (backticks pair left to right). */
+const spans = (t) => [...t.matchAll(/`([^`]+)`/g)].map((m) => m[1]);
 
 /** First sentence of a definition: dated notes, links, board ids and repository names dropped. */
 export function firstSentence(text) {
     let s = text.replace(NOTE, '')                                          // *(added 2026-…)* notes
         .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')                            // links → their text
         .replace(/\s*\((?:[^()]*`?[A-Z][A-Z0-9]+(?:-[A-Z0-9]+)*-\d+`?[^()]*)\)/g, '')  // (… `BOARD-ID-1` …)
-        .replace(/\s*\(([^()]|\([^()]*\))*\)/g, (p) => (REPO_CODE.test(p) || /\b(?:okf|docs|superpower)\//.test(p) ? '' : p))  // (… `com.x.Y` …)
-        .replace(new RegExp(`\\s*(?:—\\s*)?(?:\`[^\`]+\`'s\\s+)?${REPO_CODE.source}`, 'g'), '')  // a bare repository name, with its owner's possessive
+        .replace(/\s*\(([^()]|\([^()]*\))*\)/g, (p) => (spans(p).some(isRepoCode) || /\b(?:okf|docs|superpower)\//.test(p) ? '' : p))  // (… `com.x.Y` …)
+        // a bare repository name, with an em dash before it or its owner's possessive (`inspecto-agent`'s `X`)
+        .replace(/(\s*(?:—\s*)?)(?:`([^`]+)`'s\s+)?`([^`]+)`/g, (m, lead, owner, c) => (isRepoCode(c) ? '' : m))
         .replace(/\s+/g, ' ').replace(/\s+([,.;:])/g, '$1').replace(/^[\s,.;:—]+/, '').trim();
     // the first . ! ? that ends a sentence: outside parentheses and code, not an abbreviation, before a capital or the end
     let depth = 0, code = false;
