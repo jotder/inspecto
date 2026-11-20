@@ -442,6 +442,25 @@ downloadable vendor packages, versioned with the product.
 - **One compatibility matrix:** model, client, versions, pass rate, safety failures, date. Run on demand on a
   workstation with vendor keys, or fully offline with the local model; never inside the offline CI gate.
 
+### 7.7 AK-1 as built (2026-11-20)
+
+The design of record and the as-built facts live in the hub:
+[`okf/product/module/mcp/spec-mcp.md`](../okf/product/module/mcp/spec-mcp.md). In short:
+
+- **The MCP revision is pinned to `2026-07-28`** (verified 2026-11-20): stateless, no `initialize`, `server/discover`,
+  per-request `_meta`, mirrored `Mcp-Method` / `Mcp-Name` headers. `2025-11-25` and `2025-06-18` are served
+  statelessly for clients that still open with `initialize`; no session is ever minted.
+- **No side door:** every MCP Tool is an in-process `ApiContext.replay` of an existing route as the caller, so the
+  route's own policy, capability, module-switch and masking gates decide. The tool → route table is fixed in code;
+  arguments are id-shaped and URL-encoded, never a route.
+- **Identity:** AK-1 accepts any Subject the install's `Authenticator` resolves and refuses the endpoint (503) on an
+  install with no sign-in. The delegated-person allowlist (`auth.oidc.agentClients`) and the RFC 9728 protected-resource
+  metadata are designed in the hub and are AK-2's first item, before any write tool.
+- **Audit:** one `mcp.tool.called` / `mcp.resource.read` row per call naming the person, the tool, the replayed route,
+  its status and the (self-declared) agent client.
+- No decision beyond §9 was needed: the endpoint holds no capability of its own (D-UE5: the person's own Roles), and an
+  administrator can switch it off per Space through feature `mcp`.
+
 ## 8. Phases
 
 | Phase | Delivers | Depends on | Size |
@@ -452,7 +471,7 @@ downloadable vendor packages, versioned with the product.
 | **P3** | The first 30 how-tos; generated reference; edition badges on every page; the *On Inspecto* developer pages 5.1–5.6 (§3.1) | P1 | 4–6 weeks, parallel with P2, plus 2–3 weeks for the developer pages |
 | **P4** | Learning paths, the first two labs with checkers, the video series spec on the LA machinery, the instructor kit | P2 | 3–4 weeks |
 | **P5** | The *Inside Inspecto* internal render: the stage × product-area index generated from the Product Map and hub slots, six entry pages 5.7–5.12, the audience guard | P1, D-UE10 | about 1 week |
-| **AK-1** | `inspecto-mcp`: transport, read tools, resources, audit; the delegated-identity design and a security review | P0 | 3–4 weeks, parallel with P1 |
+| **AK-1** | `inspecto-mcp`: transport, read tools, resources, audit; the delegated-identity design and a security review — **done 2026-11-20 (§7.7)**: module `features/inspecto-mcp`, Streamable HTTP pinned to revision `2026-07-28` (dual-era, stateless), 19 read MCP Tools and 3 resources each replaying an existing route as the caller, one audit row per call; design and as-built in the hub `module/mcp` | P0 | 3–4 weeks, parallel with P1 |
 | **AK-2** | Write tools through validate → dry-run → Draft; `propose_action` through Action Requests; the agent capability set | AK-1, D-UE5, D-UE6 | 3 weeks |
 | **AK-3** | The first fifteen Agent Skills, their guard, and the four vendor packages | AK-2, P2 (links) | 3 weeks |
 | **AK-4** | The golden task suite, the compatibility matrix, the in-product Assistant reuse if chosen | AK-3 | 2–3 weeks |
