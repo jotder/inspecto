@@ -23,7 +23,7 @@ claims, and that a Space created from its template works — not just that its f
 | golden data and its ground truth in `conformance.toon` | [Design](user-guide-develop-design.md) §7 |
 | the **App kit** and Node.js | run from the Inspecto developer kit folder |
 | one **built bundle folder per edition you claim** (unzipped, not running) | for the boot test |
-| a **development server**, as a builder, and an administrator there | for the Space test and the checks the kit does not run; creating a Space needs the administer capability |
+| a **development server**, as a builder, and an administrator there | for the Space test and the checks the kit does not run; running Jobs and Expectations needs the run-operator capability (the seed `power` role grants it), creating a Space the administer capability |
 
 ## Steps
 

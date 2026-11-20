@@ -21,7 +21,7 @@ whose Space Template runs on a development server — adding Java only where con
 |---|---|
 | your App's design | the finding and its key, the Datasets, the logic, the template tree, the Roles, the golden data |
 | the **App kit** (`inspecto-app.mjs`) and Node.js | run from the Inspecto developer kit folder; today the kit is not shipped in customer bundles |
-| a **development server** where you work as a builder, and an administrator who creates Spaces there | any edition your App's Add-ons reach; Standard or above if it needs Incidents, Cases or Reconciliation |
+| a **development server** where you work as a builder who may also run Jobs (the run-operator capability, which the seed `power` role grants), and an administrator who creates Spaces there | any edition your App's Add-ons reach; Standard or above if it needs Incidents, Cases or Reconciliation |
 | for Java extensions only: JDK and Maven | the scaffolds build offline |
 
 The examples use the App id `acme-spend` in the folder `../acme-spend`; replace both with yours.
