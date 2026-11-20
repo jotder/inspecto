@@ -69,7 +69,7 @@ expect status 200|409
 
 - 422 `the package is refused: the package is not signed (no MANIFEST.sig)` — package it with `--key`.
 - 422 `… signed by key 'x', which this install does not trust` — step 1 is missing or the line is wrong.
-- 422 `App 'x' needs Platform >=… and this server is …` — the App was built for another Platform version.
+- 422 `App 'x' needs Platform >=…, and this server is …` — the App was built for another Platform version.
 - 422 `needs Add-on(s) […], which this installation's entitlement does not list` — the server's edition or
   entitlement lacks an Add-on the App requires.
 - 409 `App 'x' is installed already (version N) - upgrade it with PUT /apps/x` — see

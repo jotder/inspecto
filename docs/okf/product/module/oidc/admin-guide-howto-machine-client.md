@@ -44,7 +44,7 @@ attributed to it in the audit trail, without borrowing a person's sign-in.
    Restart the server.
 3. **In each Space the client may use**, admit it. Read the Space's Roles first
    (`GET /api/v1/spaces/<space>/access/roles`), then write them back with the client added — the write replaces the
-   whole set, so leaving out `roles` or `identity` clears them. `PUT /api/v1/spaces/<space>/access/roles` with:
+   whole set: `roles` is required, and leaving out `identity` clears the admitted clients. `PUT /api/v1/spaces/<space>/access/roles` with:
 
    ```json
    {
@@ -62,8 +62,7 @@ attributed to it in the audit trail, without borrowing a person's sign-in.
 
 ## Check it worked
 
-The Space lists the client among those it admits, and the machine's own call to the inbound Investigation routes
-answers 200 (here with the persona `integration` standing for the machine's token):
+The Space lists the client among those it admits:
 
 ```check
 GET /spaces/{space}/access/roles
@@ -72,11 +71,8 @@ expect status 200
 expect data.identity.machineClients has case-bridge
 ```
 
-```check
-GET /spaces/{space}/inv/investigations
-as integration
-expect status 200
-```
+Then, from the machine with its own client-credentials token, `GET /api/v1/spaces/<space>/inv/investigations` answers
+200 — and 403 in a Space that does not admit the client.
 
 ## What can go wrong
 

@@ -28,7 +28,8 @@ Get one Inspecto server running from its bundle — Basic, Standard, Advanced or
 
 1. **Unzip** it into its own folder, for example `C:\inspecto`. Which edition you have is written in
    `lib\edition.properties`.
-2. **Check the zip** against its checksum (the `.sha256` file sits beside the zip) before you go on:
+2. **Check the zip** against its checksum (the `.sha256` file sits beside the zip) before you go on — the checking
+   script ships inside the bundle, which is why you unzip first:
 
    ```powershell
    Set-Location C:\inspecto\inspecto-deploy

@@ -79,7 +79,8 @@ retry 30 every 2s
 - `path '…' declared by 'backup_dir' resolves to …, outside the root …` — a backup folder outside the Space's own
   folders is refused unless the server's safety roots include it. Restoring into a **different** Space is refused the
   same way.
-- `unknown maintenance task '…' — not built into this bundle` — the edition has no backup tasks (Basic).
+- `unknown maintenance task '…' - not built into this bundle, and no installed module provides it…` — the edition has
+  no backup tasks (Basic).
 - **Run now** is missing — you lack `canOperateRuns`.
 - A restore stops on a hash mismatch, and on files that differ unless overwrite is on.
 - **The archive holds no data.** To recover Datasets, keep their incoming files, or include the Space's `duckdb\`
