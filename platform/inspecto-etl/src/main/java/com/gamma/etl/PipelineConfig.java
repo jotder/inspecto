@@ -1258,6 +1258,50 @@ public final class PipelineConfig {
     }
 
     /**
+     * How each Consignment's rows arrive in a Stream's store ({@code output.load}, {@code BASIC-ELT-PROFILE-1} O6, the
+     * twin of {@code reference.load}): {@link Mode#APPEND} (absent: today's behaviour) adds them; {@link Mode#REPLACE}
+     * then removes every other file of the store; {@link Mode#PERIOD} then removes, from every other file, the rows on
+     * a calendar day of {@code periodColumn} that the Consignment's rows cover. Run per Consignment by the engine's
+     * commit step ({@code com.gamma.job.ArrivalLoadStep}). Only a single local Parquet store may set
+     * a mode other than append ({@link PipelineConfig#arrivalLoadRefusal()}).
+     *
+     * @param mode         the mode; never null
+     * @param periodColumn the column whose calendar days a {@link Mode#PERIOD} replaces; null for every other mode
+     */
+    @PublicApi(since = "4.0.0")
+    public record ArrivalLoad(Mode mode, String periodColumn) {
+        /** Append: the default. */
+        public static final ArrivalLoad APPEND = new ArrivalLoad(Mode.APPEND, null);
+
+        public ArrivalLoad {
+            if (mode == null) mode = Mode.APPEND;
+            if (periodColumn != null && periodColumn.isBlank()) periodColumn = null;
+            if (mode == Mode.PERIOD && periodColumn == null)
+                throw new IllegalArgumentException("output.load period needs output.period_column (the column whose days "
+                        + "an arrival replaces)");
+            if (mode != Mode.PERIOD && periodColumn != null)
+                throw new IllegalArgumentException("output.period_column applies only to output.load period");
+        }
+
+        /** The arrival modes. */
+        public enum Mode {
+            APPEND, REPLACE, PERIOD;
+
+            /** Parse {@code output.load}; blank/absent ⇒ {@link #APPEND}, else must match. */
+            public static Mode from(String s) {
+                if (s == null || s.isBlank()) return APPEND;
+                return switch (s.trim().toUpperCase(Locale.ROOT)) {
+                    case "APPEND" -> APPEND;
+                    case "REPLACE" -> REPLACE;
+                    case "PERIOD" -> PERIOD;
+                    default -> throw new IllegalArgumentException(
+                            "output.load must be 'append', 'replace' or 'period', got: '" + s + "'");
+                };
+            }
+        }
+    }
+
+    /**
      * Record-grain dedup ({@code processing.dedup}, ELT amendment §2.4: business-key dedup is a
      * <b>Step</b>, unlike file dedup which is a Guarantee). Compiles to a {@code ROW_NUMBER() OVER
      * (PARTITION BY keys ORDER BY orderBy)} QUALIFY between transform materialisation and the
@@ -1585,6 +1629,9 @@ public final class PipelineConfig {
      */
     private final Reference reference;
 
+    /** The {@code output.load} arrival mode of a Stream's store (never null, {@link ArrivalLoad#APPEND} when absent). */
+    private final ArrivalLoad arrivalLoad;
+
     /**
      * The logical Catalog <b>Stream</b> this pipeline is a member of ({@code stream:}, Reference
      * Phase-2 / GLOSSARY §3; never null). Defaults to the pipeline's own name, preserving today's
@@ -1741,6 +1788,8 @@ public final class PipelineConfig {
     public boolean producesReference() { return produces == Produces.REFERENCE; }
     /** The {@code reference:} load semantics; never null ({@link Reference#DEFAULT} when absent). */
     public Reference       reference()  { return reference; }
+    /** The {@code output.load} arrival mode; never null ({@link ArrivalLoad#APPEND} when absent). */
+    public ArrivalLoad     arrivalLoad() { return arrivalLoad; }
     /** The logical Catalog Stream this pipeline belongs to ({@code stream:}, default = pipeline name). */
     public String          stream()     { return stream; }
     /** The authored at-rest Stage-2 output store ({@code output_store:}), or {@code null} when absent. */
@@ -1857,6 +1906,7 @@ public final class PipelineConfig {
         this.description = b.description;
         this.produces = b.produces;
         this.reference = b.reference;
+        this.arrivalLoad = b.arrivalLoad == null ? ArrivalLoad.APPEND : b.arrivalLoad;
         this.stream = b.stream;
         this.outputStore = b.outputStore;
         this.trigger = b.trigger;
@@ -1954,6 +2004,7 @@ public final class PipelineConfig {
         this.description = src.description;
         this.produces = src.produces;
         this.reference = src.reference;
+        this.arrivalLoad = src.arrivalLoad;
         this.stream = src.stream;
         this.outputStore = src.outputStore;
         this.trigger = src.trigger;
@@ -2320,12 +2371,42 @@ public final class PipelineConfig {
     }
 
     /**
+     * Why this config's {@code output.load} cannot run, or {@code null} ({@code BASIC-ELT-PROFILE-1} O6, operator
+     * 2026-11-20): {@code replace} and {@code period} rewrite the files of a single local Parquet store, so a Reference
+     * (loaded by {@code reference.load}), more than one destination, a non-Parquet or DuckLake output, an object-store
+     * {@code dirs.database}, a partitioned schema, more than one schema, and {@code route:} branches are refused. The
+     * one rule the save gate ({@code SaveGate}) and the load ({@link #requireRunnable}) both apply.
+     */
+    public String arrivalLoadRefusal() {
+        if (arrivalLoad.mode() == ArrivalLoad.Mode.APPEND) return null;
+        String why = null;
+        Sink sink = sinks.get(0);
+        if (producesReference()) why = "a Reference is loaded by reference.load";
+        else if (sinks.size() > 1) why = "it writes to " + sinks.size() + " destinations";
+        else if (!"PARQUET".equalsIgnoreCase(String.valueOf(sink.format()))) why = "its output format is " + sink.format();
+        else if (sink.duckLake() != null && Boolean.parseBoolean(String.valueOf(sink.duckLake().get("enabled"))))
+            why = "it registers its files in DuckLake";
+        else if (sink.database() != null && com.gamma.config.safety.PathJail.isUri(sink.database().trim()))
+            why = "dirs.database is an object store";
+        else if (route != null) why = "it routes rows to branches";
+        else if (schemas.segments() != null && !schemas.segments().isEmpty()
+                || schemas.selector() != null && schemas.selector().hasSchemas()) why = "it writes more than one schema";
+        else if (schemas.single() != null && !PartitionDef.fromSchema(schemas.single()).isEmpty())
+            why = "its schema partitions the store";
+        return why == null ? null : "output.load " + arrivalLoad.mode().name().toLowerCase(Locale.ROOT)
+                + " needs a single local Parquet store, and " + why + "; leave output.load at append";
+    }
+
+    /**
      * The refusal half of {@link #prepare()}: every "this config cannot be armed" rule and NO filesystem
      * access. {@link #loadForValidation(String)} runs only this half.
      *
      * @throws IllegalStateException naming the first rule the config breaks
      */
     public void requireRunnable() {
+        // BASIC-ELT-PROFILE-1 O6: a replace or a period rewrites the files of ONE flat local Parquet store
+        String load = arrivalLoadRefusal();
+        if (load != null) throw new IllegalStateException(load);
         // output_per_member names each member's output file itself; a route: pipeline parks disabled branches
         // under the BATCH id and DrainCommand resumes them under the batch name, so the two cannot be mixed yet.
         if (outputPerMember && route != null) {
@@ -2609,6 +2690,7 @@ public final class PipelineConfig {
         String compression;
         Map<String, Object> duckLakeCfg;
         String outputConnection;            // output.connection: a Connection id for an object-store dirs.database
+        ArrivalLoad arrivalLoad;            // output.load + output.period_column; null ⇒ append
         /** Explicit {@code sinks:} destinations; empty ⇒ synthesise the single-{@code output:} shorthand. */
         List<Sink> sinks = new ArrayList<>();
         List<Step> steps = new ArrayList<>();   // explicit `steps:` only; empty ⇒ project from the legacy blocks

@@ -35,5 +35,6 @@ agent ──POST /mcp──▶ host: authenticate · rate limit · access policy
 - **Phase AK-1 (2026-11-20): read-only.** Nineteen read MCP Tools, three resources, the audit row, the pinned
   transport. Design and as-built: [spec-mcp.md](spec-mcp.md).
 - **Next (AK-2):** the delegated-person allowlist and protected-resource metadata, then write tools through
-  validate → dry-run → Draft, `propose_action` through Action Requests, the machine agent capability set.
+  validate → dry-run → Pending Change, `propose_action` through Action Requests, the machine agent capability set.
+  Design (proposed 2026-11-20): [`2026-11-20-agent-kit-ak2-plan.md`](../../../../superpower/2026-11-20-agent-kit-ak2-plan.md).
 - **Plan:** [`2026-11-19-user-enablement-and-agent-kit-plan.md`](../../../../superpower/2026-11-19-user-enablement-and-agent-kit-plan.md) §7.

@@ -411,6 +411,12 @@ final class PipelineConfigParser {
             b.reference = new Reference(key, load, refreshSeconds, delete, orderBy);
         }
 
+        // O6: the column a period replaces by is a stored (mapped) column, checked like reference.key
+        String periodColumn = b.arrivalLoad == null ? null : b.arrivalLoad.periodColumn();
+        if (periodColumn != null && !declaredColumns.isEmpty() && !declaredColumns.contains(periodColumn))
+            throw new IllegalArgumentException("Config error in " + sourceLabel + ": output.period_column '" + periodColumn
+                    + "' is not declared in the pipeline schema " + declaredColumns);
+
         // record-dedup keys are target (mapped) column names — validate like reference.key, here where
         // declaredColumns has been accumulated from every resolved schema.
         if (b.dedup != null && !declaredColumns.isEmpty())
@@ -978,6 +984,10 @@ final class PipelineConfigParser {
             if (b.filenameColumn != null)
                 Identifiers.validate(b.filenameColumn, "output.filename_column");
             b.outputConnection = trimToNull(out.get("connection"));
+            // BASIC-ELT-PROFILE-1 O6: the arrival mode (absent ⇒ append, today's behaviour); the store shape it needs is
+            // PipelineConfig.arrivalLoadRefusal, the column is checked against the schema in parse()
+            b.arrivalLoad = new PipelineConfig.ArrivalLoad(PipelineConfig.ArrivalLoad.Mode.from(trimToNull(out.get("load"))),
+                    trimToNull(out.get("period_column")));
         }
 
         // ── sinks (plural destinations) ─────────────────────────────────────────

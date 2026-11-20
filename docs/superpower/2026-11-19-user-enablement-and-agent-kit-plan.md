@@ -441,8 +441,12 @@ upgrade an App, Roles and Access Policies.
   report Job, a Role, the admitted machine client), all on the worked example's data (`o2c_customer_risk` scores
   C-007 at 100). The App pages need what the App kit makes off the server: a starter App `o2c-assurance` signed
   with `o2c-signing-1`, installed, then version 2.0.0, with `--space o2c-live` (a Space made from it) for install
-  and upgrade. **Not run here:** *connect the identity provider* asserts OpenID Connect sign-in, which a Demo Auth
-  build does not have — it needs a Standard install on a real provider, as T6 was run. The real-time page checks
+  and upgrade. *Connect the identity provider* asserts OpenID Connect sign-in, which a Demo Auth build does not have,
+  so it was run on its own: a Standard bundle from origin/master on :8095, signing in through a local Keycloak 26.8.1
+  realm set up as the page says (public `inspecto-spa` client, an audience mapper for `inspecto-api`, the account
+  roles dropped from the default roles, a user with realm roles `admin` and `power`) — both checks pass, the
+  preflight's `sign-in` check passes, and a token issued for `localhost` instead of `127.0.0.1` is refused (401), as
+  the page warns. **All 30 how-tos pass.** The real-time page checks
   the refusal on the worked example (no stream there); the parser page checks the built-in catalog.
 - **Fixed by the run:** the parser page named `/jobs/packs` and `/parsers` without the Space prefix; the upgrade
   page had no check for applying the Space upgrade; the report page now says where the file lands
@@ -528,11 +532,14 @@ inventory table is P1's first deliverable.
 - **Task-level tools, curated, about 30–40** — not one tool per route (627 operations would drown any model). Each is
   defined against the OpenAPI contract and generated where it maps one-to-one. Examples: `list_spaces`,
   `describe_dataset`, `query_dataset` (read-only SQL through the existing SQL guard), `validate_config`,
-  `dry_run_pipeline`, `save_draft`, `run_pipeline_now`, `get_run`, `list_incidents`, `get_incident_brief`,
+  `dry_run_pipeline`, `propose_change`, `run_pipeline_now`, `get_run`, `list_incidents`, `get_incident_brief`,
   `propose_action`, `export_bundle`, `preview_promotion`, `validate_app`, `edition_and_modules`.
 - **Resources:** the glossary, the Space's catalog (Datasets, Schemas, Pipelines), the edition and module list.
-- **Every write is validate → dry-run → Draft or change set.** Anything outbound, destructive or promoting goes
+- **Every write is validate → dry-run → Pending Change.** Anything outbound, destructive or promoting goes
   through an **Action Request** that a human approves (four-eyes); an agent can propose, never approve (D-UE6).
+  *(2026-11-20: this plan first said "Draft", which `GLOSSARY.md` gives to Link Analysis; the config concept that
+  does this is the Pending Change, and the tool once called `save_draft` is `propose_change`. Design:
+  [`2026-11-20-agent-kit-ak2-plan.md`](2026-11-20-agent-kit-ak2-plan.md).)*
 - **Masking holds:** an agent reads masked values; a reveal stays a human, audited act. No tool returns a secret.
 - **Every call is audited** with the person and the agent client both named.
 
@@ -543,7 +550,7 @@ inventory table is P1's first deliverable.
   model) and holds exactly that person's Roles. Needs a **separate allowlist of agent clients that stay persons**,
   because today any listed client is classed as a machine (`MachineTrust.machineClient`).
 - **Machine (unattended agents):** client credentials, admitted per Space as today, with a new **agent capability
-  set** — read capabilities plus Draft authoring, never approve, never reveal — added to the allowlist that holds one
+  set** — read capabilities plus authoring that is always held as a Pending Change, never approve, never reveal — added to the allowlist that holds one
   capability today (`Roles.MACHINE_CAPABILITIES`, operator decision B1). That widens an operator decision, so it is
   the operator's call.
 - **Basic has no sign-in**, so the endpoint would be open to anyone who reaches the port. Recommended: the module
@@ -615,11 +622,11 @@ The design of record and the as-built facts live in the hub:
 | **P0** | D-UE1…D-UE9 signed; the new names in `GLOSSARY.md` — **done 2026-11-19** (D-UE8 left open) | — | days |
 | **P1** | Handbook skeleton: manifest, renderer, `/help` route with screen links, `check-handbook.mjs`, the inventory map of existing pages — **lane A done 2026-11-19 (§4.6); lane B (console and bundle) in its own lane** | P0 | 2–3 weeks |
 | **P2** | Concepts; the worked example's data and Space Template; tutorials T1–T6 with their checks; the Space → App gap filed — **lane E (docs as tests: the check-block format, the guard, the reader's view, the runner) done 2026-11-19 (§4.4)**; **lane C (concepts) done 2026-11-19 (§4.6)**; **lane D (the worked example) done 2026-11-19: Space Template `order-to-cash`, its generator and ground truth, golden tests; version 2 and the gaps in the hub `solution-pack/order-to-cash`**; **T5 *Ship it* and T6 *Run it* done 2026-11-19 (hub `layer/platform`, chapters `ship` and `manage_platform`; gaps in §4.5)**; **tutorials T1–T4 (builder track) done 2026-11-19: `tutorial_first_space` (chapter *Start here* — the first page a new builder reads), `tutorial_pipeline_expectations`, `tutorial_detect_respond`, `tutorial_dashboard`; external, every step's console label driven in a live console, 31 check blocks green against a seeded demo install** | P1 | 4–6 weeks |
-| **P3** | The first 30 how-tos; generated reference; edition badges on every page; the *On Inspecto* developer pages 5.1–5.6 (§3.1) — **edition badges and the generated reference done 2026-11-20 (§4.7)**; **developer pages done 2026-11-20: six external pages in hub `layer/platform` (`user-guide-develop-{requirements,architecture,design,build,test,release}.md`), first in chapter `develop` (ids `develop_*`, track partner): 5.1–5.3 `concept`, 5.4–5.6 `howto` with the six headings; 14 check blocks (the reused o2c ones were green in the T1–T4 and T5 runs; the new `/openapi.json`, `/bootstrap`, `/modules`, `/pipelines` and `/datasets/o2c_open_items/rows` ones are grounded in the route code, not yet run live); three gaps filed (§4.5). `user-guide-builder-kit.md` stays an internal page, not yet retired into 5.4–5.5**; **how-tos: all 30 done 2026-11-20 (§5.3; 29 of 30 checks green on a seeded demo install, the identity-provider one needs OIDC)** | P1 | 4–6 weeks, parallel with P2, plus 2–3 weeks for the developer pages |
+| **P3** | The first 30 how-tos; generated reference; edition badges on every page; the *On Inspecto* developer pages 5.1–5.6 (§3.1) — **edition badges and the generated reference done 2026-11-20 (§4.7)**; **developer pages done 2026-11-20: six external pages in hub `layer/platform` (`user-guide-develop-{requirements,architecture,design,build,test,release}.md`), first in chapter `develop` (ids `develop_*`, track partner): 5.1–5.3 `concept`, 5.4–5.6 `howto` with the six headings; 14 check blocks (the reused o2c ones were green in the T1–T4 and T5 runs; the new `/openapi.json`, `/bootstrap`, `/modules`, `/pipelines` and `/datasets/o2c_open_items/rows` ones are grounded in the route code, not yet run live); three gaps filed (§4.5). `user-guide-builder-kit.md` stays an internal page, not yet retired into 5.4–5.5**; **how-tos: all 30 done 2026-11-20 (§5.3; all 30 checks green — 29 on a seeded demo install, the identity-provider one on Standard with Keycloak)** | P1 | 4–6 weeks, parallel with P2, plus 2–3 weeks for the developer pages |
 | **P4** | Learning paths, the first two labs with checkers, the video series spec on the LA machinery, the instructor kit — **wave 1 done 2026-11-20 (§6.1): four Learning Paths, Labs 1 and 2 with checkers green on a demo build, the instructor kit, the video series spec, a `training` audience; episodes not recorded, quick-reference cards not written; `TRAINING-BUNDLE-1` filed and closed: the Preview and demo builds ship the training pages** | P2 | 3–4 weeks |
 | **P5** | The *Inside Inspecto* internal render: the stage × product-area index generated from the Product Map and hub slots, six entry pages 5.7–5.12, the audience guard | P1, D-UE10 | about 1 week |
 | **AK-1** | `inspecto-mcp`: transport, read tools, resources, audit; the delegated-identity design and a security review — **done 2026-11-20 (§7.7)**: module `features/inspecto-mcp`, Streamable HTTP pinned to revision `2026-07-28` (dual-era, stateless), 19 read MCP Tools and 3 resources each replaying an existing route as the caller, one audit row per call; design and as-built in the hub `module/mcp` | P0 | 3–4 weeks, parallel with P1 |
-| **AK-2** | Write tools through validate → dry-run → Draft; `propose_action` through Action Requests; the agent capability set | AK-1, D-UE5, D-UE6 | 3 weeks |
+| **AK-2** | Write tools through validate → dry-run → Pending Change; `propose_action` through Action Requests; the agent capability set — **design proposed 2026-11-20: [`2026-11-20-agent-kit-ak2-plan.md`](2026-11-20-agent-kit-ak2-plan.md), D-AK1…D-AK4 open** | AK-1, D-UE5, D-UE6 | 3 weeks |
 | **AK-3** | The first fifteen Agent Skills, their guard, and the four vendor packages | AK-2, P2 (links) | 3 weeks |
 | **AK-4** | The golden task suite, the compatibility matrix, the in-product Assistant reuse if chosen | AK-3 | 2–3 weeks |
 
@@ -639,7 +646,7 @@ stays open; nothing needs it before P1's renderer exists. D-UE10 came later the 
 | **D-UE3** | The worked example | Order-to-cash assurance on `orders-starter` (§5.1) |
 | **D-UE4** | Which editions carry `inspecto-mcp` | Standard and up; nothing on Basic (no sign-in) |
 | **D-UE5** | Agent identity: the delegated-person allowlist, and the machine agent capability set (widens operator decision B1) | both; delegated first |
-| **D-UE6** | May an agent save a low-risk change directly, or does every save go through a Draft and approval | every save is a Draft; promotion and outbound actions need a human approver |
+| **D-UE6** | May an agent save a low-risk change directly, or does every save go through a Draft and approval | every save is a Draft; promotion and outbound actions need a human approver *(as signed; "Draft" here means a Pending Change — §7.2 note, 2026-11-20)* |
 | **D-UE7** | Which bundle carries the Labs | Preview and a training bundle only, not the sold editions. **Operator ruling 2026-11-20:** the training bundle is the existing demo build (`-Distribution demo`, Advanced or Preview) — no new Distribution; Basic, Standard and Advanced production and trial builds keep the external render (§6.1) |
 | **D-UE8** | Where the static site is hosted on the web | **open** — the operator's call (external). **Ready (2026-11-20, operator: "keep it ready so that it can be updated easily"):** the place is one line, `handbook.publish.external` in `handbook.toon` (`none` until decided); `tools/publish-handbook.mjs` renders there once it is set |
 | **D-UE9** | The golden-suite pass rate per model, and whether the in-product Assistant reuses the Agent Skills in wave 1 | pass rate set after the first run; Assistant reuse after AK-4 |
@@ -652,7 +659,7 @@ stays open; nothing needs it before P1's renderer exists. D-UE10 came later the 
 - **Drift.** Stale edition and capability claims had to be corrected across five sales and edition docs on
   2026-11-19 alone (`e7fcc8076`, `07bbe2bb8`). Mitigation:
   derived edition badges, docs as tests, generated reference.
-- **Agent writes.** Mitigation: Drafts, four-eyes, allowlisted capabilities, masking, attributed audit, and a
+- **Agent writes.** Mitigation: Pending Changes, four-eyes, allowlisted capabilities, masking, attributed audit, and a
   security review before AK-2 ships.
 - **Internal pages leaking to customers.** The *Inside Inspecto* half names gaps, board rows and maturity scores.
   Mitigation: the audience flag, a guard that refuses an internal page or link in the external render, and a bundle
