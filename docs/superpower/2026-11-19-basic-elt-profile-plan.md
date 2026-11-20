@@ -213,6 +213,9 @@ unless the operator objects.
 - **O6:** the recommendation is taken — `output.load: append | replace | period` with `output.period_column`, run
   per Consignment by a COMMIT-phase step calling `ArrivalReplacer`; Standard only on a single local Parquet store;
   Basic never writes it (Add a file passes a run-scoped override, a watched feed stays `append`).
+- **O7:** the recommendation is taken — the snapshot Pipeline's switch to `collector.connector: postgres` and the
+  inline-snapshot migration wait for O6; then one idempotent switch function serves the commit and the migration (an
+  old snapshot migrates at its first Run now), with Run now passing a run-scoped `replace`.
 
 | # | Decision | Recommendation |
 |---|---|---|
