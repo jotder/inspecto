@@ -1491,7 +1491,7 @@ if (Test-Path $uiDist) {
         $helpOut = Join-Path $uiOut 'help'
         $helpAudience = & node (Join-Path $sandboxRoot 'tools\check-bundle-handbook.mjs') --audience --edition $Edition --distribution $Distribution
         if ($LASTEXITCODE -ne 0) { throw "check-bundle-handbook.mjs --audience failed (see above)" }
-        $helpArgs = if ($helpAudience -eq 'training') { @('--training') } else { @() }
+        $helpArgs = @(if ($helpAudience -eq 'training') { '--training' })   # @(...): an `if` returning a one-element array unrolls to a string, and splatting a string passes its characters
         & node (Join-Path $sandboxRoot 'tools\render-handbook.mjs') --out $helpOut @helpArgs
         if ($LASTEXITCODE -ne 0) { throw "render-handbook.mjs failed (see above) - the bundle would ship without its /help Handbook" }
         if (-not (Test-Path (Join-Path $helpOut 'index.html'))) { throw "render-handbook.mjs wrote no $helpOut\index.html" }
