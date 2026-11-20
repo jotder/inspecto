@@ -207,6 +207,7 @@ final class DatasetFeed {
         if (!BasicProfile.Entry.KEEP_UP_TO_DATE.offered())   // D-1: Basic is manual (DT-5); the Basic profile says so
             throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "Keep this up to date: "
                     + EditionFeatures.refusal(BasicProfile.Entry.KEEP_UP_TO_DATE.feature()) + "; import the files waiting with Run now");
+        refuseSnapshot(imp);
         if ("reference".equals(imp.content().get("kind")))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
                     "a Reference is replaced with Add a file; a feed only adds rows, so it keeps Events up to date");
@@ -270,6 +271,7 @@ final class DatasetFeed {
 
     static Object stop(ApiContext api, HttpExchange ex, String id) throws IOException {
         Import imp = gate(api, ex, id, "Stop the feed");
+        refuseSnapshot(imp);
         // B1: a watched inbox is a feed too: stopping it turns the watch off (watchInbox goes with the schedule)
         rewrite(api, imp, "stopping the feed rewrites the import's Pipeline", () -> InboxWatch.keep(api, imp, id, false), collector -> {
             // the feed's own keys go; anything set in the guided editor (post_action, include, ...) stays
@@ -283,6 +285,16 @@ final class DatasetFeed {
         });
         InboxWatch.ran(imp.dataRoot(), id, null);
         return describe(ex, imp);
+    }
+
+    /**
+     * A Postgres snapshot has no feed (operator ruling 2026-11-20, O7): its Pipeline reads the table itself, and a feed's
+     * rewrite of the {@code collector} would undo that. 422, as <i>Watch this folder</i> refuses it; no server path.
+     */
+    private static void refuseSnapshot(Import imp) {
+        if (InboxWatch.snapshot(imp.content()) || PostgresSnapshot.isSnapshot(imp.writeRoot(), imp.id()))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                    "a Postgres snapshot has no feed: it copies its table on Refresh now, replacing everything");
     }
 
     /**

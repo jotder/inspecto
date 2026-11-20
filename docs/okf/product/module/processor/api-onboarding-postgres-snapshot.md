@@ -82,6 +82,12 @@ Each step looks before it writes, so a second call changes nothing. What then ho
   replacement can put it back. With the duplicate check off the Pipeline never refuses its own re-export.
 - **Add a file** on a snapshot keeps its answers: its run fetches nothing, and its mode is a run-scoped choice that wins
   over the Pipeline's `output.load` (an append still appends).
+- **No other run while Run now holds the snapshot:** the import's pre-run step refuses it (`PreRun.refused`, path-free
+  reason), so its copy is never committed under Run now's open `replace` and kept as Run now's own.
+- **The approval policy first:** under a policy holding Pipeline changes the switch writes nothing (no Connection, no
+  rewritten settings); Run now copies through the inline block as before.
+- **No feed** (operator ruling 2026-11-20): `PUT` and `DELETE /datasets/{id}/feed` on a snapshot answer 422 with a
+  path-free reason, as *Watch this folder* does; *Keep this up to date* would rewrite the switched collector.
 **The screen (U2):** Add data asks the connection on the core Connection rows (`inspecto-connection-fields`); the Connections dialog edits the saved `postgres` Connection as itself (no Routing).
 
 **Export, then move (redesigned 2026-11-05, operator).**
@@ -154,7 +160,11 @@ over, a snapshot commit switches after its first run, and a switched snapshot ke
 run fetches nothing itself; a run outside Add data replaces through `output.load`); `RunFilesTest` (the no-fetch scope
 stops only its own Collector's acquisition); `PostgresConnectorFactoryTest` (a name of its own per cycle).
 `ControlApiPostgresSnapshotTest` (real Postgres, skipped without one) now expects an old snapshot to migrate at its
-first Run now and runs the switched Pipeline outside Add data.
+first Run now and runs the switched Pipeline outside Add data. Review fixes (2026-11-20): a run started while Run now
+holds the snapshot is refused and its copy never kept (the forced interleaving gave 57 rows for 45 before), an approval
+policy stops the whole switch before anything is written, a replace whose export the row filter empties is refused with
+the older rows kept, and both feed routes refuse a snapshot behind every gate (401, 403, Add data off 403, 404, Basic 503
+for `PUT`, then 422).
 BE-4 part 2 (2026-11-20, no database needed): `ControlApiPostgresSnapshotTest` adds the Safety Policy refusing a host
 on the test and the copy before the password lookup, and `DELETE /connections/{id}` on a snapshot's Connection over
 every gate (503, 401, 403, 404, 409 for a named and an unreadable `_snapshot.toon`, 200 once the snapshot is gone);

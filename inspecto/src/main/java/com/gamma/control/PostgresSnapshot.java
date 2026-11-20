@@ -390,12 +390,18 @@ final class PostgresSnapshot {
     static void switchPipeline(ApiContext api, OnboardImport.Space space, String id) throws IOException {
         Map<String, Object> config = read(space.writeRoot(), id);
         if (config == null) return;
-        String connId = migrate(api, space, id, config);
+        Object named = config.get("connection");
+        boolean migrated = named instanceof String s && !s.isBlank();
+        String connId = migrated ? ((String) named).trim() : connectionId(id);
         Path pipelineFile = space.writeRoot().resolve(OnboardImport.CONFIG_DIR).resolve(id + "_pipeline.toon").toAbsolutePath().normalize();
-        if (switched(com.gamma.util.ToonHelper.load(pipelineFile.toString()), connId)) return;
+        boolean switched = switched(com.gamma.util.ToonHelper.load(pipelineFile.toString()), connId);
+        if (migrated && switched) return;
+        // the approval policy first: a switch it holds writes nothing - no Connection saved, no settings rewritten
         PendingChanges.holdRefusing(api, java.util.List.of("pipeline"), "the snapshot's Pipeline is switched to read Postgres itself");
+        String through = migrate(api, space, id, config);
+        if (switched) return;
         DatasetFeed.rewriteHeld(api, new DatasetFeed.Import(space.writeRoot(), space.dataRoot(), space.service(), id, Map.of(), pipelineFile),
-                p -> switchTo(p, connId), null);
+                p -> switchTo(p, through), null);
     }
 
     /** {@link #switchPipeline} where it must not fail its caller (a commit that already succeeded): a WARN, and the next Run now switches. */

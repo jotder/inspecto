@@ -99,6 +99,17 @@ final class OnboardImport {
 
     /** Ids being imported right now in this JVM (a second commit of the same id is 409, not a race). */
     static final Set<String> IN_FLIGHT = ConcurrentHashMap.newKeySet();
+    /** The claim whose Pipeline Add data is running on this thread right now ({@link Job#runChecked}); null otherwise. */
+    private static final ThreadLocal<String> OWN_RUN = new ThreadLocal<>();
+
+    /**
+     * Whether the run asking is Add data's own run of the import it has claimed ({@code claim}, {@code writeRoot|id}): the
+     * engine runs a Pipeline's pre-run steps on the thread that asked for the run, so only Add data's own call is on the
+     * thread that set it. Any other run of a claimed import is refused (O7, {@link ImportPreRunSteps}).
+     */
+    static boolean runsOwn(String claim) {
+        return claim != null && claim.equals(OWN_RUN.get());
+    }
     /** Followed runs (202), newest last; bounded. */
     private static final Map<String, Map<String, Object>> RUNS = Collections.synchronizedMap(new LinkedHashMap<>() {
         @Override
@@ -930,11 +941,14 @@ final class OnboardImport {
             // O7: a Postgres snapshot's Pipeline fetches the table itself (collector.connector: postgres); Add data's own run
             // takes what it put in the inbox - the export it checked - and never a second copy fetched by the run
             Path inbox = inbox(space.dataRoot(), id);
+            OWN_RUN.set(space.writeRoot() + "|" + id);   // the pre-run step lets this run, and only this one, through the claim
             try (com.gamma.inspector.RunFiles.Scope own = PostgresSnapshot.isSnapshot(space.writeRoot(), id)
                     ? com.gamma.inspector.RunFiles.noFetch(inbox) : null) {
                 space.service().runPipeline(id).orElseThrow(() -> new ApiException(409, ErrorCodes.CONFLICT, "the import's Pipeline '" + id + "' is not registered"));
             } catch (IllegalStateException notRunnable) {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the import could not run: " + notRunnable.getMessage());
+            } finally {
+                OWN_RUN.remove();
             }
             List<Map<String, String>> took = new ArrayList<>();
             for (Map<String, String> f : space.service().statusStore().files(cfg))

@@ -137,7 +137,17 @@ run outside Add data (`POST /pipelines/{id}/run`, a trigger) exports the table (
 `<table>_<stamp>.parquet`, because each output file is named after its input and a fixed name would overwrite the last
 output in place, where no replacement can put it back) and replaces the rows at its commit through the config path.
 Run now keeps its own export - the column check, the `import.max_rows` cap, the 422 wording - and takes the Add a file
-path with a run-scoped `replace` naming its export; its run fetches nothing itself (`RunFiles.noFetch`). The switch, the
+path with a run-scoped `replace` naming its export; its run fetches nothing itself (`RunFiles.noFetch`).
+
+**No other run while a run-scoped choice is open.** The choice applies to whatever commits into the store while it is
+open, so the import's pre-run step refuses every run of the Pipeline but Add data's own while Add data holds the
+Dataset (`ImportPreRunSteps`, `PreRun.refused`). Without it a `POST /pipelines/{id}/run` started during a Run now
+committed its own copy, the open choice took it as Run now's, and the replace kept it (57 rows for 45). The same holds
+for Add a file's *Replace everything* and *Replace the period*.
+
+**A failed *Replace everything* undoes only the replacement** (operator ruling 2026-11-20): the originals come back and
+the upload's rows go; rows of other waiting files the same run committed stay, as their ledger says they were taken
+(the old folder set-aside put the whole folder back, theirs gone with it). The switch, the
 migration of an old snapshot and the trade-offs are on the seam's page:
 [api-onboarding-postgres-snapshot.md](../processor/api-onboarding-postgres-snapshot.md).
 
@@ -153,8 +163,6 @@ switched snapshot's Run now and a run outside Add data each leave one copy).
 
 - B13's other half: Add a file's *Replace everything* on a Reference and `reference.load: replace` are still two ways
   to replace one store.
-- A failed *Replace everything* undoes only the replacement: rows of other waiting files the same run committed
-  stay (the old set-aside put the whole folder back, theirs gone with it, while their ledger said taken).
 - `output.load` in the Pipeline editor (a Standard screen); an edition Gate for it on a Basic build.
 - A heal at start-up, so a crash's mix does not wait for the Dataset's next run.
 - Arrivals mode for a Standard Pipeline's own store (B6's leftover).
