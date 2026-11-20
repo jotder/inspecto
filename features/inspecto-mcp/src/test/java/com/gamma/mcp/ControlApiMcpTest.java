@@ -237,6 +237,26 @@ class ControlApiMcpTest {
             HttpResponse<String> get = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1/mcp"))
                     .header("Authorization", OPS).GET().build(), BodyHandlers.ofString());
             assertEquals(405, get.statusCode());
+
+            // A numeric "jsonrpc" is not the string "2.0".
+            assertEquals(McpRoutes.INVALID_REQUEST, body(postRaw(c.port, OPS, Map.of("MCP-Protocol-Version", "2025-11-25"),
+                    "{\"jsonrpc\":2.0,\"id\":1,\"method\":\"tools/list\"}")).path("error").path("code").asInt());
+            // The modern header without the modern _meta is a mismatch, not an unsupported version.
+            assertEquals(McpRoutes.HEADER_MISMATCH, body(postRaw(c.port, OPS, Map.of("MCP-Protocol-Version", McpRoutes.MODERN,
+                    "Mcp-Method", "tools/list"), "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/list\"}")).path("error").path("code").asInt());
+        }
+    }
+
+    /** A request id is echoed exactly, an integer beyond 64 bits included; legacy clients may ping. */
+    @Test
+    void idsAreEchoedExactlyAndLegacyPingAnswers(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            String big = "123456789012345678901234567890";
+            HttpResponse<String> res = postRaw(c.port, OPS, Map.of("MCP-Protocol-Version", "2025-11-25"),
+                    "{\"jsonrpc\":\"2.0\",\"id\":" + big + ",\"method\":\"ping\"}");
+            assertEquals(200, res.statusCode(), res.body());
+            assertTrue(res.body().contains("\"id\":" + big), res.body());
+            assertTrue(body(res).path("result").isObject(), res.body());
         }
     }
 

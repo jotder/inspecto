@@ -54,8 +54,9 @@ and the machine agent capability set are AK-2.
 - **One endpoint, POST only.** `GET` and `DELETE` get the host's `405`. Every response is a single
   `application/json` object; the module never opens an SSE stream (no progress, no `subscriptions/listen`).
 - **Accepted methods:** `server/discover`, `tools/list`, `tools/call`, `resources/list`, `resources/read`
-  (modern); `initialize`, `notifications/initialized` (`202`, no body) and the same four list/call methods
-  (legacy). Anything else is `404` with JSON-RPC `-32601`.
+  (modern); `initialize`, `ping` and the same four list/call methods (legacy). Any notification (a request
+  without an `id`, `notifications/initialized` among them) is `202` with no body and runs nothing. Anything
+  else is `404` with JSON-RPC `-32601`. A request id is echoed exactly (a string, or an integer of any size).
 - **Request checks, in order, all before any tool runs:**
   1. A Subject is attached (see above), else `503`.
   2. `Origin`, when present, must equal `-Dcontrol.cors`; otherwise `403` (the specification's DNS-rebinding
@@ -89,7 +90,9 @@ data access of its own: it never opens a store, never reads a file other than it
 holds no table of capabilities. The tool → route map is a fixed list in code; an argument is only ever
 URL-encoded into a path segment or a query value of that fixed route, so no argument can choose a route.
 A replay's refusal (`401`/`403`/`404`/`422`…) comes back as a tool result with `isError: true` and the
-route's own message, never as a JSON-RPC protocol error.
+route's own message, never as a JSON-RPC protocol error. A `resources/read` whose replay is refused, like an
+unknown resource, is a JSON-RPC `-32602` error carrying the status and the route's message (the 2026-07-28
+code for a resource that cannot be read).
 
 `POST /mcp` itself is listed in `CapabilityManifest.EXEMPTIONS` as **`read-shaped`** in AK-1: it persists
 nothing, and every route it reaches carries its own gate. AK-2 revisits the category when write tools land

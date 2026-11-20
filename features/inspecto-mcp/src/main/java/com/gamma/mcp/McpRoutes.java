@@ -92,7 +92,7 @@ public final class McpRoutes implements RouteModule {
         if (req == null || !req.isObject())
             return send(ex, 400, error(null, INVALID_REQUEST, "the body must be one JSON-RPC object (batches are not accepted)", null));
         Object id = idOf(req.get("id"));
-        if (!"2.0".equals(req.path("jsonrpc").asText(null)) || !req.path("method").isTextual()
+        if (!req.path("jsonrpc").isTextual() || !"2.0".equals(req.get("jsonrpc").asText()) || !req.path("method").isTextual()
                 || (req.has("id") && id == null))
             return send(ex, 400, error(id, INVALID_REQUEST, "not a JSON-RPC 2.0 request", null));
         String method = req.get("method").asText();
@@ -112,6 +112,9 @@ public final class McpRoutes implements RouteModule {
         } else if ("initialize".equals(method)) {
             String asked = params.path("protocolVersion").asText("");
             version = LEGACY.contains(asked) ? asked : "2025-11-25";
+        } else if (headerVersion != null && MODERN.equals(headerVersion.trim())) {
+            return send(ex, 400, error(id, HEADER_MISMATCH, "MCP-Protocol-Version " + MODERN
+                    + " needs io.modelcontextprotocol/protocolVersion in params._meta", null));
         } else if (headerVersion != null && LEGACY.contains(headerVersion.trim())) {
             version = headerVersion.trim();
         } else if (headerVersion != null) {
@@ -131,6 +134,7 @@ public final class McpRoutes implements RouteModule {
             Map<String, Object> result = switch (method) {
                 case "server/discover" -> modern ? discover() : null;
                 case "initialize" -> initialize(version);
+                case "ping" -> modern ? null : new LinkedHashMap<>();   // legacy only: removed in 2026-07-28
                 case "tools/list" -> listResult("tools", McpTools.TOOLS.stream().map(McpTools.Tool::definition).toList(), modern);
                 case "resources/list" -> listResult("resources",
                         McpTools.RESOURCES.stream().map(McpTools.Resource::definition).toList(), modern);
@@ -401,7 +405,7 @@ public final class McpRoutes implements RouteModule {
     private static Object idOf(JsonNode n) {
         if (n == null) return null;
         if (n.isTextual()) return n.asText();
-        if (n.isIntegralNumber()) return n.asLong();
+        if (n.isIntegralNumber()) return n.numberValue();   // echoed exactly, a BigInteger included
         return null;
     }
 
