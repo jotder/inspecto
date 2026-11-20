@@ -168,7 +168,7 @@ merely arrives with a `partitionKey` and a `State`:
 |---|---|
 | retention of replaced files | `retire_superseded` maintenance task, gated on `retention_days` ≥ 1 |
 | small-file merge per partition key, on schedule | `compact` → `PartitionCompactor` (`com/gamma/job/`) |
-| lifecycle | `ConsignmentOutput.State` = `LIVE` / `SUPERSEDED` / `COMPACTED_AWAY` |
+| lifecycle | `ConsignmentOutput.State` = `LIVE` / `SUPERSEDED` / `COMPACTED_AWAY` / `REPLACED` (rows replaced by a later arrival, still readable: [spec-arrival-replace.md](spec-arrival-replace.md)) |
 | readers not seeing retired files | `ConsignmentSelector.resolve(glob)` = glob MINUS superseded/compacted paths |
 
 - 🔴 **The reprocess cascade is FREE — proven by test, not assumed.** `DbConsignmentOutputStore.supersede`

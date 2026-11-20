@@ -291,7 +291,7 @@ sink monitor and file lock, which no reader takes), so there is no deadlock.
   `QueryExecutor` reader) keeps its own rule. ⚠ A link shares the file's bytes: a writer must publish by rename, never
   rewrite a live `*.parquet` in place (the writers listed below publish by rename or write new files).
 Every writer that hides, replaces or deletes a live `*.parquet` holds the write lock: the snapshot swaps,
-`ReferenceCompactor`, `PartitionCompactor`, `DatasetPeriod` replace and restore, `IncrementalSink` prune and
+`ReferenceCompactor`, `PartitionCompactor`, `ArrivalReplacer` replace and restore, `IncrementalSink` prune and
 rollback, `ScoreOutputWriter` prune; `ScoreOutputWriter` also sweeps a crashed run's `.tmp` / `.stale`. A swap
 refuses a thread that already holds a read lock on the same store instead of waiting forever. `<store>/database`
 keys as `<store>`.
