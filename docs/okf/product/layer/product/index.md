@@ -36,7 +36,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 |---|---|---|---|---|
 | `AUTHORING-REDESIGN-1` | P3 | feature | Only letter (d) of the authoring redesign is left; no CREATE MACRO exists in any main source. | demand |
 | `BASIC-ELT-PROFILE-1` | P2 | feature | Make Basic onboarding a locked profile of ELT, retiring the parallel Basic backend and LA UI layers that duplicate ELT parts. | — |
-| `ADD-DATA-ENTRY-1` | P3 | feature | Add data has no menu entry: once a Space has a Dataset, the screen is reached only by dropping a file on Home or the Catalog, an empty Da… | — |
+| `ADD-DATA-ENTRY-1` | P3 | feature | Add data has no entry in the main navigation: once a Space has a Dataset, the screen is reached by dropping a file on Home or the Catalog… | — |
 | — | P3 | defect | COMPONENT-DELETE-IN-USE-WORDS-1 the Components screen words every refused delete as "referenced by a pipeline" | — |
 | `BI-INSIGHTS-1` | P2 | feature | Advanced insights on business data in Widgets and Dashboards, authored and tuned as Insight Profiles. | — |
 | `SPACE-TO-APP-CONSOLE-1` | P3 | feature | Turn a working Space into a Space Template, and into an App, from the console. | — |

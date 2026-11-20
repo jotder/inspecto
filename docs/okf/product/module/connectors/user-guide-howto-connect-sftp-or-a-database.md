@@ -45,7 +45,8 @@ Concept: [Connection and Collector](../elt/user-guide-concept-connection-collect
 
 1. Open **Add data** ([Add a file](../../layer/product/user-guide-howto-add-a-file.md), step 1) and choose
    **A Postgres table**.
-2. Fill host, port, database, user and the password as `${ENV:…}`, click **Test connection**, pick the table or write
+2. Fill host, port, database, user and the password as `${ENV:INSPECTO_PG_…}` (only variables named
+   `INSPECTO_PG_…` are accepted here), click **Test connection**, pick the table or write
    a query, and **Read the rows**.
 3. It is a **snapshot**: refresh it with **Refresh now** on the Dataset's card.
 
@@ -56,14 +57,14 @@ password reference resolves — not that the sign-in is accepted; the first coll
 
 ```check
 GET /spaces/{space}/connections
-as builder
+as admin
 expect status 200
 expect data[*].id has partner_sftp
 ```
 
 ```check
 POST /spaces/{space}/connections/partner_sftp/test
-as builder
+as admin
 expect status 200
 expect data.reachable = true
 ```

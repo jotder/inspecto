@@ -61,8 +61,9 @@ expect data.columns.length > 0
   column's type or format does not fit; fix it in step 3. A failed run leaves nothing behind.
 - The name is taken (409) or has characters other than letters, digits, spaces, `.`, `_` and `-`.
 - The file is empty, or larger than the server allows (413).
-- There is no menu entry for **Add data** once the Space has a Dataset: open it from an empty Datasets pane, by
-  dropping a file on Home or the Catalog, or by its address `/add-data`.
+- The main menu has no **Add data** entry: once the Space has a Dataset, open it by dropping a file on Home or the
+  Catalog, from **Platform → Studio → Link Analysis**, **Settings**, **Data**, **Add data**, or by its address
+  `/add-data`.
 
 ## Next
 

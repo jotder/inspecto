@@ -45,8 +45,9 @@ Publish) and opens the editor with a draft.
 
 ## Check it worked
 
-The Pipeline is listed, and its graph has a parse Step — here the worked example's `orders` Pipeline, a delimited
-file built this way:
+The Pipeline is listed, and its graph has a parse Step — here the worked example's `orders` Pipeline (shipped with
+the template; a Pipeline you build reads the same way, its parse Step typed by its format, such as
+`parser.delimited`):
 
 ```check
 GET /spaces/{space}/pipelines
@@ -59,7 +60,7 @@ expect data[*].name has orders
 GET /spaces/{space}/pipelines/orders/graph/raw
 as builder
 expect status 200
-expect data.nodes[*].type has parser.delimited
+expect data.nodes[*].type has parser
 ```
 
 ## What can go wrong

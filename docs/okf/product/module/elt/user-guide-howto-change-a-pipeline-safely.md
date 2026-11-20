@@ -52,7 +52,7 @@ saved versions:
 ```check
 POST /spaces/{space}/pipelines/authored/orders/dry-run
 as builder
-body {"sampleRows": [{"order_id": "O-1", "customer_id": "C-1", "amount": 10}]}
+body {"sampleRows": [{"ORDER_ID": "O-1", "ORDER_DATE": "2026-07-01", "CUSTOMER_ID": "C-1", "CURRENCY": "USD", "AMOUNT": 10}]}
 expect status 200
 expect data.sinks exists
 ```
@@ -68,10 +68,12 @@ expect data.versions exists
 
 - 422 on save with findings — the server's checks refused the change (a path outside the Space, a bound out of
   range, an error on an active Pipeline); fix what they name.
-- 409 *another change to the same target is already pending* — approve or withdraw that one first.
+- 409 `a change to pipeline '<id>' is already pending approval (<id>) — it must be approved, declined, withdrawn or
+  expire before another is proposed`.
+- *The sample has no <column> column*, or a dry run refused with a binder error — the sample rows must carry every
+  column of the Pipeline's Schema (for `orders`: `ORDER_ID`, `ORDER_DATE`, `CUSTOMER_ID`, `CURRENCY`, `AMOUNT`).
 - 403 *four-eyes: '<author>' proposed this change and cannot approve it — a different person must*.
 - 409 on **Approve** — the Pipeline changed after the request was made; make the change again.
-- *The sample has no <column> column* — the dry-run rows must carry the columns the Pipeline reads.
 - If the approval settings cannot be read, every governed change is held (fail closed).
 
 ## Next
