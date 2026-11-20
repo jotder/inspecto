@@ -127,6 +127,35 @@ class PostgresConnectorFactoryTest {
         assertFalse(r.tooLarge());
     }
 
+    /**
+     * BE-4 part 2: the Safety Policy's network gate comes before the session - before the password is even looked up, so
+     * an unset reference (which would otherwise answer "not set") shows the gate answered first - on the copy and the test.
+     */
+    @Test
+    void aHostTheSafetyPolicyRefusesIsNeverDialled(@TempDir Path dir) throws Exception {
+        String var = "INSPECTO_PG_SURELY_UNSET_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+        java.nio.file.Files.writeString(dir.resolve("safety-policy.toon"), "deny:\n  hosts[1]: db.example\n");
+        String prior = System.getProperty("system.config.dir");
+        System.setProperty("system.config.dir", dir.toString());
+        try {
+            ConnectionProfile p = profile("${ENV:" + var + "}", table());
+            PostgresCollectorConnector.Refused copy = assertThrows(PostgresCollectorConnector.Refused.class,
+                    () -> PostgresConnectorFactory.connector(p, 0).export(dir.resolve("out").resolve("t.parquet")));
+            assertTrue(copy.getMessage().contains("Safety Policy") && copy.getMessage().contains("db.example"), copy.getMessage());
+            assertFalse(copy.getMessage().contains("not set"), "refused before the password is looked up: " + copy.getMessage());
+            PostgresCollectorConnector.Refused test = assertThrows(PostgresCollectorConnector.Refused.class,
+                    () -> PostgresConnectorFactory.forTest(p).listTables(dir.resolve("scratch"), 10));
+            assertTrue(test.getMessage().contains("Safety Policy"), test.getMessage());
+            // the Pipeline's fetch answers it as an acquisition failure, the reason kept
+            com.gamma.acquire.AcquisitionException fetch = assertThrows(com.gamma.acquire.AcquisitionException.class,
+                    () -> PostgresConnectorFactory.connector(p, 0).fetchTo(null, dir.resolve("out").resolve("t.parquet")));
+            assertTrue(fetch.getMessage().contains("Safety Policy"), fetch.getMessage());
+        } finally {
+            if (prior == null) System.clearProperty("system.config.dir");
+            else System.setProperty("system.config.dir", prior);
+        }
+    }
+
     // ── against a real Postgres ─────────────────────────────────────────────────────────────────────────────────
 
     private record Pg(String jdbc, String host, int port, String db, String schema) {

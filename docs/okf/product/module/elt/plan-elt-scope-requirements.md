@@ -266,7 +266,7 @@ Measured from code and the committed contract on 2026-09-09:
 |---|---|---|
 | Built-in node types | **49**<!--count:node-types--> | 20 in the glossary (and its list predates the per-format parsers), 28 in the active plan, 20 in the editor page |
 | Recipe catalogue | ⛔ **retired 2026-09-24** — `GET /pipelines/step-types` + its contract went with their last reader, the Recipe view; `RecipeCompiler`'s verb switch is the vocabulary | the active plan said 9 entries and included `map`, a verb deleted 2026-09-05 |
-| Step processors | **122**<!--count:processors--> — **54**<!--count:processors-delivered--> delivered, **17**<!--count:processors-partial--> partial, 51 planned | ✅ all agree since 2026-09-09; derived by `tools/check-doc-counts.mjs` |
+| Step processors | **123**<!--count:processors--> — **55**<!--count:processors-delivered--> delivered, **17**<!--count:processors-partial--> partial, 51 planned | ✅ all agree since 2026-09-09; derived by `tools/check-doc-counts.mjs` |
 | Transform function catalogue | **23 in 7 categories** | the editor page said 24; the mapping page said both "~20" and "24" |
 | Live "too many of a kind" refusals | **2** at the time — one for a second parser, one for a conflicting map config (five since 2026-09-23, with `MULTI_ACQUISITION` / `MULTI_GAP` / `MULTI_MARKER`) | two documents cited refusals for a second join and a second sink; **neither constant exists** |
 

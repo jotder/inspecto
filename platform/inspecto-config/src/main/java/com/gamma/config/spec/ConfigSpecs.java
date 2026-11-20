@@ -450,6 +450,16 @@ public final class ConfigSpecs {
                 FieldSpec.of("output.connection", "Object-store Connection", FieldType.STRING,
                         "Required when dirs.database is an s3:// location, and refused otherwise: the id of the "
                                 + "s3 Connection whose endpoint and credentials reach it. An id, never a secret."),
+                FieldSpec.enumField("output.load", "Arrival mode",
+                        List.of("append", "replace", "period"), "append",
+                        "How each Consignment's rows arrive in the store (BASIC-ELT-PROFILE-1 O6, the twin of "
+                                + "reference.load): append (the default) adds them; replace then removes every other file "
+                                + "of the store; period then removes, from every other file, the rows on the calendar days "
+                                + "of output.period_column the Consignment covers. replace and period need a single local "
+                                + "Parquet store: one destination, no DuckLake, no partitions, one schema, no route."),
+                FieldSpec.of("output.period_column", "Period column", FieldType.STRING,
+                        "With output.load: period, the stored column whose calendar days an arrival replaces (a row "
+                                + "with no value is never removed). Refused with any other mode."),
                 // DuckLake registration (DuckLakeRegistrar.registerOne). Optional: catalog_url, data_path and
                 // table become required only when enabled is true — ConfigSafetyValidator enforces that and
                 // jails data_path, so none is FieldSpec.required here. A sinks[] entry's own ducklake block
@@ -621,6 +631,14 @@ public final class ConfigSpecs {
                             Object segs = at(raw, "processing.segments");
                             return segs instanceof Map<?, ?> m && !m.isEmpty();
                         }),
+                new CrossFieldRule(
+                        "output-period-needs-column",
+                        "output.load=period needs output.period_column (the column whose days an arrival replaces), "
+                                + "and output.period_column applies only to output.load=period.",
+                        Severity.ERROR,
+                        List.of("output.load", "output.period_column"),
+                        raw -> "period".equalsIgnoreCase(String.valueOf(str(raw, "output.load")).trim())
+                                == nonBlank(raw, "output.period_column")),
                 new CrossFieldRule(
                         "reference-upsert-requires-key",
                         "reference.load=upsert|scd2 requires a non-empty reference.key (the identity columns "

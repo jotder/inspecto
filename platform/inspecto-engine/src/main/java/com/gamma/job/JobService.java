@@ -2448,8 +2448,8 @@ public final class JobService implements AutoCloseable {
             m.put("version", registry.ownerOf(id).flatMap(packs::versionOf).orElse(""));
             // DATA-TIERS-1 P5: an outbound-delivery type names its screen gate (the /bootstrap features key), so the Job form
             // shows it locked with the featureReasons line where the edition withholds it. Only a screen gate: it still runs.
-            if (com.gamma.etl.EditionFeatures.EGRESS_JOB_TYPES.contains(id))
-                m.put("featureFlag", com.gamma.etl.EditionFeatures.flagOf(com.gamma.etl.EditionFeatures.PIPELINE_EGRESS));
+            String feature = com.gamma.etl.BasicProfile.jobTypeFeature(id);   // the Basic profile (BASIC-ELT-PROFILE-1 Gate)
+            if (feature != null) m.put("featureFlag", com.gamma.etl.BasicProfile.flagOf(feature));
             return m;
         });
     }

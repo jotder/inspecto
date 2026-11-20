@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-118 test file(s). Run one, or all:
+121 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -23,6 +23,7 @@ node --test tools/
 | `tools/affected-modules.test.mjs` | Fixture test for tools/affected-modules.mjs. Run: node --test tools/affected-modules.test.mjs |
 | `tools/assemble.test.mjs` | Tests for tools/assemble.mjs — PRODUCT-ASSEMBLY-1 PA-2. Run: node --test tools/assemble.test.mjs |
 | `tools/check-backlog-items.test.mjs` | Fixture test for tools/check-backlog-items.mjs. Run: node --test tools/check-backlog-items.test.mjs |
+| `tools/check-bundle-handbook.test.mjs` | Tests for tools/check-bundle-handbook.mjs — the D-UE7 rule (which bundle's /help carries the training pages) and the |
 | `tools/check-bundle-spaces.test.mjs` | node --test tools/check-bundle-spaces.test.mjs |
 | `tools/check-data-ops-duplication.test.mjs` | Fixture tests for tools/check-data-ops-duplication.mjs. Run: node --test tools/check-data-ops-duplication.test.mjs |
 | `tools/check-demo-auth-isolation.test.mjs` | Fixture test for tools/check-demo-auth-isolation.mjs — each planted violation must turn the guard RED. |
@@ -80,6 +81,7 @@ node --test tools/
 | `tools/gen-la-video7-data.test.mjs` | Determinism and planted facts of tools/gen-la-video7-data.mjs. Run: node --test tools/gen-la-video7-data.test.mjs |
 | `tools/gen-order-to-cash-data.test.mjs` | Determinism and planted facts of tools/gen-order-to-cash-data.mjs. Run: node --test tools/gen-order-to-cash-data.test.mjs |
 | `tools/handbook-checks.test.mjs` | Tests for tools/handbook-checks.mjs. Run: node --test tools/handbook-checks.test.mjs |
+| `tools/handbook-editions.test.mjs` | Tests for tools/handbook-editions.mjs. Run: node --test tools/handbook-editions.test.mjs |
 | `tools/inspecto-app.test.mjs` | node --test tools/inspecto-app.test.mjs - the App authoring kit (PRODUCT-ASSEMBLY-1 PA-6a, D-PA18 / D-PA19). |
 | `tools/java-closure.test.mjs` | Fixture test for tools/java-closure.mjs — each blind spot that bit the D-1 closure script must now be SEEN. |
 | `tools/jlink-modules.test.mjs` | ── PACKAGE-DEMOAUTH-ADVANCED-1: the demo bundle's module set follows the bundle it really stages ───────────────────────────── |
@@ -103,6 +105,7 @@ node --test tools/
 | `tools/release-notes.test.mjs` | Fixture test for tools/release-notes.mjs. Run: node --test tools/release-notes.test.mjs |
 | `tools/render-api-routes.test.mjs` |  |
 | `tools/render-feature-db.test.mjs` | Fixture test for tools/render-feature-db.mjs. Run: node --test tools/render-feature-db.test.mjs |
+| `tools/render-handbook-reference.test.mjs` | Tests for tools/render-handbook-reference.mjs. Run: node --test tools/render-handbook-reference.test.mjs |
 | `tools/render-handbook.test.mjs` | Tests for tools/render-handbook.mjs. Run: node --test tools/render-handbook.test.mjs |
 | `tools/render-offerings-matrix.test.mjs` | Fixture test for tools/render-offerings-matrix.mjs. Run: node --test tools/render-offerings-matrix.test.mjs |
 | `tools/render-product-hosts.test.mjs` | Tests for tools/render-product-hosts.mjs - PRODUCT-ASSEMBLY-1 PA-4. Run: node --test tools/render-product-hosts.test.mjs |

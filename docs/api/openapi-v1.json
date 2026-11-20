@@ -1913,7 +1913,7 @@
         "tags" : [ "runs" ],
         "summary" : "Reprocess one Consignment",
         "operationId" : "postRunsByRunIdReprocess",
-        "description" : "Body {batchId}: reprocesses that Consignment of the Pipeline named in the path. Gated on canOperateRuns. 404 for an unknown Pipeline; 409 for a template Pipeline; 400 without batchId.",
+        "description" : "Body {batchId}: reprocesses that Consignment of the Pipeline named in the path. Gated on canOperateRuns. 404 for an unknown Pipeline; 409 for a template Pipeline, or for a Consignment whose output files a compaction merged away or a later arrival replaced rows of (re-ingesting would put rows in twice or bring replaced rows back; the reason names no server path); 400 without batchId.",
         "parameters" : [ {
           "name" : "runId",
           "in" : "path",
@@ -14542,6 +14542,20 @@
           }
         },
         "x-optional-module" : true
+      }
+    },
+    "/mcp" : {
+      "post" : {
+        "tags" : [ "mcp" ],
+        "summary" : "Model Context Protocol endpoint",
+        "operationId" : "postMcp",
+        "description" : "One JSON-RPC 2.0 request of the Model Context Protocol (Streamable HTTP, revision 2026-07-28; 2025-11-25 and 2025-06-18 served statelessly for clients that open with initialize). Methods server/discover, tools/list, tools/call, resources/list, resources/read. Every MCP Tool replays an existing read route as the caller, so that route's own gates and masking decide; each tools/call and resources/read leaves an AUDIT row naming the person and the agent client. The answer is raw JSON-RPC, never the v1 envelope. 400 for a malformed body or a header that does not match the body (-32020) or an unsupported version (-32022); 403 for a disallowed Origin; 404 for an unknown method (-32601); 413 over 256 KiB; 503 when the install has no sign-in. Read-only in AK-1; Standard edition and above.",
+        "responses" : {
+          "default" : {
+            "description" : "A JSON-RPC 2.0 response object, or 202 with no body for a notification."
+          }
+        },
+        "x-generated" : true
       }
     },
     "/onboard/files" : {

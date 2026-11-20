@@ -2,7 +2,7 @@ package com.gamma.job;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.consignment.ConsignmentOutputStores;
-import com.gamma.etl.EditionFeatures;
+import com.gamma.etl.BasicProfile;
 import com.gamma.onboard.ImportFollowOn;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
@@ -166,7 +166,7 @@ public final class ArrivalCompactor {
         }
     }
 
-    private static List<Segment> segments(Map<String, Object> map) {
+    static List<Segment> segments(Map<String, Object> map) {
         List<Segment> out = new ArrayList<>();
         if (map.get("arrivals") instanceof List<?> list)
             for (Object o : list)
@@ -204,34 +204,30 @@ public final class ArrivalCompactor {
     /**
      * Commit the map after the merged file {@code file} was rewritten with {@code next} (each arrival with a row left, its new
      * segment, in order; an arrival left with none drops out, so the arrivals answer reads it as replaced - not as a
-     * retention removal). Answers the map's bytes before, for an undo ({@link #restoreMap}).
+     * retention removal). The map as it was is kept by the caller for an undo ({@link ArrivalReplacer}).
      */
-    public static byte[] segmentsRewritten(Path base, Path file, List<Segment> next) throws IOException {
+    public static void segmentsRewritten(Path base, Path file, List<Segment> next) throws IOException {
         Path mapFile = base.resolve(MAP);
-        byte[] before = Files.readAllBytes(mapFile);
-        Map<String, Object> map = new LinkedHashMap<>(readMap(mapFile));
-        List<Map<String, Object>> arrivals = new ArrayList<>();
-        for (Segment s : next) {
-            Map<String, Object> a = new LinkedHashMap<>();
-            a.put("file", s.file());
-            a.put("received", s.received());
-            a.put("firstRow", s.firstRow());
-            a.put("rows", s.rows());
-            a.put("coversFrom", s.coversFrom());
-            a.put("coversTo", s.coversTo());
-            if (!s.holds().isEmpty()) a.put("holds", s.holds());
-            arrivals.add(a);
-        }
-        map.put("arrivals", arrivals);
+        Map<String, Object> was = readMap(mapFile);
+        if (was == null) throw new IOException("the merge map of '" + base.getFileName() + "' is gone or unreadable");
+        Map<String, Object> map = new LinkedHashMap<>(was);
+        map.put("arrivals", next.stream().map(ArrivalCompactor::asMap).toList());
         map.put("mergedBytes", Files.size(file));
         map.put("mergedModified", Files.getLastModifiedTime(file).toMillis());
         AtomicFiles.write(mapFile, JSON.writeValueAsBytes(map), ".cmp-");
-        return before;
     }
 
-    /** Put back the map {@link #segmentsRewritten} replaced (the import failed after it). */
-    public static void restoreMap(Path base, byte[] before) throws IOException {
-        AtomicFiles.write(base.resolve(MAP), before, ".cmp-");
+    /** {@code s} as the map writes one arrival (the reader is {@link #segments}). */
+    static Map<String, Object> asMap(Segment s) {
+        Map<String, Object> a = new LinkedHashMap<>();
+        a.put("file", s.file());
+        a.put("received", s.received());
+        a.put("firstRow", s.firstRow());
+        a.put("rows", s.rows());
+        a.put("coversFrom", s.coversFrom());
+        a.put("coversTo", s.coversTo());
+        if (!s.holds().isEmpty()) a.put("holds", s.holds());
+        return a;
     }
 
     /** The last compaction's time ({@code at}) and the arrivals retention removed so far, from the map; nulls and 0 when none. */
@@ -325,6 +321,7 @@ public final class ArrivalCompactor {
      */
     private static Map<String, Object> merge(Path dataRoot, String id, Map<String, Object> content, boolean force) throws Exception {
         Path db = database(dataRoot, id).toAbsolutePath().normalize();
+        ArrivalReplacer.heal(dataRoot, id);   // B4: never merge a Replace the period a crash left half done
         heal(dataRoot, id);
         List<Path> files = parquetFiles(db);
         // a file a reader still holds was merged already: merging again would put its rows in twice, for good
@@ -596,7 +593,7 @@ public final class ArrivalCompactor {
 
     /** The entry's retention, or null; ignored (null) where the edition has no retention, so Basic never drops rows. */
     public static Retention retentionInForce(Map<String, Object> content) {
-        if (!EditionFeatures.present(EditionFeatures.PIPELINE_AUTOMATION)) return null;
+        if (!BasicProfile.Entry.RETENTION.offered()) return null;
         return retentionOf(content);
     }
 

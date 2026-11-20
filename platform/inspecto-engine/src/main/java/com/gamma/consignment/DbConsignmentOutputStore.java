@@ -94,6 +94,9 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
                     + "event_time_min = excluded.event_time_min, event_time_max = excluded.event_time_max, "
                     + "event_time_spread_ms = excluded.event_time_spread_ms, producer = excluded.producer";
 
+    /** The states whose path a reader may read: {@code LIVE}, and {@code REPLACED} (B4; see {@link #unreadablePaths}). */
+    private static final String READABLE = "('LIVE', 'REPLACED')";
+
     private final ConnectionSource src;
 
     // ── raw table browser seam (BrowsableStore) — read-only, borrowed per operation ──
@@ -487,7 +490,8 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      * {@code LIVE} one (see {@link #unreadablePaths}). Summing every row would count a recomputed day twice
      * and report a volume <em>increase</em> caused purely by reprocessing — the exact false signal a
      * completeness KPI exists to rule out. {@code COMPACTED_AWAY} is excluded for the same reason: its rows
-     * live on inside the compacted file, which carries its own LIVE row.
+     * live on inside the compacted file, which carries its own LIVE row. {@code REPLACED} is excluded too: its
+     * {@code row_count} still counts the rows a later arrival replaced, which that arrival's own row counts.
      *
      * <p>⚠ Days with no registered output are <b>absent from the result, not zero</b>. Only the caller knows
      * which days were expected; this method reports what the registry holds and does not invent a calendar.
@@ -557,6 +561,8 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
     /**
      * Every path this registry says is <b>no longer readable</b> — {@code SUPERSEDED} or {@code COMPACTED_AWAY},
      * across every stream — for {@link ConsignmentSelector} to subtract from a glob (addressing §7-A).
+     * {@code REPLACED} is readable (B4): a file <i>Replace the period</i> rewrote keeps its path and the rows it
+     * kept, so subtracting it would hide them from every read - and {@code retire_superseded} would delete it.
      *
      * <p><b>A path with any {@code LIVE} row is never returned, whatever else it carries.</b> Output naming is
      * not one-file-per-Consignment (§2.4): a full recompute rewrites a stable path in place, so the same path
@@ -571,7 +577,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      */
     /**
      * Whether {@code path} is a file this registry says is <b>readable</b>: registered, and carrying at least
-     * one {@code LIVE} row.
+     * one {@code LIVE} (or {@code REPLACED}, see {@link #unreadablePaths}) row.
      *
      * <p>The inverse of {@link #unreadablePaths}, and it follows the same rule for the same reason:
      * <b>readability is per-PATH, row state is per-registration</b>. Output naming is not
@@ -586,7 +592,8 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      * separator, a relative form) must normalise before asking; this method does not guess.
      */
     /**
-     * The Consignments behind {@code readPaths} under {@code tableName} — LIVE rows only, one entry per
+     * The Consignments behind {@code readPaths} under {@code tableName} — readable ({@code LIVE} or
+     * {@code REPLACED}) rows only, one entry per
      * consignment (X2 cross-lane provenance: the at-rest run records what it READ, mapped from the files
      * the selector kept, not every Consignment ever written to the store).
      *
@@ -602,7 +609,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
         java.util.Set<String> wanted = new java.util.HashSet<>();
         for (String p : readPaths) if (p != null) wanted.add(norm(p));
         String sql = "SELECT consignment_id, producer, path FROM " + T
-                + " WHERE table_name = ? AND coalesce(state, 'LIVE') = 'LIVE'";
+                + " WHERE table_name = ? AND coalesce(state, 'LIVE') IN " + READABLE;
         java.util.LinkedHashMap<String, ConsignmentSource> byId = new java.util.LinkedHashMap<>();
         try {
             src.run(conn -> {
@@ -626,7 +633,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
 
     public boolean isReadable(String path) {
         if (path == null || path.isBlank()) return false;
-        String sql = "SELECT 1 FROM " + T + " WHERE path = ? AND coalesce(state, 'LIVE') = 'LIVE' LIMIT 1";
+        String sql = "SELECT 1 FROM " + T + " WHERE path = ? AND coalesce(state, 'LIVE') IN " + READABLE + " LIMIT 1";
         try {
             return src.with(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -643,9 +650,9 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
     }
 
     public List<String> unreadablePaths() {
-        String sql = "SELECT DISTINCT t.path FROM " + T + " t WHERE coalesce(t.state, 'LIVE') <> 'LIVE' "
-                + "AND NOT EXISTS (SELECT 1 FROM " + T + " l WHERE l.path = t.path "
-                + "AND coalesce(l.state, 'LIVE') = 'LIVE')";
+        String sql = "SELECT DISTINCT t.path FROM " + T + " t WHERE coalesce(t.state, 'LIVE') NOT IN " + READABLE
+                + " AND NOT EXISTS (SELECT 1 FROM " + T + " l WHERE l.path = t.path "
+                + "AND coalesce(l.state, 'LIVE') IN " + READABLE + ")";
         List<String> out = new ArrayList<>();
         try {
             src.run(conn -> {
@@ -832,6 +839,25 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
      * @return how many rows changed state.
      */
     public int markCompactedAway(List<String> paths) {
+        return flip(paths, "state <> 'COMPACTED_AWAY'", "COMPACTED_AWAY", "compacted away");
+    }
+
+    /**
+     * Mark the given output paths {@code REPLACED} ({@code BASIC-ELT-PROFILE-1} B4) — the files a later arrival
+     * replaced rows of: <i>Replace the period</i> rewrote them without the days it covers (or removed them), or
+     * <i>Replace everything</i> set them aside. Only {@code LIVE} rows move: a {@code COMPACTED_AWAY} or
+     * {@code SUPERSEDED} row already refuses or retired what this would. The path stays readable (see
+     * {@link #unreadablePaths}); a reprocess of its Consignment is refused, because re-reading the backup would bring
+     * the replaced rows back. Matched like {@link #markCompactedAway}; unmatched paths are ignored.
+     *
+     * @return how many rows changed state.
+     */
+    public int markReplaced(List<String> paths) {
+        return flip(paths, "coalesce(state, 'LIVE') = 'LIVE'", "REPLACED", "replaced");
+    }
+
+    /** Set {@code to} on every row of {@code paths} (normalised on both sides) that {@code from} selects. */
+    private int flip(List<String> paths, String from, String to, String what) {
         if (paths == null || paths.isEmpty()) return 0;
         java.util.Set<String> wanted = new java.util.HashSet<>();
         for (String p : paths) wanted.add(norm(p));
@@ -849,14 +875,14 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
                 List<String> matches = new ArrayList<>();
                 try (Statement st = conn.createStatement();
                      ResultSet rs = st.executeQuery(
-                             "SELECT DISTINCT path FROM " + T + " WHERE state <> 'COMPACTED_AWAY'")) {
+                             "SELECT DISTINCT path FROM " + T + " WHERE " + from)) {
                     while (rs.next()) {
                         String stored = rs.getString("path");
                         if (stored != null && wanted.contains(norm(stored))) matches.add(stored);
                     }
                 }
                 try (PreparedStatement ps = conn.prepareStatement("UPDATE " + T
-                        + " SET state = 'COMPACTED_AWAY' WHERE path = ? AND state <> 'COMPACTED_AWAY'")) {
+                        + " SET state = '" + to + "' WHERE path = ? AND " + from)) {
                     for (String stored : matches) {
                         ps.setString(1, stored);
                         changed[0] += ps.executeUpdate();
@@ -864,7 +890,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
                 }
             });
         } catch (SQLException e) {
-            log.warn("Could not mark {} path(s) compacted away: {}", paths.size(), e.getMessage());
+            log.warn("Could not mark {} path(s) {}: {}", paths.size(), what, e.getMessage());
         }
         return changed[0];
     }

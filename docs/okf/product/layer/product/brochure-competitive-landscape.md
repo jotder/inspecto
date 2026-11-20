@@ -153,8 +153,8 @@ named Spaces only, opt-in through `-Dauth.oidc.clients` (`MachineTrust`, `Roles.
 *(corrected 2026-10-18; `SPEC-DEADSEAM-1` verdict refuted 2026-09-15)*: `BuiltinExpressions` implements it,
 `ExpressionRegistry` registers it permanently, and `ParameterResolver` evaluates every Job-parameter `$token`
 through it. What is true: it is loaded by `ServiceLoader` from the classpath and from Job Packs, and no
-external provider ships in the base build — so quote it as a seam, not as an existing plugin. And the processor catalogue is **122**<!--count:processors-->
-entries of which **54**<!--count:processors-delivered--> are delivered, **17**<!--count:processors-partial-->
+external provider ships in the base build — so quote it as a seam, not as an existing plugin. And the processor catalogue is **123**<!--count:processors-->
+entries of which **55**<!--count:processors-delivered--> are delivered, **17**<!--count:processors-partial-->
 partial, and the rest planned — a palette of inactive tiles a buyer will count. Claim coverage **by category
 covered end to end**, never as a percentage of that palette.
 
@@ -283,7 +283,7 @@ at once. This is structural, not a failing — Palantir loses it too.
 | Anything about the AI assistant | *(corrected 2026-09-23 — this row said "ships in no bundle")* staged in every Standard and Advanced bundle (since 2026-09-12 under the old edition names) (`CP-14`, `PKG-5`, both closed), but **no release has been tagged since `v3.12.0` (2026-06-05)** and only a `v*` tag publishes (`.github/workflows/release.yml`), so no downloadable artifact carries it (still true 2026-11-12) | a tagged release publishes a Standard bundle |
 | Anything about the autonomy ladder or the intelligence agent (approvals inbox, `SHADOW`/`AUTO`) | the original unlock — a bundling decision — **was met 2026-09-29** (`ASSURE-INTELLIGENCE-BUNDLE-1`): `inspecto-intelligence` is in `offerings/advanced.toon` (`inspecto-agent-hosted` still in none). It now waits on the same thing as the assistant: no tagged release carries it | a tagged release publishes an Advanced bundle |
 | "1 trillion rows/day" on one node, any edition | off by 10–250× on one node (§1.3) | never for one node; a cluster-design conversation on the unbuilt T5 design |
-| "119 processors" | 51 are planned, inactive tiles | say **54**<!--count:processors-delivered--> delivered, or name the families |
+| "119 processors" | 51 are planned, inactive tiles | say **55**<!--count:processors-delivered--> delivered, or name the families |
 | "90–100 % of requirements" | the palette above *(corrected 2026-11-12: this also said "one dead SPI"; there is none, §1.4)* | phrase as categories covered + named seams (§1.4) |
 | "Low maintenance" | the service wrappers shipped 2026-09-11 (`SCR-3`: a systemd unit, a Windows Scheduled Task) but their live acceptance on two hosts has never run, and preflight and upgrade / rollback are unbuilt | `DEPLOY-SERVICE-WRAPPER-1` (P2) runs its live acceptance |
 | Inline or pre-call blocking (card authorisation, pre-call telecom blocking) | detection on each stream commit is built and claimable (§4.1); an inline allow / block decision on each record before it is accepted is unbuilt *(corrected 2026-11-19: this row said the commit hook and the latency harness were unbuilt; PA-9d landed 2026-11-12)* | `REALTIME-INLINE-DECISION-1` ships its own design, a request / response route and a measured latency |

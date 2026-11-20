@@ -20,7 +20,7 @@ tags: [product-item, module]
 | architecture | current | [Screening](architecture-screening.md) |
 | features | current | [Screening — features](features-screening.md) |
 | feature-db | current | [Screening — feature database](feature-db.md) |
-| user-guide | current | [Screening — screens](user-guide-screening.md) |
+| user-guide | current | [Screen names against an Entity List](user-guide-howto-screen-names.md) · [Screening — screens](user-guide-screening.md) |
 | admin-guide | current | [Screening — admin guide](admin-guide-screening.md) |
 | api | current | [HTTP routes — module.screening](api-routes.md) · [Screening — API](api-screening.md) |
 | tests | current | [Screening — tests inventory](tests-inventory.md) |
@@ -35,3 +35,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `SCREENING-1` | P2 | feature | Confirm the Screening add-on's D6 and D8 builds; D4, D5 and D7 stand with their triggers. | — |
+| `HOWTO-DOC-DRIFT-1` | P3 | chore | internal hub pages that contradict the code, found writing the P3 how-tos: | — |

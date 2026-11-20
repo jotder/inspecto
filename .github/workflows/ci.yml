@@ -427,6 +427,12 @@ jobs:
       - name: Guard — a bundle ships only committed Space content
         run: node tools/check-bundle-spaces.mjs && node --test tools/check-bundle-spaces.test.mjs
 
+      # Bundle-handbook guard (TRAINING-BUNDLE-1, D-UE7): the Labs and the instructor kit (`audience: training`) reach the
+      # Preview's and a demo build's /help only, never a sold edition's. Pins package.ps1's render block to the rule in
+      # tools/check-bundle-handbook.mjs and renders both flavors for real; no build.
+      - name: Guard — only the Preview and a demo build ship the training Handbook pages
+        run: node tools/check-bundle-handbook.mjs && node --test tools/check-bundle-handbook.test.mjs
+
       # Offerings guard (MODULE-REORG-1 P6a): every module has a manifest, every Offering names real modules. Reads git
       # ls-files + tracked manifests/offerings/*.toon only; no build.
       - name: Guard — Offerings reference real, manifested modules
@@ -488,8 +494,12 @@ jobs:
       # also parses every docs-as-tests check block (routes against openapi-v1.json) and requires one on every tutorial and
       # how-to. The checks themselves need a live install, so they are NOT run here: tools/run-handbook-checks.mjs runs them
       # on demand and before each release (spec-handbook-doc-tests.md); its tests below use a stub server.
+      # P3: every page also resolves an edition badge (tools/handbook-editions.mjs — derived from its hub's Product Map
+      # Item and offerings/*.toon; a page's `edition:` only where nothing derives, and never earlier than the derived one),
+      # and the generated Reference pages (tools/render-handbook-reference.mjs: HTTP API, edition matrix, vocabulary) are
+      # current — the fix when stale is `node tools/render-handbook-reference.mjs --write`, never a hand edit.
       - name: Guard — the Handbook manifest holds together and its external render cannot leak
-        run: node tools/check-handbook.mjs && node --test tools/check-handbook.test.mjs tools/render-handbook.test.mjs tools/publish-handbook.test.mjs tools/handbook-checks.test.mjs tools/run-handbook-checks.test.mjs
+        run: node tools/check-handbook.mjs && node tools/render-handbook-reference.mjs --check && node --test tools/check-handbook.test.mjs tools/render-handbook.test.mjs tools/publish-handbook.test.mjs tools/handbook-checks.test.mjs tools/run-handbook-checks.test.mjs tools/handbook-editions.test.mjs tools/render-handbook-reference.test.mjs
 
       # OpenAPI fragments guard (MODULE-REORG-1 P1): docs/api/openapi-v1.json is GENERATED from the core fragment +
       # each module's META-INF/inspecto/openapi.fragment.json. Reads tracked files only; no build, ~0.3s.

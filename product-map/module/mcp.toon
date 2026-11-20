@@ -1,0 +1,8 @@
+id: module.mcp
+kind: module
+title: MCP endpoint
+parent: layer.features
+module: mcp
+billable: false
+status: preview
+docs: docs/okf/product/module/mcp/index.md

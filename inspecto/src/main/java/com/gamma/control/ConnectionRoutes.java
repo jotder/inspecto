@@ -215,13 +215,17 @@ final class ConnectionRoutes implements RouteModule {
         return p.toMap();
     }
 
-    /** {@code DELETE /connections/{id}} — remove a profile; 404 if unknown, 409 if a pipeline source uses it. */
+    /** {@code DELETE /connections/{id}} — remove a profile; 404 if unknown, 409 if a pipeline source or a Postgres snapshot uses it. */
     private Object deleteConnection(ApiContext api, String id) throws IOException {
         WriteGates.requireWriteRoot(api, "connection write");
         if (HostContext.of(api).service().connection(id).isEmpty())
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no connection profile '" + id + "'");
         WriteGates.conflictIf(HostContext.of(api).service().connectionInUse(id),
                 "connection '" + id + "' is in use by a pipeline source");
+        // BASIC-ELT-PROFILE-1 BE-4 part 2: a Postgres table Add data copied reads through its saved Connection (path-free answer)
+        String snapshot = PostgresSnapshot.readBy(api.writeRoot(), id);
+        WriteGates.conflictIf(snapshot != null, "connection '" + id + "' is in use by the Postgres copy of the Dataset '" + snapshot
+                + "'; remove that Dataset first");
         boolean removed = Files.deleteIfExists(connectionFile(api, id));
         HostContext.of(api).service().unregisterConnection(id);
         return Map.of("id", id, "deleted", true, "fileRemoved", removed);

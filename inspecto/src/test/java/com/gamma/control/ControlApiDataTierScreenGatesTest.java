@@ -2,6 +2,7 @@ package com.gamma.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gamma.etl.BasicProfile;
 import com.gamma.etl.EditionFeatures;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.job.JobConfig;
@@ -97,7 +98,7 @@ class ControlApiDataTierScreenGatesTest {
                 assertFalse(boot.at("/features/" + flag).asBoolean(), flag + " is withheld on Basic");
                 String why = boot.at("/featureReasons/" + flag).asText();
                 assertTrue(why.contains("Standard and above"), flag + " says which edition has it: " + why);
-                assertEquals(EditionFeatures.lockedReason(EditionFeatures.SCREEN_FLAGS.get(flag)), why);
+                assertEquals(EditionFeatures.lockedReason(BasicProfile.SCREEN_FLAGS.get(flag)), why);
             }
             assertTrue(boot.at("/featureReasons/remoteSystems").asText().contains("copies Postgres tables"),
                     "Basic keeps files and the Postgres snapshot: " + boot.get("featureReasons"));
@@ -114,11 +115,15 @@ class ControlApiDataTierScreenGatesTest {
             assertEquals("remoteSystems", procs.get("acquisition.file.sftp"));
             assertEquals("remoteSystems", procs.get("acquisition.db.jdbc"));
             assertNull(procs.get("acquisition.file.local"), "a folder on this machine is every edition's");
+            // BASIC-ELT-PROFILE-1 BE-4: the postgres connector is listed, and is the one remote acquisition Basic keeps
+            assertTrue(procs.containsKey("acquisition.db.postgres"), "the catalog lists the postgres connector: " + procs.keySet());
+            assertNull(procs.get("acquisition.db.postgres"), "Add data's Choose a table reads through it on Basic");
             assertEquals("pipelineTransform", procs.get("transform.join"));
             assertEquals("pipelineTransform", procs.get("transform.record"), "the SQL Step");
             assertEquals("pipelineTransform", procs.get("enrichment.reference"));
             assertNull(procs.get("transform.filter"), "filter rows is no-code shaping (DT-7)");
             assertNull(procs.get("quality.dedup.exact"), "dedupe stays on Basic (DT-15)");
+            assertNull(procs.get("quality.dedup.file"), "the Collector's duplicate check is Basic's (BASIC-ELT-PROFILE-1 Gate, 2026-11-20)");
             assertNull(procs.get("quality.pii.mask"), "masking keeps its own gate (Advanced)");
             assertNull(procs.get("parser.delimited"), "parsing is every edition's");
         });
@@ -126,7 +131,7 @@ class ControlApiDataTierScreenGatesTest {
 
     @Test
     void standardWithholdsNoScreenGateAndServesTheSameMarkers(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        EditionFeatures.overrideForTest(Set.copyOf(EditionFeatures.SCREEN_FLAGS.values()));   // what inspecto-ops declares
+        EditionFeatures.overrideForTest(Set.copyOf(BasicProfile.SCREEN_FLAGS.values()));   // what inspecto-ops declares
         serve(cfg, root, port -> {
             JsonNode boot = get(port, "/bootstrap");
             for (String flag : FLAGS) {

@@ -32,4 +32,8 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.workflow` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `PIPELINE-SAVE-HELD-TOAST-1` | P3 | defect | the Pipeline editor says *Saved pipeline '<id>'* and clears its unsaved mark for any 2xx, also when an approval policy held the change (2… | — |
+| `TEMPLATE-GOVERNANCE-1` | P3 | feature | a Space Template carries no governance: | — |
+| `CASE-TRANSITION-FOUR-EYES-1` | P3 | feature | a Workflow transition on a Case has no guard: | — |

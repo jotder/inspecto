@@ -101,7 +101,12 @@ final class RunRoutes implements RouteModule {
                 throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline '" + ApiContext.name(m) + "' is a template and is not runnable");
             String batchId = ApiContext.str(api.body(e), "batchId");
             if (batchId == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'batchId'");
-            ReprocessCommand.run(path.toString(), batchId);
+            try {
+                ReprocessCommand.run(path.toString(), batchId);
+            } catch (ReprocessCommand.Refused refused) {
+                // its outputs were merged away or replaced since: a conflict with the Dataset's state, said without server paths
+                throw new ApiException(409, ErrorCodes.CONFLICT, refused.reason());
+            }
             return Map.of("pipeline", ApiContext.name(m), "batchId", batchId, "status", "reprocessed");
         }));
 

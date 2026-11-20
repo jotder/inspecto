@@ -106,9 +106,16 @@ column type (UUID, JSON, arrays, intervals) as text.
   TRUNCATE on any non-system table).
 - **Add data's Postgres snapshot builds its connector here** (`PostgresSnapshot` → `PostgresConnectorFactory.connector`)
   and keeps a saved `postgres` Connection, `<dataset id>_postgres` (operator ruling O4). Its Pipeline still takes the
-  export through the inbox; switching it to `collector.connector: postgres` waits for the replace-by-arrival step
-  (plan B4). The `REMOTE_ACQUISITION` edition listing (`ProcessorCatalog`) does not list `postgres` yet: that is the
-  Basic Gate's work.
+  export through the inbox; switching it to `collector.connector: postgres` waits for the engine's replace-everything
+  (`output.load`, ruling O6), which is not built yet (plan `BASIC-ELT-PROFILE-1` §4, BE-4).
+- **The Safety Policy's network gate on every session** (BE-4 part 2): `PostgresCollectorConnector.Session.open` passes
+  `EgressGate.current()` for the host and port before the password is resolved, so Add data's test, draft and Run now
+  are gated as a Pipeline's acquisition is (`CollectorConnectors.forConfig` gates that one too). A refused host is the
+  connector's `Refused` (Add data answers 422 with the policy's reason; a Pipeline's fetch fails as an
+  `AcquisitionException`).
+- **Listed in the processor catalog** as `acquisition.db.postgres` (delivered), reading through the `postgres` scheme
+  (`ProcessorCatalog.ACQUISITION_SCHEMES`). The Basic profile keeps that scheme (`BasicProfile.SCHEMES`, the Gate lane), so
+  `featureOf` answers no `remoteSystems` lock for it (Add data's *Choose a table*), while every other remote scheme is locked.
 
 **Object storage is deliberately SDK-free (ACQ-4).** The auth, profile mapping, capabilities and pagination of
 `s3`, `gcs` and `azure` are in [connectors](../connectors/spec-connectors.md). One detail is recorded only here:
@@ -246,7 +253,7 @@ server's passive ports happen to be independently reachable (the connector logs 
 | `POST /streams/{id}/records` | **push ingest** (ASSURE-PUSH-INGEST-1). `{id}` is the Collector id (`GET /catalog/streams`). NDJSON (`application/x-ndjson`) or CSV (`text/csv`), validated WHOLE before anything lands; one server-named file `push-<utc>-<8 hex>.<ext>` moved atomically into `dirs.poll`, so the ordinary Collector path ingests it. Gates: `canOperateRuns` · `429` per-caller push bucket (burst 60, 10/s) · `404` unknown Stream · `501` Dataset-fed · `409` template, `pipeline paused` (paused or not active — refused rather than stranded in an unwatched inbox), or the same caller's `Idempotency-Key` still in flight · `415` other types · `413` over `-Dstreams.push.max_bytes` (8 MiB) or `-Dstreams.push.max_records` (100 000) · `413` also for a KEYED push over the W5 hash window (`Idempotency.MAX_REQUEST_BYTES`, 1 MiB), which the stage would run un-keyed · `422` not UTF-8, a malformed line (named), no records, or a `file_pattern` that would never pick the file up. A leading UTF-8 BOM is stripped for both formats, before validation and before the write. A keyed replay returns the first `{file}` to the same caller only — the key is the W5 one (Space + principal + path + body hash, SEC-IDEMPOTENCY-REPLAY-1), and the in-flight reservation reuses it, so two callers' equal keys never collide. One AUDIT row `stream.records_pushed` with `records`, `bytes`, `file` — never the payload. ⛔ **Not a config write**: data arriving at a Stream is what a Collector landing a fetched file does, so no write-root gate and no approval hold. ⚠ The idempotency store is in-memory per process (10 min): a replay after a restart lands the batch again; row-level dedup is downstream, as for Kafka. |
 | `GET /metrics/acquisition` | JSON snapshot of the twelve acquisition metrics (`AcquisitionRoutes.ACQ_METRICS`), complementing the text-only Prometheus `/metrics` |
 | `GET /connections`, `GET /connections/{id}` | profiles, **secret-masked** |
-| `POST`/`PUT`/`DELETE /connections[/{id}]` | ⚠ writes require **`canOnboardConnections`** — its own Admin-only grant, deliberately *not* `canAuthorWorkbench`, because Connections are the credential/egress surface (`ConnectionRoutes.register`). |
+| `POST`/`PUT`/`DELETE /connections[/{id}]` | ⚠ writes require **`canOnboardConnections`** — its own Admin-only grant, deliberately *not* `canAuthorWorkbench`, because Connections are the credential/egress surface (`ConnectionRoutes.register`). `DELETE` answers 409 while a Pipeline's Collector or a Postgres snapshot (Add data) reads through the Connection; the answer names no server path. |
 | `POST /connections/{id}/test` | TCP reachability + latency + secret **resolvability**; `canOnboardConnections` since 2026-09-17 (it dials from the server's network position); `404` unknown id; `422` on `?target=tunnel\|proxy` with none configured, or an unsupported target |
 | `POST /connections/test` | probes an **unsaved** profile from the create/edit form; `?target=connection\|tunnel\|proxy` picks the hop; `canOnboardConnections` since 2026-09-17 |
 | `POST /connections/{id}/probe` · `GET …/explore?path=` · `GET …/sample?path=&limit=` | the graded workbench. Gates: `404` unknown id · `422` unknown check name · `400` missing sample path · **`403` path escape (jail)** · `404` unknown path · `501` connector without workbench support · `502` protocol failure. `probe` needs `canOnboardConnections` (since 2026-09-17: it reads through the saved credential); `explore` and `sample` are reads with no capability gate. |

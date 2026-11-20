@@ -34,9 +34,10 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `JOB-PARAMS-NESTED-IGNORED-1` | P3 | defect | POST /jobs accepts a Job's settings nested under params ({"type": "report", "params": {"dataset": …}}), stores them as one text value and… | — |
 | — | P3 | feature | Platform Services Stage 2 / 3 | demand |
+| `QUARANTINE-RELEASE-1` | P3 | feature | a quarantined file has no console action: the Quarantine tab lists files per Pipeline (no run, Consignment or time) and offers only *View… | — |
 | `BASIC-ELT-PROFILE-1` | P2 | feature | Make Basic onboarding a locked profile of ELT, retiring the parallel Basic backend and LA UI layers that duplicate ELT parts. | — |
-| `REPROCESS-REFUSAL-500-1` | P3 | defect | A reprocess refused because its outputs were compacted away answers 500 INTERNAL, not a conflict with its reason (filed 2026-11-19, BASIC… | — |
 | — | P3 | feature | Bundle / Exchange — "load as draft" residuals | — |
 | `ONBOARDING-REMOTE-SYSTEMS-1` | P3 | feature | Connect a system on Standard: Add data and the guided editor's Collect stage offer remote kinds (SFTP, object stores, other databases) wi… | — |
 | `DEPLOY-EXPOSURE-KIT-1` | P3 | chore | Prove the deploy kit (proxy fence for /metrics and /health/details, TLS, upgrade, off-site backup, signature verify) on a real host. | — |

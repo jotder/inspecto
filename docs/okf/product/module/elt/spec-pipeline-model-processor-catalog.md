@@ -17,7 +17,7 @@ Part 2 of 4 of [Pipeline model — node types, the Step catalog, transforms and 
 
 ## Step Processor catalog vs. real node executors
 
-The [Step Processor catalog](user-guide-elt.md) (122<!--count:processors--> entries, 8<!--count:processor-families--> families,
+The [Step Processor catalog](user-guide-elt.md) (123<!--count:processors--> entries, 8<!--count:processor-families--> families,
 `ProcessorCatalog.java`) is a **taxonomy/palette layer**, not a 1:1 map to engine code. Five catalog entries
 that read like a "Mapping and Transformer" family — spanning the `DQ` and `XFM` families — all resolve to
 three node types (above): `transform.map` (2), `transform.sql` (2 — repointed 2026-09-04 when the

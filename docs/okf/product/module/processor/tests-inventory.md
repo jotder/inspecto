@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-467 test class(es): 190 unit, 277 real-HTTP control-plane, 0 IT.
+469 test class(es): 189 unit, 280 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -81,6 +81,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiAuditTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAuditTest.java` | Integration tests for the security audit trail emitted centrally from {@link ControlApi#dispatch}: |
 | `ControlApiAuthSessionV1Test` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAuthSessionV1Test.java` | Real-HTTP tests for the W6d backend-mediated session routes ({@code /auth/*}): code exchange sets |
 | `ControlApiAuthV1Test` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAuthV1Test.java` | Real-HTTP tests for W6's AuthN/AuthZ gate in {@link ControlApi#dispatch}. The core ships no |
+| `ControlApiBasicProfileGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBasicProfileGateTest.java` | {@code BASIC-ELT-PROFILE-1} Gate over real HTTP: every Basic entry point ({@link BasicProfile.Entry}) is driven on a Basic and |
 | `ControlApiBiMaskingReviewTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBiMaskingReviewTest.java` | BI-QUERY-MASKING-1 security review (2026-10-23; {@code docs/archived-documents/plans-archive/bi-query-masking-design.md} section 12): one test per |
 | `ControlApiBindTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBindTest.java` | GAP-1 (deployment-topology-plan §10): {@code -Dcontrol.bind} restricts the control plane's listen |
 | `ControlApiBiQueryAdversarialTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBiQueryAdversarialTest.java` |  |
@@ -216,6 +217,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiOnboardingLifecycleTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOnboardingLifecycleTest.java` | Integration tests for the stream-onboarding draft lifecycle (v5.1.0) over real HTTP: |
 | `ControlApiOnboardMatchesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOnboardMatchesTest.java` | ONBOARDING-FIRST-RUN-1 C6a over real HTTP: the Add data draft answers {@code matches}, the columns the new file shares |
 | `ControlApiOnboardTimeColumnTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOnboardTimeColumnTest.java` | {@code BASIC-ELT-PROFILE-1}, operator ruling 2026-11-19: a time of day is Basic's {@code TIME} column type, end to end |
+| `ControlApiOutputLoadTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOutputLoadTest.java` | {@code BASIC-ELT-PROFILE-1} O6 ({@code output.load}): the save path refuses a {@code replace} / {@code period} on a store |
 | `ControlApiPackParserPreviewTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiPackParserPreviewTest.java` | Real-HTTP proof of operator decision D4 (parser-plugins-trust-design.md slice P4, 2026-09-25): |
 | `ControlApiParsersTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiParsersTest.java` | Real-HTTP tests for the parser-catalog routes: {@code GET /parsers} (the self-describing |
 | `ControlApiPendingChangesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiPendingChangesTest.java` | Maker-checker over real HTTP (`ASSURE-MAKER-CHECKER-1` S1–S3): the approval policy, the hold, the Pending |
@@ -252,6 +254,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiRecordTransformerSlotSaveTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRecordTransformerSlotSaveTest.java` | The default template's Record Transformer (the projection SLOT, node id {@code map}, type |
 | `ControlApiRejectedRowsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRejectedRowsTest.java` | {@code GET /runs/{name}/errors?file=} over real HTTP — the rejected ROWS behind an |
 | `ControlApiReplayRejectsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiReplayRejectsTest.java` | {@code POST /runs/{name}/replay-rejects} over real HTTP (EXECUTION-RESIDUALS X4): replay one file's rejected |
+| `ControlApiReprocessRefusalTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiReprocessRefusalTest.java` | {@code POST /runs/{id}/reprocess} refused over real HTTP (board {@code REPROCESS-REFUSAL-500-1}, operator ruling |
 | `ControlApiRequirementTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRequirementTest.java` | Real-HTTP tests for the Requirements intake engine ({@code /requirements*}, UI-6 + SEC-7(c)): the |
 | `ControlApiRouteArmingTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRouteArmingTest.java` | The route: arming pre-check at SAVE time, over real HTTP. |
 | `ControlApiRuleTemplateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRuleTemplateTest.java` | Real-HTTP tests for {@code POST /rule-templates/{id}/simulate} — the execution half of the |
@@ -303,7 +306,6 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `DatasetEntryRulesRolesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetEntryRulesRolesTest.java` | {@code columns[].role} on a Dataset entry (LA-COLUMN-ROLES-1 P0, operator decision B 2026-11-04): one vocabulary, |
 | `DatasetFeedSchemaWriteTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetFeedSchemaWriteTest.java` | {@code BASIC-ELT-PROFILE-1} B5 (B16): the import schema's write path ({@link DatasetFeed#rewriteSchema}) gates the |
 | `DatasetNewColumnsLocalDayTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetNewColumnsLocalDayTest.java` | DATES-ONE-ZONE-1 (Basic live check 2026-11-06): the arrivals list showed a file received at {@code 2026-11-06 |
-| `DatasetPeriodSwapLockTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetPeriodSwapLockTest.java` | SNAPSHOT-SWAP-UNLOCKED-READERS-1: replacing an upload's period moves each touched Parquet file aside and puts its |
 | `DecisionRuleWritersTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DecisionRuleWritersTest.java` | {@code ASSURE-ACTION-REQUESTS-1} round-2 finding 1c — <b>every writer that can write a {@code decision-rule} runs |
 | `DialectSniffGoldenTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DialectSniffGoldenTest.java` | {@code BASIC-ELT-PROFILE-1} BE-3 slice 1: the dialect (delimiter, quote, header) the two callers of DuckDB's |
 | `EditionFeatureGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/EditionFeatureGateTest.java` | The BASIC half of `PROCESSOR-RELEASE-READINESS-1` G9 (operator decision 2026-09-24, "gate the code"): |

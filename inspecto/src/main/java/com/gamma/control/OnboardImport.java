@@ -780,40 +780,45 @@ final class OnboardImport {
         List<String> keptColumns = List.of();
         /** Why a new column was left out; null when none was. */
         String newColumnsReason;
-        private DatasetPeriod periodAside;
+        /** Replace the period's run-scoped arrival mode (O6), open from the run until {@link #dropAside} or a rollback. */
+        private com.gamma.job.ArrivalLoadStep.RunLoad periodLoad;
 
         String mode() {
             return replace ? "replace" : period ? PERIOD : "append";
         }
 
         /**
-         * Replace the period: remove, from every older Parquet file, the rows on a day this upload's own output covers.
-         * Undone by {@link #rollback}; the originals are discarded by {@link #dropAside}. Answers {@code {days, from, to,
-         * rowsReplaced, filesRewritten}}.
+         * Replace the period, as the run's own arrival mode (BASIC-ELT-PROFILE-1 O6): the engine's {@code output.load}
+         * commit step, at the upload's Consignment, removes from every older Parquet file the rows on a day the upload
+         * covers ({@link com.gamma.job.ArrivalReplacer}, B4); the run's other files append. Undone by {@link #rollback}
+         * (the originals come back, then the upload's own rows go); made final by {@link #dropAside}. Open before the run.
          */
-        Map<String, Object> replacePeriod(String eventDate) throws IOException {
-            List<Path> covering = new ArrayList<>(), fresh = new ArrayList<>();
-            String landedName = landed == null ? null : landed.getFileName().toString();
-            for (Map<String, String> r : taken) {
-                List<Path> out = DatasetPeriod.outputs(r);
-                fresh.addAll(out);
-                if (String.valueOf(r.get("filename")).equals(landedName)) covering.addAll(out);
-            }
-            periodAside = new DatasetPeriod(space.dataRoot(), id, STAMP.format(Instant.now()));
-            final DatasetPeriod p = periodAside;
-            // undone in this order: the originals come back, then the upload's own rows go - no day is left doubled. Only
-            // the upload's output: another file this run took is already marked processed, so its rows must stay. Once
-            // the import succeeded (dropAside discarded the originals) this undo does nothing.
-            final List<Path> added = List.copyOf(covering);
-            undo.push(() -> {
-                if (periodAside != p) return;
-                for (Path f : added) {
-                    Path abs = f.toAbsolutePath().normalize();
-                    if (com.gamma.config.safety.PathJail.contains(database().toAbsolutePath().normalize(), abs)) Files.deleteIfExists(abs);
+        void periodLoad(String eventDate) {
+            periodLoad = com.gamma.job.ArrivalLoadStep.override(database(), new PipelineConfig.ArrivalLoad(
+                    PipelineConfig.ArrivalLoad.Mode.PERIOD, eventDate), landed.getFileName().toString());
+            com.gamma.job.ArrivalLoadStep.RunLoad load = periodLoad;
+            undo.push(() -> {   // a no-op restore once dropAside made it final
+                try {
+                    load.restore();
+                } finally {
+                    load.close();
                 }
             });
-            undo.push(p::restore);
-            DatasetPeriod.Result r = p.replace(covering, fresh, eventDate);
+        }
+
+        /** The rows the run's replacement removed (0 without one): {@link #runChecked} judges the rows the run added. */
+        long rowsReplaced() {
+            com.gamma.job.ArrivalReplacer.Result r = periodLoad == null ? null : periodLoad.result();
+            return r == null ? 0 : r.rowsRemoved();
+        }
+
+        /** What Replace the period did, after the run: {@code {days, from, to, rowsReplaced, filesRewritten}}. */
+        Map<String, Object> replacedPeriod() throws IOException {
+            Exception failed = periodLoad.failure();
+            if (failed instanceof IOException io) throw io;
+            if (failed instanceof RuntimeException re) throw re;
+            com.gamma.job.ArrivalReplacer.Result r = periodLoad.result();
+            if (r == null) r = new com.gamma.job.ArrivalReplacer.Result(List.of(), 0, 0);   // the upload wrote no file
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("days", r.days().size());
             m.put("from", r.days().isEmpty() ? null : r.days().get(0));
@@ -975,7 +980,8 @@ final class OnboardImport {
             s.put("rowsAfter", after);
             s.put("rowsChanged", after - before);
             s.put("replaced", replace);
-            if (landed != null && (!quarantined.isEmpty() || after <= (replace ? 0 : before))) {
+            // a Replace the period removed rows inside the run (O6): the rows the run added are judged without that
+            if (landed != null && (!quarantined.isEmpty() || after + rowsReplaced() <= (replace ? 0 : before))) {
                 String why = filteredAway ? "the row filter kept none of its " + byFile.get(landedName) + " rows"
                         : !quarantined.isEmpty() ? "the file was set aside (" + quarantined.get(0).get("reason") + ")"
                         : filtered > 0 && filtered + rejected >= parsed ? "the row filter kept none of its " + parsed + " rows"
@@ -1141,7 +1147,7 @@ final class OnboardImport {
             Path base = space.dataRoot().resolve(id).toAbsolutePath().normalize();
             List<Path> outputs = new ArrayList<>();
             for (Map<String, String> r : taken)
-                for (Path p : DatasetPeriod.outputs(r)) {
+                for (Path p : ledgerOutputs(r)) {
                     Path abs = p.toAbsolutePath().normalize();
                     if (com.gamma.config.safety.PathJail.contains(base, abs) && Files.isRegularFile(abs)) outputs.add(abs);
                 }
@@ -1281,10 +1287,14 @@ final class OnboardImport {
         }
 
         void dropAside() {
-            if (aside != null) OnboardRoutes.deleteTree(aside);
+            if (aside != null) {
+                // B4/B13: the rows set aside were replaced; a reprocess of their Consignments must not bring them back
+                com.gamma.job.ArrivalReplacer.everythingReplaced(aside, database());
+                OnboardRoutes.deleteTree(aside);
+            }
             aside = null;
-            if (periodAside != null) periodAside.drop();
-            periodAside = null;
+            if (periodLoad != null) periodLoad.close();   // final: the files it replaced are marked REPLACED
+            periodLoad = null;
         }
     }
 
@@ -1334,6 +1344,14 @@ final class OnboardImport {
         } catch (NumberFormatException e) {
             return 0;
         }
+    }
+
+    /** The output files a per-file ledger row names ({@code output_paths}, {@code ;}-separated). */
+    private static List<Path> ledgerOutputs(Map<String, String> ledgerRow) {
+        List<Path> out = new ArrayList<>();
+        for (String p : ledgerRow.getOrDefault("output_paths", "").split(";"))
+            if (!p.isBlank()) out.add(Path.of(p.trim()));
+        return out;
     }
 
     /** Rows in a Parquet store directory; 0 when it holds none. */
@@ -1572,6 +1590,7 @@ final class OnboardImport {
                     Map<String, Object> s;
                     // ADD-FILE-FEED-1: the upload is whole (landFromDraft moves it in complete), so a feed's stability window does
                     // not hold it back from the person's own run; every other waiting file is gated as before
+                    if (period) j.periodLoad(eventDate);
                     try (com.gamma.inspector.RunFiles.Scope whole = com.gamma.inspector.RunFiles.complete(Set.of(j.landed))) {
                         s = j.runChecked(replace ? 0 : before);
                     } catch (RuntimeException notImported) {
@@ -1581,7 +1600,7 @@ final class OnboardImport {
                     ImportFingerprints.recordUpload(cfg, j.landed, sha);
                     if (replace || period) j.undo.push(() -> ImportFingerprints.forgetLanded(j, cfg));   // undone: its rows go
                     if (period) {
-                        s.put("period", j.replacePeriod(eventDate));
+                        s.put("period", j.replacedPeriod());
                         ImportFingerprints.forgetGone(j, cfg);   // B3 part 2: an arrival whose days were all replaced may come back
                         s.put("rowsAfter", countRows(j.database()));
                     }

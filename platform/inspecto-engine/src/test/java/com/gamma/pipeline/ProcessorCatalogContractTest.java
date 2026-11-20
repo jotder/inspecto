@@ -79,6 +79,25 @@ class ProcessorCatalogContractTest {
     }
 
     /** Every delivered/partial processor that names a node type names a REAL one, and only an authorable one is addable. */
+    /**
+     * BASIC-ELT-PROFILE-1 Gate: every acquisition processor names the Collector scheme it reads through, so the Basic profile
+     * decides its lock - an acquisition left out would be offered on Basic by default. Falsified: with the sftp entry removed
+     * from {@code ACQUISITION_SCHEMES} this fails, and so does the sftp lock in {@code ControlApiDataTierScreenGatesTest}.
+     */
+    @Test
+    void everyAcquisitionProcessorIsJudgedByTheBasicProfileThroughItsScheme() {
+        for (ProcessorCatalog.Processor p : ProcessorCatalog.PROCESSORS)
+            if ("ACQ".equals(p.family()) && "acquisition".equals(p.nodeType()))   // quality.dedup.file rides the Collector, no scheme
+                assertTrue(ProcessorCatalog.ACQUISITION_SCHEMES.containsKey(p.id()), p.id() + " names its scheme");
+        ProcessorCatalog.ACQUISITION_SCHEMES.forEach((id, scheme) -> {
+            ProcessorCatalog.Processor p = ProcessorCatalog.PROCESSORS.stream().filter(x -> x.id().equals(id)).findFirst()
+                    .orElseThrow(() -> new AssertionError(id + " is a catalog processor"));
+            assertEquals(com.gamma.etl.BasicProfile.schemeFeature(scheme), ProcessorCatalog.featureOf(p), id);
+        });
+        assertNull(ProcessorCatalog.featureOf(ProcessorCatalog.PROCESSORS.stream()
+                .filter(x -> x.id().equals("acquisition.db.postgres")).findFirst().orElseThrow()), "Basic's Postgres table copy");
+    }
+
     @Test
     void mappedNodeTypesExistAndOnlyAuthorableOnesAreAddable() {
         Set<String> known = new HashSet<>();

@@ -101,21 +101,61 @@ public final class ReprocessCommand {
      * had shipped switched off in every deployment. Where it is explicitly disabled, or for Consignments that
      * predate the registry, nothing is decidable and nothing is blocked — the per-file warning in step 1 is all
      * that can honestly be said.
+     *
+     * <p>{@code BASIC-ELT-PROFILE-1} B4: refused the same way when a later arrival replaced rows of an output
+     * ({@code REPLACED}): <i>Replace the period</i> rewrote the file without some days, or <i>Replace everything</i> set it
+     * aside, and a re-ingest of the backup would bring those rows back. Thrown as {@link Refused}.
      */
     private static void guardAgainstCompactedOutputs(String batchId, ConsignmentManifest m) {
         DbConsignmentOutputStore registry = ConsignmentOutputStores.shared();
         if (registry == null) return;
 
-        List<String> compacted = registry.outputs(batchId).stream()
+        List<ConsignmentOutput> outputs = registry.outputs(batchId);
+        List<String> compacted = outputs.stream()
                 .filter(o -> o.state() == ConsignmentOutput.State.COMPACTED_AWAY)
                 .map(ConsignmentOutput::path)
                 .toList();
-        if (compacted.isEmpty()) return;
+        // BASIC-ELT-PROFILE-1 B4: a later arrival replaced rows of these files; a re-ingest would bring them back
+        List<String> replaced = outputs.stream()
+                .filter(o -> o.state() == ConsignmentOutput.State.REPLACED)
+                .map(ConsignmentOutput::path)
+                .toList();
+        if (compacted.isEmpty() && replaced.isEmpty()) return;
 
-        throw new IllegalStateException("Refusing to reprocess " + batchId + ": " + compacted.size()
-                + " of its " + m.outputs.size() + " output file(s) were merged away by compaction, so deleting"
-                + " them is impossible and re-ingesting would duplicate rows that still exist in the merged"
-                + " file(s). Affected: " + compacted
-                + ". Rewrite the affected partition(s) instead, or restore from backup.");
+        String of = " of its " + m.outputs.size() + " output file(s) ";
+        List<String> why = new java.util.ArrayList<>();
+        if (!compacted.isEmpty())
+            why.add(compacted.size() + of + "were merged away by compaction, so deleting them is impossible and"
+                    + " re-ingesting would duplicate rows that still exist in the merged file(s)");
+        if (!replaced.isEmpty())
+            why.add(replaced.size() + of + "had rows replaced by a later arrival (Replace the period or Replace"
+                    + " everything), so re-ingesting would bring back rows that were replaced");
+        String reason = "Refusing to reprocess " + batchId + ": " + String.join("; ", why)
+                + ". Load a corrected file instead (for example with Replace the period), or rewrite the affected"
+                + " partition(s).";
+        List<String> affected = new java.util.ArrayList<>(compacted);
+        affected.addAll(replaced);
+        String message = reason + " Affected: " + affected;
+        log.warn("[REPROCESS] {}", message);
+        throw new Refused(message, reason);
+    }
+
+    /**
+     * A reprocess refused because the Consignment's outputs were merged away by a compaction or had rows replaced by a
+     * later arrival: the control plane answers it {@code 409} with {@link #reason()} (board {@code REPROCESS-REFUSAL-500-1}).
+     * The message also names the affected files, which are server paths: for the log, never for the person.
+     */
+    public static final class Refused extends IllegalStateException {
+        private final String reason;
+
+        Refused(String message, String reason) {
+            super(message);
+            this.reason = reason;
+        }
+
+        /** Why, naming no server path: how many outputs, what happened to them, what to do instead. */
+        public String reason() {
+            return reason;
+        }
     }
 }

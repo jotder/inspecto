@@ -12,12 +12,15 @@
 //   3 coverage  every tracked hub user guide and admin guide (docs/okf/**/user-guide-*.md, admin-guide-*.md) is placed
 //               in the manifest — a new guide is placed (internal by default) in the change that adds it.
 //   4 how-to    a page of type `howto` carries the six template headings (HOWTO_HEADINGS).
-//   5 leak      the EXTERNAL render, built in memory, holds no internal page, and every relative link in it reaches a
+//   5 leak      the EXTERNAL render, built in memory, holds no internal or training page, and every relative link in it reaches a
 //               file of that render (a link to a page outside the render must already be plain text).
 //   6 checks    every ```check / ```check-ui block on a manifest page parses (tools/handbook-checks.mjs), names an
 //               operation of docs/api/openapi-v1.json, and uses no {variable} before a `save` sets it — statically, no
 //               server (the runner is tools/run-handbook-checks.mjs); and every tutorial and how-to carries at least one
 //               check block (plan §4.3, §4.4).
+//   7 edition   every page resolves an edition badge (tools/handbook-editions.mjs: from its hub's Product Map Item, or a
+//               declared `edition:` where nothing derives); a declared edition is a known one and never earlier than
+//               the derived one (plan §4.2: a page cannot claim the wrong edition).
 // A floor fails a manifest that has almost nothing in it. Tests: tools/check-handbook.test.mjs.
 
 import { execFileSync } from 'node:child_process';
@@ -25,6 +28,7 @@ import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { AUDIENCES, CHAPTER_IDS, HOWTO_HEADINGS, MANIFEST, TRACKS, TYPES, loadManifest, render } from './render-handbook.mjs';
 import { extractBlocks, validatePage } from './handbook-checks.mjs';
+import { EDITIONS, editionIndex, editionName, gatherFacts, widens, withEditions } from './handbook-editions.mjs';
 
 export const OPENAPI = 'docs/api/openapi-v1.json';
 /** Page types whose every page must carry a check block (plan §4.3). */
@@ -52,8 +56,13 @@ export function findings(book, tracked, read, renderSite = render) {
         else if (seenFile.has(p.file)) out.push(`pages: ${p.file} is listed twice (${seenFile.get(p.file)}, ${at})`);
         else seenFile.set(p.file, at);
         if (!TYPES.includes(p.type)) out.push(`pages: ${at} type '${p.type}' is not one of ${TYPES.join(', ')}`);
-        if (!AUDIENCES.includes(p.audience)) out.push(`pages: ${at} audience '${p.audience}' is not external or internal`);
+        if (!AUDIENCES.includes(p.audience)) out.push(`pages: ${at} audience '${p.audience}' is not one of ${AUDIENCES.join(', ')}`);
         if (!p.tracks.length || p.tracks.some((t) => !TRACKS.includes(t))) out.push(`pages: ${at} tracks [${p.tracks}] must be from ${TRACKS.join(', ')}`);
+        if (p.declaredEdition && !editionName(p.declaredEdition)) out.push(`edition: ${at} edition '${p.declaredEdition}' is not one of ${EDITIONS.join(', ')}`);
+        else if (!p.edition) out.push(`edition: ${at} resolves no edition — it is in no hub, or its hub's Product Map Item ships in no Offering; declare \`edition:\` on the page`);
+        else if (p.declaredEdition && p.derivedEdition && widens(p.edition, p.derivedEdition)) {
+            out.push(`edition: ${at} declares ${p.edition}, but its hub's Product Map Item first ships in ${p.derivedEdition} — a page may narrow its edition, never widen it`);
+        }
         if (p.type === 'howto' && trackedSet.has(p.file)) {
             const heads = [...read(p.file).matchAll(/^#{2,3}\s+(.*?)\s*$/gm)].map((m) => m[1].replace(/[`*_]/g, ''));
             const missing = HOWTO_HEADINGS.filter((h) => !heads.includes(h));
@@ -94,16 +103,17 @@ function main() {
     if (!existsSync(MANIFEST)) { console.error(`✗ check-handbook: ${MANIFEST} not found — run from the repository root`); process.exit(2); }
     const tracked = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8', maxBuffer: 1 << 28 }).split('\0').filter(Boolean);
     let book;
-    try { book = loadManifest(readFileSync(MANIFEST, 'utf8')); } catch (e) { console.error(`✗ check-handbook: ${MANIFEST}: ${e.message}`); process.exit(1); }
+    try { book = withEditions(loadManifest(readFileSync(MANIFEST, 'utf8')), editionIndex(gatherFacts('.'))); } catch (e) { console.error(`✗ check-handbook: ${MANIFEST}: ${e.message}`); process.exit(1); }
     const pages = book.chapters.flatMap((c) => c.pages);
     if (pages.length < MIN_PAGES) { console.error(`✗ check-handbook: only ${pages.length} page(s) in the manifest, below the floor of ${MIN_PAGES}`); process.exit(1); }
     const f = findings(book, tracked, (p) => readFileSync(p, 'utf8'));
     if (f.length) { console.error(`✗ check-handbook: ${f.length} finding(s)\n` + f.map((x) => '  ' + x).join('\n')); process.exit(1); }
     const ext = pages.filter((p) => p.audience === 'external').length;
+    const trn = pages.filter((p) => p.audience === 'training').length;
     const checks = pages.reduce((n, p) => n + extractBlocks(readFileSync(p.file, 'utf8')).length, 0);
     const byType = Object.fromEntries(['tutorial', 'howto', 'reference', 'concept', 'unsorted'].map((t) => [t, pages.filter((p) => p.type === t).length]));
-    console.log(`✓ check-handbook: ${book.chapters.length} chapters, ${pages.length} pages (${ext} external, ${pages.length - ext} internal; ` +
-        `${Object.entries(byType).map(([k, v]) => `${v} ${k}`).join(', ')}); every hub guide placed; ${checks} check block(s) parse and name known routes; the external render neither leaks nor dangles.`);
+    console.log(`✓ check-handbook: ${book.chapters.length} chapters, ${pages.length} pages (${ext} external, ${trn} training, ${pages.length - ext - trn} internal; ` +
+        `${Object.entries(byType).map(([k, v]) => `${v} ${k}`).join(', ')}); every hub guide placed; every page carries an edition badge (${pages.filter((p) => p.declaredEdition).length} declared, the rest derived); ${checks} check block(s) parse and name known routes; the external render neither leaks nor dangles.`);
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) main();

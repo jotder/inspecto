@@ -217,6 +217,16 @@
     "status" : "planned",
     "addable" : false
   }, {
+    "id" : "acquisition.db.postgres",
+    "family" : "ACQ",
+    "label" : "Postgres table or query copy",
+    "emoji" : "🐘",
+    "icon" : "heroicons_outline:circle-stack",
+    "status" : "delivered",
+    "nodeType" : "acquisition",
+    "note" : "the `postgres` connector (`connector: postgres`; DuckDB's postgres extension, no driver): one table or read-only query per run, a read-only login, the password an `INSPECTO_PG_` reference only. Every edition, Basic included: Add data's Choose a table (BASIC-ELT-PROFILE-1 BE-4)",
+    "addable" : true
+  }, {
     "id" : "parser.delimited",
     "family" : "PRS",
     "label" : "Delimited / CSV / TSV / PSV parser",

@@ -538,6 +538,7 @@ com.gamma.consignment.ConsignmentOutput | public ConsignmentOutput(String, Strin
 com.gamma.consignment.ConsignmentOutput | public record ConsignmentOutput(String consignmentId, String runId, String tableName, String partitionKey, String recordDay, String path, long rows, long bytes, String writtenAt, State state, String schemaFingerprint, EventTimeBounds bounds, String producer)
 com.gamma.consignment.ConsignmentOutput.State | constant COMPACTED_AWAY
 com.gamma.consignment.ConsignmentOutput.State | constant LIVE
+com.gamma.consignment.ConsignmentOutput.State | constant REPLACED
 com.gamma.consignment.ConsignmentOutput.State | constant SIMULATED
 com.gamma.consignment.ConsignmentOutput.State | constant SUPERSEDED
 com.gamma.consignment.ConsignmentOutput.State | public enum State
@@ -546,6 +547,7 @@ com.gamma.consignment.ConsignmentOutputStores | public static DbConsignmentOutpu
 com.gamma.consignment.ConsignmentOutputStores | public static boolean stepsEnabled()
 com.gamma.consignment.ConsignmentOutputStores | public static java.util.Optional<EventTimeBounds> bounds(String)
 com.gamma.consignment.ConsignmentOutputStores | public static void markCompactedAway(List<String>)
+com.gamma.consignment.ConsignmentOutputStores | public static void markReplaced(List<String>)
 com.gamma.consignment.ConsignmentOutputStores | public static void record(List<ConsignmentOutput>)
 com.gamma.consignment.ConsignmentOutputStores | public static void recordSteps(List<com.gamma.pipeline.exec.StepReceipt>)
 com.gamma.consignment.ConsignmentOutputStores | public static void register(String, DbConsignmentOutputStore)
@@ -603,6 +605,7 @@ com.gamma.consignment.DbConsignmentOutputStore | public String browseLabel()
 com.gamma.consignment.DbConsignmentOutputStore | public boolean isReadable(String)
 com.gamma.consignment.DbConsignmentOutputStore | public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.util.BrowsableStore
 com.gamma.consignment.DbConsignmentOutputStore | public int markCompactedAway(List<String>)
+com.gamma.consignment.DbConsignmentOutputStore | public int markReplaced(List<String>)
 com.gamma.consignment.DbConsignmentOutputStore | public int pruneSteps(java.time.Instant)
 com.gamma.consignment.DbConsignmentOutputStore | public int supersede(String)
 com.gamma.consignment.DbConsignmentOutputStore | public int supersedeOtherRevisions(String, String)
@@ -826,6 +829,7 @@ com.gamma.etl.ConsignmentEvent | public record ConsignmentEvent(String pipeline,
 com.gamma.etl.EditionFeatureProvider | Set<String> features()
 com.gamma.etl.EditionFeatureProvider | public interface EditionFeatureProvider
 com.gamma.etl.IngestResult | public record IngestResult(long parsedRows, long errorRows, long junkCandidateRows)
+com.gamma.etl.PipelineConfig | public ArrivalLoad arrivalLoad()
 com.gamma.etl.PipelineConfig | public Chunking chunking()
 com.gamma.etl.PipelineConfig | public Collector collector()
 com.gamma.etl.PipelineConfig | public CommitRetryPolicy commitRetry()
@@ -861,6 +865,7 @@ com.gamma.etl.PipelineConfig | public Reference reference()
 com.gamma.etl.PipelineConfig | public Refusal refusal()
 com.gamma.etl.PipelineConfig | public RejectMode rejectMode()
 com.gamma.etl.PipelineConfig | public Schemas schemas()
+com.gamma.etl.PipelineConfig | public String arrivalLoadRefusal()
 com.gamma.etl.PipelineConfig | public String description()
 com.gamma.etl.PipelineConfig | public String outputStore()
 com.gamma.etl.PipelineConfig | public String stream()
@@ -883,6 +888,13 @@ com.gamma.etl.PipelineConfig | public static PipelineConfig loadForValidation(St
 com.gamma.etl.PipelineConfig | public static boolean selectsByColumnIndex(String)
 com.gamma.etl.PipelineConfig | public void prepare() throws IOException
 com.gamma.etl.PipelineConfig | public void requireRunnable()
+com.gamma.etl.PipelineConfig.ArrivalLoad | public record ArrivalLoad(Mode mode, String periodColumn)
+com.gamma.etl.PipelineConfig.ArrivalLoad | public static final ArrivalLoad APPEND
+com.gamma.etl.PipelineConfig.ArrivalLoad.Mode | constant APPEND
+com.gamma.etl.PipelineConfig.ArrivalLoad.Mode | constant PERIOD
+com.gamma.etl.PipelineConfig.ArrivalLoad.Mode | constant REPLACE
+com.gamma.etl.PipelineConfig.ArrivalLoad.Mode | public enum Mode
+com.gamma.etl.PipelineConfig.ArrivalLoad.Mode | public static Mode from(String)
 com.gamma.etl.PipelineConfig.Chunking | public boolean appliesTo(long)
 com.gamma.etl.PipelineConfig.Chunking | public long effectiveChunkBytes()
 com.gamma.etl.PipelineConfig.Chunking | public record Chunking(long maxFileBytes, long targetChunkBytes)

@@ -433,6 +433,7 @@ $screeningJarSrc = $null
 $anomalyJarSrc = $null
 $predictiveJarSrc = $null
 $realtimeJarSrc = $null
+$mcpJarSrc = $null
 if ($Edition -ne 'Basic') {
     # NB: not $profile — that is a PowerShell automatic variable.
     $editionProfile = if ($Edition -eq 'Preview') { 'edition-preview' } elseif ($Edition -eq 'Advanced') { 'edition-advanced' } else { 'edition-standard' }
@@ -604,6 +605,14 @@ if ($Edition -ne 'Basic') {
                       Select-Object -First 1 -ExpandProperty FullName
     if (-not $realtimeJarSrc -or -not (Test-Path $realtimeJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $realtimeTargetDir\inspecto-realtime-*.jar. Run without -NoBuild, or build it with: mvn -o package -pl :inspecto-realtime -am -DskipTests"
+    }
+    # AGENT-KIT-1 AK-1: the MCP endpoint (POST /mcp, read-only MCP Tools replaying existing routes as the caller). THIN; Standard and above, never Basic (D-UE4).
+    $mcpTargetDir = Join-Path $sandboxRoot 'features\inspecto-mcp\target'
+    $mcpJarSrc = Get-ChildItem -Path $mcpTargetDir -Filter 'inspecto-mcp-*.jar' -ErrorAction SilentlyContinue |
+                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                      Select-Object -First 1 -ExpandProperty FullName
+    if (-not $mcpJarSrc -or -not (Test-Path $mcpJarSrc)) {
+        throw "$Edition edition requested but no JAR found matching $mcpTargetDir\inspecto-mcp-*.jar. Run without -NoBuild, or build it with: mvn -o package -pl :inspecto-mcp -am -DskipTests"
     }
     # MODULE-REORG-P7: the Case Management add-on (Case Rules, merge/split, open-from-entities). THIN like inspecto-ops; Standard and above.
     $caseMgmtTargetDir = Join-Path $sandboxRoot 'features\inspecto-case-management\target'
@@ -1133,6 +1142,22 @@ if ($realtimeJarSrc) {
         Write-Host "  verified: RealtimeDetection and EditionFeatureProvider registrations present in the Real-time Detection module" -ForegroundColor DarkGray
     } finally { $rtZip.Dispose() }
 }
+if ($mcpJarSrc) {
+    Copy-Item $mcpJarSrc "$libDir\inspecto-mcp.jar"
+    Write-Host "Bundled MCP endpoint module -> inspecto-mcp.jar" -ForegroundColor Green
+    # Thin jar: the only way it ships INERT is a missing META-INF/services entry - POST /mcp would answer the absent-module 503.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $mcpZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-mcp.jar")
+    try {
+        $mcpEntry = $mcpZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.http.RouteModule' }
+        if (-not $mcpEntry) { throw 'inspecto-mcp.jar has no META-INF/services/com.gamma.spi.http.RouteModule - McpRoutes would never be discovered.' }
+        $mcpReader = New-Object System.IO.StreamReader($mcpEntry.Open())
+        try { $mcpBody = $mcpReader.ReadToEnd() } finally { $mcpReader.Dispose() }
+        if ($mcpBody -notmatch [regex]::Escape('com.gamma.mcp.McpRoutes')) { throw "inspecto-mcp.jar's RouteModule service file does not list com.gamma.mcp.McpRoutes - it lists only: $mcpBody" }
+        if (-not ($mcpZip.Entries | Where-Object { $_.FullName -eq 'META-INF/inspecto/mcp/GLOSSARY.md' })) { throw 'inspecto-mcp.jar does not carry META-INF/inspecto/mcp/GLOSSARY.md - inspecto://glossary would be empty.' }
+        Write-Host '  verified: RouteModule registration and the packaged glossary present in the MCP endpoint module' -ForegroundColor DarkGray
+    } finally { $mcpZip.Dispose() }
+}
 if ($caseMgmtJarSrc) {
     Copy-Item $caseMgmtJarSrc "$libDir\inspecto-case-management.jar"
     Write-Host "Bundled Case Management module -> inspecto-case-management.jar" -ForegroundColor Green
@@ -1460,11 +1485,19 @@ if (Test-Path $uiDist) {
         Write-Host "Bundled UI from $($indexHtml.DirectoryName) → $uiOut$stale" -ForegroundColor Green
         # USER-HANDBOOK-1: the user Handbook, pre-rendered to static pages, served at /help/ from the same ui/ folder.
         # Every edition ships it. Never --internal here: internal-audience pages must not reach a bundle.
+        # TRAINING-BUNDLE-1 (D-UE7): the Labs and the instructor kit (`audience: training`) ship in the Preview and in a demo build
+        # only, never in a sold edition's /help. tools/check-bundle-handbook.mjs holds that rule (--audience) and judges the
+        # rendered folder against it (--bundle); its no-argument mode (CI) pins this block.
         $helpOut = Join-Path $uiOut 'help'
-        & node (Join-Path $sandboxRoot 'tools\render-handbook.mjs') --out $helpOut
+        $helpAudience = & node (Join-Path $sandboxRoot 'tools\check-bundle-handbook.mjs') --audience --edition $Edition --distribution $Distribution
+        if ($LASTEXITCODE -ne 0) { throw "check-bundle-handbook.mjs --audience failed (see above)" }
+        $helpArgs = @(if ($helpAudience -eq 'training') { '--training' })   # @(...): an `if` returning a one-element array unrolls to a string, and splatting a string passes its characters
+        & node (Join-Path $sandboxRoot 'tools\render-handbook.mjs') --out $helpOut @helpArgs
         if ($LASTEXITCODE -ne 0) { throw "render-handbook.mjs failed (see above) - the bundle would ship without its /help Handbook" }
         if (-not (Test-Path (Join-Path $helpOut 'index.html'))) { throw "render-handbook.mjs wrote no $helpOut\index.html" }
-        Write-Host "  Handbook rendered → $helpOut" -ForegroundColor DarkGray
+        & node (Join-Path $sandboxRoot 'tools\check-bundle-handbook.mjs') --bundle $helpOut --edition $Edition --distribution $Distribution
+        if ($LASTEXITCODE -ne 0) { throw "the rendered /help Handbook carries pages its edition may not ship (see above)" }
+        Write-Host "  Handbook rendered ($helpAudience) → $helpOut" -ForegroundColor DarkGray
     } else {
         Write-Host "  (no index.html under $uiDist — skipping UI bundle)" -ForegroundColor Yellow
     }

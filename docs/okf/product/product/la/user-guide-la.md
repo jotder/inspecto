@@ -8,6 +8,7 @@
 
 - [Geo Map Analysis](../../module/geo-link/user-guide-geo-map.md)
 - [Link Analysis and Investigations](../../module/la-core/user-guide-concept-link-analysis.md)
+- [Explore links between entities](../../module/la-core/user-guide-howto-explore-links.md)
 - [Link Analysis — User Guide — Expand, analyse, match patterns and save](../../module/la-core/user-guide-la-core-analysis.md)
 - [Link Analysis — User Guide — The screen, building and looking at a graph](../../module/la-core/user-guide-la-core-building-graph.md)
 - [Link Analysis — User Guide — Worked examples, roles, limits and troubleshooting](../../module/la-core/user-guide-la-core-examples-roles.md)

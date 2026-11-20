@@ -607,6 +607,10 @@ public final class CapabilityManifest {
             new Exemption("POST", "/db/query", "group-gated",
                     "gated IN the handler: canAuthorWorkbench for an operational (ops:*) group — the control-plane DB, the rows the anomaly_scan / suggest_expectations agent tools read; business-store SQL stays open as read-shaped (SqlGuard-checked) because Viewer dashboards read Dataset rows through it. GET /db/table carries the same in-handler gate. Invisible to the route-gating scanners — pinned by ControlApiDbBrowserTest"),
             new Exemption("POST", "/bi/query", "read-shaped", "a Measure query; the body is the query spec"),
+            // AGENT-KIT-1 AK-1 (2026-11-20): the MCP endpoint of the optional inspecto-mcp module. Every MCP Tool is an
+            // in-process replay of an existing route as the caller (ApiContext.replay), so that route's own gates decide;
+            // the endpoint itself persists nothing. AK-2 revisits the category when write tools land (spec-mcp.md).
+            new Exemption("POST", "/mcp", "read-shaped", "the MCP endpoint (read-only in AK-1): each tool call replays an existing route as the caller, whose own policy, capability and masking gates decide; persists nothing"),
             // Operator D4 2026-09-25 (parser-plugins-trust-design.md slice P4): the gate depends on the PARSER, so
             // it lives IN the handler and the manifest (all-or-nothing per route) records it here, as /spaces does.
             new Exemption("POST", "/parsers/([^/]+)/preview", "provenance-gated",

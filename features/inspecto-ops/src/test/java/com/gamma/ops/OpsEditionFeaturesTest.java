@@ -1,5 +1,6 @@
 package com.gamma.ops;
 
+import com.gamma.etl.BasicProfile;
 import com.gamma.etl.EditionFeatures;
 import org.junit.jupiter.api.Test;
 
@@ -47,11 +48,11 @@ class OpsEditionFeaturesTest {
     @Test
     void opsDeclaresTheDataTierScreenGates() {
         EditionFeatures.overrideForTest(null);
-        for (String f : EditionFeatures.SCREEN_FLAGS.values()) {
+        for (String f : BasicProfile.SCREEN_FLAGS.values()) {
             assertTrue(EditionFeatures.present(f), f + " is declared where inspecto-ops ships (Standard and up)");
             assertFalse(EditionFeatures.gatesRoutes(f), f + " is a screen gate, never a route feature");
         }
-        for (String flag : EditionFeatures.SCREEN_FLAGS.keySet())
+        for (String flag : BasicProfile.SCREEN_FLAGS.keySet())
             assertFalse(EditionFeatures.lockedReasons().containsKey(flag), flag + " is not withheld on Standard");
     }
 

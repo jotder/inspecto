@@ -99,6 +99,7 @@ final class SaveGate {
         f.addAll(ClassificationVocabulary.findings(type, draft, writeRoot));   // CLASSIFICATION-UNMASKED-CLASS-1
         f.addAll(ConfigRoutes.collectorFindings(type, draft));   // post_action MOVE target; inert remote keys
         f.addAll(ConfigRoutes.sinkLakeCollisionFindings(type, draft));
+        f.addAll(arrivalLoadFindings(type, draft, configDir));   // BASIC-ELT-PROFILE-1 O6
         f.addAll(editionFindings(type, draft));   // G9: Standard+ features on a Basic build
         // Referential: a collector bound to a Connection this Space does not have throws once per poll.
         if (referents == Referents.MUST_EXIST) f.addAll(ConfigRoutes.unknownConnectionFindings(type, draft, api));
@@ -212,6 +213,29 @@ final class SaveGate {
                         + e.sheets().get(i).name() + "' refused: " + problem, FindingCodes.ERR_EXCEL_INVALID, fix));
         }
         return out;
+    }
+
+    /**
+     * {@code output.load: replace | period} on a store it cannot rewrite safely ({@code BASIC-ELT-PROFILE-1} O6, operator
+     * 2026-11-20: a single local Parquet store only), and a {@code output.period_column} the schema does not declare -
+     * judged by the load's own rules ({@link PipelineConfig#arrivalLoadRefusal()}, the parser), so the save and the
+     * registration cannot disagree. Refused regardless of {@code active}. A draft whose schema cannot be read yet is left
+     * to the load.
+     */
+    static List<Finding> arrivalLoadFindings(String type, Map<String, Object> draft, Path configDir) {
+        if (!"pipeline".equals(type) || !(draft.get("output") instanceof Map<?, ?> out)) return List.of();
+        Object load = out.get("load");
+        if (load == null || String.valueOf(load).isBlank() || "append".equalsIgnoreCase(String.valueOf(load).trim())) return List.of();
+        try {
+            String refused = PipelineConfig.fromMap(draft, configDir).arrivalLoadRefusal();
+            return refused == null ? List.of() : List.of(Finding.error("output.load", refused));
+        } catch (IllegalArgumentException bad) {
+            String msg = String.valueOf(bad.getMessage());
+            return msg.contains("output.period_column '") ? List.of(Finding.error("output.period_column",
+                    msg.replaceFirst("^Config error in <config>: ", ""))) : List.of();
+        } catch (Exception notThisCheck) {
+            return List.of();   // the owning check (or the load) reports it
+        }
     }
 
     /**

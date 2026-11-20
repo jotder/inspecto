@@ -20,7 +20,7 @@ tags: [product-item, module]
 | architecture | current | [Reconciliation](architecture-reconciliation.md) |
 | features | current | [Reconciliation — features](features-reconciliation.md) |
 | feature-db | current | [Reconciliation — feature database](feature-db.md) |
-| user-guide | current | [Reconciliation](user-guide-reconciliation.md) |
+| user-guide | current | [Reconcile two Datasets](user-guide-howto-reconcile-two-datasets.md) · [Reconciliation](user-guide-reconciliation.md) |
 | admin-guide | current | [Reconciliation — admin guide](admin-guide-reconciliation.md) |
 | api | current | [Reconciliation — API](api-reconciliation.md) · [HTTP routes — module.reconciliation](api-routes.md) |
 | tests | current | [Reconciliation — tests inventory](tests-inventory.md) |
@@ -34,4 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `RECON-CROSS-PERIOD-1` | P3 | feature | a Reconciliation is read one day at a time: | — |
 | `PACK-PARTNER-SETTLEMENT-1` | P3 | feature | Partner settlement slices W1…W3 (wholesale, MVNO, roaming) and confirmation of the delegated decisions. | — |
+| `HOWTO-DOC-DRIFT-1` | P3 | chore | internal hub pages that contradict the code, found writing the P3 how-tos: | — |

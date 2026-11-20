@@ -243,6 +243,93 @@ class ControlApiPostgresSnapshotTest {
         }
     }
 
+    /**
+     * BE-4 part 2: the Safety Policy's network gate applies to the snapshot read - the test and the copy (Run now reads
+     * through the same connector session) - before anything is dialled or resolved: an unset reference would otherwise
+     * answer "not set".
+     */
+    @Test
+    void aHostTheSafetyPolicyRefusesIsRefusedBeforeAnythingIsDialled(@TempDir Path cfg, @TempDir Path root, @TempDir Path server)
+            throws Exception {
+        Files.writeString(server.resolve("safety-policy.toon"), "deny:\n  hosts[1]: pg.refused.example\n");
+        String prior = System.getProperty("system.config.dir");
+        System.setProperty("system.config.dir", server.toString());
+        try (Ctx c = open(cfg, root)) {
+            String var = "INSPECTO_PG_SURELY_UNSET_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8).toUpperCase();
+            String refused = conn("pg.refused.example", 5432, "db", RO, "${ENV:" + var + "}");
+            for (String[] call : List.of(new String[]{"/onboard/postgres/test", "{\"connection\":" + refused + "}"},
+                    new String[]{"/onboard/postgres", "{\"connection\":" + refused + ",\"schema\":\"public\",\"table\":\"t\"}"})) {
+                HttpResponse<String> r = post(c, call[0], call[1], null);
+                assertEquals(422, r.statusCode(), call[0] + " " + r.body());
+                assertTrue(error(r).contains("Safety Policy") && error(r).contains("pg.refused.example"), r.body());
+                assertFalse(error(r).contains("not set"), "the gate answered first: " + r.body());
+            }
+            // a host the policy leaves alone reaches the password lookup as before
+            HttpResponse<String> other = post(c, "/onboard/postgres/test", "{\"connection\":"
+                    + conn("127.0.0.1", 5432, "db", RO, "${ENV:" + var + "}") + "}", null);
+            assertEquals(422, other.statusCode(), other.body());
+            assertTrue(error(other).contains("not set"), other.body());
+        } finally {
+            if (prior == null) System.clearProperty("system.config.dir");
+            else System.setProperty("system.config.dir", prior);
+        }
+    }
+
+    private HttpResponse<String> delete(Ctx c, String path, String auth) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + path));
+        if (auth != null) b.header("Authorization", auth);
+        return client.send(b.DELETE().build(), BodyHandlers.ofString());
+    }
+
+    /**
+     * BE-4 part 2: {@code DELETE /connections/{id}} refuses (409) the Connection a Postgres snapshot reads through - named in
+     * its {@code _snapshot.toon}, or, when that file cannot be read, the one its commit saved ({@code <id>_postgres}) - and
+     * the answer names the Dataset, never a server path. Every gate of the route: 503, 401, 403, 404, 409, 200.
+     */
+    @Test
+    void aConnectionASnapshotReadsThroughCannotBeDeleted(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, null)) {
+            assertEquals(503, delete(c, "/connections/sales_postgres", null).statusCode());
+        }
+        String connector = "Bearer connector";
+        Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
+            case "Bearer connector" -> Optional.of(new Subject("connector-1", Set.of("canOnboardConnections")));
+            case ANALYST -> Optional.of(new Subject("analyst-1", Set.of("canManageIncidents", "canAuthorWorkbench")));
+            default -> Optional.empty();
+        });
+        try (Ctx c = open(cfg, root)) {
+            String ref = "${ENV:" + PASSWORD_ENV + "}";
+            data(post(c, "/connections", pgConnection("sales_postgres", ref), connector), 200);
+            data(post(c, "/connections", pgConnection("other_postgres", ref), connector), 200);
+            Path imports = Files.createDirectories(root.resolve(OnboardImport.CONFIG_DIR));
+            Path named = imports.resolve("sales" + PostgresSnapshot.SUFFIX);
+            Files.writeString(named, "source: postgres\nconnection: sales_postgres\n");
+            Path broken = imports.resolve("other" + PostgresSnapshot.SUFFIX);
+            Files.writeString(broken, "connection[2]: other_postgres\n");   // a bad array header: the file cannot be read
+
+            assertEquals(401, delete(c, "/connections/sales_postgres", null).statusCode());
+            assertEquals(403, delete(c, "/connections/sales_postgres", ANALYST).statusCode());
+            assertEquals(404, delete(c, "/connections/nothing_here", connector).statusCode());
+            for (String[] t : List.of(new String[]{"sales_postgres", "sales"}, new String[]{"other_postgres", "other"})) {
+                HttpResponse<String> r = delete(c, "/connections/" + t[0], connector);
+                assertEquals(409, r.statusCode(), t[0] + " " + r.body());
+                assertTrue(error(r).contains("'" + t[1] + "'"), "names the Dataset: " + r.body());
+                for (String leak : List.of(root.toString(), root.toString().replace('\\', '/'), OnboardImport.CONFIG_DIR + "/", ".toon"))
+                    assertFalse(r.body().contains(leak), "no server path in the answer (" + leak + "): " + r.body());
+                assertTrue(Files.exists(root.resolve(t[0] + "_connection.toon")), "the Connection is kept: " + t[0]);
+                HttpResponse<String> still = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port
+                        + "/api/v1/connections/" + t[0])).header("Authorization", connector).GET().build(), BodyHandlers.ofString());
+                assertEquals(200, still.statusCode(), "still registered: " + t[0] + " " + still.body());
+            }
+
+            // the snapshot gone, its Connection may go
+            Files.delete(named);
+            data(delete(c, "/connections/sales_postgres", connector), 200);
+            assertFalse(Files.exists(root.resolve("sales_postgres_connection.toon")));
+            assertEquals(409, delete(c, "/connections/other_postgres", connector).statusCode(), "the other snapshot still holds its own");
+        }
+    }
+
     // ── against a real Postgres ─────────────────────────────────────────────────────────────────────────────
 
     /** The superuser fixture: where it is, and a fresh schema holding {@code transfers}. */

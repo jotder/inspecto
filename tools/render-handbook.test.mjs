@@ -7,6 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { CHAPTER_IDS, MANIFEST, inline, loadManifest, markdownToHtml, render } from './render-handbook.mjs';
+import { editionIndex, gatherFacts, withEditions } from './handbook-editions.mjs';
 
 test('markdown: frontmatter and comments dropped, title and headings collected', () => {
     const r = markdownToHtml('---\ntitle: x\n---\n<!-- hidden -->\n# The Title\n\n## Part `one`\ntext');
@@ -62,7 +63,7 @@ test('inline: raw HTML escaped, code kept literal, images become alt text, links
 const BOOK = {
     title: 'H', chapters: [
         { id: 'start', title: 'Start', group: 'S', summary: 's', pages: [
-            { id: 'pub', chapter: 'start', file: 'docs/A.md', type: 'reference', tracks: ['builder'], audience: 'external' },
+            { id: 'pub', chapter: 'start', file: 'docs/A.md', type: 'reference', tracks: ['builder'], audience: 'external', edition: 'Standard' },
             { id: 'team', chapter: 'start', file: 'docs/okf/B.md', type: 'unsorted', tracks: ['builder'], audience: 'internal' },
         ] },
     ],
@@ -77,6 +78,7 @@ test('render: the external render holds only external pages, and links to others
     assert.ok(pub.includes('<span class="nolink">team page</span>'));
     assert.ok(pub.includes('<a href="pub.html#top">self</a>'));
     assert.ok(!JSON.stringify([...files.values()]).includes('secret'));
+    assert.ok(pub.includes('<span class="edition" title="Editions this page applies to">Standard · Advanced</span>'), 'the edition badge');
 });
 
 test('render: --internal adds the internal pages and links to them', () => {
@@ -85,10 +87,21 @@ test('render: --internal adds the internal pages and links to them', () => {
     assert.ok(files.get('pub.html').includes('<a href="team.html">team page</a>'));
 });
 
+test('render: --training adds the training pages to the external ones, never the internal ones (D-UE7)', () => {
+    const book = { ...BOOK, chapters: [{ ...BOOK.chapters[0], pages: [...BOOK.chapters[0].pages,
+        { id: 'lab', chapter: 'start', file: 'docs/L.md', type: 'tutorial', tracks: ['builder'], audience: 'training' }] }] };
+    const read = (f) => ({ ...READ, 'docs/L.md': '# Lab\nanswers' })[f];
+    assert.ok(!render(book, read).files.has('lab.html'), 'the default (bundle) render leaves the Lab out');
+    const { files } = render(book, read, { training: true });
+    assert.ok(files.has('lab.html') && files.has('pub.html') && !files.has('team.html'));
+    assert.ok(JSON.parse(files.get('search.json')).some((e) => e.id === 'lab'));
+});
+
 test('the real manifest loads with the contract chapters and renders well-formed pages', () => {
-    const book = loadManifest(readFileSync(MANIFEST, 'utf8'));
+    const book = withEditions(loadManifest(readFileSync(MANIFEST, 'utf8')), editionIndex(gatherFacts('.')));
     assert.deepEqual(book.chapters.map((c) => c.id), CHAPTER_IDS);
-    const { files } = render(book, (f) => readFileSync(f, 'utf8'));
+    const { files, pages } = render(book, (f) => readFileSync(f, 'utf8'));
+    for (const p of pages) assert.ok(files.get(`${p.id}.html`).includes('<span class="edition"'), `${p.id}: no edition badge`);
     for (const [name, html] of files) {
         if (!name.endsWith('.html')) continue;
         for (const tag of ['ul', 'ol', 'table', 'blockquote', 'pre', 'main', 'nav']) {

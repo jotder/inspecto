@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.elt`](../../../../../product-map/module/elt.toon).
 
-106 test class(es): 106 unit, 0 real-HTTP control-plane, 0 IT.
+108 test class(es): 108 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -20,12 +20,13 @@ Run the whole module, or chosen classes (commas between classes, never `+`):
 
 ```bash
 mvn -o test -pl platform/inspecto-etl
-mvn -o test -pl platform/inspecto-etl -Dtest=AcceptedConfigKeysDocContractTest,ChildSpecTest
+mvn -o test -pl platform/inspecto-etl -Dtest=AcceptedConfigKeysDocContractTest,BasicProfileTest
 ```
 
 | test class | package | kind | file | summary |
 |---|---|---|---|---|
 | `AcceptedConfigKeysDocContractTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/AcceptedConfigKeysDocContractTest.java` | The accepted-names doc is <b>generated from the same map the checker enforces</b>, so it cannot |
+| `BasicProfileTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/BasicProfileTest.java` | {@code BASIC-ELT-PROFILE-1} Gate: the Basic profile is one declaration - what Basic keeps per dimension, the feature |
 | `ChildSpecTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/ChildSpecTest.java` | Parsing D9 slice 2: the {@code children} block's closed shape and every {@code ASN1-CHILD-*} code. |
 | `CollectorResilienceSpecParityTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/CollectorResilienceSpecParityTest.java` | The Collector's retry / circuit-breaker / rate-limit keys are declared in {@code ConfigSpecs.pipeline()} |
 | `CommitLogTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/CommitLogTest.java` | Tests for {@link CommitLog} — the durable append-only batch ledger (D2). |
@@ -84,6 +85,7 @@ mvn -o test -pl platform/inspecto-etl -Dtest=AcceptedConfigKeysDocContractTest,C
 | `PartitionWriterTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/PartitionWriterTest.java` |  |
 | `PhaseFConfigTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/PhaseFConfigTest.java` | Phase F config: additive {@code source.fetch / retry / circuit_breaker / post_action} parsing + defaults. <!-- vocab-allow: quoted Javadoc --> |
 | `PipelineCommitRetryConfigTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/PipelineCommitRetryConfigTest.java` | The per-pipeline {@code processing.retry} block (X1 deferral, 2026-09-25) — the bounded COMMIT retry's cap |
+| `PipelineConfigArrivalLoadTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/PipelineConfigArrivalLoadTest.java` | {@code BASIC-ELT-PROFILE-1} O6: the {@code output.load} arrival mode ({@code append \| replace \| period} with |
 | `PipelineConfigBatchTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/PipelineConfigBatchTest.java` |  |
 | `PipelineConfigCollectorMessageTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/PipelineConfigCollectorMessageTest.java` | COLLECTOR-ERRMSG-1 (authoring-residuals R1): the parser's refusal messages must cite |
 | `PipelineConfigDraftTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/PipelineConfigDraftTest.java` | Schema-less draft parsing (v5.1.0, the stream-onboarding draft lifecycle): a minimal config |

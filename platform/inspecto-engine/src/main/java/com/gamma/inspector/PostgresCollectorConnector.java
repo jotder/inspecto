@@ -8,6 +8,8 @@ import com.gamma.acquire.PatternFilter;
 import com.gamma.acquire.PostAction;
 import com.gamma.acquire.RemoteFile;
 import com.gamma.auth.secrets.SecretResolver;
+import com.gamma.config.safety.EgressGate;
+import com.gamma.config.safety.EgressRefusedException;
 import com.gamma.etl.DuckDbExtension;
 import com.gamma.util.DuckDbUtil;
 import com.gamma.util.SqlIdent;
@@ -51,6 +53,10 @@ import static com.gamma.acquire.CollectorConnector.Capability.STREAM;
  * The value is resolved only at connect time into a {@code TEMPORARY SECRET} of an in-memory DuckDB - never stored,
  * returned, logged or put in a connection string (DuckDB echoes a libpq string, password included, in its connect error;
  * the secret form does not) - and every error text is scrubbed of it anyway.
+ *
+ * <p><b>The Safety Policy's network gate</b> ({@link EgressGate}) is passed before every session, before the password is
+ * resolved: a host the Space's or the server's policy refuses is {@link Refused}, whoever asked (Add data's test, draft or
+ * Run now, or a Pipeline's acquisition, which {@code CollectorConnectors.forConfig} has also gated).
  *
  * <h3>Read-only, three ways</h3>
  * The database is attached {@code READ_ONLY}, so DuckDB refuses a write and the Postgres session runs
@@ -323,6 +329,15 @@ public final class PostgresCollectorConnector implements CollectorConnector {
 
         static Session open(PostgresCollectorConnector c, Path dir) {
             ConnectionProfile p = c.profile;
+            // BE-4 part 2: the Safety Policy's network gate, before any password is resolved - on every session, so Add
+            // data's test, draft and Run now pass it as a Pipeline's acquisition does (CollectorConnectors.forConfig). The
+            // calling thread's tier: Add data's request thread, or the acquisition's pinned run thread (one export file,
+            // so the fetch is never handed to a pool worker)
+            try {
+                EgressGate.current().require(p.host(), c.port, "postgres connection '" + p.id() + "'");
+            } catch (EgressRefusedException refused) {
+                throw new Refused(refused.getMessage(), 0);
+            }
             String ref = p.password().trim();
             String pw = SecretResolver.resolve(ref);
             if (pw == null) {

@@ -176,6 +176,7 @@ source for them yet (see `docs/okf/product/layer/platform/spec-module-reorg-deci
 | `entity-list` - Entity lists | features | optional | `entity-store` | ✅ | ✅ | ✅ | ✅ |
 | `exchange` - Exchange (publication and ingestion contracts) | features | optional | — | — | ✅ | ✅ | ✅ |
 | `intelligence` - AI assist and intelligence | features | optional | — | — | — | ✅ | ✅ |
+| `mcp` - MCP endpoint | features | optional | — | — | ✅ | ✅ | ✅ |
 | `observability` - Observability (metrics endpoint + events feed API) | features | optional | — | — | ✅ | ✅ | ✅ |
 | `ops` - Case management and objects | features | optional | — | — | ✅ | ✅ | ✅ |
 | `predictive` - Predictive Analytics | features | optional | — | — | ✅ | ✅ | ✅ |
@@ -238,8 +239,8 @@ source for them yet (see `docs/okf/product/layer/platform/spec-module-reorg-deci
 
 | | Basic | Standard | Advanced | Preview |
 |---|:-:|:-:|:-:|:-:|
-| First-party jars (processor + connectors + optional + core thin) | 23 | 42 | 46 | 46 |
+| First-party jars (processor + connectors + optional + core thin) | 23 | 43 | 47 | 47 |
 | of which core thin jars | 16 | 16 | 16 | 16 |
-| Optional modules beyond Basic | 0 | 19 | 23 | 23 |
-| Total on the classpath (+ third-party sidecars) | 23 | 43 | 47 | 47 |
+| Optional modules beyond Basic | 0 | 20 | 24 | 24 |
+| Total on the classpath (+ third-party sidecars) | 23 | 44 | 48 | 48 |
 <!-- offerings-matrix:end -->

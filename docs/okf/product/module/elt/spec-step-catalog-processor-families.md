@@ -15,7 +15,7 @@ code: platform/inspecto-etl
 
 Part 5 of 5 of [Step catalog — every Step kind, delivered and pending](spec-step-catalog.md) · previous: [Webhook and Excel sinks, and the non-chain processors](spec-step-catalog-outbound-sinks.md).
 
-## Collectors & Ingestion (`ACQ`) — 4<!--count:processors-acq-delivered--> delivered · 5<!--count:processors-acq-partial--> partial · 11<!--count:processors-acq-planned--> planned
+## Collectors & Ingestion (`ACQ`) — 5<!--count:processors-acq-delivered--> delivered · 5<!--count:processors-acq-partial--> partial · 11<!--count:processors-acq-planned--> planned
 
 **Delivered**
 
@@ -25,6 +25,7 @@ Part 5 of 5 of [Step catalog — every Step kind, delivered and pending](spec-st
 | SFTP / FTPS remote ingest | `acquisition.file.sftp` | `acquisition` — inspecto-connectors (sftp, ftps; key auth, bastion tunnel, host-key pinning) |
 | JDBC / SQL query batch reader | `acquisition.db.jdbc` | `acquisition` — the db-export connector (`connector: db`, watermark column) |
 | Dataset entry (re-ingest a registered Dataset) | `acquisition.dataset` | `acquisition` — UI-S7: `connector: dataset` + `on:dataset` trigger |
+| Postgres table or query copy | `acquisition.db.postgres` | `acquisition` — the `postgres` connector (DuckDB's postgres extension, no driver; `INSPECTO_PG_` password references only); every edition, Basic included (BASIC-ELT-PROFILE-1 BE-4) |
 
 **Partial**
 
