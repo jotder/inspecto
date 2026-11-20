@@ -72,13 +72,17 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   The checks against earlier runs (bytes, name) stay before the columns (`import.refuse_duplicates`).
   Nothing is replaced, nothing silently skipped. `on_change` is the Pipeline's own setting: set to `reprocess`, a reused
   name is read, and ⚠ a same-name file - in the same folder or another one - REPLACES the first file's rows (the person's
-  choice; engine defect `OUTPUT-NAME-OVERWRITE-1`). A *Replace everything* run judges only the
-  run's own twins: every held row is being replaced (a waiting file with the bytes of a replaced arrival is taken). Add a file and the step ask the ledger whatever the Pipeline's
+  choice; engine defect `OUTPUT-NAME-OVERWRITE-1`). A *Replace everything* run judges its WAITING
+  files the same way (a failed replacement is undone for the upload's own Consignment only, so a waiting file read beside the
+  held rows would double them): one with the bytes, or the name, of a held arrival is set aside with "this Replace everything
+  run replaces them; send it again after the replace, or rename it" - the fingerprints are forgotten AFTER the step judged
+  them, for the upload itself, and after the replace the same bytes are new again. Add a file and the step ask the ledger whatever the Pipeline's
   mode (operator 2026-11-20): an import left on `path` has its uploads fingerprinted by Add data (`recordUpload`).
   **Forgetting:**
   Replace everything forgets every fingerprint of the import before its run - the engine judges the upload against the
   ledger first, while the old rows are replaced inside the run, at the upload's commit (B13) - and an undone or failed
-  replacement (the originals restored by the journal) records them again; Replace the period forgets those of the arrivals
+  replacement (the originals restored by the journal) records them again (once the replacement is final the undo is
+  cleared: a later failure keeps the upload's fingerprint and does not bring the replaced ones back); Replace the period forgets those of the arrivals
   whose rows the Dataset no longer holds (every output file gone, none merged by a compaction), a new import those an
   earlier Dataset of its id left; a run that is undone records them again, and forgets the upload's own fingerprint
   when its rows go with it (a replace or period undone, or a 422 "nothing was imported"). **Upgrade:** at start an import Pipeline still

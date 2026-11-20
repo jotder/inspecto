@@ -150,13 +150,15 @@ final class ImportFingerprints {
      * Step 50, before the columns are judged, against what earlier runs took: set aside in {@code refused/} every waiting
      * file (of the run's {@code only}, when narrowed) whose bytes the import already took, or whose NAME ({@link #nameKey})
      * it took with other bytes (unless the Pipeline says {@code on_change} other than {@code ignore}: then the engine reads
-     * the new bytes) - recorded as a refused arrival with the reason. A <i>Replace everything</i> run skips this step's
-     * checks: the rows the fingerprints stand for are being replaced. The files of THIS run are {@link #refuseTwins}'s,
-     * once every other step has judged them.
+     * the new bytes) - recorded as a refused arrival with the reason. Also in a <i>Replace everything</i> run, for its WAITING
+     * files: a failed replacement is undone for the upload's own Consignment only, so a waiting file read beside the held rows
+     * would stay loaded next to the restored original. The upload itself is not judged here (it is not waiting; its
+     * fingerprints are forgotten by {@link #forgetAll}, which runs AFTER this step). The files of THIS run are
+     * {@link #refuseTwins}'s, once every other step has judged them.
      */
     static void refuseDuplicates(ImportPreRunSteps.Run r) throws IOException {
         PipelineConfig cfg = r.space.service().configFor(r.pipeline()).orElse(null);
-        if (cfg == null || r.job.replace) return;   // a replace sets every held row aside
+        if (cfg == null) return;
         Map<String, LedgerEntry> named = new HashMap<>();
         if (refusesRenamedContent(cfg))
             for (LedgerEntry e : ledger().entries(source(cfg))) named.merge(nameKey(cfg, e), e, (x, y) -> x.processedAt() >= y.processedAt() ? x : y);
@@ -173,6 +175,7 @@ final class ImportFingerprints {
             String reason = first != null
                     ? "the same content was already imported on " + day(first) + " as '" + shown(first) + "'; its rows are in '"
                             + r.id + "', so adding it again would count them twice"
+                            + (r.job.replace ? " (this Replace everything run replaces them; send it again after the replace, or rename it)" : "")
                     : "a file named '" + shown(took) + "' was already imported" + (took.processedAt() > 0 ? " on " + day(took) : "")
                             + (took.checksum() != null ? " with other content" : "")
                             + "; '" + name + "' is not read over it - rename it to import it";
@@ -254,7 +257,8 @@ final class ImportFingerprints {
 
     /**
      * <i>Replace everything</i>, and a new import: forget every fingerprint of the import, so the same bytes may be loaded
-     * again; the job's undo records them again.
+     * again (the upload's own, as the replacement); the job's undo records them again. Replace everything's waiting files are
+     * judged against the fingerprints BEFORE this runs ({@link #refuseDuplicates}).
      */
     static void forgetAll(OnboardImport.Job job, PipelineConfig cfg) {
         forget(job, cfg, ledger().entries(source(cfg)));

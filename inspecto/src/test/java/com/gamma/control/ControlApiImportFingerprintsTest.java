@@ -598,16 +598,80 @@ class ControlApiImportFingerprintsTest {
         }
     }
 
-    /** A Replace everything run takes a waiting file with the bytes of an arrival it replaces: those rows are going. */
+    /**
+     * A waiting file carrying the bytes of an arrival a Replace everything run replaces is set aside, not read beside it: a
+     * failed replacement is undone for the upload's own Consignment only, so such a file would stay loaded next to the
+     * restored original (reviewer's probe: 54 rows instead of 42). Sent again after the replace it is accepted.
+     */
     @Test
-    void replaceEverythingTakesAWaitingFileWithTheBytesItReplaces(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void replaceEverythingSetsAsideAWaitingFileWithTheBytesItReplaces(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             String id = imported(c, "rewaiting", transfers(30));
             data(add(c, id, "october.csv", "append", transfers(12)), 200);
             dropSettled(id, "resent.csv", transfers(12));
             JsonNode s = data(add(c, id, "november.csv", "replace", transfers(9)), 200);
-            assertEquals(21, s.get("rowsAfter").asLong(), s.toString());
-            assertFalse(s.has("refused"), s.toString());
+            assertEquals(9, s.get("rowsAfter").asLong(), s.toString());
+            assertEquals("resent.csv", s.at("/refused/0/file").asText(), s.toString());
+            assertTrue(s.at("/refused/0/reason").asText().contains("this Replace everything run replaces them"), s.toString());
+            assertTrue(Files.exists(Path.of("database", id, OnboardImport.REFUSED_DIR, "resent.csv")), "set aside, not lost");
+            // after the replace the same bytes are new again: sent once more, they are read
+            dropSettled(id, "resent_again.csv", transfers(12));
+            JsonNode again = data(send(c, "POST", "/datasets/" + id + "/run", null), 200);
+            assertEquals(12, again.get("rowsIn").asLong(), again.toString());
+            assertEquals(21, rows(id));
+        }
+    }
+
+    /** Reviewer's probe: the Replace everything fails after the old rows were restored - a waiting re-send must not double. */
+    @Test
+    void aFailedReplaceEverythingDoesNotDoubleAWaitingResend(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "b13double", transfers(30));
+            data(add(c, id, "october.csv", "append", transfers(12)), 200);
+            dropSettled(id, "resent.csv", transfers(12));
+            HttpResponse<String> failed;
+            CollectorService.preRunStep("t.fp.hold2", 200, (svc, p, scheduled) -> id.equals(p)
+                    ? CollectorService.PreRun.SKIP : CollectorService.PreRun.GO);
+            try {
+                failed = add(c, id, "broken.csv", "replace", transfers(5));
+            } finally {
+                CollectorService.preRunStep("t.fp.hold2", 200, (svc, p, scheduled) -> CollectorService.PreRun.GO);
+            }
+            assertEquals(422, failed.statusCode(), failed.body());
+            assertEquals(42, rows(id), "the old rows stand, and the waiting re-send was not read beside them");
+            assertTrue(Files.exists(Path.of("database", id, OnboardImport.REFUSED_DIR, "resent.csv")), "it waits in refused/");
+            JsonNode arrivals = data(send(c, "GET", "/datasets/" + id + "/arrivals", null), 200).get("arrivals");
+            assertTrue(arrivals.toString().contains("this Replace everything run replaces them"), arrivals.toString());
+        }
+    }
+
+    /**
+     * Once a Replace everything is final (its replacement made so), a failure in what follows must not undo what is kept: the
+     * upload's fingerprint stays, and the replaced rows' fingerprints are not recorded again.
+     */
+    @Test
+    void aFailureAfterTheReplacementIsFinalUndoesNothingItKept(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "afterfinal", transfers(30));
+            data(add(c, id, "october.csv", "append", transfers(12)), 200);
+            OnboardImport.followOnsForTest(List.of(new com.gamma.onboard.ImportFollowOn() {
+                public String key() { throw new IllegalStateException("probe"); }
+                public String does() { return "fails"; }
+                public java.util.Set<String> needs() { return java.util.Set.of(); }
+                public java.util.Map<String, Object> run(Context ctx) { throw new IllegalStateException("probe"); }
+            }));
+            HttpResponse<String> failed;
+            try {
+                failed = add(c, id, "november.csv", "replace", transfers(9));
+            } finally {
+                OnboardImport.followOnsForTest(null);
+            }
+            assertEquals(500, failed.statusCode(), "the follow-on's failure escaped: " + failed.body());
+            assertEquals(9, rows(id), "the replacement is final");
+            assertEquals(409, add(c, id, "november_again.csv", "append", transfers(9)).statusCode(),
+                    "the upload's fingerprint was kept with its rows");
+            assertEquals(21, data(add(c, id, "october_again.csv", "append", transfers(12)), 200).get("rowsAfter").asLong(),
+                    "the replaced rows' fingerprints were not recorded again");
         }
     }
 

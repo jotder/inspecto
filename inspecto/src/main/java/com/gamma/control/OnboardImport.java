@@ -1629,9 +1629,9 @@ final class OnboardImport {
                     s.put("dataset", id);
                     j.recordLastImport(s);   // before the old rows are dropped: a failed write still restores them
                     j.dropAside();
+                    j.undo.clear();   // final: a failure below must not undo what is kept (the upload's fingerprint, the replaced rows' absence)
                     j.followOn(s);
                     j.recordArrival(s);
-                    j.undo.clear();
                     return s;
                 } finally {
                     OnboardRoutes.deleteTree(stage);   // the staged copy, success or not (a followed run too)
