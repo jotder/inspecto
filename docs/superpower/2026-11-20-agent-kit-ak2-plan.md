@@ -1,6 +1,7 @@
-# Agent Kit AK-2 — agents propose changes, people approve them (plan)
+# Agent Kit AK-2 — agents propose changes, people approve them, one role at a time (plan)
 
-> **Status: PROPOSED 2026-11-20 — D-AK1…D-AK4 open (§8); nothing built.** Phase AK-2 of
+> **Status: PROPOSED 2026-11-20 — D-AK1…D-AK6 open (§8); nothing built. Built phase by phase, one agent role per
+> phase (§1.1, operator 2026-11-20).** Phase AK-2 of
 > [`2026-11-19-user-enablement-and-agent-kit-plan.md`](2026-11-19-user-enablement-and-agent-kit-plan.md) (§7, §8),
 > on top of AK-1 as built ([`spec-mcp.md`](../okf/product/module/mcp/spec-mcp.md)). Board row: `AGENT-KIT-1`.
 > Signed inputs (2026-11-19): **D-UE4** the module ships from Standard up, never on Basic; **D-UE5** both identity
@@ -20,6 +21,23 @@ it, without becoming a way around its controls:
 Done means: the AK-2 MCP Tools below work end to end against a Standard install with a real identity provider; an
 agent's write lands only as a Pending Change or Action Request; the same token calling the REST routes directly is held
 the same way; a security review finds nothing at confidence 8 or above.
+
+### 1.1 Four agent roles, phase by phase *(operator, 2026-11-20)*
+
+The agentic intention is an agent that works as four people do. They are built **one per phase**, each phase shipping
+its identity and gate work, its MCP Tools, its Agent Skills (AK-3) and its golden tasks (AK-4) together, so every
+phase ends in a role an agent can actually do:
+
+| Phase | Role | Where the agent runs | What it does | What it needs beyond the phase before |
+|---|---|---|---|---|
+| **1** | **Developer** | outside, through the Agent Kit | builds Spaces and Apps: Pipelines, Expectations, Alert Rules, Widgets, Dashboards, Jobs; validates, dry-runs, proposes | the agent identity (§4.2–§4.3), the identity-keyed hold (§4.1), the config write tools (§4.4) |
+| **2** | **Operations support engineer** | outside; often unattended | watches health, runs and freshness; diagnoses a failed run; re-runs, resumes, drains, reprocesses | operational actions (§4.6), the machine agent capability set (§4.5); product gaps `QUARANTINE-RELEASE-1`, `BACKUP-DATA-1` |
+| **3** | **Incident and Case analyst** | outside, and inside as the Assistant's Incident Brief | triages Incidents, writes Briefs, comments, assigns, proposes a transition or an outbound action | case actions (§4.6); product gap `CASE-TRANSITION-FOUR-EYES-1` |
+| **4** | **Helpdesk** | **inside** Inspecto, as the Assistant | explains the screen or Widget a user is looking at, grounded in the Handbook and the user's own rights | no write path: its own plan, [`2026-11-20-assistant-screen-help-plan.md`](2026-11-20-assistant-screen-help-plan.md) |
+
+Phases 1–3 share this plan's gate (§4.1); phase 4 shares only the masking and audit rules (§5). Phase 4 depends on no
+earlier phase and may be pulled forward by the operator. Seed recipes for phases 2 and 3 exist as this repository's
+own `incident-investigate` and `case-analysis` skills; the Agent Skills are rewritten from them for a customer's install.
 
 ## 2. Vocabulary — the plan's "Draft" is a Pending Change
 
@@ -65,7 +83,8 @@ hold keyed on `via: mcp`, the same agent token calling `PUT /…` directly would
   policy rule when there is one, else a mandatory rule: approver `ApprovalPolicy.DEFAULT_APPROVER` (`canApproveChanges`),
   four-eyes per D-AK1. Same shape as `JobWriteGuard.mandatory` today ("a policy is opt-in and the risk is not");
 - **default deny for a marked Subject**, at the host's gate (not only at `/mcp`), with every non-GET manifest entry in
-  exactly one of three buckets, pinned by a parity test over `CapabilityManifest.ENTRIES` and `EXEMPTIONS`:
+  exactly one bucket, pinned by a parity test over `CapabilityManifest.ENTRIES` and `EXEMPTIONS` — three in phase 1,
+  plus a fourth, **actions**, that phases 2 and 3 fill from the refused bucket (§4.6):
   1. **held** — the route reaches `PendingChanges.hold` / `holdSet`; starts from `PendingChanges.REPLAYABLE` minus the
      never-list below, which **overrides** this bucket (`/promotion/apply` and the `/access/*` writes are on
      `REPLAYABLE` but are refused to an agent, never held);
@@ -75,7 +94,8 @@ hold keyed on `via: mcp`, the same agent token calling `PUT /…` directly would
   3. **refused (403)** — everything else, including every route that only calls `holdRefusing` /
      `holdRefusingPaths` (those return normally when no policy covers the kind, so they do **not** hold: bundle import,
      onboarding imports, Dataset registration, Widget tags and the like), and the never-list below;
-- **the never-list holds for a marked Subject on every door:** any `…/approve`, `…/decline`, `…/retry`, `…/mark-failed`,
+- **the never-list holds for a marked Subject on every door:** any `…/approve`, `…/decline`, the approver's
+  `/action-requests/{id}/retry` and `…/mark-failed` (not a run's `/runs/{id}/retries/retry-now`, which is an action, §4.6),
   `/promotion/apply`, `/apps` writes, Access writes (`/access/*`), `/agent/approvals/*/decision`, reveal and
   link-expansion approval routes. In particular `POST /pending-changes/{id}/approve` refuses a marked Subject, so an
   agent token can never approve — whatever D-AK1 says about the person;
@@ -133,7 +153,26 @@ It joins when that row ships.
   — useful **only because** a marked Subject's every write is held (§4.1). Never `canApproveChanges`, `canAdminister`,
   any reveal or link-expansion approval capability.
 
-### 4.6 The endpoint's manifest category
+### 4.6 Operational and case actions (phases 2 and 3)
+
+The phase-1 gate refuses every write that is not a config save. Phases 2 and 3 move named routes out of the refused
+bucket into a fourth bucket, **actions**: writes that change a run's or a Case's state, not config. Today's routes:
+
+| Role | Route (gate) | Tier (D-AK5 recommended) |
+|---|---|---|
+| Operations | `POST /runs/{id}/trigger`, `…/pause`, `…/resume`, `…/retries/retry-now`, `…/retries/cancel`, `POST /jobs/runs/{id}/replay` (`canOperateRuns`) | **low** — allowed for a delegated person |
+| Operations | `POST /runs/{id}/reprocess`, `…/replay-rejects`, `…/drain` (`canOperateRuns`) | **outcome** — held for a person |
+| Analyst | `POST /objects/{id}/comments` (collaboration), `POST /incidents/{id}/briefs`, `POST /objects/{id}/ack`, `…/assign`, `POST /alerts/{id}/ack` (`canWorkIncidents`) | **low** |
+| Analyst | `POST /objects/{id}/resolve`, `…/transition`, `POST /alerts/{id}/resolve` (`canWorkIncidents`), `POST /cases/from-entities` (`canManageIncidents`) | **outcome** |
+| Analyst | `POST /action-requests` | already held by design (phase 1) |
+
+- **Low**: the person could do it with one click and it changes no outcome; allowed for a delegated person within
+  that person's rights, audited with `agentClient`.
+- **Outcome**: it closes, resolves, rewrites or discards something; **held for a person to approve**. There is no hold
+  for a non-config action today — a Pending Change is config only (`GLOSSARY.md`). How it is held is D-AK6.
+- **Machines**: propose only — every action from a machine is held, whatever its tier.
+
+### 4.7 The endpoint's manifest category
 
 `POST /mcp` stays an Exemption (it has no capability of its own), re-categorised from `read-shaped` to a new
 **`replay-gated`** category whose reason says every tool replays a gated route as the caller.
@@ -147,20 +186,27 @@ rate limit applies; a body over 256 KiB is cut and says so.
 
 ## 6. Phases
 
-| Phase | Delivers | Proof |
-|---|---|---|
-| **AK-2a** identity first | `auth.oidc.agentClients`, the Subject's agent marker on every audit row, RFC 9728 metadata and the 401 header, the identity-keyed hold in `PendingChanges.hold`/`holdSet`, the three-bucket default deny and never-list at the host gate, `authorNow` keeping the marker, `agentClient` on the Pending Change and its screen | real-HTTP tests: an agent-client token's direct `PUT` is held (202); the SPA client's is not; a `holdRefusing`-only write (bundle import) is 403 for the agent; the agent token's approve is 403; approval per D-AK1; falsified (remove the marker check → the direct `PUT` writes) |
-| **AK-2b** write tools | the §4.4 tools, the endpoint refusal list, the manifest category, tool definitions and the `openapi.fragment.json` | end to end on a Standard install with Keycloak: validate → dry-run → propose → a second person approves → the change is live; `propose_action` → approve → sent |
-| **AK-2c** machines | `auth.oidc.agentMachineClients` and the agent capability set | a machine in the set proposes and is held; one outside it keeps one capability; an approval attempt is 403 |
-| close | security review of the whole of AK-2, hub `module/mcp` spec and guides, the Handbook how-to *Let an AI agent work on a Space* | review at confidence ≥ 8 finds nothing |
+Built in the role order of §1.1. Phase 1 is AK-2a then AK-2b; phase 2 adds AK-2c and the operational half of §4.6;
+phase 3 the case half. Each phase closes with its role's Agent Skills (AK-3), its golden tasks (AK-4), a Handbook how-to
+and a security review of what it added.
+
+| Step | Phase | Delivers | Proof |
+|---|---|---|---|
+| **AK-2a** identity first | 1 | `auth.oidc.agentClients`, the Subject's agent marker on every audit row, RFC 9728 metadata and the 401 header, the identity-keyed hold in `PendingChanges.hold`/`holdSet`, the three-bucket default deny and never-list at the host gate, `authorNow` keeping the marker, `agentClient` on the Pending Change and its screen | real-HTTP tests: an agent-client token's direct `PUT` is held (202); the SPA client's is not; a `holdRefusing`-only write (bundle import) is 403 for the agent; the agent token's approve is 403; approval per D-AK1; falsified (remove the marker check → the direct `PUT` writes) |
+| **AK-2b** write tools | 1 | the §4.4 tools, the endpoint refusal list, the manifest category, tool definitions and the `openapi.fragment.json` | end to end on a Standard install with Keycloak: validate → dry-run → propose → a second person approves → the change is live; `propose_action` → approve → sent |
+| **AK-2c** machines | 2 | `auth.oidc.agentMachineClients` and the agent capability set | a machine in the set proposes and is held; one outside it keeps one capability; an approval attempt is 403 |
+| **AK-2d** operational actions | 2 | the operations rows of §4.6, the held-action record per D-AK6, the operations MCP Tools and Skills | an agent re-runs a failed run (low); its reprocess is held until a person approves; a machine's resume is held |
+| **AK-2e** case actions | 3 | the analyst rows of §4.6, the analyst MCP Tools and Skills | an agent comments and assigns (low); its resolve is held; an agent never approves an Action Request |
+| close, per phase | 1–3 | security review of what the phase added, hub `module/mcp` spec and guides, the role's Handbook how-to | review at confidence ≥ 8 finds nothing |
 
 AK-2a ships before any write tool (spec-mcp.md "Deferred to AK-2": a verified agent client must be on the row before an
-agent can author anything). Size: about 3 weeks, as the parent plan says. Prompts, subscriptions, progress
+agent can author anything). Size: phase 1 about 3 weeks, as the parent plan says for AK-2; phases 2 and 3 about
+2 weeks each, plus their Skills. Prompts, subscriptions, progress
 notifications and the tasks extension stay deferred to AK-3 / AK-4.
 
 ## 7. Risks
 
-- **A write route that skips the hold.** Mitigated by §4.1's default deny and the three-bucket parity test over every
+- **A write route that skips the hold.** Mitigated by §4.1's default deny and the bucket parity test over every
   non-GET manifest entry; a route that only calls `holdRefusing*` counts as not holding.
 - **One administrator, four-eyes.** On a single-admin install no second person can approve — D-AK1's alternative.
 - **Tool sprawl.** The allowlist for `propose_change` starts with the kinds the Handbook's builder tutorials use
@@ -175,7 +221,9 @@ notifications and the tasks extension stay deferred to AK-3 / AK-4.
 | **D-AK1** | Who may approve an agent's Pending Change? | **Another person — four-eyes always** (the agent's token never; the delegating person never). This follows the parent plan §7.2 (four-eyes for destructive or promoting changes) and the code's own precedent: four-eyes treats the person who asked and the Assistant as two makers (`IncidentBriefRoutes`). *Alternative, for single-administrator installs:* the delegating person may approve a non-destructive, non-promoting proposal (one human review), switched on per Space. A machine's proposal always needs a person. |
 | **D-AK2** | Is `run_pipeline_now` in AK-2? | **Yes for a delegated person** who passes the run route's own gate (`canAuthorWorkbench`) — a run writes data, not config, and the person could press Run; **never** for a machine. The Agent Skills require a dry run first. |
 | **D-AK3** | Do write tools require a verified agent client? | **Yes.** A token from the SPA client keeps AK-1's read tools; write tools answer 403 "sign in through an agent client", so every write names a verified client. |
-| **D-AK4** | The machine agent capability set | The authoring capabilities of the `propose_change` kinds plus `canWorkIncidents`; listed per client in `auth.oidc.agentMachineClients`. Widens operator decision B1, as D-UE5 anticipated. |
+| **D-AK4** | The machine agent capability set | The authoring capabilities of the `propose_change` kinds plus `canWorkIncidents`; listed per client in `auth.oidc.agentMachineClients`. Widens operator decision B1, as D-UE5 anticipated. Phase 2 adds `canOperateRuns` for the operations role. |
+| **D-AK5** | How are an agent's operational and case actions governed (phases 2–3)? | The two tiers of §4.6: **low** actions allowed for a delegated person within that person's rights; **outcome** actions held for a person to approve; every machine action held. |
+| **D-AK6** | How is a held non-config action recorded? | Reuse the Pending Change machinery — record the request, approve by replaying the same route as the proposer, refuse a stale replay — under its **own term** in `GLOSSARY.md` (a Pending Change stays config only). Name to be settled with the glossary owner before phase 2. |
 
 ## References
 
