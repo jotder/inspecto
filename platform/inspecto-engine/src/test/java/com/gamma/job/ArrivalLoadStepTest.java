@@ -158,6 +158,49 @@ class ArrivalLoadStepTest {
     }
 
     @Test
+    void aFailedReplacementKeepsTheCommittedRows(@TempDir Path root) throws Exception {
+        Store s = store(root);
+        // an older file written before the store had the period column: the period cannot be read from it
+        Path older = s.dir.resolve("older.parquet");
+        try (Connection c = DriverManager.getConnection("jdbc:duckdb:"); Statement st = c.createStatement()) {
+            st.execute("COPY (SELECT 7 AS v) TO '" + older.toString().replace('\\', '/') + "' (FORMAT PARQUET)");
+        }
+        Path fresh = parquet(s.dir.resolve("fresh.parquet"), "cf", "('2026-10-01', 9)");
+        ArrivalLoadStep.commit(config(s.dir, Map.of("load", "period", "period_column", "event_date")),
+                commit("SUCCESS", false, "cf", fresh), List::of);
+        assertEquals(List.of("2026-10-01:9"), rows(fresh), "the engine committed it: its rows are never deleted");
+        assertEquals(List.of("2026-10-01:1", "2026-10-02:2"), rows(s.a), "nothing replaced");
+        assertTrue(Files.exists(older));
+        assertSettled(s);
+        assertEquals(State.LIVE, state("ca"));
+    }
+
+    @Test
+    void aCrashedReplacementIsFinishedAtTheStoresNextCommitWhateverItsMode(@TempDir Path root) throws Exception {
+        Store s = store(root);
+        Path fresh = parquet(s.dir.resolve("fresh.parquet"), "cf", "('2026-10-01', 9)");
+        ArrivalReplacer.checkpointForTest = where -> {
+            if ("swap".equals(where)) throw new StackOverflowError("simulated crash");   // an Error: nothing catches it
+        };
+        try {
+            PipelineConfig period = config(s.dir, Map.of("load", "period", "period_column", "event_date"));
+            assertThrows(StackOverflowError.class, () -> ArrivalLoadStep.commit(period, commit("SUCCESS", false, "cf", fresh), List::of));
+        } finally {
+            ArrivalReplacer.checkpointForTest = null;
+        }
+        assertTrue(Files.exists(ArrivalReplacer.journalFile(s.dir)), "the crash left the replacement half done");
+        // the config went back to append: the next commit still finishes the swap (forward: the arrival was committed)
+        Path later = parquet(s.dir.resolve("later.parquet"), "cl", "('2026-10-07', 1)");
+        ArrivalLoadStep.commit(config(s.dir, Map.of("format", "PARQUET")), commit("SUCCESS", false, "cl", later), List::of);
+        assertEquals(List.of("2026-10-02:2"), rows(s.a));
+        assertFalse(Files.exists(s.b));
+        assertEquals(List.of("2026-10-01:9"), rows(fresh));
+        assertEquals(List.of("2026-10-07:1"), rows(later));
+        assertSettled(s);
+        assertEquals(State.REPLACED, state("ca"));
+    }
+
+    @Test
     void aRunScopedChoiceReplacesOnlyItsFilesConsignmentAndIsTheCallersToUndo(@TempDir Path root) throws Exception {
         Store s = store(root);
         PipelineConfig cfg = config(s.dir, Map.of("format", "PARQUET"));   // the config appends

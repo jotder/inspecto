@@ -8,6 +8,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -27,8 +28,10 @@ import java.util.function.Supplier;
  * <p>Two ways a run says how its rows arrive:
  * <ul>
  *   <li><b>The Pipeline's config</b> ({@link PipelineConfig#arrivalLoad()}): every Consignment, each one final at once
- *       ({@link ArrivalReplacer#drop}). A replacement that fails takes the Consignment's own rows out again
- *       ({@link ArrivalReplacer#restore}), so no day is left doubled, and says so in the log: reprocess it.</li>
+ *       ({@link ArrivalReplacer#drop}). A replacement that fails puts the older files back and KEEPS the Consignment's
+ *       rows ({@link ArrivalReplacer#abandon}: the engine committed them; never deleted behind a SUCCESS ledger row), and
+ *       says so in the log at ERROR: those rows were appended. A replacement a crash interrupted is finished
+ *       ({@link ArrivalReplacer#heal}) at the store's next commit, whatever its mode.</li>
  *   <li><b>A run-scoped choice</b> ({@link #override}), which wins over the config for the whole run while it is open:
  *       a person's per-upload choice (Add a file) or a caller's per-run one (a Postgres snapshot's Run now, O7). It applies
  *       to ONE Consignment - the one that holds the named file, or the run's first when none is named - and every other
@@ -81,6 +84,15 @@ public final class ArrivalLoadStep {
             o.commit(outputs, files);
             return;
         }
+        // a replacement a crash interrupted is finished at the store's next commit, whatever its mode now (a run-scoped
+        // choice's own pending replacement is left to its caller, above)
+        if (Files.exists(ArrivalReplacer.journalFile(store)))
+            try {
+                ArrivalReplacer.heal(store);
+            } catch (IOException | RuntimeException notHealed) {
+                log.error("Pipeline '{}': the interrupted replacement in its store could not be finished ({})", e.pipeline(),
+                        notHealed.toString());
+            }
         ArrivalLoad load = cfg.arrivalLoad();
         if (load.mode() == ArrivalLoad.Mode.APPEND) return;
         String refused = cfg.arrivalLoadRefusal();
@@ -93,14 +105,15 @@ public final class ArrivalLoadStep {
             replace(r, load, outputs, outputs);
             r.drop();
         } catch (IOException | RuntimeException failed) {
-            log.error("Pipeline '{}': output.load {} of Consignment {} failed ({}); its rows are taken out again so no day is "
-                    + "doubled - reprocess it", e.pipeline(), load.mode().name().toLowerCase(java.util.Locale.ROOT),
+            // the engine committed the Consignment: its rows stay (appended, a day may hold them twice), never deleted
+            log.error("Pipeline '{}': output.load {} of Consignment {} failed ({}); its rows were APPENDED, the older rows it "
+                    + "should have replaced are still there", e.pipeline(), load.mode().name().toLowerCase(java.util.Locale.ROOT),
                     e.consignmentId(), failed.toString());
             try {
-                r.restore();
+                r.abandon();
             } catch (IOException | RuntimeException notUndone) {
-                log.error("Pipeline '{}': the failed output.load of Consignment {} could not be undone ({}); its next "
-                        + "replacement heals it", e.pipeline(), e.consignmentId(), notUndone.toString());
+                log.error("Pipeline '{}': the failed output.load of Consignment {} could not be undone ({}); the store's next "
+                        + "commit heals it", e.pipeline(), e.consignmentId(), notUndone.toString());
             }
         }
     }

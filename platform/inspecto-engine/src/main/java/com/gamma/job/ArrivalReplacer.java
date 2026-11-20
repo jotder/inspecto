@@ -238,9 +238,24 @@ public final class ArrivalReplacer {
      * own rows ({@code covering}): no day is left doubled. Crash-safe through the journal; a no-op after {@link #drop}.
      */
     public void restore() throws IOException {
+        restore(false);
+    }
+
+    /**
+     * Put every original back but KEEP the arrival's own rows (O6: a replacement that failed after the engine committed the
+     * arrival - its rows are appended, not lost; a day may then hold them twice). A no-op after {@link #drop} or
+     * {@link #restore}.
+     */
+    public void abandon() throws IOException {
+        restore(true);
+    }
+
+    private void restore(boolean keepArrival) throws IOException {
         if (done) return;
         done = true;
+        if (keepArrival) covering = List.of();
         Map<String, Object> j = read(database);
+        if (keepArrival && j != null) j.put("covering", List.of());
         if (j == null || !aside.getFileName().toString().equals(j.get("aside"))) {
             if (covering.isEmpty()) return;
             if (j != null) {   // an older replace's journal its heal could not finish: left to it; only this arrival's rows go

@@ -102,8 +102,11 @@ output:
   an import's compaction at 100 and before the Space's Jobs see the commit). On each SUCCESS, non-dry Consignment it
   calls `com.gamma.job.ArrivalLoadStep.commit`: `period` is `replacePeriod` over the Consignment's own outputs,
   `replace` is `replaceEverything` (every other Parquet file of the store goes; a Consignment that wrote no file never
-  empties the store). Each one is final at once (`drop`: the files marked `REPLACED`). A replacement that fails takes
-  the Consignment's own rows out again (`restore`, so no day is doubled) and logs the Consignment to reprocess.
+  empties the store). Each one is final at once (`drop`: the files marked `REPLACED`). A replacement that fails (an
+  older file without the period column, a value that is no date) puts the older files back and KEEPS the Consignment's
+  rows (`abandon`: the engine committed them, so they are never deleted behind a SUCCESS ledger row); the log says at
+  ERROR that they were appended. A replacement a crash interrupted is finished (`heal`) at the store's next commit,
+  whatever its mode by then (not while a run-scoped choice is open: its pending replacement is its caller's).
 - **A single local Parquet store only.** `PipelineConfig.arrivalLoadRefusal()` refuses `replace` / `period` on a
   Reference (`reference.load` governs it), more than one destination, a non-Parquet or DuckLake output, an object-store
   `dirs.database`, a partitioned schema, more than one schema and `route:` branches. The load (`requireRunnable`) and the
@@ -123,7 +126,7 @@ output:
   feed stays `append`. O7's Run now of a Postgres snapshot is meant to pass a run-scoped `replace` the same way.
 
 Tests: `PipelineConfigArrivalLoadTest` (parse, refusals at load), `ArrivalLoadStepTest` (a Standard store: period,
-replace, append / failed / dry-run / empty untouched; the run-scoped choice: its file only, the run's earlier files
+replace, append / failed / dry-run / empty untouched, a failed replacement keeps the committed rows, a crash healed at the next append commit; the run-scoped choice: its file only, the run's earlier files
 kept, restore and close, one per store), `ControlApiOutputLoadTest` (real HTTP: `POST /config/write` 422 for two sinks,
 CSV, a partitioned schema, a missing or undeclared column, an unknown mode, 200 on a flat Parquet store; a Standard
 Pipeline replacing at each commit through the service), `ControlApiOnboardFilesTest` (Add a file's period through the
