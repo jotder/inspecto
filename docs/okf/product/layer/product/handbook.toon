@@ -1006,6 +1006,46 @@ chapters:
         type: tutorial
         tracks[1]: partner
         audience: external
+      howto_create_an_app:
+        file: docs/okf/product/layer/platform/user-guide-howto-create-an-app.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+      howto_golden_data_conformance:
+        file: docs/okf/product/layer/platform/user-guide-howto-golden-data-conformance.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+      howto_package_and_sign_an_app:
+        file: docs/okf/product/layer/platform/user-guide-howto-package-and-sign-an-app.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+      howto_install_an_app:
+        file: docs/okf/product/layer/platform/user-guide-howto-install-an-app.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+      howto_upgrade_an_app:
+        file: docs/okf/product/layer/platform/user-guide-howto-upgrade-an-app.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+      howto_install_an_edition:
+        file: docs/okf/product/layer/platform/admin-guide-howto-install-an-edition.md
+        type: howto
+        tracks[1]: operator
+        audience: external
+      howto_reverse_proxy:
+        file: docs/okf/product/layer/platform/admin-guide-howto-reverse-proxy.md
+        type: howto
+        tracks[1]: operator
+        audience: external
+      howto_upgrade_the_platform:
+        file: docs/okf/product/layer/platform/admin-guide-howto-upgrade-the-platform.md
+        type: howto
+        tracks[1]: operator
+        audience: external
       admin_guide_apps:
         file: docs/okf/product/layer/platform/admin-guide-apps.md
         type: unsorted
@@ -1104,6 +1144,26 @@ chapters:
       tutorial_run_the_platform:
         file: docs/okf/product/layer/platform/user-guide-tutorial-run-the-platform.md
         type: tutorial
+        tracks[1]: operator
+        audience: external
+      howto_connect_the_identity_provider:
+        file: docs/okf/product/module/oidc/admin-guide-howto-connect-the-identity-provider.md
+        type: howto
+        tracks[1]: operator
+        audience: external
+      howto_define_roles_and_access_policies:
+        file: docs/okf/product/module/access/admin-guide-howto-define-roles-and-access-policies.md
+        type: howto
+        tracks[1]: operator
+        audience: external
+      howto_back_up_and_restore:
+        file: docs/okf/product/module/backup/admin-guide-howto-back-up-and-restore.md
+        type: howto
+        tracks[1]: operator
+        audience: external
+      howto_verify_the_audit_chain:
+        file: docs/okf/product/module/event/admin-guide-howto-verify-the-audit-chain.md
+        type: howto
         tracks[1]: operator
         audience: external
       operations_guide:
@@ -1252,6 +1312,16 @@ chapters:
         type: unsorted
         tracks[1]: builder
         audience: internal
+      howto_add_a_parser:
+        file: docs/okf/product/module/elt/user-guide-howto-add-a-parser.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+      howto_machine_client:
+        file: docs/okf/product/module/oidc/admin-guide-howto-machine-client.md
+        type: howto
+        tracks[1]: partner
+        audience: external
   reference:
     title: Reference
     group: Reference

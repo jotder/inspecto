@@ -263,6 +263,13 @@ console** — today only the App kit CLI can (§1). It goes on the board in plan
 - **`upgrade.ps1` takes a relative `-BackupDir` from the wrong folder.** It changes to the bundle's parent before
   checking the backup, so `.\spaces\…` is not found and nothing is upgraded; it also leaves the shell there. T6 gives a
   full path and changes back.
+- **Found writing the P3 how-tos (2026-11-20), filed on the board:** `PARSER-SPI-KIT-1` (the Parser extension
+  point has no starter and is missing from the builder kit page), `MACHINE-CLIENT-CONSOLE-1` (machine clients set by
+  API only; a machine may hold only `canOpenInboundInvestigation`), `APPS-MULTI-SERVER-1` (`/apps` acts on one server
+  of a set), `BACKUP-DATA-1` (the backup archives configuration, not Datasets; seed `admin` cannot run Jobs),
+  `HANDBOOK-CLI-CHECK-1` (no check kind for a command, so the App kit pages check only the server side). Still true
+  from T5/T6: the App kit reaches no customer, no console for `/apps`, `/origin/upgrade` or `/audit/verify`, the
+  relative `-BackupDir` of `upgrade.ps1`.
 - **Not proven live:** the reverse proxy itself (no nginx or Caddy on the test machine; the preflight's config check
   passed), the OS-service install and the service-mode upgrade, and the Linux `.sh` scripts.
 
@@ -341,6 +348,21 @@ App with the kit; add golden data and conformance; package and sign; install int
 add a parser through an extension point; call the Control API with a machine client. Operator: install an edition;
 connect the identity provider; define Roles and Access Policies; put Inspecto behind a reverse proxy; back up and
 restore; upgrade; verify the audit chain.
+
+**As built (2026-11-20).** Each how-to is a `user-guide-howto-<topic>.md` (builder, partner) or
+`admin-guide-howto-<topic>.md` (operator) page in the hub of the item it explains, `type: howto`, `audience: external`,
+manifest id `howto_<topic>`, with the six template headings and at least one check block. Every console label, route,
+flag and message was read in the code (the fact sheets were checked against `inspecto-ui` and the route handlers); the
+checks parse and name known routes, but **none has been run against an install yet** (the tutorials' were).
+
+- **Partner and operator — 14 done:** in `layer/platform`, chapter `ship`: `howto_create_an_app`,
+  `howto_golden_data_conformance`, `howto_package_and_sign_an_app`, `howto_install_an_app`, `howto_upgrade_an_app`,
+  `howto_install_an_edition`, `howto_reverse_proxy`, `howto_upgrade_the_platform`; chapter `manage_platform`:
+  `howto_connect_the_identity_provider` (`module/oidc`), `howto_define_roles_and_access_policies` (`module/access`),
+  `howto_back_up_and_restore` (`module/backup`), `howto_verify_the_audit_chain` (`module/event`); chapter `develop`:
+  `howto_add_a_parser` (`module/elt`), `howto_machine_client` (`module/oidc`). The machine-client page says plainly
+  that a machine client may hold only `canOpenInboundInvestigation` today.
+- **Builder — 16 open.**
 
 ### 5.4 Concepts (about fifteen) and migration
 
@@ -449,7 +471,7 @@ downloadable vendor packages, versioned with the product.
 | **P0** | D-UE1…D-UE9 signed; the new names in `GLOSSARY.md` — **done 2026-11-19** (D-UE8 left open) | — | days |
 | **P1** | Handbook skeleton: manifest, renderer, `/help` route with screen links, `check-handbook.mjs`, the inventory map of existing pages — **lane A done 2026-11-19 (§4.6); lane B (console and bundle) in its own lane** | P0 | 2–3 weeks |
 | **P2** | Concepts; the worked example's data and Space Template; tutorials T1–T6 with their checks; the Space → App gap filed — **lane E (docs as tests: the check-block format, the guard, the reader's view, the runner) done 2026-11-19 (§4.4)**; **lane C (concepts) done 2026-11-19 (§4.6)**; **lane D (the worked example) done 2026-11-19: Space Template `order-to-cash`, its generator and ground truth, golden tests; version 2 and the gaps in the hub `solution-pack/order-to-cash`**; **T5 *Ship it* and T6 *Run it* done 2026-11-19 (hub `layer/platform`, chapters `ship` and `manage_platform`; gaps in §4.5)**; **tutorials T1–T4 (builder track) done 2026-11-19: `tutorial_first_space` (chapter *Start here* — the first page a new builder reads), `tutorial_pipeline_expectations`, `tutorial_detect_respond`, `tutorial_dashboard`; external, every step's console label driven in a live console, 31 check blocks green against a seeded demo install** | P1 | 4–6 weeks |
-| **P3** | The first 30 how-tos; generated reference; edition badges on every page; the *On Inspecto* developer pages 5.1–5.6 (§3.1) | P1 | 4–6 weeks, parallel with P2, plus 2–3 weeks for the developer pages |
+| **P3** | The first 30 how-tos; generated reference; edition badges on every page; the *On Inspecto* developer pages 5.1–5.6 (§3.1) — **how-tos: the 14 partner and operator how-tos done 2026-11-20 (§5.3)** | P1 | 4–6 weeks, parallel with P2, plus 2–3 weeks for the developer pages |
 | **P4** | Learning paths, the first two labs with checkers, the video series spec on the LA machinery, the instructor kit | P2 | 3–4 weeks |
 | **P5** | The *Inside Inspecto* internal render: the stage × product-area index generated from the Product Map and hub slots, six entry pages 5.7–5.12, the audience guard | P1, D-UE10 | about 1 week |
 | **AK-1** | `inspecto-mcp`: transport, read tools, resources, audit; the delegated-identity design and a security review | P0 | 3–4 weeks, parallel with P1 |
