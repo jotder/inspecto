@@ -278,7 +278,8 @@ console** — today only the App kit CLI can (§1). It goes on the board in plan
   rules or a stream trigger), `RISK-SCORE-JOB-1` (a Risk Score needs a hand-made Job), `CASE-REASSIGN-CONSOLE-1` (no
   re-assign, no *Create case* on an Incident), `PIPELINE-SAVE-HELD-TOAST-1` (the editor says *Saved* for a held
   change), `HOWTO-DOC-DRIFT-1` (internal pages that contradict the code); from the live run, `JOB-PARAMS-NESTED-IGNORED-1` (a
-  Job saved with its settings nested under `params` keeps them as one text value and runs with defaults). Still true
+  Job saved with its settings nested under `params` kept them as one text value and ran with defaults; fixed
+  2026-11-20, the route now answers 422). Still true
   from T5/T6: the App kit reaches no customer, no console for `/apps`, `/origin/upgrade` or `/audit/verify`, the
   relative `-BackupDir` of `upgrade.ps1`.
 - **Filed 2026-11-20 by the developer-pages lane (P3, 5.1–5.6):** the App kit's reach above, as

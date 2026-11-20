@@ -151,6 +151,39 @@ class ControlApiJobCrudTest {
         }
     }
 
+    @Test
+    void settingsNestedUnderAnObjectAreRefusedNotStoredAsText(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            assertEquals(200, send(c.port, "POST", "/spaces", "{\"id\":\"acme\"}").statusCode());
+            String base = "/spaces/acme";
+
+            // JOB-PARAMS-NESTED-IGNORED-1: this saved, kept "params" as one text value and ran with defaults
+            HttpResponse<String> nested = send(c.port, "POST", base + "/jobs", """
+                    {"name":"nested","type":"maintenance","params":{"task":"cleanup","retention_days":"30"}}""");
+            assertEquals(422, nested.statusCode(), nested.body());
+            assertTrue(nested.body().contains("top-level key"), nested.body());
+            assertEquals(404, send(c.port, "GET", base + "/jobs/nested", null).statusCode(), "nothing was written");
+
+            HttpResponse<String> other = send(c.port, "POST", base + "/jobs", """
+                    {"name":"nested","type":"maintenance","task":"cleanup","settings":{"retention_days":"30"}}""");
+            assertEquals(422, other.statusCode(), other.body());
+            assertTrue(other.body().contains("'settings' is an object"), other.body());
+
+            // the same settings flat save; a PUT that nests them is refused and leaves the Job as it was
+            assertEquals(200, send(c.port, "POST", base + "/jobs", """
+                    {"name":"nested","type":"maintenance","task":"cleanup","retention_days":"30"}""").statusCode());
+            HttpResponse<String> put = send(c.port, "PUT", base + "/jobs/nested", """
+                    {"name":"nested","type":"maintenance","params":{"task":"cleanup","retention_days":"90"}}""");
+            assertEquals(422, put.statusCode(), put.body());
+            assertEquals("30", json(send(c.port, "GET", base + "/jobs/nested", null)).get("retention_days").asText());
+
+            // the nested keys a Job does have still save
+            assertEquals(200, send(c.port, "POST", base + "/jobs", """
+                    {"name":"with_args","type":"maintenance","task":"cleanup","args":{"retention_days":"7"}}""")
+                    .statusCode());
+        }
+    }
+
     /** The row for {@code name} in a {@code GET /jobs} listing. */
     private static JsonNode find(JsonNode list, String name) {
         for (JsonNode n : list) if (name.equals(n.path("name").asText())) return n;

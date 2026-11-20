@@ -483,6 +483,7 @@ final class JobRoutes implements RouteModule {
     private static final java.util.Set<String> ADMINISTER_ONLY_TASKS = java.util.Set.of("event_prune", "restore", "audit_anchor_export");
 
     private static JobConfig parseJob(Map<String, Object> body) {
+        refuseNestedSettings(body);
         JobConfig cfg;
         try {
             cfg = JobConfig.fromMap(Map.of("job", body));
@@ -505,6 +506,24 @@ final class JobRoutes implements RouteModule {
                 .map(f -> f.fieldPath() + ": " + f.message()).toList();
         if (!errors.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job refused at save: " + errors);
         return cfg;
+    }
+
+    /** The {@code job:} keys whose value is an object: trigger args, signal bindings, the incremental block. */
+    private static final Set<String> NESTED_JOB_KEYS = Set.of("args", "bind", "incremental");
+
+    /**
+     * JOB-PARAMS-NESTED-IGNORED-1: a Job's settings are single values at the top level of the body, beside
+     * {@code name} and {@code type}. {@link JobConfig#fromMap} stores any other object as ONE text value, so a body
+     * like {@code {"type":"report","params":{"dataset":…}}} saved and ran with the Job Type's defaults. Refuse it.
+     */
+    static void refuseNestedSettings(Map<String, Object> body) {
+        for (Map.Entry<String, Object> e : body.entrySet()) {
+            if (!(e.getValue() instanceof Map<?, ?>) || NESTED_JOB_KEYS.contains(e.getKey())) continue;
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "params".equals(e.getKey())
+                    ? "'params' is not part of a Job: send each setting as a top-level key beside 'name' and 'type'"
+                    : "'" + e.getKey() + "' is an object: a Job setting is a single value (only 'args', 'bind' and "
+                            + "'incremental' are nested)");
+        }
     }
 
     /** Encode the config as a {@code job { … }} TOON doc, write it atomically, and hot-register it. */
