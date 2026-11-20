@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `industry.mobile-money` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `INDUSTRY-CANONICAL-DATASETS-1` | P3 | feature | No Industry declares its canonical Datasets, though GLOSSARY.md says the Industry pack owns them and every App of the Industry reads them. | — |

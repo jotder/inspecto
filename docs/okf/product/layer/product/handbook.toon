@@ -1234,6 +1234,36 @@ chapters:
     group: Develop
     summary: Requirements, architecture, design, build, test and release, for developers on Inspecto and for Inspecto's own engineers.
     pages:
+      develop_requirements:
+        file: docs/okf/product/layer/platform/user-guide-develop-requirements.md
+        type: concept
+        tracks[1]: partner
+        audience: external
+      develop_architecture:
+        file: docs/okf/product/layer/platform/user-guide-develop-architecture.md
+        type: concept
+        tracks[1]: partner
+        audience: external
+      develop_design:
+        file: docs/okf/product/layer/platform/user-guide-develop-design.md
+        type: concept
+        tracks[1]: partner
+        audience: external
+      develop_build:
+        file: docs/okf/product/layer/platform/user-guide-develop-build.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+      develop_test:
+        file: docs/okf/product/layer/platform/user-guide-develop-test.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+      develop_release:
+        file: docs/okf/product/layer/platform/user-guide-develop-release.md
+        type: howto
+        tracks[1]: partner
+        audience: external
       admin_guide_local_testing:
         file: docs/okf/product/layer/platform/admin-guide-local-testing.md
         type: unsorted
