@@ -612,7 +612,9 @@ class ControlApiImportFingerprintsTest {
             JsonNode s = data(add(c, id, "november.csv", "replace", transfers(9)), 200);
             assertEquals(9, s.get("rowsAfter").asLong(), s.toString());
             assertEquals("resent.csv", s.at("/refused/0/file").asText(), s.toString());
-            assertTrue(s.at("/refused/0/reason").asText().contains("this Replace everything run replaces them"), s.toString());
+            String reason = s.at("/refused/0/reason").asText();
+            assertTrue(reason.contains("this Replace everything run replaces that arrival") && reason.contains("can be sent again after the replace")
+                    && !reason.contains("rename"), reason);
             assertTrue(Files.exists(Path.of("database", id, OnboardImport.REFUSED_DIR, "resent.csv")), "set aside, not lost");
             // after the replace the same bytes are new again: sent once more, they are read
             dropSettled(id, "resent_again.csv", transfers(12));
@@ -622,7 +624,12 @@ class ControlApiImportFingerprintsTest {
         }
     }
 
-    /** Reviewer's probe: the Replace everything fails after the old rows were restored - a waiting re-send must not double. */
+    /**
+     * Reviewer's probe, held run: the Replace everything fails and its old rows stand. ⚠ Only the {@code refused/} assertion
+     * discriminates here - the run is held, so the waiting file is never read either way (42 rows with or without the rule);
+     * {@link #aReplacementThatFailsDoesNotDoubleAWaitingResend} is the one where a failed replacement leaves the rows of a
+     * waiting file the run did read.
+     */
     @Test
     void aFailedReplaceEverythingDoesNotDoubleAWaitingResend(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
@@ -641,7 +648,58 @@ class ControlApiImportFingerprintsTest {
             assertEquals(42, rows(id), "the old rows stand, and the waiting re-send was not read beside them");
             assertTrue(Files.exists(Path.of("database", id, OnboardImport.REFUSED_DIR, "resent.csv")), "it waits in refused/");
             JsonNode arrivals = data(send(c, "GET", "/datasets/" + id + "/arrivals", null), 200).get("arrivals");
-            assertTrue(arrivals.toString().contains("this Replace everything run replaces them"), arrivals.toString());
+            assertTrue(arrivals.toString().contains("this Replace everything run replaces that arrival"), arrivals.toString());
+        }
+    }
+
+    /**
+     * A Replace everything whose upload carries the bytes of a held arrival, with a waiting copy of them: the copy is the
+     * upload's twin ("same content as the upload, which this run takes") - not "replaced, send it again after", which would be
+     * false, since the replace loads those bytes.
+     */
+    @Test
+    void aWaitingCopyOfTheUploadsOwnBytesIsItsTwinInAReplaceEverything(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "twinreplace", transfers(30));
+            data(add(c, id, "october.csv", "append", transfers(12)), 200);
+            dropSettled(id, "copy.csv", transfers(12));
+            JsonNode s = data(add(c, id, "october_again.csv", "replace", transfers(12)), 200);
+            assertEquals(12, s.get("rowsAfter").asLong(), s.toString());
+            assertEquals("copy.csv", s.at("/refused/0/file").asText(), s.toString());
+            String reason = s.at("/refused/0/reason").asText();
+            assertTrue(reason.contains("same content as 'october_again.csv', which this run takes") && !reason.contains("rename")
+                    && !reason.contains("sent again"), reason);
+        }
+    }
+
+    /**
+     * The replacement itself fails (the old Parquet files are held open, so the journalled swap cannot move them): the upload's
+     * Consignment is undone, a genuinely new waiting file the run read stays (42 + 3 = 45), and a waiting re-send of a held
+     * arrival was never read (it would make 57) - it waits in {@code refused/}. Needs a file system that refuses to move an open
+     * file (Windows); elsewhere the replacement succeeds and the test is skipped.
+     */
+    @Test
+    void aReplacementThatFailsDoesNotDoubleAWaitingResend(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "b13lock", transfers(30));
+            data(add(c, id, "october.csv", "append", transfers(12)), 200);
+            dropSettled(id, "resent.csv", transfers(12));                 // the bytes of a held arrival
+            dropSettled(id, "fresh.csv", transfers(3).replace("T0000", "N0000"));   // genuinely new rows
+            List<java.io.Closeable> held = new ArrayList<>();
+            try (var files = Files.walk(Path.of("database", id, "database"))) {
+                for (Path p : files.filter(f -> f.getFileName().toString().endsWith(".parquet")).toList())
+                    held.add(new java.io.FileInputStream(p.toFile()));
+            }
+            HttpResponse<String> failed;
+            try {
+                failed = add(c, id, "november.csv", "replace", transfers(9));
+            } finally {
+                for (java.io.Closeable h : held) h.close();
+            }
+            assertTrue(Files.exists(Path.of("database", id, OnboardImport.REFUSED_DIR, "resent.csv")), "the re-send waits in refused/");
+            org.junit.jupiter.api.Assumptions.assumeTrue(failed.statusCode() != 200,
+                    "this file system moved an open file: the replacement did not fail");
+            assertEquals(45, rows(id), "the old rows and the new waiting file; the re-send was not read: " + failed.statusCode() + " " + failed.body());
         }
     }
 

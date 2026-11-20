@@ -172,10 +172,19 @@ final class ImportFingerprints {
             LedgerEntry first = ledger().findByChecksum(source(cfg), sha).orElse(null);
             LedgerEntry took = first == null ? named.get(nameKey(cfg, name, rel(in, f))) : null;
             if (first == null && took == null) continue;
-            String reason = first != null
+            // a Replace everything run: a file with the upload's own bytes is the upload's twin (the replace loads those bytes, so
+            // sending it again afterwards would be refused as a copy of the reload); any other held bytes are an arrival the run
+            // replaces, and the file may be sent again after the replace
+            boolean twinOfUpload = r.job.replace && r.upload != null && sha.equals(r.job.sha256);
+            String reason = first != null && twinOfUpload
+                    ? "it has the same content as '" + r.upload.name() + "', which this run takes"
+                    : first != null && r.job.replace
+                    ? "the same content was already imported on " + day(first) + " as '" + shown(first) + "'; this Replace everything run"
+                            + " replaces that arrival, so it was set aside instead of being read beside its rows - it can be sent again"
+                            + " after the replace"
+                    : first != null
                     ? "the same content was already imported on " + day(first) + " as '" + shown(first) + "'; its rows are in '"
                             + r.id + "', so adding it again would count them twice"
-                            + (r.job.replace ? " (this Replace everything run replaces them; send it again after the replace, or rename it)" : "")
                     : "a file named '" + shown(took) + "' was already imported" + (took.processedAt() > 0 ? " on " + day(took) : "")
                             + (took.checksum() != null ? " with other content" : "")
                             + "; '" + name + "' is not read over it - rename it to import it";

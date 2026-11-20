@@ -74,9 +74,11 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   name is read, and ⚠ a same-name file - in the same folder or another one - REPLACES the first file's rows (the person's
   choice; engine defect `OUTPUT-NAME-OVERWRITE-1`). A *Replace everything* run judges its WAITING
   files the same way (a failed replacement is undone for the upload's own Consignment only, so a waiting file read beside the
-  held rows would double them): one with the bytes, or the name, of a held arrival is set aside with "this Replace everything
-  run replaces them; send it again after the replace, or rename it" - the fingerprints are forgotten AFTER the step judged
-  them, for the upload itself, and after the replace the same bytes are new again. Add a file and the step ask the ledger whatever the Pipeline's
+  held rows would double them): one whose bytes a held arrival has is set aside with "this Replace everything run replaces
+  that arrival ... it can be sent again after the replace" (when the upload has those same bytes: "same content as '<upload>',
+  which this run takes", since the replace loads them); one whose NAME a held arrival has gets the name reason, "rename it"
+  - the fingerprints are forgotten AFTER the step judged them, for the upload itself, and after the replace the same bytes
+  are new again. Add a file and the step ask the ledger whatever the Pipeline's
   mode (operator 2026-11-20): an import left on `path` has its uploads fingerprinted by Add data (`recordUpload`).
   **Forgetting:**
   Replace everything forgets every fingerprint of the import before its run - the engine judges the upload against the
