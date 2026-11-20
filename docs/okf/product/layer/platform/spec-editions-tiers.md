@@ -149,23 +149,30 @@ Pipeline (read, arrange, write Parquet, then each application's follow-on; Inspe
 **How the locks work (as built 2026-11-17).** Four **screen gates**, each an edition feature declared by `inspecto-ops`
 (`OpsEditionFeatures`), so Standard and up have them and Basic does not: `pipeline.automation` (`PIPELINE_AUTOMATION`),
 `pipeline.transform` (`PIPELINE_TRANSFORM`), `pipeline.egress` (`PIPELINE_EGRESS`) and `collector.remote`
-(`REMOTE_SYSTEMS`). `EditionFeatures.SCREEN_FLAGS` maps each to its `/bootstrap` key: `features.pipelineAutomation`,
+(`REMOTE_SYSTEMS`). **One Basic-profile declaration says what each lock covers** (`BasicProfile`, `inspecto-etl`;
+`BASIC-ELT-PROFILE-1` Gate, 2026-11-20): the Collector schemes Basic keeps (`local`, `dataset`, `postgres` - every other
+scheme needs `collector.remote`; a kept scheme's settings, the duplicate check's `duplicate.mode` and `on_change`
+included, are Basic's), the one schedule Basic writes (*Watch this folder*'s 30 s preset; otherwise `trigger: manual`), the
+Step node types Basic keeps (`transform.filter`, `transform.dedup`, `transform.mask`), the outbound-delivery Job types,
+and Basic's own entry points (`BasicProfile.Entry`: *Add a file*, *Choose a table*, *Watch this folder* offered;
+*Keep this up to date* and a retention policy need `pipeline.automation`). `BasicProfile.SCREEN_FLAGS` maps each to its `/bootstrap` key: `features.pipelineAutomation`,
 `pipelineTransform`, `pipelineEgress` and `remoteSystems` are true or false, and a withheld one has a `featureReasons`
 line under the same key (`EditionFeatures.lockedReason`, one short line naming the edition). Two static markers tell the
 screens which offer a gate covers: `GET /pipelines/processor-catalog` puts `featureFlag` on each processor
-(`ProcessorCatalog.featureOf`: the remote acquisitions → `remoteSystems`; every mapped `transform.*` Step except
-`transform.filter`, `transform.dedup` and `transform.mask`, plus reference enrichment → `pipelineTransform`), and
+(`ProcessorCatalog.featureOf`, asking the profile: an acquisition by its scheme → `remoteSystems` unless Basic keeps it;
+every mapped `transform.*` Step but Basic's, plus reference enrichment → `pipelineTransform`), and
 `GET /jobs/types` puts `featureFlag: pipelineEgress` on `objectstore.export` and `publish.postgres`
-(`EditionFeatures.EGRESS_JOB_TYPES`). The console reads them through `LensService.screenLocks()` (`edition-locks.ts`; a
+(`BasicProfile.jobTypeFeature`). The console reads them through `LensService.screenLocks()` (`edition-locks.ts`; a
 flag the server does not report is offered): the Step palette shows a gated processor locked with the reason, the Collect
 stage locks its *Connection* choice, the Connection form locks a NEW `db` / `ftp` / `ftps` / `sftp` / object-store /
 Kafka Connection, and the Job form locks a NEW Job of a gated type. **None of them refuses anything on the server**: a
 Pipeline, Connection or Job already using one loads, runs and stays editable (a node already collecting through a
-Connection keeps that mode). `pipeline.automation` alone is also checked by its routes: the feed and storage routes
-answer `503 CAPABILITY_UNAVAILABLE` on Basic (a retention policy already stored is ignored there, so Basic never drops
+Connection keeps that mode). The locked entry points are also checked by their routes (`BasicProfile.Entry.offered`): the
+feed and storage routes answer `503 CAPABILITY_UNAVAILABLE` on Basic (a retention policy already stored is ignored there, so Basic never drops
 rows), and their reads report it (`automatic`, `retentionAvailable`). The product states nothing either way about
 scheduled or signal-driven Jobs on Basic (DT-16). Upgrade: a Basic import is an ordinary editable Pipeline on Standard
-(`ControlApiDataTierUpgradeTest`).
+(`ControlApiDataTierUpgradeTest`). Each entry point against the profile, on Basic and Standard, over real HTTP:
+`ControlApiBasicProfileGateTest`; the console's mirrors (`REMOTE_CONNECTORS`, `SCREEN_LOCK_FALLBACK`): `BasicProfileTest`.
 
 ### Release note — the data layer by edition (2026-11-17)
 

@@ -202,11 +202,10 @@ final class BootstrapRoutes implements RouteModule {
         f.put("laWidgets", on.contains("geoLink") && com.gamma.etl.EditionFeatures.present(com.gamma.etl.EditionFeatures.LA_WIDGETS));
         // DATA-TIERS-1 P2: the data-layer screen gates (pipelineAutomation, pipelineTransform, pipelineEgress, remoteSystems). Reported
         // here for the screens: a false one has its featureReasons line under the same key, and Basic's screens show the control
-        // locked with it (DT-13). pipelineTransform, pipelineEgress and remoteSystems are UI flags only, like laWidgets: no route,
-        // save or load refuses on them (§5.3, Basic runs any configuration). pipelineAutomation is ALSO enforced by its own routes:
-        // PUT /datasets/{id}/feed (DatasetFeed) and PUT /datasets/{id}/storage (DatasetCompaction) answer 503 on Basic, and a
-        // stored retention policy is ignored there.
-        com.gamma.etl.EditionFeatures.SCREEN_FLAGS.forEach((flag, feature) -> f.put(flag, com.gamma.etl.EditionFeatures.present(feature)));
+        // locked with it (DT-13). Declared in the Basic profile (BasicProfile, BASIC-ELT-PROFILE-1 Gate): no save or load refuses
+        // on them (§5.3, DT-9 narrowed); only the entry points the profile locks (BasicProfile.Entry: Keep this up to date, a
+        // retention policy) answer 503 on Basic, and a stored retention policy is ignored there.
+        com.gamma.etl.BasicProfile.SCREEN_FLAGS.forEach((flag, feature) -> f.put(flag, com.gamma.etl.EditionFeatures.present(feature)));
         // SEP-08: true only when the optional inspecto-entity-list module registered its routes — derived from
         // what registered, never an edition guess, and never from the stub (hasRoute excludes stubs). Probed on
         // POST /entity-lists, a LITERAL write, not on the GET /entity-lists/([^/]+) catch-all shape.
