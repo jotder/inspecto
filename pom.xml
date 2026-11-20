@@ -157,6 +157,8 @@
                 <module>features/inspecto-predictive</module>
                 <!-- PRODUCT-ASSEMBLY-1 PA-9d: the Real-time Detection add-on (windowed and Pattern Alert Rules on each Stream commit); requires ops; Standard and above (D-PA44). -->
                 <module>features/inspecto-realtime</module>
+                <!-- AGENT-KIT-1 AK-1: the MCP endpoint (POST /mcp, read-only MCP Tools); Standard and above, never Basic (D-UE4). -->
+                <module>features/inspecto-mcp</module>
             </modules>
         </profile>
         <!-- Preview: EVERYTHING, for testing/incubation — never a customer-facing tier (docs/EDITIONS.md,
@@ -203,6 +205,8 @@
                 <module>features/inspecto-predictive</module>
                 <!-- PRODUCT-ASSEMBLY-1 PA-9d: the Real-time Detection add-on (windowed and Pattern Alert Rules on each Stream commit); requires ops; Standard and above (D-PA44). -->
                 <module>features/inspecto-realtime</module>
+                <!-- AGENT-KIT-1 AK-1: the MCP endpoint (POST /mcp, read-only MCP Tools); Standard and above, never Basic (D-UE4). -->
+                <module>features/inspecto-mcp</module>
             </modules>
         </profile>
         <!-- Advanced = Standard + the ABAC policy engine (rbac-abac-plan §5) + the PostgreSQL Investigation store: the same
@@ -242,6 +246,8 @@
                 <module>features/inspecto-predictive</module>
                 <!-- PRODUCT-ASSEMBLY-1 PA-9d: the Real-time Detection add-on (windowed and Pattern Alert Rules on each Stream commit); requires ops; Standard and above (D-PA44). -->
                 <module>features/inspecto-realtime</module>
+                <!-- AGENT-KIT-1 AK-1: the MCP endpoint (POST /mcp, read-only MCP Tools); Standard and above, never Basic (D-UE4). -->
+                <module>features/inspecto-mcp</module>
             </modules>
         </profile>
         

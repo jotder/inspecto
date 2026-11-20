@@ -19,7 +19,7 @@ Install a signed App package into a server that is already running, so its Space
 ## Before you start
 
 - **Edition:** a Platform build of Standard, Advanced or Preview whose entitlement lists every Add-on the App
-  requires. On Basic there is no sign-in, so anyone who reaches the server can install.
+  requires.
 - **Who:** an administrator (capability `canAdminister`).
 - **What you need:** the App's zip and its signer's `.properties` line
   ([Package and sign an App](user-guide-howto-package-and-sign-an-app.md)), an administrator's access token, and a

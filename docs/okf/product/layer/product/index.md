@@ -22,7 +22,7 @@ tags: [product-item, layer]
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Catalog](user-guide-catalog.md) · [App](user-guide-concept-app.md) · [Dataset](user-guide-concept-dataset.md) · [Edition and Add-on](user-guide-concept-edition-addon.md) · [How the pieces fit](user-guide-concept-overview.md) · [Widget and Dashboard](user-guide-concept-widget-dashboard.md) · [Dashboard](user-guide-dashboard.md) · [Add a file](user-guide-howto-add-a-file.md) · [Build a Dashboard](user-guide-howto-build-a-dashboard.md) · [Icon Settings](user-guide-icon-settings.md) · [Journey: from an alert to a closed Case](user-guide-journey-alert-to-case.md) · [Journey: from a file to a dashboard](user-guide-journey-file-to-dashboard.md) · [Journey: a safe config change](user-guide-journey-safe-config-change.md) · [Stream & Reference Onboarding](user-guide-onboarding.md) · [Spaces](user-guide-spaces.md) · [Studio](user-guide-studio.md) · [Tutorial 4 — Present it: a Dashboard for the business user](user-guide-tutorial-dashboard.md) |
 | admin-guide | current | [Product — admin guide](admin-guide-product.md) |
-| api | current | [API Services Catalog](api-services.md) |
+| api | current | [Edition matrix](api-reference-editions.md) · [HTTP API reference](api-reference-http.md) · [Vocabulary](api-reference-vocabulary.md) · [API Services Catalog](api-services.md) |
 | tests | current | [Accessibility audit — `inspecto-ui` (WCAG 2.2 Level AA)](tests-accessibility-audit.md) · [Testing, Build & Definition of Done](tests-testing-build.md) |
 | brochure | current | [Inspecto — Competitive Landscape](brochure-competitive-landscape.md) · [Inspecto — Competitive Capability Matrix](brochure-competitive-matrix.md) · [Inspecto — Enterprise Product & Solutions Whitepaper](brochure-enterprise-whitepaper.md) · [Inspecto — Executive Brief](brochure-executive-brief.md) · [Inspecto — Solution Overview](brochure-solution-overview.md) · [Inspecto — Platform Overview & Strategy](brochure-stakeholder-overview.md) |
 
@@ -43,6 +43,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `AGT-SEGMENT-1` | P3 | chore | the assistant's commercial framing is an unvalidated product read. | — |
 | `PRODUCT-ASSEMBLY-1` | P2 | feature | Assemble finished domain Products and the Platform with chosen Add-ons from definition files, with one tool. | — |
 | `ADDON-PICKER-PAGE-1` | P3 | feature | the Add-on picker has no page yet: tools/pick-addons.mjs (PA-6c, 2026-11-11) is a CLI. | demand |
+| `INDUSTRY-CANONICAL-DATASETS-1` | P3 | feature | No Industry declares its canonical Datasets, though GLOSSARY.md says the Industry pack owns them and every App of the Industry reads them. | — |
 | `UI-ZONELESS-1` | P3 | chore | the app runs Zone.js on purpose; going zoneless needs a component-by-component audit first (filed 2026-11-15, so the code's pointer has a… | demand |
 | `UI-PICKER-OPTIONS-1` | P3 | feature | <inspecto-option-picker> gains nested options (a parent that opens to its children), a disabled option with its reason, and a per-picker… | demand |
 | `UI-SCHEMA-FORM-EDITOR-1` | P3 | feature | Move <inspecto-schema-form>'s in-row editor onto pen-field, which first needs several new pen-field features. | demand |

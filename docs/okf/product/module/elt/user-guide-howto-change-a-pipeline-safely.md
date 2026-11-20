@@ -70,7 +70,7 @@ expect data.versions exists
   range, an error on an active Pipeline); fix what they name.
 - 409 `a change to pipeline '<id>' is already pending approval (<id>) — it must be approved, declined, withdrawn or
   expire before another is proposed`.
-- *The sample has no <column> column*, or a dry run refused with a binder error — the sample rows must carry every
+- A dry run refused with a binder error — the sample rows must carry every
   column of the Pipeline's Schema (for `orders`: `ORDER_ID`, `ORDER_DATE`, `CUSTOMER_ID`, `CURRENCY`, `AMOUNT`).
 - 403 *four-eyes: '<author>' proposed this change and cannot approve it — a different person must*.
 - 409 on **Approve** — the Pipeline changed after the request was made; make the change again.

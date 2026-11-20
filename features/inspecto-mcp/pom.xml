@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-mcp</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto - MCP endpoint (optional)</name>
+    <description>
+        OPTIONAL module (AGENT-KIT-1 phase AK-1, 2026-11-20): the Model Context Protocol endpoint POST /mcp, served natively
+        on the JDK HttpServer with the host's JSON mapper - no MCP SDK, no new dependency. Every MCP Tool and resource is an
+        in-process replay of an existing Control API route as the caller (ApiContext.replay), so the route's own policy,
+        capability, module and masking gates decide; the module holds no data access of its own. AK-1 is read-only.
+        Package com.gamma.mcp; contributed through com.gamma.spi.http.RouteModule (feature id "mcp").
+
+        Bundled from the Standard edition up (D-UE4: never Basic, which has no sign-in). THIN: no shade, no sidecar
+        classifier. Built only under the edition profiles, so a routine "mvn -o clean test" (= Basic) never compiles it.
+        Design: docs/okf/product/module/mcp/spec-mcp.md.
+    </description>
+
+    <dependencies>
+        <!-- RouteModule / ApiContext (replay) and, through it, the auth SPI (Subject, RequestAttrs, ApiException). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-http-spi</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- The audit row each tool call leaves (Event, EventSink, EventType, AuditAttrs). -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-audit-spi</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
+        <!-- Tests boot a real CollectorService + ControlApi and drive /api/v1/mcp over HTTP. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <!-- A capability-gated READ route an MCP Tool replays (GET /incidents/{id}/briefs, canWorkIncidents): the
+             denied-capability test needs a real gate, and AK-1's other routes are open reads by design. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-action-requests</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Platform test kit (FakeApiContext + RouteModuleContract TCK) -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-http-spi</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <!-- The canonical vocabulary, served as the MCP resource inspecto://glossary. Copied at build time so
+                 the jar always carries the glossary of the commit it was built from. -->
+            <resource>
+                <directory>${project.basedir}/../../docs</directory>
+                <includes>
+                    <include>GLOSSARY.md</include>
+                </includes>
+                <targetPath>META-INF/inspecto/mcp</targetPath>
+            </resource>
+        </resources>
+    </build>
+</project>

@@ -16,11 +16,13 @@ chapters:
         type: reference
         tracks[4]: builder,partner,operator,business
         audience: external
+        edition: basic
       tutorial_first_space:
         file: docs/okf/product/module/config/user-guide-tutorial-first-space.md
         type: tutorial
         tracks[1]: builder
         audience: external
+        edition: standard
       user_guide_journey_alert_to_case:
         file: docs/okf/product/layer/product/user-guide-journey-alert-to-case.md
         type: unsorted
@@ -251,11 +253,13 @@ chapters:
         type: unsorted
         tracks[1]: operator
         audience: internal
+        edition: preview
       user_guide_la_showcase_off:
         file: docs/okf/product/solution-pack/la-showcase-off/user-guide-la-showcase-off.md
         type: unsorted
         tracks[2]: builder,business
         audience: internal
+        edition: preview
       admin_guide_cross_vertical_tour:
         file: docs/okf/product/solution-pack/la-showcase/admin-guide-cross-vertical-tour.md
         type: unsorted
@@ -471,6 +475,7 @@ chapters:
         type: concept
         tracks[3]: builder,partner,operator
         audience: external
+        edition: standard
       concept_link_analysis:
         file: docs/okf/product/module/la-core/user-guide-concept-link-analysis.md
         type: concept
@@ -606,6 +611,7 @@ chapters:
         type: tutorial
         tracks[1]: builder
         audience: external
+        edition: standard
       howto_add_an_expectation:
         file: docs/okf/product/module/elt/user-guide-howto-add-an-expectation.md
         type: howto
@@ -856,6 +862,7 @@ chapters:
         type: unsorted
         tracks[1]: builder
         audience: internal
+        edition: advanced
       user_guide_training_scripts:
         file: docs/okf/product/module/la-core/user-guide-training-scripts.md
         type: unsorted
@@ -1036,6 +1043,7 @@ chapters:
         type: unsorted
         tracks[1]: builder
         audience: internal
+        edition: standard
   build_present:
     title: Present
     group: Build
@@ -1046,6 +1054,7 @@ chapters:
         type: tutorial
         tracks[2]: builder,business
         audience: external
+        edition: standard
       howto_build_a_dashboard:
         file: docs/okf/product/layer/product/user-guide-howto-build-a-dashboard.md
         type: howto
@@ -1081,6 +1090,7 @@ chapters:
         type: tutorial
         tracks[1]: partner
         audience: external
+        edition: standard
       howto_create_an_app:
         file: docs/okf/product/layer/platform/user-guide-howto-create-an-app.md
         type: howto
@@ -1101,11 +1111,13 @@ chapters:
         type: howto
         tracks[1]: partner
         audience: external
+        edition: standard
       howto_upgrade_an_app:
         file: docs/okf/product/layer/platform/user-guide-howto-upgrade-an-app.md
         type: howto
         tracks[1]: partner
         audience: external
+        edition: standard
       howto_install_an_edition:
         file: docs/okf/product/layer/platform/admin-guide-howto-install-an-edition.md
         type: howto
@@ -1226,6 +1238,7 @@ chapters:
         type: tutorial
         tracks[1]: operator
         audience: external
+        edition: standard
       howto_connect_the_identity_provider:
         file: docs/okf/product/module/oidc/admin-guide-howto-connect-the-identity-provider.md
         type: howto
@@ -1236,6 +1249,7 @@ chapters:
         type: howto
         tracks[1]: operator
         audience: external
+        edition: standard
       howto_back_up_and_restore:
         file: docs/okf/product/module/backup/admin-guide-howto-back-up-and-restore.md
         type: howto
@@ -1252,6 +1266,7 @@ chapters:
         type: reference
         tracks[1]: operator
         audience: external
+        edition: basic
       admin_guide_gotchas:
         file: docs/okf/product/layer/platform/admin-guide-gotchas.md
         type: unsorted
@@ -1362,6 +1377,36 @@ chapters:
     group: Develop
     summary: Requirements, architecture, design, build, test and release, for developers on Inspecto and for Inspecto's own engineers.
     pages:
+      develop_requirements:
+        file: docs/okf/product/layer/platform/user-guide-develop-requirements.md
+        type: concept
+        tracks[1]: partner
+        audience: external
+      develop_architecture:
+        file: docs/okf/product/layer/platform/user-guide-develop-architecture.md
+        type: concept
+        tracks[1]: partner
+        audience: external
+      develop_design:
+        file: docs/okf/product/layer/platform/user-guide-develop-design.md
+        type: concept
+        tracks[1]: partner
+        audience: external
+      develop_build:
+        file: docs/okf/product/layer/platform/user-guide-develop-build.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+      develop_test:
+        file: docs/okf/product/layer/platform/user-guide-develop-test.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+      develop_release:
+        file: docs/okf/product/layer/platform/user-guide-develop-release.md
+        type: howto
+        tracks[1]: partner
+        audience: external
       admin_guide_local_testing:
         file: docs/okf/product/layer/platform/admin-guide-local-testing.md
         type: unsorted
@@ -1382,16 +1427,19 @@ chapters:
         type: unsorted
         tracks[1]: operator
         audience: internal
+        edition: standard
       admin_guide_demo_auth:
         file: docs/okf/product/module/demo-auth/admin-guide-demo-auth.md
         type: unsorted
         tracks[1]: operator
         audience: internal
+        edition: advanced
       user_guide_demo_auth:
         file: docs/okf/product/module/demo-auth/user-guide-demo-auth.md
         type: unsorted
         tracks[1]: builder
         audience: internal
+        edition: advanced
       howto_add_a_parser:
         file: docs/okf/product/module/elt/user-guide-howto-add-a-parser.md
         type: howto
@@ -1412,6 +1460,22 @@ chapters:
         title: Screen reference
         type: reference
         tracks[3]: builder,operator,business
+        audience: external
+        edition: basic
+      reference_http_api:
+        file: docs/okf/product/layer/product/api-reference-http.md
+        type: reference
+        tracks[2]: partner,operator
+        audience: external
+      reference_editions:
+        file: docs/okf/product/layer/product/api-reference-editions.md
+        type: reference
+        tracks[4]: builder,partner,operator,business
+        audience: external
+      reference_vocabulary:
+        file: docs/okf/product/layer/product/api-reference-vocabulary.md
+        type: reference
+        tracks[4]: builder,partner,operator,business
         audience: external
       admin_guide_processor:
         file: docs/okf/product/module/processor/admin-guide-processor.md
