@@ -134,8 +134,9 @@ final class ImportFingerprints {
      * Set aside in {@code refused/} every waiting file (of the run's {@code only}, when narrowed) whose bytes the import
      * already took, whose NAME it took with other bytes (unless the Pipeline says {@code on_change} other than
      * {@code ignore}: then the engine reads the new bytes), or that an earlier waiting file or the upload being added
-     * carries - recorded as a refused arrival with the reason. Nothing is replaced, nothing silently skipped. A
-     * <i>Replace everything</i> run judges only the twins: the rows the fingerprints stand for are being replaced.
+     * carries, or whose file name an earlier waiting file of this run has (in another folder) - recorded as a refused
+     * arrival with the reason. Nothing is replaced, nothing silently skipped. A <i>Replace everything</i> run judges only
+     * the run's own twins: the rows the fingerprints stand for are being replaced.
      */
     static void refuseDuplicates(ImportPreRunSteps.Run r) throws IOException {
         PipelineConfig cfg = r.space.service().configFor(r.pipeline()).orElse(null);
@@ -143,30 +144,42 @@ final class ImportFingerprints {
         boolean held = !r.job.replace;   // a replace sets every held row aside: only the run's own twins count
         // by FILE name, whatever the folder: the engine writes one output per file name, so a second feed.csv - even in
         // another folder - would be written over the first one's rows
+        boolean byName = refusesRenamedContent(cfg);
         Map<String, LedgerEntry> named = new HashMap<>();
-        if (held && refusesRenamedContent(cfg))
+        if (held && byName)
             for (LedgerEntry e : ledger().entries(source(cfg))) named.merge(e.name(), e, (a, b) -> a.processedAt() >= b.processedAt() ? a : b);
         Path dataRoot = r.space.dataRoot();
         Path in = OnboardImport.inbox(dataRoot, r.pipeline());
         Map<String, String> seen = new HashMap<>();   // sha256 → the file of this run that carries it
         if (r.job.sha256 != null && r.upload != null) seen.put(r.job.sha256, r.upload.name());
+        Map<String, String> names = new HashMap<>();   // the ledger's spelling of a file name → the waiting file this run takes
         List<Map<String, Object>> refused = new ArrayList<>(r.refused);
         for (Path f : DatasetFeed.waiting(in, "." + OnboardImport.extension(r.type))) {
             if (r.only != null && !r.only.contains(f.toAbsolutePath().normalize())) continue;
             String sha = DatasetArrivals.sha256(f);
             if (sha == null) continue;   // unreadable: left for the run, which sets it aside as before
-            String name = f.getFileName().toString();
+            String name = f.getFileName().toString(), key = FileNames.safe(cfg, name);
+            String rel = in.relativize(f).toString().replace(java.io.File.separatorChar, '/');
             LedgerEntry first = held ? ledger().findByChecksum(source(cfg), sha).orElse(null) : null;
-            LedgerEntry took = first == null ? named.get(FileNames.safe(cfg, name)) : null;
-            String twin = seen.putIfAbsent(sha, name);
-            if (first == null && took == null && twin == null) continue;
+            LedgerEntry took = first == null ? named.get(key) : null;
+            String twin = seen.get(sha);
+            String sameName = byName ? names.get(key) : null;
+            if (first == null && took == null && twin == null && sameName == null) {
+                seen.put(sha, name);   // this run takes it
+                names.put(key, rel);
+                continue;
+            }
             String reason = first != null
                     ? "the same content was already imported on " + day(first) + " as '" + shown(first) + "'; its rows are in '"
                             + r.id + "', so adding it again would count them twice"
                     : took != null
                     ? "a file named '" + name + "' was already imported" + (took.processedAt() > 0 ? " on " + day(took) : "")
-                            + " with other content; it is not read over the first one - rename it to import it"
-                    : "it has the same content as '" + twin + "', which this run takes";
+                            + (took.checksum() != null ? " with other content" : "")
+                            + "; it is not read over the first one - rename it to import it"
+                    : twin != null
+                    ? "it has the same content as '" + twin + "', which this run takes"
+                    : "'" + sameName + "' has the same file name and this run takes it; one file name holds one file's rows,"
+                            + " so it is not read over that one - rename it to import it";
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("file", name);
             out.put("reason", reason);
@@ -303,9 +316,17 @@ final class ImportFingerprints {
         }
         if (!ledger().entries(source(cfg)).isEmpty()) return;
         Map<String, Map<String, Object>> held = new LinkedHashMap<>();   // landed name → its upload line
+        long replacedBefore = 0L;   // the last Replace everything: the rows of files taken before it were set aside
         for (Map<String, Object> m : DatasetArrivals.sidecarLines(dataRoot, id)) {
             if ("system".equals(m.get("sender")) || DatasetArrivals.REFUSED.equals(m.get("status"))) continue;
-            if ("replace".equals(m.get("mode"))) held.clear();   // a Replace everything set the earlier rows aside
+            if ("replace".equals(m.get("mode"))) {
+                held.clear();   // a Replace everything set the earlier rows aside
+                try {
+                    replacedBefore = Math.max(replacedBefore, java.time.Instant.parse(String.valueOf(m.get("at"))).toEpochMilli());
+                } catch (RuntimeException noInstant) {
+                    // an undated line: the markers are judged as before
+                }
+            }
             if (m.get("sha256") instanceof String sha && !sha.isBlank() && m.get("landed") instanceof String landed)
                 held.put(landed, m);
         }
@@ -320,16 +341,17 @@ final class ImportFingerprints {
             ledger().record(new LedgerEntry(source(cfg), key, key, 0L, String.valueOf(e.getValue().get("sha256")),
                     null, null, 0L, at, LedgerEntry.PROCESSED));
         }
-        int named = seedMarkers(cfg, held.keySet());
+        int named = seedMarkers(cfg, held.keySet(), replacedBefore);
         if (!held.isEmpty() || named > 0)
             log.info("Dataset '{}': {} fingerprint(s) seeded from its arrivals, {} name(s) from its markers (B3)", id, held.size(), named);
     }
 
     /**
      * A name-only fingerprint (no checksum: the path check never kept one) for every file the import's processed markers
-     * name, but the {@code seeded} ones; answers how many. Recorded at the marker's time.
+     * name, but the {@code seeded} ones and those written before {@code replacedBefore} (the last Replace everything set
+     * their rows aside, the markers folder is not moved with them); answers how many. Recorded at the marker's time.
      */
-    private static int seedMarkers(PipelineConfig cfg, Set<String> seeded) throws IOException {
+    private static int seedMarkers(PipelineConfig cfg, Set<String> seeded, long replacedBefore) throws IOException {
         String markers = cfg.dirs().markers();
         if (markers == null || markers.isBlank()) return 0;
         Path root = Path.of(markers).toAbsolutePath().normalize();
@@ -346,11 +368,12 @@ final class ImportFingerprints {
         for (Path m : found) {
             String rel = root.relativize(m).toString().replace(java.io.File.separatorChar, '/');
             rel = rel.substring(0, rel.length() - ext.length());
-            if (seeded.contains(rel)) continue;
+            long at = Files.getLastModifiedTime(m).toMillis();
+            if (seeded.contains(rel) || at < replacedBefore) continue;
             String key = FileNames.safe(cfg, rel);
             ledger().record(new LedgerEntry(source(cfg), key, FileNames.safe(cfg, m.getFileName().toString()
                     .substring(0, m.getFileName().toString().length() - ext.length())), 0L, null, null, null, 0L,
-                    Files.getLastModifiedTime(m).toMillis(), LedgerEntry.PROCESSED));
+                    at, LedgerEntry.PROCESSED));
             n++;
         }
         return n;

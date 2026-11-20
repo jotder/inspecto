@@ -59,8 +59,10 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   file whose FILE NAME the import took with other bytes, in any folder of the inbox ("a file named 'x' was already
   imported on <day> with other content ... rename it"): ⚠ the engine writes one output per file name, so reading it would
   write the new file over the first one's rows (a reused name in another folder did exactly that, 112 rows became 106).
+  Two waiting files of one name in one run (`feed.csv`, `later/feed.csv`): the first is taken, the second set aside.
   Nothing is replaced, nothing silently skipped. `on_change` is the Pipeline's own setting: set to `reprocess`, a reused
-  name is read and its rows replace the first file's (the person's choice). A *Replace everything* run judges only the
+  name is read, and ⚠ a same-name file - in the same folder or another one - REPLACES the first file's rows (the person's
+  choice; engine defect `OUTPUT-NAME-OVERWRITE-1`). A *Replace everything* run judges only the
   run's own twins: every held row is being replaced. Add a file and the step ask the ledger whatever the Pipeline's
   mode (operator 2026-11-20): an import left on `path` has its uploads fingerprinted by Add data (`recordUpload`).
   **Forgetting:**
@@ -70,8 +72,9 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   when its rows go with it (a replace or period undone, or a 422 "nothing was imported"). **Upgrade:** at start an import Pipeline still
   on the `path` default is moved onto `content` through the Pipeline write path (an approval policy over Pipelines leaves
   it on `path`, logged), and an import the ledger holds nothing of is seeded once: its sidecar's upload hashes, and BY
-  NAME ONLY each file its processed markers name (no hash was ever kept), so a file the path check held back in the inbox
-  is set aside as already imported instead of read (`ImportFingerprints.migrate`). A foreign drop taken under the path
+  NAME ONLY each file its processed markers name (no hash was ever kept) - but not a marker older than the last Replace
+  everything, whose rows were set aside - so a file the path check held back in the inbox is set aside as already
+  imported instead of read (`ImportFingerprints.migrate`). A foreign drop taken under the path
   check is known by name only: its bytes re-sent under another name are not recognised. Tests: `ControlApiImportFingerprintsTest`.
 - **Schema drift** (D-6, operator 2026-11-05): `OnboardImport.checkColumns` judges a later file by column NAME before
   anything lands. A missing column, or a delimited column at another position, refuses it naming each (422 for an upload;

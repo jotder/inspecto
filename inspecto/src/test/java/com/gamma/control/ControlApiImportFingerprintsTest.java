@@ -306,14 +306,17 @@ class ControlApiImportFingerprintsTest {
             commit(c, id, transfers(100), 200);
             ComponentStoreAccess.setEventDate(root, id, "booked_at");
             String jpy = threeDays("JPY");
-            data(add(c, id, "three_days.csv", "append", jpy), 200);
+            JsonNode appended = data(add(c, id, "three_days.csv", "append", jpy), 200);
+            assertEquals(12, appended.get("rowsIn").asLong(), "rows read by the append (re-review LOW 3): " + appended);
             long held = rows(id);
             // a correction of the same three days: the three-day file's rows all go, the first file keeps its other days
             JsonNode s = data(add(c, id, "correction.csv", "period", threeDays("CHF")), 200);
+            assertEquals(12, s.get("rowsIn").asLong(), "rows read by the period run (re-review LOW 3): " + s);
             assertTrue(s.at("/period/rowsReplaced").asLong() > 0, s.toString());
             long after = s.get("rowsAfter").asLong();
             assertEquals(held - 12, after, "the three days once, not three times: " + s);
             JsonNode back = data(add(c, id, "three_days_again.csv", "append", jpy), 200);
+            assertEquals(12, back.get("rowsIn").asLong(), "rows read when it comes back: " + back);
             assertEquals(after + 12, back.get("rowsAfter").asLong(), "its rows were all replaced, so it may come back");
             HttpResponse<String> first = add(c, id, "first_again.csv", "append", transfers(100));
             assertEquals(409, first.statusCode(), "the first file keeps its other days, so its bytes are still refused: " + first.body());
@@ -415,6 +418,51 @@ class ControlApiImportFingerprintsTest {
      * The engine writes one output per file name, so {@code later/feed.csv} would be written over {@code feed.csv}'s rows
      * (found building this lane: 112 rows became 106): a taken name is refused in any folder.
      */
+    /** Re-review probe: feed.csv and later/feed.csv waiting in ONE run - the second is set aside, no row is lost. */
+    @Test
+    void twoWaitingFilesWithOneNameInOneRunAreNotWrittenOverEachOther(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "onerun", transfers(40));
+            dropSettled(id, "feed.csv", transfers(7));
+            Files.createDirectories(Path.of("database", "inbox", id, "later"));
+            dropSettled(id, "later/feed.csv", transfers(5));
+            JsonNode run = data(send(c, "POST", "/datasets/" + id + "/run", null), 200);
+            assertEquals(7, run.get("rowsIn").asLong(), run.toString());
+            assertEquals(47, rows(id), "the first feed.csv keeps all 7 rows: " + run);
+            assertEquals("feed.csv", run.at("/refused/0/file").asText(), run.toString());
+            assertTrue(run.at("/refused/0/reason").asText().contains("'feed.csv' has the same file name"), run.toString());
+            assertTrue(Files.exists(Path.of("database", id, OnboardImport.REFUSED_DIR, "feed.csv")), "set aside, not lost");
+            JsonNode arrivals = data(send(c, "GET", "/datasets/" + id + "/arrivals", null), 200).get("arrivals");
+            assertTrue(arrivals.toString().contains("\"status\":\"REFUSED\"") && arrivals.toString().contains("same file name"),
+                    "the arrivals say why: " + arrivals);
+        }
+    }
+
+    /** Re-review LOW: a marker written before a Replace everything names rows that were set aside, so it is not seeded. */
+    @Test
+    void markersFromBeforeAReplaceEverythingAreNotSeeded(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        String id;
+        try (Ctx c = open(cfg, root)) {
+            id = imported(c, "replaced", transfers(40));
+            data(add(c, id, "fresh.csv", "replace", transfers(9)), 200);
+        }
+        Path pipeline = pipelineOf(root, id);
+        Files.writeString(pipeline, Files.readString(pipeline).replace("mode: content", "mode: path"));
+        Path markers = Files.createDirectories(Path.of("database", id, "markers"));
+        Files.writeString(markers.resolve("old.csv.processed"), "");
+        Files.setLastModifiedTime(markers.resolve("old.csv.processed"), SETTLED);   // before the replace
+        Files.writeString(markers.resolve("new.csv.processed"), "");
+        Files.setLastModifiedTime(markers.resolve("new.csv.processed"), FileTime.fromMillis(System.currentTimeMillis() + 60_000L));
+        AcquisitionLedgers.use(new InMemoryAcquisitionLedger());
+        try (Ctx c = open(cfg, root, pipeline)) {
+            java.util.Set<String> seeded = new java.util.HashSet<>();
+            for (LedgerEntry e : AcquisitionLedgers.shared().entries(id)) seeded.add(e.relativePath());
+            assertTrue(seeded.contains("new.csv"), seeded.toString());
+            assertFalse(seeded.contains("old.csv"), "its rows were set aside by the replace: " + seeded);
+            assertEquals(2, seeded.size(), "the replace's own upload and new.csv: " + seeded);
+        }
+    }
+
     @Test
     void aTakenNameIsSetAsideInAnotherFolderToo(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
