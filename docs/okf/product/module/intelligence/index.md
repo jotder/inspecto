@@ -34,4 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `ASSISTANT-SCREEN-HELP-1` | P3 | feature | The Assistant explains the screen or Widget a user is on | operator |
 | `AGENTIC-INVESTIGATION-1` | P2 | feature | An agent that works an Incident and proposes the next action for a human to approve: slices S2-S6 remain. | — |
