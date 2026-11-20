@@ -47,9 +47,10 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   then every older Parquet file loses its rows on the calendar days the file covers; originals kept in
   `database.period-<stamp>/` until the import succeeded). `period` needs a When column. A rewritten file makes the next
   index build `full`. Since `BASIC-ELT-PROFILE-1` B4 the engine's `ArrivalReplacer` does it, crash-safe (a journal, one
-  swap, a heal to the old or the new state), and once the import succeeded the replaced files (and the files *Replace
-  everything* set aside) are `REPLACED` in the Consignment output registry, so their reprocess is refused (`409`):
-  [spec-arrival-replace.md](../elt/spec-arrival-replace.md).
+  swap, a heal to the old or the new state), and once the import succeeded the replaced files are `REPLACED` in the
+  Consignment output registry, so their reprocess is refused (`409`). *Replace everything* runs the same way since B13
+  (2026-11-20): every other file goes at the upload's commit, through the journal and the heal, so a crash no longer
+  leaves the Dataset empty: [spec-arrival-replace.md](../elt/spec-arrival-replace.md).
 - **The same bytes again** (D-3; `BASIC-ELT-PROFILE-1` B3 part 2, 2026-11-20): an import's Pipeline runs with
   `collector.duplicate: {mode: content, algorithm: SHA256, on_change: ignore}`, so the engine records the sha256 of every file it takes in the
   acquisition ledger (durable `db` by default on every edition) and the import asks that ledger
@@ -72,10 +73,12 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   Nothing is replaced, nothing silently skipped. `on_change` is the Pipeline's own setting: set to `reprocess`, a reused
   name is read, and ⚠ a same-name file - in the same folder or another one - REPLACES the first file's rows (the person's
   choice; engine defect `OUTPUT-NAME-OVERWRITE-1`). A *Replace everything* run judges only the
-  run's own twins: every held row is being replaced. Add a file and the step ask the ledger whatever the Pipeline's
+  run's own twins: every held row is being replaced (a waiting file with the bytes of a replaced arrival is taken). Add a file and the step ask the ledger whatever the Pipeline's
   mode (operator 2026-11-20): an import left on `path` has its uploads fingerprinted by Add data (`recordUpload`).
   **Forgetting:**
-  Replace everything forgets every fingerprint of the import before its run, Replace the period those of the arrivals
+  Replace everything forgets every fingerprint of the import before its run - the engine judges the upload against the
+  ledger first, while the old rows are replaced inside the run, at the upload's commit (B13) - and an undone or failed
+  replacement (the originals restored by the journal) records them again; Replace the period forgets those of the arrivals
   whose rows the Dataset no longer holds (every output file gone, none merged by a compaction), a new import those an
   earlier Dataset of its id left; a run that is undone records them again, and forgets the upload's own fingerprint
   when its rows go with it (a replace or period undone, or a 422 "nothing was imported"). **Upgrade:** at start an import Pipeline still
@@ -237,7 +240,7 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
 - **The merge map (D-8)** `<dataRoot>/<id>/compaction.json`: `merged`, `at`, `arrivals[{file, received, firstRow, rows,
   coversFrom, coversTo}]` (the arrival's own output name, its row segment, the period of its kept rows),
   `removed[{file, at, reason}]` (at most 500), `retention`. `ArrivalCompactor.merged(dataRoot, id)` answers it ONLY
-  while the merged file exists, so a *Replace everything* (which sets the whole `database` folder aside) silences it.
+  while the merged file exists, so a *Replace everything* (which removes every file but the run's own) silences it.
 - **The swap.** Write the merged file in `<id>/temp`, write `compaction.json.pending` (merged name, inputs, next map),
   move the merged file in, delete the inputs (only inside `database`, never the merged file), commit the map. `heal`
   (run before every compaction) finishes a pending swap whose merged file moved in, or drops one whose file did not.

@@ -38,7 +38,9 @@ import java.util.Set;
  *       engine's {@link CollectorService#preRunStep pre-run step} {@value #STEP} claims the Dataset, runs the same list,
  *       and holds the claim through the run, so the commit steps ({@link ImportCommitSteps}) run as its holder and Add data
  *       cannot judge the inbox under it. A scheduled run of a Dataset someone else holds does not start (the next tick
- *       looks again); a person's run of one goes ahead untouched - Add data's own run is such a run. A kept column is
+ *       looks again); Add data's own run of it (on the thread that holds the claim, {@link OnboardImport#runsOwn}) goes
+ *       ahead untouched, and any other run is refused with a reason (O7: it would commit into the Dataset while Add
+ *       data's run-scoped arrival mode is open, and that choice would take its rows as Add data's own). A kept column is
  *       undone when the run fails. A scheduled run of a local folder with a stability window judges only the files
  *       unmodified for that window and takes only those: a file still being written is never judged half-written.
  *       After the run the step writes its arrivals sidecar lines, as Run now does (BASIC-WATCH-ARRIVALS-1).
@@ -168,7 +170,13 @@ final class ImportPreRunSteps {
             boolean watched = scheduled && InboxWatch.watched(content, cfg);
             if (watched && !DataSettings.forRoot(writeRoot).selfImportInForce()) return PreRun.SKIP;
             String claim = writeRoot + "|" + id;
-            if (!OnboardImport.IN_FLIGHT.add(claim)) return scheduled ? PreRun.SKIP : PreRun.GO;   // Add data, a rewrite or a delete holds it
+            if (!OnboardImport.IN_FLIGHT.add(claim)) {   // Add data, a rewrite or a delete holds it
+                if (scheduled) return PreRun.SKIP;
+                if (OnboardImport.runsOwn(claim)) return PreRun.GO;   // Add data's own run of it, on the thread that holds it
+                // O7: any other run is refused - it would commit into the Dataset while Add data's run-scoped choice is open,
+                // which would take its rows as its own (a Run now replacing everything would keep them: two copies)
+                return PreRun.refused("'" + id + "' is being imported or changed right now; run it again when that has finished");
+            }
             Map<String, Object> summary = java.util.Collections.synchronizedMap(new java.util.LinkedHashMap<>());
             HELD_BY_RUN.put(claim, summary);
             OnboardImport.Space s = new OnboardImport.Space(writeRoot, dataRoot, service, "scheduler");

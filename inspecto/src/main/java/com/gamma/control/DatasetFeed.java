@@ -217,6 +217,7 @@ final class DatasetFeed {
         if (!BasicProfile.Entry.KEEP_UP_TO_DATE.offered())   // D-1: Basic is manual (DT-5); the Basic profile says so
             throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "Keep this up to date: "
                     + EditionFeatures.refusal(BasicProfile.Entry.KEEP_UP_TO_DATE.feature()) + "; import the files waiting with Run now");
+        refuseSnapshot(imp);
         if ("reference".equals(imp.content().get("kind")))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
                     "a Reference is replaced with Add a file; a feed only adds rows, so it keeps Events up to date");
@@ -280,6 +281,7 @@ final class DatasetFeed {
 
     static Object stop(ApiContext api, HttpExchange ex, String id) throws IOException {
         Import imp = gate(api, ex, id, "Stop the feed");
+        refuseSnapshot(imp);
         // B1: a watched inbox is a feed too: stopping it turns the watch off (watchInbox goes with the schedule)
         rewrite(api, imp, "stopping the feed rewrites the import's Pipeline", () -> InboxWatch.keep(api, imp, id, false), collector -> {
             // the feed's own keys go - its duplicate check back to the import's own (B3 part 2); anything set in the guided
@@ -294,6 +296,16 @@ final class DatasetFeed {
         });
         InboxWatch.ran(imp.dataRoot(), id, null);
         return describe(ex, imp);
+    }
+
+    /**
+     * A Postgres snapshot has no feed (operator ruling 2026-11-20, O7): its Pipeline reads the table itself, and a feed's
+     * rewrite of the {@code collector} would undo that. 422, as <i>Watch this folder</i> refuses it; no server path.
+     */
+    private static void refuseSnapshot(Import imp) {
+        if (InboxWatch.snapshot(imp.content()) || PostgresSnapshot.isSnapshot(imp.writeRoot(), imp.id()))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                    "a Postgres snapshot has no feed: it copies its table on Refresh now, replacing everything");
     }
 
     /**
@@ -332,44 +344,54 @@ final class DatasetFeed {
         if (!OnboardImport.IN_FLIGHT.add(key))
             throw new ApiException(409, ErrorCodes.CONFLICT, "'" + imp.id() + "' is being imported or deleted right now; try again when it has finished");
         try {
-            if (!Files.isRegularFile(imp.pipelineFile()))
-                throw new ApiException(409, ErrorCodes.CONFLICT, "the import's Pipeline '" + imp.id() + "' is gone");
-            byte[] before = Files.readAllBytes(imp.pipelineFile());
-            Map<String, Object> src = ToonHelper.load(imp.pipelineFile().toString());
-            Map<String, Object> p = new LinkedHashMap<>(src);
-            edit.accept(p);
-            Path dir = imp.pipelineFile().getParent();
-            List<Finding> introduced = SaveGate.introduced(
-                    SaveGate.check(api, "pipeline", p, imp.writeRoot(), dir, SaveGate.Referents.MUST_EXIST),
-                    SaveGate.check(api, "pipeline", src, imp.writeRoot(), dir, SaveGate.Referents.MUST_EXIST));
-            if (!introduced.isEmpty()) {
-                StringBuilder sb = new StringBuilder();
-                for (Finding f : introduced)
-                    if (f.severity() == Severity.ERROR) sb.append(sb.isEmpty() ? "" : "; ").append(f.fieldPath()).append(": ").append(f.message());
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the import's Pipeline was refused: " + sb);
-            }
-            RefusalConfigAudit.write(imp.pipelineFile(), ConfigCodec.toToon(p).getBytes(StandardCharsets.UTF_8), ".cfg-");
-            try {
-                PipelineConfig.load(imp.pipelineFile().toString());
-            } catch (IOException | RuntimeException refused) {
-                AtomicFiles.write(imp.pipelineFile(), before, ".cfg-");
-                imp.service().refreshConfigs();
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the import's Pipeline did not load: " + refused.getMessage());
-            }
-            if (after != null) {
-                try {
-                    after.run();
-                } catch (IOException | RuntimeException failed) {
-                    AtomicFiles.write(imp.pipelineFile(), before, ".cfg-");
-                    imp.service().refreshConfigs();
-                    throw failed;
-                }
-            }
-            PipelineHistory.record(imp.writeRoot(), imp.pipelineFile());   // PIPELINE-CONFIG-HISTORY-1
-            imp.service().refreshConfigs();
+            rewriteHeld(api, imp, edit, after);
         } finally {
             OnboardImport.IN_FLIGHT.remove(key);
         }
+    }
+
+    /**
+     * {@link #rewritePipeline} for a caller that already holds the import's claim ({@link OnboardImport#IN_FLIGHT}): a
+     * Postgres snapshot's switch (O7), inside its commit or its Run now. The caller has weighed the approval policy
+     * ({@link PendingChanges#holdRefusing}).
+     */
+    static void rewriteHeld(ApiContext api, Import imp,
+                            java.util.function.Consumer<Map<String, Object>> edit, AfterWrite after) throws IOException {
+        if (!Files.isRegularFile(imp.pipelineFile()))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "the import's Pipeline '" + imp.id() + "' is gone");
+        byte[] before = Files.readAllBytes(imp.pipelineFile());
+        Map<String, Object> src = ToonHelper.load(imp.pipelineFile().toString());
+        Map<String, Object> p = new LinkedHashMap<>(src);
+        edit.accept(p);
+        Path dir = imp.pipelineFile().getParent();
+        List<Finding> introduced = SaveGate.introduced(
+                SaveGate.check(api, "pipeline", p, imp.writeRoot(), dir, SaveGate.Referents.MUST_EXIST),
+                SaveGate.check(api, "pipeline", src, imp.writeRoot(), dir, SaveGate.Referents.MUST_EXIST));
+        if (!introduced.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (Finding f : introduced)
+                if (f.severity() == Severity.ERROR) sb.append(sb.isEmpty() ? "" : "; ").append(f.fieldPath()).append(": ").append(f.message());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the import's Pipeline was refused: " + sb);
+        }
+        RefusalConfigAudit.write(imp.pipelineFile(), ConfigCodec.toToon(p).getBytes(StandardCharsets.UTF_8), ".cfg-");
+        try {
+            PipelineConfig.load(imp.pipelineFile().toString());
+        } catch (IOException | RuntimeException refused) {
+            AtomicFiles.write(imp.pipelineFile(), before, ".cfg-");
+            imp.service().refreshConfigs();
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the import's Pipeline did not load: " + refused.getMessage());
+        }
+        if (after != null) {
+            try {
+                after.run();
+            } catch (IOException | RuntimeException failed) {
+                AtomicFiles.write(imp.pipelineFile(), before, ".cfg-");
+                imp.service().refreshConfigs();
+                throw failed;
+            }
+        }
+        PipelineHistory.record(imp.writeRoot(), imp.pipelineFile());   // PIPELINE-CONFIG-HISTORY-1
+        imp.service().refreshConfigs();
     }
 
     /**

@@ -334,8 +334,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/onboard/files` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:77` |
 | POST | `/onboard/files/([^/]+)/commit` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:78` |
 | POST | `/onboard/files/([^/]+)/redraft` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:80` |
-| POST | `/onboard/postgres` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/PostgresSnapshot.java:75` |
-| POST | `/onboard/postgres/test` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/PostgresSnapshot.java:74` |
+| POST | `/onboard/postgres` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/PostgresSnapshot.java:81` |
+| POST | `/onboard/postgres/test` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/PostgresSnapshot.java:80` |
 | POST | `/onboarding/events` | exempt | self-limiting | `inspecto/src/main/java/com/gamma/control/OnboardingRoutes.java:40` |
 | POST | `/origin/adopt` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceOriginRoutes.java:60` |
 | POST | `/origin/upgrade` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceOriginRoutes.java:62` |

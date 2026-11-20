@@ -40,8 +40,8 @@ Then the import decides:
 | succeeded | `drop` | every touched file is marked `REPLACED` in the Consignment output registry, the originals and the journal go |
 | failed | `restore` | the originals come back, the merge map as it was, and the upload's own outputs go (no day left doubled); the journal says `restoring` until done |
 
-Each is a no-op after the other. Add data's `OnboardImport.Job` pushes `restore` on its undo stack and calls `drop`
-from `dropAside`.
+Each is a no-op after the other. Add data's `OnboardImport.Job` reaches both through its run-scoped choice (below): a
+rollback restores, `dropAside` drops.
 
 ## Crash safety
 
@@ -68,8 +68,9 @@ mix. A crash before the journal is written leaves only hidden rewrites, which no
 `ConsignmentOutputStores.markReplaced` (only `LIVE` rows move; paths matched normalised, as `markCompactedAway`):
 
 - *Replace the period*: each file it rewrote or removed, at `drop` (or the heal's forward finish).
-- *Replace everything*: `ArrivalReplacer.everythingReplaced(setAside, database)` from `dropAside`, every Parquet file
-  the replace set aside (`database.prev-<stamp>`) by its path in `database` — unless the run wrote that path again.
+- *Replace everything* (B13, 2026-11-20): `replaceEverything` at the upload's commit, marked at `drop` as the period is:
+  every Parquet file of the import but the ones the run wrote. (Until B13 Add a file moved the whole `database` folder
+  aside before the run, so a crash between the move and the run left the Dataset empty.)
 
 **`REPLACED` is readable.** A rewritten file keeps its path and holds the rows the replacement kept, so
 `unreadablePaths` (what `ConsignmentSelector` subtracts from every read and `retire_superseded` deletes), `isReadable`
@@ -122,24 +123,46 @@ output:
   the whole run: it replaces at the ONE Consignment that holds `file` (the inbox file name, matched in the on-disk file
   ledger) - or the run's first, when no file is named - and every other Consignment of the run appends; what the run
   committed before it is never removed. Its replacement waits for the caller: `close()` makes it final, `restore()`
-  undoes it. One choice per store at a time. **Basic never writes `output.load`:** Add a file's *Replace the period*
-  opens this choice before its run (`OnboardImport.Job.periodLoad`), reads the result after it (`replacedPeriod`), and
+  undoes it. One choice per store at a time. **Basic never writes `output.load`:** Add a file opens this choice before
+  its run for every mode (`OnboardImport.Job.runLoad`: `replace`, `period` and `append` - an append wins over a
+  Pipeline's own `output.load`, a Postgres snapshot's), checks it after the run (`requireLoaded`, `replacedPeriod`), and
   makes it final in `dropAside` or undoes it in a rollback - the same answer, arrivals and refusals as before. A watched
-  feed stays `append`. O7's Run now of a Postgres snapshot is meant to pass a run-scoped `replace` the same way.
+  feed stays `append`. A Postgres snapshot's Run now takes the same path with `replace` (O7, below).
+
+## A Postgres snapshot's Pipeline (O7)
+
+(Built 2026-11-20 on the operator ruling O7.) A snapshot's Pipeline reads the table itself: `collector.connector:
+postgres` through its saved Connection, with `output.load: replace` and `processing.duplicate_check.enabled: false`. A
+run outside Add data (`POST /pipelines/{id}/run`, a trigger) exports the table (a name of its own per cycle,
+`<table>_<stamp>.parquet`, because each output file is named after its input and a fixed name would overwrite the last
+output in place, where no replacement can put it back) and replaces the rows at its commit through the config path.
+Run now keeps its own export - the column check, the `import.max_rows` cap, the 422 wording - and takes the Add a file
+path with a run-scoped `replace` naming its export; its run fetches nothing itself (`RunFiles.noFetch`).
+
+**No other run while a run-scoped choice is open.** The choice applies to whatever commits into the store while it is
+open, so the import's pre-run step refuses every run of the Pipeline but Add data's own while Add data holds the
+Dataset (`ImportPreRunSteps`, `PreRun.refused`). Without it a `POST /pipelines/{id}/run` started during a Run now
+committed its own copy, the open choice took it as Run now's, and the replace kept it (57 rows for 45). The same holds
+for Add a file's *Replace everything* and *Replace the period*.
+
+**A failed *Replace everything* undoes only the replacement** (operator ruling 2026-11-20): the originals come back and
+the upload's rows go; rows of other waiting files the same run committed stay, as their ledger says they were taken
+(the old folder set-aside put the whole folder back, theirs gone with it). The switch, the
+migration of an old snapshot and the trade-offs are on the seam's page:
+[api-onboarding-postgres-snapshot.md](../processor/api-onboarding-postgres-snapshot.md).
 
 Tests: `PipelineConfigArrivalLoadTest` (parse, refusals at load), `ArrivalLoadStepTest` (a Standard store: period,
 replace, append / failed / dry-run / empty untouched, a failed replacement keeps the committed rows (mid-swap, a crash in the put-back, a lost rewrite), a crash healed at the next append commit but not while a run-scoped choice is open; the run-scoped choice: its file only, the run's earlier files
 kept, restore and close, one per store), `ControlApiOutputLoadTest` (real HTTP: `POST /config/write` 422 for two sinks,
 CSV, a partitioned schema, a missing or undeclared column, an unknown mode, 200 on a flat Parquet store; a Standard
-Pipeline replacing at each commit through the service), `ControlApiOnboardFilesTest` (Add a file's period through the
-run-scoped choice, unchanged answers).
+Pipeline replacing at each commit through the service), `ControlApiOnboardFilesTest` (Add a file's period and, since
+B13, Replace everything through the run-scoped choice, unchanged answers), `ControlApiSnapshotExportTest` (O7: a
+switched snapshot's Run now and a run outside Add data each leave one copy).
 
 ## Not done here
 
-- Add a file's *Replace everything* still sets the whole `database` folder aside before the run (B13): its switch to a
-  run-scoped `replace` and its convergence with `reference.load: replace`. Until then a crash between the set-aside and
-  the run leaves the Dataset empty (no heal).
-- O7: the snapshot Pipeline's switch to `collector.connector: postgres`, with Run now passing a run-scoped `replace`.
+- B13's other half: Add a file's *Replace everything* on a Reference and `reference.load: replace` are still two ways
+  to replace one store.
 - `output.load` in the Pipeline editor (a Standard screen); an edition Gate for it on a Basic build.
 - A heal at start-up, so a crash's mix does not wait for the Dataset's next run.
 - Arrivals mode for a Standard Pipeline's own store (B6's leftover).
@@ -147,7 +170,7 @@ run-scoped choice, unchanged answers).
 Tests: `ArrivalReplacerTest` (engine: exact days removed and the drop marks; a failed import restores; a replace that
 fails before its swap still removes the upload's rows; a crash mid-swap heals forward; mid-restore heals back; after
 the swap or mid-drop heals forward; a lost rewrite heals back; the next replace and a compaction heal first; the merge
-map stays true both ways; *Replace everything* marks what it set aside; both swaps wait for a reader),
+map stays true both ways; *Replace everything* marks what it removed, never the run's own file; both swaps wait for a reader),
 `ControlApiReprocessRefusalTest` (real HTTP: 409 for a period-rewritten and a set-aside arrival, the kept rows still
 read, the next run finishes a crashed replace, 400 / 404 and a plain reprocess), `ReprocessCommandTest`,
 `DbConsignmentOutputStoreTest`, `ControlApiDatasetCompactionTest`, `ControlApiOnboardFilesTest`.

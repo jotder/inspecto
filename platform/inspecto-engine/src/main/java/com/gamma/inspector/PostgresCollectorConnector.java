@@ -65,8 +65,9 @@ import static com.gamma.acquire.CollectorConnector.Capability.STREAM;
  *
  * <h3>Typed as the import reads</h3>
  * A time-zoned timestamp becomes its UTC wall time; a type with no import column type (UUID, JSON, arrays, intervals…)
- * becomes text. The export is one logical file per cycle ({@code <table>.parquet} or {@code query.parquet}), so the
- * connector is {@link Capability#STREAM}-only: there is no source-side file to delete, move or rename.
+ * becomes text. The export is one logical file per cycle ({@code <table>_<stamp>.parquet} or {@code query_<stamp>.parquet},
+ * {@link #cycleName}), so the connector is {@link Capability#STREAM}-only: there is no source-side file to delete, move or
+ * rename.
  */
 public final class PostgresCollectorConnector implements CollectorConnector {
 
@@ -150,10 +151,12 @@ public final class PostgresCollectorConnector implements CollectorConnector {
         return EnumSet.of(STREAM);   // a copied table has no source-side file to delete/move/rename
     }
 
-    /** One logical export per cycle; no database access here (discovery stays cheap). */
+    /**
+     * One logical export per cycle, named uniquely ({@link #cycleName}); no database access here (discovery stays cheap).
+     */
     @Override
     public List<RemoteFile> discover(DiscoveryContext ctx) {
-        String name = fileName();
+        String name = cycleName();
         if (!new PatternFilter(ctx.includes(), ctx.excludes()).accepts(name)) return List.of();
         return List.of(new RemoteFile(name, name, RemoteFile.SIZE_UNKNOWN, java.time.Instant.now(), null, null, null));
     }
@@ -197,6 +200,24 @@ public final class PostgresCollectorConnector implements CollectorConnector {
     /** The export's file name: the table's, or {@code query}, as Parquet. */
     public String fileName() {
         return (table != null ? table : "query") + ".parquet";
+    }
+
+    private static final java.util.concurrent.atomic.AtomicLong CYCLES = new java.util.concurrent.atomic.AtomicLong();
+
+    /**
+     * A Pipeline's export of one cycle ({@code BASIC-ELT-PROFILE-1} O7): {@link #fileName}'s stem, then a time stamp in
+     * letters only - {@code transfers_bqxkfmazqe.parquet}. Each cycle's output file
+     * is named after its input, so a fixed name would overwrite the last cycle's output in place, where no replacement
+     * can put it back; and a digit run in a name is fingerprinted in the run ledgers.
+     */
+    String cycleName() {
+        long v = System.currentTimeMillis() * 1000 + CYCLES.incrementAndGet() % 1000;
+        StringBuilder stamp = new StringBuilder();
+        while (v > 0) {
+            stamp.append((char) ('a' + v % 26));
+            v /= 26;
+        }
+        return (table != null ? table : "query") + "_" + stamp.reverse() + ".parquet";
     }
 
     /** Whether this connector copies a table (false: a query). */

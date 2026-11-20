@@ -352,14 +352,15 @@ class ArrivalReplacerTest {
     }
 
     @Test
-    void replaceEverythingMarksWhatItSetAsideUnlessTheRunWroteItAgain(@TempDir Path data) throws Exception {
+    void replaceEverythingInAnImportMarksWhatItRemovedButNotTheRunsOwnFiles(@TempDir Path data) throws Exception {
+        // B13: Add a file's Replace everything is this replacement (it set the whole folder aside before the run)
         Store s = store(data);
-        Path aside = s.base.resolve("database.prev-1");
-        Files.move(s.db, aside);   // what Add data's setAside does
-        parquet(s.upload, "cu", "('2026-10-05', 9)");   // the replacing run writes the upload's path again
-        ArrivalReplacer.everythingReplaced(aside, s.db);
+        ArrivalReplacer r = new ArrivalReplacer(data, "calls", "t1");
+        assertEquals(6, r.replaceEverything(List.of(s.upload), List.of(s.upload)).rowsRemoved());
+        r.drop();
         for (String c : List.of("ca", "cb", "cc", "ce")) assertEquals(State.REPLACED, state(c), c);
-        assertEquals(State.LIVE, state("cu"), "a path the run wrote again is the new data");
+        assertEquals(State.LIVE, state("cu"), "the run's own file is the new data");
+        assertEquals(List.of(s.upload), ArrivalCompactor.parquetFiles(s.db));
     }
 
     // ── the store's readers (SNAPSHOT-SWAP-UNLOCKED-READERS-1) ───────────────────────────────────────────────

@@ -282,24 +282,28 @@ class ControlApiDatasetCompactionTest {
             assertEquals(ArrivalCompactor.THRESHOLD, parquetFiles(id));
             Path inbox = Path.of("database", "inbox", id).toAbsolutePath();
 
-            // held (an import in flight): the commit does not compact behind the holder's back
+            // held (an import in flight): since O7 another run is refused outright - it neither takes the waiting file nor
+            // compacts behind the holder's back (the holder compacts itself)
             String key = c.root() + "|" + id;
             assertTrue(OnboardImport.IN_FLIGHT.add(key));
             try {
                 Files.createDirectories(inbox);
                 Files.writeString(inbox.resolve("feed21.csv"), transfersOn(day(21), 5));
-                assertTrue(c.svc().runPipeline(id).isPresent(), "the import Pipeline ran");
+                IllegalStateException refused = assertThrows(IllegalStateException.class, () -> c.svc().runPipeline(id));
+                assertTrue(refused.getMessage().contains("being imported or changed right now"), refused.getMessage());
             } finally {
                 OnboardImport.IN_FLIGHT.remove(key);
             }
-            assertEquals(ArrivalCompactor.THRESHOLD + 1, parquetFiles(id), "left to the run that holds the Dataset");
+            assertEquals(ArrivalCompactor.THRESHOLD, parquetFiles(id), "nothing taken, nothing compacted");
+            assertTrue(Files.exists(inbox.resolve("feed21.csv")), "the file waits for the next run");
+            Files.delete(inbox.resolve("feed21.csv"));
 
             // the scheduler's run: nobody holds the Dataset, so its commit compacts
             Files.writeString(inbox.resolve("feed22.csv"), transfersOn(day(22), 5));
             assertTrue(c.svc().runPipeline(id).isPresent(), "the import Pipeline ran");
             assertEquals(1, parquetFiles(id), "the feed's run compacted every file into one");
-            assertEquals(110, OnboardImport.countRows(Path.of("database", id, "database")), "no row lost or doubled");
-            assertEquals(22, data(json(c, "GET", "/datasets/" + id + "/storage", null, null), 200).get("compactedArrivals").asInt());
+            assertEquals(105, OnboardImport.countRows(Path.of("database", id, "database")), "no row lost or doubled");
+            assertEquals(21, data(json(c, "GET", "/datasets/" + id + "/storage", null, null), 200).get("compactedArrivals").asInt());
         }
     }
 

@@ -277,7 +277,10 @@ class ControlApiImportFingerprintsTest {
             assertTrue(error(failed).startsWith("nothing was imported from 'broken.csv'"), "it failed after its run: " + failed.body());
             assertEquals(42, rows(id), "the rows are back");
             assertEquals(409, add(c, id, "again.csv", "append", transfers(12)).statusCode(), "and so is October's fingerprint");
-            // a replace that succeeds forgets them: October may come back
+            assertEquals(409, add(c, id, "first.csv", "append", transfers(30)).statusCode(), "and the first file's");
+            assertEquals(42, data(add(c, id, "broken_again.csv", "append", transfers(5)), 200).get("rowsBefore").asLong(),
+                    "the held replace's own upload left no fingerprint behind: the same bytes are accepted");
+            // a replace that succeeds (B13: the old rows replaced inside its run) forgets them: October may come back
             data(add(c, id, "november.csv", "replace", transfers(9)), 200);
             assertEquals(21, data(add(c, id, "october.csv", "append", transfers(12)), 200).get("rowsAfter").asLong());
         }
