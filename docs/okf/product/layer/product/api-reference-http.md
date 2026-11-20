@@ -1,7 +1,7 @@
 ---
 type: Reference
 title: HTTP API reference
-description: Every Control API operation, by area, with the editions that serve it. Generated.
+description: Every Control API operation, by area. Generated.
 tags: [handbook, reference, generated]
 ---
 
@@ -11,1028 +11,1029 @@ tags: [handbook, reference, generated]
 > source and run `node tools/render-handbook-reference.mjs --write`.
 
 Every operation of the Control API — 627 in 79 areas. Paths are relative to `/api/v1`; the full
-contract (request and answer shapes, errors) is the OpenAPI document. *Editions* names the editions whose build
-carries the code that serves the operation; what a caller may then do is still decided by their Roles. Basic has
-no sign-in, so its calls carry no token.
+contract (request and answer shapes, errors) is the OpenAPI document. *Not before* names the first edition whose
+build carries the code for the operation; below it the call is not found. An empty cell makes no promise: the
+feature behind the call may still need a later edition (see the edition matrix), and what a caller may do is
+decided by their Roles. Basic has no sign-in, so its calls carry no token.
 
 ## access
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/access/catalog` | The Access Catalog | Basic · Standard · Advanced |
-| PUT | `/access/catalog` | Replace the Access Catalog | Basic · Standard · Advanced |
-| GET | `/access/explain` | Explain an access decision for my session | Basic · Standard · Advanced |
-| GET | `/access/policies` | List access policies | Basic · Standard · Advanced |
-| PUT | `/access/policies` | Replace the access policies | Basic · Standard · Advanced |
-| POST | `/access/policies/preview` | Impact matrix for an unsaved Access Policy draft | Basic · Standard · Advanced |
-| GET | `/access/profiles` | List Access Profiles | Basic · Standard · Advanced |
-| PUT | `/access/profiles/{profileId}` | Save an Access Profile | Basic · Standard · Advanced |
-| DELETE | `/access/profiles/{profileId}` | Delete an Access Profile | Basic · Standard · Advanced |
-| GET | `/access/roles` | The role table | Basic · Standard · Advanced |
-| PUT | `/access/roles` | Replace the authored role table | Basic · Standard · Advanced |
-| GET | `/access/roles/{roleId}/effective` | What one role may do | Basic · Standard · Advanced |
+| GET | `/access/catalog` | The Access Catalog |  |
+| PUT | `/access/catalog` | Replace the Access Catalog |  |
+| GET | `/access/explain` | Explain an access decision for my session |  |
+| GET | `/access/policies` | List access policies |  |
+| PUT | `/access/policies` | Replace the access policies |  |
+| POST | `/access/policies/preview` | Impact matrix for an unsaved Access Policy draft |  |
+| GET | `/access/profiles` | List Access Profiles |  |
+| PUT | `/access/profiles/{profileId}` | Save an Access Profile |  |
+| DELETE | `/access/profiles/{profileId}` | Delete an Access Profile |  |
+| GET | `/access/roles` | The role table |  |
+| PUT | `/access/roles` | Replace the authored role table |  |
+| GET | `/access/roles/{roleId}/effective` | What one role may do |  |
 
 ## Acquisition
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/connections` | List Connection profiles | Basic · Standard · Advanced |
-| POST | `/connections` | Create a Connection profile | Basic · Standard · Advanced |
-| GET | `/connections/{id}` | One Connection profile | Basic · Standard · Advanced |
-| PUT | `/connections/{id}` | Replace a Connection profile | Basic · Standard · Advanced |
-| DELETE | `/connections/{id}` | Delete a Connection profile | Basic · Standard · Advanced |
-| POST | `/connections/{id}/test` | Test a Connection's reachability | Basic · Standard · Advanced |
+| GET | `/connections` | List Connection profiles |  |
+| POST | `/connections` | Create a Connection profile |  |
+| GET | `/connections/{id}` | One Connection profile |  |
+| PUT | `/connections/{id}` | Replace a Connection profile |  |
+| DELETE | `/connections/{id}` | Delete a Connection profile |  |
+| POST | `/connections/{id}/test` | Test a Connection's reachability |  |
 
 ## action-requests
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/action-requests` | List Action Requests | Standard · Advanced |
-| POST | `/action-requests` | Propose an Action Request | Standard · Advanced |
-| GET | `/action-requests/{actionrequestId}` | One Action Request | Standard · Advanced |
-| POST | `/action-requests/{actionrequestId}/approve` | Approve an Action Request | Standard · Advanced |
-| POST | `/action-requests/{actionrequestId}/decline` | Decline an Action Request | Standard · Advanced |
-| POST | `/action-requests/{actionrequestId}/mark-failed` | Mark a stuck Action Request failed | Standard · Advanced |
-| POST | `/action-requests/{actionrequestId}/retry` | Retry a failed Action Request | Standard · Advanced |
+| GET | `/action-requests` | List Action Requests | Standard and up |
+| POST | `/action-requests` | Propose an Action Request | Standard and up |
+| GET | `/action-requests/{actionrequestId}` | One Action Request | Standard and up |
+| POST | `/action-requests/{actionrequestId}/approve` | Approve an Action Request | Standard and up |
+| POST | `/action-requests/{actionrequestId}/decline` | Decline an Action Request | Standard and up |
+| POST | `/action-requests/{actionrequestId}/mark-failed` | Mark a stuck Action Request failed | Standard and up |
+| POST | `/action-requests/{actionrequestId}/retry` | Retry a failed Action Request | Standard and up |
 
 ## agent
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/agent/actions` | List autonomous agent actions | Basic · Standard · Advanced |
-| GET | `/agent/actions/{actionId}` | One autonomous agent action | Basic · Standard · Advanced |
-| GET | `/agent/approvals` | List agent approvals | Basic · Standard · Advanced |
-| GET | `/agent/approvals/{approvalId}` | One agent approval | Basic · Standard · Advanced |
-| POST | `/agent/approvals/{approvalId}/decision` | Approve or decline an agent action | Basic · Standard · Advanced |
-| GET | `/agent/feedback` | List Triage Run feedback | Basic · Standard · Advanced |
-| GET | `/agent/policy` | The agent autonomy policy | Basic · Standard · Advanced |
-| PUT | `/agent/policy` | Update the agent autonomy policy | Basic · Standard · Advanced |
-| POST | `/agent/policy/kill-switch` | Engage or release the autonomy kill switch | Basic · Standard · Advanced |
-| POST | `/agent/sessions` | Open an intelligence agent session | Basic · Standard · Advanced |
-| POST | `/agent/sessions/{sessionId}/ask` | Ask an agent session a question | Basic · Standard · Advanced |
-| POST | `/agent/sessions/{sessionId}/ask/stream` | Ask an agent session (SSE stream) | Basic · Standard · Advanced |
-| POST | `/agent/tools/{toolId}` | Run one agent tool | Basic · Standard · Advanced |
-| POST | `/agent/tools/{toolId}/derive` | Run an agent tool from a sentence | Basic · Standard · Advanced |
-| GET | `/agent/triage-runs` | List recent Triage Runs | Basic · Standard · Advanced |
-| GET | `/agent/triage-runs/{triageRunId}` | One Triage Run | Basic · Standard · Advanced |
-| POST | `/agent/triage-runs/{triageRunId}/feedback` | Rate a Triage Run | Basic · Standard · Advanced |
-| GET | `/agent/triage-runs/{triageRunId}/similar` | Find Triage Runs similar to one | Basic · Standard · Advanced |
+| GET | `/agent/actions` | List autonomous agent actions |  |
+| GET | `/agent/actions/{actionId}` | One autonomous agent action |  |
+| GET | `/agent/approvals` | List agent approvals |  |
+| GET | `/agent/approvals/{approvalId}` | One agent approval |  |
+| POST | `/agent/approvals/{approvalId}/decision` | Approve or decline an agent action |  |
+| GET | `/agent/feedback` | List Triage Run feedback |  |
+| GET | `/agent/policy` | The agent autonomy policy |  |
+| PUT | `/agent/policy` | Update the agent autonomy policy |  |
+| POST | `/agent/policy/kill-switch` | Engage or release the autonomy kill switch |  |
+| POST | `/agent/sessions` | Open an intelligence agent session |  |
+| POST | `/agent/sessions/{sessionId}/ask` | Ask an agent session a question |  |
+| POST | `/agent/sessions/{sessionId}/ask/stream` | Ask an agent session (SSE stream) |  |
+| POST | `/agent/tools/{toolId}` | Run one agent tool |  |
+| POST | `/agent/tools/{toolId}/derive` | Run an agent tool from a sentence |  |
+| GET | `/agent/triage-runs` | List recent Triage Runs |  |
+| GET | `/agent/triage-runs/{triageRunId}` | One Triage Run |  |
+| POST | `/agent/triage-runs/{triageRunId}/feedback` | Rate a Triage Run |  |
+| GET | `/agent/triage-runs/{triageRunId}/similar` | Find Triage Runs similar to one |  |
 
 ## alerts
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/alerts` | List recent Alerts | Basic · Standard · Advanced |
-| POST | `/alerts/{alertId}/ack` | Acknowledge an Alert | Basic · Standard · Advanced |
-| POST | `/alerts/{alertId}/resolve` | Resolve an Alert | Basic · Standard · Advanced |
-| POST | `/alerts/evaluate` | Evaluate every Alert Rule | Basic · Standard · Advanced |
-| GET | `/alerts/rules` | List armed Alert Rules | Basic · Standard · Advanced |
-| POST | `/alerts/rules` | Create an Alert Rule | Basic · Standard · Advanced |
-| PUT | `/alerts/rules/{ruleId}` | Replace an Alert Rule | Basic · Standard · Advanced |
-| DELETE | `/alerts/rules/{ruleId}` | Delete an Alert Rule | Basic · Standard · Advanced |
-| GET | `/alerts/rules/pending` | List deferred Alert Rules | Basic · Standard · Advanced |
+| GET | `/alerts` | List recent Alerts |  |
+| POST | `/alerts/{alertId}/ack` | Acknowledge an Alert |  |
+| POST | `/alerts/{alertId}/resolve` | Resolve an Alert |  |
+| POST | `/alerts/evaluate` | Evaluate every Alert Rule |  |
+| GET | `/alerts/rules` | List armed Alert Rules |  |
+| POST | `/alerts/rules` | Create an Alert Rule |  |
+| PUT | `/alerts/rules/{ruleId}` | Replace an Alert Rule |  |
+| DELETE | `/alerts/rules/{ruleId}` | Delete an Alert Rule |  |
+| GET | `/alerts/rules/pending` | List deferred Alert Rules |  |
 
 ## analytics
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/analytics/functions` | The Analytics function catalogue: every function the Analytics Kernel offers | Basic · Standard · Advanced |
+| GET | `/analytics/functions` | The Analytics function catalogue: every function the Analytics Kernel offers |  |
 
 ## anomaly-scores
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/anomaly-scores/{model}/{entityKey}` | The latest Anomaly Score of one entity under a saved anomaly-model, with its explanation and recent runs | Standard · Advanced |
-| POST | `/anomaly-scores/preview` | Preview one entity's Anomaly Score under a saved or unsaved model, writing nothing | Standard · Advanced |
+| GET | `/anomaly-scores/{model}/{entityKey}` | The latest Anomaly Score of one entity under a saved anomaly-model, with its explanation and recent runs | Standard and up |
+| POST | `/anomaly-scores/preview` | Preview one entity's Anomaly Score under a saved or unsaved model, writing nothing | Standard and up |
 
 ## assist
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| POST | `/assist/{assistId}` | Ask an assist skill | Basic · Standard · Advanced |
-| GET | `/assist/diagnoses` | List recent failure diagnoses | Basic · Standard · Advanced |
-| GET | `/assist/metrics` | Assist agent metrics | Basic · Standard · Advanced |
-| GET | `/assist/settings` | The assist model-provider settings | Basic · Standard · Advanced |
-| POST | `/assist/settings` | Update the assist model-provider settings | Basic · Standard · Advanced |
-| POST | `/assist/settings/test` | Test the assist model-provider settings | Basic · Standard · Advanced |
-| GET | `/assist/skills` | List assist skills | Basic · Standard · Advanced |
+| POST | `/assist/{assistId}` | Ask an assist skill |  |
+| GET | `/assist/diagnoses` | List recent failure diagnoses |  |
+| GET | `/assist/metrics` | Assist agent metrics |  |
+| GET | `/assist/settings` | The assist model-provider settings |  |
+| POST | `/assist/settings` | Update the assist model-provider settings |  |
+| POST | `/assist/settings/test` | Test the assist model-provider settings |  |
+| GET | `/assist/skills` | List assist skills |  |
 
 ## audit
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/audit/anchors` | List signed audit anchors | Basic · Standard · Advanced |
-| POST | `/audit/anchors` | Anchor the audit chain now | Basic · Standard · Advanced |
-| POST | `/audit/anchors/rebaseline` | Rebaseline a broken audit chain | Basic · Standard · Advanced |
-| GET | `/audit/export` | Export the audit trail | Basic · Standard · Advanced |
-| GET | `/audit/route-inventory` | The route inventory this server registered | Basic · Standard · Advanced |
-| GET | `/audit/search` | Search the audit trail | Basic · Standard · Advanced |
-| GET | `/audit/verify` | Verify the audit hash chain | Basic · Standard · Advanced |
+| GET | `/audit/anchors` | List signed audit anchors |  |
+| POST | `/audit/anchors` | Anchor the audit chain now |  |
+| POST | `/audit/anchors/rebaseline` | Rebaseline a broken audit chain |  |
+| GET | `/audit/export` | Export the audit trail |  |
+| GET | `/audit/route-inventory` | The route inventory this server registered |  |
+| GET | `/audit/search` | Search the audit trail |  |
+| GET | `/audit/verify` | Verify the audit hash chain |  |
 
 ## bi
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| POST | `/bi/query` | Run a headless BI Measure query | Basic · Standard · Advanced |
-| GET | `/bi/templates` | List BI starter templates | Basic · Standard · Advanced |
-| POST | `/bi/templates/{templateId}/apply` | Apply a BI starter template | Basic · Standard · Advanced |
+| POST | `/bi/query` | Run a headless BI Measure query |  |
+| GET | `/bi/templates` | List BI starter templates |  |
+| POST | `/bi/templates/{templateId}/apply` | Apply a BI starter template |  |
 
 ## bundle
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| POST | `/bundle/export` | Export components as a Metadata Bundle | Basic · Standard · Advanced |
-| POST | `/bundle/import` | Import a Metadata Bundle | Basic · Standard · Advanced |
-| POST | `/bundle/preview` | Read-only fit-check of a Metadata Bundle against this Space | Basic · Standard · Advanced |
+| POST | `/bundle/export` | Export components as a Metadata Bundle |  |
+| POST | `/bundle/import` | Import a Metadata Bundle |  |
+| POST | `/bundle/preview` | Read-only fit-check of a Metadata Bundle against this Space |  |
 
 ## cases
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| POST | `/cases/from-entities` | Open a Case whose first members are minted from Link Analysis Entities | Standard · Advanced |
-| GET | `/cases/rules` | List Case Rules | Standard · Advanced |
-| POST | `/cases/rules` | Save a Case Rule | Standard · Advanced |
-| DELETE | `/cases/rules/{ruleId}` | Delete a Case Rule | Standard · Advanced |
-| POST | `/cases/rules/{ruleId}/evaluate` | Evaluate a Case Rule | Standard · Advanced |
+| POST | `/cases/from-entities` | Open a Case whose first members are minted from Link Analysis Entities | Standard and up |
+| GET | `/cases/rules` | List Case Rules | Standard and up |
+| POST | `/cases/rules` | Save a Case Rule | Standard and up |
+| DELETE | `/cases/rules/{ruleId}` | Delete a Case Rule | Standard and up |
+| POST | `/cases/rules/{ruleId}/evaluate` | Evaluate a Case Rule | Standard and up |
 
 ## catalog
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/catalog` | List Catalog tables | Basic · Standard · Advanced |
-| GET | `/catalog/graph` | Traverse the Catalog graph | Basic · Standard · Advanced |
-| GET | `/catalog/kpis` | KPI catalog | Basic · Standard · Advanced |
-| GET | `/catalog/references` | List Catalog References | Basic · Standard · Advanced |
-| GET | `/catalog/resolve` | Resolve a table or Pipeline to its Catalog node | Basic · Standard · Advanced |
-| GET | `/catalog/streams` | List Catalog Streams | Basic · Standard · Advanced |
-| GET | `/catalog/tables/{tableId}` | One Catalog node with its neighbours | Basic · Standard · Advanced |
+| GET | `/catalog` | List Catalog tables |  |
+| GET | `/catalog/graph` | Traverse the Catalog graph |  |
+| GET | `/catalog/kpis` | KPI catalog |  |
+| GET | `/catalog/references` | List Catalog References |  |
+| GET | `/catalog/resolve` | Resolve a table or Pipeline to its Catalog node |  |
+| GET | `/catalog/streams` | List Catalog Streams |  |
+| GET | `/catalog/tables/{tableId}` | One Catalog node with its neighbours |  |
 
 ## collectors
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/collectors` | List Collectors | Basic · Standard · Advanced |
-| POST | `/collectors/{collectorId}/notify` | Tell a Collector a file has landed | Basic · Standard · Advanced |
+| GET | `/collectors` | List Collectors |  |
+| POST | `/collectors/{collectorId}/notify` | Tell a Collector a file has landed |  |
 
 ## components
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/components/{componentId}` | Registry components of one kind | Basic · Standard · Advanced |
-| POST | `/components/{componentId}` | Create a registry component | Basic · Standard · Advanced |
-| GET | `/components/{componentId}/{componentId2}/versions` | Version history of a component | Basic · Standard · Advanced |
-| POST | `/components/{componentId}/{componentId2}/versions/{versionId}/restore` | Restore a component version | Basic · Standard · Advanced |
-| DELETE | `/components/{type}/{id}` | Delete a registry component | Basic · Standard · Advanced |
-| POST | `/components/escalation-rule` | POST /components/escalation-rule | Basic · Standard · Advanced |
-| PUT | `/components/escalation-rule/{escalationruleId}` | PUT /components/escalation-rule/{escalationruleId} | Basic · Standard · Advanced |
-| DELETE | `/components/escalation-rule/{escalationruleId}` | DELETE /components/escalation-rule/{escalationruleId} | Basic · Standard · Advanced |
-| POST | `/components/escalation-rule/{escalationruleId}/versions/{versionId}/restore` | POST /components/escalation-rule/{escalationruleId}/versions/{versionId}/restore | Basic · Standard · Advanced |
-| POST | `/components/findings-spec` | Create the Findings spec component | Basic · Standard · Advanced |
-| PUT | `/components/findings-spec/{findingsspecId}` | Replace a Findings spec component | Basic · Standard · Advanced |
-| DELETE | `/components/findings-spec/{findingsspecId}` | Delete a Findings spec component | Basic · Standard · Advanced |
-| POST | `/components/findings-spec/{findingsspecId}/versions/{versionId}/restore` | Restore a Findings spec version | Basic · Standard · Advanced |
-| POST | `/components/grammar/{grammarId}/test` | Test a grammar component on sample text | Basic · Standard · Advanced |
-| POST | `/components/grammar/preview` | Preview an inline grammar config | Basic · Standard · Advanced |
-| POST | `/components/mapping/validate` | Validate a draft mapping | Basic · Standard · Advanced |
-| POST | `/components/sink/{sinkId}/test` | Test a sink component on sample rows | Basic · Standard · Advanced |
-| POST | `/components/sink/preview` | Preview an inline sink config | Basic · Standard · Advanced |
-| POST | `/components/sla-policy` | POST /components/sla-policy | Basic · Standard · Advanced |
-| PUT | `/components/sla-policy/{slapolicyId}` | PUT /components/sla-policy/{slapolicyId} | Basic · Standard · Advanced |
-| DELETE | `/components/sla-policy/{slapolicyId}` | DELETE /components/sla-policy/{slapolicyId} | Basic · Standard · Advanced |
-| POST | `/components/sla-policy/{slapolicyId}/versions/{versionId}/restore` | POST /components/sla-policy/{slapolicyId}/versions/{versionId}/restore | Basic · Standard · Advanced |
-| POST | `/components/sql/ast` | Parse tree of author SQL | Basic · Standard · Advanced |
-| POST | `/components/transform/{transformId}/test` | Test a transform component on sample rows | Basic · Standard · Advanced |
-| POST | `/components/transform/describe` | Derive a SQL transform's output columns | Basic · Standard · Advanced |
-| POST | `/components/transform/preview` | Preview an inline transform config | Basic · Standard · Advanced |
-| POST | `/components/workflow` | POST /components/workflow | Basic · Standard · Advanced |
-| PUT | `/components/workflow/{workflowId}` | PUT /components/workflow/{workflowId} | Basic · Standard · Advanced |
-| DELETE | `/components/workflow/{workflowId}` | DELETE /components/workflow/{workflowId} | Basic · Standard · Advanced |
-| POST | `/components/workflow/{workflowId}/versions/{versionId}/restore` | POST /components/workflow/{workflowId}/versions/{versionId}/restore | Basic · Standard · Advanced |
+| GET | `/components/{componentId}` | Registry components of one kind |  |
+| POST | `/components/{componentId}` | Create a registry component |  |
+| GET | `/components/{componentId}/{componentId2}/versions` | Version history of a component |  |
+| POST | `/components/{componentId}/{componentId2}/versions/{versionId}/restore` | Restore a component version |  |
+| DELETE | `/components/{type}/{id}` | Delete a registry component |  |
+| POST | `/components/escalation-rule` | POST /components/escalation-rule |  |
+| PUT | `/components/escalation-rule/{escalationruleId}` | PUT /components/escalation-rule/{escalationruleId} |  |
+| DELETE | `/components/escalation-rule/{escalationruleId}` | DELETE /components/escalation-rule/{escalationruleId} |  |
+| POST | `/components/escalation-rule/{escalationruleId}/versions/{versionId}/restore` | POST /components/escalation-rule/{escalationruleId}/versions/{versionId}/restore |  |
+| POST | `/components/findings-spec` | Create the Findings spec component |  |
+| PUT | `/components/findings-spec/{findingsspecId}` | Replace a Findings spec component |  |
+| DELETE | `/components/findings-spec/{findingsspecId}` | Delete a Findings spec component |  |
+| POST | `/components/findings-spec/{findingsspecId}/versions/{versionId}/restore` | Restore a Findings spec version |  |
+| POST | `/components/grammar/{grammarId}/test` | Test a grammar component on sample text |  |
+| POST | `/components/grammar/preview` | Preview an inline grammar config |  |
+| POST | `/components/mapping/validate` | Validate a draft mapping |  |
+| POST | `/components/sink/{sinkId}/test` | Test a sink component on sample rows |  |
+| POST | `/components/sink/preview` | Preview an inline sink config |  |
+| POST | `/components/sla-policy` | POST /components/sla-policy |  |
+| PUT | `/components/sla-policy/{slapolicyId}` | PUT /components/sla-policy/{slapolicyId} |  |
+| DELETE | `/components/sla-policy/{slapolicyId}` | DELETE /components/sla-policy/{slapolicyId} |  |
+| POST | `/components/sla-policy/{slapolicyId}/versions/{versionId}/restore` | POST /components/sla-policy/{slapolicyId}/versions/{versionId}/restore |  |
+| POST | `/components/sql/ast` | Parse tree of author SQL |  |
+| POST | `/components/transform/{transformId}/test` | Test a transform component on sample rows |  |
+| POST | `/components/transform/describe` | Derive a SQL transform's output columns |  |
+| POST | `/components/transform/preview` | Preview an inline transform config |  |
+| POST | `/components/workflow` | POST /components/workflow |  |
+| PUT | `/components/workflow/{workflowId}` | PUT /components/workflow/{workflowId} |  |
+| DELETE | `/components/workflow/{workflowId}` | DELETE /components/workflow/{workflowId} |  |
+| POST | `/components/workflow/{workflowId}/versions/{versionId}/restore` | POST /components/workflow/{workflowId}/versions/{versionId}/restore |  |
 
 ## config
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/config/icon-map` | The Space's processor icon map | Basic · Standard · Advanced |
-| PUT | `/config/icon-map` | Replace the Space's processor icon map | Basic · Standard · Advanced |
-| POST | `/config/patch` | Deep-merge a patch into a config file | Basic · Standard · Advanced |
-| GET | `/config/pipeline/{pipelineId}/impact` | What references a Pipeline, before a delete | Basic · Standard · Advanced |
-| GET | `/config/schema/{schemaId}/columns/{columnId}/impact` | What reads one mapped column of a Schema (column impact, report-only) | Basic · Standard · Advanced |
-| GET | `/config/schema/derived` | Derived output schema of a saved Pipeline | Basic · Standard · Advanced |
-| POST | `/config/suggest/schema` | Suggest a draft schema from sample rows | Basic · Standard · Advanced |
+| GET | `/config/icon-map` | The Space's processor icon map |  |
+| PUT | `/config/icon-map` | Replace the Space's processor icon map |  |
+| POST | `/config/patch` | Deep-merge a patch into a config file |  |
+| GET | `/config/pipeline/{pipelineId}/impact` | What references a Pipeline, before a delete |  |
+| GET | `/config/schema/{schemaId}/columns/{columnId}/impact` | What reads one mapped column of a Schema (column impact, report-only) |  |
+| GET | `/config/schema/derived` | Derived output schema of a saved Pipeline |  |
+| POST | `/config/suggest/schema` | Suggest a draft schema from sample rows |  |
 
 ## connections
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/connections/{connectionId}/explore` | Browse a Connection's resources | Basic · Standard · Advanced |
-| POST | `/connections/{connectionId}/probe` | Graded probe of a saved Connection | Basic · Standard · Advanced |
-| GET | `/connections/{connectionId}/sample` | Sample a file through a Connection | Basic · Standard · Advanced |
-| POST | `/connections/test` | Test an unsaved Connection profile | Basic · Standard · Advanced |
+| GET | `/connections/{connectionId}/explore` | Browse a Connection's resources |  |
+| POST | `/connections/{connectionId}/probe` | Graded probe of a saved Connection |  |
+| GET | `/connections/{connectionId}/sample` | Sample a file through a Connection |  |
+| POST | `/connections/test` | Test an unsaved Connection profile |  |
 
 ## dashboards
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| POST | `/dashboards/{dashboardId}/share` | Create a public share link for a Dashboard | Basic · Standard · Advanced |
+| POST | `/dashboards/{dashboardId}/share` | Create a public share link for a Dashboard |  |
 
 ## datasets
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/datasets/{datasetId}/arrivals` | Arrivals of an Add data Dataset | Basic · Standard · Advanced |
-| PUT | `/datasets/{datasetId}/columns/{columnId}` | Change which Entity Type one Dataset column holds | Basic · Standard · Advanced |
-| POST | `/datasets/{datasetId}/compact` | Compact an import Dataset now | Basic · Standard · Advanced |
-| GET | `/datasets/{datasetId}/coverage` | GET /datasets/{datasetId}/coverage | Basic · Standard · Advanced |
-| GET | `/datasets/{datasetId}/feed` | Inbox and feed of an import Dataset | Basic · Standard · Advanced |
-| PUT | `/datasets/{datasetId}/feed` | Keep an import Dataset up to date | Basic · Standard · Advanced |
-| DELETE | `/datasets/{datasetId}/feed` | Return an import Dataset to manual uploads | Basic · Standard · Advanced |
-| POST | `/datasets/{datasetId}/files` | Add a file to an imported Dataset and run it | Basic · Standard · Advanced |
-| GET | `/datasets/{datasetId}/filter` | Row filter of an import Dataset | Basic · Standard · Advanced |
-| PUT | `/datasets/{datasetId}/filter` | Edit an import Dataset's row filter | Basic · Standard · Advanced |
-| GET | `/datasets/{datasetId}/freshness` | Data as of for a Dataset | Basic · Standard · Advanced |
-| POST | `/datasets/{datasetId}/materialize` | Materialize a Dataset into another (async) | Basic · Standard · Advanced |
-| PUT | `/datasets/{datasetId}/record-type` | Say what one row of a Dataset is (its record type) | Basic · Standard · Advanced |
-| GET | `/datasets/{datasetId}/rows` | GET /datasets/{datasetId}/rows | Basic · Standard · Advanced |
-| POST | `/datasets/{datasetId}/run` | Run now: run an imported Dataset's Pipeline over what waits in its inbox | Basic · Standard · Advanced |
-| GET | `/datasets/{datasetId}/storage` | Storage state of an import Dataset | Basic · Standard · Advanced |
-| PUT | `/datasets/{datasetId}/storage` | Set an import Dataset's retention | Basic · Standard · Advanced |
-| PUT | `/datasets/{datasetId}/watch` | Watch an import Dataset's inbox | Basic · Standard · Advanced |
-| POST | `/onboard/files` | Add data: upload a file and get a draft of how to import it | Basic · Standard · Advanced |
-| POST | `/onboard/files/{fileId}/commit` | Add data: one confirm - write the import Pipeline, run it once, register the Dataset | Basic · Standard · Advanced |
-| POST | `/onboard/files/{fileId}/redraft` | Add data: answer a draft again around the column types and roles the person stated | Basic · Standard · Advanced |
-| POST | `/onboard/postgres` | Add data, Choose a table: copy a Postgres table or query into a draft | Basic · Standard · Advanced |
-| POST | `/onboard/postgres/test` | Add data, Choose a table: test a Postgres connection and list its tables | Basic · Standard · Advanced |
-| GET | `/onboard/runs/{runId}` | Follow an import run answered with 202 | Basic · Standard · Advanced |
+| GET | `/datasets/{datasetId}/arrivals` | Arrivals of an Add data Dataset |  |
+| PUT | `/datasets/{datasetId}/columns/{columnId}` | Change which Entity Type one Dataset column holds |  |
+| POST | `/datasets/{datasetId}/compact` | Compact an import Dataset now |  |
+| GET | `/datasets/{datasetId}/coverage` | GET /datasets/{datasetId}/coverage |  |
+| GET | `/datasets/{datasetId}/feed` | Inbox and feed of an import Dataset |  |
+| PUT | `/datasets/{datasetId}/feed` | Keep an import Dataset up to date |  |
+| DELETE | `/datasets/{datasetId}/feed` | Return an import Dataset to manual uploads |  |
+| POST | `/datasets/{datasetId}/files` | Add a file to an imported Dataset and run it |  |
+| GET | `/datasets/{datasetId}/filter` | Row filter of an import Dataset |  |
+| PUT | `/datasets/{datasetId}/filter` | Edit an import Dataset's row filter |  |
+| GET | `/datasets/{datasetId}/freshness` | Data as of for a Dataset |  |
+| POST | `/datasets/{datasetId}/materialize` | Materialize a Dataset into another (async) |  |
+| PUT | `/datasets/{datasetId}/record-type` | Say what one row of a Dataset is (its record type) |  |
+| GET | `/datasets/{datasetId}/rows` | GET /datasets/{datasetId}/rows |  |
+| POST | `/datasets/{datasetId}/run` | Run now: run an imported Dataset's Pipeline over what waits in its inbox |  |
+| GET | `/datasets/{datasetId}/storage` | Storage state of an import Dataset |  |
+| PUT | `/datasets/{datasetId}/storage` | Set an import Dataset's retention |  |
+| PUT | `/datasets/{datasetId}/watch` | Watch an import Dataset's inbox |  |
+| POST | `/onboard/files` | Add data: upload a file and get a draft of how to import it |  |
+| POST | `/onboard/files/{fileId}/commit` | Add data: one confirm - write the import Pipeline, run it once, register the Dataset |  |
+| POST | `/onboard/files/{fileId}/redraft` | Add data: answer a draft again around the column types and roles the person stated |  |
+| POST | `/onboard/postgres` | Add data, Choose a table: copy a Postgres table or query into a draft |  |
+| POST | `/onboard/postgres/test` | Add data, Choose a table: test a Postgres connection and list its tables |  |
+| GET | `/onboard/runs/{runId}` | Follow an import run answered with 202 |  |
 
 ## datasources
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/datasources` | List bundle-exportable Pipeline ids | Basic · Standard · Advanced |
-| GET | `/datasources/{datasourceId}/export` | Export one Pipeline's config bundle | Basic · Standard · Advanced |
+| GET | `/datasources` | List bundle-exportable Pipeline ids |  |
+| GET | `/datasources/{datasourceId}/export` | Export one Pipeline's config bundle |  |
 
 ## db
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/db/catalog` | Table browser catalog | Basic · Standard · Advanced |
-| POST | `/db/query` | Run read-only SQL against one table | Basic · Standard · Advanced |
-| GET | `/db/table` | Page one table's rows | Basic · Standard · Advanced |
+| GET | `/db/catalog` | Table browser catalog |  |
+| POST | `/db/query` | Run read-only SQL against one table |  |
+| GET | `/db/table` | Page one table's rows |  |
 
 ## decision-rules
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/decision-rules` | List Decision Rules | Basic · Standard · Advanced |
-| POST | `/decision-rules` | Create a Decision Rule | Basic · Standard · Advanced |
-| PUT | `/decision-rules/{decisionruleId}` | Replace a Decision Rule | Basic · Standard · Advanced |
-| DELETE | `/decision-rules/{decisionruleId}` | Delete a Decision Rule | Basic · Standard · Advanced |
-| POST | `/decision-rules/{decisionruleId}/apply` | Apply a Decision Rule's consequences | Basic · Standard · Advanced |
-| POST | `/decision-rules/{decisionruleId}/simulate` | Simulate a Decision Rule | Basic · Standard · Advanced |
-| GET | `/decision-rules/consequences` | List Decision Rule consequence actions | Basic · Standard · Advanced |
+| GET | `/decision-rules` | List Decision Rules |  |
+| POST | `/decision-rules` | Create a Decision Rule |  |
+| PUT | `/decision-rules/{decisionruleId}` | Replace a Decision Rule |  |
+| DELETE | `/decision-rules/{decisionruleId}` | Delete a Decision Rule |  |
+| POST | `/decision-rules/{decisionruleId}/apply` | Apply a Decision Rule's consequences |  |
+| POST | `/decision-rules/{decisionruleId}/simulate` | Simulate a Decision Rule |  |
+| GET | `/decision-rules/consequences` | List Decision Rule consequence actions |  |
 
 ## enrichment
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/enrichment` | List enrichment Jobs | Basic · Standard · Advanced |
-| POST | `/enrichment` | Register an enrichment Job from a config on disk | Basic · Standard · Advanced |
-| GET | `/enrichment/{enrichmentId}/lineage` | Output lineage of an enrichment Job | Basic · Standard · Advanced |
-| GET | `/enrichment/{enrichmentId}/report` | Run-audit report of an enrichment Job | Basic · Standard · Advanced |
-| GET | `/enrichment/{enrichmentId}/runs` | Run audit of an enrichment Job | Basic · Standard · Advanced |
-| POST | `/enrichment/preview` | Preview an enrichment draft on sample rows | Basic · Standard · Advanced |
+| GET | `/enrichment` | List enrichment Jobs |  |
+| POST | `/enrichment` | Register an enrichment Job from a config on disk |  |
+| GET | `/enrichment/{enrichmentId}/lineage` | Output lineage of an enrichment Job |  |
+| GET | `/enrichment/{enrichmentId}/report` | Run-audit report of an enrichment Job |  |
+| GET | `/enrichment/{enrichmentId}/runs` | Run audit of an enrichment Job |  |
+| POST | `/enrichment/preview` | Preview an enrichment draft on sample rows |  |
 
 ## entity-lists
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/entity-lists` | List Entity Lists | Basic · Standard · Advanced |
-| POST | `/entity-lists` | Create an Entity List | Basic · Standard · Advanced |
-| GET | `/entity-lists/{entitylistId}` | One Entity List | Basic · Standard · Advanced |
-| PUT | `/entity-lists/{entitylistId}/attributes` | Change an exclusion list's ownership, auto-apply and visibility | Basic · Standard · Advanced |
-| POST | `/entity-lists/{entitylistId}/match` | Match values against an Entity List | Basic · Standard · Advanced |
-| POST | `/entity-lists/{entitylistId}/members` | Change an Entity List's members | Basic · Standard · Advanced |
-| POST | `/entity-lists/{entitylistId}/register-dataset` | Register an Entity List's sidecar as a Dataset | Basic · Standard · Advanced |
-| POST | `/entity-lists/{entitylistId}/retire` | Retire an Entity List | Basic · Standard · Advanced |
+| GET | `/entity-lists` | List Entity Lists |  |
+| POST | `/entity-lists` | Create an Entity List |  |
+| GET | `/entity-lists/{entitylistId}` | One Entity List |  |
+| PUT | `/entity-lists/{entitylistId}/attributes` | Change an exclusion list's ownership, auto-apply and visibility |  |
+| POST | `/entity-lists/{entitylistId}/match` | Match values against an Entity List |  |
+| POST | `/entity-lists/{entitylistId}/members` | Change an Entity List's members |  |
+| POST | `/entity-lists/{entitylistId}/register-dataset` | Register an Entity List's sidecar as a Dataset |  |
+| POST | `/entity-lists/{entitylistId}/retire` | Retire an Entity List |  |
 
 ## events
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/events` | Recent operational events | Standard · Advanced |
-| GET | `/events/{eventId}` | One operational event | Standard · Advanced |
-| GET | `/events/export` | Export operational events | Standard · Advanced |
-| GET | `/events/search` | Search operational events | Standard · Advanced |
-| GET | `/events/views` | List saved event views | Standard · Advanced |
-| POST | `/events/views` | Save an event view | Standard · Advanced |
-| POST | `/events/views/{viewId}/delete` | Delete a saved event view | Standard · Advanced |
+| GET | `/events` | Recent operational events | Standard and up |
+| GET | `/events/{eventId}` | One operational event | Standard and up |
+| GET | `/events/export` | Export operational events | Standard and up |
+| GET | `/events/search` | Search operational events | Standard and up |
+| GET | `/events/views` | List saved event views | Standard and up |
+| POST | `/events/views` | Save an event view | Standard and up |
+| POST | `/events/views/{viewId}/delete` | Delete a saved event view | Standard and up |
 
 ## exchange
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/exchange/datasets/{datasetId}/{datasetId2}` | One offered Dataset's Exchange metadata | Standard · Advanced |
-| GET | `/exchange/grants` | List Exchange grants | Standard · Advanced |
-| POST | `/exchange/grants/{grantId}/{action}` | Approve, deny or revoke an Exchange grant | Standard · Advanced |
-| POST | `/exchange/grants/{grantId}/expiry` | Set an Exchange grant's expiry | Standard · Advanced |
-| POST | `/exchange/grants/{grantId}/pin` | Pin an Exchange grant to a snapshot version | Standard · Advanced |
-| GET | `/exchange/offers` | List Exchange offers | Standard · Advanced |
-| POST | `/exchange/offers` | Offer a Dataset, Widget or saved View on the Exchange | Standard · Advanced |
-| POST | `/exchange/refresh` | Refresh an offered Dataset's snapshot | Standard · Advanced |
-| POST | `/exchange/requests` | Request a share from another Space | Standard · Advanced |
-| POST | `/exchange/signal-offers` | Offer a Signal type on the Exchange | Standard · Advanced |
-| GET | `/exchange/views/{viewId}/{viewId2}` | Render-only view of a shared saved View | Standard · Advanced |
-| GET | `/exchange/widgets/{widgetId}/{widgetId2}` | Render-only view of a shared Widget | Standard · Advanced |
+| GET | `/exchange/datasets/{datasetId}/{datasetId2}` | One offered Dataset's Exchange metadata | Standard and up |
+| GET | `/exchange/grants` | List Exchange grants | Standard and up |
+| POST | `/exchange/grants/{grantId}/{action}` | Approve, deny or revoke an Exchange grant | Standard and up |
+| POST | `/exchange/grants/{grantId}/expiry` | Set an Exchange grant's expiry | Standard and up |
+| POST | `/exchange/grants/{grantId}/pin` | Pin an Exchange grant to a snapshot version | Standard and up |
+| GET | `/exchange/offers` | List Exchange offers | Standard and up |
+| POST | `/exchange/offers` | Offer a Dataset, Widget or saved View on the Exchange | Standard and up |
+| POST | `/exchange/refresh` | Refresh an offered Dataset's snapshot | Standard and up |
+| POST | `/exchange/requests` | Request a share from another Space | Standard and up |
+| POST | `/exchange/signal-offers` | Offer a Signal type on the Exchange | Standard and up |
+| GET | `/exchange/views/{viewId}/{viewId2}` | Render-only view of a shared saved View | Standard and up |
+| GET | `/exchange/widgets/{widgetId}/{widgetId2}` | Render-only view of a shared Widget | Standard and up |
 
 ## Execution & Scheduling
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/consignments/{consignmentId}` | One Consignment across every lane | Basic · Standard · Advanced |
-| POST | `/jobs/{name}/trigger` | Trigger a job (async) | Basic · Standard · Advanced |
-| GET | `/jobs/runs/{runId}` | Poll one run by id | Basic · Standard · Advanced |
+| GET | `/consignments/{consignmentId}` | One Consignment across every lane |  |
+| POST | `/jobs/{name}/trigger` | Trigger a job (async) |  |
+| GET | `/jobs/runs/{runId}` | Poll one run by id |  |
 
 ## expectations
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/expectations` | List Expectations | Basic · Standard · Advanced |
-| POST | `/expectations` | Create an Expectation | Basic · Standard · Advanced |
-| PUT | `/expectations/{expectationId}` | Replace an Expectation | Basic · Standard · Advanced |
-| DELETE | `/expectations/{expectationId}` | Delete an Expectation | Basic · Standard · Advanced |
-| POST | `/expectations/{expectationId}/baseline/accept` | Accept a profile into an Expectation's baseline | Basic · Standard · Advanced |
-| POST | `/expectations/{expectationId}/baseline/clear` | Clear an Expectation's baseline | Basic · Standard · Advanced |
-| POST | `/expectations/{expectationId}/evaluate` | Evaluate one Expectation | Basic · Standard · Advanced |
-| GET | `/expectations/breached-count` | Count breached Expectations | Basic · Standard · Advanced |
-| POST | `/expectations/evaluate` | Evaluate every Expectation | Basic · Standard · Advanced |
+| GET | `/expectations` | List Expectations |  |
+| POST | `/expectations` | Create an Expectation |  |
+| PUT | `/expectations/{expectationId}` | Replace an Expectation |  |
+| DELETE | `/expectations/{expectationId}` | Delete an Expectation |  |
+| POST | `/expectations/{expectationId}/baseline/accept` | Accept a profile into an Expectation's baseline |  |
+| POST | `/expectations/{expectationId}/baseline/clear` | Clear an Expectation's baseline |  |
+| POST | `/expectations/{expectationId}/evaluate` | Evaluate one Expectation |  |
+| GET | `/expectations/breached-count` | Count breached Expectations |  |
+| POST | `/expectations/evaluate` | Evaluate every Expectation |  |
 
 ## export
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/export` | Export the whole Space's config | Basic · Standard · Advanced |
+| GET | `/export` | Export the whole Space's config |  |
 
 ## findings
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/findings/{findingId}` | Effective Findings sections of an object kind | Standard · Advanced |
+| GET | `/findings/{findingId}` | Effective Findings sections of an object kind | Standard and up |
 
 ## geo
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| POST | `/geo/projection` | Project a Dataset onto map points | Basic · Standard · Advanced |
-| POST | `/geo/routes` | Project a Dataset onto map routes | Basic · Standard · Advanced |
+| POST | `/geo/projection` | Project a Dataset onto map points |  |
+| POST | `/geo/routes` | Project a Dataset onto map routes |  |
 
 ## health
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/health/details` | Per-subsystem health | Basic · Standard · Advanced |
+| GET | `/health/details` | Per-subsystem health |  |
 
 ## import
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| POST | `/import` | Import a config bundle into this Space | Basic · Standard · Advanced |
-| POST | `/import/preview` | Preview a config bundle import | Basic · Standard · Advanced |
+| POST | `/import` | Import a config bundle into this Space |  |
+| POST | `/import/preview` | Preview a config bundle import |  |
 
 ## incidents
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/incidents/{incidentId}/briefs` | Briefs of an Incident | Standard · Advanced |
-| POST | `/incidents/{incidentId}/briefs` | Build an Incident Brief | Standard · Advanced |
+| GET | `/incidents/{incidentId}/briefs` | Briefs of an Incident | Standard and up |
+| POST | `/incidents/{incidentId}/briefs` | Build an Incident Brief | Standard and up |
 
 ## inv
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| POST | `/inv/case-history` | The Incidents and Cases referencing one Entity, for a key that may be a masking alias | Basic · Standard · Advanced |
-| GET | `/inv/datasets/{datasetId}/discover` | What is in one Dataset: entities, busiest, kinds of link, period, Measure totals | Basic · Standard · Advanced |
-| GET | `/inv/datasets/{datasetId}/files` | List the Files recorded towards a Dataset, with each File's index state | Basic · Standard · Advanced |
-| POST | `/inv/datasets/{datasetId}/query` | Run one query-builder question over a Dataset | Basic · Standard · Advanced |
-| GET | `/inv/datasets/{datasetId}/shapes` | Which Entity Types' value shapes each column of one Dataset fits | Basic · Standard · Advanced |
-| POST | `/inv/deep-links/resolve` | Validate an Open in Inspecto LA link's parameters | Basic · Standard · Advanced |
-| GET | `/inv/entities/{entityType}/{entityKey}/profile` | Read one Entity's profile by raw value or exploration alias | Basic · Standard · Advanced |
-| GET | `/inv/entities/{entityType}/{entityKey}/summary` | One entity's summary over one Dataset's links | Basic · Standard · Advanced |
-| POST | `/inv/entities/{entityType}/resolve` | Resolve a raw value or an alias to the key an Entity profile URL takes | Basic · Standard · Advanced |
-| POST | `/inv/entities/{entityType}/suggest` | List the values of an Entity Type that start a graph (the Start box type-ahead) | Basic · Standard · Advanced |
-| GET | `/inv/entity-identities` | Resolved Entity identity groups | Basic · Standard · Advanced |
-| POST | `/inv/entity-identities` | Assert two Entity keys are one identity | Basic · Standard · Advanced |
-| POST | `/inv/entity-identities/{entityidentityId}/retract` | Retract an identity assertion | Basic · Standard · Advanced |
-| GET | `/inv/entity-identities/group` | Identity group of one Entity key | Basic · Standard · Advanced |
-| POST | `/inv/entity-identities/import` | Import identity assertions from a mapping Dataset | Basic · Standard · Advanced |
-| GET | `/inv/entity-types` | List the Entity Types in force with their bindings and cached headline | Basic · Standard · Advanced |
-| DELETE | `/inv/entity-types/{entityTypeId}` | Delete an Entity Type nothing uses | Basic · Standard · Advanced |
-| GET | `/inv/entity-types/{entityTypeId}/profile` | Read the Entity Type profile: aggregates over every column bound to the type | Basic · Standard · Advanced |
-| GET | `/inv/exclusion-lists` | The exclusion lists an Investigation can apply | Basic · Standard · Advanced |
-| POST | `/inv/expand/preview` | Unsaved Investigation preview: the Working Set its seed / expand / exclude steps would build (stores nothing) | Basic · Standard · Advanced |
-| GET | `/inv/graph/algorithms` | The graph-algorithm catalogue and run limits | Basic · Standard · Advanced |
-| GET | `/inv/graph/runs` | List the caller's graph runs | Basic · Standard · Advanced |
-| POST | `/inv/graph/runs` | Start a graph run over an Investigation's Working Set | Basic · Standard · Advanced |
-| GET | `/inv/graph/runs/{runId}` | Read one graph run | Basic · Standard · Advanced |
-| POST | `/inv/graph/runs/{runId}/cancel` | Cancel a graph run | Basic · Standard · Advanced |
-| POST | `/inv/inbound/investigations` | Third-party integration (inbound): open a seeded Investigation for an external record | Basic · Standard · Advanced |
-| GET | `/inv/index` | List the edge/node indexes of the caller's viewable Datasets | Basic · Standard · Advanced |
-| POST | `/inv/index/builds` | Start an edge/node index build over a Dataset | Basic · Standard · Advanced |
-| GET | `/inv/index/builds/{buildId}` | Read one index build | Basic · Standard · Advanced |
-| POST | `/inv/index/builds/{buildId}/cancel` | Cancel an index build | Basic · Standard · Advanced |
-| GET | `/inv/integration` | The Space's third-party integration settings (outbound) | Basic · Standard · Advanced |
-| PUT | `/inv/integration` | Replace the Space's third-party integration settings | Basic · Standard · Advanced |
-| GET | `/inv/investigation-templates` | List the caller's Investigation templates | Basic · Standard · Advanced |
-| GET | `/inv/investigation-templates/{investigationtemplateId}` | One Investigation template | Basic · Standard · Advanced |
-| POST | `/inv/investigation-templates/{investigationtemplateId}/instantiate` | Instantiate an Investigation template | Basic · Standard · Advanced |
-| GET | `/inv/investigations` | List readable Investigations | Basic · Standard · Advanced |
-| POST | `/inv/investigations` | Create an Investigation | Basic · Standard · Advanced |
-| PATCH | `/inv/investigations/{investigationId}` | PATCH /inv/investigations/{investigationId} | Basic · Standard · Advanced |
-| DELETE | `/inv/investigations/{investigationId}` | Delete an Investigation | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/alert-rules` | Alert Rules bound to an Investigation | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/alert-rules` | Bind an Alert Rule to an Investigation Measure | Basic · Standard · Advanced |
-| PUT | `/inv/investigations/{investigationId}/alert-rules/{alertruleId}` | Edit an Investigation's bound Alert Rule | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/case` | An Investigation's Case link | Basic · Standard · Advanced |
-| PUT | `/inv/investigations/{investigationId}/case` | Link an Investigation to a Case | Basic · Standard · Advanced |
-| DELETE | `/inv/investigations/{investigationId}/case` | Unlink an Investigation from its Case | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/compare` | Compare an Investigation's Working Set across two windows | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/coverage` | Data coverage of an Investigation's window | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/data-changes` | Corrected days in an Investigation's window | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/dossier` | An Investigation's Dossier | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/dossier/bundle` | Export an Investigation's sealed Dossier bundle | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/dossier/bundle/verify` | Verify a Dossier bundle | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/dossier/verify` | Verify a Dossier manifest | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/drafts` | List Drafts of an Investigation | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/drafts` | Fork a Draft of an Investigation | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/drafts/{draftId}` | One Draft of an Investigation | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/drafts/{draftId}/conflicts` | Conflicts a Draft rebase would meet | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/discard` | Discard a Draft | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/drafts/{draftId}/log` | A Draft's own step log | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/ops` | Append a step to a Draft | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/promote` | Promote a Draft into the main log | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/rebase` | Rebase a Draft onto the main head | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/drafts/{draftId}/replay` | Replay a Draft's log | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/undo` | Undo the latest Draft step | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/drafts/{draftId}/working-set` | A Draft's Working Set | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/embeds` | List the read-only embed links of an Investigation | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/embeds` | Mint a read-only embed link to an Investigation | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/embeds/{grantId}/revoke` | Revoke one embed link of an Investigation | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/expand/preview` | Grow preview: dry-run an expand and answer what it would add (appends nothing) | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/handoff` | Hand an Investigation's Dossier bundle and findings off to the external case manager | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/log` | An Investigation's step log | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/measures` | Measures over an Investigation's Working Set | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/members` | Members of an Investigation | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/members` | Grant a role on an Investigation | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/members/revoke` | Revoke a member of an Investigation | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/ops` | Append a step to an Investigation | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/pending/{pendingId}/approve` | Approve a pending four-eyes request | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/pending/{pendingId}/deny` | Deny a pending four-eyes request | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/references` | External references of an Investigation | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/references` | Add an external reference to an Investigation | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/reorder` | Fork an Investigation with its steps reordered | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/replay` | Replay an Investigation's sealed log | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/reveal` | Reveal the masked entities on screen, with a reason, audited per entity | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/standing-detection` | Enable standing detection for a bound Alert Rule | Basic · Standard · Advanced |
-| DELETE | `/inv/investigations/{investigationId}/standing-detection/{standingdetectionId}` | Disable standing detection for a bound Alert Rule | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/template` | Save an Investigation as a template | Basic · Standard · Advanced |
-| POST | `/inv/investigations/{investigationId}/undo` | Undo the latest Investigation step | Basic · Standard · Advanced |
-| GET | `/inv/investigations/{investigationId}/working-set` | An Investigation's Working Set | Basic · Standard · Advanced |
-| POST | `/inv/pattern/branching` | Match a branching pattern over a whole Dataset | Basic · Standard · Advanced |
-| POST | `/inv/pattern/temporal` | Scan a Dataset for burst or periodic links | Basic · Standard · Advanced |
-| GET | `/inv/pending` | GET /inv/pending — the four-eyes approver inbox | Basic · Standard · Advanced |
-| GET | `/inv/presets` | List the preset queries a Dataset can answer | Basic · Standard · Advanced |
-| POST | `/inv/presets/{presetId}/run` | Run one preset query over a Dataset | Basic · Standard · Advanced |
-| POST | `/inv/projection` | Fold a Dataset into distinct links (compact edge rows) | Basic · Standard · Advanced |
-| POST | `/inv/projection/multi` | Project entities across several Datasets | Basic · Standard · Advanced |
-| POST | `/inv/projection/neighbors` | One entity's one-hop links (compact edge rows) | Basic · Standard · Advanced |
-| POST | `/inv/projection/neighbors/preview` | Grow preview for the explorer: what one neighbours step from a set of entities would add | Basic · Standard · Advanced |
-| POST | `/inv/reference-rows` | Reference Dataset rows for at most 500 entity keys, masked under the Space's maskingMode | Basic · Standard · Advanced |
-| POST | `/inv/schema/overlap-profile` | Profile value overlap between Dataset columns | Basic · Standard · Advanced |
-| GET | `/inv/schema/relationships` | Suggest entity relationships across Datasets | Basic · Standard · Advanced |
-| GET | `/inv/snapshots` | List sealed Link Analysis snapshots | Basic · Standard · Advanced |
-| POST | `/inv/snapshots` | Seal a Link Analysis evidence snapshot | Basic · Standard · Advanced |
-| POST | `/inv/snapshots/attach` | Attach a sealed snapshot to a Case | Basic · Standard · Advanced |
-| POST | `/inv/traversal/recursive-paths` | Simple paths from a start node, walked server-side (from the edge index when it can answer exactly) | Basic · Standard · Advanced |
-| GET | `/inv/uploads` | List the Collectors an analyst may upload to | Basic · Standard · Advanced |
-| GET | `/inv/uploads/{collector}` | List the caller's uploads to a Collector with their ingest state | Basic · Standard · Advanced |
-| POST | `/inv/uploads/{collector}` | Land an analyst CSV in an upload-enabled Collector's inbox | Basic · Standard · Advanced |
-| DELETE | `/inv/uploads/{collector}/{file}` | Withdraw an upload the Collector has not picked up yet | Basic · Standard · Advanced |
-| GET | `/inv/value-measures` | Evaluate a value Measure over a Dataset | Basic · Standard · Advanced |
-| GET | `/public/investigations/{token}` | Read-only embedded view of one Investigation (public; the token is the credential) | Basic · Standard · Advanced |
+| POST | `/inv/case-history` | The Incidents and Cases referencing one Entity, for a key that may be a masking alias |  |
+| GET | `/inv/datasets/{datasetId}/discover` | What is in one Dataset: entities, busiest, kinds of link, period, Measure totals |  |
+| GET | `/inv/datasets/{datasetId}/files` | List the Files recorded towards a Dataset, with each File's index state |  |
+| POST | `/inv/datasets/{datasetId}/query` | Run one query-builder question over a Dataset |  |
+| GET | `/inv/datasets/{datasetId}/shapes` | Which Entity Types' value shapes each column of one Dataset fits |  |
+| POST | `/inv/deep-links/resolve` | Validate an Open in Inspecto LA link's parameters |  |
+| GET | `/inv/entities/{entityType}/{entityKey}/profile` | Read one Entity's profile by raw value or exploration alias |  |
+| GET | `/inv/entities/{entityType}/{entityKey}/summary` | One entity's summary over one Dataset's links |  |
+| POST | `/inv/entities/{entityType}/resolve` | Resolve a raw value or an alias to the key an Entity profile URL takes |  |
+| POST | `/inv/entities/{entityType}/suggest` | List the values of an Entity Type that start a graph (the Start box type-ahead) |  |
+| GET | `/inv/entity-identities` | Resolved Entity identity groups |  |
+| POST | `/inv/entity-identities` | Assert two Entity keys are one identity |  |
+| POST | `/inv/entity-identities/{entityidentityId}/retract` | Retract an identity assertion |  |
+| GET | `/inv/entity-identities/group` | Identity group of one Entity key |  |
+| POST | `/inv/entity-identities/import` | Import identity assertions from a mapping Dataset |  |
+| GET | `/inv/entity-types` | List the Entity Types in force with their bindings and cached headline |  |
+| DELETE | `/inv/entity-types/{entityTypeId}` | Delete an Entity Type nothing uses |  |
+| GET | `/inv/entity-types/{entityTypeId}/profile` | Read the Entity Type profile: aggregates over every column bound to the type |  |
+| GET | `/inv/exclusion-lists` | The exclusion lists an Investigation can apply |  |
+| POST | `/inv/expand/preview` | Unsaved Investigation preview: the Working Set its seed / expand / exclude steps would build (stores nothing) |  |
+| GET | `/inv/graph/algorithms` | The graph-algorithm catalogue and run limits |  |
+| GET | `/inv/graph/runs` | List the caller's graph runs |  |
+| POST | `/inv/graph/runs` | Start a graph run over an Investigation's Working Set |  |
+| GET | `/inv/graph/runs/{runId}` | Read one graph run |  |
+| POST | `/inv/graph/runs/{runId}/cancel` | Cancel a graph run |  |
+| POST | `/inv/inbound/investigations` | Third-party integration (inbound): open a seeded Investigation for an external record |  |
+| GET | `/inv/index` | List the edge/node indexes of the caller's viewable Datasets |  |
+| POST | `/inv/index/builds` | Start an edge/node index build over a Dataset |  |
+| GET | `/inv/index/builds/{buildId}` | Read one index build |  |
+| POST | `/inv/index/builds/{buildId}/cancel` | Cancel an index build |  |
+| GET | `/inv/integration` | The Space's third-party integration settings (outbound) |  |
+| PUT | `/inv/integration` | Replace the Space's third-party integration settings |  |
+| GET | `/inv/investigation-templates` | List the caller's Investigation templates |  |
+| GET | `/inv/investigation-templates/{investigationtemplateId}` | One Investigation template |  |
+| POST | `/inv/investigation-templates/{investigationtemplateId}/instantiate` | Instantiate an Investigation template |  |
+| GET | `/inv/investigations` | List readable Investigations |  |
+| POST | `/inv/investigations` | Create an Investigation |  |
+| PATCH | `/inv/investigations/{investigationId}` | PATCH /inv/investigations/{investigationId} |  |
+| DELETE | `/inv/investigations/{investigationId}` | Delete an Investigation |  |
+| GET | `/inv/investigations/{investigationId}/alert-rules` | Alert Rules bound to an Investigation |  |
+| POST | `/inv/investigations/{investigationId}/alert-rules` | Bind an Alert Rule to an Investigation Measure |  |
+| PUT | `/inv/investigations/{investigationId}/alert-rules/{alertruleId}` | Edit an Investigation's bound Alert Rule |  |
+| GET | `/inv/investigations/{investigationId}/case` | An Investigation's Case link |  |
+| PUT | `/inv/investigations/{investigationId}/case` | Link an Investigation to a Case |  |
+| DELETE | `/inv/investigations/{investigationId}/case` | Unlink an Investigation from its Case |  |
+| GET | `/inv/investigations/{investigationId}/compare` | Compare an Investigation's Working Set across two windows |  |
+| GET | `/inv/investigations/{investigationId}/coverage` | Data coverage of an Investigation's window |  |
+| GET | `/inv/investigations/{investigationId}/data-changes` | Corrected days in an Investigation's window |  |
+| GET | `/inv/investigations/{investigationId}/dossier` | An Investigation's Dossier |  |
+| GET | `/inv/investigations/{investigationId}/dossier/bundle` | Export an Investigation's sealed Dossier bundle |  |
+| POST | `/inv/investigations/{investigationId}/dossier/bundle/verify` | Verify a Dossier bundle |  |
+| POST | `/inv/investigations/{investigationId}/dossier/verify` | Verify a Dossier manifest |  |
+| GET | `/inv/investigations/{investigationId}/drafts` | List Drafts of an Investigation |  |
+| POST | `/inv/investigations/{investigationId}/drafts` | Fork a Draft of an Investigation |  |
+| GET | `/inv/investigations/{investigationId}/drafts/{draftId}` | One Draft of an Investigation |  |
+| GET | `/inv/investigations/{investigationId}/drafts/{draftId}/conflicts` | Conflicts a Draft rebase would meet |  |
+| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/discard` | Discard a Draft |  |
+| GET | `/inv/investigations/{investigationId}/drafts/{draftId}/log` | A Draft's own step log |  |
+| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/ops` | Append a step to a Draft |  |
+| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/promote` | Promote a Draft into the main log |  |
+| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/rebase` | Rebase a Draft onto the main head |  |
+| GET | `/inv/investigations/{investigationId}/drafts/{draftId}/replay` | Replay a Draft's log |  |
+| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/undo` | Undo the latest Draft step |  |
+| GET | `/inv/investigations/{investigationId}/drafts/{draftId}/working-set` | A Draft's Working Set |  |
+| GET | `/inv/investigations/{investigationId}/embeds` | List the read-only embed links of an Investigation |  |
+| POST | `/inv/investigations/{investigationId}/embeds` | Mint a read-only embed link to an Investigation |  |
+| POST | `/inv/investigations/{investigationId}/embeds/{grantId}/revoke` | Revoke one embed link of an Investigation |  |
+| POST | `/inv/investigations/{investigationId}/expand/preview` | Grow preview: dry-run an expand and answer what it would add (appends nothing) |  |
+| POST | `/inv/investigations/{investigationId}/handoff` | Hand an Investigation's Dossier bundle and findings off to the external case manager |  |
+| GET | `/inv/investigations/{investigationId}/log` | An Investigation's step log |  |
+| GET | `/inv/investigations/{investigationId}/measures` | Measures over an Investigation's Working Set |  |
+| GET | `/inv/investigations/{investigationId}/members` | Members of an Investigation |  |
+| POST | `/inv/investigations/{investigationId}/members` | Grant a role on an Investigation |  |
+| POST | `/inv/investigations/{investigationId}/members/revoke` | Revoke a member of an Investigation |  |
+| POST | `/inv/investigations/{investigationId}/ops` | Append a step to an Investigation |  |
+| POST | `/inv/investigations/{investigationId}/pending/{pendingId}/approve` | Approve a pending four-eyes request |  |
+| POST | `/inv/investigations/{investigationId}/pending/{pendingId}/deny` | Deny a pending four-eyes request |  |
+| GET | `/inv/investigations/{investigationId}/references` | External references of an Investigation |  |
+| POST | `/inv/investigations/{investigationId}/references` | Add an external reference to an Investigation |  |
+| POST | `/inv/investigations/{investigationId}/reorder` | Fork an Investigation with its steps reordered |  |
+| POST | `/inv/investigations/{investigationId}/replay` | Replay an Investigation's sealed log |  |
+| POST | `/inv/investigations/{investigationId}/reveal` | Reveal the masked entities on screen, with a reason, audited per entity |  |
+| POST | `/inv/investigations/{investigationId}/standing-detection` | Enable standing detection for a bound Alert Rule |  |
+| DELETE | `/inv/investigations/{investigationId}/standing-detection/{standingdetectionId}` | Disable standing detection for a bound Alert Rule |  |
+| POST | `/inv/investigations/{investigationId}/template` | Save an Investigation as a template |  |
+| POST | `/inv/investigations/{investigationId}/undo` | Undo the latest Investigation step |  |
+| GET | `/inv/investigations/{investigationId}/working-set` | An Investigation's Working Set |  |
+| POST | `/inv/pattern/branching` | Match a branching pattern over a whole Dataset |  |
+| POST | `/inv/pattern/temporal` | Scan a Dataset for burst or periodic links |  |
+| GET | `/inv/pending` | GET /inv/pending — the four-eyes approver inbox |  |
+| GET | `/inv/presets` | List the preset queries a Dataset can answer |  |
+| POST | `/inv/presets/{presetId}/run` | Run one preset query over a Dataset |  |
+| POST | `/inv/projection` | Fold a Dataset into distinct links (compact edge rows) |  |
+| POST | `/inv/projection/multi` | Project entities across several Datasets |  |
+| POST | `/inv/projection/neighbors` | One entity's one-hop links (compact edge rows) |  |
+| POST | `/inv/projection/neighbors/preview` | Grow preview for the explorer: what one neighbours step from a set of entities would add |  |
+| POST | `/inv/reference-rows` | Reference Dataset rows for at most 500 entity keys, masked under the Space's maskingMode |  |
+| POST | `/inv/schema/overlap-profile` | Profile value overlap between Dataset columns |  |
+| GET | `/inv/schema/relationships` | Suggest entity relationships across Datasets |  |
+| GET | `/inv/snapshots` | List sealed Link Analysis snapshots |  |
+| POST | `/inv/snapshots` | Seal a Link Analysis evidence snapshot |  |
+| POST | `/inv/snapshots/attach` | Attach a sealed snapshot to a Case |  |
+| POST | `/inv/traversal/recursive-paths` | Simple paths from a start node, walked server-side (from the edge index when it can answer exactly) |  |
+| GET | `/inv/uploads` | List the Collectors an analyst may upload to |  |
+| GET | `/inv/uploads/{collector}` | List the caller's uploads to a Collector with their ingest state |  |
+| POST | `/inv/uploads/{collector}` | Land an analyst CSV in an upload-enabled Collector's inbox |  |
+| DELETE | `/inv/uploads/{collector}/{file}` | Withdraw an upload the Collector has not picked up yet |  |
+| GET | `/inv/value-measures` | Evaluate a value Measure over a Dataset |  |
+| GET | `/public/investigations/{token}` | Read-only embedded view of one Investigation (public; the token is the credential) |  |
 
 ## jobs
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/jobs` | List Jobs | Basic · Standard · Advanced |
-| POST | `/jobs` | Create a Job | Basic · Standard · Advanced |
-| GET | `/jobs/{jobId}` | One Job | Basic · Standard · Advanced |
-| PUT | `/jobs/{jobId}` | Replace a Job | Basic · Standard · Advanced |
-| DELETE | `/jobs/{jobId}` | Delete a Job | Basic · Standard · Advanced |
-| GET | `/jobs/{jobId}/artifacts/latest` | Latest Run Artifacts of a Job | Basic · Standard · Advanced |
-| POST | `/jobs/{jobId}/disable` | Disable a Job | Basic · Standard · Advanced |
-| POST | `/jobs/{jobId}/enable` | Enable a Job | Basic · Standard · Advanced |
-| POST | `/jobs/{jobId}/reschedule` | Reschedule a Job | Basic · Standard · Advanced |
-| GET | `/jobs/{jobId}/runs` | List a Job's Runs | Basic · Standard · Advanced |
-| GET | `/jobs/{jobId}/runs/{runId}/artifacts` | List a Run's Artifacts | Basic · Standard · Advanced |
-| GET | `/jobs/{jobId}/runs/{runId}/artifacts/{artifactId}/content` | Download a Run Artifact file | Basic · Standard · Advanced |
-| GET | `/jobs/{jobId}/runs/{runId}/diff/{diffId}` | Compare two Job Runs | Basic · Standard · Advanced |
-| GET | `/jobs/{jobId}/runs/{runId}/log` | One Run's structured log | Basic · Standard · Advanced |
-| GET | `/jobs/{jobId}/runs/{runId}/logs` | One Run's log for live tail | Basic · Standard · Advanced |
-| GET | `/jobs/expressions` | List Job parameter expressions | Basic · Standard · Advanced |
-| GET | `/jobs/failures` | Job Run failure trend | Basic · Standard · Advanced |
-| GET | `/jobs/metrics` | Job Run metrics | Basic · Standard · Advanced |
-| GET | `/jobs/packs` | List Job Packs | Basic · Standard · Advanced |
-| POST | `/jobs/packs/rescan` | Rescan Job Packs | Basic · Standard · Advanced |
-| GET | `/jobs/processors` | List consignment processors | Basic · Standard · Advanced |
-| GET | `/jobs/runs` | List recent Job Runs | Basic · Standard · Advanced |
-| POST | `/jobs/runs/{runId}/replay` | Replay a Job Run (async) | Basic · Standard · Advanced |
-| GET | `/jobs/types` | List Job Types | Basic · Standard · Advanced |
-| GET | `/jobs/types/{typeId}` | One Job Type | Basic · Standard · Advanced |
+| GET | `/jobs` | List Jobs |  |
+| POST | `/jobs` | Create a Job |  |
+| GET | `/jobs/{jobId}` | One Job |  |
+| PUT | `/jobs/{jobId}` | Replace a Job |  |
+| DELETE | `/jobs/{jobId}` | Delete a Job |  |
+| GET | `/jobs/{jobId}/artifacts/latest` | Latest Run Artifacts of a Job |  |
+| POST | `/jobs/{jobId}/disable` | Disable a Job |  |
+| POST | `/jobs/{jobId}/enable` | Enable a Job |  |
+| POST | `/jobs/{jobId}/reschedule` | Reschedule a Job |  |
+| GET | `/jobs/{jobId}/runs` | List a Job's Runs |  |
+| GET | `/jobs/{jobId}/runs/{runId}/artifacts` | List a Run's Artifacts |  |
+| GET | `/jobs/{jobId}/runs/{runId}/artifacts/{artifactId}/content` | Download a Run Artifact file |  |
+| GET | `/jobs/{jobId}/runs/{runId}/diff/{diffId}` | Compare two Job Runs |  |
+| GET | `/jobs/{jobId}/runs/{runId}/log` | One Run's structured log |  |
+| GET | `/jobs/{jobId}/runs/{runId}/logs` | One Run's log for live tail |  |
+| GET | `/jobs/expressions` | List Job parameter expressions |  |
+| GET | `/jobs/failures` | Job Run failure trend |  |
+| GET | `/jobs/metrics` | Job Run metrics |  |
+| GET | `/jobs/packs` | List Job Packs |  |
+| POST | `/jobs/packs/rescan` | Rescan Job Packs |  |
+| GET | `/jobs/processors` | List consignment processors |  |
+| GET | `/jobs/runs` | List recent Job Runs |  |
+| POST | `/jobs/runs/{runId}/replay` | Replay a Job Run (async) |  |
+| GET | `/jobs/types` | List Job Types |  |
+| GET | `/jobs/types/{typeId}` | One Job Type |  |
 
 ## kpis
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/kpis/{kpiId}/value` | Evaluate a KPI definition for the period to date | Basic · Standard · Advanced |
+| GET | `/kpis/{kpiId}/value` | Evaluate a KPI definition for the period to date |  |
 
 ## lineage
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/lineage` | Lineage around one output table | Basic · Standard · Advanced |
+| GET | `/lineage` | Lineage around one output table |  |
 
 ## Metadata & Catalog
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/classifications` | The Space's column classification vocabulary | Basic · Standard · Advanced |
-| GET | `/components/{type}/{id}` | One registry component | Basic · Standard · Advanced |
-| PUT | `/components/{type}/{id}` | Replace a registry component | Basic · Standard · Advanced |
-| GET | `/config/{type}/{name}` | Read a config file back (decoded) | Basic · Standard · Advanced |
-| DELETE | `/config/{type}/{name}` | Discard a config file (draft delete) | Basic · Standard · Advanced |
-| POST | `/config/preview/parsing` | Parse a raw sample with a draft's parsing settings | Basic · Standard · Advanced |
-| POST | `/config/preview/schema` | TRY_CAST already-parsed sample rows against a draft schema's typed fields | Basic · Standard · Advanced |
-| GET | `/config/spec/{type}` | Declarative spec for a config type | Basic · Standard · Advanced |
-| POST | `/config/write` | Persist a validated config draft | Basic · Standard · Advanced |
-| POST | `/validate` | Validate a config file or draft | Basic · Standard · Advanced |
+| GET | `/classifications` | The Space's column classification vocabulary |  |
+| GET | `/components/{type}/{id}` | One registry component |  |
+| PUT | `/components/{type}/{id}` | Replace a registry component |  |
+| GET | `/config/{type}/{name}` | Read a config file back (decoded) |  |
+| DELETE | `/config/{type}/{name}` | Discard a config file (draft delete) |  |
+| POST | `/config/preview/parsing` | Parse a raw sample with a draft's parsing settings |  |
+| POST | `/config/preview/schema` | TRY_CAST already-parsed sample rows against a draft schema's typed fields |  |
+| GET | `/config/spec/{type}` | Declarative spec for a config type |  |
+| POST | `/config/write` | Persist a validated config draft |  |
+| POST | `/validate` | Validate a config file or draft |  |
 
 ## metrics
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/metrics` | Prometheus metrics scrape | Standard · Advanced |
-| GET | `/metrics/acquisition` | Acquisition metrics snapshot | Basic · Standard · Advanced |
+| GET | `/metrics` | Prometheus metrics scrape | Standard and up |
+| GET | `/metrics/acquisition` | Acquisition metrics snapshot |  |
 
 ## modules
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/modules` | List modules and their state | Basic · Standard · Advanced |
+| GET | `/modules` | List modules and their state |  |
 
 ## nav
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/nav/menus` | The Space's Menu tree | Basic · Standard · Advanced |
-| PUT | `/nav/menus` | Replace the Space's Menu tree | Basic · Standard · Advanced |
+| GET | `/nav/menus` | The Space's Menu tree |  |
+| PUT | `/nav/menus` | Replace the Space's Menu tree |  |
 
 ## notes
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/notes/{noteId}/{noteId2}` | All notes on a target | Standard · Advanced |
-| GET | `/notes/{noteId}/{noteId2}/attachments` | Attachments on a target | Standard · Advanced |
-| POST | `/notes/{noteId}/{noteId2}/attachments` | Attach evidence to a target | Standard · Advanced |
-| GET | `/notes/{noteId}/{noteId2}/comments` | Comments on a target | Standard · Advanced |
-| POST | `/notes/{noteId}/{noteId2}/comments` | Comment on a target | Standard · Advanced |
+| GET | `/notes/{noteId}/{noteId2}` | All notes on a target | Standard and up |
+| GET | `/notes/{noteId}/{noteId2}/attachments` | Attachments on a target | Standard and up |
+| POST | `/notes/{noteId}/{noteId2}/attachments` | Attach evidence to a target | Standard and up |
+| GET | `/notes/{noteId}/{noteId2}/comments` | Comments on a target | Standard and up |
+| POST | `/notes/{noteId}/{noteId2}/comments` | Comment on a target | Standard and up |
 
 ## notifications
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/notifications` | List my notifications | Basic · Standard · Advanced |
-| DELETE | `/notifications/{notificationId}` | Archive a notification | Basic · Standard · Advanced |
-| POST | `/notifications/{notificationId}/read` | Mark a notification read | Basic · Standard · Advanced |
-| POST | `/notifications/{notificationId}/unread` | Mark a notification unread | Basic · Standard · Advanced |
-| GET | `/notifications/channels` | List notification channels | Basic · Standard · Advanced |
-| POST | `/notifications/channels` | Create a notification channel | Basic · Standard · Advanced |
-| PUT | `/notifications/channels/{channelId}` | Update a notification channel | Basic · Standard · Advanced |
-| DELETE | `/notifications/channels/{channelId}` | Delete a notification channel | Basic · Standard · Advanced |
-| GET | `/notifications/deliveries` | List notification delivery receipts | Basic · Standard · Advanced |
-| GET | `/notifications/preferences` | The caller’s effective notification preference grid | Basic · Standard · Advanced |
-| PUT | `/notifications/preferences` | Save the caller’s own preference override (self-service) | Basic · Standard · Advanced |
-| GET | `/notifications/preferences/default` | The deployment-default notification preference grid | Basic · Standard · Advanced |
-| PUT | `/notifications/preferences/default` | Edit the deployment-default grid (canAdminister) | Basic · Standard · Advanced |
-| POST | `/notifications/read-all` | Mark all my notifications read | Basic · Standard · Advanced |
-| GET | `/notifications/rules` | List notification rules | Basic · Standard · Advanced |
-| POST | `/notifications/rules` | Create a notification rule | Basic · Standard · Advanced |
-| PUT | `/notifications/rules/{ruleId}` | Replace a notification rule | Basic · Standard · Advanced |
-| DELETE | `/notifications/rules/{ruleId}` | Delete a notification rule | Basic · Standard · Advanced |
-| GET | `/notifications/stream` | Stream notifications (SSE) | Basic · Standard · Advanced |
-| GET | `/notifications/suppressions` | List suppressed delivery destinations | Basic · Standard · Advanced |
-| DELETE | `/notifications/suppressions` | Lift a destination's suppression | Basic · Standard · Advanced |
-| GET | `/notifications/unread-count` | Count my unread notifications | Basic · Standard · Advanced |
+| GET | `/notifications` | List my notifications |  |
+| DELETE | `/notifications/{notificationId}` | Archive a notification |  |
+| POST | `/notifications/{notificationId}/read` | Mark a notification read |  |
+| POST | `/notifications/{notificationId}/unread` | Mark a notification unread |  |
+| GET | `/notifications/channels` | List notification channels |  |
+| POST | `/notifications/channels` | Create a notification channel |  |
+| PUT | `/notifications/channels/{channelId}` | Update a notification channel |  |
+| DELETE | `/notifications/channels/{channelId}` | Delete a notification channel |  |
+| GET | `/notifications/deliveries` | List notification delivery receipts |  |
+| GET | `/notifications/preferences` | The caller’s effective notification preference grid |  |
+| PUT | `/notifications/preferences` | Save the caller’s own preference override (self-service) |  |
+| GET | `/notifications/preferences/default` | The deployment-default notification preference grid |  |
+| PUT | `/notifications/preferences/default` | Edit the deployment-default grid (canAdminister) |  |
+| POST | `/notifications/read-all` | Mark all my notifications read |  |
+| GET | `/notifications/rules` | List notification rules |  |
+| POST | `/notifications/rules` | Create a notification rule |  |
+| PUT | `/notifications/rules/{ruleId}` | Replace a notification rule |  |
+| DELETE | `/notifications/rules/{ruleId}` | Delete a notification rule |  |
+| GET | `/notifications/stream` | Stream notifications (SSE) |  |
+| GET | `/notifications/suppressions` | List suppressed delivery destinations |  |
+| DELETE | `/notifications/suppressions` | Lift a destination's suppression |  |
+| GET | `/notifications/unread-count` | Count my unread notifications |  |
 
 ## objects
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/objects` | List operational objects | Standard · Advanced |
-| POST | `/objects` | Open an Incident or other operational object | Standard · Advanced |
-| GET | `/objects/{objectId}` | One operational object | Standard · Advanced |
-| PATCH | `/objects/{objectId}` | Edit an object's operator-mutable fields (priority, severity, assignee, attributes) | Standard · Advanced |
-| POST | `/objects/{objectId}/ack` | Acknowledge an operational object | Standard · Advanced |
-| POST | `/objects/{objectId}/assign` | Assign an operational object | Standard · Advanced |
-| GET | `/objects/{objectId}/attachments` | Attachments of an operational object | Standard · Advanced |
-| POST | `/objects/{objectId}/attachments` | Attach evidence to an operational object | Standard · Advanced |
-| PUT | `/objects/{objectId}/category` | Set an operational object's category | Standard · Advanced |
-| GET | `/objects/{objectId}/comments` | Comments on an operational object | Standard · Advanced |
-| POST | `/objects/{objectId}/comments` | Comment on an operational object | Standard · Advanced |
-| PUT | `/objects/{objectId}/findings` | Save a Case's Findings values (collaboration; open to anyone who can see the object) | Standard · Advanced |
-| GET | `/objects/{objectId}/graph` | Correlation graph around an operational object | Standard · Advanced |
-| PUT | `/objects/{objectId}/impact` | Replace an Incident's or Case's typed financial impact (WS-10) | Standard · Advanced |
-| GET | `/objects/{objectId}/links` | Correlation links of an operational object | Standard · Advanced |
-| POST | `/objects/{objectId}/links` | Link two operational objects | Standard · Advanced |
-| DELETE | `/objects/{objectId}/links` | Remove a link between operational objects | Standard · Advanced |
-| POST | `/objects/{objectId}/merge` | Merge Cases into this Case | Standard · Advanced |
-| PUT | `/objects/{objectId}/postmortem` | Save an Incident's postmortem | Standard · Advanced |
-| POST | `/objects/{objectId}/rca` | Seed an RCA skeleton on an operational object | Standard · Advanced |
-| POST | `/objects/{objectId}/resolve` | Resolve an Incident, Alert or Case | Standard · Advanced |
-| POST | `/objects/{objectId}/split` | Split members out of a Case | Standard · Advanced |
-| POST | `/objects/{objectId}/transition` | Move an object through its Workflow | Standard · Advanced |
-| GET | `/objects/analytics` | Operational object analytics | Standard · Advanced |
-| GET | `/objects/by-entity` | GET /objects/by-entity — an Entity's case history | Standard · Advanced |
+| GET | `/objects` | List operational objects | Standard and up |
+| POST | `/objects` | Open an Incident or other operational object | Standard and up |
+| GET | `/objects/{objectId}` | One operational object | Standard and up |
+| PATCH | `/objects/{objectId}` | Edit an object's operator-mutable fields (priority, severity, assignee, attributes) | Standard and up |
+| POST | `/objects/{objectId}/ack` | Acknowledge an operational object | Standard and up |
+| POST | `/objects/{objectId}/assign` | Assign an operational object | Standard and up |
+| GET | `/objects/{objectId}/attachments` | Attachments of an operational object | Standard and up |
+| POST | `/objects/{objectId}/attachments` | Attach evidence to an operational object | Standard and up |
+| PUT | `/objects/{objectId}/category` | Set an operational object's category | Standard and up |
+| GET | `/objects/{objectId}/comments` | Comments on an operational object | Standard and up |
+| POST | `/objects/{objectId}/comments` | Comment on an operational object | Standard and up |
+| PUT | `/objects/{objectId}/findings` | Save a Case's Findings values (collaboration; open to anyone who can see the object) | Standard and up |
+| GET | `/objects/{objectId}/graph` | Correlation graph around an operational object | Standard and up |
+| PUT | `/objects/{objectId}/impact` | Replace an Incident's or Case's typed financial impact (WS-10) | Standard and up |
+| GET | `/objects/{objectId}/links` | Correlation links of an operational object | Standard and up |
+| POST | `/objects/{objectId}/links` | Link two operational objects | Standard and up |
+| DELETE | `/objects/{objectId}/links` | Remove a link between operational objects | Standard and up |
+| POST | `/objects/{objectId}/merge` | Merge Cases into this Case | Standard and up |
+| PUT | `/objects/{objectId}/postmortem` | Save an Incident's postmortem | Standard and up |
+| POST | `/objects/{objectId}/rca` | Seed an RCA skeleton on an operational object | Standard and up |
+| POST | `/objects/{objectId}/resolve` | Resolve an Incident, Alert or Case | Standard and up |
+| POST | `/objects/{objectId}/split` | Split members out of a Case | Standard and up |
+| POST | `/objects/{objectId}/transition` | Move an object through its Workflow | Standard and up |
+| GET | `/objects/analytics` | Operational object analytics | Standard and up |
+| GET | `/objects/by-entity` | GET /objects/by-entity — an Entity's case history | Standard and up |
 
 ## openapi.json
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/openapi.json` | The OpenAPI contract | Basic · Standard · Advanced |
+| GET | `/openapi.json` | The OpenAPI contract |  |
 
 ## other
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| POST | `/onboarding/events` | Report a step only the browser sees (LA-ONBOARD-1 OB-13) | Basic · Standard · Advanced |
-| GET | `/onboarding/metrics` | What the onboarding counters say (LA-ONBOARD-1 OB-13) | Basic · Standard · Advanced |
+| POST | `/onboarding/events` | Report a step only the browser sees (LA-ONBOARD-1 OB-13) |  |
+| GET | `/onboarding/metrics` | What the onboarding counters say (LA-ONBOARD-1 OB-13) |  |
 
 ## parsers
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/parsers` | List parsers | Basic · Standard · Advanced |
-| POST | `/parsers/{parserId}/preview` | Preview a sample with a parser | Basic · Standard · Advanced |
-| GET | `/parsers/asn1/profile` | Read an ASN.1 Decode Profile | Basic · Standard · Advanced |
+| GET | `/parsers` | List parsers |  |
+| POST | `/parsers/{parserId}/preview` | Preview a sample with a parser |  |
+| GET | `/parsers/asn1/profile` | Read an ASN.1 Decode Profile |  |
 
 ## pending-changes
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/pending-changes` | List the Space's Pending Changes | Basic · Standard · Advanced |
-| GET | `/pending-changes/{pendingchangeId}` | Read one Pending Change with its content | Basic · Standard · Advanced |
-| POST | `/pending-changes/{pendingchangeId}/approve` | Approve a Pending Change and apply it | Basic · Standard · Advanced |
-| POST | `/pending-changes/{pendingchangeId}/decline` | Decline a Pending Change | Basic · Standard · Advanced |
-| GET | `/pending-changes/{pendingchangeId}/diff` | Line diff of a Pending Change | Basic · Standard · Advanced |
-| POST | `/pending-changes/{pendingchangeId}/withdraw` | Withdraw your own Pending Change | Basic · Standard · Advanced |
+| GET | `/pending-changes` | List the Space's Pending Changes |  |
+| GET | `/pending-changes/{pendingchangeId}` | Read one Pending Change with its content |  |
+| POST | `/pending-changes/{pendingchangeId}/approve` | Approve a Pending Change and apply it |  |
+| POST | `/pending-changes/{pendingchangeId}/decline` | Decline a Pending Change |  |
+| GET | `/pending-changes/{pendingchangeId}/diff` | Line diff of a Pending Change |  |
+| POST | `/pending-changes/{pendingchangeId}/withdraw` | Withdraw your own Pending Change |  |
 
 ## pipelines
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/pipelines/{pipelineId}/bundle` | Export a Pipeline with its file closure | Basic · Standard · Advanced |
-| GET | `/pipelines/{pipelineId}/document` | Pipeline Document for sign-off | Basic · Standard · Advanced |
-| GET | `/pipelines/{pipelineId}/graph` | Read-only graph of a Pipeline | Basic · Standard · Advanced |
-| PUT | `/pipelines/{pipelineId}/graph` | Save a Pipeline's edited graph | Basic · Standard · Advanced |
-| GET | `/pipelines/{pipelineId}/graph/raw` | Editable graph of a Pipeline | Basic · Standard · Advanced |
-| GET | `/pipelines/{pipelineId}/history` | List a Pipeline's kept config versions, newest first | Basic · Standard · Advanced |
-| GET | `/pipelines/{pipelineId}/history/{historyId}` | Read one kept config version | Basic · Standard · Advanced |
-| POST | `/pipelines/{pipelineId}/history/{historyId}/restore` | Restore one kept config version | Basic · Standard · Advanced |
-| GET | `/pipelines/{pipelineId}/history/diff` | Line diff of two kept versions, or of one against the current config | Basic · Standard · Advanced |
-| POST | `/pipelines/{pipelineId}/label` | Change a Pipeline's display name | Basic · Standard · Advanced |
-| GET | `/pipelines/{pipelineId}/related` | Everything related to a Pipeline | Basic · Standard · Advanced |
-| POST | `/pipelines/{pipelineId}/rename` | Rename a Pipeline's identity | Basic · Standard · Advanced |
-| POST | `/pipelines/{pipelineId}/save-as-template` | Copy a Pipeline into a template | Basic · Standard · Advanced |
-| GET | `/pipelines/{pipelineId}/settings` | Pipeline produces and reference settings | Basic · Standard · Advanced |
-| POST | `/pipelines/{pipelineId}/settings` | Save Pipeline produces and reference settings | Basic · Standard · Advanced |
-| GET | `/pipelines/authored` | List legacy authored Pipelines | Basic · Standard · Advanced |
-| GET | `/pipelines/authored/{authoredId}` | One legacy authored Pipeline's graph | Basic · Standard · Advanced |
-| DELETE | `/pipelines/authored/{authoredId}` | Delete a legacy authored Pipeline | Basic · Standard · Advanced |
-| POST | `/pipelines/authored/{authoredId}/dry-run` | Dry-run a Pipeline over sample rows | Basic · Standard · Advanced |
-| GET | `/pipelines/authored/{authoredId}/inbox` | List the files waiting in a Pipeline's inbox (dirs.poll) | Basic · Standard · Advanced |
-| POST | `/pipelines/authored/{authoredId}/inbox` | Upload one file into a Pipeline's inbox (dirs.poll) | Basic · Standard · Advanced |
-| GET | `/pipelines/authored/{authoredId}/raw` | One legacy authored Pipeline, lossless | Basic · Standard · Advanced |
-| POST | `/pipelines/authored/{authoredId}/run` | Run-to-here over real inbox files (scratch only) | Basic · Standard · Advanced |
-| POST | `/pipelines/authored/{authoredId}/trigger` | Trigger an authored Pipeline run (async) | Basic · Standard · Advanced |
-| GET | `/pipelines/combined` | Combined Pipeline and Job topology | Basic · Standard · Advanced |
-| POST | `/pipelines/import` | Import a Pipeline bundle zip | Basic · Standard · Advanced |
-| GET | `/pipelines/node-types` | Pipeline node-type catalog | Basic · Standard · Advanced |
-| GET | `/pipelines/processor-catalog` | Full Step Processor taxonomy | Basic · Standard · Advanced |
-| POST | `/pipelines/rename/resume` | Resume an interrupted Pipeline rename | Basic · Standard · Advanced |
+| GET | `/pipelines/{pipelineId}/bundle` | Export a Pipeline with its file closure |  |
+| GET | `/pipelines/{pipelineId}/document` | Pipeline Document for sign-off |  |
+| GET | `/pipelines/{pipelineId}/graph` | Read-only graph of a Pipeline |  |
+| PUT | `/pipelines/{pipelineId}/graph` | Save a Pipeline's edited graph |  |
+| GET | `/pipelines/{pipelineId}/graph/raw` | Editable graph of a Pipeline |  |
+| GET | `/pipelines/{pipelineId}/history` | List a Pipeline's kept config versions, newest first |  |
+| GET | `/pipelines/{pipelineId}/history/{historyId}` | Read one kept config version |  |
+| POST | `/pipelines/{pipelineId}/history/{historyId}/restore` | Restore one kept config version |  |
+| GET | `/pipelines/{pipelineId}/history/diff` | Line diff of two kept versions, or of one against the current config |  |
+| POST | `/pipelines/{pipelineId}/label` | Change a Pipeline's display name |  |
+| GET | `/pipelines/{pipelineId}/related` | Everything related to a Pipeline |  |
+| POST | `/pipelines/{pipelineId}/rename` | Rename a Pipeline's identity |  |
+| POST | `/pipelines/{pipelineId}/save-as-template` | Copy a Pipeline into a template |  |
+| GET | `/pipelines/{pipelineId}/settings` | Pipeline produces and reference settings |  |
+| POST | `/pipelines/{pipelineId}/settings` | Save Pipeline produces and reference settings |  |
+| GET | `/pipelines/authored` | List legacy authored Pipelines |  |
+| GET | `/pipelines/authored/{authoredId}` | One legacy authored Pipeline's graph |  |
+| DELETE | `/pipelines/authored/{authoredId}` | Delete a legacy authored Pipeline |  |
+| POST | `/pipelines/authored/{authoredId}/dry-run` | Dry-run a Pipeline over sample rows |  |
+| GET | `/pipelines/authored/{authoredId}/inbox` | List the files waiting in a Pipeline's inbox (dirs.poll) |  |
+| POST | `/pipelines/authored/{authoredId}/inbox` | Upload one file into a Pipeline's inbox (dirs.poll) |  |
+| GET | `/pipelines/authored/{authoredId}/raw` | One legacy authored Pipeline, lossless |  |
+| POST | `/pipelines/authored/{authoredId}/run` | Run-to-here over real inbox files (scratch only) |  |
+| POST | `/pipelines/authored/{authoredId}/trigger` | Trigger an authored Pipeline run (async) |  |
+| GET | `/pipelines/combined` | Combined Pipeline and Job topology |  |
+| POST | `/pipelines/import` | Import a Pipeline bundle zip |  |
+| GET | `/pipelines/node-types` | Pipeline node-type catalog |  |
+| GET | `/pipelines/processor-catalog` | Full Step Processor taxonomy |  |
+| POST | `/pipelines/rename/resume` | Resume an interrupted Pipeline rename |  |
 
 ## Pipelines
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/pipelines` | List the registered Pipelines, broken ones included | Basic · Standard · Advanced |
+| GET | `/pipelines` | List the registered Pipelines, broken ones included |  |
 
 ## Platform & Spaces
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/bootstrap` | Platform bootstrap — everything the backend owns to start the UI | Basic · Standard · Advanced |
-| GET | `/health` | Liveness | Basic · Standard · Advanced |
-| GET | `/spaces` | List hosted Spaces | Basic · Standard · Advanced |
+| GET | `/bootstrap` | Platform bootstrap — everything the backend owns to start the UI |  |
+| GET | `/health` | Liveness |  |
+| GET | `/spaces` | List hosted Spaces |  |
 
 ## predictions
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/predictions/{kind}/{model}/{entityKey}` | The latest prediction of one entity (or forecast series) under a saved Predictive model | Standard · Advanced |
+| GET | `/predictions/{kind}/{model}/{entityKey}` | The latest prediction of one entity (or forecast series) under a saved Predictive model | Standard and up |
 
 ## provenance
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/provenance` | Record counts of one Pipeline Run | Basic · Standard · Advanced |
-| GET | `/provenance/batches` | List recent batches of a Pipeline | Basic · Standard · Advanced |
+| GET | `/provenance` | Record counts of one Pipeline Run |  |
+| GET | `/provenance/batches` | List recent batches of a Pipeline |  |
 
 ## public
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/public/dashboards/{dashboardId}` | Resolve a shared Dashboard | Basic · Standard · Advanced |
-| POST | `/public/dashboards/{dashboardId}/query` | Query the data behind a shared Dashboard | Basic · Standard · Advanced |
-| POST | `/public/delivery-status/{deliverystatuId}` | Receive a delivery-status callback | Basic · Standard · Advanced |
+| GET | `/public/dashboards/{dashboardId}` | Resolve a shared Dashboard |  |
+| POST | `/public/dashboards/{dashboardId}/query` | Query the data behind a shared Dashboard |  |
+| POST | `/public/delivery-status/{deliverystatuId}` | Receive a delivery-status callback |  |
 
 ## Query & Results
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| POST | `/queries/{id}/run` | Run a persisted query | Basic · Standard · Advanced |
+| POST | `/queries/{id}/run` | Run a persisted query |  |
 
 ## rca
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/rca/templates` | List RCA templates | Standard · Advanced |
+| GET | `/rca/templates` | List RCA templates | Standard and up |
 
 ## ready
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/ready` | Readiness probe | Basic · Standard · Advanced |
+| GET | `/ready` | Readiness probe |  |
 
 ## recon
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| POST | `/recon/{reconId}/breaks/status` | Resolve, re-open or assign a Reconciliation Break | Standard · Advanced |
-| POST | `/recon/{reconId}/record` | Record a run of a Reconciliation | Standard · Advanced |
-| GET | `/recon/{reconId}/state` | Recorded state of one Reconciliation | Standard · Advanced |
-| POST | `/recon/breaks` | The paged Break sets of one anchor-relative pair | Standard · Advanced |
-| POST | `/recon/columns` | Inventory the columns of Reconciliation Datasets | Standard · Advanced |
-| POST | `/recon/promote` | Promote a Reconciliation Break to an Incident | Standard · Advanced |
-| GET | `/recon/promoted` | Breaks of a Reconciliation that have an active Incident | Standard · Advanced |
-| POST | `/recon/rows` | Raw rows behind one Reconciliation key | Standard · Advanced |
-| POST | `/recon/run` | One day of the Board: a page of grain rows + the day's exact totals and Break summary | Standard · Advanced |
-| GET | `/recon/state` | Last-run state of every Reconciliation | Standard · Advanced |
+| POST | `/recon/{reconId}/breaks/status` | Resolve, re-open or assign a Reconciliation Break | Standard and up |
+| POST | `/recon/{reconId}/record` | Record a run of a Reconciliation | Standard and up |
+| GET | `/recon/{reconId}/state` | Recorded state of one Reconciliation | Standard and up |
+| POST | `/recon/breaks` | The paged Break sets of one anchor-relative pair | Standard and up |
+| POST | `/recon/columns` | Inventory the columns of Reconciliation Datasets | Standard and up |
+| POST | `/recon/promote` | Promote a Reconciliation Break to an Incident | Standard and up |
+| GET | `/recon/promoted` | Breaks of a Reconciliation that have an active Incident | Standard and up |
+| POST | `/recon/rows` | Raw rows behind one Reconciliation key | Standard and up |
+| POST | `/recon/run` | One day of the Board: a page of grain rows + the day's exact totals and Break summary | Standard and up |
+| GET | `/recon/state` | Last-run state of every Reconciliation | Standard and up |
 
 ## regulatory-reports
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/regulatory-reports` | List regulatory reports | Standard · Advanced |
-| POST | `/regulatory-reports` | Draft a regulatory report | Standard · Advanced |
-| GET | `/regulatory-reports/{regulatoryreportId}` | One regulatory report | Standard · Advanced |
-| POST | `/regulatory-reports/{regulatoryreportId}/approve` | Approve a regulatory report | Standard · Advanced |
-| POST | `/regulatory-reports/{regulatoryreportId}/decline` | Decline a regulatory report | Standard · Advanced |
-| POST | `/regulatory-reports/{regulatoryreportId}/request-approval` | Send a regulatory report for approval | Standard · Advanced |
-| POST | `/regulatory-reports/{regulatoryreportId}/retry` | Retry a failed regulatory report submission | Standard · Advanced |
-| GET | `/regulatory-reports/{regulatoryreportId}/verify` | Verify a submitted regulatory report's file | Standard · Advanced |
-| GET | `/regulatory-reports/templates` | List regulatory report templates | Standard · Advanced |
-| PUT | `/regulatory-reports/templates/{templateId}` | Author (create or replace) a Space Report Template | Standard · Advanced |
-| DELETE | `/regulatory-reports/templates/{templateId}` | Delete a Space Report Template | Standard · Advanced |
+| GET | `/regulatory-reports` | List regulatory reports | Standard and up |
+| POST | `/regulatory-reports` | Draft a regulatory report | Standard and up |
+| GET | `/regulatory-reports/{regulatoryreportId}` | One regulatory report | Standard and up |
+| POST | `/regulatory-reports/{regulatoryreportId}/approve` | Approve a regulatory report | Standard and up |
+| POST | `/regulatory-reports/{regulatoryreportId}/decline` | Decline a regulatory report | Standard and up |
+| POST | `/regulatory-reports/{regulatoryreportId}/request-approval` | Send a regulatory report for approval | Standard and up |
+| POST | `/regulatory-reports/{regulatoryreportId}/retry` | Retry a failed regulatory report submission | Standard and up |
+| GET | `/regulatory-reports/{regulatoryreportId}/verify` | Verify a submitted regulatory report's file | Standard and up |
+| GET | `/regulatory-reports/templates` | List regulatory report templates | Standard and up |
+| PUT | `/regulatory-reports/templates/{templateId}` | Author (create or replace) a Space Report Template | Standard and up |
+| DELETE | `/regulatory-reports/templates/{templateId}` | Delete a Space Report Template | Standard and up |
 
 ## report
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/report` | Service-wide Consignment audit report | Basic · Standard · Advanced |
+| GET | `/report` | Service-wide Consignment audit report |  |
 
 ## requirements
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/requirements` | List Requirements | Basic · Standard · Advanced |
-| POST | `/requirements` | Submit a Requirement | Basic · Standard · Advanced |
-| POST | `/requirements/{requirementId}/decision` | Accept or reject a Requirement | Basic · Standard · Advanced |
-| POST | `/requirements/{requirementId}/deliver` | Mark a Requirement delivered | Basic · Standard · Advanced |
-| POST | `/requirements/{requirementId}/kpi` | Create a KPI definition from a delivered kpi Requirement | Basic · Standard · Advanced |
+| GET | `/requirements` | List Requirements |  |
+| POST | `/requirements` | Submit a Requirement |  |
+| POST | `/requirements/{requirementId}/decision` | Accept or reject a Requirement |  |
+| POST | `/requirements/{requirementId}/deliver` | Mark a Requirement delivered |  |
+| POST | `/requirements/{requirementId}/kpi` | Create a KPI definition from a delivered kpi Requirement |  |
 
 ## risk-scores
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/risk-score-lists/{model}` | The latest scores of one Risk Score model, highest first, filtered by its segments | Standard · Advanced |
-| GET | `/risk-scores/{model}/{entityKey}` | The latest Risk Score of one entity under a saved risk-score model, with its factors | Standard · Advanced |
-| POST | `/risk-scores/preview` | Preview one entity's Risk Score under a saved or unsaved model, writing nothing | Standard · Advanced |
+| GET | `/risk-score-lists/{model}` | The latest scores of one Risk Score model, highest first, filtered by its segments | Standard and up |
+| GET | `/risk-scores/{model}/{entityKey}` | The latest Risk Score of one entity under a saved risk-score model, with its factors | Standard and up |
+| POST | `/risk-scores/preview` | Preview one entity's Risk Score under a saved or unsaved model, writing nothing | Standard and up |
 
 ## rule-templates
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| POST | `/rule-templates/{ruletemplateId}/simulate` | Simulate a Rule Template | Basic · Standard · Advanced |
+| POST | `/rule-templates/{ruletemplateId}/simulate` | Simulate a Rule Template |  |
 
 ## runs
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/runs` | List registered Pipelines | Basic · Standard · Advanced |
-| POST | `/runs` | Register a Pipeline from a config on disk | Basic · Standard · Advanced |
-| GET | `/runs/{runId}/batches` | Consignment ledger of a Pipeline | Basic · Standard · Advanced |
-| GET | `/runs/{runId}/commits` | Committed Consignments of a Pipeline | Basic · Standard · Advanced |
-| POST | `/runs/{runId}/drain` | Drain a parked Consignment | Basic · Standard · Advanced |
-| GET | `/runs/{runId}/errors` | Rejected rows behind a file's error count | Basic · Standard · Advanced |
-| GET | `/runs/{runId}/files` | Processed files of a Pipeline | Basic · Standard · Advanced |
-| GET | `/runs/{runId}/files/stage` | Stage progression of one file | Basic · Standard · Advanced |
-| GET | `/runs/{runId}/lineage` | Lineage rows of a Pipeline | Basic · Standard · Advanced |
-| GET | `/runs/{runId}/outputs` | Registered outputs of one Consignment | Basic · Standard · Advanced |
-| POST | `/runs/{runId}/pause` | Pause a Pipeline | Basic · Standard · Advanced |
-| GET | `/runs/{runId}/pending` | Inbox status of a Pipeline | Basic · Standard · Advanced |
-| GET | `/runs/{runId}/quarantine` | Quarantined files of a Pipeline | Basic · Standard · Advanced |
-| POST | `/runs/{runId}/replay-rejects` | Replay one file's rejected records as a new Consignment (EXECUTION-RESIDUALS X4) | Basic · Standard · Advanced |
-| GET | `/runs/{runId}/report` | Consignment audit report of one Pipeline | Basic · Standard · Advanced |
-| POST | `/runs/{runId}/reprocess` | Reprocess one Consignment | Basic · Standard · Advanced |
-| POST | `/runs/{runId}/resume` | Resume a paused Pipeline | Basic · Standard · Advanced |
-| GET | `/runs/{runId}/retries` | List one pipeline's pending COMMIT retries (X1 deferrals) | Basic · Standard · Advanced |
-| POST | `/runs/{runId}/retries/cancel` | Cancel one file's COMMIT retries: quarantine it now under retry_cancelled (X1 deferrals) | Basic · Standard · Advanced |
-| POST | `/runs/{runId}/retries/retry-now` | Retry one file's COMMIT on the next cycle (X1 deferrals) | Basic · Standard · Advanced |
-| POST | `/runs/{runId}/trigger` | Trigger a pipeline | Basic · Standard · Advanced |
-| GET | `/runs/runs/{runId}` | Poll one manual pipeline run | Basic · Standard · Advanced |
+| GET | `/runs` | List registered Pipelines |  |
+| POST | `/runs` | Register a Pipeline from a config on disk |  |
+| GET | `/runs/{runId}/batches` | Consignment ledger of a Pipeline |  |
+| GET | `/runs/{runId}/commits` | Committed Consignments of a Pipeline |  |
+| POST | `/runs/{runId}/drain` | Drain a parked Consignment |  |
+| GET | `/runs/{runId}/errors` | Rejected rows behind a file's error count |  |
+| GET | `/runs/{runId}/files` | Processed files of a Pipeline |  |
+| GET | `/runs/{runId}/files/stage` | Stage progression of one file |  |
+| GET | `/runs/{runId}/lineage` | Lineage rows of a Pipeline |  |
+| GET | `/runs/{runId}/outputs` | Registered outputs of one Consignment |  |
+| POST | `/runs/{runId}/pause` | Pause a Pipeline |  |
+| GET | `/runs/{runId}/pending` | Inbox status of a Pipeline |  |
+| GET | `/runs/{runId}/quarantine` | Quarantined files of a Pipeline |  |
+| POST | `/runs/{runId}/replay-rejects` | Replay one file's rejected records as a new Consignment (EXECUTION-RESIDUALS X4) |  |
+| GET | `/runs/{runId}/report` | Consignment audit report of one Pipeline |  |
+| POST | `/runs/{runId}/reprocess` | Reprocess one Consignment |  |
+| POST | `/runs/{runId}/resume` | Resume a paused Pipeline |  |
+| GET | `/runs/{runId}/retries` | List one pipeline's pending COMMIT retries (X1 deferrals) |  |
+| POST | `/runs/{runId}/retries/cancel` | Cancel one file's COMMIT retries: quarantine it now under retry_cancelled (X1 deferrals) |  |
+| POST | `/runs/{runId}/retries/retry-now` | Retry one file's COMMIT on the next cycle (X1 deferrals) |  |
+| POST | `/runs/{runId}/trigger` | Trigger a pipeline |  |
+| GET | `/runs/runs/{runId}` | Poll one manual pipeline run |  |
 
 ## screening
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| POST | `/screening/check` | Screen subjects against Entity Lists (Match Scores; persists nothing) | Standard · Advanced |
-| GET | `/screening/hits` | List Screening Hits, newest first, one page at a time | Standard · Advanced |
-| GET | `/screening/hits/{hitId}` | One Screening Hit | Standard · Advanced |
-| POST | `/screening/hits/{hitId}/decide` | Decide a Screening Hit (confirm, dismiss or escalate) | Standard · Advanced |
-| GET | `/screening/hits/{hitId}/reveal` | Reveal a Screening Hit's raw subject and matched entry | Standard · Advanced |
+| POST | `/screening/check` | Screen subjects against Entity Lists (Match Scores; persists nothing) | Standard and up |
+| GET | `/screening/hits` | List Screening Hits, newest first, one page at a time | Standard and up |
+| GET | `/screening/hits/{hitId}` | One Screening Hit | Standard and up |
+| POST | `/screening/hits/{hitId}/decide` | Decide a Screening Hit (confirm, dismiss or escalate) | Standard and up |
+| GET | `/screening/hits/{hitId}/reveal` | Reveal a Screening Hit's raw subject and matched entry | Standard and up |
 
 ## Session & Identity
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| POST | `/auth/exchange` | Redeem an OIDC authorization code (backend-mediated session) | Basic · Standard · Advanced |
-| POST | `/auth/logout` | End the session | Basic · Standard · Advanced |
-| POST | `/auth/refresh` | Mint a fresh access token from the session cookie | Basic · Standard · Advanced |
+| POST | `/auth/exchange` | Redeem an OIDC authorization code (backend-mediated session) |  |
+| POST | `/auth/logout` | End the session |  |
+| POST | `/auth/refresh` | Mint a fresh access token from the session cookie |  |
 
 ## settings
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/apps` | The Product's Apps, the Apps installed live, and the trusted signers (PRODUCT-ASSEMBLY-1 PA-7d) | Basic · Standard · Advanced |
-| POST | `/apps` | Install a signed App package (canAdminister; PA-7d) | Basic · Standard · Advanced |
-| PUT | `/apps/{id}` | Upgrade an installed App (canAdminister; PA-7d, D-PA25) | Basic · Standard · Advanced |
-| DELETE | `/apps/{id}` | Remove an installed App (canAdminister; PA-7d) | Basic · Standard · Advanced |
-| GET | `/settings/approval` | Read the Space's approval policy | Basic · Standard · Advanced |
-| PUT | `/settings/approval` | Replace the Space's approval policy | Basic · Standard · Advanced |
-| GET | `/settings/approvers` | The Space's approver roster | Basic · Standard · Advanced |
-| PUT | `/settings/approvers` | Replace the Space's approver roster | Basic · Standard · Advanced |
-| GET | `/settings/branding` | The Space's branding | Basic · Standard · Advanced |
-| PUT | `/settings/branding` | Replace the Space's branding | Basic · Standard · Advanced |
-| GET | `/settings/data` | Read the Space's data settings (data.self_import) | Basic · Standard · Advanced |
-| PUT | `/settings/data` | Turn Add data on or off for the Space | Basic · Standard · Advanced |
-| GET | `/settings/egress` | The Space's egress allowlists | Basic · Standard · Advanced |
-| PUT | `/settings/egress` | Replace the Space's egress allowlists | Basic · Standard · Advanced |
-| GET | `/settings/geo` | The Space's geo settings | Basic · Standard · Advanced |
-| PUT | `/settings/geo` | Replace the Space's geo settings | Basic · Standard · Advanced |
-| GET | `/settings/link-analysis` | The Space's Link Analysis settings | Basic · Standard · Advanced |
-| PUT | `/settings/link-analysis` | Replace the Space's Link Analysis settings | Basic · Standard · Advanced |
-| GET | `/settings/link-analysis/domain-profile` | The Space's Domain Profile: the active Industry pack's terminology and the installed packs | Basic · Standard · Advanced |
-| PUT | `/settings/link-analysis/domain-profile` | Select the Space's Domain Profile (canAuthorWorkbench) | Basic · Standard · Advanced |
-| GET | `/settings/link-analysis/limits` | The Link Analysis limits catalogue | Basic · Standard · Advanced |
-| PUT | `/settings/link-analysis/limits` | Set the Space's Link Analysis limits | Basic · Standard · Advanced |
-| GET | `/settings/list-limit` | Read the Space's list limit | Basic · Standard · Advanced |
-| PUT | `/settings/list-limit` | Set the Space's list limit | Basic · Standard · Advanced |
-| GET | `/settings/mail-attachments` | The Space's mail attachment domains | Basic · Standard · Advanced |
-| PUT | `/settings/mail-attachments` | Replace the Space's mail attachment domains | Basic · Standard · Advanced |
-| GET | `/settings/modules` | The Space's disabled modules | Basic · Standard · Advanced |
-| PUT | `/settings/modules` | Replace the Space's disabled modules | Basic · Standard · Advanced |
-| GET | `/settings/pipeline-history` | Read the Space's Pipeline config-history retention | Basic · Standard · Advanced |
-| PUT | `/settings/pipeline-history` | Set the Space's Pipeline config-history retention | Basic · Standard · Advanced |
-| GET | `/settings/publication-destinations` | The Space's publication destinations | Basic · Standard · Advanced |
-| PUT | `/settings/publication-destinations` | Replace the Space's publication destinations | Basic · Standard · Advanced |
-| GET | `/settings/safety-policy` | The Space's effective Safety Policy | Basic · Standard · Advanced |
-| GET | `/settings/scheduler` | The Space's scheduler settings | Basic · Standard · Advanced |
-| PUT | `/settings/scheduler` | Update the Space's scheduler settings | Basic · Standard · Advanced |
-| GET | `/settings/timezone` | Read the Space's default timezone | Basic · Standard · Advanced |
-| PUT | `/settings/timezone` | Set the Space's default timezone | Basic · Standard · Advanced |
+| GET | `/apps` | The Product's Apps, the Apps installed live, and the trusted signers (PRODUCT-ASSEMBLY-1 PA-7d) |  |
+| POST | `/apps` | Install a signed App package (canAdminister; PA-7d) |  |
+| PUT | `/apps/{id}` | Upgrade an installed App (canAdminister; PA-7d, D-PA25) |  |
+| DELETE | `/apps/{id}` | Remove an installed App (canAdminister; PA-7d) |  |
+| GET | `/settings/approval` | Read the Space's approval policy |  |
+| PUT | `/settings/approval` | Replace the Space's approval policy |  |
+| GET | `/settings/approvers` | The Space's approver roster |  |
+| PUT | `/settings/approvers` | Replace the Space's approver roster |  |
+| GET | `/settings/branding` | The Space's branding |  |
+| PUT | `/settings/branding` | Replace the Space's branding |  |
+| GET | `/settings/data` | Read the Space's data settings (data.self_import) |  |
+| PUT | `/settings/data` | Turn Add data on or off for the Space |  |
+| GET | `/settings/egress` | The Space's egress allowlists |  |
+| PUT | `/settings/egress` | Replace the Space's egress allowlists |  |
+| GET | `/settings/geo` | The Space's geo settings |  |
+| PUT | `/settings/geo` | Replace the Space's geo settings |  |
+| GET | `/settings/link-analysis` | The Space's Link Analysis settings |  |
+| PUT | `/settings/link-analysis` | Replace the Space's Link Analysis settings |  |
+| GET | `/settings/link-analysis/domain-profile` | The Space's Domain Profile: the active Industry pack's terminology and the installed packs |  |
+| PUT | `/settings/link-analysis/domain-profile` | Select the Space's Domain Profile (canAuthorWorkbench) |  |
+| GET | `/settings/link-analysis/limits` | The Link Analysis limits catalogue |  |
+| PUT | `/settings/link-analysis/limits` | Set the Space's Link Analysis limits |  |
+| GET | `/settings/list-limit` | Read the Space's list limit |  |
+| PUT | `/settings/list-limit` | Set the Space's list limit |  |
+| GET | `/settings/mail-attachments` | The Space's mail attachment domains |  |
+| PUT | `/settings/mail-attachments` | Replace the Space's mail attachment domains |  |
+| GET | `/settings/modules` | The Space's disabled modules |  |
+| PUT | `/settings/modules` | Replace the Space's disabled modules |  |
+| GET | `/settings/pipeline-history` | Read the Space's Pipeline config-history retention |  |
+| PUT | `/settings/pipeline-history` | Set the Space's Pipeline config-history retention |  |
+| GET | `/settings/publication-destinations` | The Space's publication destinations |  |
+| PUT | `/settings/publication-destinations` | Replace the Space's publication destinations |  |
+| GET | `/settings/safety-policy` | The Space's effective Safety Policy |  |
+| GET | `/settings/scheduler` | The Space's scheduler settings |  |
+| PUT | `/settings/scheduler` | Update the Space's scheduler settings |  |
+| GET | `/settings/timezone` | Read the Space's default timezone |  |
+| PUT | `/settings/timezone` | Set the Space's default timezone |  |
 
 ## signals
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/signals` | List Signals | Basic · Standard · Advanced |
-| GET | `/signals/count` | Count Signals in a window | Basic · Standard · Advanced |
-| GET | `/signals/stream` | Live Signal stream (SSE) | Basic · Standard · Advanced |
-| GET | `/signals/tree` | Causation tree of one correlation chain | Basic · Standard · Advanced |
+| GET | `/signals` | List Signals |  |
+| GET | `/signals/count` | Count Signals in a window |  |
+| GET | `/signals/stream` | Live Signal stream (SSE) |  |
+| GET | `/signals/tree` | Causation tree of one correlation chain |  |
 
 ## space-comparisons
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| POST | `/space-comparisons` | Compare the storage growth of two or more hosted Spaces | Basic · Standard · Advanced |
+| POST | `/space-comparisons` | Compare the storage growth of two or more hosted Spaces |  |
 
 ## spaces
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/integrity` | GET /integrity - the Space lock's report: broken links, duplicates, files changed outside the server | Basic · Standard · Advanced |
-| POST | `/integrity/accept` | POST /integrity/accept - accept files changed outside the server so they leave the integrity report | Basic · Standard · Advanced |
-| GET | `/origin` | GET /origin - which Space Template (and version) the Space came from, and what changed since | Basic · Standard · Advanced |
-| POST | `/origin/adopt` | POST /origin/adopt - match an existing Space to a Space Template by file hash and record its origin | Basic · Standard · Advanced |
-| GET | `/origin/upgrade` | GET /origin/upgrade - what a newer version of the Space's template would change, file by file | Basic · Standard · Advanced |
-| POST | `/origin/upgrade` | POST /origin/upgrade - apply the chosen update and add files of a template upgrade proposal | Basic · Standard · Advanced |
-| POST | `/promotion/apply` | POST /promotion/apply - apply a previewed change set to this existing Space | Basic · Standard · Advanced |
-| POST | `/promotion/preview` | POST /promotion/preview - the change set a whole-Space bundle would make in this existing Space | Basic · Standard · Advanced |
-| POST | `/spaces` | Create a Space, optionally seeded from a Space Template | Basic · Standard · Advanced |
-| POST | `/spaces/_locations/check` | Check a Space folder or data folder | Basic · Standard · Advanced |
-| GET | `/spaces/_meta` | Multi-Space capability probe | Basic · Standard · Advanced |
-| PUT | `/spaces/{spaceId}` | Rename or re-describe a Space | Basic · Standard · Advanced |
-| DELETE | `/spaces/{spaceId}` | Deregister a Space | Basic · Standard · Advanced |
-| PUT | `/spaces/{spaceId}/data-root` | Change the data folder of a Space that holds no data | Basic · Standard · Advanced |
-| POST | `/spaces/{spaceId}/detach` | Detach a Space kept outside the Spaces root | Basic · Standard · Advanced |
-| POST | `/spaces/attach` | Attach a Space folder kept outside the Spaces root | Basic · Standard · Advanced |
-| POST | `/spaces/import` | Create a Space from a bundle zip | Basic · Standard · Advanced |
-| GET | `/spaces/templates` | List shipped Space Templates | Basic · Standard · Advanced |
-| GET | `/tests` | GET /tests - list the test cases of the bound Space | Basic · Standard · Advanced |
-| POST | `/tests/run` | POST /tests/run - run the bound Space's test cases in scratch storage | Basic · Standard · Advanced |
+| GET | `/integrity` | GET /integrity - the Space lock's report: broken links, duplicates, files changed outside the server |  |
+| POST | `/integrity/accept` | POST /integrity/accept - accept files changed outside the server so they leave the integrity report |  |
+| GET | `/origin` | GET /origin - which Space Template (and version) the Space came from, and what changed since |  |
+| POST | `/origin/adopt` | POST /origin/adopt - match an existing Space to a Space Template by file hash and record its origin |  |
+| GET | `/origin/upgrade` | GET /origin/upgrade - what a newer version of the Space's template would change, file by file |  |
+| POST | `/origin/upgrade` | POST /origin/upgrade - apply the chosen update and add files of a template upgrade proposal |  |
+| POST | `/promotion/apply` | POST /promotion/apply - apply a previewed change set to this existing Space |  |
+| POST | `/promotion/preview` | POST /promotion/preview - the change set a whole-Space bundle would make in this existing Space |  |
+| POST | `/spaces` | Create a Space, optionally seeded from a Space Template |  |
+| POST | `/spaces/_locations/check` | Check a Space folder or data folder |  |
+| GET | `/spaces/_meta` | Multi-Space capability probe |  |
+| PUT | `/spaces/{spaceId}` | Rename or re-describe a Space |  |
+| DELETE | `/spaces/{spaceId}` | Deregister a Space |  |
+| PUT | `/spaces/{spaceId}/data-root` | Change the data folder of a Space that holds no data |  |
+| POST | `/spaces/{spaceId}/detach` | Detach a Space kept outside the Spaces root |  |
+| POST | `/spaces/attach` | Attach a Space folder kept outside the Spaces root |  |
+| POST | `/spaces/import` | Create a Space from a bundle zip |  |
+| GET | `/spaces/templates` | List shipped Space Templates |  |
+| GET | `/tests` | GET /tests - list the test cases of the bound Space |  |
+| POST | `/tests/run` | POST /tests/run - run the bound Space's test cases in scratch storage |  |
 
 ## status
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/status` | Status snapshot report | Basic · Standard · Advanced |
-| GET | `/status/problem-files` | Problem files across all Pipelines | Basic · Standard · Advanced |
+| GET | `/status` | Status snapshot report |  |
+| GET | `/status/problem-files` | Problem files across all Pipelines |  |
 
 ## streams
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| POST | `/streams/{streamId}/records` | Push NDJSON or CSV records into a Stream's inbox (ASSURE-PUSH-INGEST-1) | Basic · Standard · Advanced |
+| POST | `/streams/{streamId}/records` | Push NDJSON or CSV records into a Stream's inbox (ASSURE-PUSH-INGEST-1) |  |
 
 ## system
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| PUT | `/system/link-analysis/limits` | Set install-wide Link Analysis limits | Basic · Standard · Advanced |
-| GET | `/system/operational-db` | The operational database in use | Basic · Standard · Advanced |
-| POST | `/system/operational-db/test` | Test an operational database URL | Basic · Standard · Advanced |
-| GET | `/system/scheduler` | Server-wide scheduler settings | Basic · Standard · Advanced |
-| PUT | `/system/scheduler` | Update server-wide scheduler settings | Basic · Standard · Advanced |
+| PUT | `/system/link-analysis/limits` | Set install-wide Link Analysis limits |  |
+| GET | `/system/operational-db` | The operational database in use |  |
+| POST | `/system/operational-db/test` | Test an operational database URL |  |
+| GET | `/system/scheduler` | Server-wide scheduler settings |  |
+| PUT | `/system/scheduler` | Update server-wide scheduler settings |  |
 
 ## tags
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/tags` | List tags | Standard · Advanced |
-| POST | `/tags` | Create a tag | Standard · Advanced |
-| DELETE | `/tags/{tagId}` | Delete a tag | Standard · Advanced |
-| POST | `/tags/{tagId}/rename` | Rename a tag everywhere | Standard · Advanced |
-| GET | `/tags/{tagId}/targets` | Everything carrying a tag | Standard · Advanced |
-| GET | `/tags/assignments/{assignmentId}/{assignmentId2}` | Tags on one target | Standard · Advanced |
-| POST | `/tags/assignments/{assignmentId}/{assignmentId2}` | Apply a tag to a target | Standard · Advanced |
-| DELETE | `/tags/assignments/{assignmentId}/{assignmentId2}/{assignmentId22}` | Remove a tag from a target | Standard · Advanced |
-| GET | `/tags/rules` | List Tag Rules | Standard · Advanced |
-| POST | `/tags/rules` | Save a Tag Rule | Standard · Advanced |
-| DELETE | `/tags/rules/{ruleId}` | Delete a Tag Rule | Standard · Advanced |
-| POST | `/tags/rules/{ruleId}/apply` | Apply a Tag Rule to existing objects | Standard · Advanced |
+| GET | `/tags` | List tags | Standard and up |
+| POST | `/tags` | Create a tag | Standard and up |
+| DELETE | `/tags/{tagId}` | Delete a tag | Standard and up |
+| POST | `/tags/{tagId}/rename` | Rename a tag everywhere | Standard and up |
+| GET | `/tags/{tagId}/targets` | Everything carrying a tag | Standard and up |
+| GET | `/tags/assignments/{assignmentId}/{assignmentId2}` | Tags on one target | Standard and up |
+| POST | `/tags/assignments/{assignmentId}/{assignmentId2}` | Apply a tag to a target | Standard and up |
+| DELETE | `/tags/assignments/{assignmentId}/{assignmentId2}/{assignmentId22}` | Remove a tag from a target | Standard and up |
+| GET | `/tags/rules` | List Tag Rules | Standard and up |
+| POST | `/tags/rules` | Save a Tag Rule | Standard and up |
+| DELETE | `/tags/rules/{ruleId}` | Delete a Tag Rule | Standard and up |
+| POST | `/tags/rules/{ruleId}/apply` | Apply a Tag Rule to existing objects | Standard and up |
 
 ## test-discovered
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/test-discovered/ping` | GET /test-discovered/ping (generated skeleton) | Basic · Standard · Advanced |
+| GET | `/test-discovered/ping` | GET /test-discovered/ping (generated skeleton) |  |
 
 ## trigger
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| POST | `/trigger` | Run every Pipeline once | Basic · Standard · Advanced |
+| POST | `/trigger` | Run every Pipeline once |  |
 
 ## views
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/views` | List recorded view definitions | Basic · Standard · Advanced |
-| GET | `/views/{viewId}` | One view definition | Basic · Standard · Advanced |
-| GET | `/views/{viewId}/data` | Preview a view's rows | Basic · Standard · Advanced |
+| GET | `/views` | List recorded view definitions |  |
+| GET | `/views/{viewId}` | One view definition |  |
+| GET | `/views/{viewId}/data` | Preview a view's rows |  |
 
 ## workflows
 
-| Method | Path | What it does | Editions |
+| Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/workflows/{workflowId}` | Effective workflow of an object kind | Standard · Advanced |
+| GET | `/workflows/{workflowId}` | Effective workflow of an object kind | Standard and up |

@@ -475,6 +475,7 @@ chapters:
         type: concept
         tracks[3]: builder,partner,operator
         audience: external
+        edition: standard
       concept_link_analysis:
         file: docs/okf/product/module/la-core/user-guide-concept-link-analysis.md
         type: concept
@@ -826,6 +827,7 @@ chapters:
         type: unsorted
         tracks[1]: builder
         audience: internal
+        edition: advanced
       user_guide_training_scripts:
         file: docs/okf/product/module/la-core/user-guide-training-scripts.md
         type: unsorted
@@ -976,6 +978,7 @@ chapters:
         type: unsorted
         tracks[1]: builder
         audience: internal
+        edition: standard
   build_present:
     title: Present
     group: Build
@@ -1257,13 +1260,13 @@ chapters:
         type: unsorted
         tracks[1]: operator
         audience: internal
-        edition: preview
+        edition: advanced
       user_guide_demo_auth:
         file: docs/okf/product/module/demo-auth/user-guide-demo-auth.md
         type: unsorted
         tracks[1]: builder
         audience: internal
-        edition: preview
+        edition: advanced
   reference:
     title: Reference
     group: Reference

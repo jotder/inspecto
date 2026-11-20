@@ -48,22 +48,27 @@ export function httpReference(openapi, opModule, moduleEdition) {
             if (!op) continue;
             n++;
             const tag = op.tags?.[0] ?? 'other';
-            // an operation no module registers is the control-plane host's, as on the api-routes pages
-            const ed = moduleEdition(opModule(m.toUpperCase(), path) ?? HOST);
+            // Only a lower bound is a fact: an optional module's route has no code below that module's first edition.
+            // A route a base module (or the host) registers can still need a later edition — the feature behind it,
+            // a module it calls — so it gets no claim here (verification 2026-11-20: /access/policies, /assist).
+            const mod = opModule(m.toUpperCase(), path);
+            const ed = mod ? moduleEdition(mod) : null;
+            const from = mod && ed !== EDITIONS[0] ? (ed && SOLD.includes(ed) ? `${ed} and up` : 'no sold edition') : '';
             if (!groups.has(tag)) groups.set(tag, []);
-            groups.get(tag).push({ m: m.toUpperCase(), path, summary: op.summary ?? '', editions: ed ? editionLabel(ed) : 'no sold edition' });
+            groups.get(tag).push({ m: m.toUpperCase(), path, summary: op.summary ?? '', from });
         }
     }
-    const L = [...front('HTTP API reference', 'Every Control API operation, by area, with the editions that serve it. Generated.'),
+    const L = [...front('HTTP API reference', 'Every Control API operation, by area. Generated.'),
         '# HTTP API reference', '', ...banner('[`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) and the modules that register each route'), '',
         `Every operation of the Control API — ${n} in ${groups.size} areas. Paths are relative to \`/api/v1\`; the full`,
-        'contract (request and answer shapes, errors) is the OpenAPI document. *Editions* names the editions whose build',
-        'carries the code that serves the operation; what a caller may then do is still decided by their Roles. Basic has',
-        'no sign-in, so its calls carry no token.', ''];
+        'contract (request and answer shapes, errors) is the OpenAPI document. *Not before* names the first edition whose',
+        'build carries the code for the operation; below it the call is not found. An empty cell makes no promise: the',
+        'feature behind the call may still need a later edition (see the edition matrix), and what a caller may do is',
+        'decided by their Roles. Basic has no sign-in, so its calls carry no token.', ''];
     for (const tag of [...groups.keys()].sort((a, b) => a.localeCompare(b))) {
-        L.push(`## ${cell(tag)}`, '', '| Method | Path | What it does | Editions |', '|---|---|---|---|');
+        L.push(`## ${cell(tag)}`, '', '| Method | Path | What it does | Not before |', '|---|---|---|---|');
         const rows = groups.get(tag).sort((a, b) => a.path.localeCompare(b.path) || METHODS.indexOf(a.m.toLowerCase()) - METHODS.indexOf(b.m.toLowerCase()));
-        for (const r of rows) L.push(`| ${r.m} | \`${cell(r.path)}\` | ${cell(r.summary)} | ${r.editions} |`);
+        for (const r of rows) L.push(`| ${r.m} | \`${cell(r.path)}\` | ${cell(r.summary)} | ${r.from} |`);
         L.push('');
     }
     return L.join('\n');
@@ -92,12 +97,19 @@ export function editionsReference(items, itemEdition) {
     return L.join('\n');
 }
 
-/** First sentence of a definition: dated notes, board-id parentheses and links dropped. */
+/** An italic dated note `*( … )*`, one level of parentheses inside. */
+const NOTE = /\*\(([^()]|\([^()]*\))*\)\*/g;
+/** A code span that names the repository, not the product: a Java package, a source file or doc path, a class. */
+const REPO_CODE = /`(?:(?:com|org)\.[^`]*|[^`]*\.(?:md|java|ts|mjs|js)\b[^`]*|[^`]*\b(?:okf|docs|superpower)\/[^`]*|[A-Z][a-z0-9]+[A-Z][A-Za-z0-9]*(?:\.\w+)*(?:\(\))?)`/;
+
+/** First sentence of a definition: dated notes, links, board ids and repository names dropped. */
 export function firstSentence(text) {
-    let s = text.replace(/\*\(([^()]|\([^()]*\))*\)\*/g, '')               // *(added 2026-…)* notes
+    let s = text.replace(NOTE, '')                                          // *(added 2026-…)* notes
         .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')                            // links → their text
         .replace(/\s*\((?:[^()]*`?[A-Z][A-Z0-9]+(?:-[A-Z0-9]+)*-\d+`?[^()]*)\)/g, '')  // (… `BOARD-ID-1` …)
-        .replace(/\s+/g, ' ').trim();
+        .replace(/\s*\(([^()]|\([^()]*\))*\)/g, (p) => (REPO_CODE.test(p) || /\b(?:okf|docs|superpower)\//.test(p) ? '' : p))  // (… `com.x.Y` …)
+        .replace(new RegExp(`\\s*(?:—\\s*)?${REPO_CODE.source}`, 'g'), '')  // a bare repository name
+        .replace(/\s+/g, ' ').replace(/\s+([,.;:])/g, '$1').trim();
     // the first . ! ? that ends a sentence: outside parentheses and code, not an abbreviation, before a capital or the end
     let depth = 0, code = false;
     for (let i = 0; i < s.length; i++) {
@@ -105,27 +117,41 @@ export function firstSentence(text) {
         if (c === '`') code = !code;
         else if (!code && c === '(') depth++;
         else if (!code && c === ')') depth = Math.max(0, depth - 1);
-        else if (!code && depth === 0 && '.!?'.includes(c) && /^(\s+[A-Z*⛔⚠✅]|$)/.test(s.slice(i + 1)) && !/\b(e\.g|i\.e|etc|vs)$/i.test(s.slice(0, i))) {
+        else if (!code && depth === 0 && '.!?'.includes(c) && /^(\s+[A-Z*⛔⚠✅]|$)/.test(s.slice(i + 1)) && !/\b(e\.g|i\.e|etc|vs|incl|cf|approx)$/i.test(s.slice(0, i))) {
             return s.slice(0, i + 1);
         }
     }
     return s;
 }
 
-/** The vocabulary page from GLOSSARY.md: `**Term** — definition` paragraphs under their `## ` sections. */
+/**
+ * The vocabulary page from GLOSSARY.md. A definition is a PARAGRAPH (after a blank line or a heading) that opens with a
+ * head of bold names — `**Triage** / **Triage Run**`, `**Submission** (of a Regulatory Report)` — and any dated notes,
+ * possibly wrapped over lines, then ` — ` and the definition. A bold word that merely wraps to a line start is inside
+ * a paragraph and is not a term. A term is kept once, at its first definition, under its `## ` section.
+ */
 export function vocabularyReference(glossary) {
     const lines = glossary.replace(/\r\n/g, '\n').split('\n');
-    const sections = [];
+    const sections = [], seen = new Set();
     let cur = null;
     for (let i = 0; i < lines.length; i++) {
         const h = lines[i].match(/^## (.*)$/);
-        if (h) { cur = { title: h[1].replace(/\*\(.*?\)\*/g, '').replace(/^[\d]+(-[A-Z])?\.\s*/, '').trim(), terms: [] }; sections.push(cur); continue; }
-        const t = lines[i].match(/^\*\*([^*]+)\*\*\s*(\*\([^\n]*?\)\*)?\s*—\s*(.*)$/);
-        if (!t || !cur) continue;
-        const body = [t[3]];
-        while (i + 1 < lines.length && lines[i + 1].trim() && !/^(\*\*[^*]+\*\*\s*(\*\(.*?\)\*)?\s*—|#|\||[-*] |>)/.test(lines[i + 1])) body.push(lines[++i]);
-        const def = firstSentence(body.join(' '));
-        if (def) cur.terms.push({ term: t[1].trim(), def });
+        if (h) { cur = { title: h[1].replace(NOTE, '').replace(/^[\d]+(-[A-Z])?\.\s*/, '').trim(), terms: [] }; sections.push(cur); continue; }
+        const opens = /^\*\*[^*]/.test(lines[i]) && (i === 0 || !lines[i - 1].trim() || /^#/.test(lines[i - 1]));
+        if (!opens || !cur) continue;
+        const para = [lines[i]];
+        while (i + 1 < lines.length && lines[i + 1].trim() && !/^(#|\||[-*] |>)/.test(lines[i + 1])) para.push(lines[++i]);
+        const text = para.join(' ').replace(NOTE, '');
+        const at = text.indexOf(' — ');
+        if (at < 0) continue;
+        const head = text.slice(0, at);
+        // the head holds only bold names, slashes and plain parentheses — else the dash is inside a sentence
+        if (head.replace(/\*\*[^*]+\*\*/g, '').replace(/\([^()]*\)/g, '').replace(/[\s/,]|\bor\b/g, '') !== '') continue;
+        const term = head.replace(/\*\*/g, '').replace(/\s+/g, ' ').trim();
+        const def = firstSentence(text.slice(at + 3));
+        if (!def || seen.has(term.toLowerCase())) continue;
+        seen.add(term.toLowerCase());
+        cur.terms.push({ term, def });
     }
     const kept = sections.filter((s) => s.terms.length);
     const total = kept.reduce((n, s) => n + s.terms.length, 0);

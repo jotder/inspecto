@@ -112,7 +112,7 @@ typed: `tools/handbook-editions.mjs` maps the page's hub to its Product Map Item
 from `offerings/*.toon` (a page's `edition:` in `handbook.toon` only where nothing derives, or to narrow — never to
 widen; `check-handbook.mjs` refuses a page without one). The Handbook's **Reference** chapter holds three generated
 pages in this hub — `api-reference-http.md`, `api-reference-editions.md`, `api-reference-vocabulary.md` — written by
-`tools/render-handbook-reference.mjs` from `docs/api/openapi-v1.json` with the registering module per route, the
+`tools/render-handbook-reference.mjs` from `docs/api/openapi-v1.json` (a first edition only for routes an optional module registers), the
 Product Map and Offerings, and `GLOSSARY.md`; CI fails when they are stale. `angular.json` has no environment file
 replacement: `src/environments/environment.ts` is the file that ships.
 

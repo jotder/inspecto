@@ -12,19 +12,19 @@ import { routeModules } from './render-api-routes.mjs';
 
 const ED = { core: 'Basic', processor: 'Basic', cases: 'Standard', demo: null };
 
-test('http: every operation once, grouped by first tag, with the registering module\'s editions; unregistered → the host', () => {
+test('http: every operation once, grouped by first tag; only an optional module\'s route claims a first edition', () => {
     const openapi = { paths: {
         '/cases': { get: { tags: ['cases'], summary: 'List | Cases' }, post: { tags: ['cases'], summary: 'Open' } },
         '/health': { get: { tags: ['health'], summary: 'Liveness' } },
         '/demo': { get: { summary: 'Demo only' } },
     } };
-    const owner = { 'GET /cases': 'cases', 'POST /cases': 'cases', 'GET /demo': 'demo' };
+    const owner = { 'GET /cases': 'cases', 'POST /cases': 'cases', 'GET /demo': 'demo', 'GET /health': 'core' };
     const md = httpReference(openapi, (m, p) => owner[`${m} ${p}`] ?? null, (id) => ED[id]);
     assert.ok(md.includes('— 4 in 3 areas'));
-    assert.ok(md.includes('| GET | `/cases` | List \\| Cases | Standard · Advanced |'));
+    assert.ok(md.includes('| GET | `/cases` | List \\| Cases | Standard and up |'));
     assert.ok(md.indexOf('| GET | `/cases`') < md.indexOf('| POST | `/cases`'), 'GET before POST on one path');
-    assert.ok(md.includes('| GET | `/health` | Liveness | Basic · Standard · Advanced |'), 'no registering module → the control-plane host');
-    assert.ok(md.includes('## other') && md.includes('| no sold edition |'));
+    assert.ok(md.includes('| GET | `/health` | Liveness |  |'), 'a base module\'s route makes no edition claim');
+    assert.ok(md.includes('## other') && md.includes('| GET | `/demo` | Demo only | no sold edition |'));
     assert.ok(GENERATED_BANNER.test(md.split('\n').slice(0, 15).join('\n')), 'docs-health reads the banner');
 });
 
@@ -47,6 +47,10 @@ test('firstSentence: stops at the first sentence end outside parentheses and cod
     assert.equal(firstSentence('See [the guide](a/b.md) for more. Next.'), 'See the guide for more.');
     assert.equal(firstSentence('A thing (`LA-ONBOARD-1`, shipped) that works. Next.'), 'A thing that works.');
     assert.equal(firstSentence('no end at all'), 'no end at all');
+    assert.equal(firstSentence('One shared set (`com.gamma.objects.Kinds`), never a list. X.'), 'One shared set, never a list.');
+    assert.equal(firstSentence('A gate (e.g. `canX` — `LensService`). X.'), 'A gate.');
+    assert.equal(firstSentence('A trail (exports; `okf/a/plan.md` §3). X.'), 'A trail.');
+    assert.equal(firstSentence('Rules incl. transforms. X.'), 'Rules incl. transforms.');
 });
 
 test('vocabulary: **Term** — definition paragraphs under their sections, multi-line bodies joined, tables and lists skipped', () => {
@@ -57,6 +61,19 @@ test('vocabulary: **Term** — definition paragraphs under their sections, multi
     assert.ok(md.includes('## Tenancy\n\n- **Space** — A fully isolated project.\n- **Pod** — One process.'));
     assert.ok(md.includes('## Personas\n\n- **Lens** — A view.'));
     assert.ok(!md.includes('Rename map') && !md.includes('Not**') && !md.includes('Listed'));
+});
+
+test('vocabulary: wrapped notes and plain-parenthesis names are terms; a bold word inside a paragraph and a repeat are not', () => {
+    const md = vocabularyReference(['## 4. Rules', '', '**Load** *(added 2026-08-13 — as built:', '[x](a.md))* — The third stage. More.', '',
+        '**Submission** (of a Report) — Writing the bytes. More.', '', '**Triage** / **Triage Run** *(renamed)* —', 'A playbook. More.', '',
+        '**Annotation** — The umbrella for metadata: a Note. Every Annotation addresses its subject as an',
+        '**Annotation Target** — a pair. More.', '', '**Load** — Again. More.'].join('\n'));
+    assert.ok(md.includes('- **Load** — The third stage.'));
+    assert.ok(md.includes('- **Submission (of a Report)** — Writing the bytes.'));
+    assert.ok(md.includes('- **Triage / Triage Run** — A playbook.'));
+    assert.ok(!md.includes('**Annotation Target**'), 'a bold word wrapped to a line start is not a term');
+    assert.ok(!md.includes('Again'), 'a term is kept once');
+    assert.ok(md.includes('The 4 words'));
 });
 
 test('routeModules: an operation maps to the module whose src/main registers it; parameters match by position', () => {
