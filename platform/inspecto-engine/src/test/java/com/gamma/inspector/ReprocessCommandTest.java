@@ -95,10 +95,58 @@ class ReprocessCommandTest {
                     () -> ReprocessCommand.run(toon.toString(), batchId));
             assertTrue(e.getMessage().contains("duplicate"), e.getMessage());
             assertTrue(e.getMessage().contains(batchId), e.getMessage());
+            // REPROCESS-REFUSAL-500-1: a typed refusal whose reason (the control plane's 409) names no server path
+            String reason = assertInstanceOf(ReprocessCommand.Refused.class, e).reason();
+            assertTrue(reason.contains("merged away by compaction") && reason.contains(batchId), reason);
+            for (ConsignmentManifest.OutputEntry o : m.outputs)
+                assertFalse(reason.contains(Path.of(o.outputFile()).getFileName().toString()), reason);
 
             // And it refused before mutating anything — the manifest is still live.
             assertTrue(Files.exists(Path.of(cfg.dirs().manifestsDir(), batchId + ".json")));
             assertFalse(Files.exists(Path.of(cfg.dirs().manifestsDir(), batchId + ".json.superseded")));
+        } finally {
+            ConsignmentOutputStores.use(null);
+        }
+    }
+
+    /**
+     * {@code BASIC-ELT-PROFILE-1} B4: a Consignment a later arrival replaced rows of ({@code REPLACED}: Replace the period
+     * rewrote its file without some days, or Replace everything set it aside) is refused too - re-ingesting its backup
+     * would bring the replaced rows back - before anything moves.
+     */
+    @Test
+    void refusesWhenALaterArrivalReplacedRowsOfItsOutputs(@TempDir Path dir) throws Exception {
+        Path toon = PipelineConfigBatchTestRef.writePipeline(dir, """
+              batch:
+                max_files: 100
+            """);
+        PipelineConfig cfg = PipelineConfig.load(toon.toString());
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.createDirectories(inbox);
+        Files.writeString(inbox.resolve("a.csv"), "ID,AMT,EVENT_DATE\na,1.0,2020-04-03\n");
+        CollectorProcessor.run(cfg);
+        String batchId;
+        try (Stream<Path> w = Files.walk(Path.of(cfg.dirs().manifestsDir()))) {
+            batchId = w.filter(p -> p.toString().endsWith(".json")).findFirst().orElseThrow()
+                    .getFileName().toString().replace(".json", "");
+        }
+        ConsignmentManifest m = ManifestStore.read(cfg.dirs().manifestsDir(), batchId);
+        List<String> outputs = m.outputs.stream().map(o -> o.outputFile()).toList();
+
+        try (DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            store.record(outputs.stream().map(o -> new ConsignmentOutput(batchId, null, "t", "dt=2020-04-03", "2020-04-03",
+                    o, 1L, 100L, "2026-08-04T10:00:00Z", ConsignmentOutput.State.LIVE)).toList());
+            assertEquals(outputs.size(), store.markReplaced(outputs));
+            ConsignmentOutputStores.use(store);
+
+            ReprocessCommand.Refused e = assertThrows(ReprocessCommand.Refused.class,
+                    () -> ReprocessCommand.run(toon.toString(), batchId));
+            assertTrue(e.reason().contains("replaced by a later arrival") && e.reason().contains(batchId), e.reason());
+            for (String o : outputs) {
+                assertFalse(e.reason().contains(Path.of(o).getFileName().toString()), "no server path: " + e.reason());
+                assertTrue(Files.exists(Path.of(o)), "nothing was deleted: " + o);
+            }
+            assertTrue(Files.exists(Path.of(cfg.dirs().manifestsDir(), batchId + ".json")), "the manifest is still live");
         } finally {
             ConsignmentOutputStores.use(null);
         }

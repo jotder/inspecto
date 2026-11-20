@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-466 test class(es): 190 unit, 276 real-HTTP control-plane, 0 IT.
+466 test class(es): 189 unit, 277 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -251,6 +251,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiRecordTransformerSlotSaveTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRecordTransformerSlotSaveTest.java` | The default template's Record Transformer (the projection SLOT, node id {@code map}, type |
 | `ControlApiRejectedRowsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRejectedRowsTest.java` | {@code GET /runs/{name}/errors?file=} over real HTTP — the rejected ROWS behind an |
 | `ControlApiReplayRejectsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiReplayRejectsTest.java` | {@code POST /runs/{name}/replay-rejects} over real HTTP (EXECUTION-RESIDUALS X4): replay one file's rejected |
+| `ControlApiReprocessRefusalTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiReprocessRefusalTest.java` | {@code POST /runs/{id}/reprocess} refused over real HTTP (board {@code REPROCESS-REFUSAL-500-1}, operator ruling |
 | `ControlApiRequirementTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRequirementTest.java` | Real-HTTP tests for the Requirements intake engine ({@code /requirements*}, UI-6 + SEC-7(c)): the |
 | `ControlApiRouteArmingTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRouteArmingTest.java` | The route: arming pre-check at SAVE time, over real HTTP. |
 | `ControlApiRuleTemplateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRuleTemplateTest.java` | Real-HTTP tests for {@code POST /rule-templates/{id}/simulate} — the execution half of the |
@@ -302,7 +303,6 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `DatasetEntryRulesRolesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetEntryRulesRolesTest.java` | {@code columns[].role} on a Dataset entry (LA-COLUMN-ROLES-1 P0, operator decision B 2026-11-04): one vocabulary, |
 | `DatasetFeedSchemaWriteTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetFeedSchemaWriteTest.java` | {@code BASIC-ELT-PROFILE-1} B5 (B16): the import schema's write path ({@link DatasetFeed#rewriteSchema}) gates the |
 | `DatasetNewColumnsLocalDayTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetNewColumnsLocalDayTest.java` | DATES-ONE-ZONE-1 (Basic live check 2026-11-06): the arrivals list showed a file received at {@code 2026-11-06 |
-| `DatasetPeriodSwapLockTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DatasetPeriodSwapLockTest.java` | SNAPSHOT-SWAP-UNLOCKED-READERS-1: replacing an upload's period moves each touched Parquet file aside and puts its |
 | `DecisionRuleWritersTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DecisionRuleWritersTest.java` | {@code ASSURE-ACTION-REQUESTS-1} round-2 finding 1c — <b>every writer that can write a {@code decision-rule} runs |
 | `DialectSniffGoldenTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/DialectSniffGoldenTest.java` | {@code BASIC-ELT-PROFILE-1} BE-3 slice 1: the dialect (delimiter, quote, header) the two callers of DuckDB's |
 | `EditionFeatureGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/EditionFeatureGateTest.java` | The BASIC half of `PROCESSOR-RELEASE-READINESS-1` G9 (operator decision 2026-09-24, "gate the code"): |

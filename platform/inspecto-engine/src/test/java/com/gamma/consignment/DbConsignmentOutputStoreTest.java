@@ -414,6 +414,32 @@ class DbConsignmentOutputStoreTest {
         }
     }
 
+    /**
+     * {@code BASIC-ELT-PROFILE-1} B4: {@code markReplaced} flips only LIVE rows of the given paths (normalised like
+     * {@code markCompactedAway}), and a {@code REPLACED} path stays READABLE - Replace the period rewrote it in place and
+     * it holds the rows the replacement kept, so subtracting it from a read (or retiring it) would lose them.
+     */
+    @Test
+    void markReplacedFlipsLiveRowsAndTheFileStaysReadable() throws Exception {
+        try (DbConsignmentOutputStore db = DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            db.record(List.of(
+                    out("c1", "work/imp/database/a.parquet", 1, State.LIVE),
+                    out("c2", "/w/b.parquet", 2, State.COMPACTED_AWAY),
+                    out("c3", "/w/c.parquet", 3, State.LIVE)));
+
+            String absolute = Path.of("work/imp/database/a.parquet").toAbsolutePath().normalize().toString();
+            assertEquals(1, db.markReplaced(List.of(absolute, "/w/b.parquet", "/w/never-registered.parquet")),
+                    "the LIVE row only: a compacted-away row keeps its state, an unknown path is ignored");
+            assertEquals(State.REPLACED, db.outputs("c1").get(0).state());
+            assertEquals(State.COMPACTED_AWAY, db.outputs("c2").get(0).state());
+            assertEquals(State.LIVE, db.outputs("c3").get(0).state());
+            assertEquals(0, db.markReplaced(List.of(absolute)), "idempotent");
+
+            assertTrue(db.isReadable("work/imp/database/a.parquet"), "a replaced file is still read: it holds the kept rows");
+            assertEquals(List.of("/w/b.parquet"), db.unreadablePaths(), "only the compacted-away path is subtracted from a read");
+        }
+    }
+
     /** Same fail-open contract as record(): a failed state flip is logged, never thrown. */
     @Test
     void stateTransitionsAreBestEffortAndNeverThrow() throws Exception {
@@ -423,6 +449,8 @@ class DbConsignmentOutputStoreTest {
         assertEquals(0, db.markCompactedAway(List.of("/w/a.parquet")));
         assertEquals(0, db.markCompactedAway(List.of()));
         assertEquals(0, db.markCompactedAway(null));
+        assertEquals(0, db.markReplaced(List.of("/w/a.parquet")));
+        assertEquals(0, db.markReplaced(null));
     }
 
     // ── per-producer high water (consignment addressing §3.6) ────────────────────
