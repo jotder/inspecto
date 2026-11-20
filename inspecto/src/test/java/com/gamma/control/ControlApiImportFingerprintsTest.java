@@ -414,10 +414,6 @@ class ControlApiImportFingerprintsTest {
         }
     }
 
-    /**
-     * The engine writes one output per file name, so {@code later/feed.csv} would be written over {@code feed.csv}'s rows
-     * (found building this lane: 112 rows became 106): a taken name is refused in any folder.
-     */
     /** Re-review probe: feed.csv and later/feed.csv waiting in ONE run - the second is set aside, no row is lost. */
     @Test
     void twoWaitingFilesWithOneNameInOneRunAreNotWrittenOverEachOther(@TempDir Path cfg, @TempDir Path root) throws Exception {
@@ -444,6 +440,7 @@ class ControlApiImportFingerprintsTest {
         String id;
         try (Ctx c = open(cfg, root)) {
             id = imported(c, "replaced", transfers(40));
+            dropSettled(id, "ride.csv", transfers(4));   // a drop the replace's own run takes along
             data(add(c, id, "fresh.csv", "replace", transfers(9)), 200);
         }
         Path pipeline = pipelineOf(root, id);
@@ -453,16 +450,67 @@ class ControlApiImportFingerprintsTest {
         Files.setLastModifiedTime(markers.resolve("old.csv.processed"), SETTLED);   // before the replace
         Files.writeString(markers.resolve("new.csv.processed"), "");
         Files.setLastModifiedTime(markers.resolve("new.csv.processed"), FileTime.fromMillis(System.currentTimeMillis() + 60_000L));
+        // written during the replace's run, so before its arrivals line is stamped: still that run's file, its rows held
+        Files.writeString(markers.resolve("ride.csv.processed"), "");
+        Files.setLastModifiedTime(markers.resolve("ride.csv.processed"), SETTLED);
         AcquisitionLedgers.use(new InMemoryAcquisitionLedger());
         try (Ctx c = open(cfg, root, pipeline)) {
             java.util.Set<String> seeded = new java.util.HashSet<>();
             for (LedgerEntry e : AcquisitionLedgers.shared().entries(id)) seeded.add(e.relativePath());
             assertTrue(seeded.contains("new.csv"), seeded.toString());
             assertFalse(seeded.contains("old.csv"), "its rows were set aside by the replace: " + seeded);
-            assertEquals(2, seeded.size(), "the replace's own upload and new.csv: " + seeded);
+            assertTrue(seeded.contains("ride.csv"), "taken by the replace's own run: " + seeded);
+            assertEquals(3, seeded.size(), "the replace's own upload, ride.csv and new.csv: " + seeded);
         }
     }
 
+    /**
+     * Re-review: the name is the engine's output name - the stem without folder or extension, case-folded - so
+     * {@code Feed.CSV} after {@code feed.csv} (across runs) and {@code later/Feed.csv} beside {@code feed.csv} (one run)
+     * are set aside: either would be written over {@code feed.csv}'s rows.
+     */
+    @Test
+    void aNameIsTheEnginesOutputNameWhateverItsCaseOrExtension(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "cased", transfers(40));
+            dropSettled(id, "feed.csv", transfers(7));
+            Files.createDirectories(Path.of("database", "inbox", id, "later"));
+            dropSettled(id, "later/Feed.csv", transfers(5));
+            JsonNode one = data(send(c, "POST", "/datasets/" + id + "/run", null), 200);
+            assertEquals(7, one.get("rowsIn").asLong(), one.toString());
+            assertEquals(47, rows(id), "one run: feed.csv keeps its rows: " + one);
+            assertEquals("Feed.csv", one.at("/refused/0/file").asText(), one.toString());
+            dropSettled(id, "FEED.CSV", transfers(3));
+            JsonNode across = data(send(c, "POST", "/datasets/" + id + "/run", null), 200);
+            assertEquals(47, rows(id), "across runs: " + across);
+            assertEquals("FEED.CSV", across.at("/refused/0/file").asText(), across.toString());
+            assertTrue(across.at("/refused/0/reason").asText().contains("named 'feed.csv' was already imported"), across.toString());
+        }
+    }
+
+    /**
+     * Re-review: a file the column check refuses claims no name, so the valid {@code later/feed.csv} beside a
+     * wrong-columns {@code feed.csv} is taken (before, the name was claimed first and the valid file refused).
+     */
+    @Test
+    void aFileTheColumnCheckRefusesClaimsNoName(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "ordered", transfers(40));
+            dropSettled(id, "feed.csv", "colour,shape\nred,square\n");
+            Files.createDirectories(Path.of("database", "inbox", id, "later"));
+            dropSettled(id, "later/feed.csv", transfers(5));
+            JsonNode run = data(send(c, "POST", "/datasets/" + id + "/run", null), 200);
+            assertEquals(5, run.get("rowsIn").asLong(), run.toString());
+            assertEquals(45, rows(id));
+            assertEquals(1, run.get("refused").size(), run.toString());
+            assertTrue(run.at("/refused/0/reason").asText().contains("does not have the columns"), run.toString());
+        }
+    }
+
+    /**
+     * The engine writes one output per file name, so {@code later/feed.csv} would be written over {@code feed.csv}'s rows
+     * (found building this lane: 112 rows became 106): a taken name is refused in any folder.
+     */
     @Test
     void aTakenNameIsSetAsideInAnotherFolderToo(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

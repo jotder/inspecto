@@ -51,6 +51,20 @@ public final class FileNames {
         return FP_SPAN.matcher(safe(cfg, CsvIngester.stripExtensions(fileName))).replaceAll("fp-$1");
     }
 
+    /** {@link #outputStem} of a name already in its {@link #safe} form (a fingerprint ledger row's name): not made safe twice. */
+    public static String outputStemOfSafe(String safeName) {
+        return FP_SPAN.matcher(CsvIngester.stripExtensions(safeName)).replaceAll("fp-$1");
+    }
+
+    /**
+     * The key two outputs collide on: the stem case-folded, as a case-insensitive filesystem folds it. The ONE spelling
+     * the engine's batch guard ({@code ConsignmentIngestStrategy.claimOutputStem}) and an Add data import's name check
+     * ({@code ImportFingerprints}) compare, so the two cannot drift.
+     */
+    public static String stemKey(String stem) {
+        return stem.toLowerCase(java.util.Locale.ROOT);
+    }
+
     /** The reject-sidecar name of an inbox file: {@code <outputStem>_errors.csv}. The ONE spelling every writer
      *  ({@code ParserSpec}, the quarantine mover) and reader (the rejected-rows route, record replay) agrees on,
      *  so a value in the source name never reaches the {@code errors} directory. */

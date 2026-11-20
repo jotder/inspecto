@@ -113,7 +113,7 @@ interface ConsignmentIngestStrategy {
      */
     static MemberAudit claimOutputStem(Map<String, Consignment.Member> claimed, Consignment.Member m, String stem,
                                        PipelineConfig cfg, java.time.LocalDateTime mStart) throws java.io.IOException {
-        Consignment.Member owner = claimed.putIfAbsent(stem.toLowerCase(java.util.Locale.ROOT), m);
+        Consignment.Member owner = claimed.putIfAbsent(FileNames.stemKey(stem), m);
         if (owner == null) return null;
         QuarantineManager.quarantine(m.file(), QuarantineManager.REASON_OUTPUT_STEM_COLLISION, false, cfg);
         log.warn("[INGEST] [{}] output stem '{}' is already used by member [{}] of this batch — failing it closed"
