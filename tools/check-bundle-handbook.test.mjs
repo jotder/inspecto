@@ -22,6 +22,8 @@ test('sold editions get the external render, in production and trial', () => {
 test('the Preview, and any demo build, get the training render', () => {
     for (const distribution of ['production', 'trial', 'demo']) assert.equal(handbookAudience({ edition: 'Preview', distribution }), 'training');
     assert.equal(handbookAudience({ edition: 'Advanced', distribution: 'demo' }), 'training');
+    assert.equal(handbookAudience({ edition: 'preview', distribution: 'production' }), 'training', 'ValidateSet is case-insensitive');
+    assert.equal(handbookAudience({ edition: 'advanced', distribution: 'Demo' }), 'training');
 });
 
 test('a sold edition passes with the external render and fails with the training one', () => {

@@ -32,7 +32,9 @@ const PACKAGE_PS1 = join(ROOT, 'inspecto', 'package.ps1');
 
 /** The render a bundle of this edition and Distribution gets: 'training' (Preview, or a demo build) or 'external'. */
 export function handbookAudience({ edition, distribution }) {
-    return edition === 'Preview' || distribution === 'demo' ? 'training' : 'external';
+    // Case-insensitive: PowerShell's ValidateSet lets `-Edition preview` through.
+    const is = (v, want) => String(v ?? '').toLowerCase() === want;
+    return is(edition, 'preview') || is(distribution, 'demo') ? 'training' : 'external';
 }
 
 /**
@@ -87,8 +89,12 @@ function main(argv) {
 
     // ── static: package.ps1 takes the render from this rule and judges what it wrote ───────────────────────────
     const pkg = readFileSync(PACKAGE_PS1, 'utf8');
-    const renders = pkg.match(/render-handbook\.mjs'\)[^\r\n]*/g) || [];
-    if (renders.length !== 1) fail(`inspecto/package.ps1 calls render-handbook.mjs ${renders.length} time(s); expected exactly once.`);
+    const code = pkg.replace(/^\s*#.*$/gm, '');
+    // Any call, however quoted: the script name followed by its arguments (messages that only name the tool don't count).
+    const mentions = (code.match(/render-handbook\.mjs['"]?\)?\s+--/g) || []).length;
+    if (mentions !== 1) fail(`inspecto/package.ps1 calls render-handbook.mjs ${mentions} time(s); expected exactly once.`);
+    const renders = code.match(/render-handbook\.mjs'\)[^\r\n]*/g) || [];
+    if (renders.length !== 1) fail("inspecto/package.ps1's one render-handbook.mjs call is not the expected `(Join-Path $sandboxRoot 'tools\\render-handbook.mjs')` form.");
     if (!/--out \$helpOut @helpArgs\s*$/.test(renders[0])) fail(`inspecto/package.ps1's render call is \`${renders[0].trim()}\`; expected \`--out $helpOut @helpArgs\`.`);
     if (/--internal/.test(pkg.replace(/^\s*#.*$/gm, ''))) fail('inspecto/package.ps1 passes --internal somewhere — internal pages must never reach a bundle.');
     if (!/\$helpAudience = & node \(Join-Path \$sandboxRoot 'tools\\check-bundle-handbook\.mjs'\) --audience --edition \$Edition --distribution \$Distribution/.test(pkg))
