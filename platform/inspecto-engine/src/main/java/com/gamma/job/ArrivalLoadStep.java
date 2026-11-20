@@ -100,7 +100,7 @@ public final class ArrivalLoadStep {
             log.warn("Pipeline '{}': {}; its rows were appended", e.pipeline(), refused);
             return;
         }
-        ArrivalReplacer r = ArrivalReplacer.forStore(store, stamp());
+        ArrivalReplacer r = ArrivalReplacer.forStore(store, stamp()).keepingArrival();
         try {
             replace(r, load, outputs, outputs);
             r.drop();

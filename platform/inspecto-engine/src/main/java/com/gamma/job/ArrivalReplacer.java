@@ -80,6 +80,8 @@ public final class ArrivalReplacer {
     private List<Path> covering = List.of();
     /** Dropped or restored: the other is then a no-op. */
     private boolean done;
+    /** The arrival's rows are committed for good (O6's config path): no way back removes them ({@link #keepingArrival}). */
+    private boolean keepArrival;
 
     /** One <i>Replace the period</i> of Dataset {@code id}; {@code stamp} names its aside folder (letters and digits). */
     public ArrivalReplacer(Path dataRoot, String id, String stamp) {
@@ -92,6 +94,16 @@ public final class ArrivalReplacer {
      */
     public static ArrivalReplacer forStore(Path store, String stamp) {
         return new ArrivalReplacer(store, stamp);
+    }
+
+    /**
+     * The arrival's rows are committed for good whatever happens to this replacement (O6: a Pipeline's own
+     * {@code output.load}, no caller to refuse it): the journal says so, and every way back - {@link #abandon}, and a heal
+     * back after a lost rewrite - keeps them instead of removing them.
+     */
+    public ArrivalReplacer keepingArrival() {
+        this.keepArrival = true;
+        return this;
     }
 
     private ArrivalReplacer(Path store, String stamp) {
@@ -186,6 +198,7 @@ public final class ArrivalReplacer {
      */
     private void swapAll(List<Entry> entries, List<Path> own, Path merged, List<ArrivalCompactor.Segment> next) throws IOException {
         Map<String, Object> j = journal(SWAP, database, aside, entries, own, merged, next);
+        if (keepArrival) j.put("keepArrival", true);
         write(database, j);
         Files.createDirectories(aside);
         if (merged != null) Files.copy(base.resolve(ArrivalCompactor.MAP), aside.resolve(MAP_BEFORE), StandardCopyOption.REPLACE_EXISTING);
@@ -333,6 +346,7 @@ public final class ArrivalReplacer {
                 if (!(e.tmp() == null || Files.exists(e.tmp()) || Files.exists(kept(database, aside, e)) && Files.exists(e.file()))) {
                     log.warn("Replace the period of '{}' was interrupted and a rewrite is lost: the originals are put back",
                             name(database));
+                    if (Boolean.TRUE.equals(j.get("keepArrival"))) j.put("covering", List.of());   // committed for good
                     j.put("phase", RESTORING);
                     write(database, j);
                     back(database, j);

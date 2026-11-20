@@ -200,6 +200,92 @@ class ArrivalLoadStepTest {
         assertEquals(State.REPLACED, state("ca"));
     }
 
+    private static final PipelineConfig.ArrivalLoad PERIOD = new ArrivalLoad(ArrivalLoad.Mode.PERIOD, "event_date");
+
+    /** A config {@code period} commit of {@code fresh} with {@code at} the checkpoint seam (reset after). */
+    private static void periodCommit(Store s, Path fresh, java.util.function.Consumer<String> at) throws Exception {
+        ArrivalReplacer.checkpointForTest = at;
+        try {
+            ArrivalLoadStep.commit(config(s.dir, Map.of("load", "period", "period_column", "event_date")),
+                    commit("SUCCESS", false, "cf", fresh), List::of);
+        } finally {
+            ArrivalReplacer.checkpointForTest = null;
+        }
+    }
+
+    private void assertOriginalsAndFreshKept(Store s, Path fresh) throws Exception {
+        assertEquals(List.of("2026-10-01:1", "2026-10-02:2"), rows(s.a), "the original is back");
+        assertEquals(List.of("2026-10-01:3"), rows(s.b), "the emptied file is back");
+        assertEquals(List.of("2026-10-01:9"), rows(fresh), "the committed rows are never deleted");
+        assertSettled(s);
+        assertEquals(State.LIVE, state("ca"));
+    }
+
+    @Test
+    void aReplacementThatFailsMidSwapPutsTheOriginalsBackAndKeepsTheCommittedRows(@TempDir Path root) throws Exception {
+        Store s = store(root);
+        Path fresh = parquet(s.dir.resolve("fresh.parquet"), "cf", "('2026-10-01', 9)");
+        java.util.concurrent.atomic.AtomicBoolean once = new java.util.concurrent.atomic.AtomicBoolean();
+        // a failure (not a crash) after the journal and the first file's swap: the step catches it and abandons
+        periodCommit(s, fresh, where -> {
+            if ("swap".equals(where) && once.compareAndSet(false, true)) throw new IllegalStateException("disk full");
+        });
+        assertOriginalsAndFreshKept(s, fresh);
+    }
+
+    @Test
+    void aCrashDuringTheAbandonHealsBackAndStillKeepsTheCommittedRows(@TempDir Path root) throws Exception {
+        Store s = store(root);
+        Path fresh = parquet(s.dir.resolve("fresh.parquet"), "cf", "('2026-10-01', 9)");
+        java.util.concurrent.atomic.AtomicBoolean failed = new java.util.concurrent.atomic.AtomicBoolean();
+        assertThrows(StackOverflowError.class, () -> periodCommit(s, fresh, where -> {
+            if ("swap".equals(where) && failed.compareAndSet(false, true)) throw new IllegalStateException("disk full");
+            if ("restore".equals(where)) throw new StackOverflowError("simulated crash in the put-back");
+        }));
+        assertTrue(Files.exists(ArrivalReplacer.journalFile(s.dir)), "the crash left the put-back half done");
+        Path later = parquet(s.dir.resolve("later.parquet"), "cl", "('2026-10-07', 1)");
+        ArrivalLoadStep.commit(config(s.dir, Map.of("format", "PARQUET")), commit("SUCCESS", false, "cl", later), List::of);
+        assertOriginalsAndFreshKept(s, fresh);
+    }
+
+    @Test
+    void aLostRewriteHealsBackAndKeepsTheCommittedRowsOfAPipelinesOwnStore(@TempDir Path root) throws Exception {
+        Store s = store(root);
+        Path d = parquet(s.dir.resolve("d.parquet"), "cd", "('2026-10-01', 4), ('2026-10-04', 5)");
+        Path fresh = parquet(s.dir.resolve("fresh.parquet"), "cf", "('2026-10-01', 9)");
+        assertThrows(StackOverflowError.class, () -> periodCommit(s, fresh, where -> {
+            if ("swap".equals(where)) throw new StackOverflowError("simulated crash after the first swap");
+        }));
+        Path dRewrite = s.dir.resolve(".period-d.parquet.tmp");
+        assertTrue(Files.exists(dRewrite), "d is not swapped yet");
+        Files.delete(dRewrite);   // the rewrite is lost: the heal must go back
+        Path later = parquet(s.dir.resolve("later.parquet"), "cl", "('2026-10-07', 1)");
+        ArrivalLoadStep.commit(config(s.dir, Map.of("format", "PARQUET")), commit("SUCCESS", false, "cl", later), List::of);
+        assertEquals(List.of("2026-10-01:4", "2026-10-04:5"), rows(d));
+        assertOriginalsAndFreshKept(s, fresh);
+    }
+
+    @Test
+    void aHalfSwappedStoreIsNotHealedWhileARunScopedChoiceIsOpen(@TempDir Path root) throws Exception {
+        Store s = store(root);
+        Path fresh = parquet(s.dir.resolve("fresh.parquet"), "cf", "('2026-10-01', 9)");
+        assertThrows(StackOverflowError.class, () -> periodCommit(s, fresh, where -> {
+            if ("swap".equals(where)) throw new StackOverflowError("simulated crash after the first swap");
+        }));
+        PipelineConfig append = config(s.dir, Map.of("format", "PARQUET"));
+        try (ArrivalLoadStep.RunLoad run = ArrivalLoadStep.override(s.dir, PERIOD, "other.csv")) {
+            Path waiting = parquet(s.dir.resolve("waiting.parquet"), "cw", "('2026-10-05', 8)");
+            ArrivalLoadStep.commit(append, commit("SUCCESS", false, "cw", waiting), () -> List.of("waiting.csv"));
+            assertTrue(Files.exists(ArrivalReplacer.journalFile(s.dir)), "left alone while the run's choice is open");
+            assertTrue(Files.exists(s.b), "still half swapped");
+            assertNull(run.result());
+        }
+        Path later = parquet(s.dir.resolve("later.parquet"), "cl", "('2026-10-07', 1)");
+        ArrivalLoadStep.commit(append, commit("SUCCESS", false, "cl", later), List::of);
+        assertFalse(Files.exists(s.b), "healed forward at the next commit once the choice is closed");
+        assertSettled(s);
+    }
+
     @Test
     void aRunScopedChoiceReplacesOnlyItsFilesConsignmentAndIsTheCallersToUndo(@TempDir Path root) throws Exception {
         Store s = store(root);
