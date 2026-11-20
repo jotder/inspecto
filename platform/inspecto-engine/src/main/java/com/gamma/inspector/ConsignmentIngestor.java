@@ -574,8 +574,7 @@ public final class ConsignmentIngestor {
                     // re-delivery in another compression form finds them; plain files keep the
                     // verbatim key — a plain-only inbox is byte-for-byte unchanged. `name` keeps the
                     // actual spelling either way, which is what the alias-hit log line reports.
-                    String ledgerKey = com.gamma.etl.unpack.LogicalNames.involvesCompression(srcFile.getName())
-                            ? com.gamma.etl.unpack.LogicalNames.logicalName(rel, cfg) : rel;
+                    String ledgerKey = ledgerKey(cfg, srcFile.getName(), rel);
                     // Never store values: a name that embeds a digit-form value is recorded as its salted
                     // fingerprint form (FileNames) — key AND name, the same transform CollectorProcessor's
                     // lookup applies, so dedup identity is unchanged.
@@ -988,4 +987,15 @@ public final class ConsignmentIngestor {
 
         audit.flush(batchRow, fileRows, lineage);
     }
+
+    /**
+     * The fingerprint ledger key of a committed member before {@link FileNames#safe} (the commit records it, a reprocess
+     * forgets it): the inbox-relative path {@code rel} ({@code archive!entry} for an archive member), under its LOGICAL name
+     * when compression is involved (unpack-stage plan §2.3), else verbatim.
+     */
+    static String ledgerKey(PipelineConfig cfg, String fileName, String rel) {
+        return com.gamma.etl.unpack.LogicalNames.involvesCompression(fileName)
+                ? com.gamma.etl.unpack.LogicalNames.logicalName(rel, cfg) : rel;
+    }
+
 }

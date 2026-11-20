@@ -370,7 +370,10 @@ restart; the test reactor pins it), selected once from `-Dacquire.ledger.backend
 `AcquisitionLedgers.DEFAULT_BACKEND`). Tables: `inspecto_acquisition_ledger` and `inspecto_acquisition_db_watermark`
 (`DbAcquisitionLedger.TABLE`, `.WM_TABLE`); an index on `(source_id, checksum)` serves `findByChecksum`.
 `entries(sourceId)` and `forget(sourceId, relativePath)` let an Add data import forget the fingerprints of rows it set
-aside (B3 part 2, [arrivals](../la-core/architecture-data-onboarding-arrivals-storage.md)). `AcquisitionLedgers` is the per-space `shared()` accessor + lifecycle
+aside (B3 part 2, [arrivals](../la-core/architecture-data-onboarding-arrivals-storage.md)). A reprocess
+(`ReprocessCommand`) forgets its members' fingerprints beside deleting their markers, keyed as the commit recorded them
+(`ConsignmentIngestor.ledgerKey`): in a content-based mode the restored files were otherwise skipped as duplicates and
+the rows their deleted outputs held never read again. `AcquisitionLedgers` is the per-space `shared()` accessor + lifecycle
 manager — one of the five MDC-routed singletons. Dedup keys are SHA-256 hashed in the ledger (decision
 2026-09-01, [plan](plan-elt.md)).
 

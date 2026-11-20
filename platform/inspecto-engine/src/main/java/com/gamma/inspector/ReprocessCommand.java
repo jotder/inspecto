@@ -51,6 +51,19 @@ public final class ReprocessCommand {
         for (String marker : m.markers) {
             Files.deleteIfExists(Paths.get(marker));
         }
+        // 2b. forget the members' fingerprints - the content-based modes' marker (BASIC-ELT-PROFILE-1 B3 part 2): a ledger
+        // still holding them answers DUPLICATE to the restored files, so the poll below skips them and the rows the outputs
+        // held (deleted in 1) are never read again. Keyed exactly as the commit recorded them (ConsignmentIngestor.ledgerKey).
+        if (cfg.processing().duplicateCheckEnabled() && cfg.collector().duplicate().contentBased()) {
+            com.gamma.acquire.AcquisitionLedger ledger = com.gamma.acquire.AcquisitionLedgers.shared();
+            for (ConsignmentManifest.MemberEntry me : m.members) {
+                String rel = me.originalRelPath();
+                if (rel == null || rel.isBlank()) continue;
+                String archive = rel.contains("!") ? rel.substring(0, rel.indexOf('!')) : rel;
+                String fileName = archive.substring(archive.lastIndexOf('/') + 1);
+                ledger.forget(cfg.collector().id(), com.gamma.etl.FileNames.safe(cfg, ConsignmentIngestor.ledgerKey(cfg, fileName, rel)));
+            }
+        }
         // 3. restore members from backup into the inbox (original relative path)
         Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath();
         for (ConsignmentManifest.MemberEntry me : m.members) {
