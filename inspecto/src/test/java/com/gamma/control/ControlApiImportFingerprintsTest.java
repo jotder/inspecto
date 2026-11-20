@@ -1,0 +1,371 @@
+package com.gamma.control;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gamma.acquire.AcquisitionLedger;
+import com.gamma.acquire.AcquisitionLedgers;
+import com.gamma.acquire.DbAcquisitionLedger;
+import com.gamma.acquire.InMemoryAcquisitionLedger;
+import com.gamma.acquire.LedgerEntry;
+import com.gamma.etl.EditionFeatures;
+import com.gamma.etl.PipelineConfigBatchTest;
+import com.gamma.service.CollectorService;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpRequest.BodyPublishers;
+import java.net.http.HttpResponse;
+import java.net.http.HttpResponse.BodyHandlers;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
+import java.security.MessageDigest;
+import java.util.ArrayList;
+import java.util.HexFormat;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/**
+ * {@code BASIC-ELT-PROFILE-1} B3 part 2 over real HTTP: an Add data import refuses the same bytes by the engine's fingerprint
+ * ledger ({@link ImportFingerprints}) - Add a file's 409 across a restart of a durable ledger; a waiting duplicate (watched
+ * or Run now) set aside in {@code refused/} with its reason; <i>Replace everything</i> and <i>Replace the period</i> forget
+ * the fingerprints of the rows they set aside (and a failed replace puts them back); a new import forgets what an earlier
+ * Dataset of its id left; the start-up move of an older import onto the ledger, seeded once from its arrivals. The
+ * same-bytes refusal of Add a file itself is {@code ControlApiOnboardFilesTest#theSameFileAddedAgainIsRefusedUntilEverythingIsReplaced}.
+ * Synthetic fixtures only.
+ */
+class ControlApiImportFingerprintsTest {
+
+    private static final ObjectMapper JSON = new ObjectMapper();
+    private static final FileTime SETTLED = FileTime.fromMillis(System.currentTimeMillis() - 120_000L);
+    private final HttpClient client = HttpClient.newHttpClient();
+    private final List<String> ids = new ArrayList<>();
+
+    private record Ctx(CollectorService svc, ControlApi api, int port, Path root) implements AutoCloseable {
+        public void close() {
+            api.close();
+            svc.close();
+        }
+    }
+
+    @BeforeEach
+    void freshLedger() {
+        AcquisitionLedgers.use(new InMemoryAcquisitionLedger());   // the default Space's: no other test's fingerprints
+    }
+
+    @AfterEach
+    void cleanUp() {
+        AcquisitionLedgers.use(null);
+        EditionFeatures.overrideForTest(null);
+        Path data = Path.of("database").toAbsolutePath();
+        for (String id : ids) {
+            OnboardRoutes.deleteTree(data.resolve(id));
+            OnboardRoutes.deleteTree(data.resolve("inbox").resolve(id));
+        }
+        OnboardRoutes.deleteTree(data.resolve(OnboardRoutes.DRAFTS));
+        for (Path p : List.of(data.resolve("inbox"), data))
+            try {
+                Files.deleteIfExists(p);
+            } catch (java.io.IOException notEmpty) {
+                // another fixture's data lives there
+            }
+    }
+
+    /** A host over {@code cfg}'s fixture Pipeline and {@code more} - as a restart registers what the config root holds. */
+    private Ctx open(Path cfg, Path writeRoot, Path... more) throws Exception {
+        Path pipe = PipelineConfigBatchTest.writePipeline(cfg, "");
+        System.setProperty("assist.write.root", writeRoot.toString());
+        try {
+            List<Path> all = new ArrayList<>(List.of(pipe));
+            all.addAll(List.of(more));
+            CollectorService svc = new CollectorService(all, 3600, 1);
+            ControlApi api = new ControlApi(svc, 0);
+            api.start();
+            return new Ctx(svc, api, api.port(), writeRoot);
+        } finally {
+            System.clearProperty("assist.write.root");
+        }
+    }
+
+    private static Path pipelineOf(Path root, String id) {
+        return root.resolve(OnboardImport.CONFIG_DIR).resolve(id + "_pipeline.toon");
+    }
+
+    private HttpResponse<String> send(Ctx c, String method, String path, byte[] body) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + path));
+        b = body == null ? (method.equals("GET") ? b.GET() : b.method(method, BodyPublishers.noBody()))
+                : b.method(method, BodyPublishers.ofByteArray(body));
+        return client.send(b.build(), BodyHandlers.ofString());
+    }
+
+    private HttpResponse<String> add(Ctx c, String id, String name, String mode, String csv) throws Exception {
+        return send(c, "POST", "/datasets/" + id + "/files?name=" + name + "&mode=" + mode, csv.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static JsonNode data(HttpResponse<String> r, int expected) throws Exception {
+        assertEquals(expected, r.statusCode(), r.body());
+        return V1Body.of(r.body());
+    }
+
+    private static String error(HttpResponse<String> r) throws Exception {
+        return JSON.readTree(r.body()).path("error").path("message").asText();
+    }
+
+    private String newId(String base) {
+        String id = base + "_" + UUID.randomUUID().toString().substring(0, 8);
+        ids.add(id);
+        return id;
+    }
+
+    private String imported(Ctx c, String base, String csv) throws Exception {
+        String id = newId(base);
+        commit(c, id, csv, 200);
+        return id;
+    }
+
+    private HttpResponse<String> commit(Ctx c, String id, String csv, int expected) throws Exception {
+        JsonNode d = data(send(c, "POST", "/onboard/files?name=transfers.csv&kind=stream", csv.getBytes(StandardCharsets.UTF_8)), 200);
+        HttpResponse<String> r = send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit",
+                ("{\"name\":\"" + id + "\"}").getBytes(StandardCharsets.UTF_8));
+        assertEquals(expected, r.statusCode(), r.body());
+        return r;
+    }
+
+    private static String transfers(int rows) {
+        return ControlApiOnboardFilesTest.transfers(rows);
+    }
+
+    /** The rows of {@code transfers(100)} on 10 - 12 September, in {@code currency}: one file, three days. */
+    private static String threeDays(String currency) {
+        StringBuilder sb = new StringBuilder();
+        for (String line : transfers(100).split("\n")) {
+            if (sb.isEmpty()) {
+                sb.append(line).append('\n');
+                continue;
+            }
+            if (line.contains(",2026-09-10 ") || line.contains(",2026-09-11 ") || line.contains(",2026-09-12 "))
+                sb.append(line.replace(",EUR", "," + currency)).append('\n');
+        }
+        return sb.toString();
+    }
+
+    private static String sha256(String text) throws Exception {
+        return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private static long rows(String id) throws Exception {
+        return OnboardImport.countRows(Path.of("database", id, "database"));
+    }
+
+    private static Path dropSettled(String id, String name, String content) throws Exception {
+        Path f = Path.of("database", "inbox", id).resolve(name);
+        Files.writeString(f, content);
+        Files.setLastModifiedTime(f, SETTLED);
+        return f;
+    }
+
+    // ── a durable ledger: the refusal outlives a restart ─────────────────────────────────────────────────────────
+
+    @Test
+    void theRefusalOfTheSameBytesOutlivesARestartOfTheDurableLedger(@TempDir Path cfg, @TempDir Path root, @TempDir Path db)
+            throws Exception {
+        String url = "jdbc:duckdb:" + db.resolve("ledger.db").toString().replace('\\', '/');
+        AcquisitionLedger ledger = DbAcquisitionLedger.open(url, null, null);
+        AcquisitionLedgers.use(ledger);
+        String id;
+        try (Ctx c = open(cfg, root)) {
+            id = imported(c, "durable", transfers(40));
+            data(add(c, id, "october.csv", "append", transfers(12)), 200);
+        } finally {
+            ledger.close();
+        }
+        AcquisitionLedger reopened = DbAcquisitionLedger.open(url, null, null);   // what a restart opens
+        AcquisitionLedgers.use(reopened);
+        try (Ctx c = open(cfg, root, pipelineOf(root, id))) {
+            HttpResponse<String> again = add(c, id, "copy.csv", "append", transfers(12));
+            assertEquals(409, again.statusCode(), again.body());
+            assertTrue(error(again).contains("as 'october.csv'") && error(again).contains("replace everything"), again.body());
+            assertEquals(52, rows(id), "nothing landed");
+        } finally {
+            reopened.close();
+        }
+    }
+
+    @Test
+    void theBytesAsSentAreTheFingerprintWhenANewColumnWasLeftOutOfTheLandedCopy(@TempDir Path cfg, @TempDir Path root)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "leftout", transfers(30));
+            String wider = ControlApiArrivalNewColumnsTest.withColumn(transfers(8), "fee", i -> "1." + i);
+            data(send(c, "POST", "/datasets/" + id + "/files?name=wider.csv&mode=append&newColumns=leave",
+                    wider.getBytes(StandardCharsets.UTF_8)), 200);   // landed without its fee column: other bytes
+            HttpResponse<String> again = send(c, "POST", "/datasets/" + id + "/files?name=wider_again.csv&mode=append&newColumns=leave",
+                    wider.getBytes(StandardCharsets.UTF_8));
+            assertEquals(409, again.statusCode(), again.body());
+            assertTrue(error(again).contains("as 'wider.csv'"), again.body());
+            assertEquals(38, rows(id));
+        }
+    }
+
+    // ── a waiting duplicate is set aside, with its reason ────────────────────────────────────────────────────────
+
+    @Test
+    void aWatchedDuplicateIsSetAsideInRefusedAndItsArrivalSaysWhy(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        EditionFeatures.overrideForTest(Set.of());   // Basic
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "watched", transfers(40));
+            data(send(c, "PUT", "/datasets/" + id + "/watch", "{\"watch\":true}".getBytes(StandardCharsets.UTF_8)), 200);
+            dropSettled(id, "resent.csv", transfers(40));   // the first file's bytes under another name
+            dropSettled(id, "fresh.csv", transfers(6));
+            ControlApiImportPreRunStepsTest.poll(c.svc());
+            ControlApiImportPreRunStepsTest.poll(c.svc());
+            assertEquals(46, rows(id), "the new file taken, the duplicate not");
+            assertTrue(Files.exists(Path.of("database", id, OnboardImport.REFUSED_DIR, "resent.csv")), "set aside, not skipped in the inbox");
+            assertEquals(0, data(send(c, "GET", "/datasets/" + id + "/feed", null), 200).get("waiting").asInt(), "nothing left waiting");
+            JsonNode refused = null;
+            for (JsonNode a : data(send(c, "GET", "/datasets/" + id + "/arrivals", null), 200).get("arrivals"))
+                if ("resent.csv".equals(a.get("file").asText())) refused = a;
+            assertNotNull(refused, "the duplicate is an arrival");
+            assertEquals(DatasetArrivals.REFUSED, refused.get("status").asText(), refused.toString());
+            assertTrue(refused.get("reason").asText().contains("already imported") && refused.get("reason").asText().contains("as 'transfers.csv'"),
+                    refused.toString());
+            assertEquals(OnboardImport.REFUSED_DIR + "/resent.csv", refused.get("setAside").asText(), refused.toString());
+        }
+    }
+
+    @Test
+    void twoWaitingFilesWithTheSameBytesAreTakenOnce(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "twins", transfers(40));
+            dropSettled(id, "a.csv", transfers(7));
+            dropSettled(id, "b.csv", transfers(7));
+            JsonNode run = data(send(c, "POST", "/datasets/" + id + "/run", null), 200);
+            assertEquals(7, run.get("rowsIn").asLong(), run.toString());
+            assertEquals("b.csv", run.at("/refused/0/file").asText(), run.toString());
+            assertTrue(run.at("/refused/0/reason").asText().contains("same content as 'a.csv'"), run.toString());
+            assertEquals(47, rows(id));
+        }
+    }
+
+    // ── forgetting what was set aside ────────────────────────────────────────────────────────────────────────────
+
+    @Test
+    void aFailedReplaceEverythingPutsTheFingerprintsBack(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "undo", transfers(30));
+            data(add(c, id, "october.csv", "append", transfers(12)), 200);
+            // a run that does not happen (a pre-run step holds it): the replace loads nothing and is undone, the old rows and
+            // their fingerprints back
+            HttpResponse<String> failed;
+            CollectorService.preRunStep("t.fp.hold", 200, (svc, p, scheduled) -> id.equals(p)
+                    ? CollectorService.PreRun.SKIP : CollectorService.PreRun.GO);
+            try {
+                failed = add(c, id, "broken.csv", "replace", transfers(5));
+            } finally {
+                CollectorService.preRunStep("t.fp.hold", 200, (svc, p, scheduled) -> CollectorService.PreRun.GO);
+            }
+            assertEquals(422, failed.statusCode(), failed.body());
+            assertTrue(error(failed).startsWith("nothing was imported from 'broken.csv'"), "it failed after its run: " + failed.body());
+            assertEquals(42, rows(id), "the rows are back");
+            assertEquals(409, add(c, id, "again.csv", "append", transfers(12)).statusCode(), "and so is October's fingerprint");
+            // a replace that succeeds forgets them: October may come back
+            data(add(c, id, "november.csv", "replace", transfers(9)), 200);
+            assertEquals(21, data(add(c, id, "october.csv", "append", transfers(12)), 200).get("rowsAfter").asLong());
+        }
+    }
+
+    /** Verifier finding 1: a period run undone after the engine committed the upload takes its rows out, and its fingerprint. */
+    @Test
+    void anUndonePeriodRunForgetsTheUploadsFingerprint(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = newId("undone");
+            commit(c, id, transfers(40), 200);
+            ComponentStoreAccess.setEventDate(root, id, "channel");   // a text When column: the period step fails after the run
+            String week = transfers(6).replace(",EUR\n", ",CHF\n");
+            HttpResponse<String> failed = add(c, id, "week.csv", "period", week);
+            assertNotEquals(200, failed.statusCode(), failed.body());
+            assertEquals(40, rows(id), "the upload's rows are gone");
+            assertEquals(46, data(add(c, id, "week_again.csv", "append", week), 200).get("rowsAfter").asLong(),
+                    "so its bytes are not refused as already imported");
+        }
+    }
+
+    @Test
+    void replaceThePeriodForgetsTheArrivalsWhoseDaysItReplacedWhole(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = newId("period");
+            commit(c, id, transfers(100), 200);
+            ComponentStoreAccess.setEventDate(root, id, "booked_at");
+            String jpy = threeDays("JPY");
+            data(add(c, id, "three_days.csv", "append", jpy), 200);
+            long held = rows(id);
+            // a correction of the same three days: the three-day file's rows all go, the first file keeps its other days
+            JsonNode s = data(add(c, id, "correction.csv", "period", threeDays("CHF")), 200);
+            assertTrue(s.at("/period/rowsReplaced").asLong() > 0, s.toString());
+            long after = s.get("rowsAfter").asLong();
+            assertEquals(held - 12, after, "the three days once, not three times: " + s);
+            JsonNode back = data(add(c, id, "three_days_again.csv", "append", jpy), 200);
+            assertEquals(after + 12, back.get("rowsAfter").asLong(), "its rows were all replaced, so it may come back");
+            HttpResponse<String> first = add(c, id, "first_again.csv", "append", transfers(100));
+            assertEquals(409, first.statusCode(), "the first file keeps its other days, so its bytes are still refused: " + first.body());
+        }
+    }
+
+    @Test
+    void aNewImportForgetsTheFingerprintsAnEarlierDatasetOfItsIdLeft(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = newId("reborn");
+            String csv = transfers(25);
+            AcquisitionLedgers.shared().record(new LedgerEntry(id, "add_old_transfers.csv", "add_old_transfers.csv", 1, sha256(csv),
+                    null, null, 1L, 1L, LedgerEntry.PROCESSED));
+            commit(c, id, csv, 200);
+            assertEquals(25, rows(id));
+        }
+    }
+
+    // ── an import made before: moved onto the ledger at start, seeded once ───────────────────────────────────────
+
+    @Test
+    void anOlderImportIsMovedOntoTheLedgerAndSeededFromItsArrivalsOnce(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        String id;
+        try (Ctx c = open(cfg, root)) {
+            id = imported(c, "older", transfers(40));
+        }
+        // as B3 part 1 left it: the Pipeline on the path default, the ledger knowing nothing (it lived in memory)
+        Path pipeline = pipelineOf(root, id);
+        String toon = Files.readString(pipeline);
+        assertTrue(toon.contains("mode: content"), toon);
+        Files.writeString(pipeline, toon.replace("mode: content", "mode: path"));
+        AcquisitionLedgers.use(new InMemoryAcquisitionLedger());
+        try (Ctx c = open(cfg, root, pipeline)) {
+            assertTrue(Files.readString(pipeline).contains("mode: content"), "moved onto the ledger at start");
+            assertEquals(1, AcquisitionLedgers.shared().entries(id).size(), "seeded from the arrivals sidecar");
+            HttpResponse<String> again = add(c, id, "copy.csv", "append", transfers(40));
+            assertEquals(409, again.statusCode(), again.body());
+            assertTrue(error(again).contains("as 'transfers.csv'"), again.body());
+        }
+        try (Ctx c = open(cfg, root, pipeline)) {
+            assertEquals(1, AcquisitionLedgers.shared().entries(id).size(), "seeded once: an import with fingerprints is left alone");
+        }
+    }
+
+    /** The Dataset entry's When column, written as the Dataset editor does. */
+    private static final class ComponentStoreAccess {
+        static void setEventDate(Path root, String id, String column) throws Exception {
+            com.gamma.pipeline.ComponentStore store = new com.gamma.pipeline.ComponentStore(root.resolve("registry"));
+            java.util.Map<String, Object> entry = new java.util.LinkedHashMap<>(store.get("dataset", id).orElseThrow().content());
+            entry.remove("name");
+            entry.put("eventDate", column);
+            store.write("dataset", id, entry);
+        }
+    }
+}

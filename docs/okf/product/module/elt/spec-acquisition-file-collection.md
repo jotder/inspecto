@@ -364,11 +364,13 @@ prior one for its key. Four operations: `find`, `record`, `highWatermark(sourceI
 `dbWatermark`/advance (row-level, DB export). `LedgerEntry` carries `sourceId, relativePath, name, size,
 checksum, etag, version, lastModified, processedAt, status`.
 
-Implementations: `InMemoryAcquisitionLedger` (**default — lost on restart**) and `DbAcquisitionLedger`
-(durable JDBC over its own DuckDB file, single-writer, or a Postgres URL), selected once from
-`-Dacquire.ledger.backend` (`memory` default | `db`, `AcquisitionLedgers`). Tables:
-`inspecto_acquisition_ledger` and `inspecto_acquisition_db_watermark`
-(`DbAcquisitionLedger.TABLE`, `.WM_TABLE`). `AcquisitionLedgers` is the per-space `shared()` accessor + lifecycle
+Implementations: `DbAcquisitionLedger` (**the default on every edition**, operator 2026-11-20: durable JDBC over its
+own DuckDB file, single-writer, or a Postgres URL) and `InMemoryAcquisitionLedger` (the `memory` opt-in, lost on
+restart; the test reactor pins it), selected once from `-Dacquire.ledger.backend` (`db` default | `memory`,
+`AcquisitionLedgers.DEFAULT_BACKEND`). Tables: `inspecto_acquisition_ledger` and `inspecto_acquisition_db_watermark`
+(`DbAcquisitionLedger.TABLE`, `.WM_TABLE`); an index on `(source_id, checksum)` serves `findByChecksum`.
+`entries(sourceId)` and `forget(sourceId, relativePath)` let an Add data import forget the fingerprints of rows it set
+aside (B3 part 2, [arrivals](../la-core/architecture-data-onboarding-arrivals-storage.md)). `AcquisitionLedgers` is the per-space `shared()` accessor + lifecycle
 manager — one of the five MDC-routed singletons. Dedup keys are SHA-256 hashed in the ledger (decision
 2026-09-01, [plan](plan-elt.md)).
 
@@ -509,9 +511,9 @@ the frontier and the next cycle re-read it. Now `SliceFrontiers` (`inspecto-engi
   `discover`: every record whose slice is still in the inbox is re-stashed, so the in-flight fence (below)
   holds across a restart; a record whose slice is gone, or whose value the ledger already holds, is removed.
 
-⚠ **Durable exactly as far as the ledger is.** Under the default in-memory ledger (Phase C) the *committed*
-frontier is itself lost on restart, and a Kafka Collector re-reads from `options.start` whatever this record
-says. Restart-safe delivery needs `-Dacquire.ledger.backend=db`. ⚠ `.frontier` is reserved inside the
+⚠ **Durable exactly as far as the ledger is.** Under the `memory` opt-in (or a ledger that fell back to memory)
+the *committed* frontier is itself lost on restart, and a Kafka Collector re-reads from `options.start` whatever
+this record says. Restart-safe delivery needs the default `-Dacquire.ledger.backend=db`. ⚠ `.frontier` is reserved inside the
 staging tree: a listing path that would stage into it is skipped as a fetch failure. ⛔ **Why not the slice
 name.** The design proposed renaming a Kafka slice to its reached range and deriving the frontier from the
 name. Refused on the code: the commit is source-agnostic and the ledger key (profile id, topic, partition) is

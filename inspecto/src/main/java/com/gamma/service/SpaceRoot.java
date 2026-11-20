@@ -94,7 +94,7 @@ public interface SpaceRoot {
      */
     String runLeaseDbUrl();
 
-    /** Default JDBC URL for the acquisition (dedup) ledger, when {@code -Dacquire.ledger.backend=db}. */
+    /** Default JDBC URL for the acquisition (dedup) ledger ({@code -Dacquire.ledger.backend=db}, the default). */
     String acquisitionLedgerDbUrl();
 
     /** Default JDBC URL for the Consignment output-file registry, when {@code -Dconsignment.outputs.backend} is set. */

@@ -749,16 +749,20 @@ class ControlApiOnboardFilesTest {
             assertTrue(after.get(0).get("kept").asBoolean());
             for (int i = 1; i < 4; i++) assertFalse(after.get(i).get("kept").asBoolean(), after.get(i).toString());
 
-            // a foreign process sending the SAME name again: the import Pipeline's duplicate policy skips it (no arrival)
-            Files.writeString(Path.of("database", "inbox", id).resolve("foreign_drop.csv"), transfers(5));
+            // a foreign process sending bytes the Dataset holds (December's, under another name): set aside, a refused
+            // arrival saying why (BASIC-ELT-PROFILE-1 B3 part 2: by content, no longer by name)
+            Files.writeString(Path.of("database", "inbox", id).resolve("foreign_drop.csv"), transfers(10));
             JsonNode resent = data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200);
             assertEquals(0, resent.get("rowsIn").asLong(), resent.toString());
-            assertEquals(4, data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals").size());
+            assertTrue(resent.at("/refused/0/reason").asText().contains("as 'december.csv'"), resent.toString());
+            JsonNode five = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals");
+            assertEquals(5, five.size(), five.toString());
+            assertEquals(DatasetArrivals.REFUSED, five.get(0).get("status").asText(), five.get(0).toString());
             // ... while a new name is an arrival of its own - here taken by an upload's run, which records both files
             Files.writeString(Path.of("database", "inbox", id).resolve("second_drop.csv"), transfers(5));
             data(send(c, "POST", "/datasets/" + id + "/files?name=extra.csv&mode=append", transfers(7).getBytes(StandardCharsets.UTF_8), null), 200);
             JsonNode again = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals");
-            assertEquals(6, again.size(), again.toString());
+            assertEquals(7, again.size(), again.toString());
             JsonNode drop2 = null, extra = null;
             for (int i = 0; i < 2; i++)
                 if ("system".equals(again.get(i).get("sender").asText())) drop2 = again.get(i); else extra = again.get(i);

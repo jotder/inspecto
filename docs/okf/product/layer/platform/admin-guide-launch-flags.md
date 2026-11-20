@@ -30,7 +30,7 @@ separate one-shot tool that holds only `migrate-configs`; the `ura` pre-ETL util
 | `-Dui.dir=./ui` | Serve the bundled Angular SPA; omit to disable UI serving. |
 | `-Dcontrol.cors=<origin>` | CORS origin allow-list for the control plane. |
 | `-Dassist.write.root=<dir>` | Enable config/pipeline/connection write-back; absent → mutations return `503` (see [auth & security](../../module/access/admin-guide-auth-security.md)). |
-| `-Dacquire.ledger.backend=db` | Use the durable [DB acquisition ledger](../../module/elt/architecture-elt.md) instead of in-memory. |
+| `-Dacquire.ledger.backend=memory` | Keep the [acquisition ledger](../../module/elt/architecture-elt.md) in memory instead of the durable default (`db`, every edition since 2026-11-20): dedup history and an import's duplicate refusals are lost on restart. |
 | `-Dauth.mode=none\|oidc` | **Label only** — read by `BootstrapRoutes` to fill `/bootstrap`'s `edition`/`features.authMode`; **nothing branches on it**. The switch is the classpath: `Authenticators.active()` is a `ServiceLoader` lookup, empty on Basic, so dispatch skips auth entirely. `serve.sh`/`serve.bat` set it beside `inspecto-oidc.jar`, which is what actually decided the edition. |
 
 Plus `--enable-native-access=ALL-UNNAMED` is always required (see [build & test](spec-build-test.md)).

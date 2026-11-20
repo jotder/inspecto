@@ -178,6 +178,42 @@ public final class DbAcquisitionLedger implements AcquisitionLedger, com.gamma.u
     }
 
     @Override
+    public java.util.List<LedgerEntry> entries(String sourceId) {
+        String sql = "SELECT " + COLS + " FROM " + TABLE + " WHERE source_id = ?";
+        try {
+            return src.with(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, sourceId);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        java.util.List<LedgerEntry> out = new java.util.ArrayList<>();
+                        while (rs.next()) out.add(mapRow(rs));
+                        return out;
+                    }
+                }
+            });
+        } catch (SQLException e) {
+            throw new IllegalStateException("could not list ledger entries of " + sourceId + ": " + e.getMessage(), e);
+        }
+    }
+
+    @Override
+    public boolean forget(String sourceId, String relativePath) {
+        try {
+            return src.with(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(
+                        "DELETE FROM " + TABLE + " WHERE source_id = ? AND relative_path = ?")) {
+                    ps.setString(1, sourceId);
+                    ps.setString(2, relativePath);
+                    return ps.executeUpdate() > 0;
+                }
+            });
+        } catch (SQLException e) {
+            throw new IllegalStateException(
+                    "could not forget ledger entry " + sourceId + "/" + relativePath + ": " + e.getMessage(), e);
+        }
+    }
+
+    @Override
     public OptionalLong highWatermark(String sourceId) {
         String sql = "SELECT MAX(last_modified) FROM " + TABLE + " WHERE source_id = ?";
         try {
@@ -390,6 +426,9 @@ public final class DbAcquisitionLedger implements AcquisitionLedger, com.gamma.u
                     st.execute("CREATE TABLE IF NOT EXISTS " + WM_TABLE + " ("
                             + "source_key VARCHAR, watermark_value VARCHAR, advanced_at BIGINT, "
                             + "PRIMARY KEY (source_key))");
+                    // B3: findByChecksum reads by (source_id, checksum) on every hashed candidate and every Add a file;
+                    // without this index each lookup scans the source's whole history (both bundled DuckDB and Postgres)
+                    st.execute("CREATE INDEX IF NOT EXISTS " + TABLE + "_checksum ON " + TABLE + " (source_id, checksum)");
                 }
             });
         } catch (SQLException e) {

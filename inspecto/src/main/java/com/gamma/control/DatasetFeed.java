@@ -33,7 +33,8 @@ import java.util.stream.Stream;
  * <ul>
  *   <li>{@code GET /datasets/{id}/feed} - the Dataset's inbox (its path: absolute on the server for a holder of
  *       {@code canAdminister} and with no sign-in, else relative to the Space's data folder, {@link ServerPaths}; the
- *       files waiting there, and which of them the import already took under the same name, so Run now skips them)
+ *       files waiting there, and which of them the import already took - the same name and bytes - so the next run
+ *       sets them aside)
  *       and its feed: {@code uploads} (a person adds files; the Pipeline runs only when asked), {@code folder} (the inbox
  *       is watched) or {@code sftp} (a Connection is read). Every edition: on Basic the files waiting are imported with
  *       <i>Run now</i>, or by <i>Watch this folder</i> ({@link InboxWatch}, {@code BASIC-ONBOARD-1} P2: {@code watch},
@@ -100,8 +101,8 @@ final class DatasetFeed {
         int alreadyImported = 0;
         for (int i = 0; i < waiting.size(); i++) {
             Path p = waiting.get(i);
-            // the import's duplicate check skips a file whose name it took before: it would wait here for ever
-            boolean taken = MarkerManager.isAlreadyProcessed(p.toFile(), cfg);
+            // a file the import took before: the next run sets it aside (B3 part 2), or skips it (a path-mode Pipeline)
+            boolean taken = alreadyImported(cfg, inbox, p);
             if (taken) alreadyImported++;
             if (i >= LISTED) continue;
             Map<String, Object> f = new LinkedHashMap<>();
@@ -139,7 +140,7 @@ final class DatasetFeed {
             Path inbox = OnboardImport.inbox(dataRoot, id).toAbsolutePath().normalize();
             List<Path> waiting = waiting(inbox, "." + OnboardImport.extension(String.valueOf(content.get("importFormat"))));
             int taken = 0;
-            for (Path p : waiting) if (MarkerManager.isAlreadyProcessed(p.toFile(), cfg)) taken++;
+            for (Path p : waiting) if (alreadyImported(cfg, inbox, p)) taken++;
             f.put("waiting", waiting.size());
             f.put("alreadyImported", taken);
         } catch (IOException unreadable) {
@@ -155,6 +156,15 @@ final class DatasetFeed {
         if (InboxWatch.snapshot(content)) out.put("snapshot", true);   // refreshed with Run now only, never polled
         String error = on ? InboxWatch.lastError(dataRoot, id) : null;
         if (error != null) out.put("watchError", error);
+    }
+
+    /**
+     * Whether the waiting file {@code p} is one the import took before: the same name and bytes in the fingerprint ledger
+     * ({@link ImportFingerprints}, B3 part 2), or - a Pipeline still on the path check - its processed marker.
+     */
+    private static boolean alreadyImported(PipelineConfig cfg, Path inbox, Path p) throws IOException {
+        return ImportFingerprints.checked(cfg) ? ImportFingerprints.alreadyImported(cfg, inbox, p)
+                : MarkerManager.isAlreadyProcessed(p.toFile(), cfg);
     }
 
     /** The import's own files in its inbox, oldest first: never a hidden file (a landing upload, a marker). */
@@ -271,10 +281,11 @@ final class DatasetFeed {
         Import imp = gate(api, ex, id, "Stop the feed");
         // B1: a watched inbox is a feed too: stopping it turns the watch off (watchInbox goes with the schedule)
         rewrite(api, imp, "stopping the feed rewrites the import's Pipeline", () -> InboxWatch.keep(api, imp, id, false), collector -> {
-            // the feed's own keys go; anything set in the guided editor (post_action, include, ...) stays
+            // the feed's own keys go - its duplicate check back to the import's own (B3 part 2); anything set in the guided
+            // editor (post_action, include, ...) stays
             collector.remove("connection");
             collector.remove("stability");
-            collector.remove("duplicate");
+            collector.put("duplicate", ImportFingerprints.duplicate());
             collector.put("discovery", "poll");
             collector.put("connector", "local");
             collector.put("accepts_upload", true);

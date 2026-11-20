@@ -10,7 +10,7 @@ import java.util.OptionalLong;
  * silently skipped (data loss) or always reprocessed.
  *
  * <p>SPI twin of the OI stores ({@link com.gamma.ops.note.NoteStore} et al.): {@link InMemoryAcquisitionLedger}
- * is the lean default; {@link DbAcquisitionLedger} is durable JDBC over the bundled DuckDB (its <b>own</b> DB
+ * is the lean opt-in ({@code -Dacquire.ledger.backend=memory}); {@link DbAcquisitionLedger} (the default) is durable JDBC over the bundled DuckDB (its <b>own</b> DB
  * file, single-writer) or a Postgres URL. Unlike the append-only note/link stores this one <b>upserts</b> — a
  * file's latest fingerprint replaces the prior one for its key. The {@code PATH}-mode default keeps using
  * {@code MarkerManager} sentinels, so a pipeline with no {@code source.duplicate} block is unaffected.
@@ -34,6 +34,22 @@ public interface AcquisitionLedger extends AutoCloseable {
      */
     default Optional<LedgerEntry> findByChecksum(String sourceId, String checksum) {
         return Optional.empty();
+    }
+
+    /**
+     * Every fingerprint recorded for {@code sourceId}, in no particular order ({@code BASIC-ELT-PROFILE-1} B3 part 2: an
+     * import that sets its rows aside forgets the fingerprints of the files those rows came from). The default holds none.
+     */
+    default java.util.List<LedgerEntry> entries(String sourceId) {
+        return java.util.List.of();
+    }
+
+    /**
+     * Forget the fingerprint of {@code (sourceId, relativePath)}: the file reads as new to the source again. Answers
+     * whether a row was removed. The default forgets nothing.
+     */
+    default boolean forget(String sourceId, String relativePath) {
+        return false;
     }
 
     /**

@@ -772,6 +772,11 @@
                                  every edition; the reactor pins memory so no test creates a DuckDB file. The tests
                                  that pin durability (DbAlertStoreTest, AlertRecordsParityTest) open their own store. -->
                             <alerts.backend>memory</alerts.backend>
+                            <!-- BASIC-ELT-PROFILE-1 B3 part 2: the acquisition ledger defaults to the durable db on every
+                                 edition, and SpaceRoot.legacy() / AcquisitionLedgers.shared() resolve its file in the
+                                 working directory; the reactor pins memory so no test creates inspecto-acquisition.db.
+                                 Tests that pin the db default (AcquisitionLedgersTest) clear the property and restore it. -->
+                            <acquire.ledger.backend>memory</acquire.ledger.backend>
                         </systemPropertyVariables>
                     </configuration>
                 </plugin>

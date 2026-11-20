@@ -58,8 +58,9 @@ deferred knob (`acquire.maxFilesPerCycle`, BACKLOG §6).
   `stability.window` across `stability.size_checks` cycles). One shared instance per [space](../processor/architecture-processor.md).
 * **C — Deduplication + watermark.** `AcquisitionLedger` (`com/gamma/acquire/AcquisitionLedger.java`) is the
   fingerprint SPI: `find`/`record` per `(sourceId, relativePath)`, `highWatermark(sourceId)` for incremental
-  discovery, `dbWatermark` for row-level DB export. Implementations: `InMemoryAcquisitionLedger` (default,
-  lost on restart) and `DbAcquisitionLedger` (durable DuckDB/Postgres, via `-Dacquire.ledger.backend=db`).
+  discovery, `dbWatermark` for row-level DB export. Implementations: `DbAcquisitionLedger` (durable
+  DuckDB/Postgres, `-Dacquire.ledger.backend=db`, the default on every edition since 2026-11-20) and
+  `InMemoryAcquisitionLedger` (the `memory` opt-in, lost on restart).
   `DuplicatePolicy` is **three** enums, not one list (`DuplicatePolicy.java`) — ⚠ conflating
   them is how this line came to name four tokens that do not exist:
   · **`Mode`** (how a file already seen at the same path is judged) — `PATH`, `METADATA`, `CHECKSUM`,
@@ -185,7 +186,7 @@ Connector `options` examples: Kafka reads `topic`, `bootstrap_servers`, `securit
 `max_records`, `start` (default `earliest`); `db` reads `watermark_column`, `watermark_type`,
 `watermark_initial`.
 
-JVM switches: `-Dacquire.ledger.backend` (`memory` | `db`), `-Dacquire.pollSeconds`,
+JVM switches: `-Dacquire.ledger.backend` (`db` default | `memory`), `-Dacquire.pollSeconds`,
 `-Dacquire.maxConcurrent`, `-Dacquire.backpressure.highWater` (0 = off).
 
 ### A6. Screens
@@ -209,7 +210,7 @@ Moved to [Collectors — API](api-elt.md).
 
 ### A9. Limits and gotchas
 
-- The default ledger is in memory: restart-safe dedup and frontiers need `-Dacquire.ledger.backend=db`.
+- The ledger is durable by default (`db`); with the `memory` opt-in, dedup and frontiers do not survive a restart.
 - A ledger-requiring `guarantee` with `duplicate.mode: path` only logs a `[CONFIG]` warning and behaves
   as best-effort.
 - `staging_dir` must be outside `dirs.poll`; it is refused otherwise.

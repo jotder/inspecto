@@ -25,10 +25,14 @@ class ServiceBootstrapLedgerTest {
 
     private static final String[] NO_CONFIGS = new String[0];
 
+    /** The reactor's pin (root pom: memory), put back after each test - cleared, later tests would get the db default. */
+    private final String pinnedBackend = System.getProperty("acquire.ledger.backend");
+
     @AfterEach
     void dropDefaultSpaceLedger() {
         AcquisitionLedgers.unregister(EventLog.DEFAULT_SPACE_ID);
-        System.clearProperty("acquire.ledger.backend");
+        if (pinnedBackend == null) System.clearProperty("acquire.ledger.backend");
+        else System.setProperty("acquire.ledger.backend", pinnedBackend);
         System.clearProperty("acquire.ledger.db.url");
         System.clearProperty("inspecto.db");
         System.clearProperty("inspecto.db.url");

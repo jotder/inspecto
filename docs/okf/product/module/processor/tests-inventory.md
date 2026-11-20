@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-466 test class(es): 190 unit, 276 real-HTTP control-plane, 0 IT.
+467 test class(es): 190 unit, 277 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -168,6 +168,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiImportCommitStepsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportCommitStepsTest.java` | {@code BASIC-ELT-PROFILE-1} BE-1a over real HTTP: a commit of an import Pipeline outside Add data (a scheduled run) runs |
 | `ControlApiImportConcurrentRollbackTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportConcurrentRollbackTest.java` | `IMPORT-RESIDUALS-1` (3) over real HTTP: a refused {@code POST /spaces/{id}/import} rolls back every file it |
 | `ControlApiImportFilterEditTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportFilterEditTest.java` | {@code ADD-DATA-FILTER-EDIT-1} over real HTTP: {@code PUT /datasets/{id}/filter} rewrites an import's row conditions |
+| `ControlApiImportFingerprintsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportFingerprintsTest.java` | {@code BASIC-ELT-PROFILE-1} B3 part 2 over real HTTP: an Add data import refuses the same bytes by the engine's fingerprint |
 | `ControlApiImportPreRunStepsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportPreRunStepsTest.java` | {@code BASIC-ELT-PROFILE-1} BE-1b over real HTTP: a scheduled run of an import Pipeline (a kept-up-to-date folder) runs the |
 | `ControlApiImportRefusalAuditTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportRefusalAuditTest.java` | Round 5: the IMPORT doors write Pipeline configs through {@code ImportJournal}, not the write routes — each import |
 | `ControlApiImportReservedPathsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiImportReservedPathsTest.java` | `SEC-IMPORT-ROLES-ESCALATION-1`, over real HTTP with an ARMED Authenticator (without a Subject |

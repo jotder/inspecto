@@ -105,9 +105,9 @@ public final class ServiceBootstrap {
      * deliberate leaf that this module depends <b>on</b> ({@code inspecto/pom.xml}), so calling
      * {@link OperationalDb} from there would be a Maven cycle. It has to happen on this side of the boundary.
      *
-     * <p>⚠ Eager rather than lazy, exactly as {@link SpaceBootstrap} is: with the default {@code memory}
-     * backend this allocates an in-memory ledger and touches no disk, and with {@code -Dacquire.ledger.backend=db}
-     * it opens the same handle the first poll would have opened — but a failure is now reported to
+     * <p>⚠ Eager rather than lazy, exactly as {@link SpaceBootstrap} is: with the default {@code db} backend
+     * (every edition since 2026-11-20) it opens the same handle the first poll would have opened, and with
+     * {@code -Dacquire.ledger.backend=memory} it allocates an in-memory ledger and touches no disk — but a failure is now reported to
      * {@code StoreHealth} for the {@code default} space at boot rather than on whichever thread happened to
      * ask first.
      */

@@ -14,9 +14,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * idiom of {@link com.gamma.metrics.MetricRegistry#global()} / {@link StabilityGate#shared()}, so the static
  * poll/commit cycle reads and writes one shared ledger without threading it through every call.
  *
- * <p>The backend is chosen once from {@code -Dacquire.ledger.backend} (<b>memory</b> default | {@code db}); a DB
- * that fails to open degrades to in-memory so acquisition is never blocked. The in-memory default holds no OS
- * handle; a DB connection lives for the process (closed at JVM exit). {@link #use(AcquisitionLedger)} installs a
+ * <p>The backend is chosen once from {@code -Dacquire.ledger.backend} ({@code memory} | <b>db</b> default, every edition
+ * since 2026-11-20); a DB that fails to open degrades to in-memory so acquisition is never blocked. The in-memory
+ * opt-in holds no OS handle; a DB connection lives for the process (closed at JVM exit). {@link #use(AcquisitionLedger)} installs a
  * specific ledger — for tests and for an embedder that owns the lifecycle.
  *
  * <p><b>Per-space.</b> {@link #shared()}/{@link #use(AcquisitionLedger)} resolve one ledger <em>per space</em>
@@ -29,6 +29,12 @@ public final class AcquisitionLedgers {
 
     private static final Logger log = LoggerFactory.getLogger(AcquisitionLedgers.class);
     private static final String DEFAULT_DB_URL = "jdbc:duckdb:inspecto-acquisition.db";
+    /**
+     * The backend when {@code -Dacquire.ledger.backend} is unset: {@code db} on every edition (operator 2026-11-20,
+     * {@code BASIC-ELT-PROFILE-1} B3 part 2) - an import's duplicate refusal must survive a restart. {@code memory} is an
+     * explicit opt-in (the test reactor pins it in the root pom).
+     */
+    static final String DEFAULT_BACKEND = "db";
 
     private AcquisitionLedgers() {}
 
@@ -178,7 +184,7 @@ public final class AcquisitionLedgers {
     }
 
     /**
-     * Build a ledger at {@code url}. The backend toggle ({@code -Dacquire.ledger.backend}, memory default | db)
+     * Build a ledger at {@code url}. The backend toggle ({@code -Dacquire.ledger.backend}, memory | db default)
      * stays process-global — only the URL becomes per-space — mirroring {@link com.gamma.service.ServiceStores}.
      * A {@code db} URL that fails to open degrades to in-memory so acquisition is never blocked.
      */
@@ -196,7 +202,7 @@ public final class AcquisitionLedgers {
      * space that actually degraded.
      */
     public static AcquisitionLedger build(String url, String spaceId) {
-        String backend = System.getProperty("acquire.ledger.backend", "memory");
+        String backend = System.getProperty("acquire.ledger.backend", DEFAULT_BACKEND);
         if (!"db".equalsIgnoreCase(backend)) {
             StoreHealth.record(spaceId, "acquisitionLedger", StoreHealth.Status.NOT_CONFIGURED, backend,
                     "-Dacquire.ledger.backend=" + backend + " — pre-fetch dedup history is lost on restart");

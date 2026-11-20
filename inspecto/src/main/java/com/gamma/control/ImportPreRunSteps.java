@@ -27,8 +27,9 @@ import java.util.Set;
 
 /**
  * <b>The steps before an import Pipeline reads its inbox</b> ({@code BASIC-ELT-PROFILE-1} BE-1b; LA-ARRIVAL-MODES-1,
- * LA-ARRIVAL-NEW-COLUMNS-1): judge every waiting file by the Dataset's columns (a refused one is set aside in
- * {@code refused/} with its reason), then keep the new columns every file the run takes carries - in that order, ONE
+ * LA-ARRIVAL-NEW-COLUMNS-1): set aside every waiting file with bytes the import already took ({@link ImportFingerprints},
+ * B3 part 2), judge the rest by the Dataset's columns (a refused one is set aside in {@code refused/} with its reason),
+ * then keep the new columns every file the run takes carries - in that order, ONE
  * implementation for both ways an import's Pipeline runs:
  * <ul>
  *   <li><b>Inside Add data's run</b> (Add a file, Run now): the run claims the Dataset in {@link OnboardImport#IN_FLIGHT}
@@ -96,10 +97,13 @@ final class ImportPreRunSteps {
 
     /** The steps, sorted by {@code order}: the order both ways run them. */
     static final List<Step> STEPS = java.util.stream.Stream.of(
+            new Step(ImportFingerprints.STEP, 50, ImportFingerprints::refuseDuplicates),   // B3 part 2: the same bytes again
             new Step("import.judge_inbox", 100, r -> {
-                r.refused = OnboardImport.judgeInbox(r.space.dataRoot(), r.pipeline(), r.id, r.type,
+                List<Map<String, Object>> refused = new ArrayList<>(r.refused);
+                refused.addAll(OnboardImport.judgeInbox(r.space.dataRoot(), r.pipeline(), r.id, r.type,
                         r.space.writeRoot().resolve(OnboardImport.CONFIG_DIR).resolve(r.pipeline() + "_schema.toon"),
-                        r.content, r.taken, r.only);
+                        r.content, r.taken, r.only));
+                r.refused = refused;
                 if (r.upload != null) r.taken.add(r.upload);
             }),
             new Step("import.settle_new_columns", 200, r -> OnboardImport.settleNewColumns(r.job, r.id, r.type, r.taken, r.keepNewColumns)))

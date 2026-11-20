@@ -5,7 +5,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * In-memory {@link AcquisitionLedger} — the lean default (no extra files; tests stay light). State is lost on
+ * In-memory {@link AcquisitionLedger} — the lean opt-in, {@code -Dacquire.ledger.backend=memory} (no extra files; tests stay light). State is lost on
  * restart, which is acceptable for the default deployment because {@code PATH} mode still writes durable
  * {@code MarkerManager} sentinels; a deployment that wants durable METADATA/CHECKSUM dedup across restarts uses
  * {@link DbAcquisitionLedger}.
@@ -33,6 +33,18 @@ public final class InMemoryAcquisitionLedger implements AcquisitionLedger {
             if (e.sourceId().equals(sourceId) && checksum.equals(e.checksum())
                     && (newest == null || e.processedAt() > newest.processedAt())) newest = e;
         return Optional.ofNullable(newest);
+    }
+
+    @Override
+    public java.util.List<LedgerEntry> entries(String sourceId) {
+        java.util.List<LedgerEntry> out = new java.util.ArrayList<>();
+        for (LedgerEntry e : rows.values()) if (e.sourceId().equals(sourceId)) out.add(e);
+        return out;
+    }
+
+    @Override
+    public boolean forget(String sourceId, String relativePath) {
+        return rows.remove(key(sourceId, relativePath)) != null;
     }
 
     @Override
