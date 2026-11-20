@@ -850,12 +850,11 @@ interface ConsignmentIngestStrategy {
      * another directory, in this or a later batch, gets a different name). Never the raw path: never-store-values.
      */
     static String memberStem(PipelineConfig cfg, java.io.File file) {
-        String stem = FileNames.outputStem(cfg, file.getName());
-        if (!cfg.outputPerMember()) return stem;
+        if (!cfg.outputPerMember()) return FileNames.outputStem(cfg, file.getName());
         java.nio.file.Path origin = com.gamma.etl.unpack.UnpackOrigins.originalOr(file).toPath().toAbsolutePath().normalize();
         java.nio.file.Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
         String rel = (origin.startsWith(poll) ? poll.relativize(origin) : origin).toString().replace('\\', '/');
-        return stem + "__" + com.gamma.etl.FailureText.fingerprint(cfg, rel).substring(3, 11);
+        return FileNames.memberStem(cfg, file.getName(), rel);   // the one spelling, shared with an Add data import's check
     }
 
     /**

@@ -51,6 +51,18 @@ public final class FileNames {
         return FP_SPAN.matcher(safe(cfg, CsvIngester.stripExtensions(fileName))).replaceAll("fp-$1");
     }
 
+    /**
+     * The output stem of ONE file of a batch, as the engine names it ({@code ConsignmentIngestStrategy.memberStem}, which
+     * calls this): {@link #outputStem} with {@code processing.output_per_member} off; on, {@code <stem>__<8 hex>} where the hex
+     * is the salted keyed fingerprint ({@link FailureText#fingerprint}) of the file's path relative to {@code dirs.poll}
+     * ({@code pollRelativePath}) - a same-stem file in another folder then gets another name.
+     */
+    public static String memberStem(PipelineConfig cfg, String fileName, String pollRelativePath) {
+        String stem = outputStem(cfg, fileName);
+        if (!cfg.outputPerMember()) return stem;
+        return stem + "__" + FailureText.fingerprint(cfg, pollRelativePath).substring(3, 11);
+    }
+
     /** {@link #outputStem} of a name already in its {@link #safe} form (a fingerprint ledger row's name): not made safe twice. */
     public static String outputStemOfSafe(String safeName) {
         return FP_SPAN.matcher(CsvIngester.stripExtensions(safeName)).replaceAll("fp-$1");

@@ -489,6 +489,55 @@ class ControlApiImportFingerprintsTest {
     }
 
     /**
+     * Re-review: only a file every refusing step passed counts as taken. {@code later/feed.csv} is set aside for its name, so
+     * {@code zother.csv} with its bytes is no twin of anything and is read: 7 + 5 rows, nothing lost, nothing doubled.
+     */
+    @Test
+    void aFileSetAsideForItsNameMakesNoOtherFileItsTwin(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = imported(c, "twins_after", transfers(40));
+            dropSettled(id, "feed.csv", transfers(7));
+            Files.createDirectories(Path.of("database", "inbox", id, "later"));
+            dropSettled(id, "later/feed.csv", transfers(5));
+            dropSettled(id, "zother.csv", transfers(5));
+            JsonNode run = data(send(c, "POST", "/datasets/" + id + "/run", null), 200);
+            assertEquals(12, run.get("rowsIn").asLong(), run.toString());
+            assertEquals(52, rows(id), run.toString());
+            assertEquals(1, run.get("refused").size(), "only later/feed.csv: " + run);
+            assertEquals("feed.csv", run.at("/refused/0/file").asText(), run.toString());
+            assertTrue(run.at("/refused/0/reason").asText().contains("'feed.csv' has the same file name")
+                    && run.at("/refused/0/reason").asText().contains("'later/feed.csv' is not read over it"), run.toString());
+            assertTrue(Files.exists(Path.of("database", id, OnboardImport.REFUSED_DIR, "feed.csv")));
+        }
+    }
+
+    /**
+     * Re-review: with {@code processing.output_per_member} on, the engine names each output by its stem and a hash of its
+     * path, so {@code feed.csv} and {@code later/feed.csv} do not collide: both are read.
+     */
+    @Test
+    void withOutputPerMemberTwoFoldersKeepTheirOwnName(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        String id;
+        try (Ctx c = open(cfg, root)) {
+            id = imported(c, "permember", transfers(40));
+        }
+        Path pipeline = pipelineOf(root, id);
+        String toon = Files.readString(pipeline);
+        assertTrue(toon.contains("processing:\n"), toon);
+        Files.writeString(pipeline, toon.replace("processing:\n", "processing:\n  output_per_member: true\n"));
+        try (Ctx c = open(cfg, root, pipeline)) {
+            assertTrue(c.svc().configFor(id).orElseThrow().outputPerMember(), "the option is on");
+            dropSettled(id, "feed.csv", transfers(7));
+            Files.createDirectories(Path.of("database", "inbox", id, "later"));
+            dropSettled(id, "later/feed.csv", transfers(5));
+            JsonNode run = data(send(c, "POST", "/datasets/" + id + "/run", null), 200);
+            assertEquals(12, run.get("rowsIn").asLong(), run.toString());
+            assertEquals(52, rows(id), run.toString());
+            assertFalse(run.has("refused"), run.toString());
+        }
+    }
+
+    /**
      * Re-review: a file the column check refuses claims no name, so the valid {@code later/feed.csv} beside a
      * wrong-columns {@code feed.csv} is taken (before, the name was claimed first and the valid file refused).
      */

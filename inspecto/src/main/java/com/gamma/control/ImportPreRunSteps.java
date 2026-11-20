@@ -106,8 +106,8 @@ final class ImportPreRunSteps {
                 r.refused = refused;
                 if (r.upload != null) r.taken.add(r.upload);
             }),
-            // after the columns are judged: a file they refuse claims no name (B3 part 2 re-review)
-            new Step(ImportFingerprints.SAME_NAME_STEP, 150, ImportFingerprints::refuseSameName),
+            // after the columns are judged: only a file every refusing step passed counts as taken (B3 part 2 re-review)
+            new Step(ImportFingerprints.TWINS_STEP, 150, ImportFingerprints::refuseTwins),
             new Step("import.settle_new_columns", 200, r -> OnboardImport.settleNewColumns(r.job, r.id, r.type, r.taken, r.keepNewColumns)))
             .sorted(java.util.Comparator.comparingInt(Step::order)).toList();
 

@@ -131,91 +131,100 @@ final class ImportFingerprints {
     // ── the pre-run step ────────────────────────────────────────────────────────────────────────────────────────
 
     /**
-     * The key two files' outputs collide on: the engine names an output by the file's stem without its folder and
-     * extension, case-folded ({@link FileNames#outputStem}, {@link FileNames#stemKey}, as its own batch guard does). So
-     * {@code feed.csv}, {@code later/Feed.csv} and {@code FEED.CSV} are one name.
+     * The key two files' outputs collide on: the engine's name for a file's output ({@link FileNames#memberStem}: the stem
+     * without folder or extension, plus a hash of the file's path when {@code processing.output_per_member} is on),
+     * case-folded as its own batch guard folds it ({@link FileNames#stemKey}). So by default {@code feed.csv},
+     * {@code later/Feed.csv} and {@code FEED.CSV} are one name; with {@code output_per_member} only the same path is.
      */
-    static String nameKey(PipelineConfig cfg, String fileName) {
-        return FileNames.stemKey(FileNames.outputStem(cfg, fileName));
+    static String nameKey(PipelineConfig cfg, String fileName, String pollRelativePath) {
+        return FileNames.stemKey(FileNames.memberStem(cfg, fileName, pollRelativePath));
+    }
+
+    /** {@link #nameKey} of a fingerprint (its name and path are already in their safe form: not made safe twice). */
+    private static String nameKey(PipelineConfig cfg, LedgerEntry e) {
+        return cfg.outputPerMember() ? nameKey(cfg, e.name(), e.relativePath())
+                : FileNames.stemKey(FileNames.outputStemOfSafe(e.name()));
     }
 
     /**
-     * Step 50, before the columns are judged: set aside in {@code refused/} every waiting file (of the run's {@code only},
-     * when narrowed) whose bytes the import already took, whose NAME ({@link #nameKey}) it took with other bytes (unless
-     * the Pipeline says {@code on_change} other than {@code ignore}: then the engine reads the new bytes), or whose bytes an
-     * earlier waiting file of this run or the upload being added carries - recorded as a refused arrival with the reason.
-     * Nothing is replaced, nothing silently skipped. A <i>Replace everything</i> run judges only the run's own twins: the
-     * rows the fingerprints stand for are being replaced. Two files of one name in one run are {@link #refuseSameName}'s,
-     * after the columns are judged.
+     * Step 50, before the columns are judged, against what earlier runs took: set aside in {@code refused/} every waiting
+     * file (of the run's {@code only}, when narrowed) whose bytes the import already took, or whose NAME ({@link #nameKey})
+     * it took with other bytes (unless the Pipeline says {@code on_change} other than {@code ignore}: then the engine reads
+     * the new bytes) - recorded as a refused arrival with the reason. A <i>Replace everything</i> run skips this step's
+     * checks: the rows the fingerprints stand for are being replaced. The files of THIS run are {@link #refuseTwins}'s,
+     * once every other step has judged them.
      */
     static void refuseDuplicates(ImportPreRunSteps.Run r) throws IOException {
         PipelineConfig cfg = r.space.service().configFor(r.pipeline()).orElse(null);
-        if (cfg == null) return;
-        boolean held = !r.job.replace;   // a replace sets every held row aside: only the run's own twins count
-        // by output name, whatever the folder: the engine writes one output per name, so a second feed.csv - even in
-        // another folder, or spelled Feed.CSV - would be written over the first one's rows
+        if (cfg == null || r.job.replace) return;   // a replace sets every held row aside
         Map<String, LedgerEntry> named = new HashMap<>();
-        if (held && refusesRenamedContent(cfg))
-            for (LedgerEntry e : ledger().entries(source(cfg)))
-                named.merge(FileNames.stemKey(FileNames.outputStemOfSafe(e.name())), e,
-                        (x, y) -> x.processedAt() >= y.processedAt() ? x : y);
+        if (refusesRenamedContent(cfg))
+            for (LedgerEntry e : ledger().entries(source(cfg))) named.merge(nameKey(cfg, e), e, (x, y) -> x.processedAt() >= y.processedAt() ? x : y);
         Path dataRoot = r.space.dataRoot();
         Path in = OnboardImport.inbox(dataRoot, r.pipeline());
-        Map<String, String> seen = new HashMap<>();   // sha256 → the file of this run that carries it
-        if (r.job.sha256 != null && r.upload != null) seen.put(r.job.sha256, r.upload.name());
         List<Map<String, Object>> refused = new ArrayList<>(r.refused);
         for (Path f : waiting(r, in)) {
             String sha = DatasetArrivals.sha256(f);
             if (sha == null) continue;   // unreadable: left for the run, which sets it aside as before
             String name = f.getFileName().toString();
-            LedgerEntry first = held ? ledger().findByChecksum(source(cfg), sha).orElse(null) : null;
-            LedgerEntry took = first == null ? named.get(nameKey(cfg, name)) : null;
-            String twin = seen.get(sha);
-            if (first == null && took == null && twin == null) {
-                seen.put(sha, name);   // identical bytes are judged alike by the later steps, so the twin rule holds
-                continue;
-            }
+            LedgerEntry first = ledger().findByChecksum(source(cfg), sha).orElse(null);
+            LedgerEntry took = first == null ? named.get(nameKey(cfg, name, rel(in, f))) : null;
+            if (first == null && took == null) continue;
             String reason = first != null
                     ? "the same content was already imported on " + day(first) + " as '" + shown(first) + "'; its rows are in '"
                             + r.id + "', so adding it again would count them twice"
-                    : took != null
-                    ? "a file named '" + shown(took) + "' was already imported" + (took.processedAt() > 0 ? " on " + day(took) : "")
+                    : "a file named '" + shown(took) + "' was already imported" + (took.processedAt() > 0 ? " on " + day(took) : "")
                             + (took.checksum() != null ? " with other content" : "")
-                            + "; '" + name + "' is not read over it - rename it to import it"
-                    : "it has the same content as '" + twin + "', which this run takes";
+                            + "; '" + name + "' is not read over it - rename it to import it";
             setAside(r, refused, dataRoot, f, name, reason);
         }
         r.refused = refused;
     }
 
-    /** The pre-run step that claims names: after the columns are judged, so a file a column check refused claims none. */
-    static final String SAME_NAME_STEP = "import.refuse_same_name";
+    /** The pre-run step that judges the run's own files against each other, after every other step that refuses. */
+    static final String TWINS_STEP = "import.refuse_twins";
 
     /**
-     * Step 150, after the columns are judged: of the waiting files the run will take (those still in the inbox), the
-     * first of each name ({@link #nameKey}) is taken and every later one set aside - the engine would write it over the
-     * first one's rows. Not when the Pipeline says {@code on_change} other than {@code ignore} (the person's choice: a
-     * same-name file then replaces the first one's rows).
+     * Step 150, after the columns are judged: of the waiting files the run will take (those still in the inbox, every
+     * earlier step passed), a file is set aside when an earlier one of them - or the upload being added - has its bytes,
+     * or its name ({@link #nameKey}; the engine would write it over the first one's rows; not when the Pipeline says
+     * {@code on_change} other than {@code ignore}, the person's choice). A file counts as taken only once it passed both,
+     * so a refused file never makes another one a "twin".
      */
-    static void refuseSameName(ImportPreRunSteps.Run r) throws IOException {
+    static void refuseTwins(ImportPreRunSteps.Run r) throws IOException {
         PipelineConfig cfg = r.space.service().configFor(r.pipeline()).orElse(null);
-        if (cfg == null || !refusesRenamedContent(cfg)) return;
+        if (cfg == null) return;
+        boolean byName = refusesRenamedContent(cfg);
         Path dataRoot = r.space.dataRoot();
         Path in = OnboardImport.inbox(dataRoot, r.pipeline());
+        Map<String, String> bytes = new HashMap<>();   // sha256 → the file this run takes with it
+        if (r.job.sha256 != null && r.upload != null) bytes.put(r.job.sha256, r.upload.name());
         Map<String, String> names = new HashMap<>();   // name key → the waiting file this run takes
         List<Map<String, Object>> refused = new ArrayList<>(r.refused);
         for (Path f : waiting(r, in)) {
-            String rel = in.relativize(f).toString().replace(java.io.File.separatorChar, '/');
-            String first = names.putIfAbsent(nameKey(cfg, f.getFileName().toString()), rel);
-            if (first == null) continue;
-            String name = f.getFileName().toString();
-            if (setAside(r, refused, dataRoot, f, name, "'" + first + "' has the same file name and this run takes it;"
-                    + " one file name holds one file's rows, so '" + rel + "' is not read over it - rename it to import it")) {
+            String name = f.getFileName().toString(), rel = rel(in, f);
+            String sha = DatasetArrivals.sha256(f);
+            String key = nameKey(cfg, name, rel);
+            String twin = sha == null ? null : bytes.get(sha);
+            String sameName = twin == null && byName ? names.get(key) : null;
+            if (twin == null && sameName == null) {
+                if (sha != null) bytes.put(sha, rel);   // taken: it passed every refusing step
+                names.put(key, rel);
+                continue;
+            }
+            String reason = twin != null ? "it has the same content as '" + twin + "', which this run takes"
+                    : "'" + sameName + "' has the same file name and this run takes it; one file name holds one file's rows,"
+                            + " so '" + rel + "' is not read over it - rename it to import it";
+            if (setAside(r, refused, dataRoot, f, name, reason)) {
                 Path abs = f.toAbsolutePath().normalize();
                 r.taken.removeIf(t -> t.file().toAbsolutePath().normalize().equals(abs));   // its new columns are not kept for it
             }
         }
         r.refused = refused;
+    }
+
+    private static String rel(Path in, Path f) {
+        return in.relativize(f).toString().replace(java.io.File.separatorChar, '/');
     }
 
     /** The run's waiting files, oldest first, narrowed to its {@code only}. */

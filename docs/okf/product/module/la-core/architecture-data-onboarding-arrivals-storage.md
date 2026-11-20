@@ -60,9 +60,12 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   imported on <day> with other content ... rename it"): ⚠ the engine writes one output per file name, so reading it would
   write the new file over the first one's rows (a reused name in another folder did exactly that, 112 rows became 106).
   Two waiting files of one name in one run (`feed.csv`, `later/feed.csv`): the first is taken, the second set aside
-  (step `import.refuse_same_name`, after the columns are judged, so a file the column check refuses claims no name).
-  "One name" is the engine's output name: the stem without folder or extension, case-folded (`FileNames.outputStem` +
-  `FileNames.stemKey`, the key the engine's own batch guard `claimOutputStem` uses), so `Feed.CSV` is `feed.csv`.
+  (step `import.refuse_twins`, after the columns are judged; it also takes the run's same-bytes twins, and a file
+  counts as taken only once every refusing step passed it, so a refused file claims no name and makes no twin).
+  "One name" is the engine's output name: the stem without folder or extension, case-folded (`FileNames.memberStem` +
+  `FileNames.stemKey`, what the engine's `memberStem` and its batch guard `claimOutputStem` use), so `Feed.CSV` is
+  `feed.csv`; with `processing.output_per_member` on, the name carries a hash of the path, so only the same path collides.
+  The checks against earlier runs (bytes, name) stay before the columns (`import.refuse_duplicates`).
   Nothing is replaced, nothing silently skipped. `on_change` is the Pipeline's own setting: set to `reprocess`, a reused
   name is read, and ⚠ a same-name file - in the same folder or another one - REPLACES the first file's rows (the person's
   choice; engine defect `OUTPUT-NAME-OVERWRITE-1`). A *Replace everything* run judges only the
