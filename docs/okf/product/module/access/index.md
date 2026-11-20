@@ -21,7 +21,7 @@ tags: [product-item, module]
 | features | current | [Identity and Access — features](features-access.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Identity and Access — screens](user-guide-access.md) · [Roles and Access Policies](user-guide-concept-roles-access-policies.md) |
-| admin-guide | current | [Auth & Security — Advanced ABAC and the 2026-07-25 decisions](admin-guide-auth-security-abac-decisions.md) · [Auth & Security — Fail-closed boot, Space and config guards](admin-guide-auth-security-boot-guards.md) · [Auth & Security — Imports, identity files and maker-checker](admin-guide-auth-security-imports-maker-checker.md) · [Auth & Security](admin-guide-auth-security.md) |
+| admin-guide | current | [Auth & Security — Advanced ABAC and the 2026-07-25 decisions](admin-guide-auth-security-abac-decisions.md) · [Auth & Security — Fail-closed boot, Space and config guards](admin-guide-auth-security-boot-guards.md) · [Auth & Security — Imports, identity files and maker-checker](admin-guide-auth-security-imports-maker-checker.md) · [Auth & Security](admin-guide-auth-security.md) · [Define Roles and Access Policies](admin-guide-howto-define-roles-and-access-policies.md) |
 | api | current | [Identity and Access — API](api-access.md) |
 | tests | current | [Access policy (roles, grants, row scope, audit trail) — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
@@ -36,4 +36,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | `IMPORT-WHOLE-SPACE-SPLIT-1` | P3 | feature | split a whole-Space export into its kinds' own validated routes on import, if ever asked. | demand |
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
+| `MACHINE-CLIENT-CONSOLE-1` | P3 | feature | a Space's admitted machine clients (identity.machineClients) and attribute claims are set only through PUT /access/roles; the Roles scree… | — |
 | `SPACE-ADMISSION-FOLLOWUPS-1` | P3 | chore | Seven follow-ups the closed-Space change (D5) left on purpose. | — |

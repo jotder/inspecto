@@ -20,7 +20,7 @@ tags: [product-item, module]
 | architecture | current | [Case Management](architecture-case-management.md) |
 | features | current | [Case Management — features](features-case-management.md) |
 | feature-db | current | [Case Management — feature database](feature-db.md) |
-| user-guide | current | [Case Management — screens](user-guide-case-management.md) |
+| user-guide | current | [Case Management — screens](user-guide-case-management.md) · [Open and work a Case](user-guide-howto-open-and-work-a-case.md) |
 | admin-guide | current | [Case Management — admin guide](admin-guide-case-management.md) |
 | api | current | [Case Management — API](api-case-management.md) · [HTTP routes — module.case-management](api-routes.md) |
 | tests | current | [Case Management — tests inventory](tests-inventory.md) |
@@ -34,5 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `CASE-REASSIGN-CONSOLE-1` | P3 | feature | an existing Case cannot be re-assigned in the console | — |
 | `D6-REAL-USER-SESSION-1` | P3 | chore | The D10 think-aloud with a REAL Case-desk lead is still unrun. | external |
 | `MODULE-REORG-P7-INCIDENTS` | P3 | chore | Delete AlertMigration (and LegacyAlertObjects) in 5.0.0; 4.0.0 ships the migration. | — |

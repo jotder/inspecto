@@ -20,7 +20,7 @@ tags: [product-item, module]
 | architecture | current | [Connectors Module (providers/inspecto-connectors/)](architecture-connectors.md) |
 | features | current | [Collector and export connectors — features](features-connectors.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Connections](user-guide-connections.md) |
+| user-guide | current | [Connections](user-guide-connections.md) · [Connect SFTP or a database](user-guide-howto-connect-sftp-or-a-database.md) |
 | admin-guide | current | [Remote connectors — operator runbook](admin-guide-connectors-runbook.md) |
 | api | current | [Collector connector SPI](api-connectors.md) |
 | tests | current | [Collector and export connectors — tests inventory](tests-inventory.md) |
@@ -34,4 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `DB-CONNECTION-CONSOLE-1` | P3 | defect | the console cannot make a database Connection a Collector can use: | — |
 | `ONBOARDING-REMOTE-SYSTEMS-1` | P3 | feature | Connect a system on Standard: Add data and the guided editor's Collect stage offer remote kinds (SFTP, object stores, other databases) wi… | — |

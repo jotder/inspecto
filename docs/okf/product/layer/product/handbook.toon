@@ -16,11 +16,13 @@ chapters:
         type: reference
         tracks[4]: builder,partner,operator,business
         audience: external
+        edition: basic
       tutorial_first_space:
         file: docs/okf/product/module/config/user-guide-tutorial-first-space.md
         type: tutorial
         tracks[1]: builder
         audience: external
+        edition: standard
       user_guide_journey_alert_to_case:
         file: docs/okf/product/layer/product/user-guide-journey-alert-to-case.md
         type: unsorted
@@ -251,11 +253,13 @@ chapters:
         type: unsorted
         tracks[1]: operator
         audience: internal
+        edition: preview
       user_guide_la_showcase_off:
         file: docs/okf/product/solution-pack/la-showcase-off/user-guide-la-showcase-off.md
         type: unsorted
         tracks[2]: builder,business
         audience: internal
+        edition: preview
       admin_guide_cross_vertical_tour:
         file: docs/okf/product/solution-pack/la-showcase/admin-guide-cross-vertical-tour.md
         type: unsorted
@@ -471,6 +475,7 @@ chapters:
         type: concept
         tracks[3]: builder,partner,operator
         audience: external
+        edition: standard
       concept_link_analysis:
         file: docs/okf/product/module/la-core/user-guide-concept-link-analysis.md
         type: concept
@@ -491,6 +496,21 @@ chapters:
     group: Build
     summary: Add a file, watch a folder, connect SFTP, a database or object storage, read a stream.
     pages:
+      howto_add_a_file:
+        file: docs/okf/product/layer/product/user-guide-howto-add-a-file.md
+        type: howto
+        tracks[1]: builder
+        audience: external
+      howto_watch_a_folder:
+        file: docs/okf/product/module/elt/user-guide-howto-watch-a-folder.md
+        type: howto
+        tracks[1]: builder
+        audience: external
+      howto_connect_sftp_or_a_database:
+        file: docs/okf/product/module/connectors/user-guide-howto-connect-sftp-or-a-database.md
+        type: howto
+        tracks[1]: builder
+        audience: external
       user_guide_onboarding:
         file: docs/okf/product/layer/product/user-guide-onboarding.md
         type: unsorted
@@ -531,6 +551,11 @@ chapters:
     group: Build
     summary: Pipelines, mappings and enrichment.
     pages:
+      howto_pipeline_from_a_sample:
+        file: docs/okf/product/module/elt/user-guide-howto-pipeline-from-a-sample.md
+        type: howto
+        tracks[1]: builder
+        audience: external
       admin_guide_elt:
         file: docs/okf/product/module/elt/admin-guide-elt.md
         type: unsorted
@@ -586,11 +611,27 @@ chapters:
         type: tutorial
         tracks[1]: builder
         audience: external
+        edition: standard
+      howto_add_an_expectation:
+        file: docs/okf/product/module/elt/user-guide-howto-add-an-expectation.md
+        type: howto
+        tracks[1]: builder
+        audience: external
+      howto_handle_quarantined_rows:
+        file: docs/okf/product/module/elt/user-guide-howto-handle-quarantined-rows.md
+        type: howto
+        tracks[1]: builder
+        audience: external
   build_analyse:
     title: Analyse it
     group: Build
     summary: Queries, Studio, Link Analysis, the Geo map and the Assistant.
     pages:
+      howto_explore_links:
+        file: docs/okf/product/module/la-core/user-guide-howto-explore-links.md
+        type: howto
+        tracks[1]: builder
+        audience: external
       user_guide_catalog:
         file: docs/okf/product/layer/product/user-guide-catalog.md
         type: unsorted
@@ -821,6 +862,7 @@ chapters:
         type: unsorted
         tracks[1]: builder
         audience: internal
+        edition: advanced
       user_guide_training_scripts:
         file: docs/okf/product/module/la-core/user-guide-training-scripts.md
         type: unsorted
@@ -831,6 +873,31 @@ chapters:
     group: Build
     summary: Alert Rules, real-time detection, Reconciliation, scoring, anomaly and screening.
     pages:
+      howto_reconcile_two_datasets:
+        file: docs/okf/product/module/reconciliation/user-guide-howto-reconcile-two-datasets.md
+        type: howto
+        tracks[1]: builder
+        audience: external
+      howto_write_an_alert_rule:
+        file: docs/okf/product/addon/incidents/user-guide-howto-write-an-alert-rule.md
+        type: howto
+        tracks[1]: builder
+        audience: external
+      howto_detect_in_real_time:
+        file: docs/okf/product/module/realtime/user-guide-howto-detect-in-real-time.md
+        type: howto
+        tracks[1]: builder
+        audience: external
+      howto_score_entities:
+        file: docs/okf/product/module/scoring/user-guide-howto-score-entities.md
+        type: howto
+        tracks[1]: builder
+        audience: external
+      howto_screen_names:
+        file: docs/okf/product/module/screening/user-guide-howto-screen-names.md
+        type: howto
+        tracks[1]: builder
+        audience: external
       admin_guide_anomaly:
         file: docs/okf/product/module/anomaly/admin-guide-anomaly.md
         type: unsorted
@@ -894,6 +961,11 @@ chapters:
       tutorial_detect_respond:
         file: docs/okf/product/addon/incidents/user-guide-tutorial-detect-respond.md
         type: tutorial
+        tracks[1]: builder
+        audience: external
+      howto_open_and_work_a_case:
+        file: docs/okf/product/module/case-management/user-guide-howto-open-and-work-a-case.md
+        type: howto
         tracks[1]: builder
         audience: external
       user_guide_alerts:
@@ -971,6 +1043,7 @@ chapters:
         type: unsorted
         tracks[1]: builder
         audience: internal
+        edition: standard
   build_present:
     title: Present
     group: Build
@@ -980,6 +1053,17 @@ chapters:
         file: docs/okf/product/layer/product/user-guide-tutorial-dashboard.md
         type: tutorial
         tracks[2]: builder,business
+        audience: external
+        edition: standard
+      howto_build_a_dashboard:
+        file: docs/okf/product/layer/product/user-guide-howto-build-a-dashboard.md
+        type: howto
+        tracks[1]: builder
+        audience: external
+      howto_schedule_a_report:
+        file: docs/okf/product/module/analytics/user-guide-howto-schedule-a-report.md
+        type: howto
+        tracks[1]: builder
         audience: external
       user_guide_dashboard:
         file: docs/okf/product/layer/product/user-guide-dashboard.md
@@ -1005,6 +1089,49 @@ chapters:
         file: docs/okf/product/layer/platform/user-guide-tutorial-ship-an-app.md
         type: tutorial
         tracks[1]: partner
+        audience: external
+        edition: standard
+      howto_create_an_app:
+        file: docs/okf/product/layer/platform/user-guide-howto-create-an-app.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+      howto_golden_data_conformance:
+        file: docs/okf/product/layer/platform/user-guide-howto-golden-data-conformance.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+      howto_package_and_sign_an_app:
+        file: docs/okf/product/layer/platform/user-guide-howto-package-and-sign-an-app.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+      howto_install_an_app:
+        file: docs/okf/product/layer/platform/user-guide-howto-install-an-app.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+        edition: standard
+      howto_upgrade_an_app:
+        file: docs/okf/product/layer/platform/user-guide-howto-upgrade-an-app.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+        edition: standard
+      howto_install_an_edition:
+        file: docs/okf/product/layer/platform/admin-guide-howto-install-an-edition.md
+        type: howto
+        tracks[1]: operator
+        audience: external
+      howto_reverse_proxy:
+        file: docs/okf/product/layer/platform/admin-guide-howto-reverse-proxy.md
+        type: howto
+        tracks[1]: operator
+        audience: external
+      howto_upgrade_the_platform:
+        file: docs/okf/product/layer/platform/admin-guide-howto-upgrade-the-platform.md
+        type: howto
+        tracks[1]: operator
         audience: external
       admin_guide_apps:
         file: docs/okf/product/layer/platform/admin-guide-apps.md
@@ -1041,6 +1168,11 @@ chapters:
     group: Manage
     summary: Runs, data-quality breaches, Incidents and safe changes.
     pages:
+      howto_change_a_pipeline_safely:
+        file: docs/okf/product/module/elt/user-guide-howto-change-a-pipeline-safely.md
+        type: howto
+        tracks[1]: builder
+        audience: external
       user_guide_journey_safe_config_change:
         file: docs/okf/product/layer/product/user-guide-journey-safe-config-change.md
         type: unsorted
@@ -1106,12 +1238,35 @@ chapters:
         type: tutorial
         tracks[1]: operator
         audience: external
+        edition: standard
+      howto_connect_the_identity_provider:
+        file: docs/okf/product/module/oidc/admin-guide-howto-connect-the-identity-provider.md
+        type: howto
+        tracks[1]: operator
+        audience: external
+      howto_define_roles_and_access_policies:
+        file: docs/okf/product/module/access/admin-guide-howto-define-roles-and-access-policies.md
+        type: howto
+        tracks[1]: operator
+        audience: external
+        edition: standard
+      howto_back_up_and_restore:
+        file: docs/okf/product/module/backup/admin-guide-howto-back-up-and-restore.md
+        type: howto
+        tracks[1]: operator
+        audience: external
+      howto_verify_the_audit_chain:
+        file: docs/okf/product/module/event/admin-guide-howto-verify-the-audit-chain.md
+        type: howto
+        tracks[1]: operator
+        audience: external
       operations_guide:
         file: docs/ADVANCED_GUIDE.md
         title: Operations guide
         type: reference
         tracks[1]: operator
         audience: external
+        edition: basic
       admin_guide_gotchas:
         file: docs/okf/product/layer/platform/admin-guide-gotchas.md
         type: unsorted
@@ -1222,6 +1377,36 @@ chapters:
     group: Develop
     summary: Requirements, architecture, design, build, test and release, for developers on Inspecto and for Inspecto's own engineers.
     pages:
+      develop_requirements:
+        file: docs/okf/product/layer/platform/user-guide-develop-requirements.md
+        type: concept
+        tracks[1]: partner
+        audience: external
+      develop_architecture:
+        file: docs/okf/product/layer/platform/user-guide-develop-architecture.md
+        type: concept
+        tracks[1]: partner
+        audience: external
+      develop_design:
+        file: docs/okf/product/layer/platform/user-guide-develop-design.md
+        type: concept
+        tracks[1]: partner
+        audience: external
+      develop_build:
+        file: docs/okf/product/layer/platform/user-guide-develop-build.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+      develop_test:
+        file: docs/okf/product/layer/platform/user-guide-develop-test.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+      develop_release:
+        file: docs/okf/product/layer/platform/user-guide-develop-release.md
+        type: howto
+        tracks[1]: partner
+        audience: external
       admin_guide_local_testing:
         file: docs/okf/product/layer/platform/admin-guide-local-testing.md
         type: unsorted
@@ -1242,16 +1427,29 @@ chapters:
         type: unsorted
         tracks[1]: operator
         audience: internal
+        edition: standard
       admin_guide_demo_auth:
         file: docs/okf/product/module/demo-auth/admin-guide-demo-auth.md
         type: unsorted
         tracks[1]: operator
         audience: internal
+        edition: advanced
       user_guide_demo_auth:
         file: docs/okf/product/module/demo-auth/user-guide-demo-auth.md
         type: unsorted
         tracks[1]: builder
         audience: internal
+        edition: advanced
+      howto_add_a_parser:
+        file: docs/okf/product/module/elt/user-guide-howto-add-a-parser.md
+        type: howto
+        tracks[1]: partner
+        audience: external
+      howto_machine_client:
+        file: docs/okf/product/module/oidc/admin-guide-howto-machine-client.md
+        type: howto
+        tracks[1]: partner
+        audience: external
   reference:
     title: Reference
     group: Reference
@@ -1262,6 +1460,22 @@ chapters:
         title: Screen reference
         type: reference
         tracks[3]: builder,operator,business
+        audience: external
+        edition: basic
+      reference_http_api:
+        file: docs/okf/product/layer/product/api-reference-http.md
+        type: reference
+        tracks[2]: partner,operator
+        audience: external
+      reference_editions:
+        file: docs/okf/product/layer/product/api-reference-editions.md
+        type: reference
+        tracks[4]: builder,partner,operator,business
+        audience: external
+      reference_vocabulary:
+        file: docs/okf/product/layer/product/api-reference-vocabulary.md
+        type: reference
+        tracks[4]: builder,partner,operator,business
         audience: external
       admin_guide_processor:
         file: docs/okf/product/module/processor/admin-guide-processor.md

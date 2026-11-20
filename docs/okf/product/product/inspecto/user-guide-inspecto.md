@@ -13,6 +13,8 @@
 - [How the pieces fit](../../layer/product/user-guide-concept-overview.md)
 - [Widget and Dashboard](../../layer/product/user-guide-concept-widget-dashboard.md)
 - [Dashboard](../../layer/product/user-guide-dashboard.md)
+- [Add a file](../../layer/product/user-guide-howto-add-a-file.md)
+- [Build a Dashboard](../../layer/product/user-guide-howto-build-a-dashboard.md)
 - [Icon Settings](../../layer/product/user-guide-icon-settings.md)
 - [Journey: from an alert to a closed Case](../../layer/product/user-guide-journey-alert-to-case.md)
 - [Journey: from a file to a dashboard](../../layer/product/user-guide-journey-file-to-dashboard.md)
@@ -26,6 +28,7 @@
 
 - [Geo Map Analysis](../../module/geo-link/user-guide-geo-map.md)
 - [Link Analysis and Investigations](../../module/la-core/user-guide-concept-link-analysis.md)
+- [Explore links between entities](../../module/la-core/user-guide-howto-explore-links.md)
 - [Link Analysis — User Guide — Expand, analyse, match patterns and save](../../module/la-core/user-guide-la-core-analysis.md)
 - [Link Analysis — User Guide — The screen, building and looking at a graph](../../module/la-core/user-guide-la-core-building-graph.md)
 - [Link Analysis — User Guide — Worked examples, roles, limits and troubleshooting](../../module/la-core/user-guide-la-core-examples-roles.md)

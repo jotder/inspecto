@@ -21,7 +21,7 @@ tags: [product-item, module]
 | features | current | [Backup and restore — features](features-backup.md) |
 | feature-db | current | [Backup and restore — feature database](feature-db.md) |
 | user-guide | n/a | no screen or end-user configuration of its own; the tasks are maintenance Jobs authored by administrators, covered by admin-guide-backup-restore |
-| admin-guide | current | [Backup & Restore Runbook (System Maintenance MNT-5/MNT-6)](admin-guide-backup-restore.md) |
+| admin-guide | current | [Backup & Restore Runbook (System Maintenance MNT-5/MNT-6)](admin-guide-backup-restore.md) · [Back up and restore a Space](admin-guide-howto-back-up-and-restore.md) |
 | api | n/a | no HTTP routes of its own; the tasks run through the generic Jobs routes (POST /jobs, POST /jobs/{name}/trigger) |
 | tests | current | [Backup and restore — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.backup` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `BACKUP-DATA-1` | P3 | feature | the backup maintenance task archives a Space's configuration only; its Datasets (data/, duckdb/) are in no archive and no guide gives a d… | — |

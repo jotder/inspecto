@@ -21,7 +21,7 @@ tags: [product-item, module]
 | features | current | [OIDC authenticator and token relay — features](features-oidc.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | n/a | end users only see the sign-in button, documented with the other access screens in module.access user-guide-access.md |
-| admin-guide | current | [OIDC authenticator and token relay — admin guide](admin-guide-oidc.md) |
+| admin-guide | current | [Connect the identity provider](admin-guide-howto-connect-the-identity-provider.md) · [Call the Control API with a machine client](admin-guide-howto-machine-client.md) · [OIDC authenticator and token relay — admin guide](admin-guide-oidc.md) |
 | api | n/a | implements the Authenticator and TokenRelay contracts owned by module.auth-spi; the /auth/* routes live in the core and are documented in module.access api-access.md |
 | tests | current | [OIDC authenticator and token relay — tests inventory](tests-inventory.md) · [Security review: inbound OIDC client-credentials tokens for Link Analysis](tests-security-review-oidc-client-credentials.md) |
 | brochure | n/a | per edition / solution pack |
@@ -35,3 +35,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
+| `MACHINE-CLIENT-CONSOLE-1` | P3 | feature | a Space's admitted machine clients (identity.machineClients) and attribute claims are set only through PUT /access/roles; the Roles scree… | — |

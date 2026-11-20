@@ -1350,6 +1350,8 @@ public final class ControlApi implements AutoCloseable, HostContext {
         return LinkAnalysisRateClasses.isExpensive(method, path)
                 || path.equals("/db/query") || path.equals("/bi/query")
                 || path.startsWith("/recon/") || path.startsWith("/agent/")
+                // AGENT-KIT-1 AK-1: every MCP Tool call can run SQL (query_dataset), and its in-process replay skips this stage.
+                || path.equals("/mcp")
                 || path.startsWith("/public/delivery-status/")
                 || isEmbedPath(path)
                 || StreamPushRoutes.isPushPath(path)
