@@ -998,4 +998,17 @@ public final class ConsignmentIngestor {
                 ? com.gamma.etl.unpack.LogicalNames.logicalName(rel, cfg) : rel;
     }
 
+    /**
+     * {@link #ledgerKey} of a manifest member, from what the manifest keeps: the member's own file name and its
+     * {@code originalRelPath}. An archive member is addressed {@code <archive>!<entry>} where {@code <entry>} IS the
+     * member's file name, so the archive's name is what precedes exactly that suffix - never the first {@code !}, which a
+     * folder or file name may hold. Any other member (a plain file, a 1-to-1 stream expansion) is its path's last segment.
+     */
+    static String ledgerKeyOfMember(PipelineConfig cfg, String memberFileName, String originalRelPath) {
+        String suffix = "!" + memberFileName;
+        String archiveRel = originalRelPath.endsWith(suffix)
+                ? originalRelPath.substring(0, originalRelPath.length() - suffix.length()) : originalRelPath;
+        return ledgerKey(cfg, archiveRel.substring(archiveRel.lastIndexOf('/') + 1), originalRelPath);
+    }
+
 }

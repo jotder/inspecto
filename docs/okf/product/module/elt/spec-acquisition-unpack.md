@@ -79,6 +79,11 @@ alone leaves that lane leaking the temp name.
 `archive!entry` — that bakes a key downstream consumers must parse into a data column. (`archive!entry` is
 the manifest and quarantine address only; the per-file ledger's `logical_name` is the Archive's identity, §5.)
 
+⚠ **A reprocess of one archive Consignment is wrong today** (board `REPROCESS-ARCHIVE-MEMBER-1`): a member's manifest entry
+carries the archive's backup and the composite `archive!entry` path, so `ReprocessCommand` restores the whole archive as
+`<inbox>/archive!entry` and the poll reads every entry again - rows double. (Its fingerprint forget,
+`ConsignmentIngestor.ledgerKeyOfMember`, splits the composite name at the member's own suffix, not at the first `!`.)
+
 ## 3. A skipped entry is not silence
 
 An encrypted or unsupported-method member has readable metadata but no readable bytes

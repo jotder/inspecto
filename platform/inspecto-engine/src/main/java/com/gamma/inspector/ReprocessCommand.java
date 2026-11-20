@@ -51,20 +51,14 @@ public final class ReprocessCommand {
         for (String marker : m.markers) {
             Files.deleteIfExists(Paths.get(marker));
         }
-        // 2b. forget the members' fingerprints - the content-based modes' marker (BASIC-ELT-PROFILE-1 B3 part 2): a ledger
-        // still holding them answers DUPLICATE to the restored files, so the poll below skips them and the rows the outputs
-        // held (deleted in 1) are never read again. Keyed exactly as the commit recorded them (ConsignmentIngestor.ledgerKey).
-        if (cfg.processing().duplicateCheckEnabled() && cfg.collector().duplicate().contentBased()) {
-            com.gamma.acquire.AcquisitionLedger ledger = com.gamma.acquire.AcquisitionLedgers.shared();
-            for (ConsignmentManifest.MemberEntry me : m.members) {
-                String rel = me.originalRelPath();
-                if (rel == null || rel.isBlank()) continue;
-                String archive = rel.contains("!") ? rel.substring(0, rel.indexOf('!')) : rel;
-                String fileName = archive.substring(archive.lastIndexOf('/') + 1);
-                ledger.forget(cfg.collector().id(), com.gamma.etl.FileNames.safe(cfg, ConsignmentIngestor.ledgerKey(cfg, fileName, rel)));
-            }
-        }
         // 3. restore members from backup into the inbox (original relative path)
+        // 3b. and forget the fingerprint of each member RESTORED - the content-based modes' marker (BASIC-ELT-PROFILE-1 B3
+        // part 2): a ledger still holding it answers DUPLICATE to the restored file, so the poll below skips it and the rows
+        // its deleted outputs held are never read again. Only a member that succeeded and whose file came back: a failed or
+        // unrestorable member leaves its fingerprint, which a later arrival of that path may now own.
+        com.gamma.acquire.AcquisitionLedger ledger =
+                cfg.processing().duplicateCheckEnabled() && cfg.collector().duplicate().contentBased()
+                        ? com.gamma.acquire.AcquisitionLedgers.shared() : null;
         Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath();
         for (ConsignmentManifest.MemberEntry me : m.members) {
             if (me.backupPath() == null || me.backupPath().isBlank()) continue;
@@ -77,6 +71,9 @@ public final class ReprocessCommand {
             Path dst = poll.resolve(me.originalRelPath());
             Files.createDirectories(dst.getParent());
             Files.move(src, dst, StandardCopyOption.REPLACE_EXISTING);
+            if (ledger != null && com.gamma.etl.MemberStatus.SUCCESS.name().equals(me.status()))
+                ledger.forget(cfg.collector().id(), com.gamma.etl.FileNames.safe(cfg,
+                        ConsignmentIngestor.ledgerKeyOfMember(cfg, me.filename(), me.originalRelPath())));
         }
         // 4. supersede the manifest, and the registry rows beside it (a no-op when the registry is off)
         ManifestStore.supersede(cfg.dirs().manifestsDir(), batchId);
