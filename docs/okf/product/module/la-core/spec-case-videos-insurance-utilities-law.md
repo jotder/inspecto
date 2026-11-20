@@ -14,6 +14,8 @@ code: la/inspecto-la-core
 
 # Inspecto LA case videos v2 — Insurance, Utilities, Law enforcement and the shared Standard module
 
+> **Recording environment (operator, 2026-11-20):** the Standard edition with the fake Demo Auth sign-in and the bundled example Spaces, from a fresh `la-standard.zip` unzip per lane; plan [§4.5](../../../../superpower/2026-11-19-la-case-videos-v2-plan.md).
+
 > Specs for three of the twenty case films, the shared Standard module and the spoken-form lexicon, written to the
 > standard of [the v2 plan](../../../../superpower/2026-11-19-la-case-videos-v2-plan.md) (§3 content, §4 voice, audio and
 > presentation, §5 format, §7 gates). They replace the v1 text of the same cases in

@@ -14,7 +14,7 @@
 
 - **Twenty videos**, one per bundled case: the nineteen in `tools/la-demo-cases.mjs` plus the money-mule ring
   (`Banking_MuleRing`). Each is a *case film*: one planted story in one showcase Space, told from the stakes to the lead,
-  recorded live on the shipped Standard build (the Basic-to-Standard step is shown once, in §4.4, not in every film).
+  recorded live on the shipped Standard build, signed in with the fake Demo Auth sign-in, in the bundled example Spaces (§4.5; the Basic-to-Standard step is shown once, in §4.4, not in every film).
 - **Audience:** a prospect, a new analyst or a team lead who wants to see *what Inspecto LA finds and how a team would act
   on it* in their industry. Not a feature tour; the training series is the tour.
 - **Done means:** (a) the twenty specs follow §5 and pass the spec gates in §7; (b) every figure, id and screen in a spec
@@ -160,6 +160,31 @@ and its Working Set; the step log with who and why; the team (four-eyes, reviewe
 once on the case that carries it best (Telecom SIM swap), linked from the end card of the other nineteen. Each
 film keeps one 60–75 s tail beat only where its story needs it (§3 rule 4).
 
+### 4.5 Recording environment (operator, 2026-11-20): Standard, the fake sign-in, the bundled examples
+
+- **Build:** the Standard edition as shipped in `la-standard.zip` (the Preview demo build), loopback only, started from a
+  **fresh unzip per lane** (the installs are relocatable and boot in 15–21 s), each lane in its own folder and on its own
+  port. No Basic install is used for the case films; the Basic start of a graph is the training series' episode B1.
+- **Sign-in:** the **Demo Auth** sign-in, the fake one: local, no password, five Demo Users (Admin, Analyst, Manager,
+  Reviewer, Outsider), a sign-in sends only a `demo:<id>` code and never a credential, and it works on loopback only
+  (`tools/check-demo-auth-isolation.mjs` keeps it out of release builds). The recorder's `signin` verb picks the user on
+  the sign-in page; a user is left through the User menu, from an open Investigation page. No real identity provider, no
+  real credential and no secret appears in a spec, a log or a film.
+- **Examples:** the bundled industry showcase Spaces with their synthetic data, saved views and seeded Investigations.
+  Space per film: Mobile Money (rows 1, 2), Telecom (3, 5), Other Examples (4, 6, 11), Banking and finance (7–10),
+  Insurance (12), Utilities (13), Law enforcement (14), Public sector (15, 16), Healthcare (17), Logistics (18),
+  Enterprise (19, 20); the Space ids are in the §6 table.
+- **Who signs in:** Demo Analyst for every film. Demo Admin only for the reveal and identity beats (Telecom_Structuring,
+  the tail of Telecom_DeviceFarm, Banking_MuleRing, Enterprise_FictitiousVendor), where the Space lets only the
+  administrator reveal. Demo Manager only in the shared module of §4.4, where it approves nothing. Reviewer and
+  Outsider are not used in the case films (training episodes F5 and H3 cover them).
+- **What the viewer sees of the sign-in:** the first frame of a film is after sign-in (a cut); the sign-in screen
+  appears only in the shared module and, as a one-second cut, where a film changes user.
+- **State rules** (the training series' lesson: recorded steps persist): the films use the saved views and the seeded
+  Investigations read-only; a film that must change state (an Entity List, an Alert Rule, a Dossier) does it in its last
+  scene, on a fresh unzip, and the next film does not reuse that unzip; one lane per Space at a time; a film that is
+  re-recorded starts from a fresh unzip again.
+
 ## 5. The case spec (what every one of the twenty files holds)
 
 Specs use the training-guide format, so the renderer and the `episode` recorder read them unchanged
@@ -244,7 +269,7 @@ Voice lines; chapter markers present; one listening pass by a person; vocabulary
 | P1 | **Twenty specs**, four lanes in parallel, each written against the Space's ground truth and a live screen check | five spec files, one per industry group, in the la-core hub (Telecom 5, Banking 6, Insurance + Utilities + Law enforcement 3, Public sector + Healthcare + Logistics + Enterprise 6) |
 | P2 | Voice and audio upgrades in `tools/la-video-voice.mjs` and the renderer: lexicon table and test, pace profile and `[pause]` markers, mastering to -16 LUFS, ambient bed and ducking, UI tick, `--no-ui-sound` | tested tool changes; three trial takes of one case for the operator (D-CV1, D-CV2) |
 | P3 | Renderer presentation: intro and case-file cards, story card, decoy marker, chips, captions and SRT, chapters, industry accents (shares P3 of the training plan §6.1) | `render-la-demo-video.mjs` flags; one pilot film |
-| P4 | Episode JSON per case (`tools/la-demo/<id>.episode.json`) written from each spec, probed on the live Space; fresh state or reseed per case; recording order noted | twenty episode specs |
+| P4 | Episode JSON per case (`tools/la-demo/<id>.episode.json`) written from each spec, probed on the live Space; a fresh `la-standard.zip` unzip per lane with the Demo Auth sign-in (§4.5), reseed after any state change; recording order noted | twenty episode specs |
 | P5 | Render, QA, package | twenty films, zips per industry, status table in this plan |
 | P6 | Mark v1 superseded: its generated script gets a banner, `tools/la-demo-cases.mjs` kept as the data for the shared closing words and the figures until retired | clean docs |
 
@@ -265,8 +290,10 @@ per push; never record two lanes on the same Space at once (the training series'
   each v2 renders.
 - **D-CV5 captions and SRT:** burned in plus sidecar *(recommended)*, or sidecar only.
 - **D-CV6 UI tick sound:** included, switchable *(recommended)*, or none.
+- **D-CV7 environment (answered by the operator, 2026-11-20):** record on Standard with the fake Demo Auth sign-in and the bundled example Spaces (§4.5).
 
 ## 10. Status log
 
 - **2026-11-19:** plan written; the standard and the case table fixed; P1 (twenty specs) started in four lanes.
 - **2026-11-19 (later):** P1 first drafts of all twenty specs written (four files, §6), the table corrected to the data. Open before sign-off: a review pass for sentence rhythm (average 9–10 words, target 12–16), the `[check in UI]` marks (Insurance start-from step, whether the Law enforcement taxi is drawn, v1 link counts, the Access creep "no ticket" claim), `tools/check-vocabulary.mjs` on the new files once tracked, and decisions D-CV1…D-CV6.
+- **2026-11-20:** the operator confirmed the recording environment: Standard, fake Demo Auth sign-in, the bundled examples (new §4.5, D-CV7). Spec headers point to it.

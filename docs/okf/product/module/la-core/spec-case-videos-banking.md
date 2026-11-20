@@ -14,6 +14,8 @@ code: la/inspecto-la-core
 
 # Inspecto LA case videos v2 — Banking and finance
 
+> **Recording environment (operator, 2026-11-20):** the Standard edition with the fake Demo Auth sign-in and the bundled example Spaces, from a fresh `la-standard.zip` unzip per lane; plan [§4.5](../../../../superpower/2026-11-19-la-case-videos-v2-plan.md).
+
 > Six case specs under [the case-videos v2 plan](../../../../superpower/2026-11-19-la-case-videos-v2-plan.md) (standard in §3–§5,
 > gates in §7). They replace the banking sections of the v1 scripts
 > ([brochure-video-demo-case-scripts.md](brochure-video-demo-case-scripts.md) and

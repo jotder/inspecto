@@ -14,6 +14,8 @@ code: la/inspecto-la-core
 
 # Inspecto LA case videos v2 — public sector, healthcare, logistics, enterprise
 
+> **Recording environment (operator, 2026-11-20):** the Standard edition with the fake Demo Auth sign-in and the bundled example Spaces, from a fresh `la-standard.zip` unzip per lane; plan [§4.5](../../../../superpower/2026-11-19-la-case-videos-v2-plan.md).
+
 > Six of the twenty case-film specs of [the v2 plan](../../../../superpower/2026-11-19-la-case-videos-v2-plan.md): the arc (§3),
 > the voice, audio and picture standard (§4) and the spec format (§5) are defined there and are not repeated. They replace,
 > case by case, the generated v1 scripts in [brochure-video-demo-case-scripts.md](brochure-video-demo-case-scripts.md).

@@ -14,6 +14,8 @@ code: la/inspecto-la-core
 
 # Inspecto LA case videos v2 - Telecom (five specs)
 
+> **Recording environment (operator, 2026-11-20):** the Standard edition with the fake Demo Auth sign-in and the bundled example Spaces, from a fresh `la-standard.zip` unzip per lane; plan [§4.5](../../../../superpower/2026-11-19-la-case-videos-v2-plan.md).
+
 **Status 2026-11-19: specs, nothing re-recorded.** These five films re-tell the Telecom cases of
 [`brochure-video-demo-case-scripts.md`](brochure-video-demo-case-scripts.md) (v1, generated from `tools/la-demo-cases.mjs`)
 under the standard of [`2026-11-19-la-case-videos-v2-plan.md`](../../../../superpower/2026-11-19-la-case-videos-v2-plan.md):
