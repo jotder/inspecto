@@ -20,7 +20,7 @@ tags: [product-item, module]
 | architecture | current | [Scoring and the Decision Kernel](architecture-scoring.md) |
 | features | current | [Decision Kernel (Decision Rules and the Condition Language) — features](features-decision-kernel.md) · [Risk Scores and Entity Lists — features](features-scoring-entity-lists.md) |
 | feature-db | current | [Scoring — feature database](feature-db.md) |
-| user-guide | current | [Decision Kernel (Decision Rules and the Condition Language) — screens](user-guide-decision-kernel.md) · [Risk Scores and Entity Lists — screens](user-guide-scoring-entity-lists.md) |
+| user-guide | current | [Decision Kernel (Decision Rules and the Condition Language) — screens](user-guide-decision-kernel.md) · [Score entities](user-guide-howto-score-entities.md) · [Risk Scores and Entity Lists — screens](user-guide-scoring-entity-lists.md) |
 | admin-guide | current | [Scoring — admin guide](admin-guide-scoring.md) |
 | api | current | [Decision Kernel (Decision Rules and the Condition Language) — API](api-decision-kernel.md) · [HTTP routes — module.scoring](api-routes.md) · [Risk Scores and Entity Lists — API](api-scoring-entity-lists.md) |
 | tests | current | [Scoring — tests inventory](tests-inventory.md) |
@@ -32,4 +32,6 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.scoring` — the board is the only list; change the row there.
 
-_No open rows._
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `RISK-SCORE-JOB-1` | P3 | feature | a saved Risk Score scores nothing until someone creates a risk.score Job for it by hand; | — |

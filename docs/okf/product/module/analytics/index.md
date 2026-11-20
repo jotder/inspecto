@@ -20,7 +20,7 @@ tags: [product-item, module]
 | architecture | current | [Analytics kernel](architecture-analytics.md) |
 | features | current | [Analytics kernel — features](features-analytics.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Analytics functions](user-guide-analytics-functions.md) · [Analytics kernel — screens](user-guide-analytics.md) · [KPI & Reports](user-guide-kpi-reports.md) |
+| user-guide | current | [Analytics functions](user-guide-analytics-functions.md) · [Analytics kernel — screens](user-guide-analytics.md) · [Schedule a report](user-guide-howto-schedule-a-report.md) · [KPI & Reports](user-guide-kpi-reports.md) |
 | admin-guide | current | [Analytics Kernel — admin guide](admin-guide-analytics.md) |
 | api | current | [Analytics kernel — API](api-analytics.md) |
 | tests | current | [Analytics Kernel (canonical statistics and baselines) — tests inventory](tests-inventory.md) |

@@ -34,4 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `a
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `REALTIME-CONSOLE-1` | P3 | feature | windowed and pattern Alert Rules and a Pipeline's stream trigger have no console form | — |
 | `REALTIME-DECISIONING-1` | P3 | feature | PA-9e (the CEP App) and PA-9f (its docs) are open; the Add-on (PA-9a…PA-9d) is built. | demand |

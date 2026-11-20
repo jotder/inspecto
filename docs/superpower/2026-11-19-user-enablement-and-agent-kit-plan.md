@@ -267,7 +267,13 @@ console** — today only the App kit CLI can (§1). It goes on the board in plan
   point has no starter and is missing from the builder kit page), `MACHINE-CLIENT-CONSOLE-1` (machine clients set by
   API only; a machine may hold only `canOpenInboundInvestigation`), `APPS-MULTI-SERVER-1` (`/apps` acts on one server
   of a set), `BACKUP-DATA-1` (the backup archives configuration, not Datasets; seed `admin` cannot run Jobs),
-  `HANDBOOK-CLI-CHECK-1` (no check kind for a command, so the App kit pages check only the server side). Still true
+  `HANDBOOK-CLI-CHECK-1` (no check kind for a command, so the App kit pages check only the server side); builder track:
+  `ADD-DATA-ENTRY-1` (no menu entry for Add data), `PIPELINE-INBOX-FIELD-1` (no inbox-folder field; Collectors cannot
+  be created on their page), `DB-CONNECTION-CONSOLE-1` (no console database Collector; Test proves TCP only),
+  `QUARANTINE-RELEASE-1` (no action for a quarantined file), `REALTIME-CONSOLE-1` (no form for windowed or pattern
+  rules or a stream trigger), `RISK-SCORE-JOB-1` (a Risk Score needs a hand-made Job), `CASE-REASSIGN-CONSOLE-1` (no
+  re-assign, no *Create case* on an Incident), `PIPELINE-SAVE-HELD-TOAST-1` (the editor says *Saved* for a held
+  change), `HOWTO-DOC-DRIFT-1` (internal pages that contradict the code). Still true
   from T5/T6: the App kit reaches no customer, no console for `/apps`, `/origin/upgrade` or `/audit/verify`, the
   relative `-BackupDir` of `upgrade.ps1`.
 - **Not proven live:** the reverse proxy itself (no nginx or Caddy on the test machine; the preflight's config check
@@ -362,7 +368,22 @@ checks parse and name known routes, but **none has been run against an install y
   `howto_back_up_and_restore` (`module/backup`), `howto_verify_the_audit_chain` (`module/event`); chapter `develop`:
   `howto_add_a_parser` (`module/elt`), `howto_machine_client` (`module/oidc`). The machine-client page says plainly
   that a machine client may hold only `canOpenInboundInvestigation` today.
-- **Builder — 16 open.**
+- **Builder — 16 done:** chapter `build_bring_data_in`: `howto_add_a_file` (`layer/product`), `howto_watch_a_folder`
+  (`module/elt`), `howto_connect_sftp_or_a_database` (`module/connectors`); `build_shape`:
+  `howto_pipeline_from_a_sample` (`module/elt`); `build_trust`: `howto_add_an_expectation`,
+  `howto_handle_quarantined_rows` (`module/elt`); `build_analyse`: `howto_explore_links` (`module/la-core`);
+  `build_detect`: `howto_reconcile_two_datasets` (`module/reconciliation`), `howto_write_an_alert_rule`
+  (`addon/incidents`), `howto_detect_in_real_time` (`module/realtime`), `howto_score_entities` (`module/scoring`),
+  `howto_screen_names` (`module/screening`); `build_respond`: `howto_open_and_work_a_case` (`module/case-management`);
+  `build_present`: `howto_build_a_dashboard` (`layer/product`), `howto_schedule_a_report` (`module/analytics`);
+  `manage_app`: `howto_change_a_pipeline_safely` (`module/elt`). Where the console has no path the page says so and
+  shows the configuration or API way: windowed real-time rules, re-assigning a Case, turning four-eyes on, a database
+  Collector (console: the PostgreSQL snapshot only). A scheduled report is a Dataset export (CSV or Excel), not a
+  Dashboard.
+- **Checks use the worked example's names where it has them** (`orders`, `payments`, `o2c_orders_vs_payments`,
+  `o2c_unmatched_value`, `o2c_overview`), so most run against an `order-to-cash` Space; the rest name an example the
+  reader creates (`partner_sftp`, `payment_account`, `blocked_parties`, `daily_orders`, `many_numbers_dialled`,
+  `collections`, `my_format`, `case-bridge`). Running all 30 against a seeded install is the next step.
 
 ### 5.4 Concepts (about fifteen) and migration
 
@@ -471,7 +492,7 @@ downloadable vendor packages, versioned with the product.
 | **P0** | D-UE1…D-UE9 signed; the new names in `GLOSSARY.md` — **done 2026-11-19** (D-UE8 left open) | — | days |
 | **P1** | Handbook skeleton: manifest, renderer, `/help` route with screen links, `check-handbook.mjs`, the inventory map of existing pages — **lane A done 2026-11-19 (§4.6); lane B (console and bundle) in its own lane** | P0 | 2–3 weeks |
 | **P2** | Concepts; the worked example's data and Space Template; tutorials T1–T6 with their checks; the Space → App gap filed — **lane E (docs as tests: the check-block format, the guard, the reader's view, the runner) done 2026-11-19 (§4.4)**; **lane C (concepts) done 2026-11-19 (§4.6)**; **lane D (the worked example) done 2026-11-19: Space Template `order-to-cash`, its generator and ground truth, golden tests; version 2 and the gaps in the hub `solution-pack/order-to-cash`**; **T5 *Ship it* and T6 *Run it* done 2026-11-19 (hub `layer/platform`, chapters `ship` and `manage_platform`; gaps in §4.5)**; **tutorials T1–T4 (builder track) done 2026-11-19: `tutorial_first_space` (chapter *Start here* — the first page a new builder reads), `tutorial_pipeline_expectations`, `tutorial_detect_respond`, `tutorial_dashboard`; external, every step's console label driven in a live console, 31 check blocks green against a seeded demo install** | P1 | 4–6 weeks |
-| **P3** | The first 30 how-tos; generated reference; edition badges on every page; the *On Inspecto* developer pages 5.1–5.6 (§3.1) — **how-tos: the 14 partner and operator how-tos done 2026-11-20 (§5.3)** | P1 | 4–6 weeks, parallel with P2, plus 2–3 weeks for the developer pages |
+| **P3** | The first 30 how-tos; generated reference; edition badges on every page; the *On Inspecto* developer pages 5.1–5.6 (§3.1) — **how-tos: all 30 done 2026-11-20 (§5.3; checks parse, not yet run on an install)** | P1 | 4–6 weeks, parallel with P2, plus 2–3 weeks for the developer pages |
 | **P4** | Learning paths, the first two labs with checkers, the video series spec on the LA machinery, the instructor kit | P2 | 3–4 weeks |
 | **P5** | The *Inside Inspecto* internal render: the stage × product-area index generated from the Product Map and hub slots, six entry pages 5.7–5.12, the audience guard | P1, D-UE10 | about 1 week |
 | **AK-1** | `inspecto-mcp`: transport, read tools, resources, audit; the delegated-identity design and a security review | P0 | 3–4 weeks, parallel with P1 |

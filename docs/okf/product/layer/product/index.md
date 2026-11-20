@@ -20,7 +20,7 @@ tags: [product-item, layer]
 | architecture | current | [Inspecto UI Architecture](architecture-product.md) · [Studio BI](architecture-studio-bi.md) · [inspecto-ui conventions and gotchas](architecture-ui-conventions.md) |
 | features | current | [Inspecto — Product Capabilities](features-product-capabilities.md) |
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
-| user-guide | current | [Catalog](user-guide-catalog.md) · [App](user-guide-concept-app.md) · [Dataset](user-guide-concept-dataset.md) · [Edition and Add-on](user-guide-concept-edition-addon.md) · [How the pieces fit](user-guide-concept-overview.md) · [Widget and Dashboard](user-guide-concept-widget-dashboard.md) · [Dashboard](user-guide-dashboard.md) · [Icon Settings](user-guide-icon-settings.md) · [Journey: from an alert to a closed Case](user-guide-journey-alert-to-case.md) · [Journey: from a file to a dashboard](user-guide-journey-file-to-dashboard.md) · [Journey: a safe config change](user-guide-journey-safe-config-change.md) · [Stream & Reference Onboarding](user-guide-onboarding.md) · [Spaces](user-guide-spaces.md) · [Studio](user-guide-studio.md) · [Tutorial 4 — Present it: a Dashboard for the business user](user-guide-tutorial-dashboard.md) |
+| user-guide | current | [Catalog](user-guide-catalog.md) · [App](user-guide-concept-app.md) · [Dataset](user-guide-concept-dataset.md) · [Edition and Add-on](user-guide-concept-edition-addon.md) · [How the pieces fit](user-guide-concept-overview.md) · [Widget and Dashboard](user-guide-concept-widget-dashboard.md) · [Dashboard](user-guide-dashboard.md) · [Add a file](user-guide-howto-add-a-file.md) · [Build a Dashboard](user-guide-howto-build-a-dashboard.md) · [Icon Settings](user-guide-icon-settings.md) · [Journey: from an alert to a closed Case](user-guide-journey-alert-to-case.md) · [Journey: from a file to a dashboard](user-guide-journey-file-to-dashboard.md) · [Journey: a safe config change](user-guide-journey-safe-config-change.md) · [Stream & Reference Onboarding](user-guide-onboarding.md) · [Spaces](user-guide-spaces.md) · [Studio](user-guide-studio.md) · [Tutorial 4 — Present it: a Dashboard for the business user](user-guide-tutorial-dashboard.md) |
 | admin-guide | current | [Product — admin guide](admin-guide-product.md) |
 | api | current | [API Services Catalog](api-services.md) |
 | tests | current | [Accessibility audit — `inspecto-ui` (WCAG 2.2 Level AA)](tests-accessibility-audit.md) · [Testing, Build & Definition of Done](tests-testing-build.md) |
@@ -36,6 +36,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 |---|---|---|---|---|
 | `AUTHORING-REDESIGN-1` | P3 | feature | Only letter (d) of the authoring redesign is left; no CREATE MACRO exists in any main source. | demand |
 | `BASIC-ELT-PROFILE-1` | P2 | feature | Make Basic onboarding a locked profile of ELT, retiring the parallel Basic backend and LA UI layers that duplicate ELT parts. | — |
+| `ADD-DATA-ENTRY-1` | P3 | feature | Add data has no menu entry: once a Space has a Dataset, the screen is reached only by dropping a file on Home or the Catalog, an empty Da… | — |
 | — | P3 | defect | COMPONENT-DELETE-IN-USE-WORDS-1 the Components screen words every refused delete as "referenced by a pipeline" | — |
 | `BI-INSIGHTS-1` | P2 | feature | Advanced insights on business data in Widgets and Dashboards, authored and tuned as Insight Profiles. | — |
 | `SPACE-TO-APP-CONSOLE-1` | P3 | feature | Turn a working Space into a Space Template, and into an App, from the console. | — |
@@ -48,5 +49,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `UI-BUNDLE-BUDGETS-RED-1` | P3 | defect | The la-app and gamma bundle checks fail on master (seen 2026-11-19). | — |
 | `PACK-SALES-MARKETING-1` | P3 | feature | A Sales & Marketing BI pack: sales, commissions, marketing and churn analytics. | operator |
 | `USER-HANDBOOK-1` | P2 | feature | The Handbook: users learn to build, ship and manage an App from the console's Help, organised by lifecycle for three tracks. | — |
+| `HOWTO-DOC-DRIFT-1` | P3 | chore | internal hub pages that contradict the code, found writing the P3 how-tos: | — |
 | `HANDBOOK-CLI-CHECK-1` | P3 | feature | the Handbook's check blocks ( check ,  check-ui ) cannot run a command, so the App kit how-tos (create, golden data, package and sign) pr… | — |
 | `USER-TRAINING-1` | P3 | feature | training on the Handbook's worked example: a Learning Path per track, Labs (lab-* Space Templates with an API checker), a platform video… | — |

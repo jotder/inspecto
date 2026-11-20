@@ -20,7 +20,7 @@ tags: [product-item, addon]
 | architecture | current | [Incidents and Alerts](architecture-incidents.md) |
 | features | current | [Alerts — features](features-alerts.md) · [Incidents — features](features-incidents.md) |
 | feature-db | current | [Incidents — feature database](feature-db.md) |
-| user-guide | current | [Alerts](user-guide-alerts.md) · [Alert, Incident and Case](user-guide-concept-alert-incident-case.md) · [Alert Rule, Expectation and Decision Rule](user-guide-concept-alert-rule.md) · [Incidents — screens](user-guide-incidents.md) · [Tutorial 3 — Detect and respond: Reconciliation, Alert Rule, Incidents and a Case](user-guide-tutorial-detect-respond.md) |
+| user-guide | current | [Alerts](user-guide-alerts.md) · [Alert, Incident and Case](user-guide-concept-alert-incident-case.md) · [Alert Rule, Expectation and Decision Rule](user-guide-concept-alert-rule.md) · [Write an Alert Rule](user-guide-howto-write-an-alert-rule.md) · [Incidents — screens](user-guide-incidents.md) · [Tutorial 3 — Detect and respond: Reconciliation, Alert Rule, Incidents and a Case](user-guide-tutorial-detect-respond.md) |
 | admin-guide | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
 | api | current | [Alerts — API](api-alerts.md) · [Incidents — API](api-incidents.md) |
 | tests | n/a | an Add-on licenses modules — see the hubs of the modules it holds |
@@ -35,6 +35,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `a
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LEGAL-HOLD-SCOPE-1` | P3 | feature | A legal hold does not yet protect a Pipeline's data partitions, and holds have no screen. | — |
+| `CASE-REASSIGN-CONSOLE-1` | P3 | feature | an existing Case cannot be re-assigned in the console | — |
 | `ALERTS-PAGE-WORDS-1` | P3 | defect | the Alert text the server writes still uses stored ids | — |
 | `MODULE-REORG-P7-INCIDENTS` | P3 | chore | Delete AlertMigration (and LegacyAlertObjects) in 5.0.0; 4.0.0 ships the migration. | — |
 | `DOCS-SKILLS-ALERTS-AGENTIC-1` | P3 | feature | hub-routed agent skills exist for docs lookup, pipeline authoring, incident investigation and case analysis (.claude/skills/) | demand |

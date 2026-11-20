@@ -491,6 +491,21 @@ chapters:
     group: Build
     summary: Add a file, watch a folder, connect SFTP, a database or object storage, read a stream.
     pages:
+      howto_add_a_file:
+        file: docs/okf/product/layer/product/user-guide-howto-add-a-file.md
+        type: howto
+        tracks[1]: builder
+        audience: external
+      howto_watch_a_folder:
+        file: docs/okf/product/module/elt/user-guide-howto-watch-a-folder.md
+        type: howto
+        tracks[1]: builder
+        audience: external
+      howto_connect_sftp_or_a_database:
+        file: docs/okf/product/module/connectors/user-guide-howto-connect-sftp-or-a-database.md
+        type: howto
+        tracks[1]: builder
+        audience: external
       user_guide_onboarding:
         file: docs/okf/product/layer/product/user-guide-onboarding.md
         type: unsorted
@@ -531,6 +546,11 @@ chapters:
     group: Build
     summary: Pipelines, mappings and enrichment.
     pages:
+      howto_pipeline_from_a_sample:
+        file: docs/okf/product/module/elt/user-guide-howto-pipeline-from-a-sample.md
+        type: howto
+        tracks[1]: builder
+        audience: external
       admin_guide_elt:
         file: docs/okf/product/module/elt/admin-guide-elt.md
         type: unsorted
@@ -586,11 +606,26 @@ chapters:
         type: tutorial
         tracks[1]: builder
         audience: external
+      howto_add_an_expectation:
+        file: docs/okf/product/module/elt/user-guide-howto-add-an-expectation.md
+        type: howto
+        tracks[1]: builder
+        audience: external
+      howto_handle_quarantined_rows:
+        file: docs/okf/product/module/elt/user-guide-howto-handle-quarantined-rows.md
+        type: howto
+        tracks[1]: builder
+        audience: external
   build_analyse:
     title: Analyse it
     group: Build
     summary: Queries, Studio, Link Analysis, the Geo map and the Assistant.
     pages:
+      howto_explore_links:
+        file: docs/okf/product/module/la-core/user-guide-howto-explore-links.md
+        type: howto
+        tracks[1]: builder
+        audience: external
       user_guide_catalog:
         file: docs/okf/product/layer/product/user-guide-catalog.md
         type: unsorted
@@ -831,6 +866,31 @@ chapters:
     group: Build
     summary: Alert Rules, real-time detection, Reconciliation, scoring, anomaly and screening.
     pages:
+      howto_reconcile_two_datasets:
+        file: docs/okf/product/module/reconciliation/user-guide-howto-reconcile-two-datasets.md
+        type: howto
+        tracks[1]: builder
+        audience: external
+      howto_write_an_alert_rule:
+        file: docs/okf/product/addon/incidents/user-guide-howto-write-an-alert-rule.md
+        type: howto
+        tracks[1]: builder
+        audience: external
+      howto_detect_in_real_time:
+        file: docs/okf/product/module/realtime/user-guide-howto-detect-in-real-time.md
+        type: howto
+        tracks[1]: builder
+        audience: external
+      howto_score_entities:
+        file: docs/okf/product/module/scoring/user-guide-howto-score-entities.md
+        type: howto
+        tracks[1]: builder
+        audience: external
+      howto_screen_names:
+        file: docs/okf/product/module/screening/user-guide-howto-screen-names.md
+        type: howto
+        tracks[1]: builder
+        audience: external
       admin_guide_anomaly:
         file: docs/okf/product/module/anomaly/admin-guide-anomaly.md
         type: unsorted
@@ -894,6 +954,11 @@ chapters:
       tutorial_detect_respond:
         file: docs/okf/product/addon/incidents/user-guide-tutorial-detect-respond.md
         type: tutorial
+        tracks[1]: builder
+        audience: external
+      howto_open_and_work_a_case:
+        file: docs/okf/product/module/case-management/user-guide-howto-open-and-work-a-case.md
+        type: howto
         tracks[1]: builder
         audience: external
       user_guide_alerts:
@@ -980,6 +1045,16 @@ chapters:
         file: docs/okf/product/layer/product/user-guide-tutorial-dashboard.md
         type: tutorial
         tracks[2]: builder,business
+        audience: external
+      howto_build_a_dashboard:
+        file: docs/okf/product/layer/product/user-guide-howto-build-a-dashboard.md
+        type: howto
+        tracks[1]: builder
+        audience: external
+      howto_schedule_a_report:
+        file: docs/okf/product/module/analytics/user-guide-howto-schedule-a-report.md
+        type: howto
+        tracks[1]: builder
         audience: external
       user_guide_dashboard:
         file: docs/okf/product/layer/product/user-guide-dashboard.md
@@ -1081,6 +1156,11 @@ chapters:
     group: Manage
     summary: Runs, data-quality breaches, Incidents and safe changes.
     pages:
+      howto_change_a_pipeline_safely:
+        file: docs/okf/product/module/elt/user-guide-howto-change-a-pipeline-safely.md
+        type: howto
+        tracks[1]: builder
+        audience: external
       user_guide_journey_safe_config_change:
         file: docs/okf/product/layer/product/user-guide-journey-safe-config-change.md
         type: unsorted
