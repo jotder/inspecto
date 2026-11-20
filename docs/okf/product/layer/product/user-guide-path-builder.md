@@ -19,7 +19,8 @@ assurance*, orders against payments — so you finish with one complete thing ra
 
 Every page carries a type: a **tutorial** teaches by doing, a **how-to** does one task, a **concept** explains, a
 **reference** lists. A **Lab** is an exercise with a checker that grades your Space through the Control API; Labs are
-training material, given to you by whoever runs your training, and not part of this Help.
+training material: a Preview install and a demo build carry them in this Help; on any other install, whoever runs
+your training gives them to you.
 
 ## Stage 1 — Understand (about 2 hours)
 

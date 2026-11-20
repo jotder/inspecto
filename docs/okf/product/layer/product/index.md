@@ -54,4 +54,3 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `HOWTO-DOC-DRIFT-1` | P3 | chore | internal hub pages that contradict the code, found writing the P3 how-tos: | — |
 | `HANDBOOK-CLI-CHECK-1` | P3 | feature | the Handbook's check blocks ( check ,  check-ui ) cannot run a command, so the App kit how-tos (create, golden data, package and sign) pr… | — |
 | `USER-TRAINING-1` | P3 | feature | training on the Handbook's worked example. | — |
-| `TRAINING-BUNDLE-1` | P3 | feature | no bundle carries the Labs. | — |

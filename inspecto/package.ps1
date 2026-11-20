@@ -1485,11 +1485,19 @@ if (Test-Path $uiDist) {
         Write-Host "Bundled UI from $($indexHtml.DirectoryName) → $uiOut$stale" -ForegroundColor Green
         # USER-HANDBOOK-1: the user Handbook, pre-rendered to static pages, served at /help/ from the same ui/ folder.
         # Every edition ships it. Never --internal here: internal-audience pages must not reach a bundle.
+        # TRAINING-BUNDLE-1 (D-UE7): the Labs and the instructor kit (`audience: training`) ship in the Preview and in a demo build
+        # only, never in a sold edition's /help. tools/check-bundle-handbook.mjs holds that rule (--audience) and judges the
+        # rendered folder against it (--bundle); its no-argument mode (CI) pins this block.
         $helpOut = Join-Path $uiOut 'help'
-        & node (Join-Path $sandboxRoot 'tools\render-handbook.mjs') --out $helpOut
+        $helpAudience = & node (Join-Path $sandboxRoot 'tools\check-bundle-handbook.mjs') --audience --edition $Edition --distribution $Distribution
+        if ($LASTEXITCODE -ne 0) { throw "check-bundle-handbook.mjs --audience failed (see above)" }
+        $helpArgs = if ($helpAudience -eq 'training') { @('--training') } else { @() }
+        & node (Join-Path $sandboxRoot 'tools\render-handbook.mjs') --out $helpOut @helpArgs
         if ($LASTEXITCODE -ne 0) { throw "render-handbook.mjs failed (see above) - the bundle would ship without its /help Handbook" }
         if (-not (Test-Path (Join-Path $helpOut 'index.html'))) { throw "render-handbook.mjs wrote no $helpOut\index.html" }
-        Write-Host "  Handbook rendered → $helpOut" -ForegroundColor DarkGray
+        & node (Join-Path $sandboxRoot 'tools\check-bundle-handbook.mjs') --bundle $helpOut --edition $Edition --distribution $Distribution
+        if ($LASTEXITCODE -ne 0) { throw "the rendered /help Handbook carries pages its edition may not ship (see above)" }
+        Write-Host "  Handbook rendered ($helpAudience) → $helpOut" -ForegroundColor DarkGray
     } else {
         Write-Host "  (no index.html under $uiDist — skipping UI bundle)" -ForegroundColor Yellow
     }

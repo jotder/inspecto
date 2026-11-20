@@ -288,8 +288,9 @@ console** — today only the App kit CLI can (§1). It goes on the board in plan
   the canonical Datasets `GLOSSARY.md` says it owns (`industry.toon` is id, title, pack), so pages 5.1 and 5.3 tell
   authors to name Datasets after the Industry pack's record types. `app.toon` has no edition and no persona key; the
   pages say the editions follow from `requires.addons` and the personas are the template's `config/roles.toon` — no gap.
-- **Filed 2026-11-20 by the P4 lane (§6.1):** `TRAINING-BUNDLE-1` — no bundle renders the `training` pages, so the
-  Labs and the instructor kit reach no install; D-UE7 wants them in the Preview and a training bundle.
+- **Filed 2026-11-20 by the P4 lane (§6.1), closed the same day:** `TRAINING-BUNDLE-1` — no bundle rendered the
+  `training` pages, so the Labs and the instructor kit reached no install. Now the Preview and every demo build render
+  `/help` with `--training` (§6.1, D-UE7 ruling).
 - **Not proven live:** the reverse proxy itself (no nginx or Caddy on the test machine; the preflight's config check
   passed), the OS-service install and the service-mode upgrade, and the Linux `.sh` scripts.
 
@@ -499,7 +500,15 @@ inventory table is P1's first deliverable.
   (B1–B15, S1–S8, M1–M8), the LA episode card, the recording gate, and the LA machinery reused as is (the `episode`
   recorder, the series voice, the scene renderer). Nothing recorded. Two blockers: the tutorials carry no `check-ui`
   blocks, and the recorder captures a browser only (S and M are mostly terminal work).
-- **Gap filed:** `TRAINING-BUNDLE-1` (§4.5). **Not done:** quick-reference cards, more Labs, the episodes.
+- **Which bundle carries them (`TRAINING-BUNDLE-1`, closed 2026-11-20).** `inspecto/package.ps1` asks
+  `tools/check-bundle-handbook.mjs --audience` which render `/help` gets: `training` when the Edition is Preview
+  (any Distribution) or the Distribution is `demo` (Advanced or Preview), `external` for Basic, Standard and Advanced
+  production and trial builds. It then judges the rendered folder (`--bundle`: the `.handbook` marker, every training
+  page there exactly when the rule says so, never an internal page) before the zip. The guard's no-argument mode (CI
+  `guards`) pins package.ps1's render block to the rule and renders both flavors for real; tests in
+  `check-bundle-handbook.test.mjs`. The "training bundle" of D-UE7 is the existing demo build — no new Distribution
+  (operator ruling 2026-11-20).
+- **Not done:** quick-reference cards, more Labs, the episodes.
 
 ## 7. The Agent Kit — Claude, Gemini, OpenAI and local models
 
@@ -607,7 +616,7 @@ The design of record and the as-built facts live in the hub:
 | **P1** | Handbook skeleton: manifest, renderer, `/help` route with screen links, `check-handbook.mjs`, the inventory map of existing pages — **lane A done 2026-11-19 (§4.6); lane B (console and bundle) in its own lane** | P0 | 2–3 weeks |
 | **P2** | Concepts; the worked example's data and Space Template; tutorials T1–T6 with their checks; the Space → App gap filed — **lane E (docs as tests: the check-block format, the guard, the reader's view, the runner) done 2026-11-19 (§4.4)**; **lane C (concepts) done 2026-11-19 (§4.6)**; **lane D (the worked example) done 2026-11-19: Space Template `order-to-cash`, its generator and ground truth, golden tests; version 2 and the gaps in the hub `solution-pack/order-to-cash`**; **T5 *Ship it* and T6 *Run it* done 2026-11-19 (hub `layer/platform`, chapters `ship` and `manage_platform`; gaps in §4.5)**; **tutorials T1–T4 (builder track) done 2026-11-19: `tutorial_first_space` (chapter *Start here* — the first page a new builder reads), `tutorial_pipeline_expectations`, `tutorial_detect_respond`, `tutorial_dashboard`; external, every step's console label driven in a live console, 31 check blocks green against a seeded demo install** | P1 | 4–6 weeks |
 | **P3** | The first 30 how-tos; generated reference; edition badges on every page; the *On Inspecto* developer pages 5.1–5.6 (§3.1) — **edition badges and the generated reference done 2026-11-20 (§4.7)**; **developer pages done 2026-11-20: six external pages in hub `layer/platform` (`user-guide-develop-{requirements,architecture,design,build,test,release}.md`), first in chapter `develop` (ids `develop_*`, track partner): 5.1–5.3 `concept`, 5.4–5.6 `howto` with the six headings; 14 check blocks (the reused o2c ones were green in the T1–T4 and T5 runs; the new `/openapi.json`, `/bootstrap`, `/modules`, `/pipelines` and `/datasets/o2c_open_items/rows` ones are grounded in the route code, not yet run live); three gaps filed (§4.5). `user-guide-builder-kit.md` stays an internal page, not yet retired into 5.4–5.5**; **how-tos: all 30 done 2026-11-20 (§5.3; 29 of 30 checks green on a seeded demo install, the identity-provider one needs OIDC)** | P1 | 4–6 weeks, parallel with P2, plus 2–3 weeks for the developer pages |
-| **P4** | Learning paths, the first two labs with checkers, the video series spec on the LA machinery, the instructor kit — **wave 1 done 2026-11-20 (§6.1): four Learning Paths, Labs 1 and 2 with checkers green on a demo build, the instructor kit, the video series spec, a `training` audience; episodes not recorded, quick-reference cards not written; `TRAINING-BUNDLE-1` filed** | P2 | 3–4 weeks |
+| **P4** | Learning paths, the first two labs with checkers, the video series spec on the LA machinery, the instructor kit — **wave 1 done 2026-11-20 (§6.1): four Learning Paths, Labs 1 and 2 with checkers green on a demo build, the instructor kit, the video series spec, a `training` audience; episodes not recorded, quick-reference cards not written; `TRAINING-BUNDLE-1` filed and closed: the Preview and demo builds ship the training pages** | P2 | 3–4 weeks |
 | **P5** | The *Inside Inspecto* internal render: the stage × product-area index generated from the Product Map and hub slots, six entry pages 5.7–5.12, the audience guard | P1, D-UE10 | about 1 week |
 | **AK-1** | `inspecto-mcp`: transport, read tools, resources, audit; the delegated-identity design and a security review — **done 2026-11-20 (§7.7)**: module `features/inspecto-mcp`, Streamable HTTP pinned to revision `2026-07-28` (dual-era, stateless), 19 read MCP Tools and 3 resources each replaying an existing route as the caller, one audit row per call; design and as-built in the hub `module/mcp` | P0 | 3–4 weeks, parallel with P1 |
 | **AK-2** | Write tools through validate → dry-run → Draft; `propose_action` through Action Requests; the agent capability set | AK-1, D-UE5, D-UE6 | 3 weeks |
@@ -631,7 +640,7 @@ stays open; nothing needs it before P1's renderer exists. D-UE10 came later the 
 | **D-UE4** | Which editions carry `inspecto-mcp` | Standard and up; nothing on Basic (no sign-in) |
 | **D-UE5** | Agent identity: the delegated-person allowlist, and the machine agent capability set (widens operator decision B1) | both; delegated first |
 | **D-UE6** | May an agent save a low-risk change directly, or does every save go through a Draft and approval | every save is a Draft; promotion and outbound actions need a human approver |
-| **D-UE7** | Which bundle carries the Labs | Preview and a training bundle only, not the sold editions |
+| **D-UE7** | Which bundle carries the Labs | Preview and a training bundle only, not the sold editions. **Operator ruling 2026-11-20:** the training bundle is the existing demo build (`-Distribution demo`, Advanced or Preview) — no new Distribution; Basic, Standard and Advanced production and trial builds keep the external render (§6.1) |
 | **D-UE8** | Where the static site is hosted on the web | **open** — the operator's call (external). **Ready (2026-11-20, operator: "keep it ready so that it can be updated easily"):** the place is one line, `handbook.publish.external` in `handbook.toon` (`none` until decided); `tools/publish-handbook.mjs` renders there once it is set |
 | **D-UE9** | The golden-suite pass rate per model, and whether the in-product Assistant reuses the Agent Skills in wave 1 | pass rate set after the first run; Assistant reuse after AK-4 |
 | **D-UE10** *(added 2026-11-19 with §3.1)* | Where the *Inside Inspecto* internal render is published for the team | **open** — recommended: built from the repository on demand (`tools/render-handbook.mjs --internal`) into a gitignored folder, never into a bundle or the public site; a team host only if the operator names one. **Ready (2026-11-20):** `handbook.publish.internal` in `handbook.toon` (`none` until decided); meanwhile `tools/publish-handbook.mjs` keeps the render current in the gitignored `target/handbook/internal` |
