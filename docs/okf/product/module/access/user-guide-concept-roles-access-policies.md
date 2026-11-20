@@ -5,7 +5,7 @@ description: What a Role and an Access Policy are, how they decide what each sig
 item: module.access
 audience: external
 status: current
-verified: 2026-11-19 last-edit
+verified: 2026-11-20 code-reviewed
 code: platform/inspecto-access
 ---
 

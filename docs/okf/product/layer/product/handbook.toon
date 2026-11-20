@@ -8,7 +8,7 @@ chapters:
   start:
     title: Start here
     group: Start here
-    summary: What Inspecto is, the editions, ready-made Space Templates, and walkthroughs from a file to a dashboard or an alert to a closed Case.
+    summary: What Inspecto is, the editions, a Learning Path for each track, ready-made Space Templates, and walkthroughs from a file to a dashboard or an alert to a closed Case.
     pages:
       editions:
         file: docs/EDITIONS.md
@@ -17,6 +17,35 @@ chapters:
         tracks[4]: builder,partner,operator,business
         audience: external
         edition: basic
+      path_builder:
+        file: docs/okf/product/layer/product/user-guide-path-builder.md
+        title: "Learning Path: Builder"
+        type: concept
+        tracks[1]: builder
+        audience: external
+      path_partner:
+        file: docs/okf/product/layer/product/user-guide-path-partner.md
+        title: "Learning Path: Partner developer"
+        type: concept
+        tracks[1]: partner
+        audience: external
+      path_operator:
+        file: docs/okf/product/layer/product/user-guide-path-operator.md
+        title: "Learning Path: Operator"
+        type: concept
+        tracks[1]: operator
+        audience: external
+      path_business:
+        file: docs/okf/product/layer/product/user-guide-path-business.md
+        title: "Learning Path: Business user"
+        type: concept
+        tracks[1]: business
+        audience: external
+      instructor_kit:
+        file: docs/okf/product/layer/product/user-guide-instructor-kit.md
+        type: reference
+        tracks[3]: builder,partner,operator
+        audience: training
       tutorial_first_space:
         file: docs/okf/product/module/config/user-guide-tutorial-first-space.md
         type: tutorial
@@ -612,6 +641,12 @@ chapters:
         tracks[1]: builder
         audience: external
         edition: standard
+      lab_trust_the_feeds:
+        file: docs/okf/product/module/elt/user-guide-lab-trust-the-feeds.md
+        type: tutorial
+        tracks[1]: builder
+        audience: training
+        edition: standard
       howto_add_an_expectation:
         file: docs/okf/product/module/elt/user-guide-howto-add-an-expectation.md
         type: howto
@@ -963,6 +998,11 @@ chapters:
         type: tutorial
         tracks[1]: builder
         audience: external
+      lab_exposure_per_customer:
+        file: docs/okf/product/addon/incidents/user-guide-lab-exposure-per-customer.md
+        type: tutorial
+        tracks[1]: builder
+        audience: training
       howto_open_and_work_a_case:
         file: docs/okf/product/module/case-management/user-guide-howto-open-and-work-a-case.md
         type: howto

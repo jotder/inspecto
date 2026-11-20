@@ -51,8 +51,16 @@ closed Space needs at least one authored Role for its members.
 
 ## Check it worked
 
-The Space lists your Role as authored, and its effective capabilities show what it may do (here a Role named
-`collections`):
+Save a Role named `collections` that may work Incidents — through the Control API, as **Save** does; the write
+replaces the Space's authored Roles — then the Space lists it as authored and its effective capabilities show what it
+may do:
+
+```check
+PUT /spaces/{space}/access/roles
+as admin
+body {"roles": [{"name": "collections", "capabilities": ["canWorkIncidents"]}]}
+expect status 200
+```
 
 ```check
 GET /spaces/{space}/access/roles
@@ -66,6 +74,8 @@ GET /spaces/{space}/access/roles/collections/effective
 as admin
 expect status 200
 expect data.role = "collections"
+expect data.source = "authored"
+expect data.capabilities[0].allowed = true
 ```
 
 ## What can go wrong

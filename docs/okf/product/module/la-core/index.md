@@ -52,4 +52,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-DAILY-INGEST-1` | P3 | feature | Hive JDBC / Kerberos, the db Collector door and SCD2 / as-of join for daily LA ingestion. | demand |
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | A timed whitepaper-demo rehearsal with a sceptical second person. | external |
 | `HOWTO-DOC-DRIFT-1` | P3 | chore | internal hub pages that contradict the code, found writing the P3 how-tos: | — |
-| `USER-TRAINING-1` | P3 | feature | training on the Handbook's worked example: a Learning Path per track, Labs (lab-* Space Templates with an API checker), a platform video… | — |
+| `USER-TRAINING-1` | P3 | feature | training on the Handbook's worked example. | — |

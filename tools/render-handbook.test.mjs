@@ -87,6 +87,16 @@ test('render: --internal adds the internal pages and links to them', () => {
     assert.ok(files.get('pub.html').includes('<a href="team.html">team page</a>'));
 });
 
+test('render: --training adds the training pages to the external ones, never the internal ones (D-UE7)', () => {
+    const book = { ...BOOK, chapters: [{ ...BOOK.chapters[0], pages: [...BOOK.chapters[0].pages,
+        { id: 'lab', chapter: 'start', file: 'docs/L.md', type: 'tutorial', tracks: ['builder'], audience: 'training' }] }] };
+    const read = (f) => ({ ...READ, 'docs/L.md': '# Lab\nanswers' })[f];
+    assert.ok(!render(book, read).files.has('lab.html'), 'the default (bundle) render leaves the Lab out');
+    const { files } = render(book, read, { training: true });
+    assert.ok(files.has('lab.html') && files.has('pub.html') && !files.has('team.html'));
+    assert.ok(JSON.parse(files.get('search.json')).some((e) => e.id === 'lab'));
+});
+
 test('the real manifest loads with the contract chapters and renders well-formed pages', () => {
     const book = withEditions(loadManifest(readFileSync(MANIFEST, 'utf8')), editionIndex(gatherFacts('.')));
     assert.deepEqual(book.chapters.map((c) => c.id), CHAPTER_IDS);

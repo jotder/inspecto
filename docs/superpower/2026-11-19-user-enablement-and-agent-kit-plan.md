@@ -1,8 +1,10 @@
 # User enablement and the Agent Kit — docs, training and AI agent skills
 
 > **Status: APPROVED 2026-11-19 — D-UE1…D-UE7 and D-UE9 signed (operator, the recommended options); D-UE8 (web
-> hosting) open and not blocking; P0 done (the names are in `GLOSSARY.md` §1-A and §12); nothing built; P1 and AK-1
-> startable.** **Developer track added 2026-11-19 (operator): §3.1, phases P3 and P5, D-UE10 open.** Board rows:
+> hosting) open and not blocking; P0 done (the names are in `GLOSSARY.md` §1-A and §12).** **Built by 2026-11-20:
+> P1 lane A, P2, P3 and AK-1 (§8); P4 in flight; P5 waits on D-UE10; AK-2 next on the Agent Kit; both publish places
+> ready as one manifest line each (`handbook.publish`, D-UE8 / D-UE10).** **Developer track added 2026-11-19
+> (operator): §3.1, phases P3 and P5, D-UE10 open.** Board rows:
 > `USER-HANDBOOK-1`, `USER-TRAINING-1`, `AGENT-KIT-1` (§11).
 > **Operator choices, 2026-11-19 (in chat):** wave 1 serves **all three tracks at once** (console builders, partner
 > developers, operators and admins); users read the docs as **in-app Help plus a static site**, generated from the
@@ -240,7 +242,9 @@ A how-to that cannot be written because the product has no path becomes a board 
 workaround page. The first one is known now: **turning a working Space into a Space Template and an App from the
 console** — today only the App kit CLI can (§1). It goes on the board in plan phase P2, the first phase that needs it.
 
-**Found writing T5 and T6 (2026-11-19), each run on two Standard installs — candidates for the board, not filed:**
+**Found writing T5 and T6 (2026-11-19), each run on two Standard installs — filed 2026-11-20 as `APPS-UPGRADE-CONSOLE-1`,
+`SPACE-EXPORT-CLEAN-1`, `KEYCLOAK-REALM-BLUEPRINT-1`, `SEED-ADMIN-ALERT-RULE-1`, `RESTORE-NEW-SPACE-1` and
+`UPGRADE-BACKUPDIR-RELATIVE-1`; the App kit's reach and the create-time refusal as noted below:**
 
 - **The App kit reaches no customer.** `tools/inspecto-app.mjs` reads the source tree (products, offerings, module
   manifests); no bundle or download carries it. T5 says "run from the Inspecto developer kit folder", which does not
@@ -273,7 +277,8 @@ console** — today only the App kit CLI can (§1). It goes on the board in plan
   `QUARANTINE-RELEASE-1` (no action for a quarantined file), `REALTIME-CONSOLE-1` (no form for windowed or pattern
   rules or a stream trigger), `RISK-SCORE-JOB-1` (a Risk Score needs a hand-made Job), `CASE-REASSIGN-CONSOLE-1` (no
   re-assign, no *Create case* on an Incident), `PIPELINE-SAVE-HELD-TOAST-1` (the editor says *Saved* for a held
-  change), `HOWTO-DOC-DRIFT-1` (internal pages that contradict the code). Still true
+  change), `HOWTO-DOC-DRIFT-1` (internal pages that contradict the code); from the live run, `JOB-PARAMS-NESTED-IGNORED-1` (a
+  Job saved with its settings nested under `params` keeps them as one text value and runs with defaults). Still true
   from T5/T6: the App kit reaches no customer, no console for `/apps`, `/origin/upgrade` or `/audit/verify`, the
   relative `-BackupDir` of `upgrade.ps1`.
 - **Filed 2026-11-20 by the developer-pages lane (P3, 5.1–5.6):** the App kit's reach above, as
@@ -283,6 +288,8 @@ console** — today only the App kit CLI can (§1). It goes on the board in plan
   the canonical Datasets `GLOSSARY.md` says it owns (`industry.toon` is id, title, pack), so pages 5.1 and 5.3 tell
   authors to name Datasets after the Industry pack's record types. `app.toon` has no edition and no persona key; the
   pages say the editions follow from `requires.addons` and the personas are the template's `config/roles.toon` — no gap.
+- **Filed 2026-11-20 by the P4 lane (§6.1):** `TRAINING-BUNDLE-1` — no bundle renders the `training` pages, so the
+  Labs and the instructor kit reach no install; D-UE7 wants them in the Preview and a training bundle.
 - **Not proven live:** the reverse proxy itself (no nginx or Caddy on the test machine; the preflight's config check
   passed), the OS-service install and the service-mode upgrade, and the Linux `.sh` scripts.
 
@@ -401,7 +408,7 @@ restore; upgrade; verify the audit chain.
 `admin-guide-howto-<topic>.md` (operator) page in the hub of the item it explains, `type: howto`, `audience: external`,
 manifest id `howto_<topic>`, with the six template headings and at least one check block. Every console label, route,
 flag and message was read in the code (the fact sheets were checked against `inspecto-ui` and the route handlers); the
-checks parse and name known routes, but **none has been run against an install yet** (the tutorials' were). Edition
+checks were run on 2026-11-20 against a seeded install (below). Edition
 badges are derived (§4.7); three pages in Basic hubs are narrowed to Standard in the manifest — install an App,
 upgrade an App, Roles and Access Policies.
 
@@ -424,10 +431,23 @@ upgrade an App, Roles and Access Policies.
   shows the configuration or API way: windowed real-time rules, re-assigning a Case, turning four-eyes on, a database
   Collector (console: the PostgreSQL snapshot only). A scheduled report is a Dataset export (CSV or Excel), not a
   Dashboard.
-- **Checks use the worked example's names where it has them** (`orders`, `payments`, `o2c_orders_vs_payments`,
-  `o2c_unmatched_value`, `o2c_overview`), so most run against an `order-to-cash` Space; the rest name an example the
-  reader creates (`partner_sftp`, `payment_account`, `blocked_parties`, `daily_orders`, `many_numbers_dialled`,
-  `collections`, `my_format`, `case-bridge`). Running all 30 against a seeded install is the next step.
+- **The checks, run (2026-11-20): 29 of 30 pages pass, twice in a row** (a create answers 200 or 409, and the Case
+  page opens a new Case each run, so every page re-runs). Install: an Advanced demo bundle built from origin/master 43410b8e3
+  (`package.ps1 -Edition Advanced -Product inspecto -Distribution demo -NoBakeDemo -SkipBootCheck`) on :8093, a
+  roster-only Space whose Demo Users `builder` and `admin` hold `admin;power` (what the pages tell readers to hold),
+  and `POST /spaces` of `order-to-cash` with samples; T1–T4 run first, as a reader would. Each page makes what it
+  checks through the same API its console step calls (a Connection, a Risk Score and its Job, an Entity List, a
+  report Job, a Role, the admitted machine client), all on the worked example's data (`o2c_customer_risk` scores
+  C-007 at 100). The App pages need what the App kit makes off the server: a starter App `o2c-assurance` signed
+  with `o2c-signing-1`, installed, then version 2.0.0, with `--space o2c-live` (a Space made from it) for install
+  and upgrade. **Not run here:** *connect the identity provider* asserts OpenID Connect sign-in, which a Demo Auth
+  build does not have — it needs a Standard install on a real provider, as T6 was run. The real-time page checks
+  the refusal on the worked example (no stream there); the parser page checks the built-in catalog.
+- **Fixed by the run:** the parser page named `/jobs/packs` and `/parsers` without the Space prefix; the upgrade
+  page had no check for applying the Space upgrade; the report page now says where the file lands
+  (`config\exports\<id>`); the screening page says a different legal form (*Ltd* / *Limited*) scores about 0.66; the Case page opens
+  its own Case instead of using up one T3 left open. The parser, real-time and Connection checks prove the route
+  and its answer, not the reader's own outcome (no pack jar, no stream, no SFTP server on the test machine).
 
 ### 5.4 Concepts (about fifteen) and migration
 
@@ -449,6 +469,37 @@ inventory table is P1's first deliverable.
 - **Instructor kit** for partner and SI workshops: slides, the lab guide, timings and answer keys.
 - **Quick-reference cards:** one page per track.
 - Certification is deferred until a partner asks (`hold: demand` inside `USER-TRAINING-1`).
+
+### 6.1 P4 as built — wave 1 (2026-11-20)
+
+- **A third audience, `training`** (D-UE7). `tools/render-handbook.mjs --training` renders the external pages plus
+  the `audience: training` ones; the default (bundle) render and `--internal` are unchanged, and `check-handbook.mjs`
+  counts a training page in the external render as a leak (tests in `render-handbook.test.mjs`,
+  `check-handbook.test.mjs`; `docs-health.mjs` accepts the header value). An external page's link to a training
+  page renders as plain text there and as a link in the training render.
+- **Learning Paths** — four external `concept` pages in `layer/product`, first in chapter `start` (ids `path_builder`,
+  `path_partner`, `path_operator`, `path_business`): stages Understand → Build → Ship → Manage, each an ordered list of
+  existing tutorials, how-tos and concepts (no new teaching text) and a self-check with its answers; every answer was
+  read in the page it comes from.
+- **Labs 1 and 2** — `training` tutorials, starting state the `order-to-cash` Space Template itself (no `lab-*`
+  template: the worked example's template is the starting state of both, and the plan's `lab-*` templates would ship
+  in every edition — every bundle carries the whole committed gallery, operator decision 2026-09-25). *Trust the
+  feeds* (`module/elt`, after T2): three Expectations of the learner's own, graded by `POST …/expectations/<id>/evaluate`
+  (no single-Expectation GET exists) — kind, target, column, result, 16 violations for `lab_orders_over_800`. *Exposure
+  per customer* (`addon/incidents`, after T3): an Alert Rule per customer at ≥ 300 (C-007 620, C-016 480, C-011 310)
+  and the C-007 Incident accepted; read-only checks. An Incident's title and description do not carry its rule's
+  name, so the checker finds them by the description's words *threshold of 300* and pins them by `attributes.alertKey`.
+  **Run live** on an Advanced demo build of `11ccf32d4` (Demo Users `builder` and `ana`, both `admin` and `power`):
+  both checkers green on the learner's Space, red on a fresh Space (404 / rule not found) and on a wrong threshold (0
+  Incidents found); `builder` graded the learner's *closed* Space. The learner's work was done through the API the
+  console forms call — the console labels come from the grounded how-tos, not from a driven console.
+- **Instructor kit** (`layer/product/user-guide-instructor-kit.md`, `training`, `reference`): three workshop formats,
+  the builder day's timings, the room set-up, a slide outline, the lab guide, both answer keys.
+- **Video series spec** (`layer/product/spec-video-series-build-ship-manage.md`): 31 episodes, one per tutorial step
+  (B1–B15, S1–S8, M1–M8), the LA episode card, the recording gate, and the LA machinery reused as is (the `episode`
+  recorder, the series voice, the scene renderer). Nothing recorded. Two blockers: the tutorials carry no `check-ui`
+  blocks, and the recorder captures a browser only (S and M are mostly terminal work).
+- **Gap filed:** `TRAINING-BUNDLE-1` (§4.5). **Not done:** quick-reference cards, more Labs, the episodes.
 
 ## 7. The Agent Kit — Claude, Gemini, OpenAI and local models
 
@@ -555,8 +606,8 @@ The design of record and the as-built facts live in the hub:
 | **P0** | D-UE1…D-UE9 signed; the new names in `GLOSSARY.md` — **done 2026-11-19** (D-UE8 left open) | — | days |
 | **P1** | Handbook skeleton: manifest, renderer, `/help` route with screen links, `check-handbook.mjs`, the inventory map of existing pages — **lane A done 2026-11-19 (§4.6); lane B (console and bundle) in its own lane** | P0 | 2–3 weeks |
 | **P2** | Concepts; the worked example's data and Space Template; tutorials T1–T6 with their checks; the Space → App gap filed — **lane E (docs as tests: the check-block format, the guard, the reader's view, the runner) done 2026-11-19 (§4.4)**; **lane C (concepts) done 2026-11-19 (§4.6)**; **lane D (the worked example) done 2026-11-19: Space Template `order-to-cash`, its generator and ground truth, golden tests; version 2 and the gaps in the hub `solution-pack/order-to-cash`**; **T5 *Ship it* and T6 *Run it* done 2026-11-19 (hub `layer/platform`, chapters `ship` and `manage_platform`; gaps in §4.5)**; **tutorials T1–T4 (builder track) done 2026-11-19: `tutorial_first_space` (chapter *Start here* — the first page a new builder reads), `tutorial_pipeline_expectations`, `tutorial_detect_respond`, `tutorial_dashboard`; external, every step's console label driven in a live console, 31 check blocks green against a seeded demo install** | P1 | 4–6 weeks |
-| **P3** | The first 30 how-tos; generated reference; edition badges on every page; the *On Inspecto* developer pages 5.1–5.6 (§3.1) — **edition badges and the generated reference done 2026-11-20 (§4.7)**; **developer pages done 2026-11-20: six external pages in hub `layer/platform` (`user-guide-develop-{requirements,architecture,design,build,test,release}.md`), first in chapter `develop` (ids `develop_*`, track partner): 5.1–5.3 `concept`, 5.4–5.6 `howto` with the six headings; 14 check blocks (the reused o2c ones were green in the T1–T4 and T5 runs; the new `/openapi.json`, `/bootstrap`, `/modules`, `/pipelines` and `/datasets/o2c_open_items/rows` ones are grounded in the route code, not yet run live); three gaps filed (§4.5). `user-guide-builder-kit.md` stays an internal page, not yet retired into 5.4–5.5**; **how-tos: all 30 done 2026-11-20 (§5.3; checks parse and are grounded in the code, not yet run on an install)** | P1 | 4–6 weeks, parallel with P2, plus 2–3 weeks for the developer pages |
-| **P4** | Learning paths, the first two labs with checkers, the video series spec on the LA machinery, the instructor kit | P2 | 3–4 weeks |
+| **P3** | The first 30 how-tos; generated reference; edition badges on every page; the *On Inspecto* developer pages 5.1–5.6 (§3.1) — **edition badges and the generated reference done 2026-11-20 (§4.7)**; **developer pages done 2026-11-20: six external pages in hub `layer/platform` (`user-guide-develop-{requirements,architecture,design,build,test,release}.md`), first in chapter `develop` (ids `develop_*`, track partner): 5.1–5.3 `concept`, 5.4–5.6 `howto` with the six headings; 14 check blocks (the reused o2c ones were green in the T1–T4 and T5 runs; the new `/openapi.json`, `/bootstrap`, `/modules`, `/pipelines` and `/datasets/o2c_open_items/rows` ones are grounded in the route code, not yet run live); three gaps filed (§4.5). `user-guide-builder-kit.md` stays an internal page, not yet retired into 5.4–5.5**; **how-tos: all 30 done 2026-11-20 (§5.3; 29 of 30 checks green on a seeded demo install, the identity-provider one needs OIDC)** | P1 | 4–6 weeks, parallel with P2, plus 2–3 weeks for the developer pages |
+| **P4** | Learning paths, the first two labs with checkers, the video series spec on the LA machinery, the instructor kit — **wave 1 done 2026-11-20 (§6.1): four Learning Paths, Labs 1 and 2 with checkers green on a demo build, the instructor kit, the video series spec, a `training` audience; episodes not recorded, quick-reference cards not written; `TRAINING-BUNDLE-1` filed** | P2 | 3–4 weeks |
 | **P5** | The *Inside Inspecto* internal render: the stage × product-area index generated from the Product Map and hub slots, six entry pages 5.7–5.12, the audience guard | P1, D-UE10 | about 1 week |
 | **AK-1** | `inspecto-mcp`: transport, read tools, resources, audit; the delegated-identity design and a security review — **done 2026-11-20 (§7.7)**: module `features/inspecto-mcp`, Streamable HTTP pinned to revision `2026-07-28` (dual-era, stateless), 19 read MCP Tools and 3 resources each replaying an existing route as the caller, one audit row per call; design and as-built in the hub `module/mcp` | P0 | 3–4 weeks, parallel with P1 |
 | **AK-2** | Write tools through validate → dry-run → Draft; `propose_action` through Action Requests; the agent capability set | AK-1, D-UE5, D-UE6 | 3 weeks |

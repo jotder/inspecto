@@ -2,7 +2,7 @@
 // render-handbook — the Handbook: one manifest over the hub pages, rendered to a static site (USER-HANDBOOK-1 P1;
 // docs/superpower/2026-11-19-user-enablement-and-agent-kit-plan.md §3.2, §4).
 //
-//   node tools/render-handbook.mjs --out <dir> [--internal]
+//   node tools/render-handbook.mjs --out <dir> [--internal | --training]
 //
 // Reads docs/okf/product/layer/product/handbook.toon and writes a self-contained site: <dir>/index.html (home),
 // <dir>/<chapter-id>.html (one landing page per chapter), <dir>/<page-id>.html (one per page), <dir>/search.json.
@@ -12,8 +12,10 @@
 //
 // AUDIENCE: the default render holds `audience: external` pages only — what a customer may read (BUNDLE-LAYOUT-1: the
 // bundle ships only operator-facing documents, and a hub page becomes external by a deliberate per-page decision).
-// `--internal` adds the internal pages for Inspecto's own team and must never feed a bundle. A link to a page that is
-// not in this render becomes plain text, so an external render can neither leak nor dangle.
+// `--internal` adds the internal pages for Inspecto's own team and must never feed a bundle. `--training` adds the
+// `audience: training` pages (Labs, the instructor kit — USER-TRAINING-1) to the external ones: decision D-UE7 puts Labs
+// in the Preview and a training bundle only, never in a sold edition's /help. A link to a page that is not in this
+// render becomes plain text, so an external render can neither leak nor dangle.
 //
 // Markdown: a small converter for what these docs use — headings, paragraphs, lists, tables, fenced code,
 // blockquotes, links, emphasis, inline code. A ```check / ```check-ui block (docs as tests, tools/handbook-checks.mjs)
@@ -39,7 +41,7 @@ export const CHAPTER_IDS = ['start', 'understand', 'build_bring_data_in', 'build
     'troubleshooting'];
 export const TYPES = ['tutorial', 'howto', 'reference', 'concept', 'unsorted'];
 export const TRACKS = ['builder', 'partner', 'operator', 'business'];
-export const AUDIENCES = ['external', 'internal'];
+export const AUDIENCES = ['external', 'internal', 'training'];
 export const HOWTO_HEADINGS = ['Goal', 'Before you start', 'Steps', 'Check it worked', 'What can go wrong', 'Next'];
 const P = path.posix;
 
@@ -219,8 +221,8 @@ function shell(book, chapters, current, title, body) {
  * Render the site in memory. `read(file)` returns a repository file's text. Returns { files: Map<name, text>, pages }.
  * Pure apart from `read`, so check-handbook.mjs and the tests render without writing.
  */
-export function render(book, read, { internal = false } = {}) {
-    const visible = (p) => internal || p.audience === 'external';
+export function render(book, read, { internal = false, training = false } = {}) {
+    const visible = (p) => internal || p.audience === 'external' || (training && p.audience === 'training');
     const chapters = book.chapters.map((c) => ({ ...c, pages: c.pages.filter(visible) }));
     const byFile = new Map();
     for (const c of chapters) for (const p of c.pages) byFile.set(p.file, p);
@@ -242,7 +244,7 @@ export function render(book, read, { internal = false } = {}) {
             const ed = editionLabel(p.edition);
             const badges = `<div class="badges">${ed ? `<span class="edition" title="Editions this page applies to">${esc(ed)}</span>` : ''}` +
                 `<span>${esc(p.type)}</span>${p.tracks.map((t) => `<span>${esc(t)}</span>`).join('')}` +
-                (internal ? `<span>${esc(p.audience)}</span>` : '') + '</div>';
+                (internal || training ? `<span>${esc(p.audience)}</span>` : '') + '</div>';
             const crumb = `<p class="muted"><a href="${c.id}.html">${esc(c.title)}</a></p>`;
             files.set(`${p.id}.html`, shell(book, chapters, c.id, title, crumb + badges + r.html));
             index.push({ id: p.id, title, chapter: c.id, headings: r.headings.map((h) => h.text).slice(0, 40) });
@@ -266,21 +268,22 @@ function main() {
     const args = process.argv.slice(2);
     const at = args.indexOf('--out');
     const out = at >= 0 ? args[at + 1] : null;
-    if (!out) { console.error('usage: node tools/render-handbook.mjs --out <dir> [--internal]'); process.exit(2); }
+    if (!out) { console.error('usage: node tools/render-handbook.mjs --out <dir> [--internal | --training]'); process.exit(2); }
     if (!existsSync(MANIFEST)) { console.error(`✗ render-handbook: ${MANIFEST} not found — run from the repository root`); process.exit(2); }
     const internal = args.includes('--internal');
+    const training = !internal && args.includes('--training');
     const book = withEditions(loadManifest(readFileSync(MANIFEST, 'utf8')), editionIndex(gatherFacts('.')));
-    const { files, pages } = writeRender(out, book, (f) => readFileSync(f, 'utf8'), { internal });
-    console.log(`render-handbook: ${internal ? 'INTERNAL' : 'external'} render, ${pages.length} page(s), ${files.size} file(s) → ${out}`);
+    const { files, pages } = writeRender(out, book, (f) => readFileSync(f, 'utf8'), { internal, training });
+    console.log(`render-handbook: ${internal ? 'INTERNAL' : training ? 'training' : 'external'} render, ${pages.length} page(s), ${files.size} file(s) → ${out}`);
 }
 
 /** Render into `out`; a folder this tool wrote before (its `.handbook` marker) loses its old pages first. */
-export function writeRender(out, book, read, { internal = false } = {}) {
-    const result = render(book, read, { internal });
+export function writeRender(out, book, read, { internal = false, training = false } = {}) {
+    const result = render(book, read, { internal, training });
     mkdirSync(out, { recursive: true });
     const marker = path.join(out, '.handbook');
     if (existsSync(marker)) for (const f of readdirSync(out)) if (/\.(html|json)$/.test(f)) rmSync(path.join(out, f));
-    writeFileSync(marker, internal ? 'internal\n' : 'external\n');
+    writeFileSync(marker, internal ? 'internal\n' : training ? 'training\n' : 'external\n');
     for (const [name, text] of result.files) writeFileSync(path.join(out, name), text);
     return result;
 }

@@ -97,7 +97,8 @@ Upgrading carries the Space's data and Incidents over; the new Expectation and W
 - **No console path from a Space to a Space Template or an App** — on the board as `SPACE-TO-APP-CONSOLE-1`. Only the App
   kit CLI (`tools/inspecto-app.mjs`) packages one; the tutorials (T5) use the CLI.
 
-The rest are candidates for the board, not filed:
+The rest are on the board since 2026-11-20, in this order: `CASE-TRANSITION-FOUR-EYES-1`, `EXPECTATION-UNIQUE-KIND-1`,
+`TEMPLATE-GOVERNANCE-1`, `RECON-CROSS-PERIOD-1`.
 
 - **No four-eyes on a Case transition.** A Workflow transition has no guard (no capability, no "another person than the one
   who proposed"); four-eyes exists only for config changes (the per-kind approval policy, `ASSURE-MAKER-CHECKER-1`). The

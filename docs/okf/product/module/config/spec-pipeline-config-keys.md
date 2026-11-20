@@ -8,7 +8,7 @@ timestamp: 2026-09-01T00:00:00Z
 item: module.config
 audience: internal
 status: current
-verified: 2026-11-19 last-edit
+verified: 2026-11-20 code-reviewed
 code: platform/inspecto-config
 ---
 
@@ -120,7 +120,7 @@ Parser-only (10):
 | `processing.summarize` | at-rest chain | node drawer |
 | `processing.map` | `RowShaper.columnsOf`/`mappingSchemaOf` — **executes on the live ingest graph executor**, unlike its three neighbours; authored `columns`/`rules` vs derived `schema`/`csv` split pinned by `MapNodeKeyContractTest` | map node dialog; never a `steps:` kind |
 | `processing.disabled_steps` | `StepDisableArming` / `PipelineLift` overlays `enabled: false` — park-and-drain ([step-park-drain](../elt/spec-pipeline-execution.md)) | **product-derived** on save from node enabled state |
-| `processing.duplicate_check` | marker-file dedup on the local poll path (`CollectorProcessor`) — ⚠ the `collector.duplicate:` block is a no-op there | guided create derives it silently; hand |
+| `processing.duplicate_check` | turns dedup on or off on the local poll path (`CollectorProcessor.dedupLocal`); when on, a content-based `collector.duplicate.mode` (metadata, checksum, etag, content) uses the fingerprint ledger, and `path` the marker file | guided create derives it silently; hand |
 | `processing.schemas` | `SchemaSelector` two-pass multi-schema dispatch (file-pattern fast path, column-count probe) — replaces `schema_file` | hand-authored only |
 | `processing.segments` | plugin-ingester segment→schema map (`StreamingPluginIngestStrategy`); required non-empty when `ingester` is set | hand-authored only |
 

@@ -5,7 +5,7 @@ description: What a Space is — the isolated project that owns your data, confi
 item: module.config
 audience: external
 status: current
-verified: 2026-11-19 last-edit
+verified: 2026-11-20 code-reviewed
 code: platform/inspecto-config
 ---
 

@@ -20,12 +20,13 @@ Run the whole module, or chosen classes (commas between classes, never `+`):
 
 ```bash
 mvn -o test -pl platform/inspecto-etl
-mvn -o test -pl platform/inspecto-etl -Dtest=AcceptedConfigKeysDocContractTest,ChildSpecTest
+mvn -o test -pl platform/inspecto-etl -Dtest=AcceptedConfigKeysDocContractTest,BasicProfileTest
 ```
 
 | test class | package | kind | file | summary |
 |---|---|---|---|---|
 | `AcceptedConfigKeysDocContractTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/AcceptedConfigKeysDocContractTest.java` | The accepted-names doc is <b>generated from the same map the checker enforces</b>, so it cannot |
+| `BasicProfileTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/BasicProfileTest.java` | {@code BASIC-ELT-PROFILE-1} Gate: the Basic profile is one declaration - what Basic keeps per dimension, the feature |
 | `ChildSpecTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/ChildSpecTest.java` | Parsing D9 slice 2: the {@code children} block's closed shape and every {@code ASN1-CHILD-*} code. |
 | `CollectorResilienceSpecParityTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/CollectorResilienceSpecParityTest.java` | The Collector's retry / circuit-breaker / rate-limit keys are declared in {@code ConfigSpecs.pipeline()} |
 | `CommitLogTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/CommitLogTest.java` | Tests for {@link CommitLog} — the durable append-only batch ledger (D2). |

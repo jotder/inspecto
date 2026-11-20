@@ -52,8 +52,17 @@ Concept: [Connection and Collector](../elt/user-guide-concept-connection-collect
 
 ## Check it worked
 
-The Connection exists and answers (here one named `partner_sftp`). **Test** proves the host is reachable and the
-password reference resolves — not that the sign-in is accepted; the first collection proves that.
+The Connection is saved — here one named `partner_sftp`, made through the Control API as **Create** makes it — and
+**Test** answers for it. On your own server `reachable` is `true` and `secretsResolved` is `true` once the environment
+variable is set. **Test** proves the host answers and the password reference resolves, not that the sign-in is
+accepted; the first collection proves that.
+
+```check
+POST /spaces/{space}/connections
+as admin
+body {"id": "partner_sftp", "connector": "sftp", "host": "sftp.example.com", "port": 22, "username": "inspecto", "password": "${ENV:SFTP_PW}", "basePath": "/in", "options": {"auth_method": "password"}}
+expect status 200|409
+```
 
 ```check
 GET /spaces/{space}/connections
@@ -66,7 +75,8 @@ expect data[*].id has partner_sftp
 POST /spaces/{space}/connections/partner_sftp/test
 as admin
 expect status 200
-expect data.reachable = true
+expect data.endpoint = "sftp.example.com:22"
+expect data.reachable exists
 ```
 
 ## What can go wrong

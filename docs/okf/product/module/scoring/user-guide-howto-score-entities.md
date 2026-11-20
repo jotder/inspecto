@@ -45,25 +45,71 @@ which ones are high.
 
 ## Check it worked
 
-Previewing one entity's score answers its score and how each factor contributed (here a Risk Score
-`payment_account` and an account `A-1001`):
+On the worked example: a Risk Score `o2c_customer_risk` over customers, with one factor — the unmatched value of
+each customer's open items, `sum(unmatched_value)`, weight 1, capped at 100 — and a high threshold of 50. Save it,
+preview customer C-007, make and run its Job, and read the scores. The open items must be built first (the
+`o2c_open_items` Job, as in Tutorial 2).
+
+```check
+POST /spaces/{space}/jobs/o2c_open_items/trigger
+as builder
+expect status 200|202
+save data.runId as openItems
+```
+
+```check
+GET /spaces/{space}/jobs/runs/{openItems}
+as builder
+expect data.status = "SUCCESS"
+retry 30 every 2s
+```
+
+```check
+POST /spaces/{space}/components/risk-score
+as builder
+body {"id": "o2c_customer_risk", "entityType": "customer", "highThreshold": 50, "factors": [{"id": "unpaid", "label": "Unmatched value", "dataset": "o2c_open_items", "key": "customer_id", "measure": "sum(unmatched_value)", "weight": 1, "cap": 100}]}
+expect status 200|409
+```
+
+Previewing C-007 scores it now and shows each factor's contribution — C-007 owes 620, capped at 100, so it is high:
 
 ```check
 POST /spaces/{space}/risk-scores/preview
 as builder
-body {"model": "payment_account", "entityKey": "A-1001"}
+body {"model": "o2c_customer_risk", "entityKey": "C-007"}
 expect status 200
-expect data.model = "payment_account"
-expect data.factors exists
+expect data.found = true
+expect data.score = 100
+expect data.high = true
+expect data.factors[0].indicator = "unpaid"
 ```
 
-After the Job has run, the list of scores is filled:
+```check
+POST /spaces/{space}/jobs
+as builder
+body {"name": "o2c_customer_risk_score", "type": "risk.score", "model": "o2c_customer_risk", "enabled": true}
+expect status 200|409
+```
 
 ```check
-GET /spaces/{space}/risk-score-lists/payment_account
+POST /spaces/{space}/jobs/o2c_customer_risk_score/trigger
+as builder
+expect status 202
+save data.runId as scoreRun
+```
+
+```check
+GET /spaces/{space}/jobs/runs/{scoreRun}
+as builder
+expect data.status = "SUCCESS"
+retry 30 every 2s
+```
+
+```check
+GET /spaces/{space}/risk-score-lists/o2c_customer_risk
 as builder
 expect status 200
-expect data.rows exists
+expect data.rows[*].entityKey has C-007
 ```
 
 ## What can go wrong
