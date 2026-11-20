@@ -5,7 +5,7 @@ description: How Identity and Access decides who is calling and what they may do
 item: module.access
 audience: internal
 status: current
-verified: 2026-11-18 last-edit
+verified: 2026-11-20 code-reviewed
 code: [platform/inspecto-access]
 ---
 
