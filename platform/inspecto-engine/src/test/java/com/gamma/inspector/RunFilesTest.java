@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /** BASIC-ONBOARD-SETTLE-1: a run takes from a scoped folder only the files the caller checked. */
 class RunFilesTest {
@@ -44,5 +45,32 @@ class RunFilesTest {
                     "the upload joins, in discovery order; the fresh drop still waits");
         }
         assertEquals(gated, RunFiles.release(discovered, gated, p -> p), "closed: the gate decides again");
+    }
+
+    /**
+     * O7: while a no-fetch scope is open for its inbox, a remote Collector's acquisition fetches nothing - not even its
+     * connector is built (sftp, which this module cannot build, so acquisition fails the moment it reaches it). Another inbox, and the
+     * same one once the scope is closed, acquire as before.
+     */
+    @Test
+    void aNoFetchScopeStopsOnlyItsOwnCollectorsAcquisitionAndEndsWhenClosed(@TempDir Path dir) throws Exception {
+        com.gamma.etl.PipelineConfig cfg = remote(dir, "in");
+        com.gamma.etl.PipelineConfig other = remote(dir, "other");
+        assertThrows(RuntimeException.class, () -> CollectorProcessor.acquire(cfg, false), "no scope: it reaches the connector");
+        try (RunFiles.Scope s = RunFiles.noFetch(dir.resolve("in"))) {
+            assertEquals(0, CollectorProcessor.acquire(cfg, false), "the caller put the run's files in the inbox itself");
+            assertThrows(RuntimeException.class, () -> CollectorProcessor.acquire(other, false), "another inbox fetches as before");
+        }
+        assertThrows(RuntimeException.class, () -> CollectorProcessor.acquire(cfg, false), "closed: it fetches again");
+    }
+
+    private static com.gamma.etl.PipelineConfig remote(Path dir, String inbox) throws Exception {
+        Files.createDirectories(dir.resolve(inbox));
+        return com.gamma.etl.PipelineConfig.fromMap(java.util.Map.of(
+                "name", "NOFETCH_" + inbox.toUpperCase(),
+                "dirs", java.util.Map.of("poll", dir.resolve(inbox).toString(), "database", dir.resolve(inbox + "_out").toString(),
+                        "temp", dir.resolve(inbox + "_tmp").toString()),
+                "processing", java.util.Map.of("threads", 1),
+                "collector", java.util.Map.of("connector", "sftp")));
     }
 }

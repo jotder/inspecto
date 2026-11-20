@@ -455,6 +455,16 @@ class ControlApiPostgresSnapshotTest {
             data(post(c, "/datasets/" + id + "/run", null, null), 200);
             assertEquals(34, OnboardImport.countRows(dataRoot.resolve(id).resolve("database")));
 
+            // O7: the commit switched the Pipeline to read Postgres itself; a run not started by Run now copies the table
+            // through the Connection and replaces the rows (output.load: replace) - never a second full copy
+            assertEquals("postgres", c.svc().configFor(id).orElseThrow().collector().connector());
+            pg.exec("DELETE FROM " + pg.schema + ".transfers WHERE id = 44");
+            c.svc().runPipeline(id).orElseThrow();
+            assertEquals(33, OnboardImport.countRows(dataRoot.resolve(id).resolve("database")), "the table as it is now, not added to");
+            c.svc().runPipeline(id).orElseThrow();
+            assertEquals(33, OnboardImport.countRows(dataRoot.resolve(id).resolve("database")), "the same table again: still one copy");
+            assertEquals("[]", inboxListing(dataRoot, id), "each run's export was taken");
+
             // deleting the Dataset retires its import: the snapshot's settings (and their reference) go with it
             HttpRequest del = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1/components/dataset/" + id))
                     .DELETE().build();
@@ -532,13 +542,15 @@ class ControlApiPostgresSnapshotTest {
     }
 
     /**
-     * BE-4 compatibility: a snapshot committed before snapshots kept a saved Connection holds its connection inline in
-     * {@code _snapshot.toon}. It is read as it is (validated as a request body), refreshes through the same scheme, and is
-     * never rewritten; deleting its Dataset leaves no file behind. (The session's own read-only test moved with the session
-     * to the engine: {@code PostgresConnectorFactoryTest}.)
+     * O7: a snapshot committed before snapshots kept a saved Connection holds its connection inline in {@code _snapshot.toon}
+     * and a Pipeline that reads its inbox. Its first Run now migrates it - the Connection saved from the inline block, the
+     * settings rewritten to name it, the Pipeline switched - and copies the table; a run outside Add data then replaces the
+     * rows through the Pipeline. Deleting its Dataset leaves no file behind. (The session's own read-only test moved with
+     * the session to the engine: {@code PostgresConnectorFactoryTest}.)
      */
     @Test
-    void aSnapshotCommittedBeforeConnectionsStillRefreshesAsItIs(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    @SuppressWarnings("unchecked")
+    void aSnapshotCommittedBeforeConnectionsMigratesAtItsFirstRunNow(@TempDir Path cfg, @TempDir Path root) throws Exception {
         Pg pg = seeded();
         try (Ctx c = open(cfg, root)) {
             JsonNode d = data(post(c, "/onboard/postgres", "{\"connection\":" + pg.connection(RO)
@@ -546,10 +558,8 @@ class ControlApiPostgresSnapshotTest {
             String id = "snap_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
             ids.add(id);
             data(post(c, "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
-            // turn it into the old shape: no saved Connection, the connection inline
+            // turn it into the old shape on disk: the connection inline, no saved Connection, the Pipeline reading its inbox
             String connId = PostgresSnapshot.connectionId(id);
-            HttpRequest del = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1/connections/" + connId)).DELETE().build();
-            assertEquals(200, client.send(del, BodyHandlers.ofString()).statusCode());
             Map<String, Object> legacy = new java.util.LinkedHashMap<>();
             legacy.put("source", "postgres");
             legacy.put("connection", JSON.readValue(pg.connection(RO), Map.class));
@@ -557,13 +567,33 @@ class ControlApiPostgresSnapshotTest {
             legacy.put("table", "transfers");
             Path snapFile = PostgresSnapshot.configFile(root, id);
             PostgresSnapshot.write(snapFile, legacy);
-            String before = Files.readString(snapFile);
+            Path pipelineFile = root.resolve(OnboardImport.CONFIG_DIR).resolve(id + "_pipeline.toon");
+            Map<String, Object> p = new java.util.LinkedHashMap<>(com.gamma.util.ToonHelper.load(pipelineFile.toString()));
+            Map<String, Object> collector = new java.util.LinkedHashMap<>((Map<String, Object>) p.get("collector"));
+            collector.put("connector", "local");
+            collector.remove("connection");
+            p.put("collector", collector);
+            p.put("output", Map.of("format", "PARQUET", "compression", "snappy"));
+            Map<String, Object> processing = new java.util.LinkedHashMap<>((Map<String, Object>) p.get("processing"));
+            processing.put("duplicate_check", Map.of("enabled", true, "marker_extension", ".processed"));
+            p.put("processing", processing);
+            Files.writeString(pipelineFile, com.gamma.config.io.ConfigCodec.toToon(p));
+            c.svc().refreshConfigs();
+            Files.delete(root.resolve(connId + "_connection.toon"));
+            c.svc().unregisterConnection(connId);
+            assertEquals("local", c.svc().configFor(id).orElseThrow().collector().connector());
 
             pg.exec("DELETE FROM " + pg.schema + ".transfers WHERE id <= 10");
             JsonNode run = data(post(c, "/datasets/" + id + "/run", null, null), 200);
             assertEquals(30, run.get("rowsAfter").asLong(), run.toString());
-            assertEquals(before, Files.readString(snapFile), "an old snapshot is read as it is, never rewritten");
-            assertFalse(Files.exists(root.resolve(connId + "_connection.toon")), "and no Connection is made for it");
+            assertEquals(connId, com.gamma.util.ToonHelper.load(snapFile.toString()).get("connection"), "the settings name the Connection");
+            String saved = Files.readString(root.resolve(connId + "_connection.toon"));
+            assertTrue(saved.contains(pg.schema) && saved.contains("${ENV:" + PASSWORD_ENV + "}"), saved);
+            assertEquals("postgres", c.svc().configFor(id).orElseThrow().collector().connector(), "the Pipeline reads Postgres itself");
+            pg.exec("DELETE FROM " + pg.schema + ".transfers WHERE id = 11");
+            c.svc().runPipeline(id).orElseThrow();
+            assertEquals(29, OnboardImport.countRows(Path.of("database").toAbsolutePath().resolve(id).resolve("database")),
+                    "a run outside Add data replaces the rows");
 
             HttpRequest gone = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1/components/dataset/" + id))
                     .DELETE().build();

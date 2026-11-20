@@ -91,8 +91,12 @@ last registered first, **after** the run's `RUN` commit steps. `stepRun` wraps `
   Dataset's `OnboardImport.IN_FLIGHT` claim and **holds it through the run** (released in its `after`); the import's
   commit steps treat a claim held by the run's own pre-run step as theirs (`ImportPreRunSteps.heldByRun`), so they
   still compact, follow on and check Expectations, and Add data cannot judge the inbox under the run. When someone else
-  holds the claim (Add data's own run, a rewrite, a delete) a **scheduled** run is skipped and a person's run goes ahead
-  untouched (Add data's own `runPipeline` is such a run: it already did the steps).
+  holds the claim (Add data's own run, a rewrite, a delete) a **scheduled** run is skipped; Add data's own `runPipeline`
+  goes ahead untouched (it already did the steps; told apart by the thread that holds the claim,
+  `OnboardImport.runsOwn`), and **any other run is refused** with a path-free reason (`PreRun.refused`: a synchronous
+  run throws it, an asynchronous one is a FAILED run naming it). Since O7 (2026-11-20) Add data's run may hold a
+  run-scoped arrival mode, and a run committing into the Dataset meanwhile would be taken as Add data's own (a Run now
+  replacing everything would keep its rows: two copies).
 - **A file still being written.** A scheduled run of a `local` Collector with a stability window judges only the files
   unmodified for that window, and takes only those (`RunFiles.only` over the inbox until the run ends): a file written
   between the step and the read is neither judged half-written nor taken unjudged; it waits for a later run. A remote

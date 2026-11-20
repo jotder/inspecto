@@ -47,9 +47,10 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   then every older Parquet file loses its rows on the calendar days the file covers; originals kept in
   `database.period-<stamp>/` until the import succeeded). `period` needs a When column. A rewritten file makes the next
   index build `full`. Since `BASIC-ELT-PROFILE-1` B4 the engine's `ArrivalReplacer` does it, crash-safe (a journal, one
-  swap, a heal to the old or the new state), and once the import succeeded the replaced files (and the files *Replace
-  everything* set aside) are `REPLACED` in the Consignment output registry, so their reprocess is refused (`409`):
-  [spec-arrival-replace.md](../elt/spec-arrival-replace.md).
+  swap, a heal to the old or the new state), and once the import succeeded the replaced files are `REPLACED` in the
+  Consignment output registry, so their reprocess is refused (`409`). *Replace everything* runs the same way since B13
+  (2026-11-20): every other file goes at the upload's commit, through the journal and the heal, so a crash no longer
+  leaves the Dataset empty: [spec-arrival-replace.md](../elt/spec-arrival-replace.md).
 - **The same bytes again** (D-3): append or period whose sha256 matches an upload whose rows are still held answers 409
   with the first import's date (`DatasetArrivals.alreadyImported`). Replace everything may always reload. A folder drop
   under the same name is skipped by the import Pipeline's duplicate policy and stays in the inbox.
@@ -203,7 +204,7 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
 - **The merge map (D-8)** `<dataRoot>/<id>/compaction.json`: `merged`, `at`, `arrivals[{file, received, firstRow, rows,
   coversFrom, coversTo}]` (the arrival's own output name, its row segment, the period of its kept rows),
   `removed[{file, at, reason}]` (at most 500), `retention`. `ArrivalCompactor.merged(dataRoot, id)` answers it ONLY
-  while the merged file exists, so a *Replace everything* (which sets the whole `database` folder aside) silences it.
+  while the merged file exists, so a *Replace everything* (which removes every file but the run's own) silences it.
 - **The swap.** Write the merged file in `<id>/temp`, write `compaction.json.pending` (merged name, inputs, next map),
   move the merged file in, delete the inputs (only inside `database`, never the merged file), commit the map. `heal`
   (run before every compaction) finishes a pending swap whose merged file moved in, or drops one whose file did not.

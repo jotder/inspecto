@@ -33,8 +33,6 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 import java.time.Instant;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -91,7 +89,6 @@ final class OnboardImport {
     private static final Pattern ID = Pattern.compile("[a-z][a-z0-9_]{0,62}");
     private static final Pattern COLUMN = Pattern.compile("[A-Za-z_][A-Za-z0-9_]{0,63}");
     private static final Set<String> TYPES = Set.of("VARCHAR", "BIGINT", "DOUBLE", "DATE", "TIMESTAMP", "TIME", "BOOLEAN");
-    private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmssSSS").withZone(ZoneOffset.UTC);
     /** Pipelines that run on their own (Standard and up): <i>Keep this up to date</i> and a retention policy. */
     static final String AUTOMATION_FEATURE = EditionFeatures.PIPELINE_AUTOMATION;
     /**
@@ -102,6 +99,17 @@ final class OnboardImport {
 
     /** Ids being imported right now in this JVM (a second commit of the same id is 409, not a race). */
     static final Set<String> IN_FLIGHT = ConcurrentHashMap.newKeySet();
+    /** The claim whose Pipeline Add data is running on this thread right now ({@link Job#runChecked}); null otherwise. */
+    private static final ThreadLocal<String> OWN_RUN = new ThreadLocal<>();
+
+    /**
+     * Whether the run asking is Add data's own run of the import it has claimed ({@code claim}, {@code writeRoot|id}): the
+     * engine runs a Pipeline's pre-run steps on the thread that asked for the run, so only Add data's own call is on the
+     * thread that set it. Any other run of a claimed import is refused (O7, {@link ImportPreRunSteps}).
+     */
+    static boolean runsOwn(String claim) {
+        return claim != null && claim.equals(OWN_RUN.get());
+    }
     /** Followed runs (202), newest last; bounded. */
     private static final Map<String, Map<String, Object>> RUNS = Collections.synchronizedMap(new LinkedHashMap<>() {
         @Override
@@ -223,12 +231,19 @@ final class OnboardImport {
                 }
                 job.landFromDraft(String.valueOf(draft.get("type")));
 
+                // O7: a snapshot's first run imports the draft's copy as every commit does; then its Pipeline reads Postgres
+                // itself (PostgresSnapshot.switchPipeline), still under this commit's claim
                 if (Files.size(job.landed) > lim.get(LaLimit.IMPORT_INLINE_MAX_BYTES)) {
-                    Map<String, Object> rec = follow(job, "commit", () -> job.finishCommit(draftDir));
+                    Map<String, Object> rec = follow(job, "commit", () -> {
+                        Map<String, Object> summary = job.finishCommit(draftDir);
+                        if (snapshot != null) PostgresSnapshot.switchAfterCommit(api, space, id);
+                        return summary;
+                    });
                     handedOff = true;
                     return ApiContext.respondJson(ex, 202, rec);
                 }
                 Map<String, Object> summary = job.finishCommit(draftDir);
+                if (snapshot != null) PostgresSnapshot.switchAfterCommit(api, space, id);
                 return summary;
             } catch (IOException | RuntimeException fault) {
                 if (!handedOff) job.rollback();
@@ -756,7 +771,6 @@ final class OnboardImport {
         final boolean replace;
         final Deque<Undo> undo = new ArrayDeque<>();
         Path landed;
-        Path aside;
         /** C2: this run is a commit of a draft, so a set-aside file is explained with fixes that edit that draft. */
         boolean fromDraft;
         /** The source is a complete export outside the inbox (a Postgres snapshot's Run now): moved in, not copied. */
@@ -779,44 +793,53 @@ final class OnboardImport {
         List<String> keptColumns = List.of();
         /** Why a new column was left out; null when none was. */
         String newColumnsReason;
-        /** Replace the period's run-scoped arrival mode (O6), open from the run until {@link #dropAside} or a rollback. */
-        private com.gamma.job.ArrivalLoadStep.RunLoad periodLoad;
+        /** Add a file's run-scoped arrival mode (O6; B13), open from the run until {@link #dropAside} or a rollback. */
+        private com.gamma.job.ArrivalLoadStep.RunLoad runLoad;
 
         String mode() {
             return replace ? "replace" : period ? PERIOD : "append";
         }
 
         /**
-         * Replace the period, as the run's own arrival mode (BASIC-ELT-PROFILE-1 O6): the engine's {@code output.load}
-         * commit step, at the upload's Consignment, removes from every older Parquet file the rows on a day the upload
-         * covers ({@link com.gamma.job.ArrivalReplacer}, B4); the run's other files append. Undone by {@link #rollback}
-         * (the originals come back, then the upload's own rows go); made final by {@link #dropAside}. Open before the run.
+         * Add a file's choice, as the run's own arrival mode (BASIC-ELT-PROFILE-1 O6, B13): the engine's {@code output.load}
+         * commit step, at the upload's Consignment, removes every other Parquet file of the Dataset (Replace everything) or
+         * the rows of every older file on a day the upload covers (Replace the period; {@link com.gamma.job.ArrivalReplacer},
+         * B4), through the replacer's journal and heal; the run's other files append. An append is a choice too: it wins
+         * over the {@code output.load} a Postgres snapshot's Pipeline holds (O7). Undone by {@link #rollback} (the originals
+         * come back, then the upload's own rows go); made final by {@link #dropAside}. Open before the run, once landed.
          */
-        void periodLoad(String eventDate) {
-            periodLoad = com.gamma.job.ArrivalLoadStep.override(database(), new PipelineConfig.ArrivalLoad(
-                    PipelineConfig.ArrivalLoad.Mode.PERIOD, eventDate), landed.getFileName().toString());
-            com.gamma.job.ArrivalLoadStep.RunLoad load = periodLoad;
+        void runLoad(String eventDate) {
+            PipelineConfig.ArrivalLoad load = replace ? new PipelineConfig.ArrivalLoad(PipelineConfig.ArrivalLoad.Mode.REPLACE, null)
+                    : period ? new PipelineConfig.ArrivalLoad(PipelineConfig.ArrivalLoad.Mode.PERIOD, eventDate)
+                    : PipelineConfig.ArrivalLoad.APPEND;
+            runLoad = com.gamma.job.ArrivalLoadStep.override(database(), load, landed.getFileName().toString());
+            com.gamma.job.ArrivalLoadStep.RunLoad open = runLoad;
             undo.push(() -> {   // a no-op restore once dropAside made it final
                 try {
-                    load.restore();
+                    open.restore();
                 } finally {
-                    load.close();
+                    open.close();
                 }
             });
         }
 
         /** The rows the run's replacement removed (0 without one): {@link #runChecked} judges the rows the run added. */
         long rowsReplaced() {
-            com.gamma.job.ArrivalReplacer.Result r = periodLoad == null ? null : periodLoad.result();
+            com.gamma.job.ArrivalReplacer.Result r = runLoad == null ? null : runLoad.result();
             return r == null ? 0 : r.rowsRemoved();
+        }
+
+        /** After the run: the run's replacement failed, so the caller undoes the run ({@link #rollback}). */
+        void requireLoaded() throws IOException {
+            Exception failed = runLoad == null ? null : runLoad.failure();
+            if (failed instanceof IOException io) throw io;
+            if (failed instanceof RuntimeException re) throw re;
         }
 
         /** What Replace the period did, after the run: {@code {days, from, to, rowsReplaced, filesRewritten}}. */
         Map<String, Object> replacedPeriod() throws IOException {
-            Exception failed = periodLoad.failure();
-            if (failed instanceof IOException io) throw io;
-            if (failed instanceof RuntimeException re) throw re;
-            com.gamma.job.ArrivalReplacer.Result r = periodLoad.result();
+            requireLoaded();
+            com.gamma.job.ArrivalReplacer.Result r = runLoad.result();
             if (r == null) r = new com.gamma.job.ArrivalReplacer.Result(List.of(), 0, 0);   // the upload wrote no file
             Map<String, Object> m = new LinkedHashMap<>();
             m.put("days", r.days().size());
@@ -915,10 +938,17 @@ final class OnboardImport {
             Map<String, Long> read = filters && COUNTED_FORMATS.contains(format) ? new LinkedHashMap<>() : null;
             // finding 5: in the same pass, the values each typed column cannot read (blank in the Dataset, the row kept)
             List<Map<String, Object>> blanked = prescan(cfg, format, read);
-            try {
+            // O7: a Postgres snapshot's Pipeline fetches the table itself (collector.connector: postgres); Add data's own run
+            // takes what it put in the inbox - the export it checked - and never a second copy fetched by the run
+            Path inbox = inbox(space.dataRoot(), id);
+            OWN_RUN.set(space.writeRoot() + "|" + id);   // the pre-run step lets this run, and only this one, through the claim
+            try (com.gamma.inspector.RunFiles.Scope own = PostgresSnapshot.isSnapshot(space.writeRoot(), id)
+                    ? com.gamma.inspector.RunFiles.noFetch(inbox) : null) {
                 space.service().runPipeline(id).orElseThrow(() -> new ApiException(409, ErrorCodes.CONFLICT, "the import's Pipeline '" + id + "' is not registered"));
             } catch (IllegalStateException notRunnable) {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the import could not run: " + notRunnable.getMessage());
+            } finally {
+                OWN_RUN.remove();
             }
             List<Map<String, String>> took = new ArrayList<>();
             for (Map<String, String> f : space.service().statusStore().files(cfg))
@@ -977,8 +1007,8 @@ final class OnboardImport {
             s.put("rowsAfter", after);
             s.put("rowsChanged", after - before);
             s.put("replaced", replace);
-            // a Replace the period removed rows inside the run (O6): the rows the run added are judged without that
-            if (landed != null && (!quarantined.isEmpty() || after + rowsReplaced() <= (replace ? 0 : before))) {
+            // a replacement removed rows inside the run (O6, B13): the rows the run added are judged without that
+            if (landed != null && (!quarantined.isEmpty() || after + rowsReplaced() <= before)) {
                 String why = filteredAway ? "the row filter kept none of its " + byFile.get(landedName) + " rows"
                         : !quarantined.isEmpty() ? "the file was set aside (" + quarantined.get(0).get("reason") + ")"
                         : filtered > 0 && filtered + rejected >= parsed ? "the row filter kept none of its " + parsed + " rows"
@@ -1267,31 +1297,13 @@ final class OnboardImport {
             ImportCommitSteps.runAll(space, id, current, summary);
         }
 
-        /** Replace: set the current data aside; {@link #restore} puts it back, {@link #dropAside} discards it. */
-        void setAside() throws IOException {
-            Path db = database();
-            if (!Files.isDirectory(db)) return;
-            aside = db.resolveSibling("database.prev-" + STAMP.format(Instant.now()));
-            Files.move(db, aside, StandardCopyOption.ATOMIC_MOVE);
-            undo.push(this::restore);
-        }
-
-        void restore() throws IOException {
-            if (aside == null) return;
-            OnboardRoutes.deleteTree(database());
-            Files.move(aside, database(), StandardCopyOption.ATOMIC_MOVE);
-            aside = null;
-        }
-
+        /**
+         * The run succeeded: its replacement ({@link #runLoad}) is final - the files it replaced are marked {@code REPLACED}
+         * (B4: a reprocess of their Consignments must not bring them back) and the originals it set aside go.
+         */
         void dropAside() {
-            if (aside != null) {
-                // B4/B13: the rows set aside were replaced; a reprocess of their Consignments must not bring them back
-                com.gamma.job.ArrivalReplacer.everythingReplaced(aside, database());
-                OnboardRoutes.deleteTree(aside);
-            }
-            aside = null;
-            if (periodLoad != null) periodLoad.close();   // final: the files it replaced are marked REPLACED
-            periodLoad = null;
+            if (runLoad != null) runLoad.close();
+            runLoad = null;
         }
     }
 
@@ -1579,17 +1591,17 @@ final class OnboardImport {
             job.moveSource = moveIntoInbox;
             long before = countRows(job.database());
             final Job j = job;
-            if (replace) job.setAside();
             job.landFromDraft(type);
             Work rest = () -> {
                 try {
                     Map<String, Object> s;
                     // ADD-FILE-FEED-1: the upload is whole (landFromDraft moves it in complete), so a feed's stability window does
                     // not hold it back from the person's own run; every other waiting file is gated as before
-                    if (period) j.periodLoad(eventDate);
+                    j.runLoad(eventDate);   // B13: Replace everything replaces at the upload's commit, journalled and healed
                     try (com.gamma.inspector.RunFiles.Scope whole = com.gamma.inspector.RunFiles.complete(Set.of(j.landed))) {
-                        s = j.runChecked(replace ? 0 : before);
+                        s = j.runChecked(before);
                     }
+                    j.requireLoaded();
                     if (period) {
                         s.put("period", j.replacedPeriod());
                         s.put("rowsAfter", countRows(j.database()));
@@ -1954,11 +1966,10 @@ final class OnboardImport {
         Path dataRoot = OnboardRoutes.requireDataRoot(api);
         CollectorService service = HostContext.of(api).service();
         Map<String, Object> content = importDataset(writeRoot, ex, id, service);
-        // BASIC-ONBOARD-1 P3: a Postgres snapshot's Run now copies the table again, replacing everything
-        Map<String, Object> snapshot = PostgresSnapshot.read(writeRoot, id);
-        if (snapshot != null)
-            return PostgresSnapshot.refresh(new Space(writeRoot, dataRoot, service, ApiContext.actor(ex)),
-                    content, id, snapshot, ex);
+        // BASIC-ONBOARD-1 P3: a Postgres snapshot's Run now copies the table again, replacing everything (O7: and switches
+        // its Pipeline to read Postgres itself, migrating an old snapshot)
+        if (PostgresSnapshot.read(writeRoot, id) != null)
+            return PostgresSnapshot.refresh(api, new Space(writeRoot, dataRoot, service, ApiContext.actor(ex)), content, id, ex);
         return importWaiting(new Space(writeRoot, dataRoot, service, ApiContext.actor(ex)), id, content, null);
     }
 

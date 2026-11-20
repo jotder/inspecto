@@ -49,12 +49,45 @@ it; a failed commit removes both. Deleting the Dataset deletes the snapshot file
 that is `<id>_postgres` and no Pipeline is bound to it. While the snapshot stands, `DELETE /connections/{id}` refuses
 its Connection: 409 naming the Dataset, no server path in the answer (`PostgresSnapshot.readBy`: the Connection a
 `_snapshot.toon` names, or `<id>_postgres` when that file cannot be read; BE-4 part 2). **Snapshots committed before 2026-11-19** keep their connection
-inline in `_snapshot.toon` (connection map + schema/table or query): Run now reads that shape as it is (validated as a
-request body), refreshes through the same connector, and never rewrites it or makes a Connection for it (read-both,
-not migrate-on-write). Only this commit writes the snapshot file: an import into an existing Space carrying a `*_snapshot.toon` anywhere is refused
+inline in `_snapshot.toon` (connection map + schema/table or query) until their next Run now migrates them (O7, below). Only this commit writes the snapshot file: an import into an existing Space carrying a `*_snapshot.toon` anywhere is refused
 (`ImportPaths.REFUSED_SUFFIXES`, 2026-11-05), so an import cannot point Run now at another database. A new Space
 created from a bundle (`canAdminister`) keeps the file, as it keeps every file it seeds.
 **Run now** (`POST /datasets/{id}/run`) on such a Dataset copies the table again and runs the Add-a-file replace path.
+
+**The Pipeline reads Postgres itself (`BASIC-ELT-PROFILE-1` O7, built 2026-11-20).** One idempotent function,
+`PostgresSnapshot.switchPipeline`, switches the snapshot's Pipeline to `collector.connector: postgres` with
+`collector.connection: <id>_postgres`, `output.load: replace` and `processing.duplicate_check.enabled: false`, every
+other key kept, through `DatasetFeed.rewriteHeld` (the approval policy over Pipelines, the save gate, the audit, the
+Pipeline's history; the caller holds the import's claim). It serves both ways in:
+- **A snapshot commit** imports the draft's copy as before, then switches (`switchAfterCommit`, inline or in the followed
+  run). A switch that fails there does not fail the commit: it is logged at WARN and the next Run now switches.
+- **Run now** switches first. An old snapshot migrates there: the Connection `<id>_postgres` is saved from the inline
+  block through the same save as `POST /connections`, `_snapshot.toon` is rewritten to name it, then the Pipeline is
+  switched. A Connection of that name already saved for the same table (a migration a crash cut short) is taken as it
+  is; one that reads anything else is never overwritten. A switch that cannot be made never stops Run now: WARN, the
+  copy goes through the inline block as before, the next Run now tries again.
+
+Each step looks before it writes, so a second call changes nothing. What then holds:
+- **Run now keeps its own export** (the column check before the run, the `import.max_rows` cap and its 413, the 422
+  wording for a failed copy) and the Add-a-file path with a run-scoped `replace` naming its export
+  (`ArrivalLoadStep.override`; the replacement is final only when the import succeeded, undone by a refusal). Its run
+  fetches nothing itself (`RunFiles.noFetch` over the inbox, opened by `Job.runChecked` for every Add data run of a
+  snapshot: Add a file too), so the export it checked is its one copy.
+- **A run not started by Run now** (`POST /pipelines/{id}/run`, a trigger) exports the table through the Connection and
+  replaces the rows at its commit through `output.load: replace` (the config path: final at once; a replacement that
+  fails keeps the rows and logs ERROR). Such a run has no column check, no `import.max_rows` cap (a Pipeline's own
+  limits apply) and the engine's wording for a failed fetch (logged; the run takes nothing).
+- **The export is named apart each cycle** (`<table>_<stamp>.parquet`, `PostgresCollectorConnector.cycleName`): an
+  output file is named after its input, so a fixed name would overwrite the previous output in place, where no
+  replacement can put it back. With the duplicate check off the Pipeline never refuses its own re-export.
+- **Add a file** on a snapshot keeps its answers: its run fetches nothing, and its mode is a run-scoped choice that wins
+  over the Pipeline's `output.load` (an append still appends).
+- **No other run while Run now holds the snapshot:** the import's pre-run step refuses it (`PreRun.refused`, path-free
+  reason), so its copy is never committed under Run now's open `replace` and kept as Run now's own.
+- **The approval policy first:** under a policy holding Pipeline changes the switch writes nothing (no Connection, no
+  rewritten settings); Run now copies through the inline block as before.
+- **No feed** (operator ruling 2026-11-20): `PUT` and `DELETE /datasets/{id}/feed` on a snapshot answer 422 with a
+  path-free reason, as *Watch this folder* does; *Keep this up to date* would rewrite the switched collector.
 **The screen (U2):** Add data asks the connection on the core Connection rows (`inspecto-connection-fields`); the Connections dialog edits the saved `postgres` Connection as itself (no Routing).
 
 **Export, then move (redesigned 2026-11-05, operator).**
@@ -121,6 +154,17 @@ Connection saved only with an `INSPECTO_PG_` reference (create and update), the 
 removal with the Dataset, a pre-BE-4 inline snapshot refreshing unchanged, and a taken Connection name refusing the
 commit whole; `ControlApiSnapshotExportTest` runs its failed-export case on both shapes. 13 + 9 + 6 ran against a
 throwaway `postgres:18` container, 0 skipped.
+O7 (2026-11-20): `ControlApiSnapshotExportTest` (no database) - Run now switches the Pipeline once and migrates an old
+snapshot first, a second Run now changes nothing, a Connection of the snapshot's name for another table is never taken
+over, a snapshot commit switches after its first run, and a switched snapshot keeps one copy whoever runs it (Run now's
+run fetches nothing itself; a run outside Add data replaces through `output.load`); `RunFilesTest` (the no-fetch scope
+stops only its own Collector's acquisition); `PostgresConnectorFactoryTest` (a name of its own per cycle).
+`ControlApiPostgresSnapshotTest` (real Postgres, skipped without one) now expects an old snapshot to migrate at its
+first Run now and runs the switched Pipeline outside Add data. Review fixes (2026-11-20): a run started while Run now
+holds the snapshot is refused and its copy never kept (the forced interleaving gave 57 rows for 45 before), an approval
+policy stops the whole switch before anything is written, a replace whose export the row filter empties is refused with
+the older rows kept, and both feed routes refuse a snapshot behind every gate (401, 403, Add data off 403, 404, Basic 503
+for `PUT`, then 422).
 BE-4 part 2 (2026-11-20, no database needed): `ControlApiPostgresSnapshotTest` adds the Safety Policy refusing a host
 on the test and the copy before the password lookup, and `DELETE /connections/{id}` on a snapshot's Connection over
 every gate (503, 401, 403, 404, 409 for a named and an unreadable `_snapshot.toon`, 200 once the snapshot is gone);

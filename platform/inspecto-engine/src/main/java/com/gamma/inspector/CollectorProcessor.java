@@ -408,6 +408,8 @@ public class CollectorProcessor {
     @PublicApi(since = "4.0.0")
     public static int acquire(PipelineConfig cfg, boolean skipPostAction) throws java.io.IOException {
         if (!CollectorConnectors.isRemote(cfg)) return 0;   // local collector: nothing to acquire
+        // O7: the caller put this run's files in the inbox itself (a Postgres snapshot's Run now): nothing is fetched
+        if (cfg.dirs().poll() != null && !RunFiles.fetches(Paths.get(cfg.dirs().poll()))) return 0;
 
         PipelineConfig.Collector src = cfg.collector();
         // G9 backstop for the CLI entry points the pipeline registry does not guard: the MOVE archive is

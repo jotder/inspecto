@@ -2622,7 +2622,8 @@ com.gamma.service.CollectorService.CommitPhase | constant RUN
 com.gamma.service.CollectorService.CommitPhase | public enum CommitPhase
 com.gamma.service.CollectorService.CommitStep | public interface CommitStep
 com.gamma.service.CollectorService.CommitStep | void run(CollectorService, ConsignmentEvent)
-com.gamma.service.CollectorService.PreRun | public record PreRun(boolean skip, boolean reload, java.util.function.Consumer<Boolean> after)
+com.gamma.service.CollectorService.PreRun | public record PreRun(boolean skip, boolean reload, java.util.function.Consumer<Boolean> after, String refusal)
+com.gamma.service.CollectorService.PreRun | public static PreRun refused(String)
 com.gamma.service.CollectorService.PreRun | public static PreRun reloadThen(java.util.function.Consumer<Boolean>)
 com.gamma.service.CollectorService.PreRun | public static PreRun then(java.util.function.Consumer<Boolean>)
 com.gamma.service.CollectorService.PreRun | public static final PreRun GO

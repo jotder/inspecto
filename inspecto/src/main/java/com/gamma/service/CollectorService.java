@@ -277,20 +277,28 @@ public final class CollectorService implements ReadModel, AutoCloseable {
      * Pipeline's config files so the run must read them again ({@code reload}: a kept column grows the schema), and what
      * it wants told once the run has ended ({@code after}, handed whether the run succeeded; may be null).
      */
-    public record PreRun(boolean skip, boolean reload, java.util.function.Consumer<Boolean> after) {
+    public record PreRun(boolean skip, boolean reload, java.util.function.Consumer<Boolean> after, String refusal) {
         /** Go ahead, nothing to do after. */
-        public static final PreRun GO = new PreRun(false, false, null);
+        public static final PreRun GO = new PreRun(false, false, null, null);
         /** Do not start this run (the next tick looks again); nothing to do after. */
-        public static final PreRun SKIP = new PreRun(true, false, null);
+        public static final PreRun SKIP = new PreRun(true, false, null, null);
 
         /** Go ahead, and run {@code after} once the run has ended. */
         public static PreRun then(java.util.function.Consumer<Boolean> after) {
-            return new PreRun(false, false, after);
+            return new PreRun(false, false, after, null);
         }
 
         /** Go ahead reading the Pipeline's config again (this step changed it), and run {@code after} once the run has ended. */
         public static PreRun reloadThen(java.util.function.Consumer<Boolean> after) {
-            return new PreRun(false, true, after);
+            return new PreRun(false, true, after, null);
+        }
+
+        /**
+         * Do not start this run, and say why to whoever started it ({@code why}, no server path): the run fails with it - a
+         * synchronous caller gets an {@link IllegalStateException}, an asynchronous one a FAILED run naming it.
+         */
+        public static PreRun refused(String why) {
+            return new PreRun(true, false, null, Objects.requireNonNull(why, "why"));
         }
     }
 
@@ -312,7 +320,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
     /**
      * Register the pre-run step {@code name}, as {@link #commitStep}: ascending {@code order} (a tie: by name), a second
      * registration of the same name replaces the first, a step that throws is logged and the next one runs. A step that
-     * answers {@link PreRun#SKIP} ends the list: the run does not start, and the steps before it are told it did not succeed.
+     * answers {@link PreRun#SKIP} ends the list: the run does not start, and the steps before it are told it did not succeed;
+     * one that answers {@link PreRun#refused} ends it the same way and fails the run with its reason.
      */
     public static synchronized void preRunStep(String name, int order, PreRunStep step) {
         Objects.requireNonNull(name, "name");
@@ -343,6 +352,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         boolean ok = false;
         try {
             boolean skip = false, reload = false;
+            String refused = null;
             for (NamedPreRunStep s : preRunSteps) {
                 PreRun p;
                 try {
@@ -356,9 +366,11 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                 reload |= p.reload();
                 if (p.skip()) {
                     skip = true;
+                    refused = p.refusal();
                     break;
                 }
             }
+            if (refused != null) throw new IllegalStateException(refused);
             if (skip) return new MultiCollectorProcessor.RunResult(0, 0);
             final boolean again = reload;
             MultiCollectorProcessor.RunResult r = commitStepRun(pipeline, () -> run.apply(again));

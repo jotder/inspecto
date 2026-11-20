@@ -41,9 +41,10 @@ import java.util.stream.Stream;
  *       at its own path (a file left with no row is removed), the original kept in {@code <id>/database.period-<stamp>/}
  *       until the import has succeeded ({@link #drop}) or failed ({@link #restore}).</li>
  *   <li><b>The registry</b>: once the import has succeeded, every file whose rows were replaced is marked {@code REPLACED}
- *       in the Consignment output registry - by <i>Replace the period</i> ({@link #drop}) and by <i>Replace everything</i>
- *       ({@link #everythingReplaced}) - so a reprocess of its Consignment is refused instead of bringing the replaced rows
- *       back. A {@code REPLACED} file stays readable: it holds the rows the replacement kept.</li>
+ *       in the Consignment output registry ({@link #drop}) - by <i>Replace the period</i> and by <i>Replace everything</i>
+ *       ({@link #replaceEverything}; Add a file's runs it too since B13) - so a reprocess of its Consignment is refused
+ *       instead of bringing the replaced rows back. A {@code REPLACED} file stays readable: it holds the rows the
+ *       replacement kept.</li>
  * </ul>
  * <p><b>Crash safety</b> (the plan's data-loss risk): every rewrite is written aside first (a hidden {@code .period-…tmp}
  * beside the file), then the journal {@code <id>/period.pending} names each file, its rewrite, the arrival's own outputs and
@@ -298,27 +299,6 @@ public final class ArrivalReplacer {
         } catch (IOException | RuntimeException failed) {
             log.warn("Replace the period of '{}' succeeded, but its originals were not discarded yet (the next run does it): {}",
                     base.getFileName(), failed.toString());
-        }
-    }
-
-    // ── replace everything ─────────────────────────────────────────────────────────────────────────────────────
-
-    /**
-     * <i>Replace everything</i> succeeded: mark every Parquet file it set aside ({@code setAside}, the old {@code database}
-     * folder moved whole) {@code REPLACED} by its path in {@code database}, unless the run wrote that path again. Best
-     * effort, like the registry itself.
-     */
-    public static void everythingReplaced(Path setAside, Path database) {
-        try {
-            Path from = setAside.toAbsolutePath().normalize(), to = database.toAbsolutePath().normalize();
-            List<String> gone = new ArrayList<>();
-            for (Path p : ArrivalCompactor.parquetFiles(from)) {
-                Path original = to.resolve(from.relativize(p).toString());
-                if (!Files.exists(original)) gone.add(original.toString());
-            }
-            ConsignmentOutputStores.markReplaced(gone);
-        } catch (IOException | RuntimeException failed) {
-            log.warn("the files Replace everything set aside in '{}' were not marked replaced: {}", database, failed.toString());
         }
     }
 
