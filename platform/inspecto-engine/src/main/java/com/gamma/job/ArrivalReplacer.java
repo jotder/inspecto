@@ -59,12 +59,15 @@ public final class ArrivalReplacer {
     private static final Logger log = LoggerFactory.getLogger(ArrivalReplacer.class);
     private static final ObjectMapper JSON = new ObjectMapper();
 
-    /** The journal of the replacement in progress, beside the merge map. */
+    /**
+     * The journal of the replacement in progress, beside the store: {@code period.pending} for an import Dataset's
+     * {@code database} folder (beside the merge map), {@code <store>.period.pending} for any other store folder.
+     */
     public static final String JOURNAL = "period.pending";
     /** The merge map as it was before the swap, inside the aside folder. */
     static final String MAP_BEFORE = "compaction.json.before";
     static final String SWAP = "swap", SWAPPED = "swapped", RESTORING = "restoring";
-    private static final Pattern ASIDE = Pattern.compile("database\\.period-[A-Za-z0-9]+");
+    private static final Pattern STAMP = Pattern.compile("[A-Za-z0-9]+");
 
     /** What the replacement did: the days the arrival covers, the rows it removed, the files it rewrote or emptied. */
     public record Result(List<String> days, long rowsRemoved, int filesTouched) { }
@@ -77,14 +80,38 @@ public final class ArrivalReplacer {
     private List<Path> covering = List.of();
     /** Dropped or restored: the other is then a no-op. */
     private boolean done;
+    /** The arrival's rows are committed for good (O6's config path): no way back removes them ({@link #keepingArrival}). */
+    private boolean keepArrival;
 
     /** One <i>Replace the period</i> of Dataset {@code id}; {@code stamp} names its aside folder (letters and digits). */
     public ArrivalReplacer(Path dataRoot, String id, String stamp) {
-        this.base = dataRoot.resolve(id).toAbsolutePath().normalize();
-        this.database = base.resolve("database");
-        this.aside = base.resolve("database.period-" + stamp);
-        if (!ASIDE.matcher(aside.getFileName().toString()).matches())
+        this(dataRoot.resolve(id).resolve("database"), stamp);
+    }
+
+    /**
+     * One replacement in the store folder {@code store} (a Pipeline's {@code dirs.database}, flat local Parquet:
+     * {@code output.load}, BASIC-ELT-PROFILE-1 O6); its journal and aside folder sit beside it.
+     */
+    public static ArrivalReplacer forStore(Path store, String stamp) {
+        return new ArrivalReplacer(store, stamp);
+    }
+
+    /**
+     * The arrival's rows are committed for good whatever happens to this replacement (O6: a Pipeline's own
+     * {@code output.load}, no caller to refuse it): the journal says so, and every way back - {@link #abandon}, and a heal
+     * back after a lost rewrite - keeps them instead of removing them.
+     */
+    public ArrivalReplacer keepingArrival() {
+        this.keepArrival = true;
+        return this;
+    }
+
+    private ArrivalReplacer(Path store, String stamp) {
+        if (!STAMP.matcher(String.valueOf(stamp)).matches())
             throw new IllegalArgumentException("a replace stamp is letters and digits: " + stamp);
+        this.database = store.toAbsolutePath().normalize();
+        this.base = database.getParent();
+        this.aside = base.resolve(database.getFileName() + ".period-" + stamp);
     }
 
     // ── replace the period ─────────────────────────────────────────────────────────────────────────────────────
@@ -101,7 +128,7 @@ public final class ArrivalReplacer {
             if (PathJail.contains(database, abs)) own.add(abs);
         }
         this.covering = own;   // before anything can fail: a restore removes the arrival's rows whatever happened
-        heal(base);
+        heal(database);
         if (covering.isEmpty()) return new Result(List.of(), 0, 0);
         String col = SqlIdent.q(eventDate);
         List<Entry> entries = new ArrayList<>();
@@ -161,15 +188,62 @@ public final class ArrivalReplacer {
 
         // the journal first: from here a failure is undone (restore) and a crash heals (heal); then the merge map as it
         // was, then the swap of every file at once
-        Map<String, Object> j = journal(SWAP, aside, entries, own, merged, next);
-        write(base, j);
+        swapAll(entries, own, merged, next);
+        return new Result(days, removed, entries.size());
+    }
+
+    /**
+     * The journal first: from here a failure is undone (restore) and a crash heals (heal); then the merge map as it was,
+     * then the swap of every file at once.
+     */
+    private void swapAll(List<Entry> entries, List<Path> own, Path merged, List<ArrivalCompactor.Segment> next) throws IOException {
+        Map<String, Object> j = journal(SWAP, database, aside, entries, own, merged, next);
+        if (keepArrival) j.put("keepArrival", true);
+        write(database, j);
         Files.createDirectories(aside);
         if (merged != null) Files.copy(base.resolve(ArrivalCompactor.MAP), aside.resolve(MAP_BEFORE), StandardCopyOption.REPLACE_EXISTING);
         swap(database, aside, entries);
         if (merged != null) ArrivalCompactor.segmentsRewritten(base, merged, next);
         j.put("phase", SWAPPED);
-        write(base, j);
-        return new Result(days, removed, entries.size());
+        write(database, j);
+    }
+
+    // ── replace everything ─────────────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * <i>Replace everything</i> at the commit of an arrival ({@code output.load: replace}, O6): every Parquet file of the
+     * store except {@code fresh} (the files this run wrote) goes, through the same journal, swap and heal as
+     * {@link #replacePeriod}. {@code covering} (the arrival's own output) empty → nothing is removed: an arrival that wrote
+     * no file never empties the store. Undone by {@link #restore}, made final by {@link #drop}. The result names no day.
+     */
+    public Result replaceEverything(List<Path> covering, List<Path> fresh) throws IOException {
+        List<Path> own = new ArrayList<>();
+        for (Path c : covering) {
+            Path abs = c.toAbsolutePath().normalize();
+            if (PathJail.contains(database, abs)) own.add(abs);
+        }
+        this.covering = own;
+        heal(database);
+        if (own.isEmpty()) return new Result(List.of(), 0, 0);
+        Set<Path> freshSet = new HashSet<>(own);
+        for (Path f : fresh) freshSet.add(f.toAbsolutePath().normalize());
+        List<Entry> entries = new ArrayList<>();
+        long removed = 0;
+        try (Connection duck = open(); Statement st = duck.createStatement()) {
+            for (Path f : ArrivalCompactor.parquetFiles(database)) {
+                if (freshSet.contains(f)) continue;
+                try (ResultSet rs = st.executeQuery("SELECT count(*) FROM " + source(List.of(f)))) {
+                    rs.next();
+                    removed += rs.getLong(1);
+                }
+                entries.add(new Entry(f, null));
+            }
+        } catch (SQLException failed) {
+            throw new IOException("the store could not be replaced: " + failed.getMessage(), failed);
+        }
+        if (entries.isEmpty()) return new Result(List.of(), 0, 0);
+        swapAll(entries, own, null, null);   // the merge map falls with its merged file (trusted only while it exists)
+        return new Result(List.of(), removed, entries.size());
     }
 
     /**
@@ -177,9 +251,24 @@ public final class ArrivalReplacer {
      * own rows ({@code covering}): no day is left doubled. Crash-safe through the journal; a no-op after {@link #drop}.
      */
     public void restore() throws IOException {
+        restore(false);
+    }
+
+    /**
+     * Put every original back but KEEP the arrival's own rows (O6: a replacement that failed after the engine committed the
+     * arrival - its rows are appended, not lost; a day may then hold them twice). A no-op after {@link #drop} or
+     * {@link #restore}.
+     */
+    public void abandon() throws IOException {
+        restore(true);
+    }
+
+    private void restore(boolean keepArrival) throws IOException {
         if (done) return;
         done = true;
-        Map<String, Object> j = read(base);
+        if (keepArrival) covering = List.of();
+        Map<String, Object> j = read(database);
+        if (keepArrival && j != null) j.put("covering", List.of());
         if (j == null || !aside.getFileName().toString().equals(j.get("aside"))) {
             if (covering.isEmpty()) return;
             if (j != null) {   // an older replace's journal its heal could not finish: left to it; only this arrival's rows go
@@ -188,11 +277,11 @@ public final class ArrivalReplacer {
                 }
                 return;
             }
-            j = journal(RESTORING, aside, List.of(), covering, null, null);   // nothing was swapped: only the arrival's rows go
+            j = journal(RESTORING, database, aside, List.of(), covering, null, null);   // nothing was swapped: only the arrival's rows go
         }
         j.put("phase", RESTORING);
-        write(base, j);
-        back(base, j);
+        write(database, j);
+        back(database, j);
     }
 
     /**
@@ -204,8 +293,8 @@ public final class ArrivalReplacer {
         if (done) return;
         done = true;
         try {
-            Map<String, Object> j = read(base);
-            if (j != null) finish(base, j);
+            Map<String, Object> j = read(database);
+            if (j != null) finish(database, j);
         } catch (IOException | RuntimeException failed) {
             log.warn("Replace the period of '{}' succeeded, but its originals were not discarded yet (the next run does it): {}",
                     base.getFileName(), failed.toString());
@@ -237,37 +326,39 @@ public final class ArrivalReplacer {
 
     /** Finish a <i>Replace the period</i> of Dataset {@code id} that a crash interrupted (see the class javadoc). */
     public static void heal(Path dataRoot, String id) throws IOException {
-        heal(dataRoot.resolve(id).toAbsolutePath().normalize());
+        heal(dataRoot.resolve(id).resolve("database"));
     }
 
-    private static void heal(Path base) throws IOException {
-        Map<String, Object> j = read(base);
+    /** Finish a replacement in the store folder {@code store} that a crash interrupted (see the class javadoc). */
+    public static void heal(Path store) throws IOException {
+        Path database = store.toAbsolutePath().normalize();
+        Map<String, Object> j = read(database);
         if (j == null) return;
         String phase = String.valueOf(j.get("phase"));
         if (RESTORING.equals(phase)) {
-            back(base, j);
+            back(database, j);
             return;
         }
         if (SWAP.equals(phase)) {
-            Path database = base.resolve("database");
-            Path aside = aside(base, j);
+            Path aside = aside(database, j);
             List<Entry> entries = entries(database, j);
             for (Entry e : entries)
                 if (!(e.tmp() == null || Files.exists(e.tmp()) || Files.exists(kept(database, aside, e)) && Files.exists(e.file()))) {
                     log.warn("Replace the period of '{}' was interrupted and a rewrite is lost: the originals are put back",
-                            base.getFileName());
+                            name(database));
+                    if (Boolean.TRUE.equals(j.get("keepArrival"))) j.put("covering", List.of());   // committed for good
                     j.put("phase", RESTORING);
-                    write(base, j);
-                    back(base, j);
+                    write(database, j);
+                    back(database, j);
                     return;
                 }
             swap(database, aside, entries);
             if (j.get("merged") instanceof String m)
-                ArrivalCompactor.segmentsRewritten(base, inside(database, m), segments(j));
+                ArrivalCompactor.segmentsRewritten(database.getParent(), inside(database, m), segments(j));
             j.put("phase", SWAPPED);
-            write(base, j);
+            write(database, j);
         }
-        finish(base, j);
+        finish(database, j);
     }
 
     // ── the steps both ways share ──────────────────────────────────────────────────────────────────────────────
@@ -290,9 +381,9 @@ public final class ArrivalReplacer {
     }
 
     /** Back to the old state: originals in place, rewrites gone, the merge map as it was, the arrival's own rows gone. */
-    private static void back(Path base, Map<String, Object> j) throws IOException {
-        Path database = base.resolve("database");
-        Path aside = aside(base, j);
+    private static void back(Path database, Map<String, Object> j) throws IOException {
+        Path base = database.getParent();
+        Path aside = aside(database, j);
         List<Entry> entries = entries(database, j);
         try (SnapshotSwapLock.Held lock = SnapshotSwapLock.write(database)) {   // deletes files a reader may hold
             for (int i = entries.size() - 1; i >= 0; i--) {
@@ -312,25 +403,23 @@ public final class ArrivalReplacer {
         Path before = aside.resolve(MAP_BEFORE);
         if (Files.isRegularFile(before)) AtomicFiles.write(base.resolve(ArrivalCompactor.MAP), Files.readAllBytes(before), ".cmp-");
         deleteTree(aside);
-        Files.deleteIfExists(base.resolve(JOURNAL));
+        Files.deleteIfExists(journalFile(database));
     }
 
     /** Forward to the end: the replaced files marked in the registry (idempotent), the originals discarded, the journal gone. */
-    private static void finish(Path base, Map<String, Object> j) throws IOException {
-        Path database = base.resolve("database");
+    private static void finish(Path database, Map<String, Object> j) throws IOException {
         List<String> replaced = new ArrayList<>();
         for (Entry e : entries(database, j)) replaced.add(e.file().toString());
         ConsignmentOutputStores.markReplaced(replaced);
         checkpoint("drop");
-        deleteTree(aside(base, j));
-        Files.deleteIfExists(base.resolve(JOURNAL));
+        deleteTree(aside(database, j));
+        Files.deleteIfExists(journalFile(database));
     }
 
     // ── the journal ────────────────────────────────────────────────────────────────────────────────────────────
 
-    private static Map<String, Object> journal(String phase, Path aside, List<Entry> entries, List<Path> covering, Path merged,
-                                               List<ArrivalCompactor.Segment> next) {
-        Path database = aside.resolveSibling("database");
+    private static Map<String, Object> journal(String phase, Path database, Path aside, List<Entry> entries, List<Path> covering,
+                                               Path merged, List<ArrivalCompactor.Segment> next) {
         Map<String, Object> j = new LinkedHashMap<>();
         j.put("phase", phase);
         j.put("aside", aside.getFileName().toString());
@@ -348,20 +437,32 @@ public final class ArrivalReplacer {
         return j;
     }
 
-    private static void write(Path base, Map<String, Object> j) throws IOException {
-        AtomicFiles.write(base.resolve(JOURNAL), JSON.writeValueAsBytes(j), ".period-");
+    /** The journal of {@code database}: {@link #JOURNAL} beside an import's {@code database}, else named by the store. */
+    static Path journalFile(Path database) {
+        String store = database.getFileName().toString();
+        return database.resolveSibling("database".equals(store) ? JOURNAL : store + "." + JOURNAL);
+    }
+
+    /** The Dataset (an import's {@code <id>/database}) or the store folder, as a log line names it. */
+    private static String name(Path database) {
+        return "database".equals(database.getFileName().toString()) ? database.getParent().getFileName().toString()
+                : database.getFileName().toString();
+    }
+
+    private static void write(Path database, Map<String, Object> j) throws IOException {
+        AtomicFiles.write(journalFile(database), JSON.writeValueAsBytes(j), ".period-");
     }
 
     /** The journal, or null when there is none; an unreadable one is refused, never guessed at. */
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> read(Path base) throws IOException {
-        Path f = base.resolve(JOURNAL);
+    private static Map<String, Object> read(Path database) throws IOException {
+        Path f = journalFile(database);
         if (!Files.isRegularFile(f)) return null;
         try {
             return new LinkedHashMap<>(JSON.readValue(f.toFile(), Map.class));
         } catch (IOException unreadable) {
-            throw new IOException("the last Replace the period of '" + base.getFileName() + "' cannot be finished: its journal "
-                    + JOURNAL + " is unreadable (" + unreadable.getMessage() + ")", unreadable);
+            throw new IOException("the last replacement in '" + name(database) + "' cannot be finished: its journal "
+                    + f.getFileName() + " is unreadable (" + unreadable.getMessage() + ")", unreadable);
         }
     }
 
@@ -381,11 +482,13 @@ public final class ArrivalReplacer {
         return ArrivalCompactor.segments(m);
     }
 
-    /** The journal's aside folder: a sibling of {@code database} named as {@link #ASIDE} says, never anywhere else. */
-    private static Path aside(Path base, Map<String, Object> j) throws IOException {
+    /** The journal's aside folder: a sibling of {@code database} named {@code <store>.period-<stamp>}, never anywhere else. */
+    private static Path aside(Path database, Map<String, Object> j) throws IOException {
         String name = String.valueOf(j.get("aside"));
-        if (!ASIDE.matcher(name).matches()) throw new IOException("the journal of '" + base.getFileName() + "' names no aside folder");
-        return base.resolve(name);
+        String prefix = database.getFileName() + ".period-";
+        if (!name.startsWith(prefix) || !STAMP.matcher(name.substring(prefix.length())).matches())
+            throw new IOException("the journal of '" + name(database) + "' names no aside folder");
+        return database.resolveSibling(name);
     }
 
     private static Path kept(Path database, Path aside, Entry e) {
