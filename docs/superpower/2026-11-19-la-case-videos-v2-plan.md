@@ -278,18 +278,18 @@ Sequencing: P0 and P1 now; P2 and P3 can start as soon as D-CV1…D-CV3 are answ
 fans out. Lanes in P4 and P5 follow the training series' lane flow: probe, spec, render, contact-sheet, commit; one lane
 per push; never record two lanes on the same Space at once (the training series' state-pollution lesson).
 
-## 9. Decisions for the operator
+## 9. Decisions for the operator (all answered 2026-11-20: D-CV1…D-CV6 "all recommended", D-CV7 the environment)
 
-- **D-CV1 voice:** keep Piper `hfc_female` for continuity with the training series *(recommended)*, or choose a second
+- **D-CV1 voice (decided 2026-11-20, the recommendation):** keep Piper `hfc_female` for continuity with the training series *(recommended)*, or choose a second
   voice for case films (a trial of two candidates costs one lane).
-- **D-CV2 loudness and music:** -16 LUFS with the ambient bed under cards only *(recommended)*, or no music, or -18 LUFS
+- **D-CV2 loudness and music (decided 2026-11-20, the recommendation):** -16 LUFS with the ambient bed under cards only *(recommended)*, or no music, or -18 LUFS
   like the training series.
-- **D-CV3 length:** 4–5 minutes per film with a shared 90-second Standard module *(recommended)*, or keep the v1 length
+- **D-CV3 length (decided 2026-11-20, the recommendation):** 4–5 minutes per film with a shared 90-second Standard module *(recommended)*, or keep the v1 length
   and tail in every film.
-- **D-CV4 supersede:** v1 files stay in the folder as `_v1` until v2 is signed off *(recommended)*, or are deleted when
+- **D-CV4 supersede (decided 2026-11-20, the recommendation):** v1 files stay in the folder as `_v1` until v2 is signed off *(recommended)*, or are deleted when
   each v2 renders.
-- **D-CV5 captions and SRT:** burned in plus sidecar *(recommended)*, or sidecar only.
-- **D-CV6 UI tick sound:** included, switchable *(recommended)*, or none.
+- **D-CV5 captions and SRT (decided 2026-11-20, the recommendation):** burned in plus sidecar *(recommended)*, or sidecar only.
+- **D-CV6 UI tick sound (decided 2026-11-20, the recommendation):** included, switchable *(recommended)*, or none.
 - **D-CV7 environment (answered by the operator, 2026-11-20):** record on Standard with the fake Demo Auth sign-in and the bundled example Spaces (§4.5).
 
 ## 10. Status log
@@ -297,3 +297,4 @@ per push; never record two lanes on the same Space at once (the training series'
 - **2026-11-19:** plan written; the standard and the case table fixed; P1 (twenty specs) started in four lanes.
 - **2026-11-19 (later):** P1 first drafts of all twenty specs written (four files, §6), the table corrected to the data. Open before sign-off: a review pass for sentence rhythm (average 9–10 words, target 12–16), the `[check in UI]` marks (Insurance start-from step, whether the Law enforcement taxi is drawn, v1 link counts, the Access creep "no ticket" claim), `tools/check-vocabulary.mjs` on the new files once tracked, and decisions D-CV1…D-CV6.
 - **2026-11-20:** the operator confirmed the recording environment: Standard, fake Demo Auth sign-in, the bundled examples (new §4.5, D-CV7). Spec headers point to it.
+- **2026-11-20 (later):** the operator answered "all recommended" for D-CV1…D-CV6 and said start: three lanes began, VOICE (P2: lexicon and its test, pace profile and `[pause]`, -16 LUFS mastering, ambient bed with ducking, UI tick), RENDER (P3: story card, decoy marker, case-file card, intro card, SRT and chapters for case films), PILOT (Telecom_SimSwap on a fresh Standard unzip with Demo Auth: episode JSON and probes). Review of the spec drafts for sentence rhythm and the `[check in UI]` marks runs beside them.
