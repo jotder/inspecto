@@ -326,7 +326,7 @@ public final class ConfigSpecs {
                                 + "same path), checksum (the bytes at the same path), etag (the remote listing's etag or "
                                 + "version), content (the bytes under any name: a file re-sent under a new name is a "
                                 + "duplicate too). Every mode but path keeps the fingerprint ledger, which outlives a "
-                                + "restart only with -Dacquire.ledger.backend=db. Default path."),
+                                + "restart (-Dacquire.ledger.backend=db, the default; memory forgets it). Default path."),
                 // ── source-side post-action (PROCESSOR-RELEASE-READINESS-1, sink.archive, 2026-09-24) ──
                 // RemoteAcquisitionHandler.resolvePostAction reads an unknown on_success as RETAIN with a
                 // run-time log line only, so a typo silently archived nothing. No spec defaults, as above.

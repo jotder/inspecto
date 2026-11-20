@@ -406,7 +406,7 @@ Postgres instead, and some files exist only when their flag is set. Each file ha
 | `inspecto-alerts.db` | Alert records | `-Dalerts.backend=db`, the default on every edition |
 | `inspecto-dedup-ledger.db` | cross-Consignment record dedup ledger | when used |
 | `inspecto-consignment-outputs.db` | Consignment output-file registry | `-Dconsignment.outputs.backend` |
-| `inspecto-acquisition.db` | acquisition (dedup) ledger | `-Dacquire.ledger.backend=db` |
+| `inspecto-acquisition.db` | acquisition (dedup) ledger | default (`-Dacquire.ledger.backend=db`) |
 | `inspecto-events.db` | event store (instead of `data/events/`) | `-Devents.backend=db` |
 | `inspecto-file-stages.db` | per-file stage progression | `-Dfile.stages.backend` |
 | `inspecto-delivery-receipts.db` | delivery receipts | `-Ddelivery.receipts.backend` (off by default) |

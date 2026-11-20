@@ -235,13 +235,18 @@ class ControlApiInboxWatchTest {
                     "the arrivals list names the import and the refusal with its reason: " + all);
             assertFalse(list.at("/feed").has("watchError"), list.toString());
 
-            // a file imported before under the same name is skipped by the run: nothing new arrives
+            // a file imported before sent again is not imported again: set aside, and the arrivals say why (B3 part 2)
+            long rows = OnboardImport.countRows(Path.of("database", id, "database"));
             dropSettled(id, "drop_a.csv", ControlApiOnboardFilesTest.transfers(10));
             int arrivalsBefore = list.get("arrivals").size();
             poll(c);
             poll(c);
-            assertEquals(arrivalsBefore, data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200)
-                    .get("arrivals").size(), "nothing ran");
+            JsonNode later = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals");
+            assertEquals(arrivalsBefore + 1, later.size(), later.toString());
+            assertEquals("REFUSED", later.get(0).get("status").asText(), later.get(0).toString());
+            assertTrue(later.get(0).get("reason").asText().contains("already imported"), later.get(0).toString());
+            assertEquals(rows, OnboardImport.countRows(Path.of("database", id, "database")), "nothing ran");
+            assertEquals(List.of("scheduler"), probed, "nothing followed on");
         }
     }
 

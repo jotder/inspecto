@@ -113,7 +113,7 @@ interface ConsignmentIngestStrategy {
      */
     static MemberAudit claimOutputStem(Map<String, Consignment.Member> claimed, Consignment.Member m, String stem,
                                        PipelineConfig cfg, java.time.LocalDateTime mStart) throws java.io.IOException {
-        Consignment.Member owner = claimed.putIfAbsent(stem.toLowerCase(java.util.Locale.ROOT), m);
+        Consignment.Member owner = claimed.putIfAbsent(FileNames.stemKey(stem), m);
         if (owner == null) return null;
         QuarantineManager.quarantine(m.file(), QuarantineManager.REASON_OUTPUT_STEM_COLLISION, false, cfg);
         log.warn("[INGEST] [{}] output stem '{}' is already used by member [{}] of this batch — failing it closed"
@@ -850,12 +850,11 @@ interface ConsignmentIngestStrategy {
      * another directory, in this or a later batch, gets a different name). Never the raw path: never-store-values.
      */
     static String memberStem(PipelineConfig cfg, java.io.File file) {
-        String stem = FileNames.outputStem(cfg, file.getName());
-        if (!cfg.outputPerMember()) return stem;
+        if (!cfg.outputPerMember()) return FileNames.outputStem(cfg, file.getName());
         java.nio.file.Path origin = com.gamma.etl.unpack.UnpackOrigins.originalOr(file).toPath().toAbsolutePath().normalize();
         java.nio.file.Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
         String rel = (origin.startsWith(poll) ? poll.relativize(origin) : origin).toString().replace('\\', '/');
-        return stem + "__" + com.gamma.etl.FailureText.fingerprint(cfg, rel).substring(3, 11);
+        return FileNames.memberStem(cfg, file.getName(), rel);   // the one spelling, shared with an Add data import's check
     }
 
     /**

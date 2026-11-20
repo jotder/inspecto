@@ -178,3 +178,10 @@ every gate (503, 401, 403, 404, 409 for a named and an unreadable `_snapshot.too
 - a snapshot cannot be watched, and an old `watchInbox: true` never reads as watched.
 
 Two mutants were killed by these tests: allowing Watch on a snapshot, and leaving the failed export's folder behind.
+
+## Not done here
+
+- A run of a switched snapshot Pipeline outside Run now (`POST /pipelines/{id}/run`, a trigger) reads through the
+  engine's connector: it has no column check, no `import.max_rows` cap and only the engine's own fetch wording, where Run
+  now keeps its own export. A feed set on a snapshot before the 422 ruling cannot be stopped, because
+  `DELETE /datasets/{id}/feed` refuses a snapshot too (board `SNAPSHOT-OUTSIDE-RUN-NOW-1`).

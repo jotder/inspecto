@@ -574,8 +574,7 @@ public final class ConsignmentIngestor {
                     // re-delivery in another compression form finds them; plain files keep the
                     // verbatim key — a plain-only inbox is byte-for-byte unchanged. `name` keeps the
                     // actual spelling either way, which is what the alias-hit log line reports.
-                    String ledgerKey = com.gamma.etl.unpack.LogicalNames.involvesCompression(srcFile.getName())
-                            ? com.gamma.etl.unpack.LogicalNames.logicalName(rel, cfg) : rel;
+                    String ledgerKey = ledgerKey(cfg, srcFile.getName(), rel);
                     // Never store values: a name that embeds a digit-form value is recorded as its salted
                     // fingerprint form (FileNames) — key AND name, the same transform CollectorProcessor's
                     // lookup applies, so dedup identity is unchanged.
@@ -988,4 +987,28 @@ public final class ConsignmentIngestor {
 
         audit.flush(batchRow, fileRows, lineage);
     }
+
+    /**
+     * The fingerprint ledger key of a committed member before {@link FileNames#safe} (the commit records it, a reprocess
+     * forgets it): the inbox-relative path {@code rel} ({@code archive!entry} for an archive member), under its LOGICAL name
+     * when compression is involved (unpack-stage plan §2.3), else verbatim.
+     */
+    static String ledgerKey(PipelineConfig cfg, String fileName, String rel) {
+        return com.gamma.etl.unpack.LogicalNames.involvesCompression(fileName)
+                ? com.gamma.etl.unpack.LogicalNames.logicalName(rel, cfg) : rel;
+    }
+
+    /**
+     * {@link #ledgerKey} of a manifest member, from what the manifest keeps: the member's own file name and its
+     * {@code originalRelPath}. An archive member is addressed {@code <archive>!<entry>} where {@code <entry>} IS the
+     * member's file name, so the archive's name is what precedes exactly that suffix - never the first {@code !}, which a
+     * folder or file name may hold. Any other member (a plain file, a 1-to-1 stream expansion) is its path's last segment.
+     */
+    static String ledgerKeyOfMember(PipelineConfig cfg, String memberFileName, String originalRelPath) {
+        String suffix = "!" + memberFileName;
+        String archiveRel = originalRelPath.endsWith(suffix)
+                ? originalRelPath.substring(0, originalRelPath.length() - suffix.length()) : originalRelPath;
+        return ledgerKey(cfg, archiveRel.substring(archiveRel.lastIndexOf('/') + 1), originalRelPath);
+    }
+
 }

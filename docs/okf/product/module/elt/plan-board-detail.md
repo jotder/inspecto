@@ -28,10 +28,6 @@ work; this page keeps the narrative the row carried, verbatim as it stood on the
 
 - **Step Processor catalog** — ✅ **The 2026-09-23 hold on new Step Processors was LIFTED (operator, 2026-10-06)** — the operator named `transform.analytics.running` first (delivered 2026-10-06 as `transform.running`); `sink.file.excel` was also named and DELIVERED 2026-10-06 as `sink.excel`. Build the next one only when the operator names it. 123<!--count:processors--> processors: **55**<!--count:processors-delivered--> delivered / **17**<!--count:processors-partial--> partial / 51 planned (`processor-catalog.contract.json`). Each partial is its own product decision (Kafka consumer, XPath grammar, resampler, KPI layer, Jinja, graph tagging, commit controller, SLA object, view/email sinks…) — pick one by name. ⚠ A catalog entry is a `BuiltinNodeType` case compiled by `RecipeCompiler`/`ProcessorCatalog`, **not** the `ConsignmentProcessor` SPI; the namespace is `transform.*`; a new node type needs a flat-config home too; and both contract JSONs under `inspecto-ui/` are generated from Java and must be regenerated in the same change. → `EDITIONS.md` §Step Processors · `okf/product/module/elt/spec-step-catalog.md`
 
-### BASIC-ELT-PROFILE-1
-
-- `BASIC-ELT-PROFILE-1` — **Basic onboarding as a locked profile of ELT: one implementation, Basic = options locked.** Basic already runs a registered Pipeline, but a parallel layer of about 6,700 backend lines (own 30 s poller, own follow-on seam, arrival rules, sniff and Postgres path in `inspecto/.../control/`) and about 9,400 UI lines in the LA project duplicate ELT parts. Phases: P0 verify (backend, UI), UI-0 move Add data to the core library, UI-1 reuse the schema / connection / grammar / Collector components, BE-1 poller and follow-on, BE-2 arrival rules as engine Pipeline options, BE-3 sniff, BE-4 Postgres as a connector scheme, then the Edition gate. → `superpower/2026-11-19-basic-elt-profile-plan.md`
-
 ## Standing refusals and decisions
 
 Board §6: not work — kept so nobody re-files it.

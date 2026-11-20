@@ -51,9 +51,56 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   Consignment output registry, so their reprocess is refused (`409`). *Replace everything* runs the same way since B13
   (2026-11-20): every other file goes at the upload's commit, through the journal and the heal, so a crash no longer
   leaves the Dataset empty: [spec-arrival-replace.md](../elt/spec-arrival-replace.md).
-- **The same bytes again** (D-3): append or period whose sha256 matches an upload whose rows are still held answers 409
-  with the first import's date (`DatasetArrivals.alreadyImported`). Replace everything may always reload. A folder drop
-  under the same name is skipped by the import Pipeline's duplicate policy and stays in the inbox.
+- **The same bytes again** (D-3; `BASIC-ELT-PROFILE-1` B3 part 2, 2026-11-20): an import's Pipeline runs with
+  `collector.duplicate: {mode: content, algorithm: SHA256, on_change: ignore}`, so the engine records the sha256 of every file it takes in the
+  acquisition ledger (durable `db` by default on every edition) and the import asks that ledger
+  (`ImportFingerprints`, `AcquisitionLedger.findByChecksum`), not the sidecar: append or period whose bytes it holds answers
+  409 with the day it was recorded and the name it came under (Add data's landed name without its stamp). The upload's
+  bytes as sent are its fingerprint, also when a new column was left out of the landed copy. A **waiting file** (Run now,
+  *Watch this folder*, the drops Add a file's run takes) with bytes the ledger holds, or the bytes of an earlier waiting
+  file or of the upload, is moved to `<id>/refused/` before the columns are judged (pre-run step
+  `import.refuse_duplicates`) and listed as a refused arrival with the reason - never left in the inbox. So is a waiting
+  file whose FILE NAME the import took with other bytes, in any folder of the inbox ("a file named 'x' was already
+  imported on <day> with other content ... rename it"): ⚠ the engine writes one output per file name, so reading it would
+  write the new file over the first one's rows (a reused name in another folder did exactly that, 112 rows became 106).
+  Two waiting files of one name in one run (`feed.csv`, `later/feed.csv`): the first is taken, the second set aside
+  (step `import.refuse_twins`, after the columns are judged; it also takes the run's same-bytes twins, and a file
+  counts as taken only once every refusing step passed it, so a refused file claims no name and makes no twin).
+  "One name" is the engine's output name: the stem without folder or extension, case-folded (`FileNames.memberStem` +
+  `FileNames.stemKey`, what the engine's `memberStem` and its batch guard `claimOutputStem` use), so `Feed.CSV` is
+  `feed.csv`; with `processing.output_per_member` on, the name carries a hash of the path, so only the same path collides.
+  The checks against earlier runs (bytes, name) stay before the columns (`import.refuse_duplicates`).
+  ⚠ Open (board `IMPORT-NAME-CHECK-LEFTOVERS-1`): with `output_per_member` on, that cross-run name check can miss a file
+  whose path holds a run of 8 or more digits (the ledger stores the value-masked path, so the path hash the check
+  recomputes differs from the engine's), and each waiting file is hashed twice, in `import.refuse_duplicates` (50) and
+  `import.refuse_twins` (150). Add data cannot set the duplicate check (`duplicate.mode`, `on_change`); a Basic import's
+  Pipeline carries the import's own setting and only the Pipelines editor's Collector stage changes it (board
+  `ADD-DATA-DUPLICATE-CHECK-UI-1`, needs a design).
+  Nothing is replaced, nothing silently skipped. `on_change` is the Pipeline's own setting: set to `reprocess`, a reused
+  name is read, and ⚠ a same-name file - in the same folder or another one - REPLACES the first file's rows (the person's
+  choice; engine defect `OUTPUT-NAME-OVERWRITE-1`). A *Replace everything* run judges its WAITING
+  files the same way (a failed replacement is undone for the upload's own Consignment only, so a waiting file read beside the
+  held rows would double them): one whose bytes a held arrival has is set aside with "this Replace everything run replaces
+  that arrival ... it can be sent again after the replace" (when the upload has those same bytes: "same content as '<upload>',
+  which this run takes", since the replace loads them); one whose NAME a held arrival has gets the name reason, "rename it"
+  - the fingerprints are forgotten AFTER the step judged them, for the upload itself, and after the replace the same bytes
+  are new again. Add a file and the step ask the ledger whatever the Pipeline's
+  mode (operator 2026-11-20): an import left on `path` has its uploads fingerprinted by Add data (`recordUpload`).
+  **Forgetting:**
+  Replace everything forgets every fingerprint of the import before its run - the engine judges the upload against the
+  ledger first, while the old rows are replaced inside the run, at the upload's commit (B13) - and an undone or failed
+  replacement (the originals restored by the journal) records them again (once the replacement is final the undo is
+  cleared: a later failure keeps the upload's fingerprint and does not bring the replaced ones back); Replace the period forgets those of the arrivals
+  whose rows the Dataset no longer holds (every output file gone, none merged by a compaction), a new import those an
+  earlier Dataset of its id left; a run that is undone records them again, and forgets the upload's own fingerprint
+  when its rows go with it (a replace or period undone, or a 422 "nothing was imported"). **Upgrade:** at start an import Pipeline still
+  on the `path` default is moved onto `content` through the Pipeline write path (an approval policy over Pipelines leaves
+  it on `path`, logged), and an import the ledger holds nothing of is seeded once: its sidecar's upload hashes, and BY
+  NAME ONLY each file its processed markers name (no hash was ever kept) - but not a marker older than the last Replace
+  everything, whose rows were set aside, unless that replace's own run or a later one took the file (its arrivals line
+  is stamped after the run, its markers before) - so a file the path check held back in the inbox is set aside as already
+  imported instead of read (`ImportFingerprints.migrate`). A foreign drop taken under the path
+  check is known by name only: its bytes re-sent under another name are not recognised. Tests: `ControlApiImportFingerprintsTest`.
 - **Schema drift** (D-6, operator 2026-11-05): `OnboardImport.checkColumns` judges a later file by column NAME before
   anything lands. A missing column, or a delimited column at another position, refuses it naming each (422 for an upload;
   Run now, and Add a file for the drops its run takes, move a refused waiting file to `<id>/refused/`). An import with no
@@ -90,7 +137,7 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   **One clock for person-facing times (`DATES-ONE-ZONE-1`, fixed 2026-11-06):** an arrival's `received` is the
   server's local wall clock without a zone (`yyyy-MM-dd HH:mm:ss`), so `<date>` above is `keptFrom.at` (an ISO UTC
   instant on the wire) turned to the server's local day (`DatasetNewColumns.localDay`), never its UTC date part; the duplicate-import 409 ("'x' was
-  already imported on <date>", from the arrival sidecar line's instant) uses the same. The UI
+  already imported on <date>", from the fingerprint's `processed_at`) uses the same. The UI
   shows every server-recorded time through `ledgerTime()` (`add-data.model.ts`): a zoneless value as it is, a value
   WITH a zone (`compactedAt`, a carried compaction block's `received`) in local time. Event dates (`coversFrom/To`) are
   the data's own values and are never moved. Gap: a zoneless value is the server's clock and a zoned one is turned to
@@ -156,9 +203,10 @@ for THIS id).
   nothing imported. Tests:
   `ControlApiDatasetFeedTest` (`addAFileRightAfterKeepThisUpToDate…`, `onBasicAddAFileStillTakes…`), `RunFilesTest`.
 - **Waiting files** = regular files under the inbox (depth 4, links not followed) with the import's extension, never a
-  hidden one (`.landing-*` uploads in flight). A file whose name the import took before (`MarkerManager
-  .isAlreadyProcessed`) is skipped by Run now and would wait for ever, so it is flagged (`alreadyImported`, per file and
-  counted) and the inbox says to rename it (found by the ledger lane).
+  hidden one (`.landing-*` uploads in flight). A file the import took before - the same name AND bytes in
+  the fingerprint ledger, hashed only when the name and size match (B3 part 2; a Pipeline still on `path`: its processed
+  marker) - is flagged (`alreadyImported`, per file and counted): the next run sets it aside. A same-name file with new
+  bytes is not flagged; the next run sets it aside too (unless the Pipeline says `on_change: reprocess`).
 - **The index Job is proposed, not written.** The PUT answers `indexJob`: an `la.index.build` Job
   (`on_signal: pipeline.commit`, `when $signal.pipeline == <id> && SUCCESS`, the link mapping's columns, `allow_full`)
   or null without a link mapping; the client saves it through `POST /jobs`, so the Jobs route's rights, approvals and

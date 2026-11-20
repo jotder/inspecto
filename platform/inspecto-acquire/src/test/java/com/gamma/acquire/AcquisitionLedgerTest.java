@@ -36,6 +36,22 @@ class AcquisitionLedgerTest {
         dbWatermarkContract(ledger);
         renameSourceContract(ledger);
         checksumContract(ledger);
+        forgetContract(ledger);
+    }
+
+    /** B3 part 2: a source's fingerprints listed, and one forgotten - its bytes read as new again; other sources untouched. */
+    private static void forgetContract(AcquisitionLedger ledger) {
+        assertTrue(ledger.entries("F").isEmpty(), "nothing recorded ⇒ none");
+        ledger.record(new LedgerEntry("F", "a.csv", "a.csv", 1, "x", null, null, 1L, 1L, LedgerEntry.PROCESSED));
+        ledger.record(new LedgerEntry("F", "b.csv", "b.csv", 1, "y", null, null, 1L, 2L, LedgerEntry.PROCESSED));
+        ledger.record(new LedgerEntry("G", "a.csv", "a.csv", 1, "x", null, null, 1L, 1L, LedgerEntry.PROCESSED));
+        assertEquals(java.util.Set.of("a.csv", "b.csv"),
+                ledger.entries("F").stream().map(LedgerEntry::relativePath).collect(java.util.stream.Collectors.toSet()));
+        assertTrue(ledger.forget("F", "a.csv"));
+        assertFalse(ledger.forget("F", "a.csv"), "already forgotten");
+        assertTrue(ledger.findByChecksum("F", "x").isEmpty(), "its bytes are new to the source again");
+        assertEquals("a.csv", ledger.findByChecksum("G", "x").orElseThrow().relativePath(), "another source keeps its own");
+        assertEquals(1, ledger.entries("F").size());
     }
 
     /** B3: the newest fingerprint with these bytes under any path of the source; never another source's, never a null checksum. */
@@ -99,6 +115,25 @@ class AcquisitionLedgerTest {
         String url = "jdbc:duckdb:" + dir.resolve("ledger.db").toString().replace('\\', '/');
         try (AcquisitionLedger ledger = DbAcquisitionLedger.open(url, null, null)) {
             contract(ledger);
+        }
+    }
+
+    /** B3 verifier note: findByChecksum's (source_id, checksum) lookup has its own index, made on open (and on an existing file). */
+    @Test
+    void duckDbIndexesTheChecksumLookup(@TempDir Path dir) throws Exception {
+        String url = "jdbc:duckdb:" + dir.resolve("ix.db").toString().replace('\\', '/');
+        DbAcquisitionLedger.open(url, null, null).close();
+        try (AcquisitionLedger again = DbAcquisitionLedger.open(url, null, null)) {   // idempotent on reopen
+            again.record(new LedgerEntry("S", "a.csv", "a.csv", 1, "x", null, null, 1L, 1L, LedgerEntry.PROCESSED));
+            again.record(new LedgerEntry("S", "a.csv", "a.csv", 2, "y", null, null, 2L, 2L, LedgerEntry.PROCESSED));   // upsert with the index
+            assertEquals("a.csv", again.findByChecksum("S", "y").orElseThrow().relativePath());
+        }
+        try (java.sql.Connection c = com.gamma.util.JdbcDrivers.connect(url);
+             java.sql.Statement st = c.createStatement();
+             java.sql.ResultSet rs = st.executeQuery("SELECT sql FROM duckdb_indexes() WHERE table_name = 'inspecto_acquisition_ledger'")) {
+            assertTrue(rs.next(), "the checksum index exists");
+            String sql = rs.getString(1).toLowerCase(java.util.Locale.ROOT);
+            assertTrue(sql.contains("source_id") && sql.contains("checksum"), sql);
         }
     }
 

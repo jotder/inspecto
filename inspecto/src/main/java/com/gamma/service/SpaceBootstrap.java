@@ -40,8 +40,8 @@ final class SpaceBootstrap {
         // Discover the space's configs from its own config/ tree; an empty space is allowed (no exit).
         CollectorService service = ServiceBootstrap.buildFrom(root, new String[]{root.config().toString()}, false);
 
-        // The space's own acquisition (dedup) ledger — its own DuckDB file when the backend is `db`; the default
-        // memory backend yields an isolated in-memory instance. Keyed by space id (the poll path resolves by MDC).
+        // The space's own acquisition (dedup) ledger — its own DuckDB file under the default `db` backend; the
+        // memory opt-in yields an isolated in-memory instance. Keyed by space id (the poll path resolves by MDC).
         String ledgerUrl = OperationalDb.urlFor(
                 OperationalDb.Family.ACQUISITION_LEDGER, root, root.acquisitionLedgerDbUrl());
         AcquisitionLedgers.register(id.value(), AcquisitionLedgers.build(ledgerUrl, id.value()));

@@ -94,4 +94,21 @@ class FileNamesTest {
         assertEquals(once, FileNames.outputStem(c, once + ".csv"));
         assertEquals("fp-1234567890abcdef", FileNames.outputStem(c, "fp-1234567890abcdef.csv"));
     }
+
+    /** The output name two files collide on: the stem, case-folded; with output_per_member also the path's hash. */
+    @Test
+    void theOutputNameKeyFoldsCaseAndFollowsOutputPerMember(@TempDir Path dir) throws Exception {
+        PipelineConfig off = cfg(dir, "a");
+        assertEquals("feed", FileNames.stemKey(FileNames.memberStem(off, "Feed.CSV", "later/Feed.CSV")));
+        assertEquals(FileNames.outputStem(off, "feed.csv"), FileNames.memberStem(off, "feed.csv", "later/feed.csv"),
+                "off: the folder does not count");
+        Path p = PipelineConfigBatchTest.writePipeline(Files.createDirectories(dir.resolve("b")), "");
+        Files.writeString(p, Files.readString(p).replace("processing:\n", "processing:\n  output_per_member: true\n"));
+        PipelineConfig on = PipelineConfig.load(p.toString());
+        assertTrue(on.outputPerMember());
+        String top = FileNames.memberStem(on, "feed.csv", "feed.csv"), later = FileNames.memberStem(on, "feed.csv", "later/feed.csv");
+        assertTrue(top.startsWith("feed__") && later.startsWith("feed__"), top + " " + later);
+        assertNotEquals(top, later, "on: another folder is another name");
+        assertEquals(top, FileNames.memberStem(on, "feed.csv", "feed.csv"), "stable");
+    }
 }

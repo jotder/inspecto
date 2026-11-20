@@ -95,6 +95,7 @@ final class OnboardRoutes implements RouteModule {
         ImportCommitSteps.register(api);   // BASIC-ELT-PROFILE-1 BE-1a: the follow_on step of a commit outside Add data
         ImportPreRunSteps.register(api);   // BE-1b: inbox judgement and new columns before a run outside Add data
         InboxWatch.registerRoutes(api);   // BASIC-ONBOARD-1 P2
+        ImportFingerprints.migrate(api);   // B3 part 2: imports made before refuse the same bytes by the fingerprint ledger
         PostgresSnapshot.register(api);   // BASIC-ONBOARD-1 P3
     }
 

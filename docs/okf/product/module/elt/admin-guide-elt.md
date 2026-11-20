@@ -83,8 +83,8 @@ Every `dirs.*` value resolves under the Space directory.
 
 | Flag | Default | Effect |
 |---|---|---|
-| `-Dacquire.ledger.backend` | `memory` | `db` keeps the pre-fetch dedup ledger in a database. With `memory`, dedup history is lost on restart and already-fetched files can be fetched again. |
-| `-Dacquire.ledger.db.url` | `jdbc:duckdb:inspecto-acquisition.db` | JDBC URL of the ledger when the backend is `db` (a relative DuckDB file lands in the working directory). |
+| `-Dacquire.ledger.backend` | `db` (every edition, since 2026-11-20) | `db` keeps the dedup ledger (fingerprints, frontiers) in a database: a Space's own `duckdb/inspecto-acquisition.db`. `memory` is an opt-in: dedup history is lost on restart, already-fetched files can be fetched again, and an Add data import forgets which bytes it took. |
+| `-Dacquire.ledger.db.url` | the Space's `duckdb/inspecto-acquisition.db` (`jdbc:duckdb:inspecto-acquisition.db` in the working directory for a host without Spaces) | JDBC URL of the ledger. |
 | `-Dacquire.ledger.db.user` / `-Dacquire.ledger.db.password` | unset | Credentials for a server database ledger. |
 | `-Dingest.maxFilesPerCycle` | `500` | Files one poll cycle may admit; `0` turns admission control off. |
 | `-Dingest.minFilesPerCycle` | `1` | Floor the adaptive controller may halve down to. |
@@ -158,8 +158,8 @@ re-ingest.
   the `runlog_prune` maintenance task.
 - Operational stores (job runs, consignment outputs, ledgers): one DuckDB file per family under
   `<space>/duckdb/` ([spec-db-layer](../engine/spec-db-layer.md)).
-- The acquisition ledger, when `-Dacquire.ledger.backend=db`: the database named by `-Dacquire.ledger.db.url`
-  (§3.1).
+- The acquisition ledger (`-Dacquire.ledger.backend=db`, the default): the database named by
+  `-Dacquire.ledger.db.url` (§3.1).
 
 ## 6. Quarantine
 
@@ -206,7 +206,7 @@ In story order: acquisition, ingest, Jobs, packs.
 
 | Symptom | Cause | Fix or where to look |
 |---|---|---|
-| Files re-fetched after a restart | Ledger is in memory | Set `-Dacquire.ledger.backend=db`. |
+| Files re-fetched after a restart | Ledger is in memory (`-Dacquire.ledger.backend=memory`, or it fell back) | Remove the `memory` opt-in, or fix the ledger URL. |
 | Health shows the ledger degraded | The ledger URL did not open (path, lock, credentials); acquisition continues in memory | Fix the URL and restart. |
 | A Collector stops polling for a while | Circuit breaker open after endpoint failures | Test the Connection. |
 | Files never picked up | Not yet stable, or the `ready_marker` sentinel is missing | — |

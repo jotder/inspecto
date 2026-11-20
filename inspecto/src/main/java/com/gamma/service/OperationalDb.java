@@ -148,7 +148,12 @@ public final class OperationalDb {
         // opt back out.
         STATUS("Status", "status.backend", "db", Mode.DB_FLAG,
                 "status.db.url", "status.db.user", "status.db.password", SpaceRoot::statusDbUrl),
-        ACQUISITION_LEDGER("Acquisition ledger", "acquire.ledger.backend", "memory", Mode.DB_FLAG,
+        // BASIC-ELT-PROFILE-1 B3 part 2 (operator 2026-11-20): default "db" on EVERY edition, Basic included - an
+        // import refuses the same bytes sent again by this ledger's fingerprints, and a refusal that a restart forgets
+        // is not one. The file is the Space's own duckdb/inspecto-acquisition.db (a host without Spaces: the working directory's
+        // inspecto-acquisition.db, as the status family); "memory" stays an explicit opt-in
+        // (the test reactor pins it in the root pom).
+        ACQUISITION_LEDGER("Acquisition ledger", "acquire.ledger.backend", "db", Mode.DB_FLAG,
                 "acquire.ledger.db.url", null, null, SpaceRoot::acquisitionLedgerDbUrl),
         // `INBOX-REGISTRY-CROSS-POD-1` (scale-out §5.3). ⛔ Default "none": absent, SpaceInboxAudit keeps
         // comparing only the Spaces this pod hosts, exactly as before — a detector that is off is the

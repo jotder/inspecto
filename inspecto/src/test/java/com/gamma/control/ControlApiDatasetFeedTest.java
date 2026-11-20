@@ -151,7 +151,8 @@ class ControlApiDatasetFeedTest {
             assertEquals(0, data(json(c, "GET", "/datasets/" + id + "/feed", null, null), 200).get("waiting").asInt(),
                     "Import waiting files took them");
 
-            // the same name sent again is skipped by the import's duplicate check: it waits, and the inbox says why
+            // the same file sent again: the inbox says the import took it, and the next run sets it aside with the reason
+            // (BASIC-ELT-PROFILE-1 B3 part 2: the fingerprint ledger, no longer a marker that leaves it waiting for ever)
             Files.writeString(inbox(id).resolve("drop_a.csv"), ControlApiOnboardFilesTest.transfers(10));
             Files.writeString(inbox(id).resolve("drop_c.csv"), ControlApiOnboardFilesTest.transfers(3));
             JsonNode again = data(json(c, "GET", "/datasets/" + id + "/feed", null, null), 200);
@@ -159,11 +160,14 @@ class ControlApiDatasetFeedTest {
             assertEquals(1, again.get("alreadyImported").asInt(), again.toString());
             for (JsonNode f : again.get("files"))
                 assertEquals(f.get("name").asText().equals("drop_a.csv"), f.get("alreadyImported").asBoolean(), again.toString());
-            assertEquals(3, data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200).get("rowsIn").asLong(),
-                    "only the new file is read");
+            JsonNode ran = data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200);
+            assertEquals(3, ran.get("rowsIn").asLong(), "only the new file is read");
+            assertEquals("drop_a.csv", ran.at("/refused/0/file").asText(), ran.toString());
+            assertTrue(ran.at("/refused/0/reason").asText().contains("already imported"), ran.toString());
+            assertTrue(Files.exists(Path.of("database", id, OnboardImport.REFUSED_DIR, "drop_a.csv")), "set aside, not lost");
             JsonNode left = data(json(c, "GET", "/datasets/" + id + "/feed", null, null), 200);
-            assertEquals(1, left.get("waiting").asInt(), left.toString());
-            assertEquals(1, left.get("alreadyImported").asInt(), "the skipped file stays, still marked");
+            assertEquals(0, left.get("waiting").asInt(), left.toString());
+            assertEquals(0, left.get("alreadyImported").asInt(), left.toString());
         }
     }
 
@@ -224,7 +228,7 @@ class ControlApiDatasetFeedTest {
             var manual = c.svc().configFor(id).orElseThrow();
             assertEquals(PipelineTrigger.Kind.MANUAL, PipelineTrigger.of(manual.triggerConfig()).kind());
             assertFalse(manual.collector().stability().enabled());
-            assertEquals("path", manual.collector().duplicate().mode(), "the feed's own keys are gone");
+            assertEquals("content", manual.collector().duplicate().mode(), "the feed's own check gone, the import's own back (B3)");
             assertEquals(2, manual.collector().recursiveDepth(), "the editor's setting is still kept");
             data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200);   // the import still runs by hand
         }

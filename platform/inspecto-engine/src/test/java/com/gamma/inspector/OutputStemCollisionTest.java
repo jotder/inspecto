@@ -99,6 +99,20 @@ class OutputStemCollisionTest {
                 "quarantined under its own directory, evidence kept");
     }
 
+    /** The guard folds case as a case-insensitive filesystem does ({@code FileNames.stemKey}): {@code X.bin} is {@code x.bin}. */
+    @Test
+    void generationModeStemsThatDifferOnlyByCaseCollide(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = cfg(dir);
+        File a = inbox(cfg, "a/x.bin", String.format(CALL, "AAA1"));
+        File b = inbox(cfg, "b/X.bin", String.format(CALL, "BBB2"));
+
+        IngestOutcome out = new StreamingPluginIngestStrategy(1).ingest(batch(cfg, a, b), cfg);
+
+        assertEquals(1, out.survivors().size(), out.memberAudits().toString());
+        assertFalse(allData(cfg).contains("BBB2"), "the second member's rows must not land (or overwrite)");
+        assertTrue(out.memberAudits().get(1).error().startsWith("output_stem_collision:"), out.memberAudits().get(1).error());
+    }
+
     @Test
     void generationModeDistinctStemsAreUnaffected(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = cfg(dir);

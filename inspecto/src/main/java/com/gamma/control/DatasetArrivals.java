@@ -40,7 +40,8 @@ import java.util.Map;
  * <p>A READ over what the engine already records: the per-file audit ledger ({@code StatusStore.files}: file, times,
  * rows read / rejected, output Parquet), plus the covered period from the arrival's own Parquet output (min / max of the
  * Dataset's {@code eventDate} column), plus one small sidecar line per upload ({@code <dataRoot>/<id>/arrivals.jsonl}:
- * the file's own name, replace or append, its sha256, the import-time index outcome) that the ledger cannot know. A file
+ * the file's own name, replace or append, its sha256 (shown, no longer read for the duplicate check: the engine's
+ * fingerprint ledger answers that, {@link ImportFingerprints}), the import-time index outcome) that the ledger cannot know. A file
  * with no sidecar line came from a system (a drop in the inbox) - unless Add data landed it ({@code add_<stamp>_<name>},
  * {@link #ADD_DATA_NAME}): an import made before the sidecar existed, or whose best-effort line was lost, was still added
  * by a person. Every edition: it is the explorer's own data.
@@ -146,20 +147,6 @@ final class DatasetArrivals {
     }
 
     static final String REFUSED = "REFUSED";
-
-    /**
-     * D-3 (LA-ARRIVAL-MODES-1): the earlier upload of the same bytes whose rows the Dataset still holds - the newest line
-     * with this sha256 that no later <i>Replace everything</i> set aside - or null. A refused or system line never counts.
-     */
-    static Map<String, Object> alreadyImported(Path dataRoot, String pipeline, String sha256) {
-        Map<String, Object> hit = null;
-        for (Map<String, Object> m : sidecarLines(dataRoot, pipeline)) {
-            if (isSystem(m) || REFUSED.equals(m.get("status"))) continue;
-            if (sha256.equals(m.get("sha256"))) hit = m;
-            else if ("replace".equals(m.get("mode"))) hit = null;   // a later Replace everything set the earlier rows aside
-        }
-        return hit;
-    }
 
     /** The sidecar's lines, oldest first; torn lines skipped. */
     static List<Map<String, Object>> sidecarLines(Path dataRoot, String pipeline) {

@@ -317,8 +317,10 @@ Dataset). A Dataset that Mappings read cannot be deleted until they are.
 - **replaces the days it covers** (only for a Dataset with a *When* column): its rows are added, and the older rows on
   the same days are removed; every other day stays. Send a corrected week this way and you get exactly that week again.
 
-The same file twice is refused ("already imported on …"), so its rows are never counted twice. To load it again, replace
-everything. A file must have the Dataset's columns, by name: a missing column, or one moved to another place, refuses
+The same file twice is refused ("already imported on …"), whatever its name, so its rows are never counted twice; a copy
+another system puts in the inbox is set aside in `refused/` and listed with that reason, and so is a different file under
+a name already imported (rename it to import it). To load it again, replace
+everything; a file whose every row a later *replace the days it covers* replaced may also come back. A file must have the Dataset's columns, by name: a missing column, or one moved to another place, refuses
 the file and says which. A new column is kept as a detail of the Dataset: the result says "New column fee: kept as a
 detail", and older files read it as empty. Untick *Keep new columns as details* before you add the file to leave it out
 instead. Once a column is kept, a later file without it is refused, naming the column and the file it was kept from. A file another system put in the inbox is judged the same way by *Run now*; a refused one is set

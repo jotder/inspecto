@@ -685,6 +685,7 @@ final class OnboardImport {
             collector.put("discovery", "poll");
             collector.put("connector", "local");
             collector.put("accepts_upload", true);
+            collector.put("duplicate", ImportFingerprints.duplicate());   // B3 part 2: the same bytes under any name
             p.put("collector", collector);
             return p;
         }
@@ -907,6 +908,8 @@ final class OnboardImport {
 
         /** Run, check, register the Dataset, then build the index and evaluate Expectations; undo everything on failure. */
         Map<String, Object> finishCommit(Path draftDir) throws IOException {
+            // B3 part 2: a new Dataset holds no rows, so no fingerprint an earlier Dataset of this id left refuses its file
+            space.service().configFor(id).ifPresent(cfg -> ImportFingerprints.forgetAll(this, cfg));
             Map<String, Object> summary = runChecked(0);
             ComponentStore registry = new ComponentStore(space.writeRoot().resolve("registry"));
             dataset.put(LAST_IMPORT, lastImport(summary));
@@ -1569,28 +1572,32 @@ final class OnboardImport {
             String sha = DatasetArrivals.sha256(file);   // the bytes as uploaded, before any column is left out
             ColumnCheck uploadCheck = requireSameColumns(stage, file, name, type,
                     writeRoot.resolve(CONFIG_DIR).resolve(pipeline + "_schema.toon"), id, content);
-            // D-3: the same bytes added again would count their rows twice; Replace everything may always reload a file
-            if (!replace && sha != null) {
-                Map<String, Object> first = DatasetArrivals.alreadyImported(dataRoot, pipeline, sha);
-                if (first != null)
-                    throw new ApiException(409, ErrorCodes.CONFLICT, "'" + name + "' was already imported"
-                            + (first.get("at") instanceof String at && at.length() >= 10 ? " on " + DatasetNewColumns.localDay(at) : "")
-                            + (first.get("file") != null && !name.equals(first.get("file")) ? " as '" + first.get("file") + "'" : "")
-                            + " and its rows are in '" + id + "'; adding it again would count them twice. To load it again, replace everything");
-            }
+            // D-3: the same bytes added again would count their rows twice; Replace everything may always reload a file. B3 part 2:
+            // the engine's fingerprint ledger answers, the import's Pipeline hashing what it takes (ImportFingerprints)
+            PipelineConfig cfg = space.service().configFor(pipeline)
+                    .orElseThrow(() -> new ApiException(409, ErrorCodes.CONFLICT, "the import's Pipeline '" + pipeline + "' is not registered"));
+            com.gamma.acquire.LedgerEntry first = replace ? null : ImportFingerprints.imported(cfg, sha);
+            if (first != null)
+                throw new ApiException(409, ErrorCodes.CONFLICT, "'" + name + "' was already imported on " + ImportFingerprints.day(first)
+                        + (!name.equals(ImportFingerprints.shown(first)) ? " as '" + ImportFingerprints.shown(first) + "'" : "")
+                        + " and its rows are in '" + id + "'; adding it again would count them twice. To load it again, replace everything");
             // the run also takes any file waiting in the inbox: judged by the same columns policy as Run now, then the new
             // columns of every file it takes, the upload's too (BE-1b: the pre-run steps, ImportPreRunSteps)
             job = new Job(space, pipeline, String.valueOf(content.get("kind")), file, name, content, replace);
             job.period = period;
             ImportPreRunSteps.Run pre = new ImportPreRunSteps.Run(space, id, content, job, null, keepNewColumns);
             pre.upload = new DatasetNewColumns.Taken(stage, file, name, uploadCheck);
+            job.sha256 = sha;   // before the pre-run steps: a waiting file with the upload's bytes is set aside
             ImportPreRunSteps.runAll(pre);
             List<Map<String, Object>> refused = pre.refused;
             List<String> newColumns = job.newColumns;
-            job.sha256 = sha;
             job.moveSource = moveIntoInbox;
             long before = countRows(job.database());
             final Job j = job;
+            // B3 part 2: Replace everything replaces the old rows INSIDE the run (B13), but the engine judges the upload against
+            // the ledger first: the fingerprints of the rows about to be replaced go now, so the same bytes may be loaded again.
+            // A run that is undone (the replacement restored) records them again (ImportFingerprints.forget's undo).
+            if (replace) ImportFingerprints.forgetAll(job, cfg);
             job.landFromDraft(type);
             Work rest = () -> {
                 try {
@@ -1600,10 +1607,18 @@ final class OnboardImport {
                     j.runLoad(eventDate);   // B13: Replace everything replaces at the upload's commit, journalled and healed
                     try (com.gamma.inspector.RunFiles.Scope whole = com.gamma.inspector.RunFiles.complete(Set.of(j.landed))) {
                         s = j.runChecked(before);
+                    } catch (RuntimeException notImported) {
+                        ImportFingerprints.forgetLanded(j, cfg);   // B3 part 2: no rows of it are kept
+                        throw notImported;
                     }
+                    // undone (the replacement restored, the upload's own rows gone): its fingerprint goes too - pushed before
+                    // requireLoaded, whose failure is such an undo
+                    if (replace || period) j.undo.push(() -> ImportFingerprints.forgetLanded(j, cfg));
                     j.requireLoaded();
+                    ImportFingerprints.recordUpload(cfg, j.landed, sha);
                     if (period) {
                         s.put("period", j.replacedPeriod());
+                        ImportFingerprints.forgetGone(j, cfg);   // B3 part 2: an arrival whose days were all replaced may come back
                         s.put("rowsAfter", countRows(j.database()));
                     }
                     if (!newColumns.isEmpty()) s.put("newColumns", newColumns);
@@ -1614,9 +1629,9 @@ final class OnboardImport {
                     s.put("dataset", id);
                     j.recordLastImport(s);   // before the old rows are dropped: a failed write still restores them
                     j.dropAside();
+                    j.undo.clear();   // final: a failure below must not undo what is kept (the upload's fingerprint, the replaced rows' absence)
                     j.followOn(s);
                     j.recordArrival(s);
-                    j.undo.clear();
                     return s;
                 } finally {
                     OnboardRoutes.deleteTree(stage);   // the staged copy, success or not (a followed run too)
@@ -2063,23 +2078,33 @@ final class OnboardImport {
                 continue;
             }
             try {
-                Path dir = dataRoot.resolve(pipeline).resolve(REFUSED_DIR);
-                Files.createDirectories(dir);
-                Path to = dir.resolve(name);
-                if (Files.exists(to)) to = dir.resolve(stamp() + "_" + name);
-                Files.move(f, to, StandardCopyOption.ATOMIC_MOVE);
+                String setAside = setAsideRefused(dataRoot, pipeline, f, name, c.refusal());
                 Map<String, Object> r = new LinkedHashMap<>();
                 r.put("file", name);
                 r.put("reason", c.refusal());
                 if (!c.missing().isEmpty()) r.put("findings", missingFindings(c, name, id));   // C2
-                r.put("setAside", REFUSED_DIR + "/" + to.getFileName());
+                r.put("setAside", setAside);
                 out.add(r);
-                DatasetArrivals.recordRefused(dataRoot, pipeline, name, c.refusal(), r.get("setAside").toString());
             } catch (IOException cannotMove) {
                 // left in the inbox: the run reads it as before
             }
         }
         return out;
+    }
+
+    /**
+     * Move the waiting file {@code f} to {@code <dataRoot>/<pipeline>/refused/} (a stamped name when that name is taken) and
+     * record it as a refused arrival with {@code reason}; answers where it went, relative to the Dataset's directory.
+     */
+    static String setAsideRefused(Path dataRoot, String pipeline, Path f, String name, String reason) throws IOException {
+        Path dir = dataRoot.resolve(pipeline).resolve(REFUSED_DIR);
+        Files.createDirectories(dir);
+        Path to = dir.resolve(name);
+        if (Files.exists(to)) to = dir.resolve(stamp() + "_" + name);
+        Files.move(f, to, StandardCopyOption.ATOMIC_MOVE);
+        String setAside = REFUSED_DIR + "/" + to.getFileName();
+        DatasetArrivals.recordRefused(dataRoot, pipeline, name, reason, setAside);
+        return setAside;
     }
 
     // ── deleting an import Dataset (LA-ONBOARD-ORPHAN-PIPELINE-1) ──────────────────────────────────────────
