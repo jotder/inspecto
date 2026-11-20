@@ -252,6 +252,164 @@ class ControlApiSnapshotExportTest {
         }
     }
 
+    // ── O7: the snapshot's Pipeline reads Postgres itself ───────────────────────────────────────────────────
+
+    private static Path pipelineFile(Path root, String id) {
+        return root.resolve(OnboardImport.CONFIG_DIR).resolve(id + "_pipeline.toon");
+    }
+
+    private static void assertSwitched(Ctx c, String id) throws Exception {
+        String connId = PostgresSnapshot.connectionId(id);
+        com.gamma.etl.PipelineConfig cfg = c.svc().configFor(id).orElseThrow();
+        assertEquals("postgres", cfg.collector().connector(), "the Pipeline reads Postgres itself");
+        assertEquals(connId, cfg.collector().connection(), "through the snapshot's saved Connection");
+        assertEquals(com.gamma.etl.PipelineConfig.ArrivalLoad.Mode.REPLACE, cfg.arrivalLoad().mode(),
+                "a run outside Add data replaces the rows instead of adding a second copy");
+        assertFalse(cfg.processing().duplicateCheckEnabled(), "the Pipeline never refuses its own re-export");
+        assertEquals(connId, com.gamma.util.ToonHelper.load(PostgresSnapshot.configFile(c.root(), id).toString()).get("connection"),
+                "the snapshot settings name the Connection");
+    }
+
+    /**
+     * O7: Run now switches the snapshot's Pipeline to {@code collector.connector: postgres} before it exports - an old
+     * snapshot (its connection inline) migrates first: its Connection {@code <id>_postgres} is saved from the inline block
+     * and {@code _snapshot.toon} rewritten to name it. Here the export then fails (no database), so the switch is seen on
+     * its own; a second Run now changes nothing (the switch is idempotent).
+     */
+    @Test
+    void runNowSwitchesTheSnapshotsPipelineOnceMigratingAnOldSnapshotFirst(@TempDir Path cfg, @TempDir Path root, @TempDir Path tmp)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            for (boolean legacy : List.of(true, false)) {
+                String id = snapshot(c, tmp, null, legacy);
+                String connId = PostgresSnapshot.connectionId(id);
+                Path connFile = root.resolve(connId + "_connection.toon");
+                assertEquals(!legacy, Files.exists(connFile));
+                assertTrue(Files.readString(pipelineFile(root, id)).contains("connector: local"), "before: the import's own inbox");
+
+                HttpResponse<String> run = send(c, "POST", "/datasets/" + id + "/run", null);
+                assertEquals(422, run.statusCode(), run.body());
+                assertTrue(error(run).contains("INSPECTO_PG_NEVER_SET"), "Run now's own wording for a failed copy: " + run.body());
+                assertSwitched(c, id);
+                String saved = Files.readString(connFile);
+                assertTrue(saved.contains("postgres") && saved.contains("transfers") && saved.contains("${ENV:INSPECTO_PG_NEVER_SET_"),
+                        "the Connection holds the inline block's host, table and reference: " + saved);
+                assertEquals(200, send(c, "GET", "/connections/" + connId, null).statusCode(), "and is registered");
+                assertEquals(30, OnboardImport.countRows(DATA.resolve(id).resolve("database")), "the data is unchanged");
+
+                byte[] pipeline = Files.readAllBytes(pipelineFile(root, id)), settings = Files.readAllBytes(PostgresSnapshot.configFile(root, id)),
+                        connection = Files.readAllBytes(connFile);
+                assertEquals(422, send(c, "POST", "/datasets/" + id + "/run", null).statusCode());
+                assertArrayEquals(pipeline, Files.readAllBytes(pipelineFile(root, id)), "a switched Pipeline is left as it is");
+                assertArrayEquals(settings, Files.readAllBytes(PostgresSnapshot.configFile(root, id)));
+                assertArrayEquals(connection, Files.readAllBytes(connFile));
+                assertFalse(OnboardImport.IN_FLIGHT.contains(root + "|" + id), "the import is free again");
+            }
+        }
+    }
+
+    /** O7: a Connection already saved under the snapshot's name for another table is never taken over by the migration. */
+    @Test
+    void theMigrationNeverTakesOverAnotherConnectionOfTheSnapshotsName(@TempDir Path cfg, @TempDir Path root, @TempDir Path tmp)
+            throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = snapshot(c, tmp, null, true);
+            String connId = PostgresSnapshot.connectionId(id);
+            Map<String, Object> other = new LinkedHashMap<>();
+            other.put("id", connId);
+            other.put("connector", "postgres");
+            other.put("host", "127.0.0.1");
+            other.put("port", 5432);
+            other.put("database", "nowhere");
+            other.put("username", "onboard_snap_ro");
+            other.put("password", "${ENV:INSPECTO_PG_NEVER_SET_" + id.toUpperCase() + "}");
+            other.put("options", Map.of("schema", "public", "table", "other_table"));
+            data(send(c, "POST", "/connections", JSON.writeValueAsBytes(other)), 200);
+            byte[] theirs = Files.readAllBytes(root.resolve(connId + "_connection.toon"));
+            byte[] pipeline = Files.readAllBytes(pipelineFile(root, id));
+
+            HttpResponse<String> run = send(c, "POST", "/datasets/" + id + "/run", null);
+            assertEquals(422, run.statusCode(), "Run now still copies through the inline block: " + run.body());
+            assertTrue(error(run).contains("INSPECTO_PG_NEVER_SET"), run.body());
+            assertArrayEquals(theirs, Files.readAllBytes(root.resolve(connId + "_connection.toon")), "the other Connection is untouched");
+            assertInstanceOf(Map.class, com.gamma.util.ToonHelper.load(PostgresSnapshot.configFile(root, id).toString()).get("connection"),
+                    "the snapshot keeps its inline connection");
+            assertArrayEquals(pipeline, Files.readAllBytes(pipelineFile(root, id)), "and its Pipeline is not switched");
+        }
+    }
+
+    /** O7: a snapshot commit runs its draft's copy as before, then switches its Pipeline (no database: the draft is given its snapshot). */
+    @Test
+    @SuppressWarnings("unchecked")
+    void aSnapshotCommitImportsItsCopyThenSwitchesThePipeline(@TempDir Path cfg, @TempDir Path root, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=transfers.parquet&kind=stream",
+                    Files.readAllBytes(parquet(tmp.resolve("first.parquet"), 30, 1))), 200);
+            String id = "snapc_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8);
+            ids.add(id);
+            // what POST /onboard/postgres stores beside its copy
+            Path draftJson = DATA.resolve(OnboardRoutes.DRAFTS).resolve(d.get("draftId").asText()).resolve("draft.json");
+            Map<String, Object> draft = JSON.readValue(Files.readAllBytes(draftJson), LinkedHashMap.class);
+            Map<String, Object> snap = new LinkedHashMap<>();
+            snap.put("source", PostgresSnapshot.SOURCE);
+            snap.put("connection", Map.of("host", "127.0.0.1", "port", 5432, "database", "nowhere", "user", "onboard_snap_ro",
+                    "password", "${ENV:INSPECTO_PG_NEVER_SET_" + id.toUpperCase() + "}"));
+            snap.put("schema", "public");
+            snap.put("table", "transfers");
+            draft.put("snapshot", snap);
+            Files.write(draftJson, JSON.writeValueAsBytes(draft));
+
+            JsonNode made = data(send(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit",
+                    ("{\"name\":\"" + id + "\"}").getBytes(StandardCharsets.UTF_8)), 200);
+            assertEquals(30, made.get("rowsAfter").asLong(), "the first run imports the draft's copy: " + made);
+            assertSwitched(c, id);
+            assertEquals("postgres", new ComponentStore(root.resolve("registry")).get("dataset", id).orElseThrow().content().get("importSource"));
+            assertFalse(OnboardImport.IN_FLIGHT.contains(root + "|" + id), "the import is free again");
+        }
+    }
+
+    /**
+     * O7: once switched, Run now's own run takes only the export it checked - the run fetches nothing itself - and replaces
+     * the rows; a run not started by Run now (the Pipeline run outside Add data) replaces them too, through the Pipeline's
+     * {@code output.load: replace}, instead of adding a second full copy.
+     */
+    @Test
+    void aSwitchedSnapshotsRunsReplaceItsRowsWhoeverStartsThem(@TempDir Path cfg, @TempDir Path root, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = snapshot(c, tmp, null);
+            assertEquals(422, send(c, "POST", "/datasets/" + id + "/run", null).statusCode());   // switches; no database to copy
+            assertSwitched(c, id);
+            Path db = DATA.resolve(id).resolve("database");
+            assertEquals(30, OnboardImport.countRows(db));
+            List<String> fetched = java.util.Collections.synchronizedList(new ArrayList<>());
+            java.util.function.Consumer<com.gamma.audit.Event> tap = e -> {
+                if (com.gamma.audit.EventType.FILE_DISCOVERED.equals(e.type()) && id.equals(e.pipeline()))
+                    fetched.add(String.valueOf(e.attributes().get("file")));
+            };
+            com.gamma.event.EventLog.global().addSubscriber(tap);
+            try {
+                // Run now, after its COPY … TO: the complete export handed to the replace path
+                Path stage = DATA.resolve(OnboardRoutes.DRAFTS).resolve("a" + UUID.randomUUID().toString().replace("-", ""));
+                Path export = parquet(stage.resolve(OnboardRoutes.storedName("transfers.parquet")), 45, 100);
+                Map<String, Object> content = new ComponentStore(root.resolve("registry")).get("dataset", id).orElseThrow().content();
+                String key = root + "|" + id;
+                assertTrue(OnboardImport.IN_FLIGHT.add(key));
+                Map<String, Object> s = (Map<String, Object>) OnboardImport.addStaged(new OnboardImport.Space(root, DATA, c.svc, "tester"),
+                        content, id, key, stage, export, "transfers.parquet", "replace", null, true);
+                assertEquals(45, OnboardImport.countRows(db), "the export replaced the rows: " + s);
+                assertEquals(List.of(), fetched, "Run now's run fetched nothing itself: the checked export is its one copy");
+
+                // a run not started by Run now: the engine fetches (here it cannot: no database) and takes what the inbox holds
+                parquet(OnboardImport.inbox(DATA, id).resolve("transfers_zzexport.parquet"), 12, 500);
+                c.svc().runPipeline(id).orElseThrow();
+                assertFalse(fetched.isEmpty(), "a run outside Add data does fetch the table itself");
+                assertEquals(12, OnboardImport.countRows(db), "output.load: replace - not 45 + 12");
+            } finally {
+                com.gamma.event.EventLog.global().removeSubscriber(tap);
+            }
+        }
+    }
+
     @Test
     void anExportStillBeingWrittenIsInvisibleToRunNowAndToThePoll(@TempDir Path cfg, @TempDir Path root, @TempDir Path tmp)
             throws Exception {

@@ -47,6 +47,25 @@ public final class RunFiles {
         return () -> COMPLETE.removeAll(mine);
     }
 
+    private static final Set<Path> NO_FETCH = ConcurrentHashMap.newKeySet();
+
+    /**
+     * While open, a run of the remote Collector whose inbox is {@code inbox} fetches nothing ({@code BASIC-ELT-PROFILE-1}
+     * O7): the caller has put the run's files in the inbox itself - Add data's run of a Postgres snapshot exports the table
+     * before the run, so it can check the columns and the row cap first - and takes only those. A run with no scope open
+     * fetches as before.
+     */
+    public static Scope noFetch(Path inbox) {
+        Path root = real(inbox);
+        NO_FETCH.add(root);
+        return () -> NO_FETCH.remove(root);
+    }
+
+    /** Whether a run of the Collector whose inbox is {@code inbox} fetches: no {@link #noFetch} scope is open for it. */
+    static boolean fetches(Path inbox) {
+        return NO_FETCH.isEmpty() || !NO_FETCH.contains(real(inbox));
+    }
+
     /** {@code ready} plus each file of {@code discovered} an open {@link #complete} scope names, in discovery order. */
     static <T> List<T> release(List<T> discovered, List<T> ready, java.util.function.Function<T, Path> path) {
         if (COMPLETE.isEmpty() || discovered.size() == ready.size()) return ready;

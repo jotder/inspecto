@@ -108,12 +108,16 @@ class PostgresConnectorFactoryTest {
     }
 
     @Test
-    void oneExportIsDiscoveredPerCycleNamedAfterTheTable() throws Exception {
+    void oneExportIsDiscoveredPerCycleNamedAfterTheTableAndUniquePerCycle() throws Exception {
         try (PostgresCollectorConnector c = PostgresConnectorFactory.connector(profile(REF, table()), 0)) {
             List<RemoteFile> found = c.discover(new DiscoveryContext(List.of(), List.of(), -1));
             assertEquals(1, found.size());
-            assertEquals("transfers.parquet", found.get(0).relativePath());
+            // O7: each cycle's output is named after its input, so a fixed name would overwrite the last cycle's output
+            assertTrue(found.get(0).relativePath().matches("transfers_[a-z]+\\.parquet"), found.get(0).relativePath());
             assertEquals(com.gamma.acquire.CollectorConnector.Readiness.READY, c.readiness(found.get(0)));
+            java.util.Set<String> names = new java.util.HashSet<>();
+            for (int i = 0; i < 50; i++) names.add(c.discover(new DiscoveryContext(List.of(), List.of(), -1)).get(0).relativePath());
+            assertEquals(50, names.size(), "every cycle's export has a name of its own");
         }
         assertEquals("query.parquet", PostgresConnectorFactory.connector(profile(REF, Map.of("query", "SELECT 1")), 0).fileName());
     }

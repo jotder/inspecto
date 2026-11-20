@@ -45,7 +45,11 @@ import java.util.regex.Pattern;
  * {@code postgres} Connection, {@code <id>_postgres_connection.toon} under the write root, through the same save as
  * {@code POST /connections} - so the scheme's check refuses any secret that is not an {@code INSPECTO_PG_} reference - and
  * {@code _snapshot.toon} only names it. A snapshot committed before this keeps its connection inline in
- * {@code _snapshot.toon}; it is read as it is (validated exactly as a request body) and never rewritten.
+ * {@code _snapshot.toon} (validated exactly as a request body) until its next Run now migrates it ({@link #switchPipeline}).
+ *
+ * <p><b>The Pipeline reads Postgres itself</b> (operator ruling O7, 2026-11-20): after a commit's first run, or at an old
+ * snapshot's next Run now, its Pipeline is switched to {@code collector.connector: postgres} through that Connection, with
+ * {@code output.load: replace} - so a run outside Add data copies the table again and replaces the rows ({@link #switchPipeline}).
  *
  * <p><b>Export, then move</b> (operator 2026-11-05): Run now EXPORTS the table into a temporary folder under the data
  * root's drafts folder - never inside the inbox - and only once the file is complete MOVES it atomically into the
@@ -55,6 +59,8 @@ import java.util.regex.Pattern;
 final class PostgresSnapshot {
 
     private PostgresSnapshot() {}
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PostgresSnapshot.class);
 
     /** The Dataset entry's {@code importSource} for a snapshot (display only; {@link #configFile} is the authority). */
     static final String SOURCE = "postgres";
@@ -295,7 +301,7 @@ final class PostgresSnapshot {
     @SuppressWarnings("unchecked")
     static ConnectionProfile connectionOf(Path writeRoot, String id, Map<String, Object> config) {
         Object c = config.get("connection");
-        if (c instanceof Map<?, ?>)   // the pre-Connection shape: read as it is, never rewritten
+        if (c instanceof Map<?, ?>)   // the pre-Connection shape, until Run now migrates it (switchPipeline)
             return Conn.of(c).profile(connectionId(id), Source.fromMap(config));
         if (!(c instanceof String connId) || connId.isBlank()) throw unreadable(id);
         Path file = ConnectionRoutes.connectionFile(writeRoot, connId.trim());
@@ -363,24 +369,153 @@ final class PostgresSnapshot {
                 + id + SUFFIX + ") cannot be read");
     }
 
+    // ── the Pipeline reads Postgres itself (O7) ──────────────────────────────────────────────────────────────
+
+    /**
+     * <b>The switch</b> ({@code BASIC-ELT-PROFILE-1} O7, operator 2026-11-20): the snapshot's Pipeline reads the table
+     * itself - {@code collector.connector: postgres} through the saved Connection - so any run of it (Run now,
+     * {@code POST /pipelines/{id}/run}, a trigger) copies the table again. Two more keys make that run right:
+     * {@code output.load: replace} (a run outside Add data replaces the snapshot's rows at its commit instead of adding a
+     * second full copy; Add data's own runs choose per run, {@link OnboardImport.Job#runLoad}, which wins) and
+     * {@code processing.duplicate_check.enabled: false} (the Pipeline never refuses its own re-export; each export is named
+     * apart, {@code PostgresCollectorConnector#cycleName}).
+     *
+     * <p>ONE function, idempotent, for both ways in: a snapshot commit, after its first run; and an old snapshot, at its
+     * next Run now - which first saves the Connection {@code <id>_postgres} from the inline block and rewrites
+     * {@code _snapshot.toon} to name it ({@link #migrate}). Each step looks before it writes, so a switch a crash cut short
+     * is finished by the next call and a switched Pipeline is left as it is. The Pipeline is rewritten through
+     * {@link DatasetFeed#rewriteHeld}: the approval policy, the save gate, the audit and the Pipeline's history. The caller
+     * holds the import's claim ({@link OnboardImport#IN_FLIGHT}).
+     */
+    static void switchPipeline(ApiContext api, OnboardImport.Space space, String id) throws IOException {
+        Map<String, Object> config = read(space.writeRoot(), id);
+        if (config == null) return;
+        String connId = migrate(api, space, id, config);
+        Path pipelineFile = space.writeRoot().resolve(OnboardImport.CONFIG_DIR).resolve(id + "_pipeline.toon").toAbsolutePath().normalize();
+        if (switched(com.gamma.util.ToonHelper.load(pipelineFile.toString()), connId)) return;
+        PendingChanges.holdRefusing(api, java.util.List.of("pipeline"), "the snapshot's Pipeline is switched to read Postgres itself");
+        DatasetFeed.rewriteHeld(api, new DatasetFeed.Import(space.writeRoot(), space.dataRoot(), space.service(), id, Map.of(), pipelineFile),
+                p -> switchTo(p, connId), null);
+    }
+
+    /** {@link #switchPipeline} where it must not fail its caller (a commit that already succeeded): a WARN, and the next Run now switches. */
+    static void switchAfterCommit(ApiContext api, OnboardImport.Space space, String id) {
+        try {
+            switchPipeline(api, space, id);
+        } catch (IOException | RuntimeException notSwitched) {
+            log.warn("Postgres snapshot '{}': its Pipeline was not switched to read Postgres itself ({}); its next Run now does it",
+                    id, notSwitched.getMessage());
+        }
+    }
+
+    /**
+     * The saved Connection the snapshot reads through. A snapshot committed before Connections keeps its connection inline:
+     * it is saved as {@code <id>_postgres} (through the save {@code POST /connections} runs) and {@code _snapshot.toon} is
+     * rewritten to name it. A Connection of that name already saved for this same table (a migration a crash cut short) is
+     * taken as it is; one that reads anything else is 409, never overwritten.
+     */
+    private static String migrate(ApiContext api, OnboardImport.Space space, String id, Map<String, Object> config) throws IOException {
+        Object c = config.get("connection");
+        if (c instanceof String named && !named.isBlank()) return named.trim();
+        if (!(c instanceof Map<?, ?>)) throw unreadable(id);
+        String connId = connectionId(id);
+        ConnectionProfile p = Conn.of(c).profile(connId, Source.fromMap(config));   // checked exactly as a request body
+        Path file = ConnectionRoutes.connectionFile(space.writeRoot(), connId);
+        if (Files.isRegularFile(file)) {
+            ConnectionProfile saved;
+            try {
+                saved = ConnectionProfile.load(file);
+            } catch (IOException | RuntimeException unreadableConnection) {
+                saved = null;
+            }
+            if (saved == null || !sameSource(saved, p))
+                throw new ApiException(409, ErrorCodes.CONFLICT, "a Connection '" + connId + "' already exists and does not read the table '"
+                        + id + "' copies; rename or remove it, then Run now again");
+            if (space.service().connection(connId).isEmpty()) space.service().registerConnection(saved);
+        } else {
+            ConnectionRoutes.persistConnection(api, p);
+        }
+        Map<String, Object> named = new LinkedHashMap<>();
+        named.put("source", SOURCE);
+        named.put("connection", connId);
+        write(configFile(space.writeRoot(), id), named);
+        log.info("Postgres snapshot '{}': its inline connection is now the saved Connection '{}'", id, connId);
+        return connId;
+    }
+
+    /** Whether two {@code postgres} profiles read the same thing the same way (the id and the folder aside). */
+    static boolean sameSource(ConnectionProfile a, ConnectionProfile b) {
+        int pa = a.port() == ConnectionProfile.NO_PORT ? PostgresCollectorConnector.DEFAULT_PORT : a.port();
+        int pb = b.port() == ConnectionProfile.NO_PORT ? PostgresCollectorConnector.DEFAULT_PORT : b.port();
+        return PostgresCollectorConnector.SCHEME.equals(a.connector()) && PostgresCollectorConnector.SCHEME.equals(b.connector())
+                && pa == pb && java.util.Objects.equals(a.host(), b.host()) && java.util.Objects.equals(a.database(), b.database())
+                && java.util.Objects.equals(a.username(), b.username())
+                && java.util.Objects.equals(a.password() == null ? null : a.password().trim(), b.password() == null ? null : b.password().trim())
+                && a.options().equals(b.options()) && a.tunnel() == null && b.tunnel() == null && a.proxy() == null && b.proxy() == null;
+    }
+
+    /** Whether the Pipeline config {@code p} is already switched to read through {@code connId}. */
+    @SuppressWarnings("unchecked")
+    static boolean switched(Map<String, Object> p, String connId) {
+        Map<String, Object> collector = p.get("collector") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+        Map<String, Object> output = p.get("output") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+        Map<String, Object> processing = p.get("processing") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+        Map<String, Object> dup = processing.get("duplicate_check") instanceof Map<?, ?> m ? (Map<String, Object>) m : Map.of();
+        return PostgresCollectorConnector.SCHEME.equals(String.valueOf(collector.get("connector")))
+                && connId.equals(String.valueOf(collector.get("connection")))
+                && "replace".equals(String.valueOf(output.get("load")))
+                && "false".equals(String.valueOf(dup.get("enabled")));
+    }
+
+    /** The switch's edit of the Pipeline config, every other key kept. */
+    @SuppressWarnings("unchecked")
+    static void switchTo(Map<String, Object> p, String connId) {
+        Map<String, Object> collector = p.get("collector") instanceof Map<?, ?> m ? new LinkedHashMap<>((Map<String, Object>) m) : new LinkedHashMap<>();
+        collector.put("connector", PostgresCollectorConnector.SCHEME);
+        collector.put("connection", connId);
+        p.put("collector", collector);
+        Map<String, Object> output = p.get("output") instanceof Map<?, ?> m ? new LinkedHashMap<>((Map<String, Object>) m) : new LinkedHashMap<>();
+        output.put("load", "replace");
+        p.put("output", output);
+        Map<String, Object> processing = p.get("processing") instanceof Map<?, ?> m ? new LinkedHashMap<>((Map<String, Object>) m) : new LinkedHashMap<>();
+        Map<String, Object> dup = processing.get("duplicate_check") instanceof Map<?, ?> m ? new LinkedHashMap<>((Map<String, Object>) m) : new LinkedHashMap<>();
+        dup.put("enabled", false);
+        processing.put("duplicate_check", dup);
+        p.put("processing", processing);
+    }
+
     // ── refresh: Run now ──────────────────────────────────────────────────────────────────────────────────────
 
     /**
-     * Run now on a snapshot: EXPORT the table into a staged Parquet file under the data root's drafts folder (outside the
-     * inbox, so neither a concurrent Run now nor anything reading the inbox sees it half-written), then hand the complete
-     * file to the replace path ({@link OnboardImport#addStaged}), which MOVES it into the inbox and imports it.
+     * Run now on a snapshot: switch its Pipeline first ({@link #switchPipeline}: an old snapshot migrates here), then
+     * EXPORT the table into a staged Parquet file under the data root's drafts folder (outside the inbox, so neither a
+     * concurrent Run now nor anything reading the inbox sees it half-written) - capped at {@code import.max_rows}, refused
+     * in Add data's words - and hand the complete file to the replace path ({@link OnboardImport#addStaged}), which checks
+     * its columns, MOVES it into the inbox and imports it, replacing the snapshot's rows at its commit (a run-scoped
+     * {@code replace}). That run fetches nothing itself ({@code RunFiles.noFetch}): the export it checked is its one copy.
+     * A switch that cannot be made never stops Run now: it is logged, and the next Run now tries again.
      */
-    static Object refresh(OnboardImport.Space space, Map<String, Object> content, String id, Map<String, Object> config,
+    static Object refresh(ApiContext api, OnboardImport.Space space, Map<String, Object> content, String id,
                           HttpExchange ex) throws IOException {
-        ConnectionProfile profile = connectionOf(space.writeRoot(), id, config);
-        String name = answered(() -> PostgresConnectorFactory.connector(profile, 0).fileName(), 0);   // the profile, checked
         String pipeline = String.valueOf(content.get("importPipeline"));
-        LaLimitValues lim = OnboardRoutes.limits(space.writeRoot());
         String key = space.writeRoot() + "|" + pipeline;
         if (!OnboardImport.IN_FLIGHT.add(key)) throw new ApiException(409, ErrorCodes.CONFLICT, "'" + id + "' is being imported right now");
         Path stage = space.dataRoot().resolve(OnboardRoutes.DRAFTS).resolve("a" + UUID.randomUUID().toString().replace("-", ""));
-        Path file = stage.resolve(OnboardRoutes.storedName(name));
+        Path file;
+        String name;
         try {
+            try {
+                switchPipeline(api, space, id);
+            } catch (IOException | RuntimeException notSwitched) {
+                log.warn("Postgres snapshot '{}': its Pipeline was not switched to read Postgres itself ({}); Run now copies "
+                        + "the table as before and the next Run now tries again", id, notSwitched.getMessage());
+            }
+            Map<String, Object> config = read(space.writeRoot(), id);
+            if (config == null) throw unreadable(id);
+            ConnectionProfile profile = connectionOf(space.writeRoot(), id, config);
+            name = answered(() -> PostgresConnectorFactory.connector(profile, 0).fileName(), 0);   // the profile, checked
+            LaLimitValues lim = OnboardRoutes.limits(space.writeRoot());
+            file = stage.resolve(OnboardRoutes.storedName(name));
             Files.createDirectories(stage);
             pull(profile, file, lim);
         } catch (IOException | RuntimeException fault) {

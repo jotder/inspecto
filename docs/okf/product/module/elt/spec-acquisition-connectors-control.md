@@ -88,7 +88,9 @@ drain is simply the next poll.
 **The `postgres` scheme (BASIC-ELT-PROFILE-1 BE-4, 2026-11-19).** `inspecto-engine` registers
 `com.gamma.inspector.PostgresConnectorFactory`, `scheme() == "postgres"`: one Postgres table (`options.schema` +
 `options.table`) or one read-only query (`options.query`, a single `SELECT` / `WITH`), copied into one typed Parquet
-file per cycle (`<table>.parquet` / `query.parquet`, `STREAM` only, `post` is a no-op). It reads through DuckDB's
+file per cycle, named apart each cycle (`<table>_<stamp>.parquet` / `query_<stamp>.parquet`, letters only: an output
+file is named after its input, so a fixed name would overwrite the last cycle's output; O7), `STREAM` only, `post` is a
+no-op. It reads through DuckDB's
 `postgres` extension, so it needs **no JDBC driver and Basic has it**; the JDBC `db` scheme stays the one for
 incremental (`watermark_column`) loads. A time-zoned timestamp lands as its UTC wall time and a type with no import
 column type (UUID, JSON, arrays, intervals) as text.
@@ -105,9 +107,11 @@ column type (UUID, JSON, arrays, intervals) as text.
   one `SELECT`/`WITH`, and every session refuses a login that could write (superuser, or INSERT / UPDATE / DELETE /
   TRUNCATE on any non-system table).
 - **Add data's Postgres snapshot builds its connector here** (`PostgresSnapshot` → `PostgresConnectorFactory.connector`)
-  and keeps a saved `postgres` Connection, `<dataset id>_postgres` (operator ruling O4). Its Pipeline still takes the
-  export through the inbox; switching it to `collector.connector: postgres` waits for the engine's replace-everything
-  (`output.load`, ruling O6), which is not built yet (plan `BASIC-ELT-PROFILE-1` §4, BE-4).
+  and keeps a saved `postgres` Connection, `<dataset id>_postgres` (operator ruling O4). Since O7 (2026-11-20) its
+  Pipeline reads through it too: `collector.connector: postgres` with `output.load: replace` and the duplicate check
+  off, so any run replaces the snapshot's rows. Add data's own runs of it fetch nothing (`RunFiles.noFetch`, a per-run
+  scope over the inbox that `CollectorProcessor.acquire` honours): Run now exports and checks the table itself first.
+  [api-onboarding-postgres-snapshot.md](../processor/api-onboarding-postgres-snapshot.md).
 - **The Safety Policy's network gate on every session** (BE-4 part 2): `PostgresCollectorConnector.Session.open` passes
   `EgressGate.current()` for the host and port before the password is resolved, so Add data's test, draft and Run now
   are gated as a Pipeline's acquisition is (`CollectorConnectors.forConfig` gates that one too). A refused host is the
