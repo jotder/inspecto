@@ -112,31 +112,8 @@ public final class EditionFeatures {
      */
     public static final String REMOTE_SYSTEMS = "collector.remote";
 
-    /**
-     * The {@code DATA-TIERS-1} screen gates by their {@code /bootstrap} {@code features} key: each flag is true when its
-     * feature is {@link #present}, and a withheld one has a {@code featureReasons} entry under the same key. No load or save of
-     * a configuration is refused by them (§5.3); only {@link #PIPELINE_AUTOMATION} is also checked by its own routes (the feed
-     * and storage routes answer 503 without it).
-     */
-    public static final Map<String, String> SCREEN_FLAGS = screenFlags();
-
-    private static Map<String, String> screenFlags() {
-        Map<String, String> m = new java.util.LinkedHashMap<>();
-        m.put("pipelineAutomation", PIPELINE_AUTOMATION);
-        m.put("pipelineTransform", PIPELINE_TRANSFORM);
-        m.put("pipelineEgress", PIPELINE_EGRESS);
-        m.put("remoteSystems", REMOTE_SYSTEMS);
-        return java.util.Collections.unmodifiableMap(m);
-    }
-
-    /** The {@link #SCREEN_FLAGS} key of {@code feature}, or null when it is not a screen gate. */
-    public static String flagOf(String feature) {
-        for (Map.Entry<String, String> e : SCREEN_FLAGS.entrySet()) if (e.getValue().equals(feature)) return e.getKey();
-        return null;
-    }
-
-    /** The Job types that deliver data out of the product ({@link #PIPELINE_EGRESS}, {@code DATA-TIERS-1} P5). */
-    public static final Set<String> EGRESS_JOB_TYPES = Set.of("objectstore.export", "publish.postgres");
+    // The DATA-TIERS-1 screen gates (the four features above), what Basic keeps and Basic's entry points are declared once in
+    // BasicProfile (BASIC-ELT-PROFILE-1 Gate): no load or save of a configuration is refused by them (§5.3, DT-9 narrowed).
 
     /**
      * Real-time Detection (PRODUCT-ASSEMBLY-1 PA-9d, D-PA44): windowed and Pattern Alert Rules ({@code window:} /
@@ -236,8 +213,8 @@ public final class EditionFeatures {
     public static Map<String, String> lockedReasons() {
         Map<String, String> out = new TreeMap<>();
         for (String f : ROUTE_FEATURES) if (!present(f)) out.put(f, lockedReason(f));
-        // DATA-TIERS-1 P2: the screen gates, under their /bootstrap features key (SCREEN_FLAGS).
-        SCREEN_FLAGS.forEach((flag, f) -> { if (!present(f)) out.put(flag, lockedReason(f)); });
+        // DATA-TIERS-1 P2: the screen gates, under their /bootstrap features key (BasicProfile.SCREEN_FLAGS).
+        BasicProfile.SCREEN_FLAGS.forEach((flag, f) -> { if (!present(f)) out.put(flag, lockedReason(f)); });
         // PRODUCT-ASSEMBLY-1 PA-7a: every feature only modules the install's signed entitlement leaves out provide.
         for (String f : com.gamma.module.Entitlements.unentitledFeatures()) out.put(f, "Not in this installation's entitlement.");
         return out;

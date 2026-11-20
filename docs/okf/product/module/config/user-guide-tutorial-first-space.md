@@ -5,7 +5,7 @@ description: "Create the Order-to-cash Space from its Space Template, see its tw
 item: module.config
 audience: external
 status: current
-verified: 2026-11-19 last-edit
+verified: 2026-11-20 code-reviewed
 code: platform/inspecto-config
 ---
 

@@ -67,21 +67,17 @@ Concept: [Alert Rule, Expectation and Decision Rule](../../addon/incidents/user-
 
 ## Check it worked
 
-The rule is saved and armed — a rule the edition cannot run is listed but marked inert, *needs the Real-time
-Detection Add-on*:
+On your stream Dataset the save answers 200 and the rule is listed armed; a rule the edition cannot run is listed
+but marked inert, *needs the Real-time Detection Add-on*. On the worked example, which has no stream, the same
+validation shows itself: the `payments` Dataset's date is a `DATE`, not an event-time `TIMESTAMP`, so a window over
+it is refused — and the refusal is about the column, not the edition, so the Add-on is present:
 
 ```check
 POST /spaces/{space}/alerts/rules
 as builder
-body {"name": "many_numbers_dialled", "dataset": "calls", "measure": "countDistinct(b_number)", "by": ["a_number"], "comparator": "gte", "threshold": 30, "severity": "CRITICAL", "window": {"type": "sliding", "size": "10m", "slide": "1m", "time": "event_ts", "distinctOn": ["topic", "partition", "offset"]}}
-expect status 200|409
-```
-
-```check
-GET /spaces/{space}/alerts/rules
-as builder
-expect status 200
-expect data[*].name has many_numbers_dialled
+body {"name": "many_payments", "dataset": "payments", "measure": "count", "by": ["customer_id"], "comparator": "gte", "threshold": 30, "severity": "CRITICAL", "window": {"type": "sliding", "size": "10m", "slide": "1m", "time": "payment_date"}}
+expect status 422
+expect error.message matches /needs an event-time TIMESTAMP column/
 ```
 
 ## What can go wrong

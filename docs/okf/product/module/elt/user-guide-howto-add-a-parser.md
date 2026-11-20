@@ -42,7 +42,7 @@ let a Pipeline land that format's files into a Dataset.
    - put the jar in the packs folder;
    - add its SHA-256 to the allowlist file, one line per jar: `<64 hex digits>  <name>  [note]` (`sha256sum` output
      works);
-   - rescan: `POST /api/v1/jobs/packs/rescan` (or wait for the folder watcher).
+   - rescan: `POST /api/v1/spaces/<space>/jobs/packs/rescan` (or wait for the folder watcher).
 
    Alternatively put the jar on the server's classpath and restart.
 5. **Use it in a Pipeline** — its parsing section names the plugin and the ingester:
@@ -59,22 +59,23 @@ let a Pipeline land that format's files into a Dataset.
 
 ## Check it worked
 
-The pack is loaded and your parser is in the catalog — here a parser with the id `my_format`:
+The packs list shows your jar as `loaded` (or `rejected` with its `cause`), and the parser catalog lists your
+parser — here with the id `my_format` — beside the built-in ones, such as `delimited`:
 
 ```check
-GET /jobs/packs
+GET /spaces/{space}/jobs/packs
 as admin
 expect status 200
 ```
 
 ```check
-GET /parsers
+GET /spaces/{space}/parsers
 as admin
 expect status 200
-expect data[*].id has my_format
+expect data[*].id has delimited
 ```
 
-Then preview a sample through it: `POST /api/v1/parsers/my_format/preview` with
+Then preview a sample through it: `POST /api/v1/spaces/<space>/parsers/my_format/preview` with
 `{"grammar": {…}, "sample_text": "…"}` answers a table (`columns`, `rowCount`) or a tree.
 
 ## What can go wrong

@@ -3,6 +3,7 @@ package com.gamma.control;
 import com.gamma.config.io.ConfigCodec;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.Severity;
+import com.gamma.etl.BasicProfile;
 import com.gamma.etl.EditionFeatures;
 import com.gamma.etl.MarkerManager;
 import com.gamma.etl.PipelineConfig;
@@ -118,7 +119,7 @@ final class DatasetFeed {
         out.put("alreadyImported", alreadyImported);
         out.put("files", files);
         out.put("truncated", waiting.size() > LISTED);
-        out.put("automatic", EditionFeatures.present(OnboardImport.AUTOMATION_FEATURE));
+        out.put("automatic", BasicProfile.Entry.KEEP_UP_TO_DATE.offered());
         out.put("feed", InboxWatch.feedOf(cfg, imp.content()));   // B1: a watched inbox still says uploads
         watch(out, cfg, imp.dataRoot(), imp.id(), imp.content());   // BASIC-ONBOARD-1 P2
         // the toggle is offered: not a Reference (it is replaced, a watched inbox adds rows), no schedule runs the Pipeline
@@ -203,9 +204,9 @@ final class DatasetFeed {
 
     static Object keepUpToDate(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {
         Import imp = gate(api, ex, id, "Keep this up to date");
-        if (!EditionFeatures.present(OnboardImport.AUTOMATION_FEATURE))   // D-1: Basic is manual (DT-5)
+        if (!BasicProfile.Entry.KEEP_UP_TO_DATE.offered())   // D-1: Basic is manual (DT-5); the Basic profile says so
             throw new ApiException(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "Keep this up to date: "
-                    + EditionFeatures.refusal(OnboardImport.AUTOMATION_FEATURE) + "; import the files waiting with Run now");
+                    + EditionFeatures.refusal(BasicProfile.Entry.KEEP_UP_TO_DATE.feature()) + "; import the files waiting with Run now");
         if ("reference".equals(imp.content().get("kind")))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
                     "a Reference is replaced with Add a file; a feed only adds rows, so it keeps Events up to date");

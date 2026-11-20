@@ -62,7 +62,15 @@ attributed to it in the audit trail, without borrowing a person's sign-in.
 
 ## Check it worked
 
-The Space lists the client among those it admits:
+Admit `case-bridge` beside the Space's authored Role `collections` (step 3), and the Space lists it among the
+clients it admits:
+
+```check
+PUT /spaces/{space}/access/roles
+as admin
+body {"roles": [{"name": "collections", "capabilities": ["canWorkIncidents"]}], "identity": {"machineClients": ["case-bridge"]}}
+expect status 200
+```
 
 ```check
 GET /spaces/{space}/access/roles
