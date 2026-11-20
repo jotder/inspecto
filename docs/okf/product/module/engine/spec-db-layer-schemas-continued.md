@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS consignment_outputs (
   row_count      BIGINT,   -- (the plan sketch calls this `rows`; `ROWS` is a SQL keyword)
   bytes          BIGINT,
   written_at     VARCHAR,
-  state          VARCHAR,  -- LIVE | SUPERSEDED | COMPACTED_AWAY | SIMULATED (PIPELINE-DRYRUN-1 — a dry-run
+  state          VARCHAR,  -- LIVE | SUPERSEDED | COMPACTED_AWAY | REPLACED | SIMULATED (PIPELINE-DRYRUN-1 — a dry-run
                             -- "would-have" row: no bytes written, `path` a placeholder; excluded from every
                             -- state='LIVE' readability/selection check, so it can never be read as real data
   schema_fingerprint VARCHAR,  -- §3.4.3 CanonicalHash of the schema that wrote the file; NULL pre-column / no-schema paths
@@ -187,7 +187,9 @@ it started with.
 `COMPACTED_AWAY` for `ConsignmentSelector` to subtract from a glob — but **never a path that also has a
 `LIVE` row**. Output naming is not one-file-per-Consignment: a full recompute rewrites a stable path in
 place, so one path legitimately owns an old dead row and a current live one, and returning it would drop live
-data from every read. Row state is per-registration; readability is per-path.
+data from every read. Row state is per-registration; readability is per-path. `REPLACED` (B4: a later arrival
+replaced some of the file's rows; `markReplaced`) counts as readable like `LIVE`: the file keeps its path and the kept
+rows ([spec-arrival-replace.md](../elt/spec-arrival-replace.md)).
 
 **The two non-live states are opposites to a reader that aggregates.** `producerHighWater(table)` — the
 per-producer `max(event_time_max)` the §3.6 Watermark folds — filters `state <> 'SUPERSEDED'` but keeps

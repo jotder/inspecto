@@ -181,7 +181,9 @@ writer's own spelling — which may be relative — while an enumerator answers 
 would match nothing and report success.
 
 **A path with any `LIVE` row is never excluded**, whatever dead rows also name it: output naming is not
-one-file-per-Consignment, so one path can own an old `SUPERSEDED` row and a current `LIVE` one.
+one-file-per-Consignment, so one path can own an old `SUPERSEDED` row and a current `LIVE` one. A `REPLACED` row
+(`BASIC-ELT-PROFILE-1` B4: a later arrival replaced some of the file's rows) is readable too: the file keeps its path
+and the rows the replacement kept ([spec-arrival-replace.md](spec-arrival-replace.md)).
 
 ⛔ **Not a pruner.** Bounds-based window pruning is deliberately unbuilt: a file whose bounds miss the
 window contains no matching rows, so the query's own predicate already excludes them — identical

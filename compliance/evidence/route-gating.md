@@ -382,13 +382,13 @@ system: the evidence cannot say something the code does not.
 | POST | `/risk-scores/preview` | gated | `canWorkIncidents` | `features/inspecto-scoring/src/main/java/com/gamma/risk/RiskScoreRoutes.java:75` |
 | POST | `/rule-templates/([^/]+)/simulate` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/RuleRoutes.java:55` |
 | POST | `/runs` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:54` |
-| POST | `/runs/([^/]+)/drain` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:125` |
+| POST | `/runs/([^/]+)/drain` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:130` |
 | POST | `/runs/([^/]+)/pause` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:60` |
-| POST | `/runs/([^/]+)/replay-rejects` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:110` |
+| POST | `/runs/([^/]+)/replay-rejects` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:115` |
 | POST | `/runs/([^/]+)/reprocess` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:98` |
 | POST | `/runs/([^/]+)/resume` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:64` |
-| POST | `/runs/([^/]+)/retries/cancel` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:119` |
-| POST | `/runs/([^/]+)/retries/retry-now` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:117` |
+| POST | `/runs/([^/]+)/retries/cancel` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:124` |
+| POST | `/runs/([^/]+)/retries/retry-now` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:122` |
 | POST | `/runs/([^/]+)/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:55` |
 | POST | `/screening/check` | exempt | read-shaped | `features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java:60` |
 | POST | `/screening/hits/([^/]+)/decide` | gated | `canWorkIncidents` | `features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java:65` |
@@ -430,7 +430,7 @@ system: the evidence cannot say something the code does not.
 | DELETE | `/tags/rules/([^/]+)` | gated | `canAuthorWorkbench` | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:58` |
 | POST | `/tags/rules/([^/]+)/apply` | exempt | collaboration | `features/inspecto-ops/src/main/java/com/gamma/opsapi/TagRoutes.java:60` |
 | POST | `/tests/run` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SpaceTestRoutes.java:32` |
-| POST | `/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:147` |
+| POST | `/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:152` |
 | POST | `/validate` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ConfigPreviewRoutes.java:45` |
 
 <!--route-gating:end-->

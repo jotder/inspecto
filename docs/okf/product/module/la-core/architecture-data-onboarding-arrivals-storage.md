@@ -44,9 +44,12 @@ Every edition; Add data Datasets only (a Pipeline-fed Dataset answers no arrival
   first build is `full`. About 7 to 11 s per 10,000-row append at 1 M rows, end to end
   (`ControlApiOnboardLinkAnalysisTest#v4MeasuredAtScale`).
 - **Three modes** for *Add a file*: `replace` (everything), `append` (add rows), `period` (D-2: the file's rows are added,
-  then every older Parquet file loses its rows on the calendar days the file covers; `DatasetPeriod`, originals kept in
+  then every older Parquet file loses its rows on the calendar days the file covers; originals kept in
   `database.period-<stamp>/` until the import succeeded). `period` needs a When column. A rewritten file makes the next
-  index build `full`.
+  index build `full`. Since `BASIC-ELT-PROFILE-1` B4 the engine's `ArrivalReplacer` does it, crash-safe (a journal, one
+  swap, a heal to the old or the new state), and once the import succeeded the replaced files (and the files *Replace
+  everything* set aside) are `REPLACED` in the Consignment output registry, so their reprocess is refused (`409`):
+  [spec-arrival-replace.md](../elt/spec-arrival-replace.md).
 - **The same bytes again** (D-3): append or period whose sha256 matches an upload whose rows are still held answers 409
   with the first import's date (`DatasetArrivals.alreadyImported`). Replace everything may always reload. A folder drop
   under the same name is skipped by the import Pipeline's duplicate policy and stays in the inbox.
@@ -254,8 +257,8 @@ All three after Add a file's gates (503 no write root, 403 `data.self_import`, 4
   both match. **Replace the period keeps the map true** (`LA-DATASET-COMPACT-2`, as built 2026-11-06): when the file it
   rewrites IS the map's merged file and the map still holds (`ArrivalCompactor.trustedSegments`), it writes the kept
   rows in their row order (`file_row_number`), re-counts each arrival's segment and period from the same read
-  (`DatasetPeriod.recount`), and commits the map with the new size and time (`segmentsRewritten`; undone with the
-  import, `restoreMap`). An arrival left with no row drops out of the map, so the arrivals answer reads it as replaced
+  (`ArrivalReplacer.recount`), and commits the map with the new size and time (`segmentsRewritten`; undone with the
+  import from the copy the replace keeps aside). An arrival left with no row drops out of the map, so the arrivals answer reads it as replaced
   (not as a retention removal). So *keep N arrivals* after a *Replace the period* counts every arrival. Only when the
   map cannot be trusted (an older map, a row outside every segment, a rewrite by anything else) do its arrivals stay
   *kept* with no known period and the next compaction carries the file as ONE block (`holds` names the arrivals in it),

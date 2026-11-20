@@ -103,6 +103,14 @@ public record ConsignmentOutput(
         /** Merged into a compacted file and unlinked (§6.3). */
         COMPACTED_AWAY,
         /**
+         * {@code BASIC-ELT-PROFILE-1} B4: some or all of the file's rows were replaced by a later arrival - <i>Replace the
+         * period</i> rewrote it without the days the arrival covers (or removed it when none was left), or <i>Replace
+         * everything</i> set it aside. <b>Readable</b>, unlike the other non-live states: a rewritten file keeps its path
+         * and holds the rows the replacement kept, so a reader must still see it (a removed one matches no read anyway).
+         * What it forbids is a reprocess: re-reading the Consignment's backup would bring back the replaced rows.
+         */
+        REPLACED,
+        /**
          * PIPELINE-DRYRUN-1: a "would-have" row for a dry run — no bytes were written, {@code path} is a
          * placeholder, and {@code rows} is a best-effort preview count. Deliberately excluded from every
          * {@code state = 'LIVE'} readability/selection check in {@link DbConsignmentOutputStore} (isReadable,

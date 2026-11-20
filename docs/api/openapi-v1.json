@@ -1913,7 +1913,7 @@
         "tags" : [ "runs" ],
         "summary" : "Reprocess one Consignment",
         "operationId" : "postRunsByRunIdReprocess",
-        "description" : "Body {batchId}: reprocesses that Consignment of the Pipeline named in the path. Gated on canOperateRuns. 404 for an unknown Pipeline; 409 for a template Pipeline; 400 without batchId.",
+        "description" : "Body {batchId}: reprocesses that Consignment of the Pipeline named in the path. Gated on canOperateRuns. 404 for an unknown Pipeline; 409 for a template Pipeline, or for a Consignment whose output files a compaction merged away or a later arrival replaced rows of (re-ingesting would put rows in twice or bring replaced rows back; the reason names no server path); 400 without batchId.",
         "parameters" : [ {
           "name" : "runId",
           "in" : "path",

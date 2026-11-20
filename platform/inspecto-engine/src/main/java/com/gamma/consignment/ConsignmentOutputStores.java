@@ -119,4 +119,14 @@ public final class ConsignmentOutputStores {
         DbConsignmentOutputStore store = shared();
         if (store != null) store.markCompactedAway(paths);
     }
+
+    /**
+     * Flip {@code paths} to {@code REPLACED} in the calling space's registry ({@code BASIC-ELT-PROFILE-1} B4), or do
+     * nothing when none is registered — the arrival-replace twin of {@link #markCompactedAway}.
+     */
+    public static void markReplaced(List<String> paths) {
+        if (paths == null || paths.isEmpty()) return;
+        DbConsignmentOutputStore store = shared();
+        if (store != null) store.markReplaced(paths);
+    }
 }
