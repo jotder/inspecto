@@ -59,13 +59,20 @@ Upgrading is two moves: the **App** on the server, then each **Space** when its 
 
 ## Check it worked
 
-The server runs version 2 of the App, and the Space records the new template version:
+The server runs version 2 of the App; applying the Space's upgrade (step 4) records the new template version:
 
 ```check
 GET /apps
 as admin
 expect status 200
 expect data.installed[*].version has 2.0.0
+```
+
+```check
+POST /spaces/{space}/origin/upgrade
+as admin
+body {"toVersion": "2.0.0"}
+expect status 200|409
 ```
 
 ```check

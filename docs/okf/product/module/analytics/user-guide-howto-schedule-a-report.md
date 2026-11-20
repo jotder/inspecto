@@ -30,11 +30,19 @@ Have a Dataset exported every morning as a CSV or Excel file, and its recipients
    **Cron schedule** with its **Cron expression** (`0 0 6 * * *` is 06:00 every day), or **Manual only**.
 3. Optionally list **Recipients (comma-separated)**. Leave **Enabled (armed)** on and click **Schedule**.
 4. On its row: *Run now*, *Download latest export*, *Edit schedule*, *Delete schedule*. Each run writes its file to the
-   Space's `exports/<schedule id>` folder.
+   Space's `config\exports\<schedule id>\` folder.
 
 ## Check it worked
 
-Run the schedule now and read the file it wrote (here a schedule `daily_orders`):
+The schedule — here `daily_orders`, the orders Dataset as CSV every day at 06:00, saved through the Control API as
+**Schedule** saves it (the Job's settings are top-level keys) — runs now and leaves its file:
+
+```check
+POST /spaces/{space}/jobs
+as builder
+body {"name": "daily_orders", "type": "report", "cron": "0 0 6 * * *", "enabled": true, "scope": "dataset", "dataset": "orders", "format": "csv", "out_dir": "exports/daily_orders"}
+expect status 200|409
+```
 
 ```check
 POST /spaces/{space}/jobs/daily_orders/trigger
@@ -47,6 +55,7 @@ save data.runId as exportRun
 GET /spaces/{space}/jobs/runs/{exportRun}
 as builder
 expect data.status = "SUCCESS"
+expect data.message matches /delivered to/
 retry 30 every 2s
 ```
 

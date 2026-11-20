@@ -47,21 +47,31 @@ Hit opens an Incident and a Case.
 
 ## Check it worked
 
-The list exists, and checking a name against it answers a result per name (here a list `blocked_parties`):
+Make the list `blocked_parties` with two names — through the Control API, as **Create list** and **Edit entries…** do
+— and check a misspelt name against it. Case and punctuation do not matter, and a typo still matches:
 
 ```check
-GET /spaces/{space}/entity-lists
+POST /spaces/{space}/entity-lists
 as builder
+body {"id": "blocked_parties", "title": "Blocked parties", "purpose": "watch", "entityType": "organisation", "reason": "Handbook how-to"}
+expect status 201|409
+```
+
+```check
+POST /spaces/{space}/entity-lists/blocked_parties/members
+as builder
+body {"add": ["Acme Trading Ltd", "Globex Holdings"], "reason": "Handbook how-to"}
 expect status 200
-expect data.lists[*].id has blocked_parties
 ```
 
 ```check
 POST /spaces/{space}/screening/check
 as builder
-body {"subjects": [{"name": "Acme Trading Ltd"}], "lists": ["blocked_parties"]}
+body {"subjects": [{"name": "ACME Tradng Ltd."}, {"name": "Initech"}], "lists": ["blocked_parties"]}
 expect status 200
-expect data.results.length = 1
+expect data.results[0].matches[0].entry = "acme trading ltd"
+expect data.results[0].matches[0].score >= 0.85
+expect data.results[1].matches.length = 0
 ```
 
 ## What can go wrong
@@ -73,6 +83,8 @@ expect data.results.length = 1
 - 403 — a restricted list whose members you may not see.
 - *Screening is not available on this deployment* — the edition has no Screening.
 - In a Space that masks data, matched entries show as mask tokens.
+- A different legal form is not folded: *ACME Trading Limited* scores about 0.66 against *Acme Trading Ltd*, below the
+  default threshold of 0.85. Enter the forms you expect as separate entries, or lower the **Threshold**.
 
 ## Next
 
