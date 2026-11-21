@@ -63,6 +63,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `CONVERT-TYPE-DECIMAL-MARK-1` | P3 | defect | *Change the type* (convert.type) ignores the Grammar's decimal mark (filed 2026-11-19, BASIC-ELT-PROFILE-1 U3 review). | — |
 | `GRAMMAR-NO-QUOTE-1` | P3 | defect | The Grammar editor cannot state "no quote" (filed 2026-11-19, BASIC-ELT-PROFILE-1 BE-3 review). | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
+| `TEST-WRITES-TRACKED-DIR-1` | P3 | chore | a test run deletes a tracked file: | — |
 | `SAVE-AS-TEMPLATE-LEFTOVER-1` | P3 | defect | POST /pipelines/{id}/save-as-template copies the source's schema and segment schemas into the write root before its hold and removes them… | — |
 | `DUCKLAKE-REAL-DRIVER-FAILURE-PROOF-1` | P3 | chore | no test proves that a real DuckLake driver's registration failure is non-fatal (filed 2026-11-16; untracked since SPEC-NOPROOF-1 closed o… | external |
 | `HOWTO-DOC-DRIFT-1` | P3 | chore | internal hub pages that contradict the code, found writing the P3 how-tos: | — |

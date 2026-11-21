@@ -146,7 +146,7 @@ final class EntityShapes {
         if (t.equals("DATE") || t.equals("TIMESTAMP"))
             return OnboardDraft.choice("temporal", c.name() + " holds " + Words.plural(t), true);
         if (t.equals("DOUBLE") || OnboardDraft.isDecimal(t) || (t.equals("BIGINT") && hasAny(c.name(), AMOUNT_WORDS)))
-            return OnboardDraft.choice("measure", c.name() + (t.equals("DOUBLE") ? " holds decimal numbers" : " is named as an amount and holds numbers"),
+            return OnboardDraft.choice("measure", c.name() + (t.equals("DOUBLE") || OnboardDraft.isDecimal(t) ? " holds decimal numbers" : " is named as an amount and holds numbers"),
                     n >= OnboardDraft.MIN_SAMPLE);
         if (TEXT.contains(t) && n > 0) {
             int distinct = new LinkedHashSet<>(c.values()).size();
@@ -164,7 +164,7 @@ final class EntityShapes {
     /**
      * ENTITY-TYPE-RECORD-ROLES-1: the role the record type's hints give a column of {@code type} - its first Time, Measure or
      * Category hint naming the column, in that order, whose role the type can hold (a Time is a DATE or TIMESTAMP, a Measure
-     * a DOUBLE or BIGINT, a Category neither a DOUBLE nor a date); null when none does. {@code [role, hint]}.
+     * a DOUBLE, a DECIMAL or a BIGINT, a Category neither a DOUBLE, a DECIMAL nor a date); null when none does. {@code [role, hint]}.
      */
     static String[] hintedRole(String column, String type, IndustryPack.RoleHints hints) {
         String t = type == null ? "VARCHAR" : type.toUpperCase(Locale.ROOT);

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-471 test class(es): 190 unit, 281 real-HTTP control-plane, 0 IT.
+472 test class(es): 191 unit, 281 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -401,6 +401,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `TypeFlowSaveTimeFindingsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/TypeFlowSaveTimeFindingsTest.java` | {@link ConfigRoutes#routeColumnFindings} and {@link ConfigRoutes#summarizeMeasureFindings} — |
 | `TypeInferenceGoldenTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/TypeInferenceGoldenTest.java` | {@code BASIC-ELT-PROFILE-1} BE-3: the column types the three type inferences answer for one file — the parse |
 | `UndeclaredMutatingRouteTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/UndeclaredMutatingRouteTest.java` | <b>The control itself (route-gating plan step 3c, 2026-09-16).</b> A mutating route must declare its |
+| `UnknownComponentKeysTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/UnknownComponentKeysTest.java` | UNKNOWN-KEYS-SILENT-1: the census of a Dataset's and a Reconciliation's keys, and the scan that keeps every shipped file |
 | `WriteGateOrderTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/WriteGateOrderTest.java` | The four-stage write gate: <b>its ORDER, and {@link WriteGates} itself</b> — one of |
 | `BaselineEvaluatorGoldenTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/BaselineEvaluatorGoldenTest.java` | Golden figures of the {@code baseline} Expectation kind (ANALYTICS-CORE-1 M4 / M2): every profiled cell over parquet |
 | `BaselineEvaluatorTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/BaselineEvaluatorTest.java` | DUCKLE-C8 — the {@code baseline} kind's decision logic (median of the accepted window, limits in either |
