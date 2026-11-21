@@ -38,7 +38,7 @@ class ControlApiUnknownKeysTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     /** AGENT = author-1 (pipeline-developer) through agent client claude-code; AUTHOR = the same person, own token. */
-    private static final String AGENT = "Bearer agent", AUTHOR = "Bearer author";
+    private static final String AGENT = "Bearer agent", AUTHOR = "Bearer author", ADMIN = "Bearer admin";
     private final HttpClient client = HttpClient.newHttpClient();
 
     @TempDir
@@ -56,11 +56,12 @@ class ControlApiUnknownKeysTest {
         System.setProperty("jobs.audit.dir", auditDir.resolve("jobs_audit").toString());
         Authenticators.forTest(ex -> {
             String h = String.valueOf(ex.getRequestHeaders().getFirst("Authorization"));
-            if (!AGENT.equals(h) && !AUTHOR.equals(h)) return Optional.empty();
-            Roles.Def def = Roles.effective(ex).get("pipeline-developer");
-            ComponentAccess.heldRoles(ex, Set.of("pipeline-developer"));
+            if (!AGENT.equals(h) && !AUTHOR.equals(h) && !ADMIN.equals(h)) return Optional.empty();
+            String role = ADMIN.equals(h) ? "admin" : "pipeline-developer";
+            Roles.Def def = Roles.effective(ex).get(role);
+            ComponentAccess.heldRoles(ex, Set.of(role));
             String agent = AGENT.equals(h) ? "claude-code" : null;
-            return Optional.of(new Subject("author-1", def.capabilities(), def.dataScopes(), Map.of(), null, null, null, agent));
+            return Optional.of(new Subject(ADMIN.equals(h) ? "admin-1" : "author-1", def.capabilities(), def.dataScopes(), Map.of(), null, null, null, agent));
         });
     }
 
@@ -155,11 +156,36 @@ class ControlApiUnknownKeysTest {
         }
     }
 
+    private HttpResponse<String> get(Ctx c, String path, String auth) throws Exception {
+        HttpRequest.Builder b = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + path)).header("Authorization", auth);
+        return client.send(b.GET().build(), BodyHandlers.ofString());
+    }
+
+    /** Step 3: a person saves, the response names the unknown keys in `warnings`, and the audit row records them. */
     @Test
-    void thePersonsOwnTokenIsNotRefusedHere(@TempDir Path dir) throws Exception {
+    void aPersonsSaveWithAnUnknownKeySucceedsWithWarningsAndAnAuditedRow(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             HttpResponse<String> own = post(c, "dataset", DATASET.formatted("ds_person", ",\"phyiscalRef\":\"x\""), AUTHOR);
-            assertTrue(own.statusCode() < 300, "step 2 judges agents only: " + own.body());
+            assertTrue(own.statusCode() < 300, own.body());
+            JsonNode warnings = JSON.readTree(own.body()).at("/data/warnings");
+            assertEquals(1, warnings.size(), own.body());
+            assertEquals("UNKNOWN_KEY", warnings.get(0).get("code").asText());
+            assertEquals("phyiscalRef", warnings.get(0).get("key").asText());
+            assertTrue(exists(c, "dataset", "ds_person"), "the save still happened");
+
+            HttpResponse<String> rc = post(c, "reconciliation", RECON.formatted("rc_person", "\"toleranceTyp\":\"absolute\","), AUTHOR);
+            assertTrue(rc.statusCode() < 300, rc.body());
+            assertEquals("compareColumns[0].toleranceTyp", JSON.readTree(rc.body()).at("/data/warnings/0/key").asText(), rc.body());
+
+            // a clean save carries no warnings
+            JsonNode clean = JSON.readTree(post(c, "dataset", DATASET.formatted("ds_person_ok", ""), AUTHOR).body());
+            assertTrue(clean.at("/data/warnings").isMissingNode(), clean.toString());
+
+            // the audit row of the unclean save names the keys
+            boolean audited = false;
+            for (JsonNode row : JSON.readTree(get(c, "/audit/search?type=AUDIT&limit=500", ADMIN).body()).get("data"))
+                if (row.toString().contains("unknownKeys") && row.toString().contains("phyiscalRef")) audited = true;
+            assertTrue(audited, "an audit row carries unknownKeys=phyiscalRef");
         }
     }
 }

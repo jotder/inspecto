@@ -84,6 +84,15 @@ final class UnknownComponentKeys {
         return out;
     }
 
+    /** The response's {@code warnings}: one entry per unknown key, saved anyway for a person. */
+    static List<Map<String, Object>> warnings(String type, List<String> unknown) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (String k : unknown)
+            out.add(Map.of("code", "UNKNOWN_KEY", "key", k, "message", type + " key '" + k + "' is read by nothing; it was saved but has no effect"
+                    + " (prefix it with '" + AcceptedConfigKeys.EXTENSION_PREFIX + "' to mark it as deliberately extra)"));
+        return out;
+    }
+
     /** The sentence a refusal or a warning carries. */
     static String describe(String type, List<String> unknown) {
         return type + " has unknown key(s) " + unknown + " that nothing reads; remove them, or prefix with '"

@@ -42,7 +42,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | defect | COMPONENT-DELETE-IN-USE-WORDS-1 the Components screen words every refused delete as "referenced by a pipeline" | — |
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
-| `UNKNOWN-KEYS-SILENT-1` | P3 | defect | unknown keys are accepted silently | — |
+| `UNKNOWN-KEYS-REJECT-1` | P3 | defect | reject unknown Dataset and Reconciliation keys for people too: | operator |
 | `COMPONENT-VALIDATE-ALL-1` | P3 | feature | no validate or dry run for a KPI, Reconciliation, Dataset, Widget or Dashboard: | — |
 | `BUILDER-API-PAPERCUTS-1` | P3 | defect | small gaps that cost an agent calls: | — |
 | `SPACE-TO-APP-CONSOLE-1` | P3 | feature | Turn a working Space into a Space Template, and into an App, from the console. | — |

@@ -822,6 +822,14 @@ final class ComponentRoutes implements RouteModule {
             List<String> unknownKeys = UnknownComponentKeys.of(type, content, stored == null ? null : stored.content());
             if (!unknownKeys.isEmpty() && ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject who && who.agent())
                 throw new IllegalArgumentException(UnknownComponentKeys.describe(type, unknownKeys));
+            // Step 3: anyone else saves, and is told (the response `warnings`) and audited (the row's `unknownKeys`); rejecting for
+            // people is UNKNOWN-KEYS-REJECT-1, not built. Recorded before the hold, so a held change is audited too.
+            if (!unknownKeys.isEmpty()) {
+                Map<String, Object> attrs = new LinkedHashMap<>();
+                if (ApiContext.attr(ex, ApiContext.ATTR_AUDIT_ATTRS) instanceof Map<?, ?> have) have.forEach((k, v) -> attrs.put(String.valueOf(k), v));
+                attrs.put("unknownKeys", String.join(",", unknownKeys));
+                ApiContext.attr(ex, ApiContext.ATTR_AUDIT_ATTRS, attrs);
+            }
             // ASSURE-ACTION-REQUESTS-1 round-2 finding 1: this door writes decision-rule too — the same invoke-api gate
             // and server-stamped makers as /decision-rules, before the hold (version restore lands here as well).
             if (DecisionRuleGuard.TYPE.equals(type)) {
@@ -858,9 +866,10 @@ final class ComponentRoutes implements RouteModule {
             ComponentRegistry.Component c = store.write(type, id, content);
             log.info("[COMPONENT-WRITE] wrote {}", c.ref());
             ETags.set(ex, ETags.of(ContentHash.of(c.content())));
-            if (linkFindings.isEmpty()) return componentDoc(c);
+            if (linkFindings.isEmpty() && unknownKeys.isEmpty()) return componentDoc(c);
             Map<String, Object> doc = componentDoc(c);
-            doc.put("linkWarnings", linkFindings);   // shadow: what refuse mode would have refused
+            if (!linkFindings.isEmpty()) doc.put("linkWarnings", linkFindings);   // shadow: what refuse mode would have refused
+            if (!unknownKeys.isEmpty()) doc.put("warnings", UnknownComponentKeys.warnings(type, unknownKeys));
             return doc;
         } catch (IllegalArgumentException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
