@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-473 test class(es): 191 unit, 282 real-HTTP control-plane, 0 IT.
+474 test class(es): 191 unit, 283 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -109,6 +109,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiCommitRetryTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCommitRetryTest.java` | The X1 retry affordance over real HTTP ({@code GET /runs/{name}/retries}, |
 | `ControlApiComponentSharesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiComponentSharesTest.java` | Component sharing RBAC (R3, {@code docs/superpower/rbac-abac-plan.md} §3) over real HTTP: the |
 | `ControlApiComponentsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiComponentsTest.java` | Component registry CRUD (T19, §7.1) over real HTTP: create / list / get / update / delete |
+| `ControlApiComponentValidateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiComponentValidateTest.java` | COMPONENT-VALIDATE-ALL-1 over real HTTP: {@code POST /validate} judges a KPI, Reconciliation, Dataset, Widget or Dashboard |
 | `ControlApiConfigDeleteTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiConfigDeleteTest.java` | Integration tests for {@code DELETE /config/{type}/{name}} (v5.1.0, the onboarding draft-discard |
 | `ControlApiConfigIfMatchTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiConfigIfMatchTest.java` | Optimistic concurrency on {@code POST /config/write} over real HTTP — {@code CLIENT-HALVES-1} (a), |
 | `ControlApiConfigImpactTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiConfigImpactTest.java` | Integration tests for {@code GET /config/pipeline/{name}/impact} and the dependents gate it backs on |

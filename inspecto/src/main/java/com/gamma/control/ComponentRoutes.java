@@ -897,6 +897,36 @@ final class ComponentRoutes implements RouteModule {
         validateKind(api.writeRoot(), api::dataRoot, type, id, content);
     }
 
+    /** The component kinds {@code POST /validate} judges as a draft, with the checks their save door runs. */
+    static final java.util.Set<String> VALIDATABLE_KINDS = java.util.Set.of("kpi", "reconciliation", "dataset", "widget", "dashboard");
+
+    /**
+     * COMPONENT-VALIDATE-ALL-1: what a save of {@code content} as {@code type}/{@code id} through {@code POST /components/{type}}
+     * would refuse, as {@link Finding}s, writing and holding nothing. It runs the save door's own checks, not a copy: the kind's
+     * {@link #validateKind}, the widget/dashboard/expectation key census, a KPI's Dataset and fields ({@link KpiRoutes#requireMeasure}),
+     * and the Dataset / Reconciliation key census, which is an error for an agent Subject and a warning for anyone else.
+     */
+    static List<Finding> draftFindings(ApiContext api, com.sun.net.httpserver.HttpExchange ex, String type, String id,
+                                       Map<String, Object> draft) {
+        List<Finding> out = new ArrayList<>();
+        Map<String, Object> content = new LinkedHashMap<>(draft);
+        content.remove("id");
+        try {
+            validateKind(api, type, id, content);
+            if (CENSUSED_COMPONENT_KINDS.contains(type)) refuseUnknownComponentKeys(type, content);
+            if (KpiRoutes.TYPE.equals(type)) KpiRoutes.requireMeasure(api, ex, id, content);
+        } catch (IllegalArgumentException | ApiException refused) {
+            out.add(new Finding(Severity.ERROR, "", refused.getMessage(), "COMPONENT_INVALID", null));
+        }
+        boolean agent = ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject who && who.agent();
+        for (String key : UnknownComponentKeys.of(type, content))
+            out.add(new Finding(agent ? Severity.ERROR : Severity.WARNING, key,
+                    type + " key '" + key + "' is read by nothing" + (agent ? "; an agent save of it is refused" : "; a save keeps it but it has no effect")
+                            + " (prefix it with '" + AcceptedConfigKeys.EXTENSION_PREFIX + "' to mark it as deliberately extra)",
+                    "UNKNOWN_KEY", null));
+        return out;
+    }
+
     /** {@link #validateKind(ApiContext, String, String, Map)} against explicit roots (a Space Template's staged tree). */
     static void validateKind(java.nio.file.Path writeRoot, java.util.function.Supplier<java.nio.file.Path> dataRoot,
                              String type, String id, Map<String, Object> content) {
@@ -918,6 +948,16 @@ final class ComponentRoutes implements RouteModule {
             if (v.type().equals(type)) v.validate(id, content);
         // LA-ONBOARD-1 OB-8: primaryEntityType + defaultLinkMapping on a Dataset entry.
         if ("dataset".equals(type)) DatasetEntryRules.validate(content);
+        // COMPONENT-VALIDATE-ALL-1: a virtual Dataset's SQL meets, at save, the check it meets on every read
+        // (DatasetRelation.virtualOver); until now a save of SQL the guard refuses answered 200 and the first read answered 422.
+        if ("dataset".equals(type) && content.get("sql") instanceof String userSql && !userSql.isBlank()) {
+            if (!(content.get("sourceName") instanceof String source) || source.isBlank())
+                throw new IllegalArgumentException("a virtual dataset's 'sql' needs a 'sourceName' - the store its FROM reads");
+            List<Finding> refused = SqlGuard.check(userSql, source);
+            if (!refused.isEmpty())
+                throw new IllegalArgumentException("dataset 'sql' failed the SQL safety check: "
+                        + String.join("; ", refused.stream().map(Finding::message).toList()));
+        }
         if ("findings-spec".equals(type)) {
             // The store stamps name=id, and GET /findings/{type} resolves by that id, so validate the
             // content as it will be persisted and refuse a spec whose objectType/caseType disagrees with

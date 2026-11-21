@@ -36,6 +36,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | `BI-INSIGHTS-1` | P2 | feature | Advanced insights on business data in Widgets and Dashboards, authored and tuned as Insight Profiles. | — |
 | `UNKNOWN-KEYS-REJECT-1` | P3 | defect | reject unknown Dataset and Reconciliation keys for people too: | operator |
-| `COMPONENT-VALIDATE-ALL-1` | P3 | feature | no validate or dry run for a KPI, Reconciliation, Dataset, Widget or Dashboard: | — |
+| `COMPONENT-VALIDATE-ALL-1` | P3 | feature | a dry run (executing preview) for a KPI, Reconciliation, Dataset, Widget or Dashboard: | — |
 | `BUILDER-API-PAPERCUTS-1` | P3 | defect | small gaps that cost an agent calls: | — |
 | `REPORT-DASHBOARD-AUTHORING-1` | P3 | feature | a Report Job cannot filter | — |

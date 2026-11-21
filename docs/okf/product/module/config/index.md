@@ -43,7 +43,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `UNKNOWN-KEYS-REJECT-1` | P3 | defect | reject unknown Dataset and Reconciliation keys for people too: | operator |
-| `COMPONENT-VALIDATE-ALL-1` | P3 | feature | no validate or dry run for a KPI, Reconciliation, Dataset, Widget or Dashboard: | — |
+| `COMPONENT-VALIDATE-ALL-1` | P3 | feature | a dry run (executing preview) for a KPI, Reconciliation, Dataset, Widget or Dashboard: | — |
 | `BUILDER-API-PAPERCUTS-1` | P3 | defect | small gaps that cost an agent calls: | — |
 | `SPACE-TO-APP-CONSOLE-1` | P3 | feature | Turn a working Space into a Space Template, and into an App, from the console. | — |
 | `APPS-UPGRADE-CONSOLE-1` | P3 | feature | Apps, a Space's template upgrade and the audit-chain check have no console: | — |
