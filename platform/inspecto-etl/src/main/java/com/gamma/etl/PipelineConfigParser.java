@@ -901,6 +901,7 @@ final class PipelineConfigParser {
                 on.add(String.valueOf(recJoin.get("on")));   // single-key shorthand: on: k
             b.join = new PipelineConfig.Join(
                     referencePath(configDir, trimToNull(recJoin.get("reference")), "processing.join.reference"), on);
+            b.joinMatch = trimToNull(recJoin.get("match"));
         }
 
         // ── map (AUTHOR-1 (a) — the authored half of a transform.map node) ──

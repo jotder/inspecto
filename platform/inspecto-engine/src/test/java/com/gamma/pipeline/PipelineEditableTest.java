@@ -401,6 +401,18 @@ class PipelineEditableTest {
                 node("j2", "transform.join", Map.of("reference", "cells")));
     }
 
+    /** LOOKUP-1: a chained join keeps its match on the steps: lower — dropping it would turn a prefix join exact. */
+    @Test
+    void aChainedJoinKeepsItsMatch() {
+        Map<String, Object> out = PipelineEditable.lower(graphWith(
+                node("j1", "transform.join", Map.of("reference", "sites", "on", "cell", "match", "longest_prefix")),
+                node("j2", "transform.join", Map.of("reference", "cells", "on", "cell"))), new LinkedHashMap<>(), true);
+        List<?> steps = (List<?>) out.get("steps");
+        assertEquals("longest_prefix", ((Map<?, ?>) ((Map<?, ?>) steps.get(0)).get("join")).get("match"));
+        assertFalse(((Map<?, ?>) ((Map<?, ?>) steps.get(1)).get("join")).containsKey("match"),
+                "an absent match stays absent (exact)");
+    }
+
     /**
      * ⚠ Two of a kind is not the only thing the singular keys could not hold — <b>order</b> is the other,
      * and it looks harmless. One dedup and one summarize fit the singular slots whichever way round they

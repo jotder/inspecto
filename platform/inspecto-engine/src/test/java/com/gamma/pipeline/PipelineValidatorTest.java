@@ -342,6 +342,25 @@ class PipelineValidatorTest {
         assertTrue(codes(PipelineValidator.validate(blanks)).contains(PipelineValidator.JOIN_ON_MISSING));
     }
 
+    /** LOOKUP-1: a join's match must be one RowShaper.join runs; exact and longest_prefix are clean. */
+    @Test
+    void aJoinWithAnUnknownMatchIsRefusedAtValidation() {
+        for (String ok : List.of("exact", "longest_prefix")) {
+            PipelineGraph g = new PipelineGraph("join-" + ok, true,
+                    List.of(new PipelineNode("j", "transform.join",
+                            Map.of("reference", "reference/prefixes", "on", "msisdn", "match", ok), null)),
+                    List.of());
+            assertFalse(codes(PipelineValidator.validate(g)).contains(PipelineValidator.JOIN_MATCH_UNKNOWN), ok);
+        }
+        PipelineGraph bad = new PipelineGraph("join-bad", true,
+                List.of(new PipelineNode("j", "transform.join",
+                        Map.of("reference", "reference/prefixes", "on", "msisdn", "match", "prefix"), null)),
+                List.of());
+        PipelineValidator.Result r = PipelineValidator.validate(bad);
+        assertTrue(codes(r).contains(PipelineValidator.JOIN_MATCH_UNKNOWN), () -> r.issues().toString());
+        assertFalse(r.ok());
+    }
+
     /** …and the correctly-spelled one against the same registry is clean. */
     @Test
     void resolvableUseRefIsClean(@TempDir Path root) throws Exception {

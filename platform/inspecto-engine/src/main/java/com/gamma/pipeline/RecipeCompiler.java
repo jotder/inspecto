@@ -321,6 +321,10 @@ public final class RecipeCompiler {
         Map<String, Object> c = new LinkedHashMap<>(cfg);
         Object join = c.remove("join");
         Object on = c.remove("on");
+        Object match = c.remove("match");
+        if (match != null && join == null)
+            refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+                    "match: only makes sense next to join: (transform: {join: references/x, on: k, match: longest_prefix})"));
         if (join != null) {
             Map<String, Object> node = new LinkedHashMap<>();
             String s = join.toString().trim();
@@ -329,6 +333,7 @@ public final class RecipeCompiler {
             if (on != null) node.put("on", on instanceof List<?> l ? l : List.of(on.toString()));
             else refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
                     "transform.join needs on: — the join-key column(s)"));
+            if (match != null) node.put("match", match.toString());
             // a step carrying both join and filter compiles to two chained nodes — distinct ids
             nodes.add(PipelineNode.of(c.containsKey("filter") ? id + "-join" : id,
                     BuiltinNodeType.TRANSFORM_JOIN.type(), node));

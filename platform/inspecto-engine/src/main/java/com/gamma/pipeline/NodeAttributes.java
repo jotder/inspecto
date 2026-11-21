@@ -913,7 +913,11 @@ public final class NodeAttributes {
                     .placeholder("reference/rates")
                     .help("The registered Reference component joined onto the row set."),
             NodeAttribute.of("on", "Join keys", "list", "required").placeholder("currency")
-                    .help("Column(s) equated between the rows and the Reference."));
+                    .help("Column(s) equated between the rows and the Reference."),
+            NodeAttribute.of("match", "Match", "select", "optional").defaultValue("exact")
+                    .options("exact", "Exact", "longest_prefix", "Longest prefix (last key)")
+                    .help("Exact: every key equal. Longest prefix: the last key matches the Reference row "
+                            + "whose key is its longest prefix (e.g. phone number to operator)."));
 
     /**
      * {@code transform.sql} (sql-transform-v1-plan.md, B1) — one author {@code SELECT} over the typed

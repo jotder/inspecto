@@ -107,6 +107,8 @@ public final class PipelineValidator {
      */
     public static final String JOIN_REFERENCE_MISSING = "JOIN_REFERENCE_MISSING";
     public static final String JOIN_ON_MISSING = "JOIN_ON_MISSING";
+    /** A {@code transform.join} node whose {@code match} is not one {@code RowShaper.join} runs (LOOKUP-1). */
+    public static final String JOIN_MATCH_UNKNOWN = "JOIN_MATCH_UNKNOWN";
 
     /** The non-blank {@code on} key column(s) of a join node — a list or a single scalar, as {@code RowShaper.join} reads it. */
     public static List<String> joinKeys(PipelineNode n) {
@@ -309,6 +311,12 @@ public final class PipelineValidator {
                 if (joinKeys(n).isEmpty()) {
                     issues.add(new Issue(Severity.ERROR, JOIN_ON_MISSING,
                             "Node '" + n.id() + "' (transform.join) names no 'on' key column(s)."));
+                }
+                Object match = n.cfg("match");
+                if (match != null && !com.gamma.pipeline.exec.RowShaper.JOIN_MATCHES.contains(match.toString())) {
+                    issues.add(new Issue(Severity.ERROR, JOIN_MATCH_UNKNOWN,
+                            "Node '" + n.id() + "' (transform.join) has match '" + match + "' — use one of "
+                                    + com.gamma.pipeline.exec.RowShaper.JOIN_MATCHES + "."));
                 }
             }
             if (n.hasUse()) {

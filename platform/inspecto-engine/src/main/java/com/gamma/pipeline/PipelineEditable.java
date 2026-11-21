@@ -1031,6 +1031,7 @@ public final class PipelineEditable {
             Map<String, Object> jn = new LinkedHashMap<>();
             putIfPresent(jn, "reference", joinNode.cfg("reference"));
             putIfPresent(jn, "on", joinNode.cfg("on"));
+            putIfPresent(jn, "match", joinNode.cfg("match"));
             processing.put("join", jn);
         } else if (strict) {
             processing.remove("join");
@@ -1303,6 +1304,7 @@ public final class PipelineEditable {
             case PipelineConfig.Step.JOIN -> {
                 putIfPresent(c, "reference", n.cfg("reference"));
                 putIfPresent(c, "on", n.cfg("on"));
+                putIfPresent(c, "match", n.cfg("match"));   // LOOKUP-1: exact | longest_prefix
             }
             case PipelineConfig.Step.SUMMARIZE -> {
                 putIfPresent(c, "group_by", n.cfg("group_by"));

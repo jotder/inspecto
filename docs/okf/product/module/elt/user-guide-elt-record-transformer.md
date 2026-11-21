@@ -334,7 +334,19 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
 - Rendered by the shared `PipelineConfigDefinitionComponent` + `InspectoSchemaFormComponent`, driven by
   `NodeAttributes.TRANSFORM_JOIN`'s spec (`node-attributes.ts`, mirroring
   `NodeAttributes.java`): `reference` (`autocomplete`, required, placeholder `reference/rates`) and
-  `on` (`list`, required, join key columns).
+  `on` (`list`, required, join key columns) and `match` (`select`, optional, default `exact`).
+- **`match` (since 2026-11-22, `LOOKUP-1` P1)** picks how the keys match:
+  - `exact` (the default, and what an absent `match` means) — every `on` column equal: the `LEFT JOIN … USING`
+    the node always ran.
+  - `longest_prefix` — the **last** `on` column matches the Reference row whose key is its **longest prefix**, both
+    read as text (phone number → operator, card BIN → issuer); earlier `on` columns are equal-matched, so
+    `on: [country, msisdn]` is a tiered key. An empty Reference key is a catch-all. A row with no match keeps its
+    columns with NULLs. The output is the input's columns, then the Reference's non-key columns. A Reference with
+    two rows for one key is refused before the join, naming the key, because the pick would be arbitrary.
+    Executed as N × |distinct key lengths| hash probes, not a `starts_with` nested loop (`RowShaper.longestPrefixJoin`).
+  - Anything else is refused at save (`JOIN_MATCH_UNKNOWN`) and at run.
+  - Written the same way in a `steps:` `join:` entry, the `processing.join` block, and a recipe
+    `transform: {join: references/x, on: k, match: longest_prefix}`; every save path keeps it.
 - **`reference` is autocomplete with real suggestions, never a hard constraint:**
   `referenceOptionLoader()` (`entity-option-loaders.ts`) calls `CatalogService.references()`
   (backed by `GET /catalog/references`, `CatalogRoutes.java`) and maps results to

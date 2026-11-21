@@ -363,6 +363,7 @@ public final class RecipeConverter {
         Map<String, Object> join = new LinkedHashMap<>();
         putRef(join, "join", cfg.get("reference"), ReferenceBinding.PREFIX, ReferenceBinding.PLURAL_PREFIX);
         putIfPresent(join, "on", cfg.get("on"));
+        putIfPresent(join, "match", cfg.get("match"));
         return join;
     }
 

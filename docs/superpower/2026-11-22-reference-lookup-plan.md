@@ -1,6 +1,6 @@
 # Lookup — exact and best-match key resolution over a Reference Dataset
 
-**State:** 🟡 **PROPOSED 2026-11-22 — feature set and phasing approved by the operator; nothing built; P1 startable.**
+**State:** 🟡 **IN FLIGHT 2026-11-22 — P1a built (`transform.join` `match: exact | longest_prefix`); rest of P1 and P2–P4 open.**
 Board row `LOOKUP-1` [items: module.elt, module.engine]. Hubs on ship: `okf/product/module/elt/` (authoring,
 Step) and `okf/product/module/engine/` (execution, point engine).
 
@@ -102,10 +102,20 @@ run — not a per-row call.
    test-a-key / stats / refresh, parity suite against the batch engine.
 4. **P4 — fuzzy:** batch (blocking key, score, top-k), then point (candidate index); test console UI.
 
-## 6. Open before P1 starts
-- **D-LK5** Step shape: a new `transform.match` node, or extend `transform.lookup` to bind a Reference Dataset.
-- **D-LK6** Where a Lookup definition lives: inline in the Step, or its own config file reusable across
-  Pipelines.
+**P1a built 2026-11-22 (operator: "longest_prefix, exact first"):** `transform.join` gained `match: exact |
+longest_prefix` — exact is the unchanged default; longest prefix on the last `on` column, earlier columns equal;
+duplicate Reference keys refused; carried by every save path (steps, `processing.join`, recipe, editor lower);
+`JOIN_MATCH_UNKNOWN` at save. As built: `okf/product/module/elt/user-guide-elt-record-transformer.md` §8.7.
+Still open in P1: normalized exact, range, as-of, the `lookup()` scalar, multi-match policy, not-found value,
+hit / miss counts.
+
+## 6. Decisions
+- **D-LK5 (decided 2026-11-22, assistant under the operator's "go"):** extend **`transform.join`** with `match:`
+  rather than add a `transform.match` node or widen `transform.lookup`. The join already binds a Reference
+  Dataset through `ReferenceReader` (current and as-of views, one read rule) and takes the key columns; a new node
+  type would touch six registries for the same inputs. `transform.lookup` stays the inline code map.
+- **D-LK6 (decided 2026-11-22, same):** the definition is inline in the Step for now; a reusable Lookup file waits
+  for a second consumer (the point engine, P3).
 
 ## 7. Verification
 Golden cases per match mode (prefix ties, overlapping ranges, the as-of boundary, not-found, multi-match), as

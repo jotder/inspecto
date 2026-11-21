@@ -447,7 +447,7 @@ class RecipeCompilerTest {
         List<Map<String, Object>> steps = (List<Map<String, Object>>) (List<?>) recipe.get("steps");
         steps.add(steps.size() - 1,   // between transform and sink
                 step("transform", new LinkedHashMap<>(Map.of(
-                        "join", "references/region_dim", "on", "ACCOUNT_NUMBER"))));
+                        "join", "references/region_dim", "on", "ACCOUNT_NUMBER", "match", "longest_prefix"))));
 
         Map<String, Object> out = RecipeCompiler.compile(recipe);
         Map<String, Object> jn = (Map<String, Object>)
@@ -455,6 +455,7 @@ class RecipeCompilerTest {
         assertEquals("reference/region_dim", jn.get("reference"),
                 "the recipe's plural references/ spelling normalises to the registry's singular");
         assertEquals(List.of("ACCOUNT_NUMBER"), jn.get("on"), "on: k is the single-key shorthand");
+        assertEquals("longest_prefix", jn.get("match"), "LOOKUP-1: the join's match rides the compile");
     }
 
     @Test

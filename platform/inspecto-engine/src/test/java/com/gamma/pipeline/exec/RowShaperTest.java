@@ -399,6 +399,119 @@ class RowShaperTest {
                 PipelineNode.of("j", "transform.join", Map.of("reference", "reference/groups")), "src", "j", resolver));
     }
 
+    // ── join match: longest_prefix (LOOKUP-1 P1) ────────────────────────────────
+
+    /** Runs a prefix join of {@code calls(id, msisdn)} against {@code prefixes} and returns id → operator. */
+    private int prefixJoins;
+
+    private Map<Integer, String> prefixJoin(Map<String, Object> cfg) throws SQLException {
+        String id = "j" + (++prefixJoins);
+        var out = new RelationByRel(RowShaper.shape(conn, PipelineNode.of(id, "transform.join", cfg),
+                "calls", id, (c, name) -> "prefixes"));
+        Map<Integer, String> byId = new java.util.TreeMap<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT id, operator FROM \"" + out.table(PipelineRel.DATA) + "\"")) {
+            while (rs.next()) byId.put(rs.getInt(1), rs.getString(2));
+        }
+        return byId;
+    }
+
+    @Test
+    void longestPrefixPicksTheLongestMatchingKeyAndKeepsUnmatchedRows() throws Exception {
+        sql("CREATE TABLE calls AS SELECT * FROM (VALUES (1,'447700900123'),(2,'447911000000'),"
+                + "(3,'33612345678'),(4,'9999'),(5,NULL)) t(id, msisdn)");
+        sql("CREATE TABLE prefixes AS SELECT * FROM (VALUES ('44','UK'),('4477','UK mobile A'),"
+                + "('447700','UK test range'),('33','France')) t(msisdn, operator)");
+        Map<Integer, String> got = prefixJoin(Map.of("reference", "reference/prefixes", "on", "msisdn",
+                "match", "longest_prefix"));
+        var expected = new java.util.TreeMap<Integer, String>();
+        expected.put(1, "UK test range");   // 447700 beats 4477 and 44
+        expected.put(2, "UK");              // only 44 is a prefix of 4479…
+        expected.put(3, "France");
+        expected.put(4, null);              // no prefix: survives with NULL
+        expected.put(5, null);              // NULL key: survives with NULL
+        assertEquals(expected, got);
+    }
+
+    /** The prefix join keeps the input's key column and adds only the Reference's non-key columns. */
+    @Test
+    void longestPrefixOutputIsTheInputColumnsThenTheReferenceNonKeyColumns() throws Exception {
+        sql("CREATE TABLE calls AS SELECT * FROM (VALUES (1,'4477')) t(id, msisdn)");
+        sql("CREATE TABLE prefixes AS SELECT * FROM (VALUES ('44','UK')) t(msisdn, operator)");
+        var out = new RelationByRel(RowShaper.shape(conn, PipelineNode.of("j", "transform.join",
+                Map.of("reference", "r", "on", "msisdn", "match", "longest_prefix")), "calls", "j",
+                (c, name) -> "prefixes"));
+        List<String> cols = new ArrayList<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM \"" + out.table(PipelineRel.DATA) + "\"")) {
+            for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++) cols.add(rs.getMetaData().getColumnName(i));
+            assertTrue(rs.next()); assertEquals("4477", rs.getString("msisdn"));
+        }
+        assertEquals(List.of("id", "msisdn", "operator"), cols);
+    }
+
+    /** Earlier on-keys are equal-matched (a tiered key: country, then the number's prefix); a numeric key is read as text. */
+    @Test
+    void longestPrefixEqualsTheLeadingKeysAndReadsANumericKeyAsText() throws Exception {
+        sql("CREATE TABLE calls AS SELECT * FROM (VALUES (1,'GB',447700123),(2,'FR',447700123)) t(id, country, msisdn)");
+        sql("CREATE TABLE prefixes AS SELECT * FROM (VALUES ('GB',4477,'UK mobile'),('FR',44,'Roamer'))"
+                + " t(country, msisdn, operator)");
+        Map<Integer, String> got = prefixJoin(Map.of("reference", "r", "on", List.of("country", "msisdn"),
+                "match", "longest_prefix"));
+        assertEquals("UK mobile", got.get(1));
+        assertEquals("Roamer", got.get(2));
+    }
+
+    /** An empty key is a catch-all: the default when nothing longer matches. */
+    @Test
+    void longestPrefixTreatsAnEmptyKeyAsTheCatchAll() throws Exception {
+        sql("CREATE TABLE calls AS SELECT * FROM (VALUES (1,'447'),(2,'999')) t(id, msisdn)");
+        sql("CREATE TABLE prefixes AS SELECT * FROM (VALUES ('','Other'),('44','UK')) t(msisdn, operator)");
+        Map<Integer, String> got = prefixJoin(Map.of("reference", "r", "on", "msisdn", "match", "longest_prefix"));
+        assertEquals("UK", got.get(1));
+        assertEquals("Other", got.get(2));
+    }
+
+    @Test
+    void longestPrefixRefusesAReferenceWithTwoRowsForOneKey() throws Exception {
+        sql("CREATE TABLE calls AS SELECT * FROM (VALUES (1,'447')) t(id, msisdn)");
+        sql("CREATE TABLE prefixes AS SELECT * FROM (VALUES ('44','UK'),('44','Also UK')) t(msisdn, operator)");
+        var e = assertThrows(IllegalArgumentException.class,
+                () -> prefixJoin(Map.of("reference", "r", "on", "msisdn", "match", "longest_prefix")));
+        assertTrue(e.getMessage().contains("msisdn=44"), e.getMessage());
+    }
+
+    /** NULL keys match nothing, so two of them are not a duplicate — the join runs. */
+    @Test
+    void longestPrefixAllowsSeveralNullKeysInTheReference() throws Exception {
+        sql("CREATE TABLE calls AS SELECT * FROM (VALUES (1,'447')) t(id, msisdn)");
+        sql("CREATE TABLE prefixes AS SELECT * FROM (VALUES ('44','UK'),(NULL,'x'),(NULL,'y')) t(msisdn, operator)");
+        assertEquals("UK", prefixJoin(Map.of("reference", "r", "on", "msisdn", "match", "longest_prefix")).get(1));
+    }
+
+    /** match: exact (and an absent match) is the unchanged equi-join: a prefix is NOT a match. */
+    @Test
+    void exactMatchIsTheDefaultAndDoesNotMatchPrefixes() throws Exception {
+        sql("CREATE TABLE calls AS SELECT * FROM (VALUES (1,'44'),(2,'447')) t(id, msisdn)");
+        sql("CREATE TABLE prefixes AS SELECT * FROM (VALUES ('44','UK')) t(msisdn, operator)");
+        for (Map<String, Object> cfg : List.<Map<String, Object>>of(
+                Map.of("reference", "r", "on", "msisdn"),
+                Map.of("reference", "r", "on", "msisdn", "match", "exact"))) {
+            Map<Integer, String> got = prefixJoin(cfg);
+            assertEquals("UK", got.get(1));
+            assertNull(got.get(2));
+        }
+    }
+
+    @Test
+    void anUnknownMatchIsRefused() throws Exception {
+        sql("CREATE TABLE calls AS SELECT * FROM (VALUES (1,'44')) t(id, msisdn)");
+        sql("CREATE TABLE prefixes AS SELECT * FROM (VALUES ('44','UK')) t(msisdn, operator)");
+        var e = assertThrows(IllegalArgumentException.class,
+                () -> prefixJoin(Map.of("reference", "r", "on", "msisdn", "match", "fuzzy")));
+        assertTrue(e.getMessage().contains("fuzzy"), e.getMessage());
+    }
+
     @Test
     void mergeUnionAndJoin() throws Exception {
         sql("CREATE TABLE a AS SELECT * FROM (VALUES (1,'x'),(2,'y')) t(id,v)");

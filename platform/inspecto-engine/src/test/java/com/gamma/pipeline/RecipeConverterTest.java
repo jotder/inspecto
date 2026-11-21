@@ -89,7 +89,7 @@ class RecipeConverterTest {
                 "dedup", new LinkedHashMap<>(Map.of(
                         "keys", List.of("ORDER_ID"), "order_by", "EVENT_TS DESC")),
                 "join", new LinkedHashMap<>(Map.of(
-                        "reference", "reference/region_dim", "on", List.of("REGION"))),
+                        "reference", "reference/region_dim", "on", List.of("REGION"), "match", "longest_prefix")),
                 "summarize", new LinkedHashMap<>(Map.of(
                         "group_by", List.of("REGION"), "measures", List.of("count", "sum(AMT)"))))));
         cfg.put("output", new LinkedHashMap<>(Map.of("format", "PARQUET")));

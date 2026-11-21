@@ -1707,6 +1707,20 @@
     "tier" : "required",
     "help" : "Column(s) equated between the rows and the Reference.",
     "placeholder" : "currency"
+  }, {
+    "key" : "match",
+    "label" : "Match",
+    "type" : "select",
+    "tier" : "optional",
+    "default" : "exact",
+    "options" : [ {
+      "value" : "exact",
+      "label" : "Exact"
+    }, {
+      "value" : "longest_prefix",
+      "label" : "Longest prefix (last key)"
+    } ],
+    "help" : "Exact: every key equal. Longest prefix: the last key matches the Reference row whose key is its longest prefix (e.g. phone number to operator)."
   } ],
   "transform.sql" : [ {
     "key" : "sql",

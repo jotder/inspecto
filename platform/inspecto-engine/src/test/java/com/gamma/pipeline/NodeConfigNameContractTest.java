@@ -472,7 +472,7 @@ class NodeConfigNameContractTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> processing = (Map<String, Object>) raw.get("processing");
         processing.put("join", new LinkedHashMap<>(Map.of(
-                "reference", "reference/region_dim", "on", List.of("ID"))));
+                "reference", "reference/region_dim", "on", List.of("ID"), "match", "longest_prefix")));
 
         PipelineConfig cfg = PipelineConfig.fromMap(raw);
         PipelineGraph g = PipelineCodec.fromMap(PipelineEditable.toMap(cfg, raw));
@@ -492,6 +492,9 @@ class NodeConfigNameContractTest {
         assertEquals("reference/customer_dim", reparsed.join().reference(),
                 "a join edit typed in the editor must survive the draft save");
         assertEquals(List.of("ID"), reparsed.join().on());
+        assertEquals("longest_prefix", reparsed.joinMatch(), "the join's match must survive the draft save");
+        assertEquals("longest_prefix", reparsed.steps().stream().filter(s -> PipelineConfig.Step.JOIN.equals(s.kind()))
+                .findFirst().orElseThrow().config().get("match"), "the projected join step carries match");
     }
 
     /**

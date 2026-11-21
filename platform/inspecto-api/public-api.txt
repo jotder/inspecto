@@ -868,6 +868,7 @@ com.gamma.etl.PipelineConfig | public RejectMode rejectMode()
 com.gamma.etl.PipelineConfig | public Schemas schemas()
 com.gamma.etl.PipelineConfig | public String arrivalLoadRefusal()
 com.gamma.etl.PipelineConfig | public String description()
+com.gamma.etl.PipelineConfig | public String joinMatch()
 com.gamma.etl.PipelineConfig | public String outputStore()
 com.gamma.etl.PipelineConfig | public String stream()
 com.gamma.etl.PipelineConfig | public Summarize summarize()
@@ -2150,6 +2151,7 @@ com.gamma.pipeline.PipelineValidator | public static final String EMPTY_GRAPH
 com.gamma.pipeline.PipelineValidator | public static final String ILLEGAL_ACCEPT
 com.gamma.pipeline.PipelineValidator | public static final String ILLEGAL_EMIT
 com.gamma.pipeline.PipelineValidator | public static final String ILLEGAL_PAIRING
+com.gamma.pipeline.PipelineValidator | public static final String JOIN_MATCH_UNKNOWN
 com.gamma.pipeline.PipelineValidator | public static final String JOIN_ON_MISSING
 com.gamma.pipeline.PipelineValidator | public static final String JOIN_REFERENCE_MISSING
 com.gamma.pipeline.PipelineValidator | public static final String NODE_MODE_UNDECLARED
@@ -2345,7 +2347,10 @@ com.gamma.pipeline.exec.RowShaper | public static List<Relation> shape(Connectio
 com.gamma.pipeline.exec.RowShaper | public static List<Relation> shape(Connection, PipelineNode, String, String, ReferenceResolver) throws SQLException
 com.gamma.pipeline.exec.RowShaper | public static List<Relation> shape(Connection, PipelineNode, String, String, ReferenceResolver, ExecutionContext) throws SQLException
 com.gamma.pipeline.exec.RowShaper | public static Optional<String> toSelect(PipelineNode, String)
+com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_MATCHES
 com.gamma.pipeline.exec.RowShaper | public static final Set<String> MAP_NODE_CONFIG_KEYS
+com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_EXACT
+com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_LONGEST_PREFIX
 com.gamma.pipeline.exec.RowShaper | public static final java.util.regex.Pattern NEW_COLUMN_NAME
 com.gamma.pipeline.exec.RowShaper | public static final java.util.regex.Pattern UNPIVOT_VALUE_TYPE
 com.gamma.pipeline.exec.RowShaper.ExecutionContext | public ExecutionContext asDryRun()

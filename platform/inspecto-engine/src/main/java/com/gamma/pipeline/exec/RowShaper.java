@@ -13,6 +13,7 @@ import com.gamma.pipeline.PipelineRel;
 import com.gamma.query.MeasureCompiler;
 
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
@@ -1162,12 +1163,71 @@ public final class RowShaper {
         }
         if (on.isEmpty())
             throw new IllegalArgumentException("transform.join node '" + node.id() + "' needs 'on' key column(s)");
+        String match = strOrNull(node, "match");
+        if (match == null) match = JOIN_MATCH_EXACT;
+        if (!JOIN_MATCHES.contains(match))
+            throw new IllegalArgumentException("transform.join node '" + node.id() + "' has match '" + match
+                    + "' — use one of " + JOIN_MATCHES);
         String ref = references.resolve(conn, reference);
-        String using = "USING (" + String.join(", ", on.stream().map(SqlIdent::q).toList()) + ")";
         String data = table(prefix, PipelineRel.DATA);
+        if (JOIN_MATCH_LONGEST_PREFIX.equals(match)) {
+            longestPrefixJoin(conn, node, input, ref, on, data);
+            return List.of(new Relation(PipelineRel.DATA, data));
+        }
+        String using = "USING (" + String.join(", ", on.stream().map(SqlIdent::q).toList()) + ")";
         exec(conn, "CREATE TABLE " + q(data) + " AS SELECT * FROM " + q(input)
                 + " LEFT JOIN " + q(ref) + " " + using);
         return List.of(new Relation(PipelineRel.DATA, data));
+    }
+
+    /** {@code transform.join} {@code match:} values; absent means {@link #JOIN_MATCH_EXACT}. */
+    public static final String JOIN_MATCH_EXACT = "exact";
+    public static final String JOIN_MATCH_LONGEST_PREFIX = "longest_prefix";
+    public static final List<String> JOIN_MATCHES = List.of(JOIN_MATCH_EXACT, JOIN_MATCH_LONGEST_PREFIX);
+
+    /**
+     * {@code match: longest_prefix} (LOOKUP-1 P1): the LAST {@code on} column is matched by prefix — a
+     * Reference row matches when its key is a prefix of the row's value, both read as text — and every
+     * earlier {@code on} column by equality. Each row takes the matching Reference row with the longest key
+     * (MSISDN → operator, BIN → issuer); an empty key is a catch-all. A row with no match survives with
+     * NULLs, as in the exact join. Output columns: every input column, then the Reference's non-key columns.
+     *
+     * <p>Not a {@code starts_with} nested loop: the Reference's distinct key lengths L are few, so each row is
+     * expanded to one candidate prefix per L and equi-joined — N×|L| hash probes, not N×M comparisons.
+     * Two Reference rows with the same keys would make the pick arbitrary, so they are refused before the
+     * join, naming the key.
+     */
+    private static void longestPrefixJoin(Connection conn, PipelineNode node, String input, String ref,
+                                          List<String> on, String data) throws SQLException {
+        List<String> exact = on.subList(0, on.size() - 1);
+        String key = q(on.get(on.size() - 1));
+        String keys = String.join(", ", on.stream().map(SqlIdent::q).toList());
+        // A NULL key matches nothing, so rows sharing one are not ambiguous — only non-NULL key tuples are checked.
+        String notNull = String.join(" AND ", on.stream().map(c -> q(c) + " IS NOT NULL").toList());
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT " + keys + " FROM " + q(ref) + " WHERE " + notNull
+                     + " GROUP BY " + keys + " HAVING count(*) > 1 LIMIT 1")) {
+            if (rs.next()) {
+                List<String> dup = new ArrayList<>();
+                for (int i = 1; i <= on.size(); i++) dup.add(on.get(i - 1) + "=" + rs.getString(i));
+                throw new IllegalArgumentException("transform.join node '" + node.id() + "' (match: longest_prefix): "
+                        + "the Reference has more than one row for key " + String.join(", ", dup)
+                        + " — a prefix must name one row");
+            }
+        }
+        StringBuilder eq = new StringBuilder();
+        for (String c : exact) eq.append(" AND i.").append(q(c)).append(" = r.").append(q(c));
+        String inputKey = "CAST(i." + key + " AS VARCHAR)";
+        exec(conn, "CREATE TABLE " + q(data) + " AS"
+                + " WITH __lk_in AS MATERIALIZED (SELECT *, row_number() OVER () AS __lk_rid FROM " + q(input) + "),"
+                + " __lk_ref AS (SELECT *, CAST(" + key + " AS VARCHAR) AS __lk_key FROM " + q(ref) + "),"
+                + " __lk_len AS (SELECT DISTINCT length(__lk_key) AS __lk_n FROM __lk_ref WHERE __lk_key IS NOT NULL),"
+                + " __lk_hit AS (SELECT i.__lk_rid, r.* EXCLUDE (" + keys + ", __lk_key), l.__lk_n"
+                + " FROM __lk_in i JOIN __lk_len l ON l.__lk_n <= length(" + inputKey + ")"
+                + " JOIN __lk_ref r ON r.__lk_key = left(" + inputKey + ", l.__lk_n)" + eq
+                + " QUALIFY row_number() OVER (PARTITION BY i.__lk_rid ORDER BY l.__lk_n DESC) = 1)"
+                + " SELECT i.* EXCLUDE (__lk_rid), h.* EXCLUDE (__lk_rid, __lk_n)"
+                + " FROM __lk_in i LEFT JOIN __lk_hit h ON i.__lk_rid = h.__lk_rid");
     }
 
     // ── split (UNNEST) ────────────────────────────────────────────────────────────

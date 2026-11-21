@@ -242,7 +242,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Step catalog & node types
 
-- **P2** · `LOOKUP-1` — **Lookup: exact and best-match key resolution over a Reference Dataset (longest prefix, range, as-of, fuzzy), a batch engine and a row-at-a-time engine, with refresh, versioning and hit/miss counts.** Feature set and phases approved 2026-11-22 (D-LK1…D-LK4); nothing built; D-LK5/D-LK6 open before P1. → `superpower/2026-11-22-reference-lookup-plan.md` [items: module.elt, module.engine · kind: feature]
+- **P2** · `LOOKUP-1` — **Lookup: exact and best-match key resolution over a Reference Dataset (longest prefix, range, as-of, fuzzy), a batch engine and a row-at-a-time engine, with refresh, versioning and hit/miss counts.** Feature set approved 2026-11-22 (D-LK1…D-LK6). **P1a built 2026-11-22:** `transform.join` `match: exact | longest_prefix`. Open: normalized, range, as-of, fuzzy, the `lookup()` scalar, counts, the cache lifecycle and the row-at-a-time engine. → `superpower/2026-11-22-reference-lookup-plan.md` [items: module.elt, module.engine · kind: feature]
 
 - **P3** · **Step Processor catalog** — **Build the next Step Processor only when the operator names it; each partial processor is its own product decision.** Waiting on the operator to name the next one. → `okf/product/module/elt/plan-board-detail.md` § Step Processor catalog [items: module.elt · kind: feature]
 
