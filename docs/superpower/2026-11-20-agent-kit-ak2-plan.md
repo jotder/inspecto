@@ -139,6 +139,27 @@ on a governed install. The phase-1 gate governs an agent's **API** calls; it can
 host. So the posture is set by who may write into the install root, not by the server — a governed install gives the
 agent read access to the install root and no write access to its Space folders (decision D-AK7, open).
 
+### 1.3 Agent-friendly documentation — a docs track under the analytics builder *(operator, 2026-11-21)*
+
+The Handbook already has the bones an agent needs: executable examples (the check blocks), a manifest, a header on every
+page. The spike showed where it falls short. From the spike's report (not re-checked against each page); the Agent
+Skills of §1.1 **link** to these pages rather than copy them, so a docs fix reaches agents with no Skill change.
+
+| Change | Why (spike) | Board row |
+|---|---|---|
+| A **component shape reference generated from the code**: every kind's keys, types, required or optional, defaults, an example | agents learned shapes from 422 text; also the missing config-key reference; a generated page cannot drift | `COMPONENT-REFERENCE-GENERATED-1` |
+| **Recipes keyed by goal** ("daily count by region with a target", "join two Datasets", "reconcile across days"), with check blocks | the derived-Dataset recipe was the largest gap and lived only inside shipped templates | `GOAL-RECIPES-1` (first: `DERIVED-DATASET-AUTHORING-1`) |
+| **Fix pages that disagree with the product** | the Handbook says Add data is on by default (it is off); Handbook and guide disagree on scheduling a Dashboard; an agent follows a page literally | `HANDBOOK-PRODUCT-DISAGREE-1` |
+| **Machine-readable entry points shipped with the install**: the API contract, the shipped templates, a flat page index (id, audience, edition, permission, URL) | both runs said the contract and the templates closed their largest gaps | `AGENT-ENTRYPOINTS-1` |
+| **An error catalogue**: each 4xx and 422 message, cause and fix, generated from the error codes | 49 of the blind run's 234 calls were refused, often without a usable message | `ERROR-CATALOGUE-1` |
+| **Assumptions on every page**: edition, sign-in posture, the permission needed; the Handbook checker rejects a new page without them | agents hit "works on Basic, refused on Standard" with no warning | `PAGE-ASSUMPTIONS-1` |
+
+**Left alone:** the tutorials that print expected answers stay as they are for people; the fix is in how agents are
+tested — AK-4's golden tasks use data and a Space the Handbook does not already answer (§1.2). The check-block format
+is kept and extended. **Order:** the generated component reference first, because the authoring-gaps lane
+(`UNKNOWN-KEYS-SILENT-1`, `COMPONENT-VALIDATE-ALL-1`) is fixing the validation it will describe; then the entry points
+and the assumptions block, which are small; recipes grow with the Agent Skills.
+
 ## 2. Vocabulary — the plan's "Draft" is a Pending Change
 
 The parent plan says "save as a Draft". **Draft** is taken: it is a Link Analysis analyst's private copy of an

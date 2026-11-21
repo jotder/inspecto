@@ -53,3 +53,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `SPACE-ROOTED-DATA-ROOT-MIGRATION-1` | P3 | feature | An install whose data_root is rooted or absent is still not relocatable, and no route migrates it. | demand |
 | `SPACE-ADMISSION-FOLLOWUPS-1` | P3 | chore | Seven follow-ups the closed-Space change (D5) left on purpose. | — |
 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | The shapes the object-store ingest lane still refuses (sinks:, produces: reference, the readers). | operator |
+| `COMPONENT-REFERENCE-GENERATED-1` | P3 | feature | a component shape reference generated from the code: | — |
