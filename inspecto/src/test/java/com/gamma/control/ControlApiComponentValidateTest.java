@@ -191,6 +191,19 @@ class ControlApiComponentValidateTest {
         }
     }
 
+    /** A hidden stored entry's keys are not exempted: the findings must not show whether it exists or what it carries. */
+    @Test
+    void aHiddenStoredEntryDoesNotExemptItsKeys(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            new ComponentStore(c.root.resolve("registry")).write("dataset", "ds_hidden",
+                    Map.of("physicalRef", "orders", "legacyKey", "v", "owner", "someone-else", "shares", List.of()));
+            JsonNode probe = validate(c, "dataset", "{\"physicalRef\":\"orders\",\"legacyKey\":\"v\"}", AUTHOR);   // id draft_x: no entry
+            JsonNode hidden = JSON.readTree(send(c, "/validate", "{\"type\":\"dataset\",\"id\":\"ds_hidden\",\"config\":{\"physicalRef\":\"orders\",\"legacyKey\":\"v\"}}", AUTHOR).body()).get("data");
+            assertEquals(probe.toString().replace("draft_x", "X"), hidden.toString().replace("ds_hidden", "X"),
+                    "a hidden entry answers as an id with no entry: " + hidden);
+        }
+    }
+
     @Test
     void anUnknownTypeIsStillNotFound(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {

@@ -924,7 +924,8 @@ final class ComponentRoutes implements RouteModule {
             if (store != null && UnknownComponentKeys.covers(type)) {
                 try {
                     ComponentRegistry.Component prior = existing(store, type, id);
-                    stored = prior == null ? null : prior.content();
+                    // only an entry the caller may see: whether a hidden one carries a key must not show in the findings
+                    stored = prior == null || !ComponentAccess.canView(ex, prior.content()) ? null : prior.content();
                 } catch (ApiException badId) {
                     stored = null;   // an unusable id is reported by the checks below, not here
                 }
