@@ -815,6 +815,21 @@ final class ComponentRoutes implements RouteModule {
                     throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + base + "'");
             }
             validateKind(api, type, id, content);
+            // UNKNOWN-KEYS-SILENT-1 step 2 (operator 2026-11-21): a Dataset or Reconciliation from an agent Subject with a key
+            // nothing reads is refused, naming the key. A key the stored entry already carries is not judged (what the product wrote
+            // round-trips: a re-save, a version restore); this door only (the bulk writers carry no Subject), and before the hold, so an agent never proposes a typo.
+            ComponentRegistry.Component stored = UnknownComponentKeys.covers(type) ? existing(store, type, id) : null;
+            List<String> unknownKeys = UnknownComponentKeys.of(type, content, stored == null ? null : stored.content());
+            if (!unknownKeys.isEmpty() && ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject who && who.agent())
+                throw new IllegalArgumentException(UnknownComponentKeys.describe(type, unknownKeys));
+            // Step 3: anyone else saves, and is told (the response `warnings`) and audited (the row's `unknownKeys`); rejecting for
+            // people is UNKNOWN-KEYS-REJECT-1, not built. Recorded before the hold, so a held change is audited too.
+            if (!unknownKeys.isEmpty()) {
+                Map<String, Object> attrs = new LinkedHashMap<>();
+                if (ApiContext.attr(ex, ApiContext.ATTR_AUDIT_ATTRS) instanceof Map<?, ?> have) have.forEach((k, v) -> attrs.put(String.valueOf(k), v));
+                attrs.put("unknownKeys", String.join(",", unknownKeys));
+                ApiContext.attr(ex, ApiContext.ATTR_AUDIT_ATTRS, attrs);
+            }
             // ASSURE-ACTION-REQUESTS-1 round-2 finding 1: this door writes decision-rule too — the same invoke-api gate
             // and server-stamped makers as /decision-rules, before the hold (version restore lands here as well).
             if (DecisionRuleGuard.TYPE.equals(type)) {
@@ -851,9 +866,10 @@ final class ComponentRoutes implements RouteModule {
             ComponentRegistry.Component c = store.write(type, id, content);
             log.info("[COMPONENT-WRITE] wrote {}", c.ref());
             ETags.set(ex, ETags.of(ContentHash.of(c.content())));
-            if (linkFindings.isEmpty()) return componentDoc(c);
+            if (linkFindings.isEmpty() && unknownKeys.isEmpty()) return componentDoc(c);
             Map<String, Object> doc = componentDoc(c);
-            doc.put("linkWarnings", linkFindings);   // shadow: what refuse mode would have refused
+            if (!linkFindings.isEmpty()) doc.put("linkWarnings", linkFindings);   // shadow: what refuse mode would have refused
+            if (!unknownKeys.isEmpty()) doc.put("warnings", UnknownComponentKeys.warnings(type, unknownKeys));
             return doc;
         } catch (IllegalArgumentException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
@@ -881,6 +897,54 @@ final class ComponentRoutes implements RouteModule {
         validateKind(api.writeRoot(), api::dataRoot, type, id, content);
     }
 
+    /** The component kinds {@code POST /validate} judges as a draft, with the checks their save door runs. */
+    static final java.util.Set<String> VALIDATABLE_KINDS = java.util.Set.of("kpi", "reconciliation", "dataset", "widget", "dashboard");
+
+    /**
+     * COMPONENT-VALIDATE-ALL-1: what a save of {@code content} as {@code type}/{@code id} through {@code POST /components/{type}}
+     * would refuse, as {@link Finding}s, writing and holding nothing. It runs the save door's own checks, not a copy: the kind's
+     * {@link #validateKind}, the widget/dashboard/expectation key census, a KPI's Dataset and fields ({@link KpiRoutes#requireMeasure}),
+     * and the Dataset / Reconciliation key census, which is an error for an agent Subject and a warning for anyone else.
+     */
+    static List<Finding> draftFindings(ApiContext api, com.sun.net.httpserver.HttpExchange ex, String type, String id,
+                                       Map<String, Object> draft) {
+        List<Finding> out = new ArrayList<>();
+        Map<String, Object> content = new LinkedHashMap<>(draft);
+        content.remove("id");
+        ComponentStore store = api.writeRoot() == null ? null : new ComponentStore(api.writeRoot().resolve("registry"));
+        Map<String, Object> stored = null;
+        try {
+            // the save door's own first check: a Mapping's base Dataset the caller cannot see answers exactly as a missing one
+            // (writeComponent), so /validate - open to every signed-in user - never says which Datasets exist
+            if (store != null && "dataset".equals(type) && content.get(DatasetEntryRules.BASED_ON) instanceof String base && !base.isBlank()) {
+                Map<String, Object> baseEntry = store.get("dataset", base).map(ComponentRegistry.Component::content).orElse(null);
+                if (baseEntry == null || !ComponentAccess.canView(ex, baseEntry))
+                    throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + base + "'");
+            }
+            if (store != null && UnknownComponentKeys.covers(type)) {
+                try {
+                    ComponentRegistry.Component prior = existing(store, type, id);
+                    // only an entry the caller may see: whether a hidden one carries a key must not show in the findings
+                    stored = prior == null || !ComponentAccess.canView(ex, prior.content()) ? null : prior.content();
+                } catch (ApiException badId) {
+                    stored = null;   // an unusable id is reported by the checks below, not here
+                }
+            }
+            validateKind(api, type, id, content);
+            if (CENSUSED_COMPONENT_KINDS.contains(type)) refuseUnknownComponentKeys(type, content);
+            if (KpiRoutes.TYPE.equals(type)) KpiRoutes.requireMeasure(api, ex, id, content);
+        } catch (IllegalArgumentException | ApiException refused) {
+            out.add(new Finding(Severity.ERROR, "", refused.getMessage(), "COMPONENT_INVALID", null));
+        }
+        boolean agent = ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject who && who.agent();
+        for (String key : UnknownComponentKeys.of(type, content, stored))
+            out.add(new Finding(agent ? Severity.ERROR : Severity.WARNING, key,
+                    type + " key '" + key + "' is read by nothing" + (agent ? "; an agent save of it is refused" : "; a save keeps it but it has no effect")
+                            + " (prefix it with '" + AcceptedConfigKeys.EXTENSION_PREFIX + "' to mark it as deliberately extra)",
+                    "UNKNOWN_KEY", null));
+        return out;
+    }
+
     /** {@link #validateKind(ApiContext, String, String, Map)} against explicit roots (a Space Template's staged tree). */
     static void validateKind(java.nio.file.Path writeRoot, java.util.function.Supplier<java.nio.file.Path> dataRoot,
                              String type, String id, Map<String, Object> content) {
@@ -902,6 +966,16 @@ final class ComponentRoutes implements RouteModule {
             if (v.type().equals(type)) v.validate(id, content);
         // LA-ONBOARD-1 OB-8: primaryEntityType + defaultLinkMapping on a Dataset entry.
         if ("dataset".equals(type)) DatasetEntryRules.validate(content);
+        // COMPONENT-VALIDATE-ALL-1: a virtual Dataset's SQL meets, at save, the check it meets on every read
+        // (DatasetRelation.virtualOver); until now a save of SQL the guard refuses answered 200 and the first read answered 422.
+        if ("dataset".equals(type) && content.get("sql") instanceof String userSql && !userSql.isBlank()) {
+            if (!(content.get("sourceName") instanceof String source) || source.isBlank())
+                throw new IllegalArgumentException("a virtual dataset's 'sql' needs a 'sourceName' - the store its FROM reads");
+            List<Finding> refused = SqlGuard.check(userSql, source);
+            if (!refused.isEmpty())
+                throw new IllegalArgumentException("dataset 'sql' failed the SQL safety check: "
+                        + String.join("; ", refused.stream().map(Finding::message).toList()));
+        }
         if ("findings-spec".equals(type)) {
             // The store stamps name=id, and GET /findings/{type} resolves by that id, so validate the
             // content as it will be persisted and refuse a spec whose objectType/caseType disagrees with

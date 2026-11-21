@@ -656,7 +656,7 @@
             "application/json" : {
               "schema" : {
                 "type" : "object",
-                "description" : "Either {configPath} (a file on the server, under the allowed roots — absolute, or relative to the write root) or {type, config} (an unsaved draft map); optional {safety:true} adds the hard-fail safety gate.",
+                "description" : "Either {configPath} (a file on the server, under the allowed roots — absolute, or relative to the write root) or {type, config} (an unsaved draft map); optional {safety:true} adds the hard-fail safety gate. COMPONENT-VALIDATE-ALL-1: type may also be kpi, reconciliation, dataset, widget or dashboard (optional id names the draft): the draft is judged by the checks its POST /components/{type} save runs (shape, a KPI's Dataset and fields, a virtual Dataset's SQL safety check, unknown keys: an error for an agent Subject, a warning otherwise), writing and holding nothing.",
                 "properties" : {
                   "configPath" : {
                     "type" : "string"
@@ -9430,9 +9430,9 @@
         "required" : true,
         "schema" : {
           "type" : "string",
-          "enum" : [ "grammar", "schema", "transform", "sink", "dataset", "widget", "dashboard" ]
+          "enum" : [ "grammar", "schema", "transform", "sink", "dataset", "widget", "dashboard", "kpi", "reconciliation" ]
         },
-        "description" : "Writable component type (W3 widened the set with dataset/widget/dashboard)."
+        "description" : "Writable component type (W3 widened the set with dataset/widget/dashboard; kpi and reconciliation are written through the same route and are validated by POST /validate)."
       },
       "ComponentId" : {
         "name" : "id",
