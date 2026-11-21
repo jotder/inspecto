@@ -4,14 +4,14 @@ import java.util.Locale;
 import java.util.Objects;
 
 /**
- * The DuckDB form of the similarity kit (ANALYTICS-CORE-1 S1): SQL expressions built on DuckDB 1.5.6's built-in
+ * The DuckDB form of the similarity kit (ANALYTICS-CORE-1 S1): SQL expressions built on DuckDB 2.0.1's built-in
  * string functions, for a caller that scores two columns in a query (the {@code quality.match.fuzzy} Step). Every
  * argument is caller-built, already-safe SQL (a quoted column, a literal); this class adds no identifier of its own.
  *
  * <p>Each {@link Method} has a JVM twin, {@link Method#score}, that returns the same value — bit for bit on the
- * parity corpus — so a figure seen in a Dataset can be recomputed in the JVM. DuckDB's string built-ins work on
- * <b>UTF-8 bytes</b>, so the twin uses {@link TextUnit#UTF8_BYTE}: an accented letter is two units unless the text is
- * normalized first (accents stripped).
+ * parity corpus — so a figure seen in a Dataset can be recomputed in the JVM. Since DuckDB 2.0.1 the string built-ins work on
+ * <b>code points</b> (2.0.0 and earlier counted UTF-8 bytes), so the twin uses {@link TextUnit#CODE_POINT}: an accented
+ * letter is one unit.
  *
  * <p>NULL on either side gives NULL. An empty side gives 0 (the kit's one empty rule, {@link Similarity}).
  */
@@ -29,7 +29,7 @@ public final class SimilaritySql {
         JARO,
         /** {@code jaro_winkler_similarity(a, b)} — p = 0.1, prefix up to 4, boost above 0.7; twin {@code JaroWinkler.DUCKDB}. */
         JARO_WINKLER,
-        /** {@code 1 − levenshtein(a, b) / greatest(strlen(a), strlen(b))}, bytes; twin {@code levenshteinSimilarity(…, UTF8_BYTE)}. */
+        /** {@code 1 − levenshtein(a, b) / greatest(length(a), length(b))}, code points; twin {@code levenshteinSimilarity(…, CODE_POINT)}. */
         LEVENSHTEIN,
         /** Jaccard of the two texts' whitespace-separated token sets; twin {@link Similarity#tokenJaccard}. */
         TOKEN_JACCARD;
@@ -51,7 +51,7 @@ public final class SimilaritySql {
             return switch (this) {
                 case JARO -> JaroWinkler.DUCKDB.jaro(a, b);
                 case JARO_WINKLER -> JaroWinkler.DUCKDB.similarity(a, b);
-                case LEVENSHTEIN -> Similarity.levenshteinSimilarity(a, b, TextUnit.UTF8_BYTE);
+                case LEVENSHTEIN -> Similarity.levenshteinSimilarity(a, b, TextUnit.CODE_POINT);
                 case TOKEN_JACCARD -> Similarity.tokenJaccard(a, b);
             };
         }
@@ -65,7 +65,7 @@ public final class SimilaritySql {
                 case JARO_WINKLER -> "jaro_winkler_similarity(" + a + ", " + b + ")";
                 case LEVENSHTEIN -> "(CASE WHEN " + a + " IS NULL OR " + b + " IS NULL THEN NULL WHEN " + a + " = '' OR " + b
                         + " = '' THEN 0.0 ELSE 1.0 - levenshtein(" + a + ", " + b
-                        + ") / greatest(strlen(" + a + "), strlen(" + b + ")) END)";
+                        + ") / greatest(length(" + a + "), length(" + b + ")) END)";
                 case TOKEN_JACCARD -> {
                     String ta = tokensSql(a), tb = tokensSql(b);
                     // NULL first: list_concat / list_intersect treat a NULL list as empty, and NULL = '' OR '' = '' is true

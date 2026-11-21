@@ -13,7 +13,7 @@ code: platform/inspecto-engine
 
 # DuckDB Integration — Sealed connections, time zones and aggregate state
 
-Part 2 of 2 of [DuckDB Integration](spec-duckdb.md) · previous: [DuckDB 2.0.0.0, the pinned version](spec-duckdb-version-pin.md).
+Part 2 of 2 of [DuckDB Integration](spec-duckdb.md) · previous: [DuckDB 2.0.1.0, the pinned version](spec-duckdb-version-pin.md).
 
 ## Every ingest connection is sealed (`SEC-INGEST-EXPR-EXTERNAL-ACCESS-1`, 2026-09-30)
 

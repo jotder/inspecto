@@ -92,7 +92,7 @@ export class OnboardService {
     }
 
     /**
-     * **Add a file** to an imported Dataset and run it (`replace` is the default; `append` for a Stream only).
+     * **Add a file** to an imported Dataset and run it (`mode` is required: `replace`, `append` for a Stream only, or `period`).
      * `keepNewColumns` false leaves a later file's new columns out (LA-ARRIVAL-NEW-COLUMNS-1; kept by default).
      */
     addFile(

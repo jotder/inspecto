@@ -65,3 +65,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `CUSTOMER-BUILD-DOMAIN-APPS-1` | P3 | feature | A Domain product customer must hold every optional App the composed Space Template joins, or the customer build is refused. | demand |
 | `PRODUCT-MAP-APP-EDITION-PRICES-1` | P3 | feature | an App has one Order Code (INS-APP-<ID>), so a price per App × Edition (D-PA6) has no key yet. | demand |
 | `USER-HANDBOOK-1` | P2 | feature | The Handbook: users learn to build, ship and manage an App from the console's Help, organised by lifecycle for three tracks. | — |
+| `AGENT-ENTRYPOINTS-1` | P3 | feature | ship the machine-readable entry points with the install: | — |
+| `ERROR-CATALOGUE-1` | P3 | feature | an error catalogue: | — |

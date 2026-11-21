@@ -1,7 +1,7 @@
 ---
 type: Concept
-title: DuckDB Integration — DuckDB 2.0.0.0, the pinned version
-description: Part 1 of 2 of DuckDB Integration: DuckDB 2.0.0.0 (pinned 2026-10-23, DUCKDB-2-MIGRATION-1)
+title: DuckDB Integration — DuckDB 2.0.1.0, the pinned version
+description: Part 1 of 2 of DuckDB Integration: DuckDB 2.0.1.0 LTS (pinned 2026-11-21) on top of the 2.0.0.0 migration (DUCKDB-2-MIGRATION-1)
 tags: [engine, duckdb, performance, appender, threads]
 timestamp: 2026-06-28T00:00:00Z
 item: module.engine
@@ -11,13 +11,25 @@ verified: 2026-11-20 last-edit
 code: platform/inspecto-engine
 ---
 
-# DuckDB Integration — DuckDB 2.0.0.0, the pinned version
+# DuckDB Integration — DuckDB 2.0.1.0, the pinned version
 
 Part 1 of 2 of [DuckDB Integration](spec-duckdb.md) · next: [Sealed connections, time zones and aggregate state](spec-duckdb-connections-state.md).
 
+## DuckDB 2.0.1.0 LTS (pinned 2026-11-21)
+
+`pom.xml` `duckdb.version` = **`2.0.1.0`**. Every 2.0.0 fact in the next section still holds, except these, each
+measured on both drivers side by side:
+
+| 2.0.1 behaviour | What the product does | Pinned by |
+|---|---|---|
+| ⚠ **Still wrong results:** `window_self_join` still counts hive-pruned days (3 where 2 is right) | the workaround stays; reported on [duckdb/duckdb#28947](https://github.com/duckdb/duckdb/issues/28947) (2.0.1 comment 2026-11-21) | `DuckDbWindowSelfJoinWorkaroundTest` canary |
+| `levenshtein`, `jaro_similarity`, `jaro_winkler_similarity` and `jaccard` count **code points**, not UTF-8 bytes (`levenshtein('é','e')` 2 → 1) — similarity scores on accented or non-Latin text change | the JVM twins (`JaroWinkler.DUCKDB`, `SimilaritySql.Method.LEVENSHTEIN`) use `TextUnit.CODE_POINT`; the Levenshtein score divides by `length()`, not `strlen()` | `SimilarityDuckDbParityTest`, `EntityGroupingParityTest`, `RowShaperSimilarityTest` |
+| ⚠ **`round(DOUBLE, n)` rounds the exact binary value** (`round(52.05::DOUBLE, 1)` = 52.0, 2.0.0: 52.1; `round(2.50005::DOUBLE, 4)` = 2.5, 2.0.0: 2.5001); `round` on a DECIMAL and `round(x)` / `round(x, 0)` are unchanged | every shipped `round(<DOUBLE>, n)` with `n ≥ 1` is written `CAST(CAST(x AS DECIMAL(38,n)) AS DOUBLE)` — equal to 2.0.0's `round` on 700,000 sampled doubles at every n in 0–8, and still DOUBLE; where the divisor can be 0, `CASE WHEN isfinite(x) THEN … ELSE x END` keeps inf/NaN (a DECIMAL cast of either raises). ⛔ Do not write `round(CAST(x AS DECIMAL(38,10)), n)`: it double-rounds (`-81.865` → `-81.87`). ⚠ The Record Transformer's `num.round` stays native `ROUND` (operator, 2026-11-21): its compiler knows column names, not types, so a user's `num.round` on a DOUBLE column rounds the 2.0.1 way (`NUM-ROUND-TYPE-AWARE-1`); on the ingest side `num.*` functions run on the all-VARCHAR raw columns and do not bind at all (`RECORD-TRANSFORM-NUM-VARCHAR-1`) | `PartnerSettlementAgingGoldenTest`, `TelcoBypassClusterGoldenTest`, the template goldens |
+| ⚠ **America/Havana** disagrees with the JDK's tzdata 2026b: DuckDB 2.0.1 keeps Cuba on UTC−4 from 2026-11-01T05:00Z for 3,192 hours (to about mid-March 2027); the JDK and DuckDB 2.0.0 move to UTC−5 that day. Every other zone checked (London, New York, Kyiv, Asunción, Apia; hourly 2020–2027) agrees | a Space in Havana time gets DuckDB and JVM labels an hour apart for that window; the parity test checks Havana's 2025 transition instead until they agree (`DUCKDB-2-0-1-HAVANA-TZ-1`) | `TimeGrainDuckDbParityTest` |
+
 ## DuckDB 2.0.0.0 (pinned 2026-10-23, `DUCKDB-2-MIGRATION-1`)
 
-`pom.xml` `duckdb.version` = **`2.0.0.0`** (GA, Maven Central, no extra repository; extensions resolve to ABI
+`pom.xml` `duckdb.version` was **`2.0.0.0`** (GA, Maven Central, no extra repository; extensions resolve to ABI
 `v2.0.0`). The move from 1.5.6.0 changed these engine facts — each is pinned by the named test, so a later bump that
 changes one again fails loudly:
 
@@ -284,4 +296,5 @@ are date expressions; the two mapping `custom` expressions are `DOUBLE`.
 
 ## Changes
 
+- 2026-11-21: pinned DuckDB 2.0.1.0 LTS — similarity built-ins count code points, `round(DOUBLE, n)` rounded via DECIMAL, Havana tzdata exempt, `window_self_join` still broken.
 - 2026-09-09: the D11 headline corrected — it read “the pair is `memory_limit=2GB` + `maxConcurrentRuns=4`”, so a skimmer took away a shipped 2GB cap.

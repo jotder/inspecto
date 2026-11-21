@@ -145,8 +145,8 @@ final class EntityShapes {
         }
         if (t.equals("DATE") || t.equals("TIMESTAMP"))
             return OnboardDraft.choice("temporal", c.name() + " holds " + Words.plural(t), true);
-        if (t.equals("DOUBLE") || (t.equals("BIGINT") && hasAny(c.name(), AMOUNT_WORDS)))
-            return OnboardDraft.choice("measure", c.name() + (t.equals("DOUBLE") ? " holds decimal numbers" : " is named as an amount and holds numbers"),
+        if (t.equals("DOUBLE") || OnboardDraft.isDecimal(t) || (t.equals("BIGINT") && hasAny(c.name(), AMOUNT_WORDS)))
+            return OnboardDraft.choice("measure", c.name() + (t.equals("DOUBLE") || OnboardDraft.isDecimal(t) ? " holds decimal numbers" : " is named as an amount and holds numbers"),
                     n >= OnboardDraft.MIN_SAMPLE);
         if (TEXT.contains(t) && n > 0) {
             int distinct = new LinkedHashSet<>(c.values()).size();
@@ -164,16 +164,16 @@ final class EntityShapes {
     /**
      * ENTITY-TYPE-RECORD-ROLES-1: the role the record type's hints give a column of {@code type} - its first Time, Measure or
      * Category hint naming the column, in that order, whose role the type can hold (a Time is a DATE or TIMESTAMP, a Measure
-     * a DOUBLE or BIGINT, a Category neither a DOUBLE nor a date); null when none does. {@code [role, hint]}.
+     * a DOUBLE, a DECIMAL or a BIGINT, a Category neither a DOUBLE, a DECIMAL nor a date); null when none does. {@code [role, hint]}.
      */
     static String[] hintedRole(String column, String type, IndustryPack.RoleHints hints) {
         String t = type == null ? "VARCHAR" : type.toUpperCase(Locale.ROOT);
         boolean date = t.equals("DATE") || t.equals("TIMESTAMP");
         String h;
         if (date && (h = IndustryPack.RoleHints.matching(hints.time(), column)) != null) return new String[] {"temporal", h};
-        if ((t.equals("DOUBLE") || t.equals("BIGINT")) && (h = IndustryPack.RoleHints.matching(hints.measure(), column)) != null)
+        if ((t.equals("DOUBLE") || t.equals("BIGINT") || OnboardDraft.isDecimal(t)) && (h = IndustryPack.RoleHints.matching(hints.measure(), column)) != null)
             return new String[] {"measure", h};
-        if (!date && !t.equals("DOUBLE") && (h = IndustryPack.RoleHints.matching(hints.category(), column)) != null)
+        if (!date && !t.equals("DOUBLE") && !OnboardDraft.isDecimal(t) && (h = IndustryPack.RoleHints.matching(hints.category(), column)) != null)
             return new String[] {"dimension", h};
         return null;
     }
@@ -519,7 +519,7 @@ final class EntityShapes {
         for (Column c : columns) {
             String said = stated.get(c.name());
             boolean chosen = "measure".equals(wanted) && wanted.equals(said);
-            if (used.contains(c.name()) || typeOf.containsKey(c.name()) || !types.contains(c.type()) || (said != null && !wanted.equals(said))
+            if (used.contains(c.name()) || typeOf.containsKey(c.name()) || !(types.contains(c.type()) || ("measure".equals(wanted) && OnboardDraft.isDecimal(c.type()))) || (said != null && !wanted.equals(said))
                     || !(chosen || hasAny(c.name(), words))) continue;
             int n = c.values().size();
             if ("kind".equals(role)) {

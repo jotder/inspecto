@@ -386,7 +386,7 @@ class ControlApiImportRowFilterTest {
 
             // Add a file, replacing everything
             List<Row> second = rows(12L, 120, 1000);
-            JsonNode rep = data(send(c, "POST", "/datasets/" + id + "/files?name=second.csv", bytes(csv(second))), 200);
+            JsonNode rep = data(send(c, "POST", "/datasets/" + id + "/files?mode=replace&name=second.csv", bytes(csv(second))), 200);
             assertEquals(expected(second, keep), keptIds(id), rep.toString());
             assertEquals(120 - expected(second, keep).size(), rep.get("rowsFilteredOut").asLong(), rep.toString());
 

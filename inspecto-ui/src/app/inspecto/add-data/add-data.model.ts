@@ -1101,7 +1101,7 @@ function indexAndExpectations(s: ImportSummary): SummaryLine[] {
 // ── Locks (A-15, A-11, DT-4, DT-5) ───────────────────────────────────────────────────────────────────────────────────
 
 /** Why Add data is locked in this Space, in the server's words (`OnboardRoutes.SELF_IMPORT_OFF`): true with or without a Pipeline. */
-export const SELF_IMPORT_OFF = 'Add data is turned off in this Space; an administrator can turn it on';
+export const SELF_IMPORT_OFF = 'Add data is turned off in this Space; an administrator can turn it on (PUT /settings/data {"selfImport":true})';
 export const NO_UPLOAD_RIGHT = 'Adding data needs the right to upload data in this Space; ask an administrator';
 /** Fallbacks until `DATA-TIERS-1` phase 2 serves `featureReasons.remoteSystems` / `pipelineAutomation`. */
 export const REMOTE_FALLBACK =

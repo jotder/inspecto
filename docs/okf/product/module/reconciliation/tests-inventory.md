@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.reconciliation`](../../../../../product-map/module/reconciliation.toon).
 
-32 test class(es): 25 unit, 7 real-HTTP control-plane, 0 IT.
+34 test class(es): 26 unit, 8 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -29,6 +29,7 @@ mvn -o test -pl features/inspecto-reconciliation -Dtest=ControlApiReconDayTest,C
 | `ControlApiReconPromoteTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-reconciliation/src/test/java/com/gamma/control/ControlApiReconPromoteTest.java` | {@code BREAK-INCIDENT-1}: {@code POST /recon/promote} hands one reconciliation Break to Ops as an |
 | `ControlApiReconStateTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-reconciliation/src/test/java/com/gamma/control/ControlApiReconStateTest.java` | R2-03 (operator 2026-09-26, reversing C9) — real-HTTP + real-DuckDB tests for a Reconciliation's |
 | `ControlApiReconTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-reconciliation/src/test/java/com/gamma/control/ControlApiReconTest.java` | Real-HTTP + real-DuckDB tests for the reconciliation routes (DAT-7, design |
+| `ControlApiReconValidateTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-reconciliation/src/test/java/com/gamma/control/ControlApiReconValidateTest.java` | COMPONENT-VALIDATE-ALL-1 over real HTTP, in the module that owns the Reconciliation validator: its draft is judged by |
 | `ReconAbsentSurfaceParityTest` | `com.gamma.control` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/control/ReconAbsentSurfaceParityTest.java` | The module's {@code module.toon} {@code provides.routes} must list EXACTLY the routes its {@code RouteModule}s |
 | `MobileMoneyPackGoldenTest` | `com.gamma.job` | real-HTTP control-plane test | `features/inspecto-reconciliation/src/test/java/com/gamma/job/MobileMoneyPackGoldenTest.java` | {@code PACK-MOBILE-MONEY-1} golden test. Boots the shipped {@code spaces/_templates/mobile-money} Space Template |
 | `OrderToCashGoldenTest` | `com.gamma.job` | real-HTTP control-plane test | `features/inspecto-reconciliation/src/test/java/com/gamma/job/OrderToCashGoldenTest.java` | {@code USER-HANDBOOK-1} P2 lane D: the Handbook's worked example, the SHIPPED {@code order-to-cash} Space Template, over the |
@@ -54,6 +55,7 @@ mvn -o test -pl features/inspecto-reconciliation -Dtest=ControlApiReconDayTest,C
 | `ReconRunJobTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconRunJobTest.java` | The {@code recon.run} Job Type: runs a saved {@code reconciliation} over its Datasets and emits a |
 | `ReconRunJobTypeTckTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconRunJobTypeTckTest.java` | {@link ReconRunJobType} against the platform's JobTypeProvider TCK (MODULE-REORG-1 P5b). |
 | `ReconServiceTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconServiceTest.java` | Unit tests for {@link ReconService} — spec validation (the route's 422 surface), the server-built |
+| `ReconShippedShapeTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconShippedShapeTest.java` | COMPONENT-VALIDATE-ALL-1: {@link ReconKindValidator} now builds the run's spec shape at save, so every Reconciliation the |
 | `ReconSignalsTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconSignalsTest.java` | Pins every emitted Signal type byte-for-byte: they are persisted and matched, so a rename is a data break. |
 | `ReconStateStoreStateZoneTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconStateStoreStateZoneTest.java` | SE-4 step 1: a Reconciliation's state under {@code state/recon-state} is read before {@code config/}'s; writes stay in config. |
 | `ReconStateStoreTest` | `com.gamma.recon` | unit | `features/inspecto-reconciliation/src/test/java/com/gamma/recon/ReconStateStoreTest.java` | {@link ReconStateStore} — a Reconciliation's recorded run + Break lifecycle (R2-03): one JSON document per |

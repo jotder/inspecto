@@ -131,9 +131,9 @@ run **offline (`-o`)**. **Every JVM launch needs `--enable-native-access=ALL-UNN
 including test invocations. Tests spin up real `SourceService`/`ControlApi` on an ephemeral port and
 drive the HTTP surface — extend that pattern (see `inspecto/src/test/java/com/gamma/control/`).
 
-## DuckDB 2.0.0.0 (pinned 2026-10-23)
+## DuckDB 2.0.1.0 (pinned 2026-11-21; 2.0 since 2026-10-23)
 
-Facts: `docs/okf/product/module/engine/spec-duckdb.md` § *DuckDB 2.0.0.0*; lesson: `.claude/memory/duckdb-and-sql-rules.md`.
+Facts: `docs/okf/product/module/engine/spec-duckdb.md` § *DuckDB 2.0.1.0*; lesson: `.claude/memory/duckdb-and-sql-rules.md`.
 
 - **Lambdas are `lambda x: …`** — the `x -> …` arrow is a Binder error in 2.0.
 - **Open every analytics connection through `DuckDbUtil`** (`openConnection` / `openInMemory` /
