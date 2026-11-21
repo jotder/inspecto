@@ -166,6 +166,31 @@ class ControlApiComponentValidateTest {
         }
     }
 
+    /** /validate is open to every signed-in user, so a Mapping's base Dataset the caller cannot see reads exactly as a missing one. */
+    @Test
+    void aHiddenBaseDatasetAnswersAsAMissingOne(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            new ComponentStore(c.root.resolve("registry")).write("dataset", "secret_ds",
+                    Map.of("physicalRef", "secret_store_xyz", "owner", "someone-else", "shares", List.of()));   // shared with no one
+            String hidden = messages(validate(c, "dataset", "{\"origin\":\"mapping\",\"basedOn\":\"secret_ds\",\"physicalRef\":\"x\"}", AUTHOR));
+            String missing = messages(validate(c, "dataset", "{\"origin\":\"mapping\",\"basedOn\":\"nope_ds\",\"physicalRef\":\"x\"}", AUTHOR));
+            assertEquals(missing.replace("nope_ds", "X"), hidden.replace("secret_ds", "X"), "same answer, hidden or missing");
+            assertFalse(hidden.contains("secret_store_xyz"), "the hidden Dataset's store is not quoted: " + hidden);
+        }
+    }
+
+    /** A key the stored entry already carries is not judged, on validate as on save: an agent re-saving it is not told otherwise. */
+    @Test
+    void aKeyTheStoredEntryCarriesIsNotFlaggedForAnAgent(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            new ComponentStore(c.root.resolve("registry")).write("dataset", "ds_prior", Map.of("physicalRef", "orders", "legacyKey", "v"));
+            HttpResponse<String> r = send(c, "/validate", "{\"type\":\"dataset\",\"id\":\"ds_prior\",\"config\":{\"physicalRef\":\"orders\",\"legacyKey\":\"v\"}}", AGENT);
+            assertTrue(JSON.readTree(r.body()).at("/data/clean").asBoolean(), r.body());
+            HttpResponse<String> added = send(c, "/validate", "{\"type\":\"dataset\",\"id\":\"ds_prior\",\"config\":{\"physicalRef\":\"orders\",\"legacyKey\":\"v\",\"newTypo\":1}}", AGENT);
+            assertFalse(JSON.readTree(added.body()).at("/data/clean").asBoolean(), added.body());
+        }
+    }
+
     @Test
     void anUnknownTypeIsStillNotFound(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {

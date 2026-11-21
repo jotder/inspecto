@@ -911,7 +911,24 @@ final class ComponentRoutes implements RouteModule {
         List<Finding> out = new ArrayList<>();
         Map<String, Object> content = new LinkedHashMap<>(draft);
         content.remove("id");
+        ComponentStore store = api.writeRoot() == null ? null : new ComponentStore(api.writeRoot().resolve("registry"));
+        Map<String, Object> stored = null;
         try {
+            // the save door's own first check: a Mapping's base Dataset the caller cannot see answers exactly as a missing one
+            // (writeComponent), so /validate - open to every signed-in user - never says which Datasets exist
+            if (store != null && "dataset".equals(type) && content.get(DatasetEntryRules.BASED_ON) instanceof String base && !base.isBlank()) {
+                Map<String, Object> baseEntry = store.get("dataset", base).map(ComponentRegistry.Component::content).orElse(null);
+                if (baseEntry == null || !ComponentAccess.canView(ex, baseEntry))
+                    throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + base + "'");
+            }
+            if (store != null && UnknownComponentKeys.covers(type)) {
+                try {
+                    ComponentRegistry.Component prior = existing(store, type, id);
+                    stored = prior == null ? null : prior.content();
+                } catch (ApiException badId) {
+                    stored = null;   // an unusable id is reported by the checks below, not here
+                }
+            }
             validateKind(api, type, id, content);
             if (CENSUSED_COMPONENT_KINDS.contains(type)) refuseUnknownComponentKeys(type, content);
             if (KpiRoutes.TYPE.equals(type)) KpiRoutes.requireMeasure(api, ex, id, content);
@@ -919,7 +936,7 @@ final class ComponentRoutes implements RouteModule {
             out.add(new Finding(Severity.ERROR, "", refused.getMessage(), "COMPONENT_INVALID", null));
         }
         boolean agent = ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject who && who.agent();
-        for (String key : UnknownComponentKeys.of(type, content))
+        for (String key : UnknownComponentKeys.of(type, content, stored))
             out.add(new Finding(agent ? Severity.ERROR : Severity.WARNING, key,
                     type + " key '" + key + "' is read by nothing" + (agent ? "; an agent save of it is refused" : "; a save keeps it but it has no effect")
                             + " (prefix it with '" + AcceptedConfigKeys.EXTENSION_PREFIX + "' to mark it as deliberately extra)",
