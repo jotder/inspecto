@@ -815,6 +815,13 @@ final class ComponentRoutes implements RouteModule {
                     throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + base + "'");
             }
             validateKind(api, type, id, content);
+            // UNKNOWN-KEYS-SILENT-1 step 2 (operator 2026-11-21): a Dataset or Reconciliation from an agent Subject with a key
+            // nothing reads is refused, naming the key. A key the stored entry already carries is not judged (what the product wrote
+            // round-trips: a re-save, a version restore); this door only (the bulk writers carry no Subject), and before the hold, so an agent never proposes a typo.
+            ComponentRegistry.Component stored = UnknownComponentKeys.covers(type) ? existing(store, type, id) : null;
+            List<String> unknownKeys = UnknownComponentKeys.of(type, content, stored == null ? null : stored.content());
+            if (!unknownKeys.isEmpty() && ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject who && who.agent())
+                throw new IllegalArgumentException(UnknownComponentKeys.describe(type, unknownKeys));
             // ASSURE-ACTION-REQUESTS-1 round-2 finding 1: this door writes decision-rule too — the same invoke-api gate
             // and server-stamped makers as /decision-rules, before the hold (version restore lands here as well).
             if (DecisionRuleGuard.TYPE.equals(type)) {

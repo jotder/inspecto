@@ -36,11 +36,15 @@ final class UnknownComponentKeys {
             "calculated", "kind", "sourceName", "view", "sql", "materialized", "query", "measures", "viz",
             // written by Add data, Mappings, arrivals and feeds
             "importPipeline", "importFormat", "importSource", "origin", "lastImport", "basedOn", "mapping", "eventDateColumn",
-            "dataAsOf", "identifyingColumn", "recordType", "feed", "storage", "retention", "compaction", "poll", "tags");
+            "dataAsOf", "identifyingColumn", "recordType", "feed", "storage", "retention", "compaction", "poll", "tags",
+            // written by the console's details dialog, the import-filter editor and the inbox watch (found by the step-2 review)
+            "title", "importFilter", "watchInbox");
 
     static final Set<String> RECONCILIATION = Set.of(
             "datasets", "leftDataset", "rightDataset", "thirdDataset", "columnMap", "filters", "compareColumns",
-            "includeRecordCount", "cardinality", "keyColumns", "impact", "bands");
+            "includeRecordCount", "cardinality", "keyColumns", "impact", "bands",
+            // read by the console (the Breaks page title), not by the loader
+            "description");
 
     /** What one {@code compareColumns} entry reads ({@code ReconConfigLoader.buildSpec}). */
     static final Set<String> COMPARE_COLUMN = Set.of("column", "agg", "toleranceType", "tolerance");
@@ -55,11 +59,21 @@ final class UnknownComponentKeys {
      * ({@code toleranceTyp}, {@code compareColumns[1].tolerence}); empty when none or when the kind is not covered.
      */
     static List<String> of(String type, Map<String, Object> content) {
+        return of(type, content, null);
+    }
+
+    /**
+     * As {@link #of(String, Map)}, but a top-level key the stored entry ({@code prior}) already carries is never unknown: whatever
+     * the product itself wrote on it (a watch, a filter, a title) round-trips through an agent that reads the entry and saves it
+     * again, or restores a version.
+     */
+    static List<String> of(String type, Map<String, Object> content, Map<String, Object> prior) {
         if (!covers(type) || content == null) return List.of();
         Set<String> known = "dataset".equals(type) ? DATASET : RECONCILIATION;
         List<String> out = new ArrayList<>();
         for (String k : content.keySet())
-            if (!known.contains(k) && !ENVELOPE.contains(k) && !k.startsWith(AcceptedConfigKeys.EXTENSION_PREFIX)) out.add(k);
+            if (!known.contains(k) && !ENVELOPE.contains(k) && !k.startsWith(AcceptedConfigKeys.EXTENSION_PREFIX)
+                    && (prior == null || !prior.containsKey(k))) out.add(k);
         if ("reconciliation".equals(type) && content.get("compareColumns") instanceof List<?> rows)
             for (int i = 0; i < rows.size(); i++)
                 if (rows.get(i) instanceof Map<?, ?> row)

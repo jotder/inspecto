@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-472 test class(es): 191 unit, 281 real-HTTP control-plane, 0 IT.
+473 test class(es): 191 unit, 282 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -299,6 +299,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiSuppressionsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSuppressionsTest.java` | `D8-SUPPRESS-1`'s operator surface over real HTTP — one case per gate of |
 | `ControlApiSystemRoutesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSystemRoutesTest.java` | PG-1 Open 2 Stage 1 over real HTTP: {@code GET /system/operational-db} reports what the deployment is |
 | `ControlApiTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiTest.java` | Integration tests for the M3 {@link ControlApi} over real HTTP: health/readiness, |
+| `ControlApiUnknownKeysTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiUnknownKeysTest.java` | UNKNOWN-KEYS-SILENT-1 over real HTTP (operator 2026-11-21): a Dataset or a Reconciliation saved by an agent Subject (the |
 | `ControlApiV1Test` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiV1Test.java` | Real-HTTP tests for the v1 transport spine (worklog W1, docs/superpower/api-contract-design.md |
 | `ControlApiValidateConfigPathJailTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiValidateConfigPathJailTest.java` | {@code VALIDATE-CONFIGPATH-UNJAILED-1} over real HTTP: {@code POST /validate {configPath}} must jail the |
 | `ControlApiVersionedSurfaceTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiVersionedSurfaceTest.java` | API-5 (2026-07-25): {@code /api/v1} is the only API surface. This pins the contract that replaced the |
