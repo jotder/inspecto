@@ -1,7 +1,7 @@
 # Agent Kit AK-2 — agents propose changes, people approve them, one role at a time (plan)
 
-> **Status: APPROVED for phase 1 on 2026-11-20 — D-AK1…D-AK4 signed (operator, "Sign recommended"); D-AK5 and
-> D-AK6 open, needed before phase 2 (§8); AK-2a and AK-2b built 2026-11-20 (§6) — phase 1 is built; its close (Agent Skills AK-3, golden tasks AK-4, the Handbook how-to) and phases 2–3 remain.
+> **Status: APPROVED for phase 1 on 2026-11-20 — D-AK1…D-AK4 signed (operator, "Sign recommended");
+> D-AK5, D-AK6 and D-AK7 open, needed before phase 2 (§8); AK-2a and AK-2b built 2026-11-20 (§6) — phase 1 is built; its close (Agent Skills AK-3, golden tasks AK-4, the Handbook how-to) and phases 2–3 remain.
 > As built, beyond the text below: the allowed bucket also holds `POST /db/query` (the read the AK-1
 > `query_dataset` tool replays, which the gate would otherwise refuse), and an agent token drops
 > `canApproveChanges`, `canApproveLinkExpansions` and `canRevealLinkEntities` at authentication, so every
@@ -79,7 +79,25 @@ phase-1 gate (§4.1): every change is a proposal another person approves.
 `order-to-cash` sample files and a plain-language spec (the finished Space withheld as the answer key), builds the
 dashboard, Reconciliation and Report and writes the solution document without reading any source or repository doc.
 Its gap list decides the shape of this track; the result and the board rows it files are recorded here when it reports.
-The spike ran before AK-2a's gate, so it measures the build path, not the approval path.
+The spike ran before AK-2a's gate, so it measures the build path, not the approval path. It has two variants:
+**A**, the API and the Handbook only; **B**, the same build with read access to the install root (its docs folder, the
+shipped example Spaces and templates, the Spaces folders), applying every change through the API.
+
+**Two postures for an agent with file access** *(operator, 2026-11-21)*:
+
+| Posture | Reads files | Writes files | Applies a change |
+|---|---|---|---|
+| **Sandbox or developer install** | freely | directly into a Space folder | by file; no approval, no audit — nothing governed is at stake |
+| **Governed install** | freely: shipped docs, example Spaces and templates, to learn the config keys | only in a scratch copy, to draft | **through the API only** (`/validate` and the dry run first), so every change is held for another person (§4.1) |
+
+Why a governed install cannot take direct file writes: the approval hold, four-eyes and `agentClient` audit live in the
+routes, so a file written into a Space folder skips all three; nothing validates the file until the server loads it; and
+the shortcut of building a Space folder and importing it as a bundle is refused to an agent token by the phase-1 gate.
+File access therefore closes the "no config-key reference" gap (the agent learns keys from shipped examples) without
+widening what an agent may change. Recommended: files for learning and drafting in both postures, the API for applying
+on a governed install. The phase-1 gate governs an agent's **API** calls; it cannot see a file an agent writes on the
+host. So the posture is set by who may write into the install root, not by the server — a governed install gives the
+agent read access to the install root and no write access to its Space folders (decision D-AK7, open).
 
 ## 2. Vocabulary — the plan's "Draft" is a Pending Change
 
@@ -260,7 +278,7 @@ notifications and the tasks extension stay deferred to AK-3 / AK-4.
 
 **D-AK1…D-AK4 signed 2026-11-20** (operator, "Sign recommended"): each as its *Recommended* column says. For D-AK1 that
 is **four-eyes always**; the single-administrator alternative is not signed and is not built unless the operator asks.
-**D-AK5 and D-AK6 stay open**; they are needed before phase 2.
+**D-AK5, D-AK6 and D-AK7 stay open**; D-AK5 and D-AK6 are needed before phase 2, D-AK7 before the analytics builder's Skills.
 
 | # | Question | Recommended |
 |---|---|---|
@@ -270,6 +288,7 @@ is **four-eyes always**; the single-administrator alternative is not signed and 
 | **D-AK4** | The machine agent capability set | The authoring capabilities of the `propose_change` kinds plus `canWorkIncidents`; listed per client in `auth.oidc.agentMachineClients`. Widens operator decision B1, as D-UE5 anticipated. Phase 2 adds `canOperateRuns` for the operations role. |
 | **D-AK5** | How are an agent's operational and case actions governed (phases 2–3)? | The two tiers of §4.6: **low** actions allowed for a delegated person within that person's rights; **outcome** actions held for a person to approve; every machine action held. |
 | **D-AK6** | How is a held non-config action recorded? | Reuse the Pending Change machinery — record the request, approve by replaying the same route as the proposer, refuse a stale replay — under its **own term** in `GLOSSARY.md` (a Pending Change stays config only). Name to be settled with the glossary owner before phase 2. |
+| **D-AK7** | Which file access does an agent get on a customer's install (§1.2)? | **Governed install:** read access to the install root (shipped docs, example Spaces and templates), no write access to Space folders, every change through the API. **Sandbox or developer install:** direct file writes allowed. The Agent Skills say which posture they assume. Settle with the spike's variant A/B comparison. |
 
 ## References
 
