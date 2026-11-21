@@ -36,3 +36,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | `COMPONENT-VALIDATE-ALL-1` | P3 | feature | no validate or dry run for a KPI, Reconciliation, Dataset, Widget or Dashboard: | — |
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
+| `ERROR-CATALOGUE-1` | P3 | feature | an error catalogue: | — |
