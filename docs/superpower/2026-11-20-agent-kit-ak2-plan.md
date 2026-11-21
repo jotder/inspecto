@@ -78,10 +78,50 @@ phase-1 gate (§4.1): every change is a proposal another person approves.
 **Evidence first — the spike (2026-11-21):** an agent session on a clean installed Standard bundle, with only the
 `order-to-cash` sample files and a plain-language spec (the finished Space withheld as the answer key), builds the
 dashboard, Reconciliation and Report and writes the solution document without reading any source or repository doc.
-Its gap list decides the shape of this track; the result and the board rows it files are recorded here when it reports.
-The spike ran before AK-2a's gate, so it measures the build path, not the approval path. It has two variants:
-**A**, the API and the Handbook only; **B**, the same build with read access to the install root (its docs folder, the
-shipped example Spaces and templates, the Spaces folders), applying every change through the API.
+Its gap list decides the shape of this track. The spike ran before AK-2a's gate, so it measures the build path, not
+the approval path. It had two variants: **A**, the API and the Handbook only; **B**, the same build with read access to
+the install root (its docs folder, the shipped example Spaces and templates, the Spaces folders), applying every
+change through the API.
+
+**Spike result (2026-11-21, one run each; the spike's own report, not re-run):** both variants reached the **correct
+numbers** on a Standard install — status counts, the unmatched total 1784.5 USD (six incidents 1725 plus 59.5), the
+reconciliation breaks O-1041, O-1088, O-9001, O-9002, O-1017, O-1022, O-1050, O-1064 — in **234 API calls (A) and 196
+(B)**, with silent traps along the way.
+
+| Deliverable | A: API + Handbook | B: + install-root read access |
+|---|---|---|
+| orders and payments Datasets | pass | pass |
+| open-items Dataset derived on the platform | **fail** — a customer-side script, a static snapshot | pass — the recipe is in the shipped templates |
+| Expectations | pass | pass |
+| KPI / Measures | partial — no Dataset Measures route | pass (named Measures unverified) |
+| Report | pass | pass |
+| Reconciliation | partial — four break types right through an undocumented trick | partial — the cardinality break never emitted |
+| Dashboard | partial — four tiles, never rendered | partial — four tiles, never rendered |
+| solution document generated from the server | pass | pass |
+
+**What the spike settles for this plan**
+- **Skills + MCP + today's routes are close, not enough.** The build is possible; what is missing is one authoring
+  recipe for a derived Dataset (a page and a validate route), strict validation (an unknown key rejected) with
+  validate and dry run on every component, a whole-period Reconciliation (`RECON-CROSS-PERIOD-1`), honest upload
+  defaults (append, decimal), the API contract and the shipped templates served as readable reference, and an
+  approval-policy preset so "governed" means gated.
+- **File read access is worth giving; file write is not** (D-AK7). Read access closed the largest gap (the derived
+  Dataset recipe) and part of two more; B never needed a file write.
+- **A Standard install is not gated by default** (`APPROVAL-POLICY-PRESET-1`): the approval policy and approver list
+  were empty, so a person's token applied every change at once. An agent-client token is held regardless (AK-2a); the
+  preset closes the same gap for people.
+- **Golden-task caveat (AK-4):** Handbook tutorials 2–4 print the expected answers for this very data, and both agents
+  used them as an answer source; and A's server exposed the shipped `order-to-cash` template over the API. A golden task
+  must use data and a Space the Handbook does not already answer.
+- **Not covered:** neither run rendered the Dashboard or ran the shipped template's tile values live; the approval path
+  (a held proposal approved by a second person) was not exercised; the spike's agents loaded this repository's
+  `CLAUDE.md` at start though both reported no repository reads.
+- **Gaps filed on the board (2026-11-21, unverified against the code):** `DERIVED-DATASET-AUTHORING-1`,
+  `UPLOAD-DEFAULTS-1`, `SPACE-CREATE-NAME-1`, `UNKNOWN-KEYS-SILENT-1`, `COMPONENT-VALIDATE-ALL-1`,
+  `BUILDER-API-PAPERCUTS-1`, `REPORT-DASHBOARD-AUTHORING-1`, `INCIDENTS-READ-ROUTE-1`, `APPROVAL-POLICY-PRESET-1`.
+  The reconciliation finding adds evidence to `RECON-CROSS-PERIOD-1` and the missing uniqueness check to
+  `EXPECTATION-UNIQUE-KIND-1`. Full record: the spike's `gaps.md` (scratch folder `C:\sandbox\spike-inputs`, not in the
+  repo).
 
 **Two postures for an agent with file access** *(operator, 2026-11-21)*:
 

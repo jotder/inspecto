@@ -36,6 +36,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | `IMPORT-WHOLE-SPACE-SPLIT-1` | P3 | feature | split a whole-Space export into its kinds' own validated routes on import, if ever asked. | demand |
 | `SEED-ADMIN-ALERT-RULE-1` | P3 | defect | the seed admin Role cannot create a Space from a template that carries an Alert Rule | — |
+| `APPROVAL-POLICY-PRESET-1` | P3 | feature | a Standard install is not gated by default: | — |
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
 | `MACHINE-CLIENT-CONSOLE-1` | P3 | feature | a Space's admitted machine clients (identity.machineClients) and attribute claims are set only through PUT /access/roles; the Roles scree… | — |
 | `SPACE-ADMISSION-FOLLOWUPS-1` | P3 | chore | Seven follow-ups the closed-Space change (D5) left on purpose. | — |

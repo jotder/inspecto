@@ -34,14 +34,21 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `DERIVED-DATASET-AUTHORING-1` | P3 | feature | a derived (joined) Dataset cannot be authored from the API or the Handbook: | — |
+| `UPLOAD-DEFAULTS-1` | P3 | defect | upload defaults lose or distort data: | — |
+| `SPACE-CREATE-NAME-1` | P3 | defect | creating a Space ignores name and displayName: | — |
 | `TEMPLATE-GOVERNANCE-1` | P3 | feature | a Space Template carries no governance: | — |
 | — | P2 | feature | SPACE-LINK-CENSUS-1 the link census: the default flip and the plan scope not built | — |
 | — | P3 | defect | COMPONENT-DELETE-IN-USE-WORDS-1 the Components screen words every refused delete as "referenced by a pipeline" | — |
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
+| `UNKNOWN-KEYS-SILENT-1` | P3 | defect | unknown keys are accepted silently | — |
+| `COMPONENT-VALIDATE-ALL-1` | P3 | feature | no validate or dry run for a KPI, Reconciliation, Dataset, Widget or Dashboard: | — |
+| `BUILDER-API-PAPERCUTS-1` | P3 | defect | small gaps that cost an agent calls: | — |
 | `SPACE-TO-APP-CONSOLE-1` | P3 | feature | Turn a working Space into a Space Template, and into an App, from the console. | — |
 | `APPS-UPGRADE-CONSOLE-1` | P3 | feature | Apps, a Space's template upgrade and the audit-chain check have no console: | — |
 | `SPACE-EXPORT-CLEAN-1` | P3 | feature | a Space is not cleanly exportable as a Space Template: | — |
+| `APPROVAL-POLICY-PRESET-1` | P3 | feature | a Standard install is not gated by default: | — |
 | `ORIGIN-UPGRADE-UNHELD-1` | P3 | defect | a Space Template upgrade that adds and updates nothing rewrites the Space origin record without holdSet, even under an approval policy. | — |
 | `SPACE-ROOTED-DATA-ROOT-MIGRATION-1` | P3 | feature | An install whose data_root is rooted or absent is still not relocatable, and no route migrates it. | demand |
 | `SPACE-ADMISSION-FOLLOWUPS-1` | P3 | chore | Seven follow-ups the closed-Space change (D5) left on purpose. | — |

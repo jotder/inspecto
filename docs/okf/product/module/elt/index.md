@@ -57,6 +57,8 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `KEEP-COLUMNS-ENCODING-1` | P3 | defect | The rewrite that leaves a new column out of a delimited file ignores csv_settings.encoding (filed 2026-11-20, BASIC-ELT-PROFILE-1 B5 close). | — |
 | `PIPELINE-EDITOR-OUTPUT-LOAD-1` | P3 | feature | The Pipeline editor cannot set output.load / output.period_column (filed 2026-11-20, BASIC-ELT-PROFILE-1 O6 close). | operator |
 | `BASIC-ELT-DUPLICATES-1` | P3 | chore | Basic and ELT duplications Phase 0 found and the build left (filed 2026-11-20, BASIC-ELT-PROFILE-1 close). | — |
+| `DERIVED-DATASET-AUTHORING-1` | P3 | feature | a derived (joined) Dataset cannot be authored from the API or the Handbook: | — |
+| `UPLOAD-DEFAULTS-1` | P3 | defect | upload defaults lose or distort data: | — |
 | `WATCH-KEEP-TWO-CONTROLS-1` | P3 | defect | On Standard a watched folder offers two controls for one schedule (filed 2026-11-19, BASIC-ELT-PROFILE-1 U4-Watch review). | — |
 | `CONVERT-TYPE-DECIMAL-MARK-1` | P3 | defect | *Change the type* (convert.type) ignores the Grammar's decimal mark (filed 2026-11-19, BASIC-ELT-PROFILE-1 U3 review). | — |
 | `GRAMMAR-NO-QUOTE-1` | P3 | defect | The Grammar editor cannot state "no quote" (filed 2026-11-19, BASIC-ELT-PROFILE-1 BE-3 review). | — |
