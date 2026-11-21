@@ -44,6 +44,43 @@ Phases 1–3 share this plan's gate (§4.1); phase 4 shares only the masking and
 earlier phase and may be pulled forward by the operator. Seed recipes for phases 2 and 3 exist as this repository's
 own `incident-investigate` and `case-analysis` skills; the Agent Skills are rewritten from them for a customer's install.
 
+### 1.2 The analytics builder — samples and specs in, a built Space and its solution document out *(operator, 2026-11-21)*
+
+The developer role's main job. The person gives the agent **sample data files, data specs or a Grammar, and a goal** (a
+KPI, a Report, a Reconciliation, a final Dashboard); the agent **plans first, builds, proves, and writes the solution
+document**. It must work on an **installed distribution with no source tree**: the running server's REST API, the
+Handbook the server ships at `/help`, and the server's own validation messages are its only references.
+
+| Stage | The agent's work | What exists today (checked by name, not exercised) | What is missing |
+|---|---|---|---|
+| 1 Goal | turn the request into a structured one | the **Requirement** concept (KPI, Report, Reconciliation, Rule) | the agent-readable shape of a request |
+| 2 Samples | choose the Parser, state the Grammar, infer types | built-in Parsers, Grammars, `SampleProfiler` in the engine, the server's `/onboard/…` routes (the console's Add data) | whether the onboarding routes already profile and draft enough for an agent; an MCP Tool and an upload route for a sample file (results are capped at 256 KiB) |
+| 3 Land | Collector, Schema, import Pipeline, rejected-row check | the how-tos and Pipeline tools | — |
+| 4 Shape | pick the Steps for matrix, summary and cube Datasets | `transform.summarize`, `matrix.pivot`, `matrix.unpivot`, `join`, `running`, `analytics.rank`, … | the recipe library: which Step for which goal |
+| 5 Outputs | Measures, KPIs with targets, Widgets, Dashboards, Reports, Reconciliations | all authored as config | Insight Profiles and KPI History are vocabulary only |
+| 6 Prove | check the result against the specs | Expectations, dry runs, the Handbook's check-block style | a mechanical check loop the agent runs until green |
+| 7 Document | the plan, then the solution document | nothing | a plan stored in the Space; a solution document **generated from the Space's actual config**, as the Handbook's reference pages are generated |
+
+**Skills and MCP are the foundation, not the whole answer.** A Skill is knowledge and an MCP Tool is an action; this job
+also needs the four things above — a way to *see* the data (the profile or onboarding step), a *plan object* that
+outlives one chat, a *mechanical check loop*, and *golden tasks* (AK-4) that measure how often an agent gets it right,
+per model. Long builds may outlast a single tool call; the MCP progress and tasks features (deferred in §6) are decided
+when the spike shows whether it matters.
+
+**No-source distribution — how the agent works:** the Handbook at `/help` for the exact calls; the server's API contract
+if it serves one; the onboarding routes to draft the import from a sample; the config routes with `/validate` and the
+Pipeline dry run before each save; Dataset queries through the API to verify; the plan and solution document as files
+for the person (until a plan is stored in the Space). **Limits without source:** no config-key reference yet (the
+agent learns keys from Handbook examples and 422 messages); no packaging as an App or Space Template
+(`APP-KIT-DELIVERY-1`); no new Parser (`PARSER-SPI-KIT-1`). **On a real install** an agent writes only through the
+phase-1 gate (§4.1): every change is a proposal another person approves.
+
+**Evidence first — the spike (2026-11-21):** an agent session on a clean installed Standard bundle, with only the
+`order-to-cash` sample files and a plain-language spec (the finished Space withheld as the answer key), builds the
+dashboard, Reconciliation and Report and writes the solution document without reading any source or repository doc.
+Its gap list decides the shape of this track; the result and the board rows it files are recorded here when it reports.
+The spike ran before AK-2a's gate, so it measures the build path, not the approval path.
+
 ## 2. Vocabulary — the plan's "Draft" is a Pending Change
 
 The parent plan says "save as a Draft". **Draft** is taken: it is a Link Analysis analyst's private copy of an
