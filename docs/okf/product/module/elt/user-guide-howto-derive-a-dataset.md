@@ -36,13 +36,15 @@ Concepts: [Dataset](../../layer/product/user-guide-concept-dataset.md).
    Parameters are `$name` tokens: each is a flat key of the Job (`terms_days: "14"` fills `$terms_days`; `as_of: "$today"`
    fills `$as_of` with the day of the run). Cast money to `DECIMAL(18,2)` in the SQL so sums are exact.
 2. **Check the Job** with `POST /validate` (type `job`) before you save it. It reports findings and saves nothing.
-3. **Save the Job** with `PUT /jobs/{name}`. The body is the Job's own keys, **flat**: `type: sql.template`, `sql`,
-   `sources`, `sink_dataset` (the store the result is written to), `cron`, `as_of`, your parameters and `enabled`. A key
+3. **Create the Job** with `POST /jobs` (`PUT /jobs/{name}` only updates a Job that exists, and answers 404 for a new
+   one; `POST` of an existing name answers 409). The body is the Job's own keys, **flat**: `name`, `type: sql.template`,
+   `sql`, `sources`, `sink_dataset` (the store the result is written to), `cron`, `as_of`, your parameters and `enabled`. A key
    the Job does not know is absorbed as a parameter, never refused, so check the spelling: `sink_dataset`, not
    `sinkDataset`. Never nest parameters under `params`.
-4. **Run it once:** `POST /jobs/{name}/trigger`, then read `GET /jobs/{name}/runs` until the run is `SUCCESS`. A
+4. **Run it once** (this needs the right to operate runs, `canOperateRuns`): `POST /jobs/{name}/trigger`, then read `GET /jobs/{name}/runs` until the run is `SUCCESS`. A
    `sql.template` run says how many rows it wrote and to which store.
-5. **Register the Dataset:** `PUT /components/dataset/{id}` with `physicalRef` set to the Job's `sink_dataset` and, if
+5. **Register the Dataset:** `POST /components/dataset` with `id` in the body (`PUT /components/dataset/{id}` only updates
+   an entry that exists), and `physicalRef` set to the Job's `sink_dataset` and, if
    Reconciliations or KPIs will cut it by period, a `dateField` naming a date column that is **never null**. Check the
    entry first with `POST /validate` (type `dataset`).
 6. **Read it:** `GET /datasets/{id}/rows`.
@@ -57,7 +59,8 @@ expect data.clean = true
 
 ## Check it worked
 
-The Dataset registered, and it reads what the Job wrote. In the shipped Space the Dataset is `o2c_open_items`.
+The Dataset registered, and it reads what the Job wrote. In the shipped Space the Dataset is `o2c_open_items`; this step
+holds once that Job has run at least once.
 
 ```check
 GET /spaces/{space}/datasets/o2c_open_items/rows?limit=5
