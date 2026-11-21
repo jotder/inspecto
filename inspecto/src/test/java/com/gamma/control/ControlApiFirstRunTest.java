@@ -113,7 +113,7 @@ class ControlApiFirstRunTest {
         assertFalse(off.get("selfImportInForce").asBoolean(), off.toString());
         HttpResponse<String> locked = send("POST", SPACE + "/onboard/files?name=transfers.csv&kind=stream", csv, ADMIN);
         assertEquals(403, locked.statusCode(), locked.body());
-        assertEquals("Add data is turned off in this Space; an administrator can turn it on", error(locked));
+        assertEquals("Add data is turned off in this Space; an administrator can turn it on (PUT /settings/data {\"selfImport\":true})", error(locked));
         assertEquals(OnboardRoutes.SELF_IMPORT_OFF, error(locked));
 
         // 3. Only an administrator turns it on: not an analyst who may upload, not an author who may upload.

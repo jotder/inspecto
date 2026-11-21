@@ -49,7 +49,7 @@ import java.util.stream.Stream;
  *       marked {@code origin: import}, registers it, lands the file, runs it once, registers the Dataset and answers the
  *       run summary ({@link OnboardImport}). A failed commit leaves nothing behind. Above
  *       {@code import.inline_max_bytes} it answers 202 and the run is followed at {@code GET /onboard/runs/{runId}}.</li>
- *   <li>{@code POST /datasets/{id}/files?name=[&mode=replace|append]} - <b>Add a file</b> to an imported Dataset and run it;
+ *   <li>{@code POST /datasets/{id}/files?name=&mode=replace|append|period} (mode required, 422 without) - <b>Add a file</b> to an imported Dataset and run it;
  *       {@code POST /datasets/{id}/run} - <b>Run now</b>.</li>
  *   <li>{@code PUT /datasets/{id}/columns/{column}} - change one column's Entity Type (classification); the Dataset is
  *       re-assessed on the next read.</li>
@@ -132,7 +132,7 @@ final class OnboardRoutes implements RouteModule {
      * a Pipeline: it is off here, and who turns it on. The UI holds the same words ({@code SELF_IMPORT_OFF} in
      * {@code add-data.model.ts}); {@code ControlApiFirstRunTest} pins this copy.
      */
-    static final String SELF_IMPORT_OFF = "Add data is turned off in this Space; an administrator can turn it on";
+    static final String SELF_IMPORT_OFF = "Add data is turned off in this Space; an administrator can turn it on (PUT /settings/data {\"selfImport\":true})";
 
     /** Write root 503, then {@code data.self_import} 403. Returns the write root. */
     static Path requireSelfImport(ApiContext api, String what) {
@@ -263,10 +263,10 @@ final class OnboardRoutes implements RouteModule {
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "every columns[] entry needs the draft column's name");
                 if (!known.contains(n)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the draft has no column '" + n + "'");
                 if (m.get("type") != null) {
-                    String t = String.valueOf(m.get("type")).trim().toUpperCase(Locale.ROOT);
-                    if (!OnboardDraft.COLUMN_TYPES.contains(t))
+                    String t = OnboardDraft.statedType(String.valueOf(m.get("type")));
+                    if (t == null)
                         throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "type of '" + n + "' must be one of "
-                                + new java.util.TreeSet<>(OnboardDraft.COLUMN_TYPES));
+                                + new java.util.TreeSet<>(OnboardDraft.COLUMN_TYPES) + " or DECIMAL(p,s), e.g. DECIMAL(18,2) for money");
                     types.put(n, t);
                 }
                 if (m.get("role") != null) {

@@ -35,7 +35,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `DERIVED-DATASET-AUTHORING-1` | P3 | feature | a derived (joined) Dataset cannot be authored from the API or the Handbook: | — |
-| `UPLOAD-DEFAULTS-1` | P3 | defect | upload defaults lose or distort data: | — |
+| `UPLOAD-DEFAULTS-1` | P3 | defect | upload defaults, remainder: | — |
 | `SPACE-CREATE-NAME-1` | P3 | defect | creating a Space ignores name and displayName: | — |
 | `TEMPLATE-GOVERNANCE-1` | P3 | feature | a Space Template carries no governance: | — |
 | — | P2 | feature | SPACE-LINK-CENSUS-1 the link census: the default flip and the plan scope not built | — |

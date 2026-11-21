@@ -28,13 +28,13 @@ the nine-call walkthrough (parse preview → suggest → two `/config/write` →
 | `POST /onboard/files/{draftId}/redraft` | `canUploadData` | the column types and roles the person stated on screen: answers the same draft again around them (below); writes no config |
 | `POST /onboard/files/{draftId}/commit` | `canUploadData` | one confirm: writes, registers, lands, runs once, registers the Dataset; 200 run summary, or 202 above `import.inline_max_bytes` |
 | `GET /onboard/runs/{runId}` | `canUploadData` | follows a 202 run (`running` / `succeeded` / `failed`): the caller's own, or any with `canAdminister` |
-| `POST /datasets/{id}/files?name=[&mode=replace\|append]` | `canUploadData` | **Add a file** to an imported Dataset and run it (replace is the default; append for a Stream only) |
+| `POST /datasets/{id}/files?name=&mode=replace\|append\|period` | `canUploadData` | **Add a file** to an imported Dataset and run it (`mode` is required: a missing or unknown one is 422; append for a Stream only) |
 | `POST /datasets/{id}/run` | `canUploadData` | **Run now**: runs the import Pipeline over what waits in its inbox; on a Postgres snapshot, copies the table again (below) |
 | `PUT /datasets/{id}/columns/{column}` | `canAuthorWorkbench` | one column's Entity Type: `{entityType: id\|null}` or `{classification: X\|null}`; and/or its `role`, a measure's `unit`, and `carried` (`false` keeps a Time, Measure or Category column off the links and the index; LA-COLUMN-ROLES-1) |
 | `GET` / `PUT /settings/data` | open / `canAdminister` | the Space's `data.self_import`: `{selfImport, selfImportDefault, selfImportInForce}` |
 
 **Gate order** for the Add data routes: capability 401/403 → no write root 503 → `data.self_import` off 403 ("Add
-data is turned off in this Space; an administrator can turn it on", `OnboardRoutes.SELF_IMPORT_OFF`) → the route's
+data is turned off in this Space; an administrator can turn it on (PUT /settings/data {"selfImport":true})", `OnboardRoutes.SELF_IMPORT_OFF`; UPLOAD-DEFAULTS-1 added the parenthesis, so the refusal names the setting) → the route's
 own checks. `data.self_import` lives in `data.toon` (a reserved config path: no import may write it); unset = on
 with no sign-in, off with sign-in (`Authenticators.active()`); `/bootstrap` carries the value in force as
 `selfImport`. Rate class: the standard bucket (`OnboardRoutes.isRateLimited`).

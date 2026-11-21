@@ -124,6 +124,46 @@ class ControlApiDecimalColumnTest {
         return out;
     }
 
+    /** UPLOAD-DEFAULTS-1: DECIMAL(p,s) is an opt-in column type; the draft still proposes DOUBLE, and a stated one keeps the cents exactly. */
+    @Test
+    void decimalIsAnOptInColumnTypeThatKeepsTheCentsExactly(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("exact");
+            JsonNode d = data(send(c, "POST", "/onboard/files?name=payments.csv&kind=stream", payments("P", 20, i -> "0.10")), 200);
+            assertEquals("DOUBLE", amountType(d).get("value").asText(), "nothing is inferred as DECIMAL: " + amountType(d));
+            String draftId = d.get("draftId").asText();
+
+            for (String bad : List.of("DECIMAL", "DECIMAL(50,2)", "DECIMAL(5,9)", "DECIMAL(x,2)")) {
+                HttpResponse<String> r = send(c, "POST", "/onboard/files/" + draftId + "/redraft",
+                        "{\"columns\":[{\"name\":\"amount\",\"type\":\"" + bad + "\"}]}");
+                assertEquals(422, r.statusCode(), bad + ": " + r.body());
+                assertTrue(r.body().contains("DECIMAL(p,s)"), r.body());
+            }
+
+            JsonNode stated = data(send(c, "POST", "/onboard/files/" + draftId + "/redraft",
+                    "{\"columns\":[{\"name\":\"amount\",\"type\":\"decimal(18, 2)\"}]}"), 200);
+            assertEquals("DECIMAL(18,2)", amountType(stated).get("value").asText(), amountType(stated).toString());
+            data(send(c, "POST", "/onboard/files/" + draftId + "/commit", "{\"name\":\"" + id + "\"}"), 200);
+
+            // opting into DECIMAL must not turn the money column from a Measure into a Detail
+            JsonNode ds = data(send(c, "GET", "/components/dataset/" + id, null), 200);
+            String role = null;
+            for (JsonNode col : ds.findParents("role"))
+                if ("amount".equals(col.path("name").asText())) role = col.get("role").asText();
+            assertEquals("measure", role, ds.toString());
+
+            List<String> amounts = amounts(c, id);
+            assertEquals(20, amounts.size(), amounts.toString());
+            assertTrue(amounts.stream().allMatch(a -> new java.math.BigDecimal(a).compareTo(new java.math.BigDecimal("0.10")) == 0), amounts.toString());
+            // the JSON number drops a trailing zero, so the type itself is read from what the commit wrote: the Dataset's Schema
+            try (var files = Files.walk(root)) {
+                assertTrue(files.filter(p -> p.getFileName().toString().endsWith("_schema.toon"))
+                                .anyMatch(p -> { try { return Files.readString(p).contains("DECIMAL(18,2)"); } catch (java.io.IOException e) { return false; } }),
+                        "the committed Schema types amount as DECIMAL(18,2)");
+            }
+        }
+    }
+
     @Test
     void amountsWrittenWithDotZeroAreADecimalAndALaterFractionIsKept(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

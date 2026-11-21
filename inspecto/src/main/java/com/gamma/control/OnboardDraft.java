@@ -66,6 +66,26 @@ final class OnboardDraft {
     static final Set<String> COLUMN_TYPES = Set.of("VARCHAR", "BIGINT", "DOUBLE", "DATE", "TIMESTAMP", "TIME", "BOOLEAN");
 
     /**
+     * UPLOAD-DEFAULTS-1: {@code DECIMAL(p,s)} is an opt-in column type for exact money (never inferred: a draft proposes DOUBLE, a person
+     * or an agent states DECIMAL). DuckDB allows precision 1..38 and scale 0..precision.
+     */
+    private static final java.util.regex.Pattern DECIMAL_TYPE = java.util.regex.Pattern.compile("DECIMAL\\((\\d{1,2}),(\\d{1,2})\\)");
+
+    static boolean isDecimal(String type) {
+        if (type == null) return false;
+        java.util.regex.Matcher m = DECIMAL_TYPE.matcher(type.replace(" ", ""));
+        if (!m.matches()) return false;
+        int p = Integer.parseInt(m.group(1)), s = Integer.parseInt(m.group(2));
+        return p >= 1 && p <= 38 && s <= p;
+    }
+
+    /** A column type a person may state: one of {@link #COLUMN_TYPES} or {@code DECIMAL(p,s)}; spaces removed, upper case. */
+    static String statedType(String raw) {
+        String t = raw.replace(" ", "").toUpperCase(Locale.ROOT);
+        return COLUMN_TYPES.contains(t) || isDecimal(t) ? t : null;
+    }
+
+    /**
      * How the sampled values of one column read as {@code type}: how many of the {@code of} non-blank values fit, the
      * strptime {@code format} the most date values are written in (else {@code null}), and one value that does not fit.
      */
@@ -991,7 +1011,7 @@ final class OnboardDraft {
     }
 
     private static String noun(String type) {
-        return NUMBERS.contains(type) ? "numbers" : Words.plural(type);
+        return NUMBERS.contains(type) || isDecimal(type) ? "numbers" : Words.plural(type);
     }
 
     private static String statedEvidence(Fit f) {
