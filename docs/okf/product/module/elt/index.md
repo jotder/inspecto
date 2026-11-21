@@ -37,6 +37,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `AUTHORING-REDESIGN-1` | P3 | feature | Only letter (d) of the authoring redesign is left; no CREATE MACRO exists in any main source. | demand |
 | `PIPELINE-SAVE-HELD-TOAST-1` | P3 | defect | the Pipeline editor says *Saved pipeline '<id>'* and clears its unsaved mark for any 2xx, also when an approval policy held the change (2… | — |
 | `PIPELINE-INBOX-FIELD-1` | P3 | feature | the Pipeline editor has no field for a Pipeline's inbox folder (dirs.poll), and the Collectors page lists Collectors but cannot create one; | — |
+| `LOOKUP-1` | P2 | feature | Lookup: exact and best-match key resolution over a Reference Dataset (longest prefix, range, as-of, fuzzy), a batch engine and a row-at-a… | — |
 | — | P3 | feature | Step Processor catalog | — |
 | `QUARANTINE-RELEASE-1` | P3 | feature | a quarantined file has no console action: the Quarantine tab lists files per Pipeline (no run, Consignment or time) and offers only *View… | — |
 | `OUTPUT-NAME-OVERWRITE-1` | P3 | defect | A second file with the same file name silently replaces the first file's rows, on any Pipeline (filed 2026-11-20, BASIC-ELT-PROFILE-1 B3… | — |
