@@ -123,7 +123,7 @@ class ChangePointDuckDbParityTest {
         Matcher m = Pattern.compile("(?m)^derived_sql: \"(.*)\"\s*$").matcher(Files.readString(VIEW, StandardCharsets.UTF_8));
         assertTrue(m.find(), "derived_sql in " + VIEW);
         String shipped = m.group(1);
-        String anchor = "ROUND(1000.0 + 2.0 * t";
+        String anchor = "CAST(CAST(1000.0 + 2.0 * t";
         assertTrue(shipped.contains(anchor));
         int[] totals = new int[3];                     // band breaches, regime changes, drifts over all variants
         for (String extra : new String[] {"0.0", "CASE WHEN t >= 100 THEN 300.0 ELSE 0.0 END",

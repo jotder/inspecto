@@ -168,8 +168,8 @@ twin the kernel's parity test holds equal bit for bit, so a score in the output 
 - **Normalize first** (default on): accents stripped (canonical decomposition, marks removed), lower-cased, runs of
   spaces, tabs and line breaks collapsed to one space, ends trimmed — on both sides. No transliteration: `Müller` becomes
   `muller`, not `mueller`.
-- ⚠ DuckDB's string functions count **UTF-8 bytes**: an accented letter left in place (normalize off) counts as two
-  characters. Normalizing first removes the common case.
+- DuckDB's similarity functions count **code points** since 2.0.1 (2.0.0 counted UTF-8 bytes, so an accented letter
+  counted as two). Normalizing still folds `é` to `e` and case before scoring.
 - A value that is empty (NULL) on either side gives an empty score and flag; a blank text scores 0. A non-text column is
   compared as its text.
 - **Length cap — 1,000 characters per value** (`SimilarityStep.MAX_TEXT_LENGTH`, measured on the raw text before

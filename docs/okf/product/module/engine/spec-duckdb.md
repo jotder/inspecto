@@ -21,5 +21,5 @@ The engine embeds DuckDB natively (requires the `--enable-native-access=ALL-UNNA
 
 This page is split by topic into 2 parts; each part lists the sections it holds.
 
-1. **[DuckDB 2.0.0.0, the pinned version](spec-duckdb-version-pin.md)** — DuckDB 2.0.0.0 (pinned 2026-10-23, `DUCKDB-2-MIGRATION-1`)
+1. **[DuckDB 2.0.1.0, the pinned version](spec-duckdb-version-pin.md)** — DuckDB 2.0.1.0 LTS (pinned 2026-11-21) on top of the 2.0.0.0 migration (`DUCKDB-2-MIGRATION-1`)
 2. **[Sealed connections, time zones and aggregate state](spec-duckdb-connections-state.md)** — Every ingest connection is sealed (`SEC-INGEST-EXPR-EXTERNAL-ACCESS-1`, 2026-09-30) · Every in-memory scratch connection is sealed by default (`ENGINE-INMEMORY-UNSEALED-1`, 2026-10-03) · The source time zone for temporal data · Aggregate state cannot be persisted and restored (§7.5 probe)

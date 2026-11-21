@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.gamma.util.DuckDbUtil;
 import com.gamma.util.SqlIdent;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -22,14 +21,14 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 /**
- * JVM ↔ DuckDB 1.5.6 parity for the similarity kit (ANALYTICS-CORE-1 S1). What DuckDB's built-ins compute, as found:
+ * JVM ↔ DuckDB 2.0.1 parity for the similarity kit (ANALYTICS-CORE-1 S1). What DuckDB's built-ins compute, as found:
  *
  * <ul>
- *   <li>{@code jaro_similarity} / {@code jaro_winkler_similarity} = {@link JaroWinkler#DUCKDB}: UTF-8 <b>bytes</b>,
+ *   <li>{@code jaro_similarity} / {@code jaro_winkler_similarity} = {@link JaroWinkler#DUCKDB}: <b>code points</b> (2.0.0: UTF-8 bytes),
  *       half-transpositions rounded down, p = 0.1, prefix up to 4, boost above 0.7; empty → 0. Bit for bit.</li>
- *   <li>{@code levenshtein} = {@link Similarity#levenshtein} over {@link TextUnit#UTF8_BYTE} (é ↔ e costs 2).</li>
- *   <li>{@code jaccard(s1, s2)} is <b>not</b> a token Jaccard: it is the Jaccard of the two strings' sets of UTF-8
- *       bytes, case-sensitive, and it RAISES on an empty argument. The kit's token Jaccard is built from list
+ *   <li>{@code levenshtein} = {@link Similarity#levenshtein} over {@link TextUnit#CODE_POINT} (é ↔ e costs 1; 2 up to 2.0.0).</li>
+ *   <li>{@code jaccard(s1, s2)} is <b>not</b> a token Jaccard: it is the Jaccard of the two strings' sets of code
+ *       points (UTF-8 bytes up to 2.0.0), case-sensitive, and it RAISES on an empty argument. The kit's token Jaccard is built from list
  *       functions instead ({@link SimilaritySql.Method#TOKEN_JACCARD}).</li>
  *   <li>{@code strip_accents} + {@code lower} = {@link Similarity#normalize} except on code points newer than DuckDB's
  *       Unicode tables.</li>
@@ -93,7 +92,7 @@ class SimilarityDuckDbParityTest {
                 String tag = "'" + p[0] + "' / '" + p[1] + "'";
                 assertEquals(JaroWinkler.DUCKDB.jaro(p[0], p[1]), rs.getDouble(2), 0.0, tag + " jaro_similarity");
                 assertEquals(JaroWinkler.DUCKDB.similarity(p[0], p[1]), rs.getDouble(3), 0.0, tag + " jaro_winkler_similarity");
-                assertEquals(Similarity.levenshtein(p[0], p[1], TextUnit.UTF8_BYTE), rs.getLong(4), tag + " levenshtein");
+                assertEquals(Similarity.levenshtein(p[0], p[1], TextUnit.CODE_POINT), rs.getLong(4), tag + " levenshtein");
                 int col = 5;
                 for (SimilaritySql.Method m : SimilaritySql.Method.values())
                     assertEquals(m.score(p[0], p[1]), rs.getDouble(col++), 0.0, tag + " " + m);
@@ -111,17 +110,17 @@ class SimilarityDuckDbParityTest {
         assertEquals(scalar("SELECT jaro_winkler_similarity('martha', 'marhta')"), Similarity.jaroWinkler("martha", "marhta"), 0.0);
         // an odd count: the built-in floors h
         assertNotEquals(scalar("SELECT jaro_similarity('abcdef', 'bcadef')"), Similarity.jaro("abcdef", "bcadef"));
-        // a non-ASCII letter: the built-in counts bytes
-        assertEquals(2.0, scalar("SELECT levenshtein('é', 'e')"));
+        // a non-ASCII letter: since 2.0.1 the built-in counts code points, as the kit does (2.0.0 counted bytes: 2)
+        assertEquals(1.0, scalar("SELECT levenshtein('é', 'e')"));
         assertEquals(1, Similarity.levenshtein("é", "e"));
     }
 
     @Test
-    void duckDbsJaccardIsAByteSetJaccardThatRaisesOnEmpty() throws Exception {
+    void duckDbsJaccardIsACodePointSetJaccardThatRaisesOnEmpty() throws Exception {
         for (String[] p : corpus()) {
             if (p[0].isEmpty() || p[1].isEmpty()) continue;
             double duck = scalar("SELECT jaccard(" + SqlIdent.sqlStr(p[0]) + ", " + SqlIdent.sqlStr(p[1]) + ")");
-            assertEquals(Similarity.jaccard(bytes(p[0]), bytes(p[1])), duck, 0.0, p[0] + " / " + p[1]);
+            assertEquals(Similarity.jaccard(codePoints(p[0]), codePoints(p[1])), duck, 0.0, p[0] + " / " + p[1]);
         }
         SQLException e = assertThrows(SQLException.class, () -> scalar("SELECT jaccard('', 'a')"));
         assertTrue(e.getMessage().contains("too short"), e.getMessage());
@@ -171,9 +170,9 @@ class SimilarityDuckDbParityTest {
                 }
     }
 
-    private static Set<Integer> bytes(String s) {
+    private static Set<Integer> codePoints(String s) {
         Set<Integer> out = new HashSet<>();
-        for (byte b : s.getBytes(StandardCharsets.UTF_8)) out.add(b & 0xFF);
+        s.codePoints().forEach(out::add);
         return out;
     }
 

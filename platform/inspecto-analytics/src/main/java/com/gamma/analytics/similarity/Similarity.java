@@ -42,7 +42,7 @@ public final class Similarity {
         return levenshtein(a, b, TextUnit.CODE_POINT);
     }
 
-    /** Levenshtein distance over the given unit; {@link TextUnit#UTF8_BYTE} = DuckDB's {@code levenshtein}. */
+    /** Levenshtein distance over the given unit; {@link TextUnit#CODE_POINT} = DuckDB 2.0.1's {@code levenshtein} (2.0.0: {@link TextUnit#UTF8_BYTE}). */
     public static int levenshtein(String a, String b, TextUnit unit) {
         return distance(unit.of(a), unit.of(b));
     }

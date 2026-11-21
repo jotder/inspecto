@@ -139,7 +139,7 @@ notification interfaces stay in `inspecto-engine`; the webhook and SMTP transpor
 |---|---|---|
 | Language and runtime | Java 27 (`maven.compiler.release` = 27) | root `pom.xml` |
 | Build | Maven multi-module reactor, version `4.0.0-SNAPSHOT` | root `pom.xml` |
-| Analytical engine | Embedded DuckDB, JDBC driver `2.0.0.0` | `duckdb.version` |
+| Analytical engine | Embedded DuckDB, JDBC driver `2.0.1.0` | `duckdb.version` |
 | Configuration format | TOON through JToon `1.0.9` | `jtoon.version` |
 | HTTP | JDK `HttpServer`; default port 8080 (`-Dcontrol.port`) | `ControlApi` |
 | Operational DB (optional) | PostgreSQL driver `42.7.12`, HikariCP `6.3.0` | root `pom.xml` |
