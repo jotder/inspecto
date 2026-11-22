@@ -11,6 +11,8 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, copyFileSync, readd
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stripPauses, parseOverlays, captionCues, toSrt, chaptersMeta, accentFor, introCardFilters, storyCardFilters, caseFileFilters, markLook } from './la-video-present.mjs';
+import { beatFor, familyOf, mixPlan, masterFilmAudio } from './la-video-mix.mjs';
+import { audioGate, uiSoundEnabled } from './la-video-audio.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const defaultScripts = 'docs/okf/product/module/la-core/brochure-video-demo-scripts.md';
@@ -30,7 +32,9 @@ const caseFilm = argv.includes('--case-film');                      // shorthand
 const captions = argv.includes('--captions') || caseFilm;           // burned-in captions plus the sidecar .srt
 const srtOnly = argv.includes('--srt');                             // the sidecar .srt without burning
 const chapters = argv.includes('--chapters') || caseFilm;           // one MP4 chapter per scene
-const noUiSound = argv.includes('--no-ui-sound');                   // consumed by the audio builders (see the TODO at the audio step)
+const noUiSound = !uiSoundEnabled(argv);                            // --no-ui-sound: no soft tick on the impact marks (only under --case-film)
+// --case-film also switches the audio to the v2 stack (tools/la-video-voice.mjs sayV2 per-scene pace and [pause N], tools/la-video-audio.mjs:
+// -16 LUFS master, ambient bed under the cards, ducking, ticks, and the audio gate); without it the audio is the training series' as before.
 if (!name) { console.error('usage: render-la-demo-video.mjs <name> [--scenario s] [--reuse]'); process.exit(2); }
 
 function findFfmpeg() {
@@ -72,6 +76,7 @@ const scenes = hs.map((h, k) => {
     voice: (body.match(/^- Voice:[ \t]*(.*)$/m)?.[1] ?? '').trim(),   // as written, [pause N] markers included
     overlays: parseOverlays(body),
     chip: (body.match(/^- Chip:[ \t]*(.*)$/m)?.[1] ?? '').replace(/[*`]/g, '').trim(),
+    beat: (body.match(/^- Beat:[ \t]*(\w+)/m)?.[1] ?? '').trim(),       // pace profile of the scene: cold | steady | reveal | close
     notes: [...body.matchAll(/^- Note:[ \t]*(\{.*\})$/gm)].map((m) => JSON.parse(m[1])),
   };
 });
@@ -79,20 +84,24 @@ const scenes = hs.map((h, k) => {
 const work = join(outRoot, '_work', name);
 mkdirSync(work, { recursive: true });
 const takeDir = join(outRoot, '_live', takeName);
-const PRE = 0.5, TAIL = 0.7;
+// the training voice file has no padding (the renderer adds PRE before and TAIL after); a case-film voice file (sayV2) carries its own
+// 0.35 s lead-in and 0.5 s tail, so its length is the scene length and the audio is not delayed again
+const PRE = caseFilm ? 0.35 : 0.5, TAIL = caseFilm ? 0.5 : 0.7;
+const WAV_PADDED = caseFilm;
 
 // ---------- 1 + 2: voice, then a take paced by it ----------
 if (!reuse) {
   if (!retake) {
-  // [pause N] markers are an instruction for the voice tool (lane VOICE, plan section 4.1): hand them over only when
-  // tools/la-video-voice.mjs understands them, otherwise the engine would read the marker aloud
-  const voiceKnowsPauses = /\[pause/i.test(readFileSync(join(root, 'tools/la-video-voice.mjs'), 'utf8'));
-  writeFileSync(join(work, 'items.json'), JSON.stringify(scenes.map((s) => ({ file: join(work, `${s.id}.wav`), text: voiceKnowsPauses ? s.voice : stripPauses(s.voice) }))), 'utf8');
+  // [pause N] markers are an instruction for the v2 voice (sayV2, plan section 4.1): a case film hands them over with the scene's beat;
+  // a training render uses the legacy voice, which would read the marker aloud, so they are stripped
+  writeFileSync(join(work, 'items.json'), JSON.stringify(scenes.map((s, i) => (caseFilm
+    ? { file: join(work, `${s.id}.wav`), text: s.voice, v2: true, beat: beatFor(s, i, scenes.length) }
+    : { file: join(work, `${s.id}.wav`), text: stripPauses(s.voice) }))), 'utf8');
   // the series voice (tools/la-video-voice.mjs: local Piper, warm female, D-TR1); --voice windows keeps the old SAPI voice
   if (opt('--voice', 'piper') === 'piper') run('node', [join(root, 'tools/la-video-voice.mjs'), join(work, 'items.json')]);
   else run('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', join(root, 'tools/la-video-tts.ps1'), '-Items', join(work, 'items.json'), '-Voice', voice, '-Rate', rate]);
   const timing = {};
-  for (const s of scenes) timing[s.id] = +(PRE + duration(join(work, `${s.id}.wav`)) + TAIL).toFixed(2);
+  for (const s of scenes) timing[s.id] = +((WAV_PADDED ? 0 : PRE + TAIL) + duration(join(work, `${s.id}.wav`))).toFixed(2);
   writeFileSync(join(work, 'timing.json'), JSON.stringify(timing, null, 1));
   console.log('voice lengths', JSON.stringify(timing));
   }
@@ -148,7 +157,7 @@ const wExpr = (z) => { const e = 0.9; const m = `min(clip((t-${z.t0})/${e},0,1),
 
 const clipFiles = [];
 let storyItems = null;      // the story card ("Who is who") stays from a "- Story:" line until a "- Story: off"
-const srtCues = [], chapterList = [];
+const srtCues = [], chapterList = [], mixClips = [];
 let tAcc = 0;               // start of the current clip in the final film
 scenes.forEach((s, i) => {
   const { take, start } = at[s.id];
@@ -200,27 +209,35 @@ scenes.forEach((s, i) => {
     fc += `;[v]subtitles=cap_${s.id}.srt:force_style='FontName=Arial,FontSize=9,PrimaryColour=&H00FFFFFF,BackColour=&H99000000,BorderStyle=3,Outline=3,Shadow=0,MarginV=14,Alignment=2'[vs]`;
     vOut = '[vs]';
   }
-  fc += `;[1:a]adelay=${Math.round(PRE * 1000)}:all=1,apad[a]`;
-  // TODO(plan 2026-11-19-la-case-videos-v2 P2, lane VOICE): when tools/la-video-audio.mjs exists, master this clip's voice to -16 LUFS,
-  // lay the ambient bed under the intro and case-file cards with ducking, and add the soft impact tick unless noUiSound. Until then the
-  // clip audio is the voice as before (the training renders are unchanged), and the flags are only parsed.
+  // a case-film voice file already carries its lead-in; the film's audio is mastered, bedded and ticked after the clips are joined
+  fc += `;[1:a]adelay=${WAV_PADDED ? 0 : Math.round(PRE * 1000)}:all=1,apad[a]`;
   const out = join(work, `clip_${s.id}.mp4`);
   ff([...inputs, '-filter_complex', fc, '-map', vOut, '-map', '[a]', '-t', L.toFixed(3), '-r', '30', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '19', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-b:a', '160k', '-ar', '44100', '-ac', '1', out], work);
   clipFiles.push(`file 'clip_${s.id}.mp4'`);
   const clipLen = duration(out);   // the real length of the clip: SRT times and chapters follow the film, not the plan
   for (const c of cues) srtCues.push({ ...c, start: +(c.start + tAcc).toFixed(3), end: +(c.end + tAcc).toFixed(3) });
   chapterList.push({ title: s.title, startSec: tAcc, endSec: tAcc + clipLen });
+  mixClips.push({ t0: tAcc, length: clipLen, voiceStart: tAcc + PRE, voiceLen, introSecs: s.overlays.intro ? 4 : 0,
+    cardSecs: cardSpec && !s.overlays.intro ? (cardSpec.secs ?? 4) : 0, casefile: !!s.overlays.casefile,
+    ticks: computed.map((c) => tAcc + c.t0) });
   tAcc += clipLen;
   console.log(`  ${s.id} ${s.title}: ${L.toFixed(1)}s, ${notes.length} notes${speed > 1 ? `, footage x${speed.toFixed(1)}` : ''}`);
 });
 writeFileSync(join(work, 'clips.txt'), clipFiles.join('\n') + '\n');
 const final = join(outRoot, `${name}.mp4`);
+const joined = caseFilm ? join(work, 'film_narration.mp4') : final;   // a case film is joined first, its audio mastered after
 if (chapters) {   // one chapter per scene, from the real clip lengths
   writeFileSync(join(work, 'chapters.txt'), chaptersMeta(chapterList), 'utf8');
-  ff(['-f', 'concat', '-safe', '0', '-i', 'clips.txt', '-i', 'chapters.txt', '-map', '0', '-map_metadata', '1', '-c', 'copy', final], work);
-} else ff(['-f', 'concat', '-safe', '0', '-i', 'clips.txt', '-c', 'copy', final], work);
+  ff(['-f', 'concat', '-safe', '0', '-i', 'clips.txt', '-i', 'chapters.txt', '-map', '0', '-map_metadata', '1', '-c', 'copy', joined], work);
+} else ff(['-f', 'concat', '-safe', '0', '-i', 'clips.txt', '-c', 'copy', joined], work);
 if (srtCues.length) { writeFileSync(join(outRoot, `${name}.srt`), toSrt(srtCues), 'utf8'); console.log(`  captions: ${srtCues.length} cues → ${name}.srt${captions ? ' (burned in too)' : ''}`); }
 if (chapters) console.log(`  chapters: ${chapterList.length}`);
-if (noUiSound) console.log('  --no-ui-sound given (applies once the audio builders are wired)');
+if (caseFilm) {   // the v2 audio stage (plan section 4.2): -16 LUFS master, ambient bed under the cards with ducking, soft ticks, then the gate
+  const plan = mixPlan(mixClips);
+  masterFilmAudio({ film: joined, out: final, work, seconds: tAcc, family: familyOf(name), plan, ui: !noUiSound });
+  const gate = audioGate(final, { cards: plan.cards });
+  console.log(`  audio gate: ${gate.ok ? 'PASS' : 'FAIL'}  ${gate.lufs} LUFS, true peak ${gate.truePeak} dB, ${gate.silences.length} silence(s) over 2.5 s${noUiSound ? ', no ticks' : ', ticks on ' + plan.ticks.length + ' marks'}`);
+  if (!gate.ok) { for (const p of gate.problems) console.error('  audio gate: ' + p); throw new Error('the audio gate failed, see above (the film is at ' + final + ')'); }
+}
 const total = duration(final);
 console.log(`${name} → ${final} (${Math.floor(total / 60)}:${String(Math.round(total % 60)).padStart(2, '0')})`);

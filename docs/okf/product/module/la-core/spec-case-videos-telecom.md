@@ -260,10 +260,13 @@ fifty").
 
 ### S01 · Cold open · ~25 s
 - Voice: A customer calls. Her wallet is empty. Two hours earlier, her number was moved to a new SIM, and she did not ask for it. [pause 0.6] A SIM swap is a routine request, so who made this one? By Friday there are thirty customers with the same story.
-- Action: cold open over the Telecom Space's home page; at 0:20 the intro card ("Case file · Forty swaps, one login · Telecom · Standard").
+- Action: cold open over the Telecom Space's home page; the intro card opens the next scene ("Case file · Forty swaps, one login · Telecom Space · Standard").
 - Impact: none.
 
 ### S02 · Three files, no single answer · ~30 s
+- Beat: steady
+- Intro: Forty swaps, one login | Telecom Space
+- Story: a login = a staff account that can request a SIM swap | a swapped number = a customer's number moved to a new SIM | a new handset = the phone the number was moved to
 - Voice: The swap is in one file, the staff login in another, the wallet payments in a third. [pause 0.5] Each file is clean on its own. A login is a staff member's account that can request a swap, and most swaps are honest. Only the links put a swap and an empty wallet on one line.
 - Action: story card "Who is who": *a login*, *a swapped number*, *a new handset*; the saved view opens behind it.
 - Impact: the story card names the roles.
@@ -287,7 +290,9 @@ fifty").
 - Impact: grey "ruled out" marker on S-72, yellow on S-41.
 
 ### S06 · Forty swaps, thirty in ten days · ~45 s
-- Voice: Start from the second name. The graph draws S-41 with forty numbers around it, and each one was swapped by this login. [pause 0.5] Now expand one degree. The six new handsets appear, HS-08913 to HS-08918, and the wallets that were used from them. A customer who lost a phone does not do that. A person working down a list does.
+- Beat: reveal
+- Story: off
+- Voice: Start from the second name. The graph draws S-41 with forty numbers around it, and each one was swapped by this login. [pause 0.5] Now expand one degree. The six new handsets appear, HS-08913 to HS-08918, and the wallets that were used from them. A customer who lost a phone does not do that. A person working down a list does. [pause 0.4] Six new handsets carry thirty numbers in ten days.
 - Chip: Start from these · Expand · G
 - Action: Busiest nodes ▸ S-41 *Start from these* ▸ close the notice ▸ G ▸ *The whole graph* ▸ Expand ▸ hold on the swaps and the handsets. `[checked live: the first view draws 1 entity and 40 linked nodes; the first expand adds 11 nodes and 52 links, the six handsets HS-08913..HS-08918 among them; the Expand panel says the Dataset has no link index yet]`
 - Impact: before/after hold: the swaps and the handsets appear around S-41; mark the six handsets.
@@ -299,7 +304,7 @@ fifty").
 - Impact: mark the five mules and the two agents; before/after hold for the dock.
 
 ### S08 · Make it defensible · ~70 s
-- Voice: The lead has to survive a challenge, so it becomes an Investigation. Open SIM-swap wallet takeover. [pause 0.5] Its step log lists every step in order, with who took it and why, and nobody can edit a row afterwards. The members page shows the reviewer and the manager as the second pair of eyes: a big expand waits for their approval. And the Dossier packs the whole case with a seal, so anyone can verify that nothing changed. We only look here. Nothing is approved or sealed in this film.
+- Voice: The lead has to survive a challenge, so it becomes an Investigation. Open SIM-swap wallet takeover. [pause 0.5] The step log lists every step in order, with who took it and why, and nobody can edit a row afterwards. Replay runs the whole log again and says whether every step still gives the same result. One note records what the analyst found: thirty SIMs swapped through this login in ten days. [pause 0.5] The members page shows who is on the case. The reviewer and the manager are the second pair of eyes: a big expand waits for their approval, so the largest steps are always seen by two people. Reviewers read, and only a lead changes the steps. [pause 0.5] And the Dossier packs the Investigation, its steps and its rows, with a seal over every piece, so anyone can verify that nothing changed. We only look here. Nothing is approved or sealed in this film.
 - Chip: Step log · Members · Build Dossier
 - Action: File ▸ Open… ▸ Investigations ▸ *SIM-swap wallet takeover* ▸ Step log ▸ Investigation actions ▸ Members… ▸ Settings ▸ Investigation settings ▸ hold on the Dossier fold, do not build. `[checked live: the step log rows Start, Annotation 3 ("30 SIMs swapped through this login between 2026-06-08 and 2026-06-17"), Members: analyst lead owner, reviewer, manager, admin lead]`
 - Impact: mark a step row, the held-request line and the verified line.
@@ -311,6 +316,7 @@ fifty").
 - Impact: mark the list row.
 
 ### S10 · The case file · ~25 s
+- Casefile: Lead: one login, five wallets, two agents | Evidence: thirty swaps in ten days, each followed by a drained wallet | Next: suspend the login's swap right; freeze the five mule wallets; ask the two agents for the cash-out records | Try it: press Busiest nodes and start from the second name
 - Voice: The case file. Lead: one login, five wallets, two agents. Evidence: thirty swaps in ten days, each followed by a drained wallet. Next step: suspend, freeze, trace. [pause 0.6] A swap alone was routine. A payment alone was routine. The links joined them. The same steps run on millions of records and answer in moments. Try it: start from the second name in Busiest nodes.
 - Action: case-file card (8 s) and the outro "Next: Teams and four-eyes · training F5".
 - Impact: none.

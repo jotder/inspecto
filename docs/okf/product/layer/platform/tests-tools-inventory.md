@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-124 test file(s). Run one, or all:
+125 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -93,6 +93,7 @@ node --test tools/
 | `tools/la-demo-smoke.test.mjs` | Unit test for the pure assertion helpers of tools/la-demo-smoke.mjs, plus a stub-server run. node --test tools/la-demo-smoke.test.mjs |
 | `tools/la-mm-smoke.test.mjs` | node --test tools/la-mm-smoke.test.mjs  -  the pure verdicts of the mobile-money smoke runner, plus a dry run (no server). |
 | `tools/la-video-audio.test.mjs` | node --test tools/la-video-audio.test.mjs - the audio builders and parsers (ffmpeg is run only for the short smoke tests). |
+| `tools/la-video-mix.test.mjs` | node --test tools/la-video-mix.test.mjs - the seams between the case-film renderer and the audio stack. |
 | `tools/la-video-present.test.mjs` | node --test tools/la-video-present.test.mjs - the pure presentation helpers of the v2 case films. |
 | `tools/la-video-voice.test.mjs` | node --test tools/la-video-voice.test.mjs - the v2 lexicon, pace markers and pause parsing (no Piper needed). |
 | `tools/la_gen_io.test.mjs` | Unit test of tools/la_gen_io.py, the safe output helper of the gen-la-*-data.py generators (LA-GENERATOR-DELETE-FIRST-1). |
