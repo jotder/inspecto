@@ -377,6 +377,34 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
     refuses impossible settings with `JOIN_KEYED_INVALID` (a keyed setting without `key`, `exact_when` with `exact`,
     an unknown `duplicates`, `first`/`last` without `order_by`, several `on` with an `as` lacking `{on}`); whether
     the named columns exist is checked when it runs.
+  - **`filter`** (since 2026-11-22, `LOOKUP-1` P1c, every keyed mode) — an SQL condition on Reference columns; only the
+    rows meeting it take part (one table holding several rate kinds: `filter: "lookup_key = 'SDR_RATE'"`).
+- **`match: range` (since 2026-11-22, `LOOKUP-1` P1c)** — a value matches the Reference row whose period holds it.
+  It is keyed by `from:` / `to:` (Reference columns, either may be omitted), not `key:`.
+  ```toon
+  - join:
+      reference: reference/service_range
+      match: range
+      from: valid_from                            # inclusive; an empty value = no start
+      to: valid_to                                # inclusive; an empty value = no end (the current rate)
+      filter: "lookup_key = 'SDR_RATE'"
+      on[1]: CALL_DATE
+      columns[1]: lookup_output
+      as: "SDR_"
+      duplicates: last                            # overlapping periods: refuse (default) | first | last
+      order_by: valid_from
+  ```
+  - Values compare in their **own type** — a date as a date, a number as a number (`10` is above `9`), not as text
+    the way `exact` / `longest_prefix` compare. Bound the columns to real dates in the Reference's schema: a text
+    date such as `dd/MM/yy` never orders correctly. Against a **`DATE` bound the value is compared as a date**: a call
+    at `10:30` on a period's last day is inside it, and a value that is no date matches nothing (no error).
+  - **Overlapping periods** make the match ambiguous. `duplicates: refuse` stops the run, naming two overlapping
+    periods; `first` / `last` keep, per value, the matching row ordered by `order_by`. Because bounds are inclusive,
+    `[1 Jan – 31 Jan]` and `[31 Jan – 28 Feb]` overlap on 31 Jan. A date that does not exist (`31/06/26`) parses as
+    empty and becomes an open end — which then overlaps every later period, so `refuse` finds it.
+  - A value in no period (a gap) or a NULL value matches nothing; `default` fills it as in the other keyed modes.
+    Each distinct value is resolved once, then joined back per `on` column.
+  - Save refuses `match: range` without `from`/`to`, with `key`, and `from`/`to` on any other match (`JOIN_KEYED_INVALID`).
 - **`reference` is autocomplete with real suggestions, never a hard constraint:**
   `referenceOptionLoader()` (`entity-option-loaders.ts`) calls `CatalogService.references()`
   (backed by `GET /catalog/references`, `CatalogRoutes.java`) and maps results to

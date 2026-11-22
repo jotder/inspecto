@@ -360,6 +360,21 @@ class PipelineValidatorTest {
         }
     }
 
+    /** LOOKUP-1 P1c: a range join needs its bounds, takes no key, and bounds belong to range only. */
+    @Test
+    void aRangeJoinsImpossibleSettingsAreRefusedAtValidation() {
+        Map<String, Object> ok = new java.util.LinkedHashMap<>(Map.of("reference", "reference/rates", "match", "range",
+                "from", "valid_from", "to", "valid_to", "on", "call_date", "filter", "lookup_key = 'SDR'"));
+        assertFalse(codes(PipelineValidator.validate(joinGraph(ok))).contains(PipelineValidator.JOIN_KEYED_INVALID));
+        for (Map<String, Object> bad : List.<Map<String, Object>>of(
+                without(without(ok, "from"), "to"),                     // range with no bounds
+                with(ok, "key", "lookup_key"),                          // range with a key
+                with(with(ok, "match", "exact"), "key", "lookup_key"))) { // bounds on an exact join
+            PipelineValidator.Result r = PipelineValidator.validate(joinGraph(bad));
+            assertTrue(codes(r).contains(PipelineValidator.JOIN_KEYED_INVALID), () -> bad + " → " + r.issues());
+        }
+    }
+
     private static PipelineGraph joinGraph(Map<String, Object> cfg) {
         return new PipelineGraph("keyed", true, List.of(new PipelineNode("j", "transform.join", cfg, null)), List.of());
     }

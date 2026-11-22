@@ -653,6 +653,154 @@ class RowShaperTest {
         assertThrows(IllegalArgumentException.class, () -> keyedJoin(keyedCfg("on", List.of("nope"))));
     }
 
+    // ── join match: range (LOOKUP-1 P1c) ─────────────────────────────────────────
+    // A synthetic rate table shaped like a telco service-range dimension: a kind, a rate, a validity period.
+
+    private void seedRates() throws SQLException {
+        sql("CREATE TABLE rates AS SELECT * FROM (VALUES"
+                + " ('SDR', '610.5', DATE '2020-01-01', DATE '2022-01-31'),"
+                + " ('SDR', '612.7', DATE '2022-02-01', DATE '2022-02-28'),"
+                + " ('TAX', '1.41',  DATE '2021-12-20', NULL),"                  // another kind, open-ended
+                + " ('SDR', '812.4', DATE '2026-08-01', NULL)"                    // the current rate, open-ended
+                + ") t(lookup_key, lookup_output, valid_from, valid_to)");
+        sql("CREATE TABLE calls AS SELECT * FROM (VALUES"
+                + " (1, DATE '2021-06-15'), (2, DATE '2022-02-01'), (3, DATE '2022-02-28'),"
+                + " (4, DATE '2023-05-01'), (5, DATE '2027-01-01'), (6, NULL)"
+                + ") t(id, call_date)");
+    }
+
+    private Map<Integer, String> rateJoin(Map<String, Object> extra) throws SQLException {
+        Map<String, Object> cfg = new java.util.LinkedHashMap<>(Map.of("reference", "r", "match", "range",
+                "from", "valid_from", "to", "valid_to", "on", "call_date",
+                "columns", List.of("lookup_output"), "as", "sdr_"));
+        cfg.putAll(extra);
+        String id = "r" + (++keyedJoins);
+        var out = new RelationByRel(RowShaper.shape(conn, PipelineNode.of(id, "transform.join", cfg), "calls", id,
+                (c, name) -> "rates"));
+        Map<Integer, String> byId = new java.util.TreeMap<>();
+        lastRangeRows = 0;
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT id, sdr_lookup_output FROM \"" + out.table(PipelineRel.DATA) + "\"")) {
+            while (rs.next()) { byId.put(rs.getInt(1), rs.getString(2)); lastRangeRows++; }
+        }
+        return byId;
+    }
+
+    /** Rows the last {@link #rateJoin} wrote — the map above keys by id, so it cannot see a repeated row. */
+    private int lastRangeRows;
+
+    @Test
+    void aTimestampOnARangesLastDayMatchesAndATextValueMatchesNothing() throws Exception {
+        seedRates();
+        sql("CREATE OR REPLACE TABLE calls AS SELECT * FROM (VALUES"
+                + " (1, TIMESTAMP '2022-02-28 10:30:00'), (2, TIMESTAMP '2022-02-01 00:00:00'),"
+                + " (3, TIMESTAMP '2022-03-01 00:00:01')) t(id, call_date)");
+        Map<Integer, String> got = rateJoin(Map.of("filter", "lookup_key = 'SDR'"));
+        assertEquals("612.7", got.get(1), "10:30 on the last day of a DATE range is inside it");
+        assertEquals("612.7", got.get(2));
+        assertNull(got.get(3), "the next day is outside");
+        sql("CREATE OR REPLACE TABLE calls AS SELECT * FROM (VALUES (1, 'not a date'), (2, '2021-06-15')) t(id, call_date)");
+        Map<Integer, String> text = rateJoin(Map.of("filter", "lookup_key = 'SDR'"));
+        assertNull(text.get(1), "a value that is no date matches nothing — no raw error");
+        assertEquals("610.5", text.get(2), "an ISO date in text still reads as a date");
+    }
+
+    @Test
+    void rangesThatTouchOnOneDayOverlapBecauseBoundsAreInclusive() throws Exception {
+        sql("CREATE TABLE rates AS SELECT * FROM (VALUES ('A', DATE '2022-01-01', DATE '2022-01-31'),"
+                + " ('B', DATE '2022-01-31', DATE '2022-02-28')) t(lookup_output, valid_from, valid_to)");
+        sql("CREATE TABLE calls AS SELECT * FROM (VALUES (1, DATE '2022-01-31')) t(id, call_date)");
+        var e = assertThrows(IllegalArgumentException.class, () -> rateJoin(Map.of()));
+        assertTrue(e.getMessage().contains("overlap") && e.getMessage().contains("2022-01-31"), e.getMessage());
+        // the same pair in the other row order exercises the other side of the symmetric check
+        sql("CREATE OR REPLACE TABLE rates AS SELECT * FROM (VALUES ('B', DATE '2022-01-31', DATE '2022-02-28'),"
+                + " ('A', DATE '2022-01-01', DATE '2022-01-31')) t(lookup_output, valid_from, valid_to)");
+        assertThrows(IllegalArgumentException.class, () -> rateJoin(Map.of()), "touching, listed later-first");
+        sql("UPDATE rates SET valid_from = DATE '2022-02-01' WHERE lookup_output = 'B'");
+        assertEquals("A", rateJoin(Map.of()).get(1), "end and next start on consecutive days do not overlap");
+    }
+
+    @Test
+    void filterLimitsTheReferenceRowsInExactAndPrefixModesToo() throws Exception {
+        sql("CREATE TABLE codes AS SELECT * FROM (VALUES ('44', 'UK', 'old'), ('44', 'United Kingdom', 'new'),"
+                + " ('4477', 'UK mobile', 'old')) t(code, label, era)");
+        sql("CREATE TABLE nums AS SELECT * FROM (VALUES (1, '44'), (2, '447700')) t(id, num)");
+        for (String match : List.of("exact", "longest_prefix")) {
+            Map<String, Object> cfg = Map.of("reference", "r", "key", "code", "match", match, "on", "num",
+                    "columns", List.of("label"), "as", "c_", "filter", "era = 'new'");
+            String id = "f" + (++keyedJoins);
+            var out = new RelationByRel(RowShaper.shape(conn, PipelineNode.of(id, "transform.join", cfg), "nums", id,
+                    (c, name) -> "codes"));
+            Map<Integer, String> got = new java.util.TreeMap<>();
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT id, c_label FROM \"" + out.table(PipelineRel.DATA) + "\"")) {
+                while (rs.next()) got.put(rs.getInt(1), rs.getString(2));
+            }
+            // without the filter 44 is a repeated key (refused); with it only the 'new' row takes part
+            assertEquals("United Kingdom", got.get(1), match);
+            assertEquals("longest_prefix".equals(match) ? "United Kingdom" : null, got.get(2),
+                    match + ": 4477 is filtered out, so 447700 falls back to 44 (prefix) or matches nothing (exact)");
+        }
+    }
+
+    @Test
+    void rangeMatchesTheRowWhosePeriodHoldsTheValueBoundsInclusiveAndOpenEnds() throws Exception {
+        seedRates();
+        Map<Integer, String> got = rateJoin(Map.of("filter", "lookup_key = 'SDR'"));
+        assertEquals(6, got.size(), "a LEFT join: no call dropped");
+        assertEquals(6, lastRangeRows, "…and none repeated");
+        assertEquals("610.5", got.get(1));
+        assertEquals("612.7", got.get(2), "the start day is inside");
+        assertEquals("612.7", got.get(3), "the end day is inside");
+        assertNull(got.get(4), "a date in no period (a gap) matches nothing");
+        assertEquals("812.4", got.get(5), "an empty end reaches forever");
+        assertNull(got.get(6), "a NULL date matches nothing");
+    }
+
+    @Test
+    void overlappingRangesAreRefusedNamingBothUnlessDuplicatesSaysWhichToKeep() throws Exception {
+        seedRates();
+        // without the filter the open-ended TAX row overlaps the SDR periods
+        var e = assertThrows(IllegalArgumentException.class, () -> rateJoin(Map.of()));
+        assertTrue(e.getMessage().contains("overlap") && e.getMessage().contains("2021-12-20"), e.getMessage());
+        // keep, per date, the period that started last
+        Map<Integer, String> got = rateJoin(Map.of("duplicates", "last", "order_by", "valid_from"));
+        assertEquals("1.41", got.get(4), "2023-05-01 lies only in the open-ended TAX period");
+        assertEquals("612.7", got.get(2), "2022-02-01: the SDR period started after the TAX one");
+    }
+
+    @Test
+    void aNumericRangeComparesAsNumbersNotText() throws Exception {
+        sql("CREATE TABLE rates AS SELECT * FROM (VALUES (1, 9, 'small'), (10, 99, 'medium'), (100, NULL, 'large'))"
+                + " t(lo, hi, band)");
+        sql("CREATE TABLE calls AS SELECT * FROM (VALUES (1, 9), (2, 10), (3, 100), (4, 1000)) t(id, call_date)");
+        Map<String, Object> cfg = Map.of("reference", "r", "match", "range", "from", "lo", "to", "hi",
+                "on", "call_date", "columns", List.of("band"), "as", "b_");
+        var out = new RelationByRel(RowShaper.shape(conn, PipelineNode.of("n", "transform.join", cfg), "calls", "n",
+                (c, name) -> "rates"));
+        Map<Integer, String> band = new java.util.TreeMap<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT id, b_band FROM \"" + out.table(PipelineRel.DATA) + "\"")) {
+            while (rs.next()) band.put(rs.getInt(1), rs.getString(2));
+        }
+        // as text, '10' < '9' and '1000' < '99' — a text comparison would put 10 and 1000 in the wrong band
+        assertEquals(Map.of(1, "small", 2, "medium", 3, "large", 4, "large"), band);
+    }
+
+    @Test
+    void rangeSettingsThatCannotRunAreRefused() throws Exception {
+        seedRates();
+        assertThrows(IllegalArgumentException.class, () -> rateJoin(Map.of("key", "lookup_key")), "range takes from/to, not key");
+        assertThrows(IllegalArgumentException.class, () -> rateJoin(Map.of("from", "nope")), "a missing bound column");
+        Map<String, Object> noBounds = Map.of("reference", "r", "match", "range", "on", "call_date");
+        assertThrows(IllegalArgumentException.class, () -> RowShaper.shape(conn,
+                PipelineNode.of("x", "transform.join", noBounds), "calls", "x", (c, name) -> "rates"));
+        Map<String, Object> boundsWithoutRange = Map.of("reference", "r", "match", "exact", "key", "lookup_key",
+                "from", "valid_from", "on", "call_date");
+        assertThrows(IllegalArgumentException.class, () -> RowShaper.shape(conn,
+                PipelineNode.of("y", "transform.join", boundsWithoutRange), "calls", "y", (c, name) -> "rates"));
+    }
+
     @Test
     void mergeUnionAndJoin() throws Exception {
         sql("CREATE TABLE a AS SELECT * FROM (VALUES (1,'x'),(2,'y')) t(id,v)");

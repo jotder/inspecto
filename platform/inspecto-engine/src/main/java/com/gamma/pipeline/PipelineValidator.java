@@ -117,13 +117,19 @@ public final class PipelineValidator {
      * whether the columns exist is the run's question (the Reference is not read at save).
      */
     static String keyedJoinProblem(PipelineNode n) {
-        boolean keyed = n.cfg("key") != null && !n.cfg("key").toString().isBlank();
-        if (!keyed) {
+        boolean hasKey = n.cfg("key") != null && !n.cfg("key").toString().isBlank();
+        boolean hasBound = (n.cfg("from") != null && !n.cfg("from").toString().isBlank())
+                || (n.cfg("to") != null && !n.cfg("to").toString().isBlank());   // blank = unset, as the run reads it
+        Object match = n.cfg("match");
+        boolean range = "range".equals(String.valueOf(match));
+        if (range && !hasBound) return "match: range needs from: and/or to: — the Reference columns holding the bounds";
+        if (range && hasKey) return "match: range reads from:/to:, not key:";
+        if (!range && hasBound) return "from:/to: only apply to match: range";
+        if (!hasKey && !hasBound) {
             for (String k : com.gamma.pipeline.exec.RowShaper.JOIN_KEYED_KEYS)
                 if (n.cfg(k) != null) return "'" + k + "' needs key: — the Reference's key column";
             return null;
         }
-        Object match = n.cfg("match");
         if (n.cfg("exact_when") != null && !"longest_prefix".equals(String.valueOf(match)))
             return "exact_when only applies to match: longest_prefix";
         Object dups = n.cfg("duplicates");

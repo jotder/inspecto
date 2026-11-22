@@ -423,6 +423,22 @@ class PipelineEditableTest {
         assertEquals(cfg, ((Map<?, ?>) steps.get(0)).get("join"));
     }
 
+    /** LOOKUP-1 P1c: a range join (no key:) still lowers to steps: with its bounds and filter. */
+    @Test
+    void aRangeJoinLowersToStepsWithItsBoundsAndFilter() {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("reference", "reference/rates");
+        cfg.put("on", List.of("CALL_DATE"));
+        cfg.put("match", "range");
+        cfg.put("from", "valid_from");
+        cfg.put("to", "valid_to");
+        cfg.put("filter", "lookup_key = 'SDR_RATE'");
+        Map<String, Object> out = PipelineEditable.lower(graphWith(node("j1", "transform.join", cfg)),
+                new LinkedHashMap<>(), true);
+        assertFalse(((Map<?, ?>) out.get("processing")).containsKey("join"), "a range join is not processing.join");
+        assertEquals(cfg, ((Map<?, ?>) ((List<?>) out.get("steps")).get(0)).get("join"));
+    }
+
     /** LOOKUP-1: a chained join keeps its match on the steps: lower — dropping it would turn a prefix join exact. */
     @Test
     void aChainedJoinKeepsItsMatch() {

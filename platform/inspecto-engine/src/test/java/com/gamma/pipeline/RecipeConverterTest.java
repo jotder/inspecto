@@ -369,6 +369,23 @@ class RecipeConverterTest {
         assertEquals(cfg, back);
     }
 
+    /** LOOKUP-1 P1c: a range join's bounds and row filter round-trip through the recipe. */
+    @Test
+    void aRangeJoinStepRoundTripsWithItsBoundsAndFilter() {
+        Map<String, Object> join = new LinkedHashMap<>();
+        join.put("reference", "reference/rates");
+        join.put("on", List.of("CALL_DATE"));
+        join.put("match", "range");
+        join.put("from", "valid_from");
+        join.put("to", "valid_to");
+        join.put("filter", "lookup_key = 'SDR_RATE'");
+        join.put("columns", List.of("lookup_output"));
+        Map<String, Object> cfg = stepsConfig(new LinkedHashMap<>(Map.of("join", join)));
+
+        Map<String, Object> back = RecipeCompiler.compile(RecipeConverter.toRecipe(cfg), cfg, false);
+        assertEquals(cfg, back);
+    }
+
     /**
      * A kind the recipe does not model must REFUSE, never shorten the chain — the whole point of the
      * fix is that a step the projection cannot speak is loud rather than absent.

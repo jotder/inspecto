@@ -915,9 +915,10 @@ public final class NodeAttributes {
             NodeAttribute.of("on", "Join keys", "list", "required").placeholder("currency")
                     .help("Column(s) equated between the rows and the Reference."),
             NodeAttribute.of("match", "Match", "select", "optional").defaultValue("exact")
-                    .options("exact", "Exact", "longest_prefix", "Longest prefix (last key)")
+                    .options("exact", "Exact", "longest_prefix", "Longest prefix (last key)", "range", "Range (from – to)")
                     .help("Exact: every key equal. Longest prefix: the last key matches the Reference row "
-                            + "whose key is its longest prefix (e.g. phone number to operator)."),
+                            + "whose key is its longest prefix (e.g. phone number to operator). Range: the row whose "
+                            + "From – To contains the value (e.g. the rate valid on the call date)."),
             NodeAttribute.of("key", "Reference key", "string", "optional").placeholder("dial_digit_key")
                     .help("Set it to look up each 'Join keys' column on its own in this Reference column — e.g. "
                             + "three phone-number columns against one dialling-code table."),
@@ -936,7 +937,13 @@ public final class NodeAttributes {
                     .help("What to do when the Reference has two rows for one key."),
             NodeAttribute.of("order_by", "Order repeated keys by", "string", "optional")
                     .placeholder("update_date_time")
-                    .help("An expression over Reference columns deciding which row is first or last."));
+                    .help("An expression over Reference columns deciding which row is first or last."),
+            NodeAttribute.of("from", "Range from", "string", "optional").placeholder("valid_from")
+                    .help("Range: the Reference column holding each range's start (inclusive; empty = no start)."),
+            NodeAttribute.of("to", "Range to", "string", "optional").placeholder("valid_to")
+                    .help("Range: the Reference column holding each range's end (inclusive; empty = no end)."),
+            NodeAttribute.of("filter", "Reference rows", "string", "optional").placeholder("lookup_key = 'SDR_RATE'")
+                    .help("A condition on Reference columns: only the rows meeting it take part in the lookup."));
 
     /**
      * {@code transform.sql} (sql-transform-v1-plan.md, B1) — one author {@code SELECT} over the typed

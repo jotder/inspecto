@@ -1170,14 +1170,18 @@ public final class RowShaper {
                     + "' — use one of " + JOIN_MATCHES);
         String ref = references.resolve(conn, reference);
         String data = table(prefix, PipelineRel.DATA);
-        if (strOrNull(node, "key") != null) {
+        if (strOrNull(node, "key") != null || strOrNull(node, "from") != null || strOrNull(node, "to") != null) {
             keyedJoin(conn, node, input, ref, on, match, data);
             return List.of(new Relation(PipelineRel.DATA, data));
         }
+        if (JOIN_MATCH_RANGE.equals(match))
+            throw new IllegalArgumentException("transform.join node '" + node.id() + "': match: range needs from: "
+                    + "and/or to: — the Reference columns holding each range's bounds");
         for (String k : JOIN_KEYED_KEYS)
             if (node.cfg(k) != null)
                 throw new IllegalArgumentException("transform.join node '" + node.id() + "' sets '" + k
-                        + "', which needs key: — the Reference's key column each 'on' column is looked up in");
+                        + "', which needs key: (or from:/to: for match: range) — the Reference column(s) each 'on' "
+                        + "column is looked up in");
         if (JOIN_MATCH_LONGEST_PREFIX.equals(match)) {
             longestPrefixJoin(conn, node, input, ref, on, data);
             return List.of(new Relation(PipelineRel.DATA, data));
@@ -1191,11 +1195,12 @@ public final class RowShaper {
     /** {@code transform.join} {@code match:} values; absent means {@link #JOIN_MATCH_EXACT}. */
     public static final String JOIN_MATCH_EXACT = "exact";
     public static final String JOIN_MATCH_LONGEST_PREFIX = "longest_prefix";
-    public static final List<String> JOIN_MATCHES = List.of(JOIN_MATCH_EXACT, JOIN_MATCH_LONGEST_PREFIX);
+    public static final String JOIN_MATCH_RANGE = "range";
+    public static final List<String> JOIN_MATCHES = List.of(JOIN_MATCH_EXACT, JOIN_MATCH_LONGEST_PREFIX, JOIN_MATCH_RANGE);
 
-    /** The keyed form's settings (LOOKUP-1 P1b); each needs {@code key:}. */
+    /** The keyed form's settings (LOOKUP-1 P1b/P1c); each needs {@code key:}, or {@code from:}/{@code to:} for a range. */
     public static final List<String> JOIN_KEYED_KEYS =
-            List.of("columns", "as", "default", "exact_when", "duplicates", "order_by");
+            List.of("columns", "as", "default", "exact_when", "duplicates", "order_by", "from", "to", "filter");
     /** Every config key {@code transform.join} reads — what every save path must carry. */
     public static final List<String> JOIN_CONFIG_KEYS;
     static {
@@ -1232,6 +1237,25 @@ public final class RowShaper {
         String id = node.id();
         String keyCol = strOrNull(node, "key");
         boolean prefix = JOIN_MATCH_LONGEST_PREFIX.equals(match);
+        boolean range = JOIN_MATCH_RANGE.equals(match);
+        String fromCol = strOrNull(node, "from");
+        String toCol = strOrNull(node, "to");
+        String filter = strOrNull(node, "filter");
+        if (range) {
+            if (keyCol != null)
+                throw new IllegalArgumentException("transform.join node '" + id + "': match: range reads from:/to:, "
+                        + "not key:");
+            if (fromCol == null && toCol == null)
+                throw new IllegalArgumentException("transform.join node '" + id + "': match: range needs from: and/or "
+                        + "to: — the Reference columns holding each range's bounds");
+        } else {
+            if (keyCol == null)
+                throw new IllegalArgumentException("transform.join node '" + id + "': match: " + match + " needs key: "
+                        + "— the Reference's key column");
+            if (fromCol != null || toCol != null)
+                throw new IllegalArgumentException("transform.join node '" + id + "': from:/to: only apply to "
+                        + "match: range");
+        }
         String exactWhen = strOrNull(node, "exact_when");
         if (exactWhen != null && !prefix)
             throw new IllegalArgumentException("transform.join node '" + id + "': exact_when only applies to "
@@ -1247,9 +1271,10 @@ public final class RowShaper {
                     + " needs order_by: — which row of a repeated key is the " + dups);
 
         List<String> refCols = columnsOf(conn, ref);
-        if (refCols.stream().noneMatch(c -> c.equalsIgnoreCase(keyCol)))
-            throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has no key column '"
-                    + keyCol + "' (it has " + refCols + ")");
+        for (String c : java.util.Arrays.asList(keyCol, fromCol, toCol))
+            if (c != null && refCols.stream().noneMatch(r -> r.equalsIgnoreCase(c)))
+                throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has no column '"
+                        + c + "' (it has " + refCols + ")");
         List<String> returned = new ArrayList<>();
         if (node.cfg("columns") instanceof List<?> l) {
             for (Object o : l) if (o != null && !o.toString().isBlank()) returned.add(o.toString().trim());
@@ -1293,13 +1318,18 @@ public final class RowShaper {
                 select.append(", ").append(dflt == null ? v : "coalesce(" + v + ", " + sqlStr(dflt) + ")")
                         .append(" AS ").append(q(name));
             }
-            joins.append(" LEFT JOIN __lk_hit ").append(h).append(" ON ").append(h).append(".__lk_v = CAST(i.")
-                    .append(q(o)).append(" AS VARCHAR)");
+            // a range compares in the value's own type (dates as dates); prefix and exact compare as text
+            joins.append(" LEFT JOIN __lk_hit ").append(h).append(" ON ").append(h).append(".__lk_v = ")
+                    .append(range ? "i." + q(o) : "CAST(i." + q(o) + " AS VARCHAR)");
         }
 
+        if (range) {
+            rangeJoin(conn, node, input, ref, on, fromCol, toCol, filter, dups, orderBy, returned, select, joins, data);
+            return;
+        }
         String key = q(keyCol);
         String refRows = "SELECT t.*, CAST(t." + key + " AS VARCHAR) AS __lk_key FROM " + q(ref) + " t WHERE t."
-                + key + " IS NOT NULL";
+                + key + " IS NOT NULL" + (filter == null ? "" : " AND (" + filter + ")");
         if ("refuse".equals(dups)) {
             try (Statement st = conn.createStatement();
                  ResultSet rs = st.executeQuery("SELECT __lk_key FROM (" + refRows + ") GROUP BY __lk_key"
@@ -1332,6 +1362,81 @@ public final class RowShaper {
                 + " __lk_len AS (SELECT DISTINCT length(__lk_key) AS __lk_n FROM __lk_ref),"
                 + " __lk_hit AS MATERIALIZED (" + hit + ")"
                 + " " + select + " FROM " + q(input) + " i" + joins);
+    }
+
+    /**
+     * {@code match: range} (LOOKUP-1 P1c): a value matches the Reference row whose {@code [from, to]} contains it —
+     * both bounds inclusive, an empty bound open-ended, compared in the value's own type (a date as a date, a number
+     * as a number). {@code filter} picks which Reference rows take part (one table holding several rate kinds).
+     * Overlapping ranges make the match ambiguous: {@code duplicates: refuse} (default) refuses them before the join,
+     * naming both rows; {@code first}/{@code last} keep, per value, the matching row ordered by {@code order_by}.
+     * Each distinct value is resolved once, then joined back per {@code on} column, as in the other keyed modes.
+     */
+    private static void rangeJoin(Connection conn, PipelineNode node, String input, String ref, List<String> on,
+                                  String fromCol, String toCol, String filter, String dups, String orderBy,
+                                  List<String> returned, StringBuilder select, StringBuilder joins, String data)
+            throws SQLException {
+        String id = node.id();
+        String refRows = "SELECT t.*, row_number() OVER () AS __lk_rn FROM " + q(ref) + " t"
+                + (filter == null ? "" : " WHERE (" + filter + ")");
+        // v inside r: below no upper bound and above no lower bound
+        // A DATE bound is a whole day: a TIMESTAMP value on the last day (10:30 > that day's midnight) must still match,
+        // so the value is compared as a date. TRY_CAST: a value that is no date (text) matches nothing, never a raw
+        // Binder error. Other types compare as they are — casting a number to the bound's type could round it.
+        String fromV = rangeValue(conn, ref, fromCol), toV = rangeValue(conn, ref, toCol);
+        String inside = (fromCol == null ? "TRUE" : "(r." + q(fromCol) + " IS NULL OR " + fromV + " >= r." + q(fromCol) + ")")
+                + " AND " + (toCol == null ? "TRUE" : "(r." + q(toCol) + " IS NULL OR " + toV + " <= r." + q(toCol) + ")");
+        if ("refuse".equals(dups)) {
+            // two ranges overlap when each starts no later than the other ends (an empty bound reaches forever)
+            String aStartsByBEnd = fromCol == null || toCol == null ? "TRUE"
+                    : "(a." + q(fromCol) + " IS NULL OR b." + q(toCol) + " IS NULL OR a." + q(fromCol) + " <= b." + q(toCol) + ")";
+            String bStartsByAEnd = fromCol == null || toCol == null ? "TRUE"
+                    : "(b." + q(fromCol) + " IS NULL OR a." + q(toCol) + " IS NULL OR b." + q(fromCol) + " <= a." + q(toCol) + ")";
+            String bound = (fromCol == null ? "NULL" : "CAST(%1$s." + q(fromCol) + " AS VARCHAR)") + ", "
+                    + (toCol == null ? "NULL" : "CAST(%1$s." + q(toCol) + " AS VARCHAR)");
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("WITH rr AS MATERIALIZED (" + refRows + ") SELECT "
+                         + bound.formatted("a") + ", " + bound.formatted("b")
+                         + " FROM rr a JOIN rr b ON a.__lk_rn < b.__lk_rn AND " + aStartsByBEnd + " AND " + bStartsByAEnd
+                         + " ORDER BY a.__lk_rn, b.__lk_rn LIMIT 1")) {
+                if (rs.next())
+                    throw new IllegalArgumentException("transform.join node '" + id + "': two Reference ranges overlap, "
+                            + span(rs.getString(1), rs.getString(2)) + " and " + span(rs.getString(3), rs.getString(4))
+                            + " — a value in both would match either; clean the Reference, or set duplicates: "
+                            + "first|last with order_by:");
+            }
+        }
+        String kept = String.join(", ", returned.stream().map(c -> "r." + q(c)).toList());
+        StringBuilder values = new StringBuilder();
+        for (String o : on) {
+            if (values.length() > 0) values.append(" UNION ");
+            values.append("SELECT ").append(q(o)).append(" AS __lk_v FROM ").append(q(input));
+        }
+        String hit = "SELECT v.__lk_v, " + kept + " FROM __lk_val v JOIN __lk_ref r ON " + inside
+                + ("refuse".equals(dups) ? "" : " QUALIFY row_number() OVER (PARTITION BY v.__lk_v ORDER BY (" + orderBy
+                        + ") " + ("last".equals(dups) ? "DESC" : "ASC") + " NULLS LAST, CAST(r AS VARCHAR)) = 1");
+        exec(conn, "CREATE TABLE " + q(data) + " AS"
+                + " WITH __lk_ref AS MATERIALIZED (" + refRows + "),"
+                + " __lk_val AS MATERIALIZED (SELECT DISTINCT __lk_v FROM (" + values + ") WHERE __lk_v IS NOT NULL),"
+                + " __lk_hit AS MATERIALIZED (" + hit + ")"
+                + " " + select + " FROM " + q(input) + " i" + joins);
+    }
+
+    /** The value as compared with bound column {@code col}: as a DATE when the bound is a DATE, else as it is. */
+    private static String rangeValue(Connection conn, String ref, String col) throws SQLException {
+        if (col == null) return "v.__lk_v";
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM " + q(ref) + " LIMIT 0")) {
+            java.sql.ResultSetMetaData md = rs.getMetaData();
+            for (int i = 1; i <= md.getColumnCount(); i++)
+                if (md.getColumnName(i).equalsIgnoreCase(col) && "DATE".equalsIgnoreCase(md.getColumnTypeName(i)))
+                    return "TRY_CAST(v.__lk_v AS DATE)";
+        }
+        return "v.__lk_v";
+    }
+
+    private static String span(String from, String to) {
+        return "[" + (from == null ? "…" : from) + " – " + (to == null ? "…" : to) + "]";
     }
 
     /** {@code default:} as a map, or a list of {@code col=value} entries (the Step form has no map field). */

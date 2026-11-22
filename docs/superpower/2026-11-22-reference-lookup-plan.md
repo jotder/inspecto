@@ -1,6 +1,6 @@
 # Lookup — exact and best-match key resolution over a Reference Dataset
 
-**State:** 🟡 **IN FLIGHT 2026-11-22 — P1a (`match: exact | longest_prefix`) and P1b (the keyed form: several numbers, returned columns, not-found value, exact-only rows, repeated keys) built; rest of P1 and P2–P4 open.**
+**State:** 🟡 **IN FLIGHT 2026-11-22 — P1a (`match: exact | longest_prefix`) and P1b (the keyed form: several numbers, returned columns, not-found value, exact-only rows, repeated keys) and P1c (`match: range`, `filter`) built; rest of P1 and P2–P4 open.**
 Board row `LOOKUP-1` [items: module.elt, module.engine]. Hubs on ship: `okf/product/module/elt/` (authoring,
 Step) and `okf/product/module/engine/` (execution, point engine).
 
@@ -101,6 +101,12 @@ run — not a per-row call.
 3. **P3 — point engine:** JVM indexes per mode, memory cap and spill, warm-up and readiness, Control API
    test-a-key / stats / refresh, parity suite against the batch engine.
 4. **P4 — fuzzy:** batch (blocking key, score, top-k), then point (candidate index); test console UI.
+
+**P1c built 2026-11-22 (operator: "start range"):** `match: range` on the keyed join — `from`/`to` Reference
+columns, inclusive bounds, an empty bound open-ended, compared in the value's own type; `filter` (a condition on
+Reference rows, every keyed mode); overlapping periods refused by name unless `duplicates: first|last` + `order_by`.
+Proven on the client's service-range table (SDR rate by call date): every November 2026 call gets the legacy
+`getSdrValue` rate, and the default refusal surfaced the table's overlaps and an impossible date (31/06/26).
 
 **P1b built 2026-11-22 (operator: "go and create a demo" on a client dialling-code table):** the keyed form —
 `key:` names the Reference's key column and every `on` column is an independent input; `columns`, `as`,

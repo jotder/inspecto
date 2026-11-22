@@ -2355,6 +2355,7 @@ com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_MATCHE
 com.gamma.pipeline.exec.RowShaper | public static final Set<String> MAP_NODE_CONFIG_KEYS
 com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_EXACT
 com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_LONGEST_PREFIX
+com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_RANGE
 com.gamma.pipeline.exec.RowShaper | public static final java.util.regex.Pattern NEW_COLUMN_NAME
 com.gamma.pipeline.exec.RowShaper | public static final java.util.regex.Pattern UNPIVOT_VALUE_TYPE
 com.gamma.pipeline.exec.RowShaper.ExecutionContext | public ExecutionContext asDryRun()
