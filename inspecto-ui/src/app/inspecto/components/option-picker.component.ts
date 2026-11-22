@@ -3,6 +3,7 @@ import { ControlValueAccessor, FormsModule, NG_VALUE_ACCESSOR } from '@angular/f
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialog, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { InspectoFieldHelpComponent } from './field-help.component';
 
 /** One offered choice. Same shape the `AttributeSpec.options` list already carries. */
 export interface PickerOption {
@@ -182,7 +183,7 @@ export class OptionPickerDialog {
     selector: 'inspecto-option-picker',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [MatIconModule],
+    imports: [MatIconModule, InspectoFieldHelpComponent],
     providers: [
         {
             provide: NG_VALUE_ACCESSOR,
@@ -208,6 +209,7 @@ export class OptionPickerDialog {
                     @if (required()) {
                         <span class="text-warn" aria-hidden="true">*</span>
                     }
+                    <inspecto-field-help [text]="help()" [label]="label()" />
                 </span>
                 <button
                     type="button"
@@ -231,8 +233,6 @@ export class OptionPickerDialog {
             </div>
             @if (invalid()) {
                 <p class="text-warn m-0 text-xs" role="alert" [id]="errorId">{{ label() }} is required.</p>
-            } @else if (help()) {
-                <p class="text-secondary m-0 text-xs">{{ help() }}</p>
             }
         </div>
     `,

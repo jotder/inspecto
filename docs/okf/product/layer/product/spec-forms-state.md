@@ -30,8 +30,9 @@ draws the same rows, its optional / advanced tiers as named folds that say how m
 
 * **Layout**: two rows per line (`grid sm:grid-cols-2 gap-x-8`) so a form fits at a glance; past about 12 rows,
   named fold groups; a wizard only when a step depends on an earlier answer.
-* **`help`**: one tiny line under a row whose name does not explain itself (a former `<mat-hint>`); an error
-  line replaces it.
+* **`help`**: the description of a field whose name does not explain itself, behind a small "?" after its label
+  (`<inspecto-field-help>`: a tooltip on hover, focus and tap; operator 2026-11-22 — forms stay compact, experts and
+  agents rarely need it). It used to be a line under the row (2026-11-03). An error line still shows under the row.
 * **`open`** (`<inspecto-pen-field [open]="true">`, 2026-11-15): the box stays on screen, for the one value a
   create dialog asks first. A new thing has no value to read, and a row showing "—" did not look like somewhere to
   type (Create a Space, `LA-FULL-CYCLE-TEST-1` finding 9). The value is written as it is typed, so the dialog's
