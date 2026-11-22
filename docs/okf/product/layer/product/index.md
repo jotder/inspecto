@@ -35,6 +35,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `AUTHORING-REDESIGN-1` | P3 | feature | Only letter (d) of the authoring redesign is left; no CREATE MACRO exists in any main source. | demand |
+| `DATED-REFERENCE-RUNS-1` | P2 | feature | Each record joins the Reference version of its own day, and a Job's backlog drains itself: daily Reference versions, version_by on the jo… | — |
 | `ADD-DATA-DUPLICATE-CHECK-UI-1` | P3 | feature | Add data cannot set a Basic import's duplicate check (duplicate.mode, on_change); only the Pipelines editor's Collector stage can (filed… | operator |
 | `PIPELINE-EDITOR-OUTPUT-LOAD-1` | P3 | feature | The Pipeline editor cannot set output.load / output.period_column (filed 2026-11-20, BASIC-ELT-PROFILE-1 O6 close). | operator |
 | `BASIC-ELT-DUPLICATES-1` | P3 | chore | Basic and ELT duplications Phase 0 found and the build left (filed 2026-11-20, BASIC-ELT-PROFILE-1 close). | — |
