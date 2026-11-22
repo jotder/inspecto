@@ -214,7 +214,7 @@ describe('SpaceFormDialog', () => {
             expect(box).not.toBeNull();
             expect(box.getAttribute('aria-label')).toBe('Name');
             expect(box.getAttribute('aria-required')).toBe('true');
-            expect(name.querySelector('button')).toBeNull(); // no value to click and no pencil
+            expect(name.querySelector('button:not([data-testid="field-help"])')).toBeNull(); // no value to click and no pencil (the "?" is help)
             expect(name.textContent).not.toContain('—');
             const createButton = el.querySelector<HTMLButtonElement>('button[type="submit"]')!;
             expect(createButton.disabled).toBe(true);

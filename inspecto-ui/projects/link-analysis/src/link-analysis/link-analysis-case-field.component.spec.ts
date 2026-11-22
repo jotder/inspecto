@@ -48,7 +48,9 @@ describe('LinkAnalysisCaseFieldComponent — three states, kept distinguishable'
         const field = fixture.debugElement.children[0].componentInstance as LinkAnalysisCaseFieldComponent;
         expect(field.cases()).toEqual([{ id: 'CASE-9', title: 'Real case' }]);
         expect(field.caseOptions()).toEqual([{ value: 'CASE-9', label: 'CASE-9 · Real case' }]);
-        expect(el.textContent).toContain('The open Cases you can see.');
+        expect(el.querySelector('[data-testid="field-help"]')?.getAttribute('data-help')).toBe(
+            'The open Cases you can see.',
+        );
         expect(el.querySelector('inspecto-option-picker')).not.toBeNull();
     });
 

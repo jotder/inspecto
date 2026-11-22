@@ -20,7 +20,7 @@ export function penByLabel(root: ParentNode, label: string): HTMLElement | null 
 
 /** The text a closed pen field shows (its value, else its ghost default / placeholder). */
 export function penText(host: HTMLElement): string {
-    return (host.querySelector('button')?.textContent ?? '').trim();
+    return (host.querySelector('button:not([data-testid="field-help"])')?.textContent ?? '').trim();
 }
 
 /** The error line a pen field shows, or ''. */
@@ -33,7 +33,7 @@ export function penOpen(fixture: ComponentFixture<unknown>, host: HTMLElement): 
     if (!host.querySelector('input, textarea')) {
         const pencil =
             host.querySelector<HTMLButtonElement>('button.pen-pencil') ??
-            host.querySelector<HTMLButtonElement>('button');
+            host.querySelector<HTMLButtonElement>('button:not([data-testid="field-help"])');
         pencil!.click();
         fixture.detectChanges();
     }

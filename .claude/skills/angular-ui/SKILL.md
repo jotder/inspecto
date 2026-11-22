@@ -366,7 +366,7 @@ src/app/
   pane section that shows stored values follows the same idiom; do not reintroduce a stack of outlined
   Material fields beside property rows. **Since UI-FORM-ROWS-1 P1 (2026-11-03) the tiered (non-flat) form is
   rows too**: required rows shown, *Optional settings (n)* and *Advanced settings (n)* as folds that count the
-  fields needing a fix (no gear), the help as the tiny line under a row (no info-icon tooltip), two columns on a
+  fields needing a fix (no gear), the help behind a "?" after the label (see `help` below), two columns on a
   wide host. A row's control exists only while the row is open: a spec opens it with `sfOpen(fixture, key)`
   (`inspecto/testing/schema-form.ts`) and reads errors from the row's `role="alert"` line, never `mat-error`.
   ⚠ The segments editor stays HOST-side (projected via `[grammarExtras]`): segments need one schema
@@ -536,8 +536,13 @@ src/app/
   A row bound to a SIGNAL (one control, no form around it) may bridge with `[ngModel]` / `(ngModelChange)` and
   `[ngModelOptions]="{ standalone: true }"` when it sits inside a form - the one sanctioned use of `ngModel` (UI-FORM-ROWS-1 P3; the dashboard
   filter bar, the date-range preset, the query `$param` rows). A form of several values stays reactive.
-  **`help`** (2026-11-03, `UI-FORM-ROWS-1`) is the one tiny line under the row, as `option-picker`'s `help`: give it
-  only to a field whose name does not explain itself; an error replaces it.
+  **`help`** (operator 2026-11-22, replacing the 2026-11-03 line under the row) shows behind a small "?" after the
+  label — `<inspecto-field-help>` (`inspecto/components/field-help.component.ts`): a tooltip on hover, focus and tap,
+  named "About <label>" — the same in `pen-field`, `option-picker` and every schema-form row, so forms stay compact
+  (experts and agents rarely need it). The schema form keeps an `sr-only` copy its control is described by. Give it
+  only to a field whose name does not explain itself; an error line still shows under the row. A new row component
+  puts the "?" after its label the same way — ⛔ never a visible help line again. In specs, the text is the button's
+  `data-help`, and a helper that reads "the row's first button" must skip `[data-testid="field-help"]`.
   **`wrap`** (2026-11-16, `LA-EXEC-DEMO-POLISH-1`) reads a one-line value on up to two lines, the whole in its tooltip,
   instead of cutting it with "…" (a title in a narrow panel: the Investigation's name); it still edits as one line.
   **One row geometry (UI-FORM-ROWS-1 P0, operator 2026-11-03):** `pen-field` and `option-picker` both lay out on

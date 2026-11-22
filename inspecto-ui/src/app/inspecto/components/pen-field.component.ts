@@ -14,6 +14,7 @@ import {
 } from '@angular/core';
 import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 import { MatIconModule } from '@angular/material/icon';
+import { InspectoFieldHelpComponent } from './field-help.component';
 
 /**
  * **Pen-style field** — one compact property row: `label · value · ✎`. The value reads as text; the pencil (or a
@@ -34,7 +35,7 @@ import { MatIconModule } from '@angular/material/icon';
     selector: 'inspecto-pen-field',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
-    imports: [MatIconModule],
+    imports: [MatIconModule, InspectoFieldHelpComponent],
     providers: [{ provide: NG_VALUE_ACCESSOR, useExisting: forwardRef(() => PenFieldComponent), multi: true }],
     host: { class: 'block min-w-0' },
     template: `
@@ -45,6 +46,7 @@ import { MatIconModule } from '@angular/material/icon';
                     @if (required()) {
                         <span class="text-warn"> *</span>
                     }
+                    <inspecto-field-help [text]="help()" [label]="label()" />
                 </span>
             }
             @if (boxShown()) {
@@ -128,8 +130,6 @@ import { MatIconModule } from '@angular/material/icon';
         </div>
         @if (error()) {
             <p class="text-warn m-0 text-xs" role="alert">{{ error() }}</p>
-        } @else if (help()) {
-            <p class="text-secondary m-0 text-xs">{{ help() }}</p>
         }
     `,
 })

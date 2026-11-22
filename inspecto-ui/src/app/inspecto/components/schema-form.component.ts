@@ -33,6 +33,7 @@ import {
     listPatternViolation,
 } from '../component-model';
 import { ChipComponent } from './chip.component';
+import { InspectoFieldHelpComponent } from './field-help.component';
 import { InspectoOptionPickerComponent } from './option-picker.component';
 import { InspectoSampleValueDirective } from './sample-value.directive';
 import { InspectoTokenPickerComponent } from './token-picker.component';
@@ -59,6 +60,7 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
         NgTemplateOutlet,
         ReactiveFormsModule,
         ChipComponent,
+        InspectoFieldHelpComponent,
         InspectoOptionPickerComponent,
         InspectoSampleValueDirective,
         InspectoTokenPickerComponent,
@@ -184,6 +186,7 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                                         <span class="text-warn" aria-hidden="true">*</span>
                                     }
                                 </span>
+                                <inspecto-field-help [text]="spec.help" [label]="spec.label" />
                             </span>
                             <div class="flex min-w-0 flex-1 items-center">
                                 @switch (spec.type) {
@@ -461,12 +464,9 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                                 {{ rowError(spec) }}
                             </p>
                         } @else if (spec.help) {
-                            <p
-                                class="text-secondary m-0 text-xs"
-                                [class.pl-40]="columns() === 1"
-                                [id]="lineId(spec)"
-                                [attr.data-help-for]="spec.key"
-                            >
+                            <!-- the help shows behind the label's "?" (inspecto-field-help); this hidden copy keeps
+                                 the control described for a screen reader -->
+                            <p class="sr-only" [id]="lineId(spec)" [attr.data-help-for]="spec.key">
                                 {{ spec.help }}
                             </p>
                         }
