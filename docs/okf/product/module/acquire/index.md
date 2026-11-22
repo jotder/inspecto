@@ -34,5 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `STORE-FAMILY-PARITY-GOLDEN-STALE-1` | P3 | defect | StoreFamilyParityTest.everyFamilyResolvesExactlyAsItDidBeforeTheRosterWasOpened (inspecto-ops) fails on master, alone or in its module: i… | — |
 | — | P3 | feature | Unpack (11) absent codecs | demand |
 | `SCALEOUT-U1-REMOTE-ACQUIRE-1` | P3 | feature | Remote acquisition (U1) is not distributed: two pods would both fetch the same remote file. | operator |

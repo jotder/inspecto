@@ -401,6 +401,28 @@ class PipelineEditableTest {
                 node("j2", "transform.join", Map.of("reference", "cells")));
     }
 
+    /** LOOKUP-1 P1b: a keyed join lowers to steps: (processing.join cannot hold its settings) with every key kept. */
+    @Test
+    void aKeyedJoinLowersToStepsWithAllItsSettings() {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("reference", "reference/dial_digit");
+        cfg.put("on", List.of("SERVED_MSISDN", "OTHER_MSISDN"));
+        cfg.put("match", "longest_prefix");
+        cfg.put("key", "dial_digit_key");
+        cfg.put("columns", List.of("dial_digit_key", "provider_desc"));
+        cfg.put("as", "{on}_");
+        cfg.put("default", List.of("dial_digit_key=-99"));
+        cfg.put("exact_when", "dm_ind = '1'");
+        cfg.put("duplicates", "last");
+        cfg.put("order_by", "update_date_time");
+        Map<String, Object> out = PipelineEditable.lower(graphWith(node("j1", "transform.join", cfg)),
+                new LinkedHashMap<>(), true);
+        assertFalse(((Map<?, ?>) out.get("processing")).containsKey("join"), "a keyed join is not processing.join");
+        List<?> steps = (List<?>) out.get("steps");
+        assertNotNull(steps, "a keyed join must lower to steps:");
+        assertEquals(cfg, ((Map<?, ?>) steps.get(0)).get("join"));
+    }
+
     /** LOOKUP-1: a chained join keeps its match on the steps: lower — dropping it would turn a prefix join exact. */
     @Test
     void aChainedJoinKeepsItsMatch() {

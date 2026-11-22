@@ -512,6 +512,147 @@ class RowShaperTest {
         assertTrue(e.getMessage().contains("fuzzy"), e.getMessage());
     }
 
+    // ── join keyed form: several numbers against one dialling-code table (LOOKUP-1 P1b) ──
+    // A synthetic table shaped like a telco dial-digit dimension: key, country, operator, an exact-only flag.
+
+    private void seedDialDigits() throws SQLException {
+        sql("CREATE TABLE dd AS SELECT * FROM (VALUES"
+                + " ('249', 'SD', 'Sudan', '0', 10),"
+                + " ('24991', 'SD', 'Operator A', '0', 11),"
+                + " ('2499123', 'SD', 'Operator A Toll Free', '1', 12),"   // exact-only: a whole number
+                + " ('44', 'GB', 'United Kingdom', '0', 13)"
+                + ") t(dial_digit_key, iso_country_code, provider_desc, dm_ind, nop_id_key)");
+        sql("CREATE TABLE cdr AS SELECT * FROM (VALUES"
+                + " (1, '249915555555', '2499123', '447700900123'),"
+                + " (2, '249112345678', '249912300000', NULL),"
+                + " (3, '999', '24991', '33612345678')"
+                + ") t(id, served_msisdn, other_msisdn, third_party_msisdn)");
+    }
+
+    private Map<String, Object> keyedCfg(Object... extra) {
+        Map<String, Object> cfg = new java.util.LinkedHashMap<>(Map.of("reference", "r", "key", "dial_digit_key",
+                "match", "longest_prefix",
+                "on", List.of("served_msisdn", "other_msisdn", "third_party_msisdn"),
+                "columns", List.of("dial_digit_key", "provider_desc")));
+        for (int i = 0; i < extra.length; i += 2) cfg.put((String) extra[i], extra[i + 1]);
+        return cfg;
+    }
+
+    private int keyedJoins;
+
+    /** Runs a keyed join of cdr against dd; returns each row as id → (column → value). */
+    private Map<Integer, Map<String, String>> keyedJoin(Map<String, Object> cfg) throws SQLException {
+        String id = "k" + (++keyedJoins);
+        var out = new RelationByRel(RowShaper.shape(conn, PipelineNode.of(id, "transform.join", cfg), "cdr", id,
+                (c, name) -> "dd"));
+        Map<Integer, Map<String, String>> rows = new java.util.TreeMap<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM \"" + out.table(PipelineRel.DATA) + "\"")) {
+            while (rs.next()) {
+                Map<String, String> r = new java.util.LinkedHashMap<>();
+                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++)
+                    r.put(rs.getMetaData().getColumnName(i), rs.getString(i));
+                rows.put(rs.getInt("id"), r);
+            }
+        }
+        return rows;
+    }
+
+    @Test
+    void keyedJoinLooksUpEachNumberColumnOnItsOwnAndNamesTheResultsByColumn() throws Exception {
+        seedDialDigits();
+        var rows = keyedJoin(keyedCfg());
+        assertEquals(3, rows.size(), "a LEFT join: no call record dropped or repeated");
+        assertEquals(List.of("id", "served_msisdn", "other_msisdn", "third_party_msisdn",
+                        "served_msisdn_dial_digit_key", "served_msisdn_provider_desc",
+                        "other_msisdn_dial_digit_key", "other_msisdn_provider_desc",
+                        "third_party_msisdn_dial_digit_key", "third_party_msisdn_provider_desc"),
+                List.copyOf(rows.get(1).keySet()));
+        Map<String, String> r1 = rows.get(1);
+        assertEquals("24991", r1.get("served_msisdn_dial_digit_key"), "the key column returns the matched prefix");
+        assertEquals("Operator A", r1.get("served_msisdn_provider_desc"));
+        assertEquals("2499123", r1.get("other_msisdn_dial_digit_key"), "exact value matches an exact-only key too");
+        assertEquals("44", r1.get("third_party_msisdn_dial_digit_key"));
+        assertEquals("249", rows.get(2).get("served_msisdn_dial_digit_key"), "2491… falls back to the country code");
+        assertNull(rows.get(2).get("third_party_msisdn_provider_desc"), "a NULL number matches nothing");
+        assertNull(rows.get(3).get("served_msisdn_dial_digit_key"), "no prefix of 999 is in the table");
+        assertNull(rows.get(3).get("third_party_msisdn_dial_digit_key"));
+    }
+
+    /** Without exact_when the toll-free row is an ordinary prefix; with it, it matches only the whole number. */
+    @Test
+    void exactWhenRowsMatchOnlyTheWholeNumber() throws Exception {
+        seedDialDigits();
+        assertEquals("2499123", keyedJoin(keyedCfg()).get(2).get("other_msisdn_dial_digit_key"),
+                "without exact_when, 2499123 is the longest prefix of 249912300000");
+        var rows = keyedJoin(keyedCfg("exact_when", "dm_ind = '1'"));
+        assertEquals("24991", rows.get(2).get("other_msisdn_dial_digit_key"),
+                "an exact-only key that is only a prefix is skipped for the next longest");
+        assertEquals("2499123", rows.get(1).get("other_msisdn_dial_digit_key"), "…and still matches its whole number");
+    }
+
+    @Test
+    void defaultFillsUnmatchedNumbersAndAcceptsAListOrAMap() throws Exception {
+        seedDialDigits();
+        for (Object dflt : List.of(List.of("dial_digit_key=-99", "provider_desc=Unknown"),
+                Map.of("dial_digit_key", -99, "provider_desc", "Unknown"))) {
+            var r3 = keyedJoin(keyedCfg("default", dflt)).get(3);
+            assertEquals("-99", r3.get("served_msisdn_dial_digit_key"));
+            assertEquals("Unknown", r3.get("served_msisdn_provider_desc"));
+            assertEquals("24991", r3.get("other_msisdn_dial_digit_key"), "a match is never replaced by the default");
+        }
+    }
+
+    @Test
+    void asNamesTheReturnedColumnsAndAClashIsRefused() throws Exception {
+        seedDialDigits();
+        var r1 = keyedJoin(keyedCfg("as", "{on}_dd_")).get(1);
+        assertEquals("Operator A", r1.get("served_msisdn_dd_provider_desc"));
+        var e = assertThrows(IllegalArgumentException.class, () -> keyedJoin(keyedCfg("as", "")));
+        assertTrue(e.getMessage().contains("{on}"), e.getMessage());
+        sql("ALTER TABLE cdr ADD COLUMN iso_country_code VARCHAR");   // the rows already have a returned name
+        var clash = assertThrows(IllegalArgumentException.class, () -> keyedJoin(keyedCfg(
+                "on", List.of("served_msisdn"), "as", "", "columns", List.of("iso_country_code"))));
+        assertTrue(clash.getMessage().contains("'iso_country_code' clashes"), clash.getMessage());
+    }
+
+    @Test
+    void aRepeatedKeyIsRefusedUnlessDuplicatesSaysWhichRowToKeep() throws Exception {
+        seedDialDigits();
+        sql("INSERT INTO dd VALUES ('24991', 'SD', 'Operator A (new)', '0', 99)");
+        var e = assertThrows(IllegalArgumentException.class, () -> keyedJoin(keyedCfg()));
+        assertTrue(e.getMessage().contains("dial_digit_key=24991"), e.getMessage());
+        assertEquals("Operator A (new)", keyedJoin(keyedCfg("duplicates", "last", "order_by", "nop_id_key"))
+                .get(1).get("served_msisdn_provider_desc"));
+        assertEquals("Operator A", keyedJoin(keyedCfg("duplicates", "first", "order_by", "nop_id_key"))
+                .get(1).get("served_msisdn_provider_desc"));
+        assertThrows(IllegalArgumentException.class, () -> keyedJoin(keyedCfg("duplicates", "last")),
+                "keeping one of a repeat needs order_by");
+    }
+
+    @Test
+    void keyedExactMatchNeedsTheWholeValue() throws Exception {
+        seedDialDigits();
+        var rows = keyedJoin(keyedCfg("match", "exact"));
+        assertEquals("2499123", rows.get(1).get("other_msisdn_dial_digit_key"));
+        assertNull(rows.get(1).get("served_msisdn_dial_digit_key"), "exact: a prefix is not a match");
+        assertThrows(IllegalArgumentException.class, () -> keyedJoin(keyedCfg("match", "exact",
+                "exact_when", "dm_ind = '1'")), "exact_when is a longest_prefix setting");
+    }
+
+    @Test
+    void keyedSettingsWithoutKeyOrNamingMissingColumnsAreRefused() throws Exception {
+        seedDialDigits();
+        Map<String, Object> noKey = keyedCfg();
+        noKey.remove("key");
+        noKey.put("on", "served_msisdn");
+        var e = assertThrows(IllegalArgumentException.class, () -> keyedJoin(noKey));
+        assertTrue(e.getMessage().contains("needs key"), e.getMessage());
+        assertThrows(IllegalArgumentException.class, () -> keyedJoin(keyedCfg("key", "nope")));
+        assertThrows(IllegalArgumentException.class, () -> keyedJoin(keyedCfg("columns", List.of("nope"))));
+        assertThrows(IllegalArgumentException.class, () -> keyedJoin(keyedCfg("on", List.of("nope"))));
+    }
+
     @Test
     void mergeUnionAndJoin() throws Exception {
         sql("CREATE TABLE a AS SELECT * FROM (VALUES (1,'x'),(2,'y')) t(id,v)");

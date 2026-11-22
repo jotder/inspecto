@@ -458,6 +458,27 @@ class RecipeCompilerTest {
         assertEquals("longest_prefix", jn.get("match"), "LOOKUP-1: the join's match rides the compile");
     }
 
+    /** LOOKUP-1 P1b: a recipe's keyed join keeps every setting (a keyed join compiles to a steps: entry). */
+    @Test
+    @SuppressWarnings("unchecked")
+    void aKeyedRecipeJoinKeepsItsSettings() {
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) (List<?>) recipe.get("steps");
+        steps.add(steps.size() - 1, step("transform", new LinkedHashMap<>(Map.of(
+                "join", "references/dial_digit", "on", List.of("SERVED_MSISDN", "OTHER_MSISDN"),
+                "match", "longest_prefix", "key", "dial_digit_key", "columns", List.of("provider_desc"),
+                "default", List.of("provider_desc=Unknown"), "exact_when", "dm_ind = '1'"))));
+        Map<String, Object> out = RecipeCompiler.compile(recipe);
+        Map<String, Object> join = null;
+        for (Object s : (List<?>) out.get("steps"))
+            if (s instanceof Map<?, ?> m && m.get("join") instanceof Map<?, ?> j) join = (Map<String, Object>) j;
+        assertNotNull(join, () -> "no steps: join in " + out);
+        assertEquals("dial_digit_key", join.get("key"));
+        assertEquals(List.of("provider_desc"), join.get("columns"));
+        assertEquals(List.of("provider_desc=Unknown"), join.get("default"));
+        assertEquals("dm_ind = '1'", join.get("exact_when"));
+    }
+
     @Test
     void transformJoinWithoutOnRefuses() {
         Map<String, Object> recipe = linearRecipe("/data/db");

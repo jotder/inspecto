@@ -787,6 +787,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             this.jobs.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
             this.jobs.pipelineOutputStores(this::pipelineOutputStoresForAudit);   // MNT-4: orphan output_store detection
             this.jobs.componentRegistry(this::componentRegistry);    // resolve `use:` bindings before a run
+            this.jobs.pipelineConfigs(this::loadedPipelines);        // a Job's join binds reference/<pipeline> by name
             wireJobClaims(this.jobs);                                // §5.2: cron arming + authored-pipeline exclusion
         }
         this.semanticModels    = List.copyOf(semanticModels);
@@ -1957,7 +1958,8 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             created.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
             created.pipelineOutputStores(this::pipelineOutputStoresForAudit);   // MNT-4: orphan output_store detection
             created.componentRegistry(this::componentRegistry);    // resolve `use:` bindings before a run
-            wireJobClaims(created);                                // §5.2: cron arming + authored-pipeline exclusion
+            created.pipelineConfigs(this::loadedPipelines);        // a Job's join binds reference/<pipeline> by name
+            wireJobClaims(created);                              // §5.2: cron arming + authored-pipeline exclusion
             created.notificationStore(notifications);              // notification_prune maintenance task
             created.eventStore(events);                            // event_prune maintenance task (COMPLY-3)
             created.objects(this.objects().orElse(null));           // recon.run promotion (seam; empty on Basic)

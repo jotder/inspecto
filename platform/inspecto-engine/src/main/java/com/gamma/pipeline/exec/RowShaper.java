@@ -1170,6 +1170,14 @@ public final class RowShaper {
                     + "' — use one of " + JOIN_MATCHES);
         String ref = references.resolve(conn, reference);
         String data = table(prefix, PipelineRel.DATA);
+        if (strOrNull(node, "key") != null) {
+            keyedJoin(conn, node, input, ref, on, match, data);
+            return List.of(new Relation(PipelineRel.DATA, data));
+        }
+        for (String k : JOIN_KEYED_KEYS)
+            if (node.cfg(k) != null)
+                throw new IllegalArgumentException("transform.join node '" + node.id() + "' sets '" + k
+                        + "', which needs key: — the Reference's key column each 'on' column is looked up in");
         if (JOIN_MATCH_LONGEST_PREFIX.equals(match)) {
             longestPrefixJoin(conn, node, input, ref, on, data);
             return List.of(new Relation(PipelineRel.DATA, data));
@@ -1184,6 +1192,169 @@ public final class RowShaper {
     public static final String JOIN_MATCH_EXACT = "exact";
     public static final String JOIN_MATCH_LONGEST_PREFIX = "longest_prefix";
     public static final List<String> JOIN_MATCHES = List.of(JOIN_MATCH_EXACT, JOIN_MATCH_LONGEST_PREFIX);
+
+    /** The keyed form's settings (LOOKUP-1 P1b); each needs {@code key:}. */
+    public static final List<String> JOIN_KEYED_KEYS =
+            List.of("columns", "as", "default", "exact_when", "duplicates", "order_by");
+    /** Every config key {@code transform.join} reads — what every save path must carry. */
+    public static final List<String> JOIN_CONFIG_KEYS;
+    static {
+        List<String> all = new ArrayList<>(List.of("reference", "on", "match", "key"));
+        all.addAll(JOIN_KEYED_KEYS);
+        JOIN_CONFIG_KEYS = List.copyOf(all);
+    }
+    /** {@code duplicates:} values for the keyed form; absent means {@code refuse}. */
+    public static final List<String> JOIN_DUPLICATES = List.of("refuse", "first", "last");
+
+    /**
+     * The keyed form ({@code key:} set, LOOKUP-1 P1b): every {@code on} column is an <b>independent</b> input looked
+     * up in the Reference's {@code key} column — e.g. {@code on: [SERVED_MSISDN, OTHER_MSISDN, THIRD_PARTY_MSISDN]}
+     * against {@code key: dial_digit_key}. Keys compare as text. For each {@code on} column the step adds the
+     * Reference's {@code columns} (all of them by default, the key included — which is the matched prefix), named
+     * by {@code as} ({@code "{on}_"} by default, {@code {on}} replaced by the input column's name).
+     *
+     * <ul>
+     *   <li>{@code match: longest_prefix} — the Reference row whose key is the longest prefix of the value;
+     *       {@code exact_when: <predicate over Reference columns>} marks rows that match only the WHOLE value
+     *       (toll-free and premium numbers). {@code match: exact} — key equal to the value.</li>
+     *   <li>{@code default: [col=value, …]} (or a map) — the value a returned column takes when nothing matched.</li>
+     *   <li>{@code duplicates: refuse} (default) refuses a Reference with two rows for one key, naming it;
+     *       {@code first} / {@code last} keep one per key by {@code order_by} (an SQL expression over Reference
+     *       columns), ties broken by the row's text so the pick is deterministic.</li>
+     * </ul>
+     *
+     * <p>Each distinct value across all {@code on} columns is resolved ONCE, then joined back per column by
+     * equality — call records repeat numbers, so this does the prefix work once per number, not once per row and
+     * column (measured 2026-11-22: 5M rows × 3 numbers, 6.6 s as three prefix joins, 2.3 s this way).
+     */
+    private static void keyedJoin(Connection conn, PipelineNode node, String input, String ref, List<String> on,
+                                  String match, String data) throws SQLException {
+        String id = node.id();
+        String keyCol = strOrNull(node, "key");
+        boolean prefix = JOIN_MATCH_LONGEST_PREFIX.equals(match);
+        String exactWhen = strOrNull(node, "exact_when");
+        if (exactWhen != null && !prefix)
+            throw new IllegalArgumentException("transform.join node '" + id + "': exact_when only applies to "
+                    + "match: longest_prefix");
+        String dups = strOrNull(node, "duplicates");
+        if (dups == null) dups = "refuse";
+        if (!JOIN_DUPLICATES.contains(dups))
+            throw new IllegalArgumentException("transform.join node '" + id + "' has duplicates '" + dups
+                    + "' — use one of " + JOIN_DUPLICATES);
+        String orderBy = strOrNull(node, "order_by");
+        if (!"refuse".equals(dups) && orderBy == null)
+            throw new IllegalArgumentException("transform.join node '" + id + "': duplicates: " + dups
+                    + " needs order_by: — which row of a repeated key is the " + dups);
+
+        List<String> refCols = columnsOf(conn, ref);
+        if (refCols.stream().noneMatch(c -> c.equalsIgnoreCase(keyCol)))
+            throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has no key column '"
+                    + keyCol + "' (it has " + refCols + ")");
+        List<String> returned = new ArrayList<>();
+        if (node.cfg("columns") instanceof List<?> l) {
+            for (Object o : l) if (o != null && !o.toString().isBlank()) returned.add(o.toString().trim());
+        } else if (strOrNull(node, "columns") != null) returned.add(strOrNull(node, "columns"));
+        if (returned.isEmpty()) returned.addAll(refCols);
+        for (String c : returned)
+            if (refCols.stream().noneMatch(r -> r.equalsIgnoreCase(c)))
+                throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has no column '"
+                        + c + "' to return (it has " + refCols + ")");
+        String as = node.cfg("as") == null ? "{on}_" : node.cfg("as").toString();
+        if (on.size() > 1 && !as.contains("{on}"))
+            throw new IllegalArgumentException("transform.join node '" + id + "': with several 'on' columns, as: "
+                    + "must contain {on}, or their returned columns would share names");
+        Map<String, String> defaults = joinDefaults(node);
+        for (String c : defaults.keySet())
+            if (returned.stream().noneMatch(r -> r.equalsIgnoreCase(c)))
+                throw new IllegalArgumentException("transform.join node '" + id + "': default names '" + c
+                        + "', which is not a returned column " + returned);
+
+        // output names: refuse a clash with the input or between themselves rather than let DuckDB suffix one
+        List<String> inputCols = columnsOf(conn, input);
+        java.util.Set<String> taken = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        taken.addAll(inputCols);
+        StringBuilder select = new StringBuilder("SELECT i.*");
+        StringBuilder joins = new StringBuilder();
+        for (int n = 0; n < on.size(); n++) {
+            String o = on.get(n);
+            if (inputCols.stream().noneMatch(c -> c.equalsIgnoreCase(o)))
+                throw new IllegalArgumentException("transform.join node '" + id + "': the rows have no column '" + o
+                        + "' to look up");
+            String h = "__lk_h" + n;
+            for (String c : returned) {
+                String name = as.replace("{on}", o) + c;
+                if (!taken.add(name))
+                    throw new IllegalArgumentException("transform.join node '" + id + "': the returned column '"
+                            + name + "' clashes with a column the rows already have (or another returned one) — "
+                            + "change as:");
+                String dflt = defaults.entrySet().stream().filter(e -> e.getKey().equalsIgnoreCase(c))
+                        .map(Map.Entry::getValue).findFirst().orElse(null);
+                String v = h + "." + q(c);
+                select.append(", ").append(dflt == null ? v : "coalesce(" + v + ", " + sqlStr(dflt) + ")")
+                        .append(" AS ").append(q(name));
+            }
+            joins.append(" LEFT JOIN __lk_hit ").append(h).append(" ON ").append(h).append(".__lk_v = CAST(i.")
+                    .append(q(o)).append(" AS VARCHAR)");
+        }
+
+        String key = q(keyCol);
+        String refRows = "SELECT t.*, CAST(t." + key + " AS VARCHAR) AS __lk_key FROM " + q(ref) + " t WHERE t."
+                + key + " IS NOT NULL";
+        if ("refuse".equals(dups)) {
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT __lk_key FROM (" + refRows + ") GROUP BY __lk_key"
+                         + " HAVING count(*) > 1 ORDER BY __lk_key LIMIT 1")) {
+                if (rs.next())
+                    throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has more "
+                            + "than one row for " + keyCol + "=" + rs.getString(1) + " — clean the Reference, or "
+                            + "set duplicates: first|last with order_by:");
+            }
+        } else {
+            refRows += " QUALIFY row_number() OVER (PARTITION BY CAST(t." + key + " AS VARCHAR) ORDER BY (" + orderBy
+                    + ") " + ("last".equals(dups) ? "DESC" : "ASC") + " NULLS LAST, CAST(t AS VARCHAR)) = 1";
+        }
+        String kept = String.join(", ", returned.stream().map(c -> "r." + q(c)).toList());
+        StringBuilder values = new StringBuilder();
+        for (String o : on) {
+            if (values.length() > 0) values.append(" UNION ");
+            values.append("SELECT CAST(").append(q(o)).append(" AS VARCHAR) AS __lk_v FROM ").append(q(input));
+        }
+        String hit = prefix
+                ? "SELECT v.__lk_v, " + kept + " FROM __lk_val v JOIN __lk_len l ON l.__lk_n <= length(v.__lk_v)"
+                  + " JOIN __lk_ref r ON r.__lk_key = left(v.__lk_v, l.__lk_n)"
+                  + (exactWhen == null ? "" : " AND (NOT coalesce(r.__lk_exact, false) OR l.__lk_n = length(v.__lk_v))")
+                  + " QUALIFY row_number() OVER (PARTITION BY v.__lk_v ORDER BY l.__lk_n DESC) = 1"
+                : "SELECT v.__lk_v, " + kept + " FROM __lk_val v JOIN __lk_ref r ON r.__lk_key = v.__lk_v";
+        exec(conn, "CREATE TABLE " + q(data) + " AS"
+                + " WITH __lk_ref AS MATERIALIZED (SELECT *" + (exactWhen == null ? "" : ", (" + exactWhen + ") AS __lk_exact")
+                + " FROM (" + refRows + ")),"
+                + " __lk_val AS MATERIALIZED (SELECT DISTINCT __lk_v FROM (" + values + ") WHERE __lk_v IS NOT NULL),"
+                + " __lk_len AS (SELECT DISTINCT length(__lk_key) AS __lk_n FROM __lk_ref),"
+                + " __lk_hit AS MATERIALIZED (" + hit + ")"
+                + " " + select + " FROM " + q(input) + " i" + joins);
+    }
+
+    /** {@code default:} as a map, or a list of {@code col=value} entries (the Step form has no map field). */
+    private static Map<String, String> joinDefaults(PipelineNode node) {
+        Map<String, String> out = new LinkedHashMap<>();
+        Object d = node.cfg("default");
+        if (d instanceof Map<?, ?> m) {
+            m.forEach((k, v) -> out.put(String.valueOf(k).trim(), v == null ? null : String.valueOf(v)));
+        } else if (d instanceof List<?> l) {
+            for (Object o : l) {
+                String s = String.valueOf(o);
+                int eq = s.indexOf('=');
+                if (eq <= 0)
+                    throw new IllegalArgumentException("transform.join node '" + node.id() + "': default entry '" + s
+                            + "' is not column=value");
+                out.put(s.substring(0, eq).trim(), s.substring(eq + 1));
+            }
+        } else if (d != null) {
+            throw new IllegalArgumentException("transform.join node '" + node.id() + "': default must be a list of "
+                    + "column=value entries or a map");
+        }
+        return out;
+    }
 
     /**
      * {@code match: longest_prefix} (LOOKUP-1 P1): the LAST {@code on} column is matched by prefix — a

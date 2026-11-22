@@ -616,8 +616,9 @@ public final class PipelineJobRunner implements Job {
             public List<Path> readDirs(String reference) {
                 EnrichmentConfig.Reference parsed;
                 try { parsed = parsedReference(reference); } catch (RuntimeException unresolvable) { return List.of(); }
-                if (!parsed.byName() || pipelines == null) return List.of();
-                return pipelines.get().stream()
+                List<com.gamma.etl.PipelineConfig> loaded = pipelines == null ? null : pipelines.get();
+                if (!parsed.byName() || loaded == null) return List.of();
+                return loaded.stream()
                         .filter(p -> p.identity().pipelineName().equals(parsed.ref()) && p.producesReference()
                                 && p.dirs() != null && p.dirs().database() != null && !p.dirs().database().isBlank())
                         .findFirst()

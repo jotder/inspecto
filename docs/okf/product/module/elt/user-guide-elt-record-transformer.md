@@ -347,6 +347,36 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
   - Anything else is refused at save (`JOIN_MATCH_UNKNOWN`) and at run.
   - Written the same way in a `steps:` `join:` entry, the `processing.join` block, and a recipe
     `transform: {join: references/x, on: k, match: longest_prefix}`; every save path keeps it.
+- **The keyed form (since 2026-11-22, `LOOKUP-1` P1b)** — set `key:` (the Reference's key column) and every `on`
+  column becomes an **independent** input looked up in it: three phone-number columns against one dialling-code
+  table in one Step. Keys compare as text.
+  ```toon
+  - join:
+      reference: reference/dial_digit
+      key: dial_digit_key
+      match: longest_prefix                       # or exact
+      on[3]: SERVED_MSISDN, OTHER_MSISDN, THIRD_PARTY_MSISDN
+      columns[3]: dial_digit_key, iso_country_code, provider_desc   # default: every Reference column
+      as: "{on}_"                                 # default; → OTHER_MSISDN_provider_desc
+      default[1]: dial_digit_key=-99              # or a map; the value when nothing matched
+      exact_when: "dm_ind = '1'"                  # longest_prefix only: rows matching only the whole value
+      duplicates: last                            # refuse (default) | first | last
+      order_by: update_date_time                  # an expression over Reference columns; needed by first/last
+  ```
+  - Returning the key column gives the **matched prefix**. A returned name clashing with an input column (or with
+    another returned one) is refused, naming it — change `as`. With several `on` columns `as` must contain `{on}`.
+  - `exact_when` rows count only when the key equals the whole value; a longer value falls back to a shorter key —
+    the legacy telco rule for toll-free and premium numbers.
+  - `duplicates: refuse` names the first repeated key; `first`/`last` keep one row per key by `order_by`, ties broken
+    by the row's text so the pick never changes between runs.
+  - **Cost:** every distinct value across all `on` columns is resolved once (N distinct × |distinct key lengths| hash
+    probes), then joined back per column by equality. Measured 2026-11-22 with a 9.8k-key dialling-code table: 5M
+    rows × 3 numbers in 2.3 s (three separate prefix joins: 6.6 s). No cache to keep: each run reads the current
+    Reference.
+  - A keyed join always saves as a `steps:` entry — `processing.join` holds `reference`/`on`/`match` only. Save
+    refuses impossible settings with `JOIN_KEYED_INVALID` (a keyed setting without `key`, `exact_when` with `exact`,
+    an unknown `duplicates`, `first`/`last` without `order_by`, several `on` with an `as` lacking `{on}`); whether
+    the named columns exist is checked when it runs.
 - **`reference` is autocomplete with real suggestions, never a hard constraint:**
   `referenceOptionLoader()` (`entity-option-loaders.ts`) calls `CatalogService.references()`
   (backed by `GET /catalog/references`, `CatalogRoutes.java`) and maps results to

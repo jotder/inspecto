@@ -349,6 +349,26 @@ class RecipeConverterTest {
         assertEquals(cfg, back);
     }
 
+    /** LOOKUP-1 P1b: a keyed join in a steps: chain round-trips through the recipe with every setting. */
+    @Test
+    void aKeyedJoinStepRoundTripsWithAllItsSettings() {
+        Map<String, Object> join = new LinkedHashMap<>();
+        join.put("reference", "reference/dial_digit");
+        join.put("on", List.of("SERVED_MSISDN", "OTHER_MSISDN"));
+        join.put("match", "longest_prefix");
+        join.put("key", "dial_digit_key");
+        join.put("columns", List.of("dial_digit_key", "provider_desc"));
+        join.put("as", "{on}_");
+        join.put("default", List.of("dial_digit_key=-99"));
+        join.put("exact_when", "dm_ind = '1'");
+        join.put("duplicates", "last");
+        join.put("order_by", "update_date_time");
+        Map<String, Object> cfg = stepsConfig(new LinkedHashMap<>(Map.of("join", join)));
+
+        Map<String, Object> back = RecipeCompiler.compile(RecipeConverter.toRecipe(cfg), cfg, false);
+        assertEquals(cfg, back);
+    }
+
     /**
      * A kind the recipe does not model must REFUSE, never shorten the chain — the whole point of the
      * fix is that a step the projection cannot speak is loud rather than absent.

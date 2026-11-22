@@ -342,6 +342,40 @@ class PipelineValidatorTest {
         assertTrue(codes(PipelineValidator.validate(blanks)).contains(PipelineValidator.JOIN_ON_MISSING));
     }
 
+    /** LOOKUP-1 P1b: keyed-form settings the config alone shows cannot run are refused at save. */
+    @Test
+    void aKeyedJoinsImpossibleSettingsAreRefusedAtValidation() {
+        Map<String, Object> ok = new java.util.LinkedHashMap<>(Map.of("reference", "reference/dd", "key", "dial_digit_key",
+                "match", "longest_prefix", "on", List.of("a", "b"), "exact_when", "dm_ind = '1'",
+                "duplicates", "last", "order_by", "update_date_time"));
+        assertFalse(codes(PipelineValidator.validate(joinGraph(ok))).contains(PipelineValidator.JOIN_KEYED_INVALID));
+        for (Map<String, Object> bad : List.<Map<String, Object>>of(
+                Map.of("reference", "reference/dd", "on", "a", "columns", List.of("x")),             // no key:
+                with(ok, "match", "exact"),                                                     // exact_when + exact
+                with(ok, "duplicates", "newest"),
+                with(without(ok, "order_by"), "duplicates", "first"),
+                with(ok, "as", "dd_"))) {                                                       // 2 on, no {on}
+            PipelineValidator.Result r = PipelineValidator.validate(joinGraph(bad));
+            assertTrue(codes(r).contains(PipelineValidator.JOIN_KEYED_INVALID), () -> bad + " → " + r.issues());
+        }
+    }
+
+    private static PipelineGraph joinGraph(Map<String, Object> cfg) {
+        return new PipelineGraph("keyed", true, List.of(new PipelineNode("j", "transform.join", cfg, null)), List.of());
+    }
+
+    private static Map<String, Object> with(Map<String, Object> m, String k, Object v) {
+        Map<String, Object> c = new java.util.LinkedHashMap<>(m);
+        c.put(k, v);
+        return c;
+    }
+
+    private static Map<String, Object> without(Map<String, Object> m, String k) {
+        Map<String, Object> c = new java.util.LinkedHashMap<>(m);
+        c.remove(k);
+        return c;
+    }
+
     /** LOOKUP-1: a join's match must be one RowShaper.join runs; exact and longest_prefix are clean. */
     @Test
     void aJoinWithAnUnknownMatchIsRefusedAtValidation() {

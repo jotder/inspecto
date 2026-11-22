@@ -28,7 +28,9 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **166<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 150<!--count:backlog-p3--> × P3** —
+> **168<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 152<!--count:backlog-p3--> × P3** —
+> ⬆ **167 → 168 (P3 151 → 152) on 2026-11-22**: filed P3 defect `STORE-FAMILY-PARITY-GOLDEN-STALE-1` [items: module.ops, module.acquire · kind: defect] — `StoreFamilyParityTest` red on `master` since the acquisition ledger's default became `db`.
+> ⬆ **166 → 167 (P3 150 → 151) on 2026-11-22**: filed P3 defect `JOIN-LIST-FIELDS-BLANK-1` [items: module.elt, layer.product · kind: defect] — the Pipeline editor shows "—" for a `steps:` join's list settings; and narrowed `LOOKUP-1` (P1b built).
 > ⬆ **164 → 166 (P3 148 → 150) on 2026-11-22**: filed P3 defects `REPROCESS-REFUSAL-TEST-MODE-1` [items: module.elt · kind: defect] and `IMPORT-LOADER-NAMES-UNRESERVED-1` [items: module.config · kind: defect] — two `inspecto-processor` tests red on `master`, found by the `LOOKUP-1` affected run.
 > ⬆ **163 → 164 (P2 15 → 16) on 2026-11-22**: filed P2 feature `LOOKUP-1` [items: module.elt, module.engine · kind: feature] — Lookup over a Reference Dataset, exact and best match, batch and row-at-a-time engines; plan `superpower/2026-11-22-reference-lookup-plan.md`.
 > ⬆ **160 → 163 (P3 145 → 148) on 2026-11-21**: pinned DuckDB 2.0.1.0 LTS (operator) and filed P3 chore `DUCKDB-2-0-1-HAVANA-TZ-1` [items: module.engine, module.analytics · kind: chore], P3 feature `NUM-ROUND-TYPE-AWARE-1` [items: module.elt · kind: feature] and P3 defect `RECORD-TRANSFORM-NUM-VARCHAR-1` [items: module.elt · kind: defect]; every shipped `round(DOUBLE, n)` now rounds via DECIMAL. Narrowed `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1`: the canary still passes on 2.0.1 (the bug remains), reported on duckdb/duckdb#28947.
@@ -106,10 +108,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > ↔ **89 (no count change, P2 13, P3 76) on 2026-11-17**: narrowed P3 `LEGAL-HOLD-SCOPE-1` [items: module.ops, addon.incidents, module.engine · kind: feature] (MoSCoW S12) — a legal hold now protects an Incident's evidence (its notes and attachments, Alerts, links, the Case it is in and that Case's Investigations, its audit days): the three retention tasks skip it and seven delete paths answer 409, audited, until release. Left open: `partition_prune` (no Incident-to-partition lineage) and a screen to set a hold.
 > ⬇ **90 → 89 (P3 77 → 76) on 2026-11-17**: closed P3 chore `OPENAPI-SKELETON-SUMMARIES-1` [items: module.api · kind: chore] (MoSCoW C3) — all 439 public operations that were generated skeletons in `docs/api/openapi-v1.json` now carry a summary and a one- or two-sentence description read from their handlers (what it does, the capability, the main refusals), written in the module fragments. "Public" = every `/api/v1` operation registered by shipped code; the one skeleton left, `GET /test-discovered/ping`, is registered only by a test RouteModule. New CI guard `tools/check-openapi-summaries.mjs` fails on a skeleton summary or stock description outside its allow-list, which may only shrink. `x-generated` stays: those operations still have no request/response schemas.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 150<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 152<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 150<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 166<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 152<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 168<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -236,6 +238,10 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Authoring surfaces
 
+- **P3** · `STORE-FAMILY-PARITY-GOLDEN-STALE-1` — **`StoreFamilyParityTest.everyFamilyResolvesExactlyAsItDidBeforeTheRosterWasOpened` (inspecto-ops) fails on `master`, alone or in its module: its golden `store-family-parity.golden.txt` (last updated `a808e3c0b`, 2026-10-10) still has the acquisition ledger defaulting to `memory`, and `309c1332a` (`BASIC-ELT-PROFILE-1` B3 part 2, 2026-11-20) made it `db` — five lines differ, all `ACQUISITION_LEDGER`.** Confirm the new addresses are intended, then regenerate the golden. A red here also SKIPS every module that depends on inspecto-ops in an affected run. Found 2026-11-22 by the `LOOKUP-1` P1b affected run. [items: module.ops, module.acquire · kind: defect]
+
+- **P3** · `JOIN-LIST-FIELDS-BLANK-1` — **the Pipeline editor shows "—" for every list setting of a `steps:` join (Join keys, Columns to return, When nothing matches), in View and Edit and in the field's editor, though `GET …/pipelines/<p>/graph/raw` returns the lists.** Reproduced 2026-11-22 on the shipped `spaces/default` `join_step` (`on[1]: REGION`), so it predates `LOOKUP-1`; string and select settings show. Risk: a save from that form may write the lists back empty — check before fixing. [items: module.elt, layer.product · kind: defect]
+
 - **P3** · **AUTHORING-REDESIGN-1** — **Only letter (d) of the authoring redesign is left; no `CREATE MACRO` exists in any main source.** Parked by the operator until a named consumer exists. → `okf/product/module/elt/plan-board-detail.md` § AUTHORING-REDESIGN-1 [items: module.elt, layer.product · kind: feature · hold: demand]
 
 - **P3** · `PIPELINE-SAVE-HELD-TOAST-1` — **the Pipeline editor says *Saved pipeline '<id>'* and clears its unsaved mark for any 2xx, also when an approval policy held the change (202) and nothing was written** (`pipeline-editor.component.ts` `save()`; Risk Scores, Access and Anomaly handle the hold). There is also no screen to turn approval on (`PUT /settings/approval` only), and **Validate** runs in the browser only. Found writing `howto_change_a_pipeline_safely` (plan `2026-11-19-user-enablement-and-agent-kit-plan.md` §4.5). [items: module.elt, module.workflow · kind: defect]
@@ -243,7 +249,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Step catalog & node types
 
-- **P2** · `LOOKUP-1` — **Lookup: exact and best-match key resolution over a Reference Dataset (longest prefix, range, as-of, fuzzy), a batch engine and a row-at-a-time engine, with refresh, versioning and hit/miss counts.** Feature set approved 2026-11-22 (D-LK1…D-LK6). **P1a built 2026-11-22:** `transform.join` `match: exact | longest_prefix`. Open: normalized, range, as-of, fuzzy, the `lookup()` scalar, counts, the cache lifecycle and the row-at-a-time engine. → `superpower/2026-11-22-reference-lookup-plan.md` [items: module.elt, module.engine · kind: feature]
+- **P2** · `LOOKUP-1` — **Lookup: exact and best-match key resolution over a Reference Dataset (longest prefix, range, as-of, fuzzy), a batch engine and a row-at-a-time engine, with refresh, versioning and hit/miss counts.** Feature set approved 2026-11-22 (D-LK1…D-LK6). **P1a + P1b built 2026-11-22:** `transform.join` `match: exact | longest_prefix` and the keyed form (several numbers, returned columns, not-found value, exact-only rows, repeated keys). Open: normalized, range, as-of, fuzzy, the `lookup()` scalar, counts, the Lookups screen, the row-at-a-time engine. → `superpower/2026-11-22-reference-lookup-plan.md` [items: module.elt, module.engine · kind: feature]
 
 - **P3** · **Step Processor catalog** — **Build the next Step Processor only when the operator names it; each partial processor is its own product decision.** Waiting on the operator to name the next one. → `okf/product/module/elt/plan-board-detail.md` § Step Processor catalog [items: module.elt · kind: feature]
 

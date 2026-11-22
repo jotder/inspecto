@@ -1721,6 +1721,65 @@
       "label" : "Longest prefix (last key)"
     } ],
     "help" : "Exact: every key equal. Longest prefix: the last key matches the Reference row whose key is its longest prefix (e.g. phone number to operator)."
+  }, {
+    "key" : "key",
+    "label" : "Reference key",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "Set it to look up each 'Join keys' column on its own in this Reference column — e.g. three phone-number columns against one dialling-code table.",
+    "placeholder" : "dial_digit_key"
+  }, {
+    "key" : "columns",
+    "label" : "Columns to return",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "Reference columns added for each looked-up column (all when empty). The key column returns the matched prefix.",
+    "placeholder" : "provider_desc"
+  }, {
+    "key" : "as",
+    "label" : "Name prefix",
+    "type" : "string",
+    "tier" : "optional",
+    "default" : "{on}_",
+    "help" : "Prefix of each returned column; {on} is the looked-up column's name."
+  }, {
+    "key" : "default",
+    "label" : "When nothing matches",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "column=value: the value a returned column takes when no Reference row matched.",
+    "placeholder" : "dial_digit_key=-99"
+  }, {
+    "key" : "exact_when",
+    "label" : "Exact-only rows",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "A condition on Reference columns: rows meeting it match only the whole value, never as a prefix (toll-free and premium numbers).",
+    "placeholder" : "dm_ind = '1'"
+  }, {
+    "key" : "duplicates",
+    "label" : "Repeated keys",
+    "type" : "select",
+    "tier" : "optional",
+    "default" : "refuse",
+    "options" : [ {
+      "value" : "refuse",
+      "label" : "Refuse the run"
+    }, {
+      "value" : "first",
+      "label" : "Keep the first"
+    }, {
+      "value" : "last",
+      "label" : "Keep the last"
+    } ],
+    "help" : "What to do when the Reference has two rows for one key."
+  }, {
+    "key" : "order_by",
+    "label" : "Order repeated keys by",
+    "type" : "string",
+    "tier" : "optional",
+    "help" : "An expression over Reference columns deciding which row is first or last.",
+    "placeholder" : "update_date_time"
   } ],
   "transform.sql" : [ {
     "key" : "sql",

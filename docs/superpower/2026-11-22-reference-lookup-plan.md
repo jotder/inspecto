@@ -1,6 +1,6 @@
 # Lookup — exact and best-match key resolution over a Reference Dataset
 
-**State:** 🟡 **IN FLIGHT 2026-11-22 — P1a built (`transform.join` `match: exact | longest_prefix`); rest of P1 and P2–P4 open.**
+**State:** 🟡 **IN FLIGHT 2026-11-22 — P1a (`match: exact | longest_prefix`) and P1b (the keyed form: several numbers, returned columns, not-found value, exact-only rows, repeated keys) built; rest of P1 and P2–P4 open.**
 Board row `LOOKUP-1` [items: module.elt, module.engine]. Hubs on ship: `okf/product/module/elt/` (authoring,
 Step) and `okf/product/module/engine/` (execution, point engine).
 
@@ -101,6 +101,18 @@ run — not a per-row call.
 3. **P3 — point engine:** JVM indexes per mode, memory cap and spill, warm-up and readiness, Control API
    test-a-key / stats / refresh, parity suite against the batch engine.
 4. **P4 — fuzzy:** batch (blocking key, score, top-k), then point (candidate index); test console UI.
+
+**P1b built 2026-11-22 (operator: "go and create a demo" on a client dialling-code table):** the keyed form —
+`key:` names the Reference's key column and every `on` column is an independent input; `columns`, `as`,
+`default`, `exact_when`, `duplicates` + `order_by`. Each distinct value is resolved once (5M rows × 3 numbers:
+2.3 s). Proven on a local demo against the client's legacy `getDialDigit`: 6,000 of 6,000 numbers identical. A keyed
+join saves as `steps:` only. **Decision D-LK8 (2026-11-22, operator asked "no in-memory cache?"):** batch Pipelines
+keep no cache — the join's own per-run hash table is the cache and each run sees the current Reference; an in-memory
+engine waits for a row-at-a-time caller (P3). As built: `user-guide-elt-record-transformer.md` §8.7.
+**Fixed on the way (2026-11-22):** a Job's join could not bind `reference/<pipeline>` BY NAME in a running server —
+`CollectorService` never called `JobService.pipelineConfigs(..)`, and `JobService` handed each runner the field's
+value at registration (before the host sets it). Both fixed; `JobByNameReferenceJoinTest` boots the service and runs
+the Job. The demo then read the client table as a versioned `scd2` Reference by name, 6,000 of 6,000 again.
 
 **P1a built 2026-11-22 (operator: "longest_prefix, exact first"):** `transform.join` gained `match: exact |
 longest_prefix` — exact is the unchanged default; longest prefix on the last `on` column, earlier columns equal;

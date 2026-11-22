@@ -34,6 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `JOIN-LIST-FIELDS-BLANK-1` | P3 | defect | the Pipeline editor shows "—" for every list setting of a steps: join (Join keys, Columns to return, When nothing matches), in View and E… | — |
 | `AUTHORING-REDESIGN-1` | P3 | feature | Only letter (d) of the authoring redesign is left; no CREATE MACRO exists in any main source. | demand |
 | `PIPELINE-SAVE-HELD-TOAST-1` | P3 | defect | the Pipeline editor says *Saved pipeline '<id>'* and clears its unsaved mark for any 2xx, also when an approval policy held the change (2… | — |
 | `PIPELINE-INBOX-FIELD-1` | P3 | feature | the Pipeline editor has no field for a Pipeline's inbox folder (dirs.poll), and the Collectors page lists Collectors but cannot create one; | — |
