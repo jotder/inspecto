@@ -260,61 +260,58 @@ fifty").
 
 ### S01 · Cold open · ~25 s
 - Voice: A customer calls. Her wallet is empty. Two hours earlier, her number was moved to a new SIM, and she did not ask for it. [pause 0.6] A SIM swap is a routine request, so who made this one? By Friday there are thirty customers with the same story.
-- Chip: none
 - Action: cold open over the Telecom Space's home page; at 0:20 the intro card ("Case file · Forty swaps, one login · Telecom · Standard").
 - Impact: none.
 
 ### S02 · Three files, no single answer · ~30 s
 - Voice: The swap is in one file, the staff login in another, the wallet payments in a third. [pause 0.5] Each file is clean on its own. A login is a staff member's account that can request a swap, and most swaps are honest. Only the links put a swap and an empty wallet on one line.
-- Chip: none
 - Action: story card "Who is who": *a login*, *a swapped number*, *a new handset*; the saved view opens behind it.
 - Impact: the story card names the roles.
 
 ### S03 · Linking the pieces · ~30 s
-- Voice: A Job reads the files and links the pieces. A swap links to the login that made it. A wallet links to the handset it was used from, and to the wallets it paid. [pause 0.4] The Dataset says which end is which, and the time puts them in order.
+- Voice: A Job reads the three files and links the pieces into one Dataset. Each row has two ends, the source and the destination, and both are telecom entities. [pause 0.4] A kind says what the link is: a swap, a handset, a payment. An amount and a time ride along, so the links fall in order.
 - Chip: Data · Mappings
-- Action: rail Data ▸ the screening links Dataset ▸ zoom on Mappings. [check in UI: the Dataset name and the link kinds swap, handset and payment]
+- Action: rail Data ▸ the Dataset *mfs_screen_links_dataset* ▸ hold on its Columns card. `[checked live: src and dst are Entity (Telecom entity), kind is a Category, amount a Measure, ts and event_date are Time, via and screen are Details]`
 - Impact: mark the link kinds.
 
 ### S04 · The view of bursts · ~35 s
-- Voice: The saved view draws swaps in bursts: logins, the numbers they swapped, and where the money went afterwards. [pause 0.5] Most of it looks like a busy day in a telecom, with stores and call centres swapping SIMs all day. It is too big to read, so ask a question.
+- Voice: The saved view draws swaps in bursts: logins, the numbers they swapped, and where the money went afterwards. [pause 0.5] Two pictures sit side by side. One is a small tangle. The other is a huge wheel, a single login with a hundred and sixty spokes. It is too big to read, so ask a question.
 - Chip: Saved views · Display options
-- Action: open the saved view *Mfs sim swap bursts* ▸ hold on the two clusters. [check in UI: "node labels off above 80 nodes" and the two clusters]
+- Action: open the saved view *Mfs sim swap bursts* ▸ hold on the small cluster and the large wheel. `[checked live: the caption reads "node labels off above 80 nodes: Display options turns them on"]`
 - Impact: hold on the picture; no mark.
 
 ### S05 · First sweep, and the obvious suspect · ~50 s
 - Voice: Busiest nodes. [pause 0.4] The busiest login has a hundred and sixty swaps. The obvious suspect. But it is a store in a SIM-upgrade drive, and its customers kept their money. Busy is not suspicious. Set it aside, and look at the second name: a call-centre login with forty swaps.
 - Chip: Busiest nodes
-- Action: Busiest nodes ▸ hold on S-72 (160) and S-41 (40) ▸ Add to exclusion list on S-72 is offered, point at it, do not press. [check in UI: the rows S-72, S-41, WL-07938, WL-07936]
+- Action: Busiest nodes ▸ hold on S-72 (160 links) and S-41 (40 links) ▸ point at *Add to exclusion list* on S-72, do not press. `[checked live: the rows are S-72 160, S-41 40, WL-07938 19, WL-07936 16]`
 - Impact: grey "ruled out" marker on S-72, yellow on S-41.
 
 ### S06 · Forty swaps, thirty in ten days · ~45 s
-- Voice: Start from the second name. Forty swaps, and thirty of them fall inside ten days in June. [pause 0.5] Each of those thirty numbers was used from one of six new handsets within the hour. A customer who lost a phone does not do that. A person working down a list does.
+- Voice: Start from the second name. The graph draws S-41 with forty numbers around it, and each one was swapped by this login. [pause 0.5] Now expand one degree. The six new handsets appear, HS-08913 to HS-08918, and the wallets that were used from them. A customer who lost a phone does not do that. A person working down a list does.
 - Chip: Start from these · Expand · G
-- Action: Busiest nodes ▸ S-41 ▸ Start from these ▸ Expand one degree (G) ▸ hold on the swaps and the six handsets. [check in UI: the number of entities drawn and the handset labels]
+- Action: Busiest nodes ▸ S-41 *Start from these* ▸ close the notice ▸ G ▸ *The whole graph* ▸ Expand ▸ hold on the swaps and the handsets. `[checked live: the first view draws 1 entity and 40 linked nodes; the first expand adds 11 nodes and 52 links, the six handsets HS-08913..HS-08918 among them; the Expand panel says the Dataset has no link index yet]`
 - Impact: before/after hold: the swaps and the handsets appear around S-41; mark the six handsets.
 
 ### S07 · Where the money went · ~45 s
-- Voice: Follow the money. Every wallet was drained within two hours, to the same five wallets, and cashed out at two agents. [pause 0.5] Open the table under the graph: each swap, and each payment out of the wallet that followed it, is a row. Thirty empty wallets, five places the money went.
+- Voice: Follow the money. Expand once more from the whole graph. Every wallet was drained within two hours, into the same five wallets, WL-07936 to WL-07940, and cashed out at two agents. [pause 0.5] Open the table under the graph. Each swap and each payment out is a row: from, link kind, to. Thirty empty wallets, five places the money went.
 - Chip: Rows · Expand · G
-- Action: Expand one more degree from the victims ▸ dock ▸ Rows ▸ hold. [check in UI: the five mule wallets WL-07936..07940 and the two agents A-088, A-093]
+- Action: G ▸ *The whole graph* ▸ Expand ▸ dock ▸ Rows ▸ hold on the rows. `[checked live: the Rows tab lists from, link kind, to and count, the first rows WL-00300, WL-00302, WL-00423 swapped_by S-41; the second expand adds two nodes and 45 links; the agents A-088 and A-093 are narrated, confirm them in the Nodes tab]`
 - Impact: mark the five mules and the two agents; before/after hold for the dock.
 
 ### S08 · Make it defensible · ~70 s
-- Voice: The lead has to survive a challenge, so it becomes an Investigation. Open SIM-swap wallet takeover. [pause 0.5] The step log lists every step in order, with who took it and why, and nobody can edit a row afterwards. The team page shows the manager as the second pair of eyes: a big expand waits for approval. And the Dossier packs it all with a seal, so anyone can verify that nothing changed.
+- Voice: The lead has to survive a challenge, so it becomes an Investigation. Open SIM-swap wallet takeover. [pause 0.5] Its step log lists every step in order, with who took it and why, and nobody can edit a row afterwards. The members page shows the reviewer and the manager as the second pair of eyes: a big expand waits for their approval. And the Dossier packs the whole case with a seal, so anyone can verify that nothing changed. We only look here. Nothing is approved or sealed in this film.
 - Chip: Step log · Members · Build Dossier
-- Action: File ▸ Open… ▸ Investigations ▸ *SIM-swap wallet takeover* ▸ dock ▸ Step log ▸ Investigation actions ▸ Members… ▸ Settings ▸ Investigation settings ▸ Dossier ▸ Verify (as F4, F5 and F8; nothing approved or sealed here). [check in UI: the held request's line, "Dossier verified" wording]
+- Action: File ▸ Open… ▸ Investigations ▸ *SIM-swap wallet takeover* ▸ Step log ▸ Investigation actions ▸ Members… ▸ Settings ▸ Investigation settings ▸ hold on the Dossier fold, do not build. `[checked live: the step log rows Start, Annotation 3 ("30 SIMs swapped through this login between 2026-06-08 and 2026-06-17"), Members: analyst lead owner, reviewer, manager, admin lead]`
 - Impact: mark a step row, the held-request line and the verified line.
 
 ### S09 · What the team does next · ~40 s
-- Voice: The lead: one login to investigate, five wallets and two agents to trace. [pause 0.5] The call centre suspends that login's swap right today. The five wallets are frozen. The two agents are asked for the cash-out records. The wallets are kept as an Entity List, so the next case starts from them.
+- Voice: The lead: one login to investigate, five wallets and two agents to trace. [pause 0.5] The call centre suspends that login's swap right today. The five wallets are frozen. The two agents are asked for the cash-out records. The wallets are kept in an Entity List, so the next case starts from them.
 - Chip: Entity Lists
-- Action: rail Entity Lists ▸ the list *Mule wallets to freeze* ▸ hold. [check in UI: the list exists in this Space]
+- Action: rail Entity Lists ▸ hold on the lists of this Space. `[checked live: the Space's Entity Lists are Mule wallets to freeze and Unbilled SIMs, as offered in the node dialog; open the page to read the list rows]`
 - Impact: mark the list row.
 
 ### S10 · The case file · ~25 s
 - Voice: The case file. Lead: one login, five wallets, two agents. Evidence: thirty swaps in ten days, each followed by a drained wallet. Next step: suspend, freeze, trace. [pause 0.6] A swap alone was routine. A payment alone was routine. The links joined them. The same steps run on millions of records and answer in moments. Try it: start from the second name in Busiest nodes.
-- Chip: none
 - Action: case-file card (8 s) and the outro "Next: Teams and four-eyes · training F5".
 - Impact: none.
 
