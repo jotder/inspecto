@@ -34,6 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `IMPORT-LOADER-NAMES-UNRESERVED-1` | P3 | defect | ImportLoaderInventoryTest.everyFixedNameALoaderReadsIsReservedOrAllowedWithAReason fails on master: two fixed names a loader reads — even… | — |
 | `UPLOAD-DEFAULTS-1` | P3 | defect | upload defaults, remainder: | — |
 | `SPACE-CREATE-NAME-1` | P3 | defect | creating a Space ignores name and displayName: | — |
 | `TEMPLATE-GOVERNANCE-1` | P3 | feature | a Space Template carries no governance: | — |

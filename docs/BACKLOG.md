@@ -28,7 +28,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **164<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 148<!--count:backlog-p3--> × P3** —
+> **166<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 16<!--count:backlog-p2--> × P2 · 150<!--count:backlog-p3--> × P3** —
+> ⬆ **164 → 166 (P3 148 → 150) on 2026-11-22**: filed P3 defects `REPROCESS-REFUSAL-TEST-MODE-1` [items: module.elt · kind: defect] and `IMPORT-LOADER-NAMES-UNRESERVED-1` [items: module.config · kind: defect] — two `inspecto-processor` tests red on `master`, found by the `LOOKUP-1` affected run.
 > ⬆ **163 → 164 (P2 15 → 16) on 2026-11-22**: filed P2 feature `LOOKUP-1` [items: module.elt, module.engine · kind: feature] — Lookup over a Reference Dataset, exact and best match, batch and row-at-a-time engines; plan `superpower/2026-11-22-reference-lookup-plan.md`.
 > ⬆ **160 → 163 (P3 145 → 148) on 2026-11-21**: pinned DuckDB 2.0.1.0 LTS (operator) and filed P3 chore `DUCKDB-2-0-1-HAVANA-TZ-1` [items: module.engine, module.analytics · kind: chore], P3 feature `NUM-ROUND-TYPE-AWARE-1` [items: module.elt · kind: feature] and P3 defect `RECORD-TRANSFORM-NUM-VARCHAR-1` [items: module.elt · kind: defect]; every shipped `round(DOUBLE, n)` now rounds via DECIMAL. Narrowed `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1`: the canary still passes on 2.0.1 (the bug remains), reported on duckdb/duckdb#28947.
 > ⬇ **161 → 160 (P3 146 → 145) on 2026-11-21**: closed P3 feature `DERIVED-DATASET-AUTHORING-1` [items: module.config, module.elt · kind: feature] — the how-to `user-guide-howto-derive-a-dataset.md` (a `sql.template` Job writes a store, a Dataset entry registers it, with check blocks) is in the Handbook, and `POST /validate` now covers the Dataset entry (`COMPONENT-VALIDATE-ALL-1`) as it already covered the Job.
@@ -105,10 +106,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > ↔ **89 (no count change, P2 13, P3 76) on 2026-11-17**: narrowed P3 `LEGAL-HOLD-SCOPE-1` [items: module.ops, addon.incidents, module.engine · kind: feature] (MoSCoW S12) — a legal hold now protects an Incident's evidence (its notes and attachments, Alerts, links, the Case it is in and that Case's Investigations, its audit days): the three retention tasks skip it and seven delete paths answer 409, audited, until release. Left open: `partition_prune` (no Incident-to-partition lineage) and a screen to set a hold.
 > ⬇ **90 → 89 (P3 77 → 76) on 2026-11-17**: closed P3 chore `OPENAPI-SKELETON-SUMMARIES-1` [items: module.api · kind: chore] (MoSCoW C3) — all 439 public operations that were generated skeletons in `docs/api/openapi-v1.json` now carry a summary and a one- or two-sentence description read from their handlers (what it does, the capability, the main refusals), written in the module fragments. "Public" = every `/api/v1` operation registered by shipped code; the one skeleton left, `GET /test-discovered/ping`, is registered only by a test RouteModule. New CI guard `tools/check-openapi-summaries.mjs` fails on a skeleton summary or stock description outside its allow-list, which may only shrink. `x-generated` stays: those operations still have no request/response schemas.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 148<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 150<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 16<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 148<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 164<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 150<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 166<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -254,6 +255,8 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Runs, replay & dry runs
 
+- **P3** · `REPROCESS-REFUSAL-TEST-MODE-1` — **`ControlApiReprocessRefusalTest.anArrivalReplaceEverythingSetAsideIsRefused` fails on `master`: its upload sends no arrival `mode`, so Add a file answers 422 (`mode is required and must be replace, append or period`) where the test expects 200.** The mode became required in `aede85280` (`UPLOAD-DEFAULTS-1`); the test was not updated. Fix the test to send `mode: replace`, then confirm the 409 refusal it guards still holds. Found 2026-11-22 by the `LOOKUP-1` affected run; reproduced on clean `1ddd75848`. [items: module.elt · kind: defect]
+
 - **P3** · `QUARANTINE-RELEASE-1` — **a quarantined file has no console action: the Quarantine tab lists files per Pipeline (no run, Consignment or time) and offers only *View the rejected rows*;** the remedy is to repair the file and move it back into the inbox by hand, and *Reprocess this batch* exists for batches only. Found writing `howto_handle_quarantined_rows` (plan `2026-11-19-user-enablement-and-agent-kit-plan.md` §4.5). [items: module.elt, module.processor · kind: feature]
 
 #### Consignments
@@ -278,6 +281,8 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 ### 3.4 Catalog, Onboarding, Datasets & Lineage
 
 #### Onboarding & bundles
+
+- **P3** · `IMPORT-LOADER-NAMES-UNRESERVED-1` — **`ImportLoaderInventoryTest.everyFixedNameALoaderReadsIsReservedOrAllowedWithAReason` fails on `master`: two fixed names a loader reads — `events` (`SpaceDataRoot.java`) and `schema` (`PipelineHistory.java`) — are neither in `ReservedConfigPaths` nor in the test's `ALLOWED` list with a reason, so an import could plant a file under either.** Reserve each, or allow it with the reason it is safe. Found 2026-11-22 by the `LOOKUP-1` affected run; reproduced on clean `1ddd75848`. [items: module.config · kind: defect]
 
 - **P3** · `IMPORT-RUN-REFUSAL-GAPS-1` — **Two kinds of run can still commit while Add data's run-scoped choice is open, and a held claim refuses every manual run (filed 2026-11-20, `BASIC-ELT-PROFILE-1` close).** The import's pre-run step refuses every run but Add data's own while Add data holds the Dataset, but a run whose pre-run step threw goes ahead (`CollectorService.stepRun` carries on past a throwing step; `ImportPreRunSteps` falls back to `scheduled ? SKIP : GO`) and `CollectorService.replayRejects` never reaches `stepRun`; either could commit into the store under an open *Replace everything* or Run now choice. Any holder of the claim (`OnboardImport.IN_FLIGHT`) refuses a manual run, so a claim that is never released blocks them until a restart. → `okf/product/module/elt/spec-arrival-replace.md` [items: module.elt, module.processor · kind: defect]
 - **P3** · `SNAPSHOT-OUTSIDE-RUN-NOW-1` — **A run of a switched Postgres snapshot outside Run now has no column check, no `import.max_rows` cap and only the engine's own fetch wording, and a feed set on a snapshot before the 422 ruling cannot be stopped (filed 2026-11-20, `BASIC-ELT-PROFILE-1` O7 close).** Run now keeps its own export; `POST /pipelines/{id}/run` or a trigger reads through the engine's connector. `DELETE /datasets/{id}/feed` refuses a snapshot, so an older feed on one has no way off. → `okf/product/module/processor/api-onboarding-postgres-snapshot.md` [items: module.elt, module.processor · kind: defect]
