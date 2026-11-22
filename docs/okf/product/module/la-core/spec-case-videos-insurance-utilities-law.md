@@ -216,94 +216,106 @@ code: la/inspecto-la-core
 
 ## LawEnforcement_BurglarySeries
 
-> **Eighteen burglaries, no suspect: a seller, a dealer and a car that is read near eleven scenes** · Standard · Law
-> enforcement Space (`la-law-enforcement`) · saved view `burglary_series` · 4:50
+> **Eighteen burglaries, no suspect: a seller, a dealer and a car** · Standard · Law enforcement Space (`la-law-enforcement`) · saved view `burglary_series` · 4:45
 
-- **Cast:** the seller P-00476 (nine serial matches, all at the dealer DLR-04), the car ZX 9117 X kept by P-05167, a
-  partner at the same address ADR-1377; the second dealer DLR-09 with the sellers P-04874 and P-00785. **Decoy:** the taxi
-  ZX 3465 D, kept by P-05203, read near 54 incidents in the year and none in this series.
+- **Cast:** the seller P-00476 (nine serial matches), the address ADR-1377 where the seller lives, a second person at that
+  address, P-05167, who keeps the car ZX 9117 X, and the dealers DLR-04 and DLR-09 beside the seller. **Decoy:** the taxi
+  ZX 3465 D, kept by P-05203, read near 54 incidents in the year and none in this series; it has no link to this
+  series, so it is not on the saved view and is spoken, not marked.
 - **Stakes:** a detective sergeant leading a burglary series; the scene evidence is exhausted.
-- **Vocabulary:** *serial match* (a stolen item's serial number found in a dealer's sale), *plate reader camera* (a camera
+- **Vocabulary:** *serial match* (a stolen item's serial number turning up in a sale), *plate reader camera* (a camera
   that logs number plates with place and time), defined once in S02.
 - **Ground truth:** `tools/la-police-ground-truth.json`, key `burglary_series`: 18 incidents, vehicle read near 11 of
   them (`vehicle_scenes`), plate `ZX 9117 X`, keeper `P-05167`, home `ADR-1377`, sellers `P-00476` / `P-04874` /
-  `P-00785`, dealers `DLR-04` / `DLR-09`, 13 serial matches (P-00476: 9, all at DLR-04; P-04874: 3 and P-00785: 1, at
-  DLR-09), `lookalike_taxi` plate `ZX 3465 D` keeper `P-05203` near 54 incidents; `tools/gen-la-police-data.py` header
-  (story 1: the car is read within 2 km and 30 minutes of 11 of the 18 scenes; the keeper is the seller's partner at the
-  same address). **Corrected against v1 and the plan table:** the plan table's "vehicle seen at four scenes" is wrong
-  (eleven); v1 says P-00476 sold "at two dealers" but the data puts P-00476 at DLR-04 only and the two other sellers at
-  DLR-09. The decoy is the taxi, not "the nearest suspect".
-- **Before:** fresh unzip of `la-standard.zip`, Law enforcement Space, Demo Analyst, saved view; ids read in full.
-  [check in UI: whether the taxi plate is drawn in the saved view; if not, the S05 voice names it and the mark falls on
-  an empty place, so say "not drawn" in the voice]
+  `P-00785`, dealers `DLR-04` / `DLR-09`, 13 serial matches (P-00476: 9; P-04874: 3 and P-00785: 1),
+  `lookalike_taxi` plate `ZX 3465 D` keeper `P-05203` near 54 incidents; `tools/gen-la-police-data.py` header (story 1: the
+  car is read within 2 km and 30 minutes of 11 of the 18 scenes; the keeper is the seller's partner at the same address).
+  **Corrected against v1 and the plan table:** "vehicle seen at four scenes" is wrong (eleven); the decoy is the taxi, not
+  "the nearest suspect". The saved view shows P-00476 linked to both dealers (`sold_item` links to DLR-04 and DLR-09), so
+  the voice says two dealers sit beside the seller and does not claim all sales were at one.
+- **Screen truth** (checked live on a fresh Standard unzip, Demo Analyst, 2026-11-22): the saved view *Burglary series* is
+  already drawn, every id readable (no masking); Busiest nodes answers ZX 9117 X (15 links), P-00476 (12), P-04874 (6),
+  DLR-04 (5), ADR-2129 (4). *Start from these* on the P-00476 row draws one entity and twelve linked nodes: nine incidents
+  (kind `item_match`), ADR-1377 (`lives_at`), DLR-04 and DLR-09. A double-click on ADR-1377 brings P-05167 in; a
+  double-click on P-05167 brings the car ZX 9117 X in (`keeper_of`). The Data page describes the Dataset
+  `police_property_links_dataset`: src and dst are Entities (Police entity), kind a Category, amount a Measure, ts and
+  event_date Time. The Entity Lists page holds *Burglary series sellers* (Watch these, Police entity, 3 members).
+- **Before:** fresh unzip of `la-standard.zip` with the fake Demo Auth sign-in, Law enforcement Space, Demo Analyst,
+  saved view; nothing is saved or changed in this film.
 - **Lead:** three lines of enquiry (the dealers, the sellers, the car and its keeper's address), shown as actions.
   **What would change our mind:** if the serials matched only by make and model they would be coincidences; here the
   serial numbers match. **Next actions:** visit DLR-04 and DLR-09; keep the three sellers as the Entity List *Burglary
-  series sellers*; ask the camera team for the car's reads against the seven scenes it was not read near.
+  series sellers* (it already exists, shown in S09); ask the camera team for the car's reads against the seven scenes
+  it was not read near.
 - **Voice style:** plates spoken by the lexicon ("zed ex nine one one seven ex"); "eleven of the eighteen" is a story
   figure, not a Dataset size; pace defaults, the reveal slower.
 - **Try it:** in the saved view, find the seller whose address is the car keeper's address. **Check:** why is the
   taxi, seen near more incidents, not a lead? *Answer: it was near none of this series' scenes; the links tell a busy
   car from a connected one.*
 
-### S01 · Cold open  ~20 s
-- Voice: Eighteen burglaries in three months, across two neighbourhoods. No usable fingerprints. No witness. [pause 0.4] A detective sergeant has a map of pins and no suspect. [pause 0.6] But stolen goods have to be sold, and a sale leaves a record.
-- Chip: none.
-- Action: still of the saved view, blurred; story card: *the seller · the dealer · the car*.
+### S01 · Cold open · ~22 s
+- Beat: cold
+- Voice: Eighteen burglaries in three months, across two neighbourhoods, and no usable fingerprints or witnesses. A detective sergeant has a map full of pins and no suspect. [pause 0.6] But stolen goods have to be sold, and every sale leaves a record.
+- Action: cold open over the Law enforcement Space's home page.
 - Impact: none.
 
-### S02 · Why the usual checks miss it  ~30 s
-- Voice: Each burglary is one report. Each second-hand sale is one dealer entry. Nobody reads the two together. [pause 0.4] A serial match is a stolen item's serial number turning up in a sale. A plate reader camera logs cars all day, and most of what it logs is noise. [pause 0.4] Kept apart, the records hide the series.
-- Chip: none.
-- Action: intro card (title, Law enforcement Space, *Standard*, slate bar); the saved view fades in.
-- Impact: none.
+### S02 · Why the usual checks miss it · ~32 s
+- Beat: steady
+- Intro: Eighteen burglaries, no suspect | Law enforcement Space
+- Story: the seller = a person who sells second-hand goods to a dealer | the dealer = a second-hand shop that logs every sale | the car = a vehicle read by plate reader cameras near the scenes
+- Voice: Each burglary is one report, and each second-hand sale is one entry in a dealer's book, and nobody reads the two together. [pause 0.4] A serial match is a stolen item's serial number turning up in a sale. A plate reader camera logs cars all day, and almost all of it is noise. [pause 0.4] Kept apart, these records hide the series.
+- Action: intro card (title, Law enforcement Space, *Standard*, slate bar); the saved view fades in behind the story card.
+- Impact: the story card names the three roles.
 
-### S03 · The data, in one breath  ~30 s
-- Voice: Dealers log every sale: the seller, the item, the serial number, the date. Burglary reports log the stolen serials. Cameras log plates with a place and a time. [pause 0.4] A Job links sellers to dealers, items to the burglaries they came from, people to addresses, and cars to the people who keep them.
+### S03 · The data, in one breath · ~32 s
+- Voice: Dealers log every sale: the seller, the item, the serial number. Burglary reports log the stolen serials, and cameras log plates with a place and a time. [pause 0.4] A Job links sellers to dealers, items to the incidents they came from, people to addresses, and cars to the people who keep them. Each link has two ends, and both are police entities.
 - Chip: Data · Mappings
-- Action: rail ▸ Data ▸ `police_property_links_dataset` ▸ zoom on the Mappings area. [check in UI]
-- Impact: mark the from and to columns once.
+- Action: rail ▸ Data ▸ `police_property_links_dataset` ▸ hold on its Columns card (src and dst are Entities, kind a Category, ts a Time).
+- Impact: mark the src and dst columns once.
 
-### S04 · The question  ~35 s
-- Voice: Open the saved view Burglary series. The incidents, the items, the sellers, the dealers, the addresses, and the cars read near the scenes. [pause 0.4] The view draws itself, and every id reads in full. A busy picture. Who is behind it?
-- Chip: File · Open… · Saved views
-- Action: File ▸ Open… ▸ Saved views ▸ *Burglary series* ▸ Open ▸ hold. [check in UI: the labels are on at this size]
-- Impact: computed impact on the open.
+### S04 · The question · ~30 s
+- Voice: Open the saved view Burglary series. [pause 0.4] The incidents, the stolen items, the sellers, the dealers, the addresses and the cars draw themselves, and every id reads in full. It is a busy picture, so who is behind it?
+- Chip: Saved views
+- Action: open the saved view *Burglary series* ▸ hold.
+- Impact: none.
 
-### S05 · First sweep, and the decoy  ~45 s
-- Voice: Press Busiest nodes. [pause 0.4] A number plate leads, ZX 9117 X. Then a seller, P-00476. A car, and a seller. Are they connected? [pause 0.5] First, one more car: a taxi read near fifty-four incidents this year, none of them in this series. A busy car is not a connected car. Set the taxi aside.
+### S05 · First sweep, and the decoy · ~48 s
+- Voice: Press Busiest nodes, and a number plate leads: ZX 9117 X, with fifteen links, then a seller, P-00476, with twelve. A car and a seller. [pause 0.5] One more car deserves a thought: a taxi the cameras read near fifty-four incidents this year. None of them is in this series, so it is not even on this graph. A busy car is not a connected car.
 - Chip: Busiest nodes
-- Action: toolbox ▸ On screen ▸ Busiest nodes ▸ hold on the top rows (ZX 9117 X, P-00476). [check in UI: the order of the top rows]
-- Impact: grey *ruled out* mark on the taxi's plate (or the note "not drawn"); the answer list held 3 s.
+- Action: toolbox ▸ On screen ▸ Busiest nodes ▸ hold on the top two answers (ZX 9117 X 15 links, P-00476 12 links).
+- Impact: mark the two top answers.
 
-### S06 · Start from the seller  ~40 s
-- Voice: Start from the seller. In the Investigation tab, choose Start from, one entity, pick the Dataset, and type the id. [pause 0.4] The product says how many links this seller has, and when they were first and last seen, before anything is drawn.
-- Chip: Investigation · Start from · One entity
-- Action: Investigation tab ▸ Start from *One entity* ▸ Dataset `police_property_links_dataset` ▸ type `P-00476` ▸ hold on the preview ▸ Start.
-- Impact: mark the preview line; computed impact on Start.
+### S06 · Start from the seller · ~34 s
+- Voice: Start from the seller. Press Start from these beside P-00476 on the answer, and the graph redraws around that one person. [pause 0.4] The banner says what it drew: one entity and twelve linked nodes.
+- Chip: Start from these
+- Action: Busiest nodes ▸ the P-00476 row ▸ Start from these ▸ hold on the banner and the drawn graph.
+- Impact: before/after hold: the seller's graph appears.
 
-### S07 · The reveal  ~40 s
-- Voice: P-00476 sold items from one burglary after another, nine times, all at one dealer, DLR-04. And lives at ADR-1377. [pause 0.7] At the same address, a partner keeps the car, ZX 9117 X. The cameras read that car near eleven of the eighteen scenes.
-- Chip: Select neighbours
-- Action: select P-00476 ▸ Select neighbours ▸ hover DLR-04, ADR-1377 and the car. [check in UI: the car links through the partner or the address]
-- Impact: yellow marks on P-00476, DLR-04, ADR-1377 and ZX 9117 X.
+### S07 · The reveal · ~48 s
+- Beat: reveal
+- Story: off
+- Voice: Look at what surrounds the seller: nine incidents, each tied by a serial match, and the address ADR-1377 where the seller lives. Two dealers sit beside the seller too, DLR-04 and DLR-09. [pause 0.5] Double-click the address, and a second person who lives there appears, P-05167. Double-click that person, and the car they keep appears. [pause 0.7] The car is ZX 9117 X, the plate the cameras read near eleven of the eighteen scenes.
+- Chip: Expand · double-click
+- Action: close the banner ▸ double-click ADR-1377 ▸ P-05167 appears ▸ double-click P-05167 ▸ ZX 9117 X appears.
+- Impact: marks on P-05167 and on the car ZX 9117 X.
 
-### S08 · Evidence you can defend  ~40 s
-- Voice: Open the table under the graph. Each sale is a row: the seller, the dealer, the item, the serial. [pause 0.4] The serials match the stolen reports, number for number. What would change this? If they matched only by make and model, they would be coincidences. They match by serial. [pause 0.4] Two more sellers use the second dealer, DLR-09. They are leads of their own.
+### S08 · Evidence you can defend · ~42 s
+- Voice: Is this a guess, or can a colleague check it? Open the table under the graph, and each serial match is a row with the incident, the link kind and the seller: nine rows, nine incidents. [pause 0.4] What would change this? If the serials matched only by make and model, they would be coincidences. They match by serial number, so every line can be checked.
 - Chip: Rows
-- Action: dock ▸ Rows ▸ filter to P-00476 ▸ hold on the sale rows; then filter to DLR-09. [check in UI: the Rows columns show the serial]
-- Impact: mark the sale rows; hold the table 3 s.
+- Action: the dock chevron ▸ Rows ▸ hold on the item_match rows.
+- Impact: mark the rows.
 
-### S09 · What the team does next  ~40 s
-- Voice: The lead is three lines of enquiry: the dealers, the sellers, and the car with its keeper's address. [pause 0.5] On Monday: visit DLR-04 and DLR-09. Keep the three sellers as an Entity List, so every graph marks them. And ask the camera team for the car's reads against the seven scenes it was not seen near.
+### S09 · What the team does next · ~42 s
+- Voice: The lead is three lines of enquiry: the dealers, the sellers, and the car with its keeper's address. [pause 0.5] On Monday, visit DLR-04 and DLR-09. Keep the three sellers as an Entity List, so every graph in this Space marks them. And ask the camera team for the car's reads against the seven scenes it was not seen near.
 - Chip: Entity Lists
-- Action: rail ▸ Entity Lists ▸ *Burglary series sellers* ▸ hold on its members. [check in UI: the list holds the three sellers]
-- Impact: mark the list name and its member count.
+- Action: rail ▸ Entity Lists ▸ hold on *Burglary series sellers* (Watch these, Police entity, 3 members).
+- Impact: mark the list's row.
 
-### S10 · The case file  ~25 s
-- Voice: That is the case file. [pause 0.4] Lead: a seller, two dealers and a car. Evidence: serial matches, and the car read near eleven scenes. Next: visit, list, ask. To make it defensible for a team, watch Make it defensible. Try it: find the seller who lives at the keeper's address.
-- Chip: none.
-- Action: case-file card, 8 s; outro with the links to the shared module and to training episode D3.
+### S10 · The case file · ~28 s
+- Beat: close
+- Casefile: Lead: a seller, two dealers and a car | Evidence: nine serial matches, and the car read near eleven of the eighteen scenes | Next: visit the two dealers; keep the three sellers as a list; ask for the car's other reads | Try it: find the seller who lives at the keeper's address
+- Voice: That is the case file. [pause 0.4] Lead: a seller, two dealers and a car. Evidence: nine serial matches, and a car read near eleven scenes. Next step: visit, list, ask. [pause 0.6] Each sale and each camera read was ordinary alone. Only the links joined them. The same steps run on millions of records and answer in moments. Try it: find the seller who lives at the keeper's address.
+- Action: case-file card (8 s: Lead · Evidence · Next step · Try it), then the outro "Next: Make it defensible".
 - Impact: none.
 
 ## Shared_MakeItDefensible
