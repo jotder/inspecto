@@ -63,70 +63,76 @@ shared module (§4.4).
 - **Cast:** the four rotating firms (CO-0117, CO-0242, CO-0388, CO-0561) and the director shared by two of them (P-00001). **Decoy:** the three firms that win most of Highways South (CO-0021, CO-0055, CO-0090) against real rivals. Ids readable.
 - **Stakes:** a procurement integrity officer in a roads authority. Every tender had several bidders, so by the book each was competitive. A later review will ask why nobody asked.
 - **Vocabulary:** *tender*, a call for bids on one contract. *Cover bid*, a bid made to lose. *Rotation*, bidders taking turns to win. Each said once in S02.
-- **Ground truth:** `tools/gen-la-procurement-data.ground-truth.json` · `bid_rotation` (`firms`, `unit` Highways North, `tenders_in_order` 24, `winners_in_order`, `shared_by`, `shared_director` P-00001, `lookalike_firms`, `lookalike_unit` Highways South, `lookalike_win_share` 0.744); the losers bid 5–12 % above the winner, `gen-la-procurement-data.py` line 13 and the story-1 block (`add_bid(… base * rng.uniform(1.05, 1.12))`). **Plan table corrected:** the table said "the lowest bidder every time"; the data says the decoy is the three *most frequent winners*, who win a large share against real rivals, and the lead is the order of winners.
-- **Lead:** four firms are the only bidders on twenty-four Highways North tenders and win in a fixed order, the losers always between five and twelve percent above the winner; two of them share a director. **What would change our mind:** one real third bidder with a different price on any of the twenty-four, or a director who left before the first bid. **Next actions:** refer the twenty-four tenders for audit; keep the four firms and the director as an Entity List so the next tender is marked; ask for the document authors and the addresses of the four bids.
+- **Ground truth:** `tools/gen-la-procurement-data.ground-truth.json` · `bid_rotation` (`firms`, `unit` Highways North, `tenders_in_order` 24, `winners_in_order`, `shared_by`, `shared_director` P-00001, `lookalike_firms`, `lookalike_unit` Highways South, `lookalike_win_share` 0.744); the losers bid 5–12 % above the winner, `gen-la-procurement-data.py` line 13 and the story-1 block.
+- **Screen truth** (checked live on a fresh Standard unzip, Demo Analyst, 2026-11-22): the saved view *Bid rotation* draws 512 nodes and 1,291 links, so labels show only on hover; Busiest nodes answers CO-0021 (147 links), CO-0055 (132), CO-0090 (124), CO-0242 (36) and CO-0388 (34). *Start from these* on CO-0242 draws one entity and thirty linked nodes: the tenders it bid on or won, and four directors. A double-click on P-00001 brings in CO-0561 and the address AD-00001. The Rows table lists the link kinds `directed_by`, `bid_on` and `won` (CO-0242: 36 rows). Ids are readable, nothing is masked.
+- **Before:** fresh unzip of `la-standard.zip` with the fake Demo Auth sign-in, Public sector Space, Demo Analyst; nothing is saved or changed.
+- **Lead:** four firms are the only bidders on twenty-four Highways North tenders and win in a fixed order, the losers always between five and twelve percent above the winner; two of them share a director. **What would change our mind:** one real third bidder with a different price on any of the twenty-four, or a director who left before the first bid. **Next actions:** refer the twenty-four tenders for audit; ask for the document authors and addresses of the four bids; keep the four firms and the director as an Entity List.
 - **Voice style:** cold open 1.04; the reveal scene (S06) holds 0.7 s before "Two rivals, one director." Lexicon: CO-0242 "c o zero two four two", P-00001 "p zero zero zero zero one"; say *tender* as "tender", not "T".
 - **Try it:** on the shipped zip, open the saved view *Bid rotation* and run Busiest nodes. Which names lead, and are they the rotation? *Answer: the leaders are the three firms that win most of Highways South; they face real rivals. The rotation is further down, at the firms with thirty-odd links.*
 - **Check:** why is the firm that wins most often not the lead? *Answer: winning often against real rivals is competition; the lead is firms that never face one and take turns.*
 
-### S01 · Four firms, twenty-four tenders  ~25 s
-- Voice: You are a procurement integrity officer for a roads authority. [pause 0.4] Every tender on your desk had several bidders. The lowest price won, and the file says it was competitive. [pause 0.6] A reviewer reads one tender at a time, and finds nothing wrong. This film is about what happens when you read them together.
-- Chip: none (cold open on the Space's home page)
-- Action: cold open on the home page of the Public sector Space, saved views in view; then the intro card (*Bid rotation*, *Public sector*, *Standard*).
+### S01 · Four firms, twenty-four tenders · ~25 s
+- Beat: cold
+- Voice: You are a procurement integrity officer for a roads authority. [pause 0.4] Every tender on your desk had several bidders, the lowest price won, and the file says it was competitive. [pause 0.6] A reviewer reads one tender at a time and finds nothing wrong. This film is about what shows up when you read them together.
+- Action: cold open on the home page of the Public sector Space, saved views in view.
 - Impact: none.
 
-### S02 · Why each tender looks fine  ~30 s
-- Voice: A tender with four bids passes the competition check. [pause 0.3] The winner is the lowest bidder, so it passes the price check. The paperwork is complete, so it passes the audit. Each tender is clean on its own. [pause 0.5] A cover bid is a bid made to lose, placed so the tender looks contested. Rotation means the bidders take turns to win. Neither shows in one tender. Both show in the links between tenders and bidders.
-- Chip: none
-- Action: still on the home page; the story card *Who is who* appears: *the winners*, *the losers*, *the shared director*.
-- Impact: none (the story card is the picture).
+### S02 · Why each tender looks fine · ~32 s
+- Beat: steady
+- Intro: Bid rotation | Public sector Space
+- Story: the winners = the firms that take the contract in turn | the losers = firms that bid to lose | the shared director = one person who directs two of the rivals
+- Voice: A tender with four bids passes the competition check, the winner is the lowest bidder so it passes the price check, and the paperwork is complete so it passes the audit. [pause 0.5] A cover bid is a bid made to lose, placed so the tender looks contested. Rotation means the bidders take turns to win. Neither shows in one tender, and both show in the links between tenders.
+- Action: story card "Who is who" over the home page.
+- Impact: the story card names the three roles.
 
-### S03 · The data in one breath  ~30 s
-- Voice: Every bid lands as a record: the tender, the bidder, the price, the time, and the address it came from. [pause 0.3] A Job reads those records and links each bidder to the tenders it bid on, and each firm to its directors. [pause 0.4] Firms, tenders and people are the entities. Every bid is a link between a firm and a tender.
-- Chip: Mappings · Data
-- Action: rail ▸ Data ▸ the procurement links Dataset ▸ zoom on the Mappings area (From, To, Link kind). [check in UI: the Mappings area of `procurement_links_dataset`]
-- Impact: mark the From and To columns of the mapping.
+### S03 · The data in one breath · ~30 s
+- Voice: Every bid lands as a record: the tender, the bidder, the price and the time. [pause 0.3] A Job reads those records and links each bidder to the tenders it bid on, and each firm to its directors. [pause 0.4] Firms, tenders and people are the entities, and every bid is a link between a firm and a tender.
+- Chip: Data · Mappings
+- Action: rail ▸ Data ▸ `procurement_links_dataset` ▸ hold on its Columns card.
+- Impact: mark the src and dst columns once.
 
-### S04 · The question  ~25 s
-- Voice: Open the saved view Bid rotation. [pause 0.4] It draws the bidders, the tenders and who directs which firm. The question is simple. Who really competes, and who only appears to? [pause 0.5] The picture is dense, as a real tender book is. We need the product to point.
-- Chip: File · Open… · Saved views
-- Action: File ▸ Open… ▸ Saved views ▸ *Bid rotation* ▸ hold on the drawn graph; Display options ▸ node labels on. [check in UI: the canvas draws a dense graph; labels are on hover above 1,000 links]
-- Impact: before/after hold: the graph appears; mark the dense centre.
+### S04 · The question · ~28 s
+- Voice: Open the saved view Bid rotation. [pause 0.4] It draws the bidders, the tenders and who directs which firm, and it is dense, as a real tender book is. The question is simple: who really competes, and who only appears to? We need the product to point.
+- Chip: Saved views
+- Action: open the saved view *Bid rotation* ▸ hold on the drawn graph (labels appear on hover only above one thousand links).
+- Impact: none.
 
-### S05 · The sweep points at the wrong firms  ~40 s
-- Voice: Ask the first question: who has the most links? Press Busiest nodes. [pause 0.5] Three firms tower over the list. They win most of the southern tenders. Check them, because that is what a reviewer would do. [pause 0.4] Others bid against them. They skip tenders. The lowest bid wins, and the price gaps are wide. These three win often because they are good. Set them aside.
+### S05 · The sweep points at the wrong firms · ~42 s
+- Voice: Ask the first question: who has the most links? Press Busiest nodes. [pause 0.5] Three firms tower over the list, with well over a hundred links each. They win most of the southern tenders, so a reviewer would check them first. [pause 0.4] But others bid against them, the prices are far apart, and they win because they are good. Set them aside.
 - Chip: Busiest nodes
-- Action: toolbox ▸ Quick questions ▸ Busiest nodes ▸ hold on the ranked list; click the top name ▸ the three lookalike firms shown. [check in UI: the three leaders are CO-0021, CO-0055 and CO-0090]
-- Impact: mark the three leaders grey with *ruled out* (the decoy marker).
+- Action: toolbox ▸ Quick questions ▸ Busiest nodes ▸ hold on the ranked list (CO-0021 147, CO-0055 132, CO-0090 124, then CO-0242 36, CO-0388 34).
+- Impact: grey *ruled out* mark over the three leaders (the decoy marker).
 
-### S06 · The pattern is further down  ~40 s
-- Voice: Look lower in the list. [pause 0.4] The next firms have far fewer links, thirty-six and thirty-four. Open one of them and look at what it shares. Select the person P-00001, and focus on them. [pause 0.7] This one person directs two companies, and both are among the four that bid on every northern tender. Two rivals, one director.
-- Chip: Node details · Focus
-- Action: click `P-00001` twice ▸ Node details ▸ Focus; then select the two directed firms. [check in UI: P-00001 is linked to CO-0242 and CO-0561]
-- Impact: mark P-00001 and its two firms in yellow, the lead.
+### S06 · The pattern is further down · ~42 s
+- Beat: reveal
+- Story: off
+- Voice: Look lower in the list. [pause 0.4] The next firms have far fewer links, thirty-six and thirty-four. Start from one of them, and the graph shows the tenders it bid on, and the people who direct it. [pause 0.5] Double-click one of those directors, P-00001, and a second firm appears. [pause 0.7] Two rivals, one director.
+- Chip: Start from these · Expand
+- Action: Busiest nodes ▸ the CO-0242 row ▸ Start from these ▸ close the banner ▸ double-click P-00001 ▸ CO-0561 appears.
+- Impact: marks on P-00001 and on CO-0561 in yellow, the lead.
 
-### S07 · The evidence you can quote  ~40 s
-- Voice: Is this a guess? [pause 0.4] Open the Rows tab under the graph. Every line is a row: a bid, a firm, a tender. Four firms are the only bidders on twenty-four northern tenders. [pause 0.4] They win in turn, in the same order, and the losers always sit five to twelve percent above the winner. Never identical. Each row can be quoted, sorted and exported.
+### S07 · The evidence you can quote · ~42 s
+- Voice: Is this a guess? [pause 0.4] Open the Rows tab under the graph. Every line is a row: a firm, a link kind and a tender, so you can see who directs the firm, who bid, and who won. [pause 0.4] Across the twenty-four northern tenders, four firms are the only bidders and they win in turn, in the same order. The losers always sit five to twelve percent above the winner, never identical. Each row can be quoted, sorted and exported.
 - Chip: Rows
-- Action: dock ▸ Rows ▸ sort by tender ▸ hold on the pattern of winners.
-- Impact: mark the winning column; the four firms by colour.
+- Action: dock ▸ Rows ▸ hold on the `directed_by`, `bid_on` and `won` rows of CO-0242.
+- Impact: mark the first rows.
 
-### S08 · What would change our mind  ~20 s
-- Voice: Be fair to the firms. [pause 0.3] A single real third bidder, with a different price, on any of the twenty-four tenders would weaken this. So would a director who had left before the first bid. Neither is in the data. These are the two facts to check first.
-- Chip: none
-- Action: the Rows tab stays open; the story card shows *what would change our mind*.
+### S08 · What would change our mind · ~22 s
+- Voice: Be fair to the firms. [pause 0.3] One real third bidder with a different price, on any of the twenty-four tenders, would weaken this. So would a director who had left before the first bid. Neither is in the data, and these are the two facts to check first.
+- Action: the Rows tab stays open.
 - Impact: none.
 
-### S09 · What the team does next  ~40 s
-- Voice: This is a lead, so the work starts here. [pause 0.4] First, refer the twenty-four tenders for audit. Second, ask for the document authors and addresses of the four bids. Third, keep the four firms and the director together, so the next tender they appear on is marked. [pause 0.3] That is an Entity List. On the Entity Lists page, press New list.
+### S09 · What the team does next · ~40 s
+- Voice: This is a lead, so the work starts here. [pause 0.4] First, refer the twenty-four tenders for audit. Second, ask for the document authors and addresses of the four bids. Third, keep the four firms and the director together as an Entity List, so the next tender they appear on is marked. [pause 0.3] That is the Entity Lists page, and New list opens the form.
 - Chip: Entity Lists · New list…
-- Action: rail ▸ Entity Lists ▸ New list… ▸ the form (Title, Purpose, Entity Type) ▸ Cancel (nothing is created). [check in UI: the form fields]
-- Impact: mark the form's Title and Purpose.
+- Action: rail ▸ Entity Lists ▸ hold ▸ New list… ▸ the form opens ▸ Cancel (nothing is created).
+- Impact: none.
 
-### S10 · The case file  ~20 s
-- Voice: The lead: four firms, one order, one shared director. [pause 0.4] The evidence: the rows of twenty-four tenders. The next step: audit, authors and addresses, and an Entity List. [pause 0.6] To make it defensible, see the Make it defensible module. To try it yourself, open Bid rotation on the shipped zip.
-- Chip: none
-- Action: the case-file card (*Lead*, *Evidence*, *Next step*, *Try it*); outro card.
+### S10 · The case file · ~24 s
+- Beat: close
+- Casefile: Lead: four firms, one order, one shared director | Evidence: the rows of twenty-four tenders, four bidders only | Next: refer the tenders for audit; ask for the bid authors and addresses; keep the firms as a list | Try it: run Busiest nodes and find the rotation below the leaders
+- Voice: The lead: four firms, one order, one shared director. [pause 0.4] The evidence: the rows of twenty-four tenders. The next step: audit, authors and addresses, and an Entity List. [pause 0.6] Each tender was clean on its own, and only the links showed the rotation. Try it: run Busiest nodes, and find the rotation below the leaders.
+- Action: case-file card (8 s: Lead · Evidence · Next step · Try it), then the outro.
 - Impact: none.
 
 ## PublicSector_AddressFarm
