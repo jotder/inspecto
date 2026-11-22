@@ -102,6 +102,38 @@ run — not a per-row call.
    test-a-key / stats / refresh, parity suite against the batch engine.
 4. **P4 — fuzzy:** batch (blocking key, score, top-k), then point (candidate index); test console UI.
 
+**P1d — the join output model (proposed 2026-11-22, operator):** each looked-up number fetches its OWN set of columns
+under its OWN names, and the user sees what a join adds before running it.
+- **Per-input mappings with rename** — one Step, one pass over the Reference, a mapping per `on` column, each with its
+  own column list and output names (`Reference column: output name`), so the output matches a legacy layout exactly:
+  ```toon
+  lookups[3]:
+    - on: SERVED_MSISDN
+      columns: {dial_digit_key: SERVED_MSISDN_DIAL_DIGIT_KEY, provider_desc: SERVED_MSISDN_OPER}
+      default: {SERVED_MSISDN_DIAL_DIGIT_KEY: -99}
+    - on: OTHER_MSISDN
+      columns: {dial_digit_key: OTHER_MSISDN_DIAL_DIGIT_KEY, event_category_key: EVENT_CATEGORY_KEY}
+    - …
+  ```
+  Today's `on` / `columns` / `as` stay valid as the shorthand for one mapping per `on` column.
+- **"Columns this Step adds"** — a read-only table under the join in the Step form (output column · type · from ·
+  looked up by), computed from the Reference's real columns; a clash or a missing column shows before saving. The same
+  list feeds the next Step's pickers and records each added column's origin in the output Dataset's metadata (shared
+  with the Job graph plan, JG2).
+- **Optional match details** per mapping: `matched_key` (the key or prefix that matched) and `match_kind`
+  (`exact` / `prefix` / `range` / `none`).
+- **Several joins** read as such on the canvas: each join labelled *Reference · match*; *Add another lookup* inserts
+  the next join (Job graph plan, JG2).
+- **Hit / miss counts** per mapping per run (already in P1), with a sample of unmatched values.
+
+**Known limits of P1c (open, from its review):** a `TIMESTAMPTZ` value against a `DATE` bound is turned into a date in
+the server's session time zone, which the user guide does not say yet; a `DATE` value against text bounds stops with a
+raw DuckDB error that does not name the Step (refuse it by name, or parse the bounds).
+
+**Moved out (2026-11-22):** "as-of event time" and "version used in lineage" (P2) are now the core of
+[`2026-11-22-dated-reference-runs-plan.md`](2026-11-22-dated-reference-runs-plan.md); the Job's own graph is
+[`2026-11-22-job-graph-plan.md`](2026-11-22-job-graph-plan.md).
+
 **P1c built 2026-11-22 (operator: "start range"):** `match: range` on the keyed join — `from`/`to` Reference
 columns, inclusive bounds, an empty bound open-ended, compared in the value's own type; `filter` (a condition on
 Reference rows, every keyed mode); overlapping periods refused by name unless `duplicates: first|last` + `order_by`.
