@@ -25,6 +25,51 @@ function roundTrip(cfg: Record<string, unknown>, specs: AttributeSpec[], isAcqui
     }).config;
 }
 
+describe('a type: list field is seeded with its list (JOIN-LIST-FIELDS-BLANK-1)', () => {
+    const joinSpecs = [
+        spec('reference'),
+        spec('on', { type: 'list' }),
+        spec('columns', { type: 'list' }),
+        spec('default', { type: 'list' }),
+    ];
+    const join = (config: Record<string, unknown>) => node(config, { type: 'transform.join' });
+
+    it('seeds the array itself, not the comma-joined string the flattener makes', () => {
+        const split = splitNodeConfig(
+            join({ reference: 'reference/dd', on: ['SERVED', 'OTHER'], columns: ['a', 'b'], default: ['a=-99'] }),
+            joinSpecs,
+            false,
+        );
+        expect(split.schemaInitial['on']).toEqual(['SERVED', 'OTHER']);
+        expect(split.schemaInitial['columns']).toEqual(['a', 'b']);
+        expect(split.schemaInitial['default']).toEqual(['a=-99']);
+        expect(split.schemaInitial['reference']).toBe('reference/dd');
+    });
+
+    it('seeds a scalar spelling (on: grp) as a one-entry list', () => {
+        expect(splitNodeConfig(join({ on: 'grp' }), joinSpecs, false).schemaInitial['on']).toEqual(['grp']);
+    });
+
+    it('keeps a list whose entry holds a comma whole (a default value may)', () => {
+        const split = splitNodeConfig(join({ default: ['desc=a, b'] }), joinSpecs, false);
+        expect(split.schemaInitial['default']).toEqual(['desc=a, b']);
+    });
+
+    it('an untouched save writes the lists back unchanged', () => {
+        const cfg = { reference: 'reference/dd', on: ['SERVED', 'OTHER'], columns: ['a', 'b'], default: ['a=-99'] };
+        const n = join(cfg);
+        const split = splitNodeConfig(n, joinSpecs, false);
+        const saved = buildConfiguredNode({
+            node: n,
+            specs: joinSpecs,
+            formValues: split.schemaInitial,
+            extras: Object.fromEntries(split.extraRows.map((r) => [r.key, r.value])),
+            isAcquisition: false,
+        }).config;
+        expect(saved).toEqual(cfg);
+    });
+});
+
 describe('splitNodeConfig / buildConfiguredNode round-trip', () => {
     /**
      * ⚠ The regression this file exists for. A node's config is "the raw config-file section verbatim",

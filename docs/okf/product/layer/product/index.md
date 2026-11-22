@@ -34,7 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `JOIN-LIST-FIELDS-BLANK-1` | P3 | defect | the Pipeline editor shows "—" for every list setting of a steps: join (Join keys, Columns to return, When nothing matches), in View and E… | — |
 | `AUTHORING-REDESIGN-1` | P3 | feature | Only letter (d) of the authoring redesign is left; no CREATE MACRO exists in any main source. | demand |
 | `ADD-DATA-DUPLICATE-CHECK-UI-1` | P3 | feature | Add data cannot set a Basic import's duplicate check (duplicate.mode, on_change); only the Pipelines editor's Collector stage can (filed… | operator |
 | `PIPELINE-EDITOR-OUTPUT-LOAD-1` | P3 | feature | The Pipeline editor cannot set output.load / output.period_column (filed 2026-11-20, BASIC-ELT-PROFILE-1 O6 close). | operator |

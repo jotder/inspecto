@@ -30,11 +30,30 @@ export interface NodeConfigSplit {
  * matched no spec, fell into the free-form editor as a JSON *string*, and then — free-form being
  * applied last on save — overwrote the schema form's own nested value. D4, load half.
  */
+/** The raw value under a flat key (`a__b` → `config.a.b`), or undefined. */
+function valueAt(config: Record<string, unknown> | undefined, flatKey: string): unknown {
+    let cur: unknown = config;
+    for (const seg of flatKey.split(KEY_SEP)) {
+        if (cur === null || typeof cur !== 'object' || Array.isArray(cur)) return undefined;
+        cur = (cur as Record<string, unknown>)[seg];
+    }
+    return cur;
+}
+
 export function splitNodeConfig(node: AuthoredNode, specs: AttributeSpec[], isAcquisition: boolean): NodeConfigSplit {
     const schemaKeys = new Set(specs.map((s) => s.key));
     const schemaInitial: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(flattenBlock(node.config))) {
         if (schemaKeys.has(key)) schemaInitial[key] = value;
+    }
+    // A `type: 'list'` field edits a string[], but flattenBlock joins every array into ONE comma string — the
+    // list control then showed nothing, and a save wrote that string back (JOIN-LIST-FIELDS-BLANK-1). Seed it
+    // from the raw value at its path instead: an array as its entries, a scalar (`on: grp`) as one entry.
+    for (const s of specs) {
+        if (s.type !== 'list') continue;
+        const raw = valueAt(node.config, s.key);
+        if (Array.isArray(raw)) schemaInitial[s.key] = raw.map((v) => String(v));
+        else if (raw !== undefined && raw !== null && String(raw) !== '') schemaInitial[s.key] = [String(raw)];
     }
     // An acquisition node's Connection lives on `use:`, never in cfg (a binding, not config —
     // D3-remainder, 2026-08-04), so it is seeded from there — the loop above can never find it.
