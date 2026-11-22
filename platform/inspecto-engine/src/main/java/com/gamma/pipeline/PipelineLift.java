@@ -454,6 +454,7 @@ public final class PipelineLift {
             Map<String, Object> jc = new LinkedHashMap<>();
             jc.put("reference", cfg.join().reference());
             jc.put("on", cfg.join().on());
+            put(jc, "match", cfg.joinMatch());
             nodes.add(new PipelineNode(joinId, BuiltinNodeType.TRANSFORM_JOIN.type(),
                     null, null, jc, null));
             edges.add(PipelineEdge.data(sinkUpstream, joinId));

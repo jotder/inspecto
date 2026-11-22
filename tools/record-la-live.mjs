@@ -169,7 +169,7 @@ const SCENARIOS = {
           if ('pick' in st) return h.pick(st.pick, st);
           if ('at' in st) return h.at(st.at, st);
           if ('impact' in st) return h.impact(st.impact, () => run(st.steps || []), st);
-          if ('mark' in st) return h.markBox(st.mark, st.box, st.text);
+          if ('mark' in st) return h.markBox(st.mark, st.box, st.text, !!st.decoy);   // decoy: true draws the mark grey, 'ruled out'
           if ('shot' in st) return h.shot(st.shot);
           if ('dump' in st) return h.dump(st.dump);
           if ('note' in st) return undefined;
@@ -593,12 +593,12 @@ async function main() {
       const region = opts.region ? opts.region.map((v) => Math.round(v * DPR)) : null;
       const box = diffBox(a, b, region);
       if (!box) { console.log(`  impact ${label}: nothing changed`); return; }
-      (marks.impacts ||= []).push({ label, t, box, text: opts.text || label });
+      (marks.impacts ||= []).push({ label, t, box, text: opts.text || label, ...(opts.decoy ? { decoy: true } : {}) });   // decoy: the renderer draws it grey, 'ruled out'
       console.log(`  impact ${label}: box ${box.join(',')} at ${t}s`);
     },
     // A yellow mark on a rectangle [x, y, w, h] in CSS px, held 3 s from now: for what an action changed when the picture
     // before and after differs everywhere (the layout re-fits on every expand), so a diff would mark the whole canvas.
-    markBox(label, box, text) { (marks.impacts ||= []).push({ label, t: +((Date.now() - startedAt) / 1000).toFixed(2), box: box.map((v) => Math.round(v * DPR)), text: text || label }); },
+    markBox(label, box, text, decoy = false) { (marks.impacts ||= []).push({ label, t: +((Date.now() - startedAt) / 1000).toFixed(2), box: box.map((v) => Math.round(v * DPR)), text: text || label, ...(decoy ? { decoy: true } : {}) }); },
     // Click a node by its label. The canvas is not DOM, so: Search nodes (everything else dims), take the bounding box of the bright
     // pixels below the search box, and click its centre (a single or a double click). opts: dbl, region [x,y,w,h] in CSS px.
     async pick(name, opts = {}) {

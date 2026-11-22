@@ -1031,6 +1031,7 @@ public final class PipelineEditable {
             Map<String, Object> jn = new LinkedHashMap<>();
             putIfPresent(jn, "reference", joinNode.cfg("reference"));
             putIfPresent(jn, "on", joinNode.cfg("on"));
+            putIfPresent(jn, "match", joinNode.cfg("match"));
             processing.put("join", jn);
         } else if (strict) {
             processing.remove("join");
@@ -1260,6 +1261,11 @@ public final class PipelineEditable {
             // `sql` IS in KINDS (the parser accepts it standalone) but has no singular block either.
             String kind = STEP_KIND.get(n.type());
             if (kind == null) return false;   // contributed: List.indexOf(null) NPEs on an immutable list
+            // processing.join holds reference/on/match only — a keyed join (LOOKUP-1 P1b) must take steps:
+            // (any keyed setting, not only key: — a draft saved before key: is typed must not lose the others)
+            if (PipelineConfig.Step.JOIN.equals(kind) && (n.cfg("key") != null
+                    || com.gamma.pipeline.exec.RowShaper.JOIN_KEYED_KEYS.stream().anyMatch(k -> n.cfg(k) != null)))
+                return false;
             if (PipelineConfig.Step.SQL.equals(kind) || PipelineConfig.Step.LOOKUP.equals(kind)
                     || PipelineConfig.Step.RUNNING.equals(kind) || PipelineConfig.Step.HASH.equals(kind)
                     || PipelineConfig.Step.MASK.equals(kind)
@@ -1301,8 +1307,8 @@ public final class PipelineEditable {
                 putIfPresent(c, "scope", n.cfg("scope"));   // D-9: window(<period>) | consignment
             }
             case PipelineConfig.Step.JOIN -> {
-                putIfPresent(c, "reference", n.cfg("reference"));
-                putIfPresent(c, "on", n.cfg("on"));
+                // LOOKUP-1: every key RowShaper.join reads (match, and the keyed form's key/columns/as/…)
+                for (String k : com.gamma.pipeline.exec.RowShaper.JOIN_CONFIG_KEYS) putIfPresent(c, k, n.cfg(k));
             }
             case PipelineConfig.Step.SUMMARIZE -> {
                 putIfPresent(c, "group_by", n.cfg("group_by"));

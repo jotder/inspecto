@@ -397,9 +397,9 @@ final class OnboardImport {
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + out + "' cannot name a column: letters, digits and '_'");
                 if (!outNames.add(out.toLowerCase(Locale.ROOT)))
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "two columns would be named '" + out + "'");
-                String type = o.get("type") instanceof String t ? t.trim().toUpperCase(Locale.ROOT) : String.valueOf(p.get("type"));
-                if (!TYPES.contains(type))
-                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "type of '" + n + "' must be one of " + TYPES);
+                String type = o.get("type") instanceof String t ? t.replace(" ", "").toUpperCase(Locale.ROOT) : String.valueOf(p.get("type"));
+                if (!TYPES.contains(type) && !OnboardDraft.isDecimal(type))
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "type of '" + n + "' must be one of " + TYPES + " or DECIMAL(p,s)");
                 String fmt = o.containsKey("format") ? (o.get("format") == null ? null : String.valueOf(o.get("format")))
                         : o.containsKey("type") && !type.equals(p.get("type")) ? null : (String) p.get("format");
                 if (fmt != null && !fmt.isBlank() && !type.equals("DATE") && !type.equals("TIMESTAMP"))
@@ -516,7 +516,7 @@ final class OnboardImport {
             if (proposed == null || "entity".equals(proposed)) return "detail";
             boolean fits = switch (proposed) {
                 case "temporal" -> type.equals("DATE") || type.equals("TIMESTAMP");
-                case "measure" -> type.equals("DOUBLE") || type.equals("BIGINT");
+                case "measure" -> type.equals("DOUBLE") || type.equals("BIGINT") || OnboardDraft.isDecimal(type);
                 default -> true;
             };
             return fits ? proposed : "detail";
@@ -1494,10 +1494,12 @@ final class OnboardImport {
         String pipeline = String.valueOf(content.get("importPipeline"));
         String name = OnboardRoutes.fileName(ex);
         String mode = ApiContext.query(ex, "mode");
-        boolean replace = mode == null || mode.isBlank() || mode.equals("replace");
+        // UPLOAD-DEFAULTS-1 (operator 2026-11-21): no silent default - replace removes the Dataset's old rows, so the caller says so
+        boolean replace = "replace".equals(mode);
         boolean period = PERIOD.equals(mode);
         if (!replace && !period && !"append".equals(mode))
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "mode must be replace (the default), append or period");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "mode is required and must be replace (the Dataset's old rows are removed), append (the rows are added) or period (the days the file covers are replaced)"
+                    + (mode == null || mode.isBlank() ? "" : "; got '" + mode + "'"));
         // LA-ARRIVAL-NEW-COLUMNS-1 (operator 2026-11-06): a later file's new columns are kept unless the person leaves them out
         String newCols = ApiContext.query(ex, "newColumns");
         boolean keepNew = newCols == null || newCols.isBlank() || newCols.equals("keep");

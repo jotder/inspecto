@@ -334,7 +334,77 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
 - Rendered by the shared `PipelineConfigDefinitionComponent` + `InspectoSchemaFormComponent`, driven by
   `NodeAttributes.TRANSFORM_JOIN`'s spec (`node-attributes.ts`, mirroring
   `NodeAttributes.java`): `reference` (`autocomplete`, required, placeholder `reference/rates`) and
-  `on` (`list`, required, join key columns).
+  `on` (`list`, required, join key columns) and `match` (`select`, optional, default `exact`).
+- **`match` (since 2026-11-22, `LOOKUP-1` P1)** picks how the keys match:
+  - `exact` (the default, and what an absent `match` means) — every `on` column equal: the `LEFT JOIN … USING`
+    the node always ran.
+  - `longest_prefix` — the **last** `on` column matches the Reference row whose key is its **longest prefix**, both
+    read as text (phone number → operator, card BIN → issuer); earlier `on` columns are equal-matched, so
+    `on: [country, msisdn]` is a tiered key. An empty Reference key is a catch-all. A row with no match keeps its
+    columns with NULLs. The output is the input's columns, then the Reference's non-key columns. A Reference with
+    two rows for one key is refused before the join, naming the key, because the pick would be arbitrary.
+    Executed as N × |distinct key lengths| hash probes, not a `starts_with` nested loop (`RowShaper.longestPrefixJoin`).
+  - Anything else is refused at save (`JOIN_MATCH_UNKNOWN`) and at run.
+  - Written the same way in a `steps:` `join:` entry, the `processing.join` block, and a recipe
+    `transform: {join: references/x, on: k, match: longest_prefix}`; every save path keeps it.
+- **The keyed form (since 2026-11-22, `LOOKUP-1` P1b)** — set `key:` (the Reference's key column) and every `on`
+  column becomes an **independent** input looked up in it: three phone-number columns against one dialling-code
+  table in one Step. Keys compare as text.
+  ```toon
+  - join:
+      reference: reference/dial_digit
+      key: dial_digit_key
+      match: longest_prefix                       # or exact
+      on[3]: SERVED_MSISDN, OTHER_MSISDN, THIRD_PARTY_MSISDN
+      columns[3]: dial_digit_key, iso_country_code, provider_desc   # default: every Reference column
+      as: "{on}_"                                 # default; → OTHER_MSISDN_provider_desc
+      default[1]: dial_digit_key=-99              # or a map; the value when nothing matched
+      exact_when: "dm_ind = '1'"                  # longest_prefix only: rows matching only the whole value
+      duplicates: last                            # refuse (default) | first | last
+      order_by: update_date_time                  # an expression over Reference columns; needed by first/last
+  ```
+  - Returning the key column gives the **matched prefix**. A returned name clashing with an input column (or with
+    another returned one) is refused, naming it — change `as`. With several `on` columns `as` must contain `{on}`.
+  - `exact_when` rows count only when the key equals the whole value; a longer value falls back to a shorter key —
+    the legacy telco rule for toll-free and premium numbers.
+  - `duplicates: refuse` names the first repeated key; `first`/`last` keep one row per key by `order_by`, ties broken
+    by the row's text so the pick never changes between runs.
+  - **Cost:** every distinct value across all `on` columns is resolved once (N distinct × |distinct key lengths| hash
+    probes), then joined back per column by equality. Measured 2026-11-22 with a 9.8k-key dialling-code table: 5M
+    rows × 3 numbers in 2.3 s (three separate prefix joins: 6.6 s). No cache to keep: each run reads the current
+    Reference.
+  - A keyed join always saves as a `steps:` entry — `processing.join` holds `reference`/`on`/`match` only. Save
+    refuses impossible settings with `JOIN_KEYED_INVALID` (a keyed setting without `key`, `exact_when` with `exact`,
+    an unknown `duplicates`, `first`/`last` without `order_by`, several `on` with an `as` lacking `{on}`); whether
+    the named columns exist is checked when it runs.
+  - **`filter`** (since 2026-11-22, `LOOKUP-1` P1c, every keyed mode) — an SQL condition on Reference columns; only the
+    rows meeting it take part (one table holding several rate kinds: `filter: "lookup_key = 'SDR_RATE'"`).
+- **`match: range` (since 2026-11-22, `LOOKUP-1` P1c)** — a value matches the Reference row whose period holds it.
+  It is keyed by `from:` / `to:` (Reference columns, either may be omitted), not `key:`.
+  ```toon
+  - join:
+      reference: reference/service_range
+      match: range
+      from: valid_from                            # inclusive; an empty value = no start
+      to: valid_to                                # inclusive; an empty value = no end (the current rate)
+      filter: "lookup_key = 'SDR_RATE'"
+      on[1]: CALL_DATE
+      columns[1]: lookup_output
+      as: "SDR_"
+      duplicates: last                            # overlapping periods: refuse (default) | first | last
+      order_by: valid_from
+  ```
+  - Values compare in their **own type** — a date as a date, a number as a number (`10` is above `9`), not as text
+    the way `exact` / `longest_prefix` compare. Bound the columns to real dates in the Reference's schema: a text
+    date such as `dd/MM/yy` never orders correctly. Against a **`DATE` bound the value is compared as a date**: a call
+    at `10:30` on a period's last day is inside it, and a value that is no date matches nothing (no error).
+  - **Overlapping periods** make the match ambiguous. `duplicates: refuse` stops the run, naming two overlapping
+    periods; `first` / `last` keep, per value, the matching row ordered by `order_by`. Because bounds are inclusive,
+    `[1 Jan – 31 Jan]` and `[31 Jan – 28 Feb]` overlap on 31 Jan. A date that does not exist (`31/06/26`) parses as
+    empty and becomes an open end — which then overlaps every later period, so `refuse` finds it.
+  - A value in no period (a gap) or a NULL value matches nothing; `default` fills it as in the other keyed modes.
+    Each distinct value is resolved once, then joined back per `on` column.
+  - Save refuses `match: range` without `from`/`to`, with `key`, and `from`/`to` on any other match (`JOIN_KEYED_INVALID`).
 - **`reference` is autocomplete with real suggestions, never a hard constraint:**
   `referenceOptionLoader()` (`entity-option-loaders.ts`) calls `CatalogService.references()`
   (backed by `GET /catalog/references`, `CatalogRoutes.java`) and maps results to

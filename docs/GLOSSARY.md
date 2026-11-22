@@ -693,6 +693,13 @@ refresh_seconds}` load-semantics + `stream:` grouping *config surface* is now au
 Phase-2 P0/P4, 2026-07-24), but the cached/SCD **engine** mechanics (append + current-view/as-of reads,
 compaction) remain the Phase-2 backlog.
 
+**Lookup** — A Type defined **over a Reference Dataset** that resolves a key to the matched row or value, by
+**exact** or **best match** (longest prefix, range, as-of, fuzzy), with a multi-match policy and a not-found
+value. Transforms call it per field or as a Step; it is held per run or warm across runs and refreshed when
+the Reference Dataset changes. ⛔ never "cache" or "record cache" as the entity name — the cache is how a Lookup
+is held, not what it is. Not the inline `transform.lookup` code map. *(Proposed 2026-11-22,
+`superpower/2026-11-22-reference-lookup-plan.md`.)*
+
 **Matrix** — The **intended user-facing name** for a summary / cube / roll-up data asset. It **is a Derived
 Table** (so it lives inside the **Dataset** umbrella) — "Matrix" is the label the Catalog and Studio are meant
 to show for it, not a new model type. **Surfaced 2026-08-04**: the Catalog labels `DERIVED_TABLE` **Matrix** (`nodeKindLabel()`, §13); the

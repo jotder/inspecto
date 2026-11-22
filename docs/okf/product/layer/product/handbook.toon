@@ -585,6 +585,11 @@ chapters:
         type: howto
         tracks[1]: builder
         audience: external
+      howto_derive_a_dataset:
+        file: docs/okf/product/module/elt/user-guide-howto-derive-a-dataset.md
+        type: howto
+        tracks[1]: builder
+        audience: external
       admin_guide_elt:
         file: docs/okf/product/module/elt/admin-guide-elt.md
         type: unsorted

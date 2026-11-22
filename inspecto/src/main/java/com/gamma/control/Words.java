@@ -24,17 +24,17 @@ final class Words {
 
     /** What a column of an engine type holds, as a plural noun: "dates with a time". */
     static String plural(String type) {
-        return PLURAL.getOrDefault(type == null ? "" : type.toUpperCase(java.util.Locale.ROOT), "text");
+        return OnboardDraft.isDecimal(type) ? "exact decimal numbers" : PLURAL.getOrDefault(type == null ? "" : type.toUpperCase(java.util.Locale.ROOT), "text");
     }
 
     /** One value of an engine type, with its article: "a date with a time". */
     static String singular(String type) {
-        return SINGULAR.getOrDefault(type == null ? "" : type.toUpperCase(java.util.Locale.ROOT), "text");
+        return OnboardDraft.isDecimal(type) ? "an exact decimal number" : SINGULAR.getOrDefault(type == null ? "" : type.toUpperCase(java.util.Locale.ROOT), "text");
     }
 
     /** The name the screen gives an engine type ({@code TYPE_LABELS} in {@code add-data.model.ts}): "Date and time". */
     static String label(String type) {
-        return LABEL.getOrDefault(type == null ? "" : type.toUpperCase(java.util.Locale.ROOT), "Text");
+        return OnboardDraft.isDecimal(type) ? "Exact decimal (" + type.replace(" ", "").toUpperCase(java.util.Locale.ROOT).substring(8, type.replace(" ", "").length() - 1) + ")" : LABEL.getOrDefault(type == null ? "" : type.toUpperCase(java.util.Locale.ROOT), "Text");
     }
 
     private static final Map<String, String> PLURAL = Map.of("VARCHAR", "text", "BIGINT", "whole numbers", "DOUBLE", "decimal numbers",

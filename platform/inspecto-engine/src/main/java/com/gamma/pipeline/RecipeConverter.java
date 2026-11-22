@@ -363,6 +363,9 @@ public final class RecipeConverter {
         Map<String, Object> join = new LinkedHashMap<>();
         putRef(join, "join", cfg.get("reference"), ReferenceBinding.PREFIX, ReferenceBinding.PLURAL_PREFIX);
         putIfPresent(join, "on", cfg.get("on"));
+        putIfPresent(join, "match", cfg.get("match"));
+        putIfPresent(join, "key", cfg.get("key"));
+        for (String k : com.gamma.pipeline.exec.RowShaper.JOIN_KEYED_KEYS) putIfPresent(join, k, cfg.get(k));
         return join;
     }
 

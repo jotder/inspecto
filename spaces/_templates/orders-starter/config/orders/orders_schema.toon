@@ -41,4 +41,4 @@ mapping:
       from: ""
       fn: custom
       args:
-        expression: "ROUND(TRY_CAST(QUANTITY AS DOUBLE) * TRY_CAST(UNIT_PRICE AS DOUBLE), 2)"
+        expression: "CAST(CAST(TRY_CAST(QUANTITY AS DOUBLE) * TRY_CAST(UNIT_PRICE AS DOUBLE) AS DECIMAL(38,2)) AS DOUBLE)"

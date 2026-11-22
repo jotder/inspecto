@@ -42,7 +42,7 @@ final class ConfigPreviewRoutes implements RouteModule {
             if (spec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown config type: " + ApiContext.name(m));
             return spec;
         });
-        api.post("/validate", (e, m) -> validate(api, api.body(e)));
+        api.post("/validate", (e, m) -> validate(api, e, api.body(e)));
         // Parse a raw sample with a draft's parsing: settings — stateless, scratch-only (stream
         // onboarding's sample-as-thread; the raw→parsed hop).
         api.post("/config/preview/parsing", (e, m) -> previewParsing(api.body(e)));
@@ -132,7 +132,7 @@ final class ConfigPreviewRoutes implements RouteModule {
         return entry;
     }
 
-    private Object validate(ApiContext api, Map<String, Object> body) throws IOException {
+    private Object validate(ApiContext api, com.sun.net.httpserver.HttpExchange ex, Map<String, Object> body) throws IOException {
         String configPath = ApiContext.str(body, "configPath");
         if (configPath != null) {
             configPath = jailedConfigPath(api, configPath);
@@ -168,6 +168,16 @@ final class ConfigPreviewRoutes implements RouteModule {
         if (type == null || !(cfgObj instanceof Map<?, ?>)) {
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST,
                     "body must include 'configPath', or 'type' + 'config' (a draft config map)");
+        }
+        // COMPONENT-VALIDATE-ALL-1: a component draft is judged by the checks its save door runs (ComponentRoutes.draftFindings)
+        if (ComponentRoutes.VALIDATABLE_KINDS.contains(type)) {
+            String id = ApiContext.str(body, "id");
+            List<Finding> found = ComponentRoutes.draftFindings(api, ex, type, id == null || id.isBlank() ? "draft" : id, mapAt(body, "config"));
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("type", type);
+            r.put("findings", found);
+            r.put("clean", found.isEmpty());
+            return r;
         }
         ConfigSpec spec = ConfigSpecs.forType(type);
         if (spec == null) throw new ApiException(404, ErrorCodes.NOT_FOUND, "unknown config type: " + type);

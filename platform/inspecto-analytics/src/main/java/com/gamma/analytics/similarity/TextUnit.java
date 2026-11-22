@@ -10,9 +10,9 @@ import java.nio.charset.StandardCharsets;
  *   <li>{@link #CODE_POINT} — one Unicode code point (the default): {@code é} is one unit, an emoji is one unit.</li>
  *   <li>{@link #UTF16_CHAR} — one Java {@code char}: a code point above U+FFFF is two units (a surrogate pair). The
  *       same as {@code CODE_POINT} for every text without such a character. Screening's name method uses it.</li>
- *   <li>{@link #UTF8_BYTE} — one byte of the UTF-8 encoding: {@code é} is two units. DuckDB 1.5.6's
- *       {@code jaro_similarity}, {@code jaro_winkler_similarity} and {@code levenshtein} work this way, so this unit
- *       reproduces them on any text, accented or not.</li>
+ *   <li>{@link #UTF8_BYTE} — one byte of the UTF-8 encoding: {@code é} is two units. DuckDB up to 2.0.0's
+ *       {@code jaro_similarity}, {@code jaro_winkler_similarity} and {@code levenshtein} worked this way; 2.0.1 counts
+ *       code points.</li>
  * </ul>
  */
 public enum TextUnit {

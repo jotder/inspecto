@@ -146,17 +146,17 @@ describe('PenFieldComponent', () => {
         expect(host.entered).toBe(1);
     });
 
-    it('shows its help as a tiny line under the row; an error replaces it (UI-FORM-ROWS-1)', () => {
+    it('puts its help behind a "?" after the label, never a line under the row; an error still shows (2026-11-22)', () => {
         const fixture = TestBed.createComponent(HelpHostComponent);
         fixture.detectChanges();
         const el = fixture.nativeElement as HTMLElement;
-        const help = el.querySelector('p.text-xs');
-        expect(help?.textContent).toContain('Lower-case letters');
-        expect(help?.getAttribute('role')).toBeNull();
+        const icon = el.querySelector('.prop-label [data-testid="field-help"]');
+        expect(icon, 'the "?" sits in the label').not.toBeNull();
+        expect(el.querySelector('p.text-xs'), 'no help line under the row').toBeNull();
+        expect(el.textContent).not.toContain('Lower-case letters');
         fixture.componentInstance.error = 'A name is required.';
         fixture.detectChanges();
         expect(el.querySelector('[role="alert"]')?.textContent).toContain('A name is required.');
-        expect(el.textContent).not.toContain('Lower-case letters');
     });
 
     function setup() {

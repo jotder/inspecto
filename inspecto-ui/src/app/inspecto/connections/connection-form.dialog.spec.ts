@@ -61,7 +61,10 @@ function settingsRows(el: HTMLElement): string[] {
                 : row.querySelector('mat-checkbox')
                   ? 'check'
                   : row.tagName.toLowerCase();
-        return `${kind}:${(row.textContent ?? '').replace(/\s+/g, ' ').trim()}`;
+        // a row's hint now sits behind its "?" (2026-11-22); appended where the visible line was, so the pin still
+        // proves every hint survived the move
+        const help = row.querySelector('[data-testid="field-help"]')?.getAttribute('data-help') ?? '';
+        return `${kind}:${((row.textContent ?? '') + help).replace(/\s+/g, ' ').trim()}`;
     });
 }
 

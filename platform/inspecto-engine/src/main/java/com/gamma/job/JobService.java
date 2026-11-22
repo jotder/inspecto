@@ -1062,8 +1062,12 @@ public final class JobService implements AutoCloseable {
         if (pipelineStore == null && c.opt("pipeline_config", null) == null)
             throw new IllegalStateException("pipeline job '" + c.name()
                     + "' needs an authored-pipeline store; set -Dassist.write.root so authored pipelines can be loaded");
+        // Read at RUN time, not captured here: Jobs are built when registered, which in a hosted service is before
+        // the host calls pipelineConfigs(..) — a captured null left every by-name join refusing (LOOKUP-1).
+        java.util.function.Supplier<List<com.gamma.etl.PipelineConfig>> loaded =
+                () -> pipelineConfigs == null ? null : pipelineConfigs.get();
         return new PipelineJobRunner(c, bus, pipelineStore, dataDir, auditDir, provenanceStore,
-                componentRegistry, pipelineConfigs, this::retireSupersededConfigured);
+                componentRegistry, loaded, this::retireSupersededConfigured);
     }
 
     /** Is at least one enabled {@code retire_superseded} maintenance job configured? Queried fresh per

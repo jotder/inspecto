@@ -107,6 +107,41 @@ public final class PipelineValidator {
      */
     public static final String JOIN_REFERENCE_MISSING = "JOIN_REFERENCE_MISSING";
     public static final String JOIN_ON_MISSING = "JOIN_ON_MISSING";
+    /** A {@code transform.join} node whose {@code match} is not one {@code RowShaper.join} runs (LOOKUP-1). */
+    public static final String JOIN_MATCH_UNKNOWN = "JOIN_MATCH_UNKNOWN";
+    /** A keyed {@code transform.join} (LOOKUP-1 P1b) whose settings cannot run, judged from the config alone. */
+    public static final String JOIN_KEYED_INVALID = "JOIN_KEYED_INVALID";
+
+    /**
+     * What is wrong with a join's keyed-form settings, or {@code null}. Only what the config alone decides —
+     * whether the columns exist is the run's question (the Reference is not read at save).
+     */
+    static String keyedJoinProblem(PipelineNode n) {
+        boolean hasKey = n.cfg("key") != null && !n.cfg("key").toString().isBlank();
+        boolean hasBound = (n.cfg("from") != null && !n.cfg("from").toString().isBlank())
+                || (n.cfg("to") != null && !n.cfg("to").toString().isBlank());   // blank = unset, as the run reads it
+        Object match = n.cfg("match");
+        boolean range = "range".equals(String.valueOf(match));
+        if (range && !hasBound) return "match: range needs from: and/or to: — the Reference columns holding the bounds";
+        if (range && hasKey) return "match: range reads from:/to:, not key:";
+        if (!range && hasBound) return "from:/to: only apply to match: range";
+        if (!hasKey && !hasBound) {
+            for (String k : com.gamma.pipeline.exec.RowShaper.JOIN_KEYED_KEYS)
+                if (n.cfg(k) != null) return "'" + k + "' needs key: — the Reference's key column";
+            return null;
+        }
+        if (n.cfg("exact_when") != null && !"longest_prefix".equals(String.valueOf(match)))
+            return "exact_when only applies to match: longest_prefix";
+        Object dups = n.cfg("duplicates");
+        if (dups != null && !com.gamma.pipeline.exec.RowShaper.JOIN_DUPLICATES.contains(dups.toString()))
+            return "duplicates '" + dups + "' — use one of " + com.gamma.pipeline.exec.RowShaper.JOIN_DUPLICATES;
+        if (dups != null && !"refuse".equals(dups.toString()) && n.cfg("order_by") == null)
+            return "duplicates: " + dups + " needs order_by:";
+        Object as = n.cfg("as");
+        if (joinKeys(n).size() > 1 && as != null && !as.toString().contains("{on}"))
+            return "with several 'on' columns, as: must contain {on}";
+        return null;
+    }
 
     /** The non-blank {@code on} key column(s) of a join node — a list or a single scalar, as {@code RowShaper.join} reads it. */
     public static List<String> joinKeys(PipelineNode n) {
@@ -310,6 +345,16 @@ public final class PipelineValidator {
                     issues.add(new Issue(Severity.ERROR, JOIN_ON_MISSING,
                             "Node '" + n.id() + "' (transform.join) names no 'on' key column(s)."));
                 }
+                Object match = n.cfg("match");
+                if (match != null && !com.gamma.pipeline.exec.RowShaper.JOIN_MATCHES.contains(match.toString())) {
+                    issues.add(new Issue(Severity.ERROR, JOIN_MATCH_UNKNOWN,
+                            "Node '" + n.id() + "' (transform.join) has match '" + match + "' — use one of "
+                                    + com.gamma.pipeline.exec.RowShaper.JOIN_MATCHES + "."));
+                }
+                String keyedProblem = keyedJoinProblem(n);
+                if (keyedProblem != null)
+                    issues.add(new Issue(Severity.ERROR, JOIN_KEYED_INVALID,
+                            "Node '" + n.id() + "' (transform.join): " + keyedProblem));
             }
             if (n.hasUse()) {
                 String use = n.use();

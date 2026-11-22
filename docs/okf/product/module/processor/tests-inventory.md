@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-471 test class(es): 190 unit, 281 real-HTTP control-plane, 0 IT.
+475 test class(es): 192 unit, 283 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -109,6 +109,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiCommitRetryTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiCommitRetryTest.java` | The X1 retry affordance over real HTTP ({@code GET /runs/{name}/retries}, |
 | `ControlApiComponentSharesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiComponentSharesTest.java` | Component sharing RBAC (R3, {@code docs/superpower/rbac-abac-plan.md} §3) over real HTTP: the |
 | `ControlApiComponentsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiComponentsTest.java` | Component registry CRUD (T19, §7.1) over real HTTP: create / list / get / update / delete |
+| `ControlApiComponentValidateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiComponentValidateTest.java` | COMPONENT-VALIDATE-ALL-1 over real HTTP: {@code POST /validate} judges a KPI, Reconciliation, Dataset, Widget or Dashboard |
 | `ControlApiConfigDeleteTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiConfigDeleteTest.java` | Integration tests for {@code DELETE /config/{type}/{name}} (v5.1.0, the onboarding draft-discard |
 | `ControlApiConfigIfMatchTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiConfigIfMatchTest.java` | Optimistic concurrency on {@code POST /config/write} over real HTTP — {@code CLIENT-HALVES-1} (a), |
 | `ControlApiConfigImpactTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiConfigImpactTest.java` | Integration tests for {@code GET /config/pipeline/{name}/impact} and the dependents gate it backs on |
@@ -299,6 +300,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiSuppressionsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSuppressionsTest.java` | `D8-SUPPRESS-1`'s operator surface over real HTTP — one case per gate of |
 | `ControlApiSystemRoutesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSystemRoutesTest.java` | PG-1 Open 2 Stage 1 over real HTTP: {@code GET /system/operational-db} reports what the deployment is |
 | `ControlApiTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiTest.java` | Integration tests for the M3 {@link ControlApi} over real HTTP: health/readiness, |
+| `ControlApiUnknownKeysTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiUnknownKeysTest.java` | UNKNOWN-KEYS-SILENT-1 over real HTTP (operator 2026-11-21): a Dataset or a Reconciliation saved by an agent Subject (the |
 | `ControlApiV1Test` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiV1Test.java` | Real-HTTP tests for the v1 transport spine (worklog W1, docs/superpower/api-contract-design.md |
 | `ControlApiValidateConfigPathJailTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiValidateConfigPathJailTest.java` | {@code VALIDATE-CONFIGPATH-UNJAILED-1} over real HTTP: {@code POST /validate {configPath}} must jail the |
 | `ControlApiVersionedSurfaceTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiVersionedSurfaceTest.java` | API-5 (2026-07-25): {@code /api/v1} is the only API surface. This pins the contract that replaced the |
@@ -401,6 +403,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `TypeFlowSaveTimeFindingsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/TypeFlowSaveTimeFindingsTest.java` | {@link ConfigRoutes#routeColumnFindings} and {@link ConfigRoutes#summarizeMeasureFindings} — |
 | `TypeInferenceGoldenTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/TypeInferenceGoldenTest.java` | {@code BASIC-ELT-PROFILE-1} BE-3: the column types the three type inferences answer for one file — the parse |
 | `UndeclaredMutatingRouteTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/UndeclaredMutatingRouteTest.java` | <b>The control itself (route-gating plan step 3c, 2026-09-16).</b> A mutating route must declare its |
+| `UnknownComponentKeysTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/UnknownComponentKeysTest.java` | UNKNOWN-KEYS-SILENT-1: the census of a Dataset's and a Reconciliation's keys, and the scan that keeps every shipped file |
 | `WriteGateOrderTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/WriteGateOrderTest.java` | The four-stage write gate: <b>its ORDER, and {@link WriteGates} itself</b> — one of |
 | `BaselineEvaluatorGoldenTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/BaselineEvaluatorGoldenTest.java` | Golden figures of the {@code baseline} Expectation kind (ANALYTICS-CORE-1 M4 / M2): every profiled cell over parquet |
 | `BaselineEvaluatorTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/BaselineEvaluatorTest.java` | DUCKLE-C8 — the {@code baseline} kind's decision logic (median of the accepted window, limits in either |
@@ -451,6 +454,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ImportJournalTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ImportJournalTest.java` | {@link ImportJournal} rollback — all-or-nothing, but never over a newer write (`IMPORT-RESIDUALS-1` (3)). The |
 | `ImportLoaderInventoryTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ImportLoaderInventoryTest.java` | The LOADER inventory behind the import judge (`SEC-IMPORT-ROLES-ESCALATION-1`): every file or directory a |
 | `ImportPathsTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ImportPathsTest.java` | {@link ImportPaths} as a unit. ⚠ WINDOWS-SENSITIVE: the aliases below (a trailing dot, an 8.3 short name) only |
+| `JobByNameReferenceJoinTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/JobByNameReferenceJoinTest.java` | LOOKUP-1: a pipeline Job's {@code transform.join} binds {@code reference/<pipeline>} BY NAME in a running server. |
 | `LinkCensusParityTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/LinkCensusParityTest.java` | The census is the complete list (`SPACE-LINK-CENSUS-1` LC-1): every key a link check still reads by a literal |
 | `ModuleRemovalBundleTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/ModuleRemovalBundleTest.java` | {@code MODULE-REORG-1 P4a} - removal semantics (plan section 2.5) for Space bundles: config of a module that is |
 | `OperationalDbTest` | `com.gamma.service` | unit | `inspecto/src/test/java/com/gamma/service/OperationalDbTest.java` | The one operational-database selection: DuckDB for Basic, PostgreSQL for Standard. |

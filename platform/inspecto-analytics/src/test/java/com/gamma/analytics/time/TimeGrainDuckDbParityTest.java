@@ -27,14 +27,16 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class TimeGrainDuckDbParityTest {
 
-    /** Zones with a transition in 2026, each with one transition instant to pack cases around. */
+    /** Zones with a transition in 2026 (Havana: 2025, see below), each with one transition instant to pack cases around. */
     private static final String[][] ZONES = {
             {"UTC", "2026-12-31T23:00:00Z"},
             {"Europe/Berlin", "2026-03-29T01:00:00Z"},          // 02:00 → 03:00
             {"Europe/Berlin", "2026-10-25T01:00:00Z"},          // 03:00 → 02:00, a repeated hour
             {"America/New_York", "2026-11-01T06:00:00Z"},
             {"America/Santiago", "2026-09-06T04:00:00Z"},       // 24:00 → 01:00, midnight never happens
-            {"America/Havana", "2026-11-01T05:00:00Z"},         // 01:00 → 00:00, midnight happens twice
+            {"America/Havana", "2025-11-02T05:00:00Z"},         // 01:00 → 00:00, midnight happens twice
+            // The 2026-11-01 Havana transition is exempt on DuckDB 2.0.1: its zone data keeps Cuba on UTC-4 until about
+            // mid-March 2027 while JDK tzdata 2026b (and DuckDB 2.0.0) end DST that day — DUCKDB-2-0-1-HAVANA-TZ-1.
             {"Australia/Lord_Howe", "2026-10-03T15:30:00Z"},    // a 30-minute shift
             {"Asia/Kolkata", "2026-12-31T18:30:00Z"},           // +05:30, no DST, new year
     };

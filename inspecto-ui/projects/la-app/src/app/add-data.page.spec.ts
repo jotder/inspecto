@@ -140,7 +140,7 @@ describe('AddDataPageComponent (/add-data, LA-ONBOARD-1 phase 4)', () => {
         it('someone who may not administer sees who can turn it on, and no button; no card offers a refused run (no violations)', async () => {
             const { el } = create(false, { signIn: { canAdminister: false } });
             expect(el.querySelector('[data-testid="add-data-locked"]')!.textContent).toContain(SELF_IMPORT_OFF);
-            expect(SELF_IMPORT_OFF).toBe('Add data is turned off in this Space; an administrator can turn it on');
+            expect(SELF_IMPORT_OFF).toBe('Add data is turned off in this Space; an administrator can turn it on (PUT /settings/data {"selfImport":true})');
             expect(button(el)).toBeNull();
             expect(el.querySelector('[data-testid="la-add-data-off"]')).toBeNull();
             expect(el.querySelector('[data-testid="imported-datasets"]')).toBeNull();

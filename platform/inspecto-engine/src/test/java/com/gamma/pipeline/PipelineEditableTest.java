@@ -401,6 +401,56 @@ class PipelineEditableTest {
                 node("j2", "transform.join", Map.of("reference", "cells")));
     }
 
+    /** LOOKUP-1 P1b: a keyed join lowers to steps: (processing.join cannot hold its settings) with every key kept. */
+    @Test
+    void aKeyedJoinLowersToStepsWithAllItsSettings() {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("reference", "reference/dial_digit");
+        cfg.put("on", List.of("SERVED_MSISDN", "OTHER_MSISDN"));
+        cfg.put("match", "longest_prefix");
+        cfg.put("key", "dial_digit_key");
+        cfg.put("columns", List.of("dial_digit_key", "provider_desc"));
+        cfg.put("as", "{on}_");
+        cfg.put("default", List.of("dial_digit_key=-99"));
+        cfg.put("exact_when", "dm_ind = '1'");
+        cfg.put("duplicates", "last");
+        cfg.put("order_by", "update_date_time");
+        Map<String, Object> out = PipelineEditable.lower(graphWith(node("j1", "transform.join", cfg)),
+                new LinkedHashMap<>(), true);
+        assertFalse(((Map<?, ?>) out.get("processing")).containsKey("join"), "a keyed join is not processing.join");
+        List<?> steps = (List<?>) out.get("steps");
+        assertNotNull(steps, "a keyed join must lower to steps:");
+        assertEquals(cfg, ((Map<?, ?>) steps.get(0)).get("join"));
+    }
+
+    /** LOOKUP-1 P1c: a range join (no key:) still lowers to steps: with its bounds and filter. */
+    @Test
+    void aRangeJoinLowersToStepsWithItsBoundsAndFilter() {
+        Map<String, Object> cfg = new LinkedHashMap<>();
+        cfg.put("reference", "reference/rates");
+        cfg.put("on", List.of("CALL_DATE"));
+        cfg.put("match", "range");
+        cfg.put("from", "valid_from");
+        cfg.put("to", "valid_to");
+        cfg.put("filter", "lookup_key = 'SDR_RATE'");
+        Map<String, Object> out = PipelineEditable.lower(graphWith(node("j1", "transform.join", cfg)),
+                new LinkedHashMap<>(), true);
+        assertFalse(((Map<?, ?>) out.get("processing")).containsKey("join"), "a range join is not processing.join");
+        assertEquals(cfg, ((Map<?, ?>) ((List<?>) out.get("steps")).get(0)).get("join"));
+    }
+
+    /** LOOKUP-1: a chained join keeps its match on the steps: lower — dropping it would turn a prefix join exact. */
+    @Test
+    void aChainedJoinKeepsItsMatch() {
+        Map<String, Object> out = PipelineEditable.lower(graphWith(
+                node("j1", "transform.join", Map.of("reference", "sites", "on", "cell", "match", "longest_prefix")),
+                node("j2", "transform.join", Map.of("reference", "cells", "on", "cell"))), new LinkedHashMap<>(), true);
+        List<?> steps = (List<?>) out.get("steps");
+        assertEquals("longest_prefix", ((Map<?, ?>) ((Map<?, ?>) steps.get(0)).get("join")).get("match"));
+        assertFalse(((Map<?, ?>) ((Map<?, ?>) steps.get(1)).get("join")).containsKey("match"),
+                "an absent match stays absent (exact)");
+    }
+
     /**
      * ⚠ Two of a kind is not the only thing the singular keys could not hold — <b>order</b> is the other,
      * and it looks harmless. One dedup and one summarize fit the singular slots whichever way round they

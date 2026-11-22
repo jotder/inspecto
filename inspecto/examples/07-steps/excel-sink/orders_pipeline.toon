@@ -36,6 +36,6 @@ excel:
   sheets[3]:
     - name: Orders
     - name: By region
-      sql: "SELECT REGION, count(*) AS ORDERS, round(sum(GROSS), 2) AS GROSS FROM input GROUP BY REGION ORDER BY REGION"
+      sql: "SELECT REGION, count(*) AS ORDERS, CAST(CAST(sum(GROSS) AS DECIMAL(38,2)) AS DOUBLE) AS GROSS FROM input GROUP BY REGION ORDER BY REGION"
     - name: Shipped
       sql: "SELECT ORDER_ID, REGION, PRODUCT, GROSS FROM input WHERE STATUS = 'SHIPPED' ORDER BY ORDER_ID"

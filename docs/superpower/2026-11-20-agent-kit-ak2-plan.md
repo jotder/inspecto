@@ -1,7 +1,7 @@
 # Agent Kit AK-2 — agents propose changes, people approve them, one role at a time (plan)
 
-> **Status: APPROVED for phase 1 on 2026-11-20 — D-AK1…D-AK4 signed (operator, "Sign recommended"); D-AK5 and
-> D-AK6 open, needed before phase 2 (§8); AK-2a and AK-2b built 2026-11-20 (§6) — phase 1 is built; its close (Agent Skills AK-3, golden tasks AK-4, the Handbook how-to) and phases 2–3 remain.
+> **Status: APPROVED for phase 1 on 2026-11-20 — D-AK1…D-AK4 signed (operator, "Sign recommended");
+> D-AK5, D-AK6 and D-AK7 open, needed before phase 2 (§8); AK-2a and AK-2b built 2026-11-20 (§6) — phase 1 is built; its close (Agent Skills AK-3, golden tasks AK-4, the Handbook how-to) and phases 2–3 remain.
 > As built, beyond the text below: the allowed bucket also holds `POST /db/query` (the read the AK-1
 > `query_dataset` tool replays, which the gate would otherwise refuse), and an agent token drops
 > `canApproveChanges`, `canApproveLinkExpansions` and `canRevealLinkEntities` at authentication, so every
@@ -43,6 +43,122 @@ phase ends in a role an agent can actually do:
 Phases 1–3 share this plan's gate (§4.1); phase 4 shares only the masking and audit rules (§5). Phase 4 depends on no
 earlier phase and may be pulled forward by the operator. Seed recipes for phases 2 and 3 exist as this repository's
 own `incident-investigate` and `case-analysis` skills; the Agent Skills are rewritten from them for a customer's install.
+
+### 1.2 The analytics builder — samples and specs in, a built Space and its solution document out *(operator, 2026-11-21)*
+
+The developer role's main job. The person gives the agent **sample data files, data specs or a Grammar, and a goal** (a
+KPI, a Report, a Reconciliation, a final Dashboard); the agent **plans first, builds, proves, and writes the solution
+document**. It must work on an **installed distribution with no source tree**: the running server's REST API, the
+Handbook the server ships at `/help`, and the server's own validation messages are its only references.
+
+| Stage | The agent's work | What exists today (checked by name, not exercised) | What is missing |
+|---|---|---|---|
+| 1 Goal | turn the request into a structured one | the **Requirement** concept (KPI, Report, Reconciliation, Rule) | the agent-readable shape of a request |
+| 2 Samples | choose the Parser, state the Grammar, infer types | built-in Parsers, Grammars, `SampleProfiler` in the engine, the server's `/onboard/…` routes (the console's Add data) | whether the onboarding routes already profile and draft enough for an agent; an MCP Tool and an upload route for a sample file (results are capped at 256 KiB) |
+| 3 Land | Collector, Schema, import Pipeline, rejected-row check | the how-tos and Pipeline tools | — |
+| 4 Shape | pick the Steps for matrix, summary and cube Datasets | `transform.summarize`, `matrix.pivot`, `matrix.unpivot`, `join`, `running`, `analytics.rank`, … | the recipe library: which Step for which goal |
+| 5 Outputs | Measures, KPIs with targets, Widgets, Dashboards, Reports, Reconciliations | all authored as config | Insight Profiles and KPI History are vocabulary only |
+| 6 Prove | check the result against the specs | Expectations, dry runs, the Handbook's check-block style | a mechanical check loop the agent runs until green |
+| 7 Document | the plan, then the solution document | nothing | a plan stored in the Space; a solution document **generated from the Space's actual config**, as the Handbook's reference pages are generated |
+
+**Skills and MCP are the foundation, not the whole answer.** A Skill is knowledge and an MCP Tool is an action; this job
+also needs the four things above — a way to *see* the data (the profile or onboarding step), a *plan object* that
+outlives one chat, a *mechanical check loop*, and *golden tasks* (AK-4) that measure how often an agent gets it right,
+per model. Long builds may outlast a single tool call; the MCP progress and tasks features (deferred in §6) are decided
+when the spike shows whether it matters.
+
+**No-source distribution — how the agent works:** the Handbook at `/help` for the exact calls; the server's API contract
+if it serves one; the onboarding routes to draft the import from a sample; the config routes with `/validate` and the
+Pipeline dry run before each save; Dataset queries through the API to verify; the plan and solution document as files
+for the person (until a plan is stored in the Space). **Limits without source:** no config-key reference yet (the
+agent learns keys from Handbook examples and 422 messages); no packaging as an App or Space Template
+(`APP-KIT-DELIVERY-1`); no new Parser (`PARSER-SPI-KIT-1`). **On a real install** an agent writes only through the
+phase-1 gate (§4.1): every change is a proposal another person approves.
+
+**Evidence first — the spike (2026-11-21):** an agent session on a clean installed Standard bundle, with only the
+`order-to-cash` sample files and a plain-language spec (the finished Space withheld as the answer key), builds the
+dashboard, Reconciliation and Report and writes the solution document without reading any source or repository doc.
+Its gap list decides the shape of this track. The spike ran before AK-2a's gate, so it measures the build path, not
+the approval path. It had two variants: **A**, the API and the Handbook only; **B**, the same build with read access to
+the install root (its docs folder, the shipped example Spaces and templates, the Spaces folders), applying every
+change through the API.
+
+**Spike result (2026-11-21, one run each; the spike's own report, not re-run):** both variants reached the **correct
+numbers** on a Standard install — status counts, the unmatched total 1784.5 USD (six incidents 1725 plus 59.5), the
+reconciliation breaks O-1041, O-1088, O-9001, O-9002, O-1017, O-1022, O-1050, O-1064 — in **234 API calls (A) and 196
+(B)**, with silent traps along the way.
+
+| Deliverable | A: API + Handbook | B: + install-root read access |
+|---|---|---|
+| orders and payments Datasets | pass | pass |
+| open-items Dataset derived on the platform | **fail** — a customer-side script, a static snapshot | pass — the recipe is in the shipped templates |
+| Expectations | pass | pass |
+| KPI / Measures | partial — no Dataset Measures route | pass (named Measures unverified) |
+| Report | pass | pass |
+| Reconciliation | partial — four break types right through an undocumented trick | partial — the cardinality break never emitted |
+| Dashboard | partial — four tiles, never rendered | partial — four tiles, never rendered |
+| solution document generated from the server | pass | pass |
+
+**What the spike settles for this plan**
+- **Skills + MCP + today's routes are close, not enough.** The build is possible; what is missing is one authoring
+  recipe for a derived Dataset (a page and a validate route), strict validation (an unknown key rejected) with
+  validate and dry run on every component, a whole-period Reconciliation (`RECON-CROSS-PERIOD-1`), honest upload
+  defaults (append, decimal), the API contract and the shipped templates served as readable reference, and an
+  approval-policy preset so "governed" means gated.
+- **File read access is worth giving; file write is not** (D-AK7). Read access closed the largest gap (the derived
+  Dataset recipe) and part of two more; B never needed a file write.
+- **A Standard install is not gated by default** (`APPROVAL-POLICY-PRESET-1`): the approval policy and approver list
+  were empty, so a person's token applied every change at once. An agent-client token is held regardless (AK-2a); the
+  preset closes the same gap for people.
+- **Golden-task caveat (AK-4):** Handbook tutorials 2–4 print the expected answers for this very data, and both agents
+  used them as an answer source; and A's server exposed the shipped `order-to-cash` template over the API. A golden task
+  must use data and a Space the Handbook does not already answer.
+- **Not covered:** neither run rendered the Dashboard or ran the shipped template's tile values live; the approval path
+  (a held proposal approved by a second person) was not exercised; the spike's agents loaded this repository's
+  `CLAUDE.md` at start though both reported no repository reads.
+- **Gaps filed on the board (2026-11-21, unverified against the code):** `DERIVED-DATASET-AUTHORING-1`,
+  `UPLOAD-DEFAULTS-1`, `SPACE-CREATE-NAME-1`, `UNKNOWN-KEYS-SILENT-1`, `COMPONENT-VALIDATE-ALL-1`,
+  `BUILDER-API-PAPERCUTS-1`, `REPORT-DASHBOARD-AUTHORING-1`, `INCIDENTS-READ-ROUTE-1`, `APPROVAL-POLICY-PRESET-1`.
+  The reconciliation finding adds evidence to `RECON-CROSS-PERIOD-1` and the missing uniqueness check to
+  `EXPECTATION-UNIQUE-KIND-1`. Full record: the spike's `gaps.md` (scratch folder `C:\sandbox\spike-inputs`, not in the
+  repo).
+
+**Two postures for an agent with file access** *(operator, 2026-11-21)*:
+
+| Posture | Reads files | Writes files | Applies a change |
+|---|---|---|---|
+| **Sandbox or developer install** | freely | directly into a Space folder | by file; no approval, no audit — nothing governed is at stake |
+| **Governed install** | freely: shipped docs, example Spaces and templates, to learn the config keys | only in a scratch copy, to draft | **through the API only** (`/validate` and the dry run first), so every change is held for another person (§4.1) |
+
+Why a governed install cannot take direct file writes: the approval hold, four-eyes and `agentClient` audit live in the
+routes, so a file written into a Space folder skips all three; nothing validates the file until the server loads it; and
+the shortcut of building a Space folder and importing it as a bundle is refused to an agent token by the phase-1 gate.
+File access therefore closes the "no config-key reference" gap (the agent learns keys from shipped examples) without
+widening what an agent may change. Recommended: files for learning and drafting in both postures, the API for applying
+on a governed install. The phase-1 gate governs an agent's **API** calls; it cannot see a file an agent writes on the
+host. So the posture is set by who may write into the install root, not by the server — a governed install gives the
+agent read access to the install root and no write access to its Space folders (decision D-AK7, open).
+
+### 1.3 Agent-friendly documentation — a docs track under the analytics builder *(operator, 2026-11-21)*
+
+The Handbook already has the bones an agent needs: executable examples (the check blocks), a manifest, a header on every
+page. The spike showed where it falls short. From the spike's report (not re-checked against each page); the Agent
+Skills of §1.1 **link** to these pages rather than copy them, so a docs fix reaches agents with no Skill change.
+
+| Change | Why (spike) | Board row |
+|---|---|---|
+| A **component shape reference generated from the code**: every kind's keys, types, required or optional, defaults, an example | agents learned shapes from 422 text; also the missing config-key reference; a generated page cannot drift | `COMPONENT-REFERENCE-GENERATED-1` |
+| **Recipes keyed by goal** ("daily count by region with a target", "join two Datasets", "reconcile across days"), with check blocks | the derived-Dataset recipe was the largest gap and lived only inside shipped templates | `GOAL-RECIPES-1` (first: `DERIVED-DATASET-AUTHORING-1`) |
+| **Fix pages that disagree with the product** | the Handbook says Add data is on by default (it is off); Handbook and guide disagree on scheduling a Dashboard; an agent follows a page literally | `HANDBOOK-PRODUCT-DISAGREE-1` |
+| **Machine-readable entry points shipped with the install**: the API contract, the shipped templates, a flat page index (id, audience, edition, permission, URL) | both runs said the contract and the templates closed their largest gaps | `AGENT-ENTRYPOINTS-1` |
+| **An error catalogue**: each 4xx and 422 message, cause and fix, generated from the error codes | 49 of the blind run's 234 calls were refused, often without a usable message | `ERROR-CATALOGUE-1` |
+| **Assumptions on every page**: edition, sign-in posture, the permission needed; the Handbook checker rejects a new page without them | agents hit "works on Basic, refused on Standard" with no warning | `PAGE-ASSUMPTIONS-1` |
+
+**Left alone:** the tutorials that print expected answers stay as they are for people; the fix is in how agents are
+tested — AK-4's golden tasks use data and a Space the Handbook does not already answer (§1.2). The check-block format
+is kept and extended. **Order:** the generated component reference first, because the authoring-gaps lane
+(`UNKNOWN-KEYS-SILENT-1`, `COMPONENT-VALIDATE-ALL-1`) is fixing the validation it will describe; then the entry points
+and the assumptions block, which are small; recipes grow with the Agent Skills.
 
 ## 2. Vocabulary — the plan's "Draft" is a Pending Change
 
@@ -223,7 +339,7 @@ notifications and the tasks extension stay deferred to AK-3 / AK-4.
 
 **D-AK1…D-AK4 signed 2026-11-20** (operator, "Sign recommended"): each as its *Recommended* column says. For D-AK1 that
 is **four-eyes always**; the single-administrator alternative is not signed and is not built unless the operator asks.
-**D-AK5 and D-AK6 stay open**; they are needed before phase 2.
+**D-AK5, D-AK6 and D-AK7 stay open**; D-AK5 and D-AK6 are needed before phase 2, D-AK7 before the analytics builder's Skills.
 
 | # | Question | Recommended |
 |---|---|---|
@@ -233,6 +349,7 @@ is **four-eyes always**; the single-administrator alternative is not signed and 
 | **D-AK4** | The machine agent capability set | The authoring capabilities of the `propose_change` kinds plus `canWorkIncidents`; listed per client in `auth.oidc.agentMachineClients`. Widens operator decision B1, as D-UE5 anticipated. Phase 2 adds `canOperateRuns` for the operations role. |
 | **D-AK5** | How are an agent's operational and case actions governed (phases 2–3)? | The two tiers of §4.6: **low** actions allowed for a delegated person within that person's rights; **outcome** actions held for a person to approve; every machine action held. |
 | **D-AK6** | How is a held non-config action recorded? | Reuse the Pending Change machinery — record the request, approve by replaying the same route as the proposer, refuse a stale replay — under its **own term** in `GLOSSARY.md` (a Pending Change stays config only). Name to be settled with the glossary owner before phase 2. |
+| **D-AK7** | Which file access does an agent get on a customer's install (§1.2)? | **Governed install:** read access to the install root (shipped docs, example Spaces and templates), no write access to Space folders, every change through the API. **Sandbox or developer install:** direct file writes allowed. The Agent Skills say which posture they assume. Settle with the spike's variant A/B comparison. |
 
 ## References
 

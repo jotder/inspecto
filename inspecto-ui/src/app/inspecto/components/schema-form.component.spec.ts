@@ -855,13 +855,16 @@ describe('InspectoSchemaFormComponent', () => {
             expect(row(fixture, 'skip').querySelector('.sf-value')?.textContent?.trim()).toBe('0');
         });
 
-        it('renders help as the tiny line under the row (UI-FORM-ROWS-1), not as a tooltip', () => {
+        it('puts help behind a "?" after the label (2026-11-22); a hidden copy still describes the control', () => {
             const fixture = createFlat();
             const r = row(fixture, 'encoding');
-            expect(r.querySelector('mat-icon[aria-label="Byte encoding of the file"]')).toBeNull();
-            expect(sfHelp(fixture.nativeElement, 'encoding')).toBe('Byte encoding of the file');
+            const icon = r.querySelector('[data-testid="field-help"]') as HTMLElement;
+            expect(icon, 'the "?" sits in the row').not.toBeNull();
+            expect(icon.getAttribute('aria-label')).toContain('About');
+            // the visible line is gone; the screen-reader copy keeps the text and the id the control points at
             const help = fixture.nativeElement.querySelector('[data-help-for="encoding"]') as HTMLElement;
-            expect(help.classList.contains('text-xs')).toBe(true);
+            expect(help.classList.contains('sr-only')).toBe(true);
+            expect(sfHelp(fixture.nativeElement, 'encoding')).toBe('Byte encoding of the file');
         });
 
         it('lays rows out in a two-column grid when columns() is 2, with group headings spanning both', () => {

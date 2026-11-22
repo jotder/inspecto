@@ -13,7 +13,7 @@
 #   and both lines are kept so the split stays visible instead of being silently collapsed.
 # ⚠ SNAPSHOT entries are weakly pinned by construction: content can move under a fixed version.
 #
-# 89 third-party artifacts across 55 reactor modules.
+# 89 third-party artifacts across 59 reactor modules.
 ai.djl.huggingface:tokenizers:jar:0.36.0:compile
 ai.djl:api:jar:0.36.0:compile
 at.yawk.lz4:lz4-java:jar:1.11.4:runtime
@@ -88,7 +88,7 @@ org.bouncycastle:bcutil-jdk18on:jar:1.85:runtime
 org.bsc.async:async-generator:jar:4.3.1:compile
 org.bsc.langgraph4j:langgraph4j-core:jar:1.8.19:compile
 org.codehaus.jackson:jackson-core-asl:jar:1.9.13:compile
-org.duckdb:duckdb_jdbc:jar:2.0.0.0:compile
+org.duckdb:duckdb_jdbc:jar:2.0.1.0:compile
 org.jetbrains.kotlin:kotlin-stdlib-common:jar:1.9.10:compile
 org.jetbrains.kotlin:kotlin-stdlib-jdk7:jar:1.8.21:compile
 org.jetbrains.kotlin:kotlin-stdlib-jdk8:jar:1.8.21:compile

@@ -40,11 +40,11 @@ public record JaroWinkler(TextUnit unit, Transpositions transpositions, double p
     public static final JaroWinkler STANDARD = new JaroWinkler(TextUnit.CODE_POINT, Transpositions.HALF, 0.1, 4, 0.7);
 
     /**
-     * DuckDB 1.5.6's {@code jaro_similarity} / {@code jaro_winkler_similarity}: UTF-8 bytes, half-transpositions
+     * DuckDB 2.0.1's {@code jaro_similarity} / {@code jaro_winkler_similarity}: code points (2.0.0 and earlier: UTF-8 bytes), half-transpositions
      * rounded down, p = 0.1, prefix up to 4, boost above 0.7. {@code SimilarityDuckDbParityTest} holds it equal to
      * the built-ins.
      */
-    public static final JaroWinkler DUCKDB = new JaroWinkler(TextUnit.UTF8_BYTE, Transpositions.HALF_FLOORED, 0.1, 4, 0.7);
+    public static final JaroWinkler DUCKDB = new JaroWinkler(TextUnit.CODE_POINT, Transpositions.HALF_FLOORED, 0.1, 4, 0.7);
 
     public JaroWinkler {
         Objects.requireNonNull(unit, "unit");

@@ -342,6 +342,74 @@ class PipelineValidatorTest {
         assertTrue(codes(PipelineValidator.validate(blanks)).contains(PipelineValidator.JOIN_ON_MISSING));
     }
 
+    /** LOOKUP-1 P1b: keyed-form settings the config alone shows cannot run are refused at save. */
+    @Test
+    void aKeyedJoinsImpossibleSettingsAreRefusedAtValidation() {
+        Map<String, Object> ok = new java.util.LinkedHashMap<>(Map.of("reference", "reference/dd", "key", "dial_digit_key",
+                "match", "longest_prefix", "on", List.of("a", "b"), "exact_when", "dm_ind = '1'",
+                "duplicates", "last", "order_by", "update_date_time"));
+        assertFalse(codes(PipelineValidator.validate(joinGraph(ok))).contains(PipelineValidator.JOIN_KEYED_INVALID));
+        for (Map<String, Object> bad : List.<Map<String, Object>>of(
+                Map.of("reference", "reference/dd", "on", "a", "columns", List.of("x")),             // no key:
+                with(ok, "match", "exact"),                                                     // exact_when + exact
+                with(ok, "duplicates", "newest"),
+                with(without(ok, "order_by"), "duplicates", "first"),
+                with(ok, "as", "dd_"))) {                                                       // 2 on, no {on}
+            PipelineValidator.Result r = PipelineValidator.validate(joinGraph(bad));
+            assertTrue(codes(r).contains(PipelineValidator.JOIN_KEYED_INVALID), () -> bad + " → " + r.issues());
+        }
+    }
+
+    /** LOOKUP-1 P1c: a range join needs its bounds, takes no key, and bounds belong to range only. */
+    @Test
+    void aRangeJoinsImpossibleSettingsAreRefusedAtValidation() {
+        Map<String, Object> ok = new java.util.LinkedHashMap<>(Map.of("reference", "reference/rates", "match", "range",
+                "from", "valid_from", "to", "valid_to", "on", "call_date", "filter", "lookup_key = 'SDR'"));
+        assertFalse(codes(PipelineValidator.validate(joinGraph(ok))).contains(PipelineValidator.JOIN_KEYED_INVALID));
+        for (Map<String, Object> bad : List.<Map<String, Object>>of(
+                without(without(ok, "from"), "to"),                     // range with no bounds
+                with(ok, "key", "lookup_key"),                          // range with a key
+                with(with(ok, "match", "exact"), "key", "lookup_key"))) { // bounds on an exact join
+            PipelineValidator.Result r = PipelineValidator.validate(joinGraph(bad));
+            assertTrue(codes(r).contains(PipelineValidator.JOIN_KEYED_INVALID), () -> bad + " → " + r.issues());
+        }
+    }
+
+    private static PipelineGraph joinGraph(Map<String, Object> cfg) {
+        return new PipelineGraph("keyed", true, List.of(new PipelineNode("j", "transform.join", cfg, null)), List.of());
+    }
+
+    private static Map<String, Object> with(Map<String, Object> m, String k, Object v) {
+        Map<String, Object> c = new java.util.LinkedHashMap<>(m);
+        c.put(k, v);
+        return c;
+    }
+
+    private static Map<String, Object> without(Map<String, Object> m, String k) {
+        Map<String, Object> c = new java.util.LinkedHashMap<>(m);
+        c.remove(k);
+        return c;
+    }
+
+    /** LOOKUP-1: a join's match must be one RowShaper.join runs; exact and longest_prefix are clean. */
+    @Test
+    void aJoinWithAnUnknownMatchIsRefusedAtValidation() {
+        for (String ok : List.of("exact", "longest_prefix")) {
+            PipelineGraph g = new PipelineGraph("join-" + ok, true,
+                    List.of(new PipelineNode("j", "transform.join",
+                            Map.of("reference", "reference/prefixes", "on", "msisdn", "match", ok), null)),
+                    List.of());
+            assertFalse(codes(PipelineValidator.validate(g)).contains(PipelineValidator.JOIN_MATCH_UNKNOWN), ok);
+        }
+        PipelineGraph bad = new PipelineGraph("join-bad", true,
+                List.of(new PipelineNode("j", "transform.join",
+                        Map.of("reference", "reference/prefixes", "on", "msisdn", "match", "prefix"), null)),
+                List.of());
+        PipelineValidator.Result r = PipelineValidator.validate(bad);
+        assertTrue(codes(r).contains(PipelineValidator.JOIN_MATCH_UNKNOWN), () -> r.issues().toString());
+        assertFalse(r.ok());
+    }
+
     /** …and the correctly-spelled one against the same registry is clean. */
     @Test
     void resolvableUseRefIsClean(@TempDir Path root) throws Exception {

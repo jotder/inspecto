@@ -267,9 +267,9 @@ DuckDB's built-ins do the same. A distance is a plain count. NULL in SQL gives N
 
 | Similarity | Definition | JVM | DuckDB |
 |---|---|---|---|
-| Jaro | units match when equal and at most `w = max(0, max(|s|, |t|) / 2 − 1)` apart (each used once, first free match, left to right); with `m` matches and `x` matched positions out of order: `(m/|s| + m/|t| + (m − h)/m) / 3`, `h = x / 2` | `Similarity.jaro`, `JaroWinkler.jaro` | `jaro_similarity` (with `h = ⌊x / 2⌋`, bytes — see below) |
+| Jaro | units match when equal and at most `w = max(0, max(|s|, |t|) / 2 − 1)` apart (each used once, first free match, left to right); with `m` matches and `x` matched positions out of order: `(m/|s| + m/|t| + (m − h)/m) / 3`, `h = x / 2` | `Similarity.jaro`, `JaroWinkler.jaro` | `jaro_similarity` (with `h = ⌊x / 2⌋` — see below) |
 | Jaro-Winkler | `jaro + ℓ · p · (1 − jaro)`, `ℓ` = common prefix up to `maxPrefix`, applied only when `jaro > boostThreshold`. `STANDARD`: p = 0.1, prefix ≤ 4, threshold 0.7 (Winkler) | `Similarity.jaroWinkler`, `JaroWinkler` | `jaro_winkler_similarity` |
-| Levenshtein distance | fewest single-unit insertions, deletions and substitutions | `Similarity.levenshtein` | `levenshtein` (bytes) |
+| Levenshtein distance | fewest single-unit insertions, deletions and substitutions | `Similarity.levenshtein` | `levenshtein` |
 | Levenshtein similarity | `1 − d / max(|a|, |b|)` | `Similarity.levenshteinSimilarity` | `SimilaritySql.Method.LEVENSHTEIN` |
 | Jaccard (sets) | `|A ∩ B| / |A ∪ B|` (`equals`) | `Similarity.jaccard` | — |
 | Token Jaccard | Jaccard of the distinct runs of non-whitespace (whitespace = space, tab, LF, VT, FF, CR; nothing else) — no case folding inside | `Similarity.tokens`, `tokenJaccard` | `SimilaritySql.Method.TOKEN_JACCARD` (list functions) |
@@ -286,16 +286,16 @@ above U+FFFF is two), `UTF8_BYTE` (an accented letter is two). `JaroWinkler` car
 (`HALF` = `x / 2.0`, `HALF_FLOORED` = `⌊x / 2⌋`), prefix scale, max prefix and boost threshold as data, so a caller's exact
 arithmetic is a named instance rather than a private copy.
 
-### DuckDB 1.5.6, as found
+### DuckDB 2.0.1, as found
 
 Checked against the engine's DuckDB (`SimilarityDuckDbParityTest`, 4,014 pairs with accents, emoji, tabs, empties and
 one-swap near-duplicates, compared **bit for bit**):
 
 | Built-in | What it computes | Kit form that equals it |
 |---|---|---|
-| `jaro_similarity`, `jaro_winkler_similarity` | Jaro / Jaro-Winkler over **UTF-8 bytes**, half-transpositions **rounded down**, p 0.1, prefix ≤ 4, boost above 0.7; empty → 0 | `JaroWinkler.DUCKDB` |
-| `levenshtein` | edit distance over **UTF-8 bytes** (`é` ↔ `e` costs 2) | `levenshtein(a, b, UTF8_BYTE)` |
-| `jaccard(s1, s2)` | ⚠ **not** a token Jaccard: Jaccard of the two strings' sets of UTF-8 **bytes**, case-sensitive, and it **raises** on an empty argument | none needed — the token Jaccard is built from `regexp_extract_all`, `list_distinct`, `list_intersect` |
+| `jaro_similarity`, `jaro_winkler_similarity` | Jaro / Jaro-Winkler over **code points** (UTF-8 bytes up to 2.0.0), half-transpositions **rounded down**, p 0.1, prefix ≤ 4, boost above 0.7; empty → 0 | `JaroWinkler.DUCKDB` |
+| `levenshtein` | edit distance over **code points** (`é` ↔ `e` costs 1; 2 up to 2.0.0, which counted bytes) | `levenshtein(a, b, CODE_POINT)` |
+| `jaccard(s1, s2)` | ⚠ **not** a token Jaccard: Jaccard of the two strings' sets of **code points** (UTF-8 bytes up to 2.0.0), case-sensitive, and it **raises** on an empty argument | none needed — the token Jaccard is built from `regexp_extract_all`, `list_distinct`, `list_intersect` |
 | `strip_accents` + `lower` | as `normalize`, except on code points newer than DuckDB's Unicode tables | `normalize` — equal on every code point below U+0870 and in U+1E00–U+1FFF; 154 of planes 0–2 differ on JDK 27 (recent additions such as U+0897, U+1ACF–U+1ADC, U+A7CB–U+A7DC) |
 | `trim(x)` | ⚠ also strips Unicode spaces (no-break space, U+3000) | the normalizer trims `' '` only |
 

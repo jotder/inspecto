@@ -1681,6 +1681,7 @@ public final class PipelineConfig {
 
     /** Reference join ({@code processing.join}); {@code null} when absent. */
     private final Join join;
+    private final String joinMatch;
 
     /** Authored map projection ({@code processing.map}); {@code null} when absent. */
     private final MapConfig mapConfig;
@@ -1838,6 +1839,11 @@ public final class PipelineConfig {
      */
     public Join join() { return join; }
     /**
+     * The {@code processing.join.match} key ({@code exact} | {@code longest_prefix}, LOOKUP-1), or {@code null} when
+     * absent (= exact). Kept beside {@link Join} rather than in it: {@code Join} is a released {@code @PublicApi} record.
+     */
+    public String joinMatch() { return joinMatch; }
+    /**
      * Authored map projection ({@code processing.map}), or {@code null} when absent. ⚠ Unlike its
      * neighbours this one <b>executes</b> — {@code PipelineLift} puts it on the map node and
      * {@code RowShaper} reads it — so {@link #prepare()} deliberately does not refuse it on an active
@@ -1876,7 +1882,7 @@ public final class PipelineConfig {
                 b.sourceTimezone, b.decimalSeparator);
         this.output = new Output(b.outputFormat, b.compression, b.duckLakeCfg, b.filenameColumn, b.outputConnection);
         this.sinks = resolveSinks(b.sinks, this.output, b.databaseDir);
-        this.steps = resolveSteps(b.steps, b.rowWhere, b.join, b.dedup, b.summarize, b.profile, b.route);
+        this.steps = resolveSteps(b.steps, b.rowWhere, b.join, b.joinMatch, b.dedup, b.summarize, b.profile, b.route);
         this.explicitSteps = b.steps != null && !b.steps.isEmpty();
         this.schemas = new Schemas(b.schemaSelector, b.singleSchema, b.segmentSchemas,
                 b.ingesterClass,
@@ -1919,6 +1925,7 @@ public final class PipelineConfig {
         this.excel = b.excel;
         this.excelConfig = b.excelConfig;
         this.join = b.join;
+        this.joinMatch = b.joinMatch;
         this.mapConfig = b.mapConfig;
         this.disabledSteps = List.copyOf(b.disabledSteps);
         this.referencedFiles = List.copyOf(b.referencedFiles);
@@ -2017,6 +2024,7 @@ public final class PipelineConfig {
         this.excel = src.excel;
         this.excelConfig = src.excelConfig;
         this.join = src.join;
+        this.joinMatch = src.joinMatch;
         this.mapConfig = src.mapConfig;
         this.disabledSteps = src.disabledSteps;
         this.referencedFiles = src.referencedFiles;
@@ -2181,7 +2189,7 @@ public final class PipelineConfig {
      * is no non-arbitrary position at which a legacy block would join an authored sequence, and picking one
      * silently is the failure mode this record was introduced to remove.
      */
-    private static List<Step> resolveSteps(List<Step> declared, String rowWhere, Join join, Dedup dedup,
+    private static List<Step> resolveSteps(List<Step> declared, String rowWhere, Join join, String joinMatch, Dedup dedup,
                                            Summarize summarize, Profile profile, Map<String, Object> route) {
         if (declared != null && !declared.isEmpty()) return List.copyOf(declared);
 
@@ -2189,7 +2197,7 @@ public final class PipelineConfig {
         if (rowWhere != null && !rowWhere.isBlank())
             out.add(new Step(Step.FILTER, Map.of("where", rowWhere)));
         if (join != null)
-            out.add(new Step(Step.JOIN, cfg("reference", join.reference(), "on", join.on())));
+            out.add(new Step(Step.JOIN, cfg("reference", join.reference(), "on", join.on(), "match", joinMatch)));
         if (dedup != null)
             out.add(new Step(Step.DEDUP, cfg("keys", dedup.keys(), "order_by", dedup.orderBy(),
                     "scope", dedup.scope())));
@@ -2601,6 +2609,7 @@ public final class PipelineConfig {
         Excel excel = null;                   // Excel workbook sink (excel:); null ⇒ none
         Map<String, Object> excelConfig = null;     // the excel: block verbatim; null ⇒ none
         Join join = null;                     // reference join (processing.join); null ⇒ none
+        String joinMatch;                     // processing.join.match; null ⇒ exact
         MapConfig mapConfig = null;           // authored map projection (processing.map); null ⇒ none
         List<String> disabledSteps = List.of();   // processing.disabled_steps (S4/D-13); empty ⇒ all enabled
         final List<Path> referencedFiles = new ArrayList<>();   // schema/grammar/segment files read at parse

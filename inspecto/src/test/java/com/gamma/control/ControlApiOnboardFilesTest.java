@@ -618,6 +618,33 @@ class ControlApiOnboardFilesTest {
 
     // ── Add a file, Run now ─────────────────────────────────────────────────────────────────────────────────
 
+    /** UPLOAD-DEFAULTS-1: a file added without a mode, or with an unknown one, is refused (422) and the Dataset keeps its rows. */
+    @Test
+    void addAFileWithoutAModeIsRefusedAndKeepsTheRows(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            String id = uniqueId("nomode");
+            JsonNode d = draft(c, "transfers.csv", "stream", transfers(100), null);
+            data(json(c, "POST", "/onboard/files/" + d.get("draftId").asText() + "/commit", "{\"name\":\"" + id + "\"}", null), 200);
+            ComponentStore registry = new ComponentStore(root.resolve("registry"));
+            assertLastImport(registry, id, false, 0, 100, "transfers.csv");
+
+            HttpResponse<String> none = send(c, "POST", "/datasets/" + id + "/files?name=later.csv", transfers(60).getBytes(StandardCharsets.UTF_8), null);
+            assertEquals(422, none.statusCode(), none.body());
+            assertTrue(none.body().contains("replace") && none.body().contains("append") && none.body().contains("period"), none.body());
+            HttpResponse<String> blank = send(c, "POST", "/datasets/" + id + "/files?mode=&name=later.csv", transfers(60).getBytes(StandardCharsets.UTF_8), null);
+            assertEquals(422, blank.statusCode(), blank.body());
+            HttpResponse<String> odd = send(c, "POST", "/datasets/" + id + "/files?mode=overwrite&name=later.csv", transfers(60).getBytes(StandardCharsets.UTF_8), null);
+            assertEquals(422, odd.statusCode(), odd.body());
+            assertTrue(odd.body().contains("'overwrite'"), odd.body());
+            // nothing landed: the one import on record is still the first, so the 100 rows were not replaced
+            assertLastImport(registry, id, false, 0, 100, "transfers.csv");
+
+            // the same file with a stated mode is taken
+            data(send(c, "POST", "/datasets/" + id + "/files?mode=append&name=later.csv", transfers(60).getBytes(StandardCharsets.UTF_8), null), 200);
+            assertLastImport(registry, id, false, 100, 160, "later.csv");
+        }
+    }
+
     @Test
     void addAFileReplacesOrAppendsAndRunNowReRuns(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
@@ -627,7 +654,7 @@ class ControlApiOnboardFilesTest {
             ComponentStore registry = new ComponentStore(root.resolve("registry"));
             assertLastImport(registry, id, false, 0, 100, "transfers.csv");
 
-            JsonNode rep = data(send(c, "POST", "/datasets/" + id + "/files?name=october.csv", transfers(60).getBytes(StandardCharsets.UTF_8), null), 200);
+            JsonNode rep = data(send(c, "POST", "/datasets/" + id + "/files?mode=replace&name=october.csv", transfers(60).getBytes(StandardCharsets.UTF_8), null), 200);
             assertLastImport(registry, id, true, 100, 60, "october.csv");
             assertTrue(rep.get("replaced").asBoolean());
             assertEquals(100, rep.get("rowsBefore").asLong(), rep.toString());
@@ -652,7 +679,7 @@ class ControlApiOnboardFilesTest {
             assertEquals(0, now.get("rowsChanged").asLong());
 
             // a file of another shape is refused before it lands; the data is untouched
-            HttpResponse<String> wrong = send(c, "POST", "/datasets/" + id + "/files?name=narrow.csv", "a,b\n1,2\n".getBytes(StandardCharsets.UTF_8), null);
+            HttpResponse<String> wrong = send(c, "POST", "/datasets/" + id + "/files?mode=replace&name=narrow.csv", "a,b\n1,2\n".getBytes(StandardCharsets.UTF_8), null);
             assertEquals(422, wrong.statusCode(), wrong.body());
             assertEquals(90, data(json(c, "POST", "/datasets/" + id + "/run", null, null), 200).get("rowsAfter").asLong());
 
@@ -742,7 +769,7 @@ class ControlApiOnboardFilesTest {
             }
 
             // Replace everything: the newest arrival is kept, every older one is set aside
-            data(send(c, "POST", "/datasets/" + id + "/files?name=december.csv", transfers(10).getBytes(StandardCharsets.UTF_8), null), 200);
+            data(send(c, "POST", "/datasets/" + id + "/files?mode=replace&name=december.csv", transfers(10).getBytes(StandardCharsets.UTF_8), null), 200);
             JsonNode after = data(json(c, "GET", "/datasets/" + id + "/arrivals", null, null), 200).get("arrivals");
             assertEquals(4, after.size());
             assertEquals("replace", after.get(0).get("mode").asText());
@@ -906,10 +933,10 @@ class ControlApiOnboardFilesTest {
             assertEquals(409, send(c, "POST", "/datasets/" + id + "/files?name=october.csv&mode=period", oct, null).statusCode());
 
             byte[] nov = transfers(10).getBytes(StandardCharsets.UTF_8);
-            data(send(c, "POST", "/datasets/" + id + "/files?name=november.csv", nov, null), 200);   // Replace everything
+            data(send(c, "POST", "/datasets/" + id + "/files?mode=replace&name=november.csv", nov, null), 200);   // Replace everything
             assertEquals(40, data(send(c, "POST", "/datasets/" + id + "/files?name=october.csv&mode=append", oct, null), 200)
                     .get("rowsAfter").asLong(), "October's rows were set aside by the replace, so it may come back");
-            assertEquals(10, data(send(c, "POST", "/datasets/" + id + "/files?name=november.csv", nov, null), 200)
+            assertEquals(10, data(send(c, "POST", "/datasets/" + id + "/files?mode=replace&name=november.csv", nov, null), 200)
                     .get("rowsAfter").asLong(), "Replace everything may always reload a file");
         }
     }
@@ -1142,7 +1169,7 @@ class ControlApiOnboardFilesTest {
             // Add a file: another .TXT of the same shape lands too; a TSV is not a CSV import's file
             assertEquals(30, data(send(c, "POST", "/datasets/" + txtId + "/files?name=MORE.TXT&mode=append",
                     transfers(30).getBytes(StandardCharsets.UTF_8), null), 200).get("rowsChanged").asLong());
-            HttpResponse<String> wrong = send(c, "POST", "/datasets/" + txtId + "/files?name=x.tsv", tsv.getBytes(StandardCharsets.UTF_8), null);
+            HttpResponse<String> wrong = send(c, "POST", "/datasets/" + txtId + "/files?mode=replace&name=x.tsv", tsv.getBytes(StandardCharsets.UTF_8), null);
             assertEquals(422, wrong.statusCode(), wrong.body());
         }
     }
@@ -1214,7 +1241,7 @@ class ControlApiOnboardFilesTest {
             store.write("dataset", id, Map.of("physicalRef", id + "/database", "origin", "import", "importPipeline", id,
                     "importFormat", "csv", "kind", "stream"));
             assertEquals(409, json(c, "POST", "/datasets/" + id + "/run", null, null).statusCode());
-            assertEquals(409, send(c, "POST", "/datasets/" + id + "/files?name=t.csv", transfers(5).getBytes(StandardCharsets.UTF_8), null).statusCode());
+            assertEquals(409, send(c, "POST", "/datasets/" + id + "/files?mode=replace&name=t.csv", transfers(5).getBytes(StandardCharsets.UTF_8), null).statusCode());
             assertEquals(30, data(json(c, "POST", "/datasets/" + keep + "/run", null, null), 200).get("rowsAfter").asLong());
         }
     }
