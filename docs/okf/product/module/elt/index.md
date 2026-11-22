@@ -42,7 +42,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `JOB-GRAPH-1` | P2 | feature | A Job's chain becomes its own Pipeline: store inputs, Reference side inputs drawn as edges into their joins, a persistent output Dataset,… | — |
 | `OUTPUT-STORE-SINK-NOT-DRAWN-1` | P3 | defect | The Pipeline editor draws a steps: + output_store: Pipeline as one line ending in the landed store: the joined rows appear to go to cdr_e… | — |
 | — | P3 | feature | Step Processor catalog | — |
-| `REPROCESS-REFUSAL-TEST-MODE-1` | P3 | defect | ControlApiReprocessRefusalTest.anArrivalReplaceEverythingSetAsideIsRefused fails on master: its upload sends no arrival mode, so Add a fi… | — |
 | `QUARANTINE-RELEASE-1` | P3 | feature | a quarantined file has no console action: the Quarantine tab lists files per Pipeline (no run, Consignment or time) and offers only *View… | — |
 | `OUTPUT-NAME-OVERWRITE-1` | P3 | defect | A second file with the same file name silently replaces the first file's rows, on any Pipeline (filed 2026-11-20, BASIC-ELT-PROFILE-1 B3… | — |
 | `REPROCESS-ARCHIVE-MEMBER-1` | P3 | defect | Reprocessing ONE Consignment of a zip restores the whole archive under the member's composite name and reads every entry again, so rows d… | — |

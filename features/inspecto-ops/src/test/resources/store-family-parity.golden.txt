@@ -1,4 +1,4 @@
-META|ACQUISITION_LEDGER|Acquisition ledger|acquire.ledger.backend|memory|DB_FLAG|acquire.ledger.db.url|null|null
+META|ACQUISITION_LEDGER|Acquisition ledger|acquire.ledger.backend|db|DB_FLAG|acquire.ledger.db.url|null|null
 META|ALERTS|Alerts|alerts.backend|db|DB_FLAG|alerts.db.url|alerts.db.user|alerts.db.password
 META|CONSIGNMENT_OUTPUTS|Consignment outputs|consignment.outputs.backend|duckdb|URL_OR_ENGINE|consignment.outputs.db.url|null|null
 META|DEDUP_LEDGER|Record dedup ledger|dedup.ledger.backend|duckdb|URL_OR_ENGINE|dedup.ledger.db.url|null|null
@@ -14,7 +14,7 @@ META|PROVENANCE|Provenance|provenance.backend|none|URL_OR_ENGINE|provenance.db.u
 META|RUN_LEASE|Run lease|run.lease.backend|heap|URL_OR_ENGINE|run.lease.db.url|run.lease.db.user|run.lease.db.password
 META|STATUS|Status|status.backend|db|DB_FLAG|status.db.url|status.db.user|status.db.password
 META|TAGS|Tag assignments|objects.backend|db|DB_FLAG|objects.tags.db.url|objects.db.user|objects.db.password
-DEFAULT|space|ACQUISITION_LEDGER|DISABLED|null|null|null|null|jdbc:duckdb:default.db
+DEFAULT|space|ACQUISITION_LEDGER|SPACE_DEFAULT|jdbc:duckdb:<space>/duckdb/inspecto-acquisition.db|null|null|null|jdbc:duckdb:default.db
 DEFAULT|space|ALERTS|SPACE_DEFAULT|jdbc:duckdb:<space>/duckdb/inspecto-alerts.db|null|null|null|jdbc:duckdb:default.db
 DEFAULT|space|CONSIGNMENT_OUTPUTS|SPACE_DEFAULT|jdbc:duckdb:<space>/duckdb/inspecto-consignment-outputs.db|null|null|null|jdbc:duckdb:default.db
 DEFAULT|space|DEDUP_LEDGER|SPACE_DEFAULT|jdbc:duckdb:<space>/duckdb/inspecto-dedup-ledger.db|null|null|null|jdbc:duckdb:default.db
@@ -30,7 +30,7 @@ DEFAULT|space|PROVENANCE|DISABLED|null|null|null|null|jdbc:duckdb:default.db
 DEFAULT|space|RUN_LEASE|DISABLED|null|null|null|null|jdbc:duckdb:default.db
 DEFAULT|space|STATUS|SPACE_DEFAULT|jdbc:duckdb:<space>/duckdb/inspecto-status.db|null|null|null|jdbc:duckdb:default.db
 DEFAULT|space|TAGS|SPACE_DEFAULT|jdbc:duckdb:<space>/duckdb/inspecto-ops-tags.db|null|null|null|jdbc:duckdb:default.db
-DEFAULT|legacy|ACQUISITION_LEDGER|DISABLED|null|null|null|null|jdbc:duckdb:default.db
+DEFAULT|legacy|ACQUISITION_LEDGER|SPACE_DEFAULT|jdbc:duckdb:inspecto-acquisition.db|null|null|null|jdbc:duckdb:default.db
 DEFAULT|legacy|ALERTS|SPACE_DEFAULT|jdbc:duckdb:inspecto-alerts.db|null|null|null|jdbc:duckdb:default.db
 DEFAULT|legacy|CONSIGNMENT_OUTPUTS|SPACE_DEFAULT|jdbc:duckdb:inspecto-consignment-outputs.db|null|null|null|jdbc:duckdb:default.db
 DEFAULT|legacy|DEDUP_LEDGER|SPACE_DEFAULT|jdbc:duckdb:inspecto-dedup-ledger.db|null|null|null|jdbc:duckdb:default.db
@@ -174,7 +174,7 @@ RAW-JDBC-BACKEND-VALUES|legacy|PROVENANCE|BACKEND_PROPERTY|jdbc:duckdb:/raw/prov
 RAW-JDBC-BACKEND-VALUES|legacy|RUN_LEASE|BACKEND_PROPERTY|jdbc:duckdb:/raw/run_lease.db|null|null|null|jdbc:duckdb:default.db
 RAW-JDBC-BACKEND-VALUES|legacy|STATUS|SPACE_DEFAULT|jdbc:duckdb:inspecto-status.db|null|null|null|jdbc:duckdb:default.db
 RAW-JDBC-BACKEND-VALUES|legacy|TAGS|SPACE_DEFAULT|jdbc:duckdb:inspecto-ops-tags.db|null|null|null|jdbc:duckdb:default.db
-OBJECTS-BACKEND-POSTGRES|space|ACQUISITION_LEDGER|DISABLED|null|null|null|null|jdbc:postgresql://db:5432/inspecto?currentSchema=space_north_east
+OBJECTS-BACKEND-POSTGRES|space|ACQUISITION_LEDGER|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|null|null|null|jdbc:postgresql://db:5432/inspecto?currentSchema=space_north_east
 OBJECTS-BACKEND-POSTGRES|space|ALERTS|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|null|null|null|jdbc:postgresql://db:5432/inspecto?currentSchema=space_north_east
 OBJECTS-BACKEND-POSTGRES|space|CONSIGNMENT_OUTPUTS|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|null|null|null|jdbc:postgresql://db:5432/inspecto?currentSchema=space_north_east
 OBJECTS-BACKEND-POSTGRES|space|DEDUP_LEDGER|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|null|null|null|jdbc:postgresql://db:5432/inspecto?currentSchema=space_north_east
@@ -190,7 +190,7 @@ OBJECTS-BACKEND-POSTGRES|space|PROVENANCE|DISABLED|null|null|null|null|jdbc:post
 OBJECTS-BACKEND-POSTGRES|space|RUN_LEASE|DISABLED|null|null|null|null|jdbc:postgresql://db:5432/inspecto?currentSchema=space_north_east
 OBJECTS-BACKEND-POSTGRES|space|STATUS|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|null|null|null|jdbc:postgresql://db:5432/inspecto?currentSchema=space_north_east
 OBJECTS-BACKEND-POSTGRES|space|TAGS|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|null|null|null|jdbc:postgresql://db:5432/inspecto?currentSchema=space_north_east
-OBJECTS-BACKEND-POSTGRES|legacy|ACQUISITION_LEDGER|DISABLED|null|null|null|null|jdbc:postgresql://db:5432/inspecto
+OBJECTS-BACKEND-POSTGRES|legacy|ACQUISITION_LEDGER|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|null|null|null|jdbc:postgresql://db:5432/inspecto
 OBJECTS-BACKEND-POSTGRES|legacy|ALERTS|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|null|null|null|jdbc:postgresql://db:5432/inspecto
 OBJECTS-BACKEND-POSTGRES|legacy|CONSIGNMENT_OUTPUTS|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|null|null|null|jdbc:postgresql://db:5432/inspecto
 OBJECTS-BACKEND-POSTGRES|legacy|DEDUP_LEDGER|SHARED_PROPERTY|jdbc:postgresql://db:5432/inspecto|null|null|null|jdbc:postgresql://db:5432/inspecto

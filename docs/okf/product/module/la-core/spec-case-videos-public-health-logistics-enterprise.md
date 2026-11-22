@@ -210,148 +210,158 @@ shared module (§4.4).
 
 ## Healthcare_ReferralKickbacks
 
-> **Referral kickbacks: nine practices, one imaging centre** · Standard · Healthcare (la-healthcare) · referrals and ownership · 4:30 · plan §6 row 17
+> **Referral kickbacks: an imaging centre and two owners who share a home** · Standard · Healthcare (la-healthcare) · referrals and ownership · 4:10 · plan §6 row 17
 
 - **Cast:** the imaging centre PR-1170, its owner OW-0434, two referring practices (PR-1426, PR-1392), the owner OW-1270 who shares a home (AD-05150) with OW-0434. **Decoy:** the only local hospital (PR-1129, owner OW-0263), the busiest receiver. Ids readable.
 - **Stakes:** a health-system integrity analyst. In a small town, sending most referrals to one place can be geography. The question is whether any of it has a reason.
 - **Vocabulary:** *referral*, one provider sending a patient to another. *Ownership tie*, who owns a practice. Said once in S02.
-- **Ground truth:** `tools/gen-la-health-data.ground-truth.json` · `referral_kickbacks` (`imaging_centre` PR-1170, `spouse` OW-0434, `practice_owner` OW-1270, `second_practice_owner` OW-1286, `practices` [PR-1426, PR-1392], `home` AD-05150, `lookalike_hospital` PR-1129, `lookalike_hospital_owner` OW-0263, `scarborough_practices` seven). Nine practices = the seven seaside practices plus the two city practices. **Plan table corrected:** the table said "the specialist everyone refers to vs a loop paid back"; the data says the decoy is the only local hospital (geography) and the lead is an *ownership tie by a shared home*.
-- **Lead:** two city practices send their patients to an imaging centre whose owner shares a home with the owner of one of them. **What would change our mind:** the owners declared the tie and the referrals are documented as clinically driven, or the centre is the only one with that equipment. **Next actions:** open a conflict-of-interest review of the two practices; ask for the referral reasons on the two practices' patients; keep the centre and the three owners together as an Entity List.
+- **Ground truth:** `tools/gen-la-health-data.ground-truth.json` · `referral_kickbacks` (`imaging_centre` PR-1170, `spouse` OW-0434, `practice_owner` OW-1270, `second_practice_owner` OW-1286, `practices` [PR-1426, PR-1392], `home` AD-05150, `lookalike_hospital` PR-1129, `lookalike_hospital_owner` OW-0263).
+- **Screen truth** (checked live on a fresh Standard unzip, Demo Analyst, 2026-11-22): the saved view *Referral kickbacks* is small and fully readable (23 nodes, 22 links, PR-, OW- and AD- labels). Busiest nodes answers PR-1129 (8 links, with an offer to add it to an exclusion list), PR-1170 (3), AD-05150 (2), OW-0434 (2) and OW-1270 (2). On the canvas PR-1170 links to PR-1392 and PR-1426 (referrals), to its owner OW-0434, who lives at AD-05150, and OW-1270 also lives at AD-05150. Nothing is masked.
+- **Before:** fresh unzip of `la-standard.zip` with the fake Demo Auth sign-in, Healthcare Space, Demo Analyst; nothing is saved or created (the New list form is cancelled).
+- **Lead:** two city practices send their patients to an imaging centre whose owner shares a home with the owner of one of them. **What would change our mind:** the owners declared the tie and the referrals are documented as clinically driven, or the centre is the only one with that equipment. **Next actions:** open a conflict-of-interest review of the two practices; ask for the referral reasons on their patients; keep the centre and its owners together as an Entity List.
 - **Voice style:** the reveal scene (S06) holds 0.7 s before "They share a home." Lexicon: PR-1170 "p r one one seven zero", OW-0434 "o w zero four three four".
 - **Try it:** open *Referral kickbacks*, press Busiest nodes and compare the top name with the imaging centre. *Answer: the busiest name is the only hospital in the seaside town, which is geography; the imaging centre has few links and an ownership tie.*
 - **Check:** why is the busiest receiver not the lead? *Answer: a town with one hospital sends it most referrals; only an ownership tie gives a reason to choose one place over another.*
 
-### S01 · Nine practices, one destination  ~25 s
-- Voice: You are an integrity analyst for a health system. [pause 0.4] Nine practices send nearly all their referrals to one place. In a small town, that can be geography. [pause 0.6] Or it can be a reason. Referral data alone cannot say which. Ownership can.
-- Chip: none
-- Action: cold open on the Space's home page; intro card (*Referral kickbacks*, *Healthcare*, *Standard*).
+### S01 · Referrals that all go one way · ~24 s
+- Beat: cold
+- Voice: You are an integrity analyst for a health system. [pause 0.4] Referrals from city practices keep landing at one imaging centre. In a small town, that can be geography. [pause 0.6] Or it can be a reason. Referral data alone cannot say which, but ownership can.
+- Action: cold open on the Space's home page.
 - Impact: none.
 
-### S02 · Why referrals alone are not enough  ~30 s
-- Voice: A referral is one provider sending a patient to another. Counting them tells you who is busy, never why. [pause 0.4] Ownership says who owns each practice, and where the owners live. [pause 0.4] Referrals and ownership sit in different records. Only when they are joined does a pattern either hold up, or fall apart.
-- Chip: none
-- Action: home page; the story card names *the local hospital*, *the imaging centre*, *the owners*.
+### S02 · Why referrals alone are not enough · ~30 s
+- Beat: steady
+- Intro: Referral kickbacks | Healthcare Space
+- Story: the local hospital = the only hospital in the town | the imaging centre = a private centre that practices refer to | the owners = the people who own the practices
+- Voice: A referral is one provider sending a patient to another. Counting them tells you who is busy, never why. [pause 0.4] Ownership says who owns each practice, and where the owners live. [pause 0.4] The two sit in different records, and only when they are joined does a pattern either hold up or fall apart.
+- Action: story card "Who is who" over the home page.
+- Impact: the story card names the three roles.
+
+### S03 · The data in one breath · ~30 s
+- Voice: Every referral lands as a record: the sending provider, the receiving provider and the date. [pause 0.3] A Job links providers to each other by referral, and to their owners and the owners' addresses by ownership. Providers, owners and addresses are the entities.
+- Chip: Data · Mappings
+- Action: rail ▸ Data ▸ `health_screen_links_dataset` ▸ hold on its Columns card.
+- Impact: mark the src and dst columns once.
+
+### S04 · The question · ~26 s
+- Voice: Open the saved view Referral kickbacks. [pause 0.4] It draws the practices, where they refer, and who owns what. The question is whether any referral pattern coincides with an ownership tie. It is a small graph, and every id reads in full.
+- Chip: Saved views
+- Action: open the saved view *Referral kickbacks* ▸ hold.
 - Impact: none.
 
-### S03 · The data in one breath  ~30 s
-- Voice: Every referral lands as a record: the sending provider, the receiving provider, the patient and the date. [pause 0.3] A Job links providers to each other by referral, and to their owners and owners' addresses by ownership. Providers, owners and addresses are the entities.
-- Chip: Mappings · Data
-- Action: rail ▸ Data ▸ the health links Dataset ▸ zoom on the Mappings area. [check in UI: the Mappings area of `health_screen_links_dataset`]
-- Impact: mark the From and To columns.
-
-### S04 · The question  ~25 s
-- Voice: Open the saved view Referral kickbacks. [pause 0.4] It draws the practices, where they refer, and who owns what. The question is whether any referral pattern coincides with an ownership tie. [pause 0.4] A small, readable graph, with owners and homes on it.
-- Chip: File · Open… · Saved views
-- Action: File ▸ Open… ▸ Saved views ▸ *Referral kickbacks* ▸ hold. [check in UI: a small graph with PR-, OW- and AD- labels]
-- Impact: before/after hold: the graph appears; mark the owners.
-
-### S05 · The busiest name is geography  ~40 s
-- Voice: Press Busiest nodes. [pause 0.4] The busiest provider receives from seven practices. It is the only hospital in a seaside town, owned by a health trust. [pause 0.6] That is geography. People go where the hospital is. Set it aside. The second name has only three links, and it is a private imaging centre.
+### S05 · The busiest name is geography · ~40 s
+- Voice: Press Busiest nodes. [pause 0.4] The busiest provider, PR-1129, has eight links. It is the only hospital in a seaside town, owned by a health trust. [pause 0.6] That is geography, because people go where the hospital is. Set it aside. The second name has only three links, and it is a private imaging centre.
 - Chip: Busiest nodes
-- Action: toolbox ▸ Quick questions ▸ Busiest nodes ▸ hold; click the top name. [check in UI: the top name is PR-1129 and its owner OW-0263]
-- Impact: mark PR-1129 grey with *ruled out*.
+- Action: toolbox ▸ Quick questions ▸ Busiest nodes ▸ hold on the answers (PR-1129 8 links, PR-1170 3).
+- Impact: grey *ruled out* mark on PR-1129 in the graph.
 
-### S06 · The centre and its owner  ~45 s
-- Voice: Select the imaging centre, PR-1170, and focus on it. [pause 0.5] Two city practices send their patients here: PR-1426 and PR-1392. And the centre has one owner, OW-0434. [pause 0.4] Follow the owner's home. [pause 0.7] They share a home with OW-1270, who owns one of the two referring practices.
-- Chip: Node details · Focus
-- Action: click `PR-1170` twice ▸ Focus ▸ follow OW-0434 to `AD-05150` and back to `OW-1270`. [check in UI: OW-0434 and OW-1270 both link to AD-05150]
-- Impact: mark OW-0434, AD-05150 and OW-1270 in yellow.
+### S06 · The centre and its owner · ~44 s
+- Beat: reveal
+- Story: off
+- Voice: Look at the imaging centre, PR-1170. [pause 0.5] Two practices refer their patients here, PR-1426 and PR-1392, and the centre has one owner, OW-0434. Follow the owner's home, AD-05150. [pause 0.7] They share a home with OW-1270, who owns one of the referring practices.
+- Action: hold on the graph; marks on PR-1170, OW-0434, AD-05150 and OW-1270 in turn.
+- Impact: marks on OW-0434, AD-05150 and OW-1270 in yellow.
 
-### S07 · The evidence you can quote  ~40 s
-- Voice: Open the Rows tab. Each line is a row: a referral, an owner, a home. [pause 0.4] The referrals from the two practices to the centre, the ownership of the centre, and the shared home are all there. Each row can be read, sorted and exported to the reviewer. [pause 0.3] The tie is in the data, not in a theory.
+### S07 · The evidence you can quote · ~38 s
+- Voice: Open the Rows tab under the graph. Each line is a row: a provider, a link kind and a provider, owner or home. [pause 0.4] The referrals to the centre, its ownership and the shared home are all there, and each row can be read, sorted and exported to the reviewer. [pause 0.3] The tie is in the data, not in a theory.
 - Chip: Rows
-- Action: dock ▸ Rows ▸ sort by link kind ▸ hold on the referral and ownership rows.
-- Impact: mark the three owner rows.
+- Action: dock ▸ Rows ▸ hold.
+- Impact: mark the first rows.
 
-### S08 · What would change our mind  ~20 s
+### S08 · What would change our mind · ~22 s
 - Voice: Check the other side. [pause 0.3] If the owners declared the tie and the referrals are documented as clinically driven, this is a disclosed interest. If the centre has equipment nobody else has, the referrals are explained. Both are one request away.
-- Chip: none
-- Action: the Rows tab stays open; the story card shows *what would change our mind*.
+- Action: the Rows tab stays open.
 - Impact: none.
 
-### S09 · What the team does next  ~40 s
-- Voice: This is a lead, so here is the work. [pause 0.4] First, open a conflict-of-interest review of the two practices. Second, ask for the referral reasons on their patients. Third, keep the centre and its three owners together. [pause 0.3] That is an Entity List. On the Entity Lists page, press New list.
+### S09 · What the team does next · ~38 s
+- Voice: This is a lead, so here is the work. [pause 0.4] First, open a conflict-of-interest review of the two practices. Second, ask for the referral reasons on their patients. Third, keep the centre and its owners together. [pause 0.3] That is an Entity List, and New list opens the form.
 - Chip: Entity Lists · New list…
-- Action: rail ▸ Entity Lists ▸ New list… ▸ the form ▸ Cancel (nothing is created). [check in UI: the form fields]
-- Impact: mark the form's Title and Purpose.
+- Action: rail ▸ Entity Lists ▸ New list… ▸ the form opens ▸ Cancel (nothing is created).
+- Impact: none.
 
-### S10 · The case file  ~20 s
-- Voice: The lead: an imaging centre fed by two practices, one owner who shares a home. [pause 0.4] The evidence: the referral and ownership rows. The next step: a review, the referral reasons, and an Entity List. [pause 0.6] To try it yourself, open Referral kickbacks and compare the busiest name with the centre.
-- Chip: none
-- Action: the case-file card; outro card.
+### S10 · The case file · ~22 s
+- Beat: close
+- Casefile: Lead: an imaging centre fed by two practices, two owners who share a home | Evidence: the referral and ownership rows | Next: a conflict-of-interest review; the referral reasons; an Entity List | Try it: compare the busiest name with the centre
+- Voice: The lead: an imaging centre fed by two practices, and two owners who share a home. [pause 0.4] The evidence: the referral and ownership rows. The next step: a review, the referral reasons, and an Entity List. [pause 0.6] Try it yourself: compare the busiest name with the centre.
+- Action: case-file card (8 s: Lead · Evidence · Next step · Try it), then the outro.
 - Impact: none.
 
 ## Logistics_InsideJob
 
-> **Inside job: twelve short loads** · Standard · Logistics (la-logistics-industry) · a driver pair and one scanner · 4:30 · plan §6 row 18
+> **Inside job: twelve short loads** · Standard · Logistics (la-logistics-industry) · a driver pair and one scanner · 4:00 · plan §6 row 18
 
 - **Cast:** the driver DRV-0892 and co-driver DRV-0893 (carrier CAR-052), the warehouse scanner EMP-0123 (WH-06). **Decoy:** the driver DRV-0894 on the busiest route (Southampton to Birmingham), who lost two loads too and shares nothing with them. Ids readable.
 - **Stakes:** a loss-prevention manager. Loads arrive short on different routes in different months; cargo theft is common, so it reads as bad luck.
 - **Vocabulary:** *short load*, a delivery that arrives with goods missing. *Scanner*, the warehouse person who scans a load onto a truck. Said once in S02.
-- **Ground truth:** `tools/gen-la-logistics-data.ground-truth.json` · `inside_job` (`driver` DRV-0892, `co_driver` DRV-0893, `carrier` CAR-052, `losses` twelve, `trips` twelve, `night_trips` ten, `scanner` EMP-0123, `scanner_warehouse` WH-06, `lookalike_driver` DRV-0894, `lookalike_carrier` CAR-103, `lookalike_trips` two, `busiest_route` Southampton, Birmingham); `gen-la-logistics-data.py` lines 13 and 436–444 (ten of the twelve left Nottingham at night, scanned out by the same night-shift scanner). **Plan table corrected:** the table said "the driver with most incidents"; the data says the decoy is the driver on the busiest route, not the one with most incidents.
+- **Ground truth:** `tools/gen-la-logistics-data.ground-truth.json` · `inside_job` (`driver` DRV-0892, `co_driver` DRV-0893, `carrier` CAR-052, `losses` twelve, `trips` twelve, `night_trips` ten, `scanner` EMP-0123, `scanner_warehouse` WH-06, `lookalike_driver` DRV-0894, `lookalike_carrier` CAR-103, `lookalike_trips` two, `busiest_route` Southampton, Birmingham); `gen-la-logistics-data.py` lines 13 and 436–444 (ten of the twelve left Nottingham at night, scanned out by the same night-shift scanner).
+- **Screen truth** (checked live on a fresh Standard unzip, Demo Analyst, 2026-11-22): the saved view *Driver team inside job* draws 79 nodes and 88 links, labels readable at the size shown; Busiest nodes answers DRV-0892 (12 links), DRV-0893 (12), EMP-0123 (10), TR-02297 (4) and TR-03007 (4). The lookalike driver DRV-0894 is on the canvas with few links. Nothing is masked. The night-shift timing (ten of twelve) is a ground-truth fact the view does not show, so the voice states it as what the records say.
+- **Before:** fresh unzip of `la-standard.zip` with the fake Demo Auth sign-in, Logistics Space, Demo Analyst; nothing is saved or created.
 - **Lead:** twelve short loads, one driver pair on all of them, and one night-shift scanner on ten. **What would change our mind:** a rota showing the scanner worked other shifts on those nights, or a second pair on any of the twelve trips. **Next actions:** interview the three people; pull the warehouse badge records for the ten nights; compare WH-06 night scans against the outbound loads.
 - **Voice style:** cold open 1.04; the reveal scene (S06) holds 0.7 s before "Ten of the twelve." Lexicon: DRV-0892 "driver zero eight nine two"; EMP-0123 "employee zero one two three"; do not read trip or loss ids aloud.
 - **Try it:** open *Driver team inside job* and press Busiest nodes. Who is on top besides the drivers? *Answer: a warehouse scanner, EMP-0123, who is not a driver at all.*
 - **Check:** why is the busiest driver on the busiest route not the lead? *Answer: busy routes lose loads by bad luck; the lead is the same pair, and the same scanner, on every short load.*
 
-### S01 · Loads that arrive short  ~25 s
-- Voice: You are a loss-prevention manager. [pause 0.4] Loads keep arriving short. Different routes, different months, different customers. Each customer reports to a different depot, and nobody puts the reports side by side. [pause 0.6] Cargo theft is common, so it looks like bad luck. This film asks whether it is.
-- Chip: none
-- Action: cold open on the Space's home page; intro card (*Driver team inside job*, *Logistics*, *Standard*).
+### S01 · Loads that arrive short · ~24 s
+- Beat: cold
+- Voice: You are a loss-prevention manager. [pause 0.4] Loads keep arriving short, on different routes, in different months, for different customers. Each customer reports to a different depot, and nobody puts the reports side by side. [pause 0.6] Cargo theft is common, so it looks like bad luck. This film asks whether it is.
+- Action: cold open on the Space's home page.
 - Impact: none.
 
-### S02 · Why each loss looks like bad luck  ~30 s
-- Voice: A short load is a delivery that arrives with goods missing. [pause 0.3] Each one is a small claim against a carrier. Each is explained: a long stop, a lay-by, an unlucky night. A scanner is the warehouse person who scans a load onto a truck. [pause 0.5] Alone, none of these points to a person. Together, they might point to a team.
-- Chip: none
-- Action: home page; the story card names *the driver pair* and *the scanner*.
+### S02 · Why bad luck is the default · ~30 s
+- Beat: steady
+- Intro: Inside job | Logistics Space
+- Story: a short load = a delivery that arrives with goods missing | the driver pair = two drivers who share a truck | the scanner = the warehouse person who scans a load onto a truck
+- Voice: A short load is a delivery that arrives with goods missing. Each report is one trip, one depot and one customer, so each looks like bad luck. [pause 0.5] A scanner is the warehouse person who scans a load onto a truck. Nobody asks who drove, and who scanned, across all twelve.
+- Action: story card "Who is who" over the home page.
+- Impact: the story card names the three roles.
+
+### S03 · The data in one breath · ~28 s
+- Voice: Every trip lands as a record with its driver, carrier, route and time. [pause 0.3] Warehouse scans record who loaded which truck, and loss reports say which trips lost goods. A Job links drivers, scanners and trips, and the loss reports mark the trips that arrived short.
+- Chip: Data · Mappings
+- Action: rail ▸ Data ▸ `logistics_screen_links_dataset` ▸ hold on its Columns card.
+- Impact: mark the src and dst columns once.
+
+### S04 · The question · ~26 s
+- Voice: Open the saved view Driver team inside job. [pause 0.4] It draws the trips that lost goods with the people behind them. It is busy, and every label reads. The question is whether the same names keep coming back.
+- Chip: Saved views
+- Action: open the saved view *Driver team inside job* ▸ hold.
 - Impact: none.
 
-### S03 · The data in one breath  ~30 s
-- Voice: Every trip lands as a record: the shipment, the driver, the co-driver, the vehicle and the times. [pause 0.3] A Job links drivers and vehicles to trips, trips to the loads that arrived short, and scanners to the loads they scanned. People, vehicles and loads are the entities.
-- Chip: Mappings · Data
-- Action: rail ▸ Data ▸ the logistics links Dataset ▸ zoom on the Mappings area. [check in UI: the Mappings area of `logistics_screen_links_dataset`]
-- Impact: mark the From and To columns.
-
-### S04 · The question  ~25 s
-- Voice: Open the saved view Driver team inside job. [pause 0.4] It draws the short loads, the trips that carried them and the people on those trips. The question is whether one person, or one pair, is on more than their share.
-- Chip: File · Open… · Saved views
-- Action: File ▸ Open… ▸ Saved views ▸ *Driver team inside job* ▸ hold. [check in UI: trips, loads and drivers readable]
-- Impact: before/after hold: the graph appears; mark the dense centre.
-
-### S05 · The busiest route is a decoy  ~40 s
-- Voice: Press Busiest nodes. [pause 0.4] Two drivers lead with twelve links each, the same twelve. And a third name, which is not a driver at all: a warehouse scanner. [pause 0.5] First, set the obvious one aside. The driver on the busiest route lost two loads too. But those two share nothing with the others. Bad luck on a busy road.
+### S05 · The busiest route is bad luck · ~38 s
+- Voice: Press Busiest nodes. [pause 0.4] Two drivers lead, with twelve links each, and then someone who is not a driver at all: a warehouse employee. [pause 0.5] One more driver deserves a thought, because he drives the busiest route and lost two loads too. But that route loses loads to bad luck, and he shares nothing with the others. Set him aside.
 - Chip: Busiest nodes
-- Action: toolbox ▸ Quick questions ▸ Busiest nodes ▸ hold; click DRV-0894. [check in UI: DRV-0894 has two losses and no shared people]
-- Impact: mark DRV-0894 grey with *ruled out*.
+- Action: toolbox ▸ Quick questions ▸ Busiest nodes ▸ hold on the answers (DRV-0892 12, DRV-0893 12, EMP-0123 10).
+- Impact: grey *ruled out* mark on the lookalike driver DRV-0894 on the graph.
 
-### S06 · The pair and the scanner  ~45 s
-- Voice: Select the driver DRV-0892, and focus on them. [pause 0.5] Twelve trips. Twelve loads that arrived short. The same driver drove every one, with the same co-driver beside them. [pause 0.7] Now look at who scanned the loads on. Ten of the twelve were scanned out by the same person, on the night shift.
-- Chip: Node details · Focus
-- Action: click `DRV-0892` twice ▸ Focus ▸ follow `DRV-0893` and `EMP-0123`. [check in UI: EMP-0123 is linked to ten of the twelve trips]
-- Impact: mark DRV-0892, DRV-0893 and EMP-0123 in yellow.
+### S06 · The pair and the scanner · ~44 s
+- Beat: reveal
+- Story: off
+- Voice: Look at the top three. [pause 0.5] The same two drivers are on all twelve short loads, and the warehouse employee, EMP-0123, is on ten of them. [pause 0.7] Ten of the twelve left the depot at night, scanned out by that same person.
+- Action: hold on the graph; marks on the driver pair and EMP-0123 in yellow.
+- Impact: yellow mark on the cluster of DRV-0892, DRV-0893 and EMP-0123.
 
-### S07 · The evidence you can quote  ~40 s
-- Voice: Open the Rows tab. Each line is a row: a trip, the driver, the co-driver, the load. [pause 0.4] The same two drivers, twelve times. Ten of those trips also carry the same scanner. Sort by shift, and the ten gather at night. [pause 0.3] A pattern like this can be quoted, exported, and put in front of a manager.
+### S07 · The evidence you can quote · ~36 s
+- Voice: Open the Rows tab under the graph. Each line is a row: a driver, a link kind and a trip or a scanner. [pause 0.4] The twelve trips, the pair, and the scanner are all there, and each row can be read, sorted and exported. [pause 0.3] A loss-prevention manager can quote every line.
 - Chip: Rows
-- Action: dock ▸ Rows ▸ sort by driver ▸ hold on the twelve.
-- Impact: mark the driver columns; the ten night trips by colour.
+- Action: dock ▸ Rows ▸ hold.
+- Impact: mark the first rows.
 
-### S08 · What would change our mind  ~20 s
-- Voice: Be fair to the three. [pause 0.3] If the scanner's rota puts them on another shift for those nights, the tie weakens. So does a second pair on any of the twelve trips. The rota and the trip crew lists are the first two things to ask for.
-- Chip: none
-- Action: the Rows tab stays open; the story card shows *what would change our mind*.
+### S08 · What would change our mind · ~22 s
+- Voice: Be fair to the three. [pause 0.3] A rota showing the scanner worked other shifts on those nights would weaken this. So would a second pair on any of the twelve trips. Both are one request away.
+- Action: the Rows tab stays open.
 - Impact: none.
 
-### S09 · What the team does next  ~40 s
-- Voice: This is a lead, so here is the work. [pause 0.4] First, interview the three people. Second, pull the warehouse badge records for the ten nights. Third, compare the night scans at that warehouse with the loads that left. [pause 0.3] To keep this view for the team, press Save on the Investigation tab. Read what it asks for, and cancel.
-- Chip: Investigation · Save…
-- Action: toolbox ▸ Investigation tab ▸ Save… ▸ read the name and purpose fields ▸ Cancel (nothing is saved). [check in UI: the Save dialog]
-- Impact: mark the Name and Purpose fields.
+### S09 · What the team does next · ~36 s
+- Voice: This is a lead, so here is the work. [pause 0.4] Interview the three people. Pull the warehouse badge records for the ten nights. Compare that warehouse's night scans against the outbound loads. [pause 0.3] Keep the three together as an Entity List, and New list opens the form.
+- Chip: Entity Lists · New list…
+- Action: rail ▸ Entity Lists ▸ New list… ▸ the form opens ▸ Cancel (nothing is created).
+- Impact: none.
 
-### S10 · The case file  ~20 s
-- Voice: The lead: twelve short loads, one driver pair, one scanner. [pause 0.4] The evidence: the trip rows, with the ten at night. The next step: three interviews, badge records, and the night scans. [pause 0.6] To try it yourself, open Driver team inside job and find the third name.
-- Chip: none
-- Action: the case-file card; outro card.
+### S10 · The case file · ~22 s
+- Beat: close
+- Casefile: Lead: one driver pair on all twelve short loads, one scanner on ten | Evidence: the twelve trips and the people behind them | Next: interview the three; pull the badge records; compare the night scans | Try it: find who tops Busiest nodes besides the drivers
+- Voice: The lead: one driver pair on all twelve short loads, and one scanner on ten. [pause 0.4] The evidence: the trips and the people behind them. The next step: interview, badge records, night scans. [pause 0.6] Try it yourself: find who tops Busiest nodes besides the drivers.
+- Action: case-file card (8 s: Lead · Evidence · Next step · Try it), then the outro.
 - Impact: none.
 
 ## Enterprise_FictitiousVendor
