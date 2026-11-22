@@ -817,6 +817,192 @@ class RowShaperTest {
         assertEquals(1, count(join.get(0).table()));   // only id=1 matches
     }
 
+    // ── join output model: per-input mappings with rename + match details (LOOKUP-1 P1d) ──
+    // A synthetic dial-digit-shaped dimension; each number fetches its own columns under a legacy layout's names.
+
+    private void seedLegacyDialDigits() throws SQLException {
+        sql("CREATE TABLE ddl AS SELECT * FROM (VALUES"
+                + " ('249', 'SD', 'Sudan', 10, 'INT', 'Sudan'),"
+                + " ('24991', 'SD', 'Operator A', 11, 'ONNET', 'Sudan'),"
+                + " ('44', 'GB', 'United Kingdom', 13, 'INT', 'United Kingdom')"
+                + ") t(dial_digit_key, iso_country_code, provider_desc, nop_id_key, event_category_key, country_name)");
+        sql("CREATE TABLE cdrl AS SELECT * FROM (VALUES"
+                + " (1, '249915555555', '24991', '447700900123'),"
+                + " (2, '999', '249112345678', NULL)"
+                + ") t(id, SERVED_MSISDN, OTHER_MSISDN, THIRD_PARTY_MSISDN)");
+    }
+
+    private static Map<String, Object> legacyLookups() {
+        Map<String, Object> served = new java.util.LinkedHashMap<>();
+        served.put("on", "SERVED_MSISDN");
+        served.put("columns", orderedMap("dial_digit_key", "SERVED_MSISDN_DIAL_DIGIT_KEY",
+                "iso_country_code", "SERVED_MSISDN_ISO_CODE", "provider_desc", "SERVED_MSISDN_OPER",
+                "nop_id_key", "SERVED_MSISDN_NOP_ID_KEY"));
+        served.put("default", Map.of("SERVED_MSISDN_DIAL_DIGIT_KEY", -99));
+        Map<String, Object> other = new java.util.LinkedHashMap<>();
+        other.put("on", "OTHER_MSISDN");
+        other.put("columns", orderedMap("dial_digit_key", "OTHER_MSISDN_DIAL_DIGIT_KEY",
+                "event_category_key", "EVENT_CATEGORY_KEY", "country_name", "OTHER_MSISDN_COUNTRY",
+                "provider_desc", "OTHER_MSISDN_OPERATOR"));
+        other.put("details", true);
+        Map<String, Object> third = new java.util.LinkedHashMap<>();
+        third.put("on", "THIRD_PARTY_MSISDN");
+        third.put("columns", List.of("provider_desc"));   // a list keeps the names, under the {on}_ prefix
+        Map<String, Object> cfg = new java.util.LinkedHashMap<>();
+        cfg.put("reference", "r");
+        cfg.put("key", "dial_digit_key");
+        cfg.put("match", "longest_prefix");
+        cfg.put("lookups", List.of(served, other, third));
+        return cfg;
+    }
+
+    private static Map<String, Object> orderedMap(Object... kv) {
+        Map<String, Object> m = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < kv.length; i += 2) m.put((String) kv[i], kv[i + 1]);
+        return m;
+    }
+
+    /** Runs {@code transform.join} {@code cfg} over {@code input} against {@code ref}; rows by id. */
+    private Map<Integer, Map<String, String>> joinRows(Map<String, Object> cfg, String input, String ref)
+            throws SQLException {
+        String id = "p" + (++keyedJoins);
+        var out = new RelationByRel(RowShaper.shape(conn, PipelineNode.of(id, "transform.join", cfg), input, id,
+                (c, name) -> ref));
+        Map<Integer, Map<String, String>> rows = new java.util.TreeMap<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM \"" + out.table(PipelineRel.DATA) + "\"")) {
+            while (rs.next()) {
+                Map<String, String> r = new java.util.LinkedHashMap<>();
+                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++)
+                    r.put(rs.getMetaData().getColumnName(i), rs.getString(i));
+                rows.put(rs.getInt("id"), r);
+            }
+        }
+        return rows;
+    }
+
+    @Test
+    void lookupsGiveEachNumberItsOwnColumnsUnderTheLegacyNames() throws Exception {
+        seedLegacyDialDigits();
+        var rows = joinRows(legacyLookups(), "cdrl", "ddl");
+        assertEquals(2, rows.size(), "a LEFT join: no call record dropped or repeated");
+        assertEquals(List.of("id", "SERVED_MSISDN", "OTHER_MSISDN", "THIRD_PARTY_MSISDN",
+                        "SERVED_MSISDN_DIAL_DIGIT_KEY", "SERVED_MSISDN_ISO_CODE", "SERVED_MSISDN_OPER",
+                        "SERVED_MSISDN_NOP_ID_KEY",
+                        "OTHER_MSISDN_DIAL_DIGIT_KEY", "EVENT_CATEGORY_KEY", "OTHER_MSISDN_COUNTRY",
+                        "OTHER_MSISDN_OPERATOR", "OTHER_MSISDN_matched_key", "OTHER_MSISDN_match_kind",
+                        "THIRD_PARTY_MSISDN_provider_desc"),
+                List.copyOf(rows.get(1).keySet()));
+        var r1 = rows.get(1);
+        assertEquals("24991", r1.get("SERVED_MSISDN_DIAL_DIGIT_KEY"));
+        assertEquals("Operator A", r1.get("SERVED_MSISDN_OPER"));
+        assertEquals("11", r1.get("SERVED_MSISDN_NOP_ID_KEY"));
+        assertEquals("ONNET", r1.get("EVENT_CATEGORY_KEY"));
+        assertEquals("Sudan", r1.get("OTHER_MSISDN_COUNTRY"));
+        assertEquals("United Kingdom", r1.get("THIRD_PARTY_MSISDN_provider_desc"));
+        var r2 = rows.get(2);
+        assertEquals("-99", r2.get("SERVED_MSISDN_DIAL_DIGIT_KEY"), "the default is keyed by OUTPUT name");
+        assertNull(r2.get("SERVED_MSISDN_OPER"), "no default for this output → NULL");
+        assertEquals("INT", r2.get("EVENT_CATEGORY_KEY"), "2491… falls back to the country code row");
+        assertNull(r2.get("THIRD_PARTY_MSISDN_provider_desc"));
+    }
+
+    @Test
+    void theColumnsAStepAddsAreExactlyTheColumnsTheRunAdds() throws Exception {
+        seedLegacyDialDigits();
+        List<String> input = List.of("id", "SERVED_MSISDN", "OTHER_MSISDN", "THIRD_PARTY_MSISDN");
+        Map<String, String> refTypes = orderedMap("dial_digit_key", "VARCHAR", "iso_country_code", "VARCHAR",
+                "provider_desc", "VARCHAR", "nop_id_key", "INTEGER", "event_category_key", "VARCHAR",
+                "country_name", "VARCHAR").entrySet().stream().collect(java.util.stream.Collectors.toMap(
+                Map.Entry::getKey, e -> e.getValue().toString(), (a, b) -> a, java.util.LinkedHashMap::new));
+        var added = RowShaper.joinAddedColumns(legacyLookups(), refTypes, input);
+        var ran = new java.util.ArrayList<>(joinRows(legacyLookups(), "cdrl", "ddl").get(1).keySet());
+        assertEquals(ran.subList(input.size(), ran.size()), added.stream().map(RowShaper.AddedColumn::name).toList());
+        var nop = added.get(3);
+        assertEquals(new RowShaper.AddedColumn("SERVED_MSISDN_NOP_ID_KEY", "INTEGER", "nop_id_key", "SERVED_MSISDN",
+                "longest_prefix", null), nop);
+        var kind = added.stream().filter(a -> a.name().equals("OTHER_MSISDN_match_kind")).findFirst().orElseThrow();
+        assertEquals("match_kind", kind.detail());
+        assertNull(kind.from());
+        assertEquals("OTHER_MSISDN", kind.lookedUpBy());
+        // a clash shows before the run, by name
+        var e = assertThrows(IllegalArgumentException.class, () -> RowShaper.joinAddedColumns(legacyLookups(),
+                refTypes, List.of("id", "SERVED_MSISDN", "OTHER_MSISDN", "THIRD_PARTY_MSISDN", "EVENT_CATEGORY_KEY")));
+        assertTrue(e.getMessage().contains("'EVENT_CATEGORY_KEY' clashes"), e.getMessage());
+    }
+
+    @Test
+    void matchDetailsSayWhichKeyMatchedAndHow() throws Exception {
+        seedLegacyDialDigits();
+        Map<String, Object> cfg = orderedMap("reference", "r", "key", "dial_digit_key", "match", "longest_prefix",
+                "lookups", List.of(orderedMap("on", "OTHER_MSISDN", "columns", List.of("provider_desc"),
+                        "details", orderedMap("matched_key", "OM_KEY", "match_kind", "OM_KIND"))));
+        var rows = joinRows(cfg, "cdrl", "ddl");
+        assertEquals("24991", rows.get(1).get("OM_KEY"));
+        assertEquals("exact", rows.get(1).get("OM_KIND"), "the key is the whole value");
+        assertEquals("249", rows.get(2).get("OM_KEY"));
+        assertEquals("prefix", rows.get(2).get("OM_KIND"));
+        // none: nothing matched
+        Map<String, Object> served = orderedMap("reference", "r", "key", "dial_digit_key", "match", "longest_prefix",
+                "on", "SERVED_MSISDN", "columns", List.of("provider_desc"), "details", true);
+        var r2 = joinRows(served, "cdrl", "ddl").get(2);
+        assertNull(r2.get("SERVED_MSISDN_matched_key"));
+        assertEquals("none", r2.get("SERVED_MSISDN_match_kind"), "the shorthand takes details too");
+        // exact match
+        Map<String, Object> exact = new java.util.LinkedHashMap<>(served);
+        exact.put("match", "exact");
+        exact.put("on", "OTHER_MSISDN");
+        var ex = joinRows(exact, "cdrl", "ddl");
+        assertEquals("exact", ex.get(1).get("OTHER_MSISDN_match_kind"));
+        assertEquals("none", ex.get(2).get("OTHER_MSISDN_match_kind"), "exact never falls back to a prefix");
+        // range: the matched key is the period
+        seedRates();
+        var rr = joinRows(orderedMap("reference", "r", "match", "range", "from", "valid_from", "to", "valid_to",
+                "filter", "lookup_key = 'SDR'", "lookups", List.of(orderedMap("on", "call_date",
+                        "columns", orderedMap("lookup_output", "SDR_RATE"), "details", true))), "calls", "rates");
+        assertEquals("612.7", rr.get(2).get("SDR_RATE"));
+        assertEquals("2022-02-01..2022-02-28", rr.get(2).get("call_date_matched_key"));
+        assertEquals("range", rr.get(2).get("call_date_match_kind"));
+        assertEquals("2026-08-01..", rr.get(5).get("call_date_matched_key"), "an open end stays empty");
+        assertEquals("none", rr.get(4).get("call_date_match_kind"), "a gap matches nothing");
+    }
+
+    @Test
+    void lookupsRefuseClashesAndMistakesByName() throws Exception {
+        seedLegacyDialDigits();
+        java.util.function.Function<Map<String, Object>, String> refusal = cfg ->
+                assertThrows(IllegalArgumentException.class, () -> joinRows(cfg, "cdrl", "ddl")).getMessage();
+        // an output name equal to an input column
+        String m = refusal.apply(orderedMap("reference", "r", "key", "dial_digit_key", "lookups", List.of(
+                orderedMap("on", "SERVED_MSISDN", "columns", orderedMap("provider_desc", "OTHER_MSISDN")))));
+        assertTrue(m.contains("'OTHER_MSISDN' clashes") && m.contains("rename it"), m);
+        // two mappings writing one name (case-insensitively)
+        m = refusal.apply(orderedMap("reference", "r", "key", "dial_digit_key", "lookups", List.of(
+                orderedMap("on", "SERVED_MSISDN", "columns", orderedMap("provider_desc", "OPER")),
+                orderedMap("on", "OTHER_MSISDN", "columns", orderedMap("provider_desc", "oper")))));
+        assertTrue(m.contains("'oper' clashes"), m);
+        // a Reference column that does not exist
+        m = refusal.apply(orderedMap("reference", "r", "key", "dial_digit_key", "lookups", List.of(
+                orderedMap("on", "SERVED_MSISDN", "columns", orderedMap("operator_name", "X")))));
+        assertTrue(m.contains("no column 'operator_name'"), m);
+        // a default keyed by the Reference column, not the output name
+        m = refusal.apply(orderedMap("reference", "r", "key", "dial_digit_key", "lookups", List.of(
+                orderedMap("on", "SERVED_MSISDN", "columns", orderedMap("provider_desc", "SERVED_MSISDN_OPER"),
+                        "default", Map.of("provider_desc", "Unknown")))));
+        assertTrue(m.contains("default for 'provider_desc'"), m);
+        // lookups with the shorthand's on
+        m = refusal.apply(orderedMap("reference", "r", "key", "dial_digit_key", "on", "SERVED_MSISDN",
+                "lookups", List.of(orderedMap("on", "SERVED_MSISDN"))));
+        assertTrue(m.contains("both lookups: and 'on'"), m);
+        // an entry key that means nothing
+        m = refusal.apply(orderedMap("reference", "r", "key", "dial_digit_key", "lookups", List.of(
+                orderedMap("on", "SERVED_MSISDN", "rename", Map.of()))));
+        assertTrue(m.contains("'rename'"), m);
+        // lookups without key: is not the keyed form
+        m = refusal.apply(orderedMap("reference", "r", "lookups", List.of(orderedMap("on", "SERVED_MSISDN"))));
+        assertTrue(m.contains("'lookups'") && m.contains("needs key:"), m);
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────────
 
     /** Lookup of produced relations by their PipelineRel for terse assertions. */

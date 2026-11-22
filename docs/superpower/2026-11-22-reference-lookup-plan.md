@@ -102,7 +102,7 @@ run — not a per-row call.
    test-a-key / stats / refresh, parity suite against the batch engine.
 4. **P4 — fuzzy:** batch (blocking key, score, top-k), then point (candidate index); test console UI.
 
-**P1d — the join output model (proposed 2026-11-22, operator):** each looked-up number fetches its OWN set of columns
+**P1d — the join output model (proposed 2026-11-22, operator; built 2026-11-23, see below):** each looked-up number fetches its OWN set of columns
 under its OWN names, and the user sees what a join adds before running it.
 - **Per-input mappings with rename** — one Step, one pass over the Reference, a mapping per `on` column, each with its
   own column list and output names (`Reference column: output name`), so the output matches a legacy layout exactly:
@@ -125,6 +125,18 @@ under its OWN names, and the user sees what a join adds before running it.
 - **Several joins** read as such on the canvas: each join labelled *Reference · match*; *Add another lookup* inserts
   the next join (Job graph plan, JG2).
 - **Hit / miss counts** per mapping per run (already in P1), with a sample of unmatched values.
+
+**P1d built 2026-11-23 (backend + Step form):** `lookups:` (per-input mappings, rename maps, output-keyed `default`,
+per-entry `as`) on every keyed `match`, one pass over the Reference; `details:` (`true` → `<prefix>matched_key` /
+`<prefix>match_kind`, or a map naming them; a range's matched key is its period `from..to`); the shared planner
+`RowShaper.joinMappings` behind both the run and `RowShaper.joinAddedColumns`, served by
+`POST /components/transform/describe` with a `config` body (Reference columns from its Pipeline's declared schema, or
+`referenceColumns`) and drawn as the read-only *Columns this Step adds* table in the join pane. Save refuses `lookups:`
+mixed with the shorthand, an entry without `on` or with an unknown key, and two renamed outputs sharing a name
+(`JOIN_KEYED_INVALID`); `lookups:` stands in for `on:` (validator and recipe). **Deliberately deferred:** the form has
+no structured editor for `lookups:` (no list-of-maps control — it is kept as an extra setting and written in the
+file); the table reflects the APPLIED settings, not unsaved edits; feeding the next Step's pickers and recording each
+column's origin in the output Dataset's metadata stay with JG2; the per-mapping hit / miss counts with P1's counts.
 
 **Known limits of P1c (open, from its review):** a `TIMESTAMPTZ` value against a `DATE` bound is turned into a date in
 the server's session time zone, which the user guide does not say yet; a `DATE` value against text bounds stops with a

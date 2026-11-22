@@ -1154,23 +1154,11 @@ public final class RowShaper {
         String reference = strOrNull(node, "reference");
         if (reference == null)
             throw new IllegalArgumentException("transform.join node '" + node.id() + "' needs a 'reference'");
-        List<String> on = new ArrayList<>();
-        if (node.cfg("on") instanceof List<?> list) {
-            for (Object o : list) if (o != null && !o.toString().isBlank()) on.add(o.toString());
-        } else {
-            String scalar = strOrNull(node, "on");
-            if (scalar != null) on.add(scalar);
-        }
-        if (on.isEmpty())
-            throw new IllegalArgumentException("transform.join node '" + node.id() + "' needs 'on' key column(s)");
-        String match = strOrNull(node, "match");
-        if (match == null) match = JOIN_MATCH_EXACT;
-        if (!JOIN_MATCHES.contains(match))
-            throw new IllegalArgumentException("transform.join node '" + node.id() + "' has match '" + match
-                    + "' — use one of " + JOIN_MATCHES);
+        List<String> on = joinOn(node);
+        String match = joinMatch(node);
         String ref = references.resolve(conn, reference);
         String data = table(prefix, PipelineRel.DATA);
-        if (strOrNull(node, "key") != null || strOrNull(node, "from") != null || strOrNull(node, "to") != null) {
+        if (isKeyedJoin(node)) {
             keyedJoin(conn, node, input, ref, on, match, data);
             return List.of(new Relation(PipelineRel.DATA, data));
         }
@@ -1192,6 +1180,229 @@ public final class RowShaper {
         return List.of(new Relation(PipelineRel.DATA, data));
     }
 
+    /** Whether {@code node} is the keyed form: {@code key:}, or {@code from:}/{@code to:} for a range. */
+    private static boolean isKeyedJoin(PipelineNode node) {
+        return strOrNull(node, "key") != null || strOrNull(node, "from") != null || strOrNull(node, "to") != null;
+    }
+
+    /** The validated {@code match:}, {@link #JOIN_MATCH_EXACT} when absent. */
+    private static String joinMatch(PipelineNode node) {
+        String match = strOrNull(node, "match");
+        if (match == null) match = JOIN_MATCH_EXACT;
+        if (!JOIN_MATCHES.contains(match))
+            throw new IllegalArgumentException("transform.join node '" + node.id() + "' has match '" + match
+                    + "' — use one of " + JOIN_MATCHES);
+        return match;
+    }
+
+    /**
+     * The input columns looked up: {@code on} (a scalar or a list), or — with {@code lookups:} (LOOKUP-1 P1d) — each
+     * mapping's {@code on}, in order, without repeats. Setting both is refused: the two would disagree.
+     */
+    private static List<String> joinOn(PipelineNode node) {
+        List<String> on = new ArrayList<>();
+        Object lookups = node.cfg("lookups");
+        if (lookups != null) {
+            for (String k : List.of("on", "columns", "as", "default", "details"))
+                if (node.cfg(k) != null)
+                    throw new IllegalArgumentException("transform.join node '" + node.id() + "' sets both lookups: and '"
+                            + k + "' — with lookups:, each mapping carries its own on/columns/default/details");
+            if (!(lookups instanceof List<?> list) || list.isEmpty())
+                throw new IllegalArgumentException("transform.join node '" + node.id() + "': lookups: must be a list "
+                        + "of mappings, each with an 'on' column");
+            for (Object o : list) {
+                Object entryOn = o instanceof Map<?, ?> m ? m.get("on") : null;
+                if (entryOn == null || entryOn.toString().isBlank())
+                    throw new IllegalArgumentException("transform.join node '" + node.id() + "': every lookups: entry "
+                            + "needs 'on' — the input column it looks up");
+                if (!on.contains(entryOn.toString().trim())) on.add(entryOn.toString().trim());
+            }
+            return on;
+        }
+        if (node.cfg("on") instanceof List<?> list) {
+            for (Object o : list) if (o != null && !o.toString().isBlank()) on.add(o.toString());
+        } else {
+            String scalar = strOrNull(node, "on");
+            if (scalar != null) on.add(scalar);
+        }
+        if (on.isEmpty())
+            throw new IllegalArgumentException("transform.join node '" + node.id() + "' needs 'on' key column(s)");
+        return on;
+    }
+
+    /**
+     * One per-input mapping of the keyed join (LOOKUP-1 P1d): the input column {@code on}, the Reference columns it
+     * returns under their output names, the not-found values keyed by output name, and the optional match-detail
+     * column names ({@code null} = not added).
+     */
+    private record JoinMapping(String on, LinkedHashMap<String, String> columns, Map<String, String> defaults,
+                               String matchedKeyAs, String matchKindAs) {}
+
+    /**
+     * A column a keyed {@code transform.join} adds (LOOKUP-1 P1d — "Columns this Step adds"): its output name, its
+     * type (the Reference column's; {@code VARCHAR} for the match details), the Reference column it comes from
+     * ({@code null} for a match detail), the input column it was looked up by, and the {@code match}. {@code detail}
+     * is {@code matched_key} / {@code match_kind} for a match-detail column, else {@code null}.
+     */
+    public record AddedColumn(String name, String type, String from, String lookedUpBy, String match, String detail) {}
+
+    /**
+     * The columns a keyed {@code transform.join} with config {@code config} adds, in output order, computed from the
+     * Reference's columns ({@code referenceColumns}: name → type, in the Reference's order) without reading any data.
+     * The same mapping rules as the run: an unknown Reference column, an unknown {@code on} column (when
+     * {@code inputColumns} is given) and an output name clashing with an input column or another output name are
+     * refused by name ({@link IllegalArgumentException}). A non-keyed join adds no named list here (it returns
+     * every non-key Reference column) and is refused too.
+     *
+     * @param inputColumns the rows' columns, or empty when unknown (then {@code on} and clashes with them are not checked)
+     */
+    public static List<AddedColumn> joinAddedColumns(Map<String, Object> config, Map<String, String> referenceColumns,
+                                                     List<String> inputColumns) {
+        PipelineNode node = new PipelineNode("(join)", "transform.join", config, null);
+        if (!isKeyedJoin(node))
+            throw new IllegalArgumentException("transform.join node '(join)': the columns it adds are listed for the "
+                    + "keyed form only — set key: (or from:/to: for match: range)");
+        String match = joinMatch(node);
+        List<String> refCols = new ArrayList<>(referenceColumns.keySet());
+        List<JoinMapping> mappings = joinMappings(node, joinOn(node), refCols,
+                inputColumns == null ? List.of() : inputColumns);
+        List<AddedColumn> out = new ArrayList<>();
+        for (JoinMapping m : mappings) {
+            m.columns().forEach((c, name) -> {
+                String type = referenceColumns.entrySet().stream().filter(e -> e.getKey().equalsIgnoreCase(c))
+                        .map(Map.Entry::getValue).findFirst().orElse(null);
+                out.add(new AddedColumn(name, type == null ? "VARCHAR" : type, c, m.on(), match, null));
+            });
+            if (m.matchedKeyAs() != null)
+                out.add(new AddedColumn(m.matchedKeyAs(), "VARCHAR", null, m.on(), match, "matched_key"));
+            if (m.matchKindAs() != null)
+                out.add(new AddedColumn(m.matchKindAs(), "VARCHAR", null, m.on(), match, "match_kind"));
+        }
+        return out;
+    }
+
+    /**
+     * The keyed join's mappings (LOOKUP-1 P1d): from {@code lookups:} (one per entry), or from the shorthand
+     * {@code on}/{@code columns}/{@code as}/{@code default}/{@code details} (one per {@code on} column, all alike).
+     * Checks every name against the Reference ({@code refCols}) and the rows ({@code inputCols}, skipped when empty),
+     * and refuses an output name clashing with an input column or another output name.
+     */
+    private static List<JoinMapping> joinMappings(PipelineNode node, List<String> on, List<String> refCols,
+                                                  List<String> inputCols) {
+        String id = node.id();
+        List<JoinMapping> mappings = new ArrayList<>();
+        boolean shorthand = node.cfg("lookups") == null;
+        if (shorthand) {
+            List<String> returned = joinColumnList(node.cfg("columns"));
+            if (returned.isEmpty()) returned.addAll(refCols);
+            for (String c : returned) requireRefColumn(id, c, refCols, " to return");
+            String as = node.cfg("as") == null ? "{on}_" : node.cfg("as").toString();
+            if (on.size() > 1 && !as.contains("{on}"))
+                throw new IllegalArgumentException("transform.join node '" + id + "': with several 'on' columns, as: "
+                        + "must contain {on}, or their returned columns would share names");
+            Map<String, String> defaults = joinDefaults(id, node.cfg("default"));
+            for (String c : defaults.keySet())
+                if (returned.stream().noneMatch(r -> r.equalsIgnoreCase(c)))
+                    throw new IllegalArgumentException("transform.join node '" + id + "': default names '" + c
+                            + "', which is not a returned column " + returned);
+            for (String o : on) {
+                String prefix = as.replace("{on}", o);
+                LinkedHashMap<String, String> cols = new LinkedHashMap<>();
+                Map<String, String> dflt = new LinkedHashMap<>();
+                for (String c : returned) {
+                    cols.put(c, prefix + c);
+                    defaults.entrySet().stream().filter(e -> e.getKey().equalsIgnoreCase(c)).findFirst()
+                            .ifPresent(e -> dflt.put(prefix + c, e.getValue()));
+                }
+                String[] details = joinDetails(id, node.cfg("details"), prefix);
+                mappings.add(new JoinMapping(o, cols, dflt, details[0], details[1]));
+            }
+        } else {
+            for (Object raw : (List<?>) node.cfg("lookups")) {
+                Map<?, ?> e = (Map<?, ?>) raw;
+                for (Object k : e.keySet())
+                    if (!JOIN_LOOKUP_KEYS.contains(String.valueOf(k)))
+                        throw new IllegalArgumentException("transform.join node '" + id + "': a lookups: entry has '"
+                                + k + "' — an entry takes " + JOIN_LOOKUP_KEYS);
+                String o = e.get("on").toString().trim();
+                String prefix = (e.get("as") == null ? "{on}_" : e.get("as").toString()).replace("{on}", o);
+                LinkedHashMap<String, String> cols = new LinkedHashMap<>();
+                if (e.get("columns") instanceof Map<?, ?> renamed) {
+                    renamed.forEach((c, name) -> {
+                        String out = name == null || name.toString().isBlank() ? prefix + c : name.toString().trim();
+                        cols.put(String.valueOf(c).trim(), out);
+                    });
+                } else {
+                    List<String> listed = joinColumnList(e.get("columns"));
+                    if (listed.isEmpty()) listed.addAll(refCols);
+                    for (String c : listed) cols.put(c, prefix + c);
+                }
+                for (String c : cols.keySet()) requireRefColumn(id, c, refCols, " to return for " + o);
+                Map<String, String> dflt = joinDefaults(id, e.get("default"));
+                for (String n : dflt.keySet())
+                    if (cols.values().stream().noneMatch(v -> v.equalsIgnoreCase(n)))
+                        throw new IllegalArgumentException("transform.join node '" + id + "': the lookup on " + o
+                                + " has a default for '" + n + "', which is not one of its output columns "
+                                + cols.values());
+                String[] details = joinDetails(id, e.get("details"), prefix);
+                mappings.add(new JoinMapping(o, cols, dflt, details[0], details[1]));
+            }
+        }
+        // output names: refuse a clash with the input or between themselves rather than let DuckDB suffix one
+        java.util.Set<String> taken = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        taken.addAll(inputCols);
+        String fix = shorthand ? "change as:" : "rename it in the mapping";
+        for (JoinMapping m : mappings) {
+            if (!inputCols.isEmpty() && inputCols.stream().noneMatch(c -> c.equalsIgnoreCase(m.on())))
+                throw new IllegalArgumentException("transform.join node '" + id + "': the rows have no column '"
+                        + m.on() + "' to look up");
+            List<String> names = new ArrayList<>(m.columns().values());
+            if (m.matchedKeyAs() != null) names.add(m.matchedKeyAs());
+            if (m.matchKindAs() != null) names.add(m.matchKindAs());
+            for (String name : names)
+                if (!taken.add(name))
+                    throw new IllegalArgumentException("transform.join node '" + id + "': the returned column '"
+                            + name + "' clashes with a column the rows already have (or another returned one) — "
+                            + fix);
+        }
+        return mappings;
+    }
+
+    private static List<String> joinColumnList(Object v) {
+        List<String> out = new ArrayList<>();
+        if (v instanceof List<?> l) {
+            for (Object o : l) if (o != null && !o.toString().isBlank()) out.add(o.toString().trim());
+        } else if (v != null && !v.toString().isBlank()) out.add(v.toString().trim());
+        return out;
+    }
+
+    private static void requireRefColumn(String id, String c, List<String> refCols, String what) {
+        if (refCols.stream().noneMatch(r -> r.equalsIgnoreCase(c)))
+            throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has no column '"
+                    + c + "'" + what + " (it has " + refCols + ")");
+    }
+
+    /**
+     * {@code details:} → the {@code [matched_key, match_kind]} output names, {@code null} each when not added:
+     * {@code true} derives {@code <prefix>matched_key} / {@code <prefix>match_kind}; a map
+     * {@code {matched_key: NAME, match_kind: NAME}} names (and picks) them.
+     */
+    private static String[] joinDetails(String id, Object d, String prefix) {
+        if (d == null || Boolean.FALSE.equals(d) || "false".equalsIgnoreCase(d.toString())) return new String[2];
+        if (Boolean.TRUE.equals(d) || "true".equalsIgnoreCase(d.toString()))
+            return new String[] {prefix + "matched_key", prefix + "match_kind"};
+        if (d instanceof Map<?, ?> m) {
+            for (Object k : m.keySet())
+                if (!List.of("matched_key", "match_kind").contains(String.valueOf(k)))
+                    throw new IllegalArgumentException("transform.join node '" + id + "': details: names '" + k
+                            + "' — use matched_key and/or match_kind");
+            Object mk = m.get("matched_key"), kind = m.get("match_kind");
+            return new String[] {mk == null ? null : mk.toString().trim(), kind == null ? null : kind.toString().trim()};
+        }
+        throw new IllegalArgumentException("transform.join node '" + id + "': details: must be true, false or a map "
+                + "{matched_key: name, match_kind: name}");
+    }
+
     /** {@code transform.join} {@code match:} values; absent means {@link #JOIN_MATCH_EXACT}. */
     public static final String JOIN_MATCH_EXACT = "exact";
     public static final String JOIN_MATCH_LONGEST_PREFIX = "longest_prefix";
@@ -1200,7 +1411,10 @@ public final class RowShaper {
 
     /** The keyed form's settings (LOOKUP-1 P1b/P1c); each needs {@code key:}, or {@code from:}/{@code to:} for a range. */
     public static final List<String> JOIN_KEYED_KEYS =
-            List.of("columns", "as", "default", "exact_when", "duplicates", "order_by", "from", "to", "filter");
+            List.of("columns", "as", "default", "exact_when", "duplicates", "order_by", "from", "to", "filter",
+                    "lookups", "details");
+    /** The keys of one {@code lookups:} entry (LOOKUP-1 P1d). */
+    public static final List<String> JOIN_LOOKUP_KEYS = List.of("on", "columns", "as", "default", "details");
     /** Every config key {@code transform.join} reads — what every save path must carry. */
     public static final List<String> JOIN_CONFIG_KEYS;
     static {
@@ -1275,49 +1489,29 @@ public final class RowShaper {
             if (c != null && refCols.stream().noneMatch(r -> r.equalsIgnoreCase(c)))
                 throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has no column '"
                         + c + "' (it has " + refCols + ")");
+        List<JoinMapping> mappings = joinMappings(node, on, refCols, columnsOf(conn, input));
+        // every Reference column any mapping returns, fetched once in the one pass over the Reference
         List<String> returned = new ArrayList<>();
-        if (node.cfg("columns") instanceof List<?> l) {
-            for (Object o : l) if (o != null && !o.toString().isBlank()) returned.add(o.toString().trim());
-        } else if (strOrNull(node, "columns") != null) returned.add(strOrNull(node, "columns"));
-        if (returned.isEmpty()) returned.addAll(refCols);
-        for (String c : returned)
-            if (refCols.stream().noneMatch(r -> r.equalsIgnoreCase(c)))
-                throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has no column '"
-                        + c + "' to return (it has " + refCols + ")");
-        String as = node.cfg("as") == null ? "{on}_" : node.cfg("as").toString();
-        if (on.size() > 1 && !as.contains("{on}"))
-            throw new IllegalArgumentException("transform.join node '" + id + "': with several 'on' columns, as: "
-                    + "must contain {on}, or their returned columns would share names");
-        Map<String, String> defaults = joinDefaults(node);
-        for (String c : defaults.keySet())
-            if (returned.stream().noneMatch(r -> r.equalsIgnoreCase(c)))
-                throw new IllegalArgumentException("transform.join node '" + id + "': default names '" + c
-                        + "', which is not a returned column " + returned);
+        for (JoinMapping m : mappings)
+            for (String c : m.columns().keySet())
+                if (returned.stream().noneMatch(r -> r.equalsIgnoreCase(c))) returned.add(c);
 
-        // output names: refuse a clash with the input or between themselves rather than let DuckDB suffix one
-        List<String> inputCols = columnsOf(conn, input);
-        java.util.Set<String> taken = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
-        taken.addAll(inputCols);
         StringBuilder select = new StringBuilder("SELECT i.*");
         StringBuilder joins = new StringBuilder();
-        for (int n = 0; n < on.size(); n++) {
-            String o = on.get(n);
-            if (inputCols.stream().noneMatch(c -> c.equalsIgnoreCase(o)))
-                throw new IllegalArgumentException("transform.join node '" + id + "': the rows have no column '" + o
-                        + "' to look up");
+        for (int n = 0; n < mappings.size(); n++) {
+            JoinMapping m = mappings.get(n);
+            String o = m.on();
             String h = "__lk_h" + n;
-            for (String c : returned) {
-                String name = as.replace("{on}", o) + c;
-                if (!taken.add(name))
-                    throw new IllegalArgumentException("transform.join node '" + id + "': the returned column '"
-                            + name + "' clashes with a column the rows already have (or another returned one) — "
-                            + "change as:");
-                String dflt = defaults.entrySet().stream().filter(e -> e.getKey().equalsIgnoreCase(c))
+            m.columns().forEach((c, name) -> {
+                String dflt = m.defaults().entrySet().stream().filter(e -> e.getKey().equalsIgnoreCase(name))
                         .map(Map.Entry::getValue).findFirst().orElse(null);
                 String v = h + "." + q(c);
                 select.append(", ").append(dflt == null ? v : "coalesce(" + v + ", " + sqlStr(dflt) + ")")
                         .append(" AS ").append(q(name));
-            }
+            });
+            if (m.matchedKeyAs() != null) select.append(", ").append(h).append(".__lk_mk AS ").append(q(m.matchedKeyAs()));
+            if (m.matchKindAs() != null)
+                select.append(", coalesce(").append(h).append(".__lk_kind, 'none') AS ").append(q(m.matchKindAs()));
             // a range compares in the value's own type (dates as dates); prefix and exact compare as text
             joins.append(" LEFT JOIN __lk_hit ").append(h).append(" ON ").append(h).append(".__lk_v = ")
                     .append(range ? "i." + q(o) : "CAST(i." + q(o) + " AS VARCHAR)");
@@ -1343,18 +1537,22 @@ public final class RowShaper {
             refRows += " QUALIFY row_number() OVER (PARTITION BY CAST(t." + key + " AS VARCHAR) ORDER BY (" + orderBy
                     + ") " + ("last".equals(dups) ? "DESC" : "ASC") + " NULLS LAST, CAST(t AS VARCHAR)) = 1";
         }
-        String kept = String.join(", ", returned.stream().map(c -> "r." + q(c)).toList());
+        // __lk_mk / __lk_kind: the match details (P1d) — the key that matched, and whether it was the whole value
+        String kept = returned.stream().map(c -> ", r." + q(c)).collect(java.util.stream.Collectors.joining());
         StringBuilder values = new StringBuilder();
         for (String o : on) {
             if (values.length() > 0) values.append(" UNION ");
             values.append("SELECT CAST(").append(q(o)).append(" AS VARCHAR) AS __lk_v FROM ").append(q(input));
         }
         String hit = prefix
-                ? "SELECT v.__lk_v, " + kept + " FROM __lk_val v JOIN __lk_len l ON l.__lk_n <= length(v.__lk_v)"
+                ? "SELECT v.__lk_v" + kept + ", r.__lk_key AS __lk_mk, CASE WHEN l.__lk_n = length(v.__lk_v) THEN "
+                  + "'exact' ELSE 'prefix' END AS __lk_kind"
+                  + " FROM __lk_val v JOIN __lk_len l ON l.__lk_n <= length(v.__lk_v)"
                   + " JOIN __lk_ref r ON r.__lk_key = left(v.__lk_v, l.__lk_n)"
                   + (exactWhen == null ? "" : " AND (NOT coalesce(r.__lk_exact, false) OR l.__lk_n = length(v.__lk_v))")
                   + " QUALIFY row_number() OVER (PARTITION BY v.__lk_v ORDER BY l.__lk_n DESC) = 1"
-                : "SELECT v.__lk_v, " + kept + " FROM __lk_val v JOIN __lk_ref r ON r.__lk_key = v.__lk_v";
+                : "SELECT v.__lk_v" + kept + ", r.__lk_key AS __lk_mk, 'exact' AS __lk_kind"
+                  + " FROM __lk_val v JOIN __lk_ref r ON r.__lk_key = v.__lk_v";
         exec(conn, "CREATE TABLE " + q(data) + " AS"
                 + " WITH __lk_ref AS MATERIALIZED (SELECT *" + (exactWhen == null ? "" : ", (" + exactWhen + ") AS __lk_exact")
                 + " FROM (" + refRows + ")),"
@@ -1406,13 +1604,17 @@ public final class RowShaper {
                             + "first|last with order_by:");
             }
         }
-        String kept = String.join(", ", returned.stream().map(c -> "r." + q(c)).toList());
+        String kept = returned.stream().map(c -> ", r." + q(c)).collect(java.util.stream.Collectors.joining());
+        // the matched key of a range is its period, "from..to" (an open end left empty)
+        String span = (fromCol == null ? "''" : "coalesce(CAST(r." + q(fromCol) + " AS VARCHAR), '')") + " || '..' || "
+                + (toCol == null ? "''" : "coalesce(CAST(r." + q(toCol) + " AS VARCHAR), '')");
         StringBuilder values = new StringBuilder();
         for (String o : on) {
             if (values.length() > 0) values.append(" UNION ");
             values.append("SELECT ").append(q(o)).append(" AS __lk_v FROM ").append(q(input));
         }
-        String hit = "SELECT v.__lk_v, " + kept + " FROM __lk_val v JOIN __lk_ref r ON " + inside
+        String hit = "SELECT v.__lk_v" + kept + ", " + span + " AS __lk_mk, 'range' AS __lk_kind"
+                + " FROM __lk_val v JOIN __lk_ref r ON " + inside
                 + ("refuse".equals(dups) ? "" : " QUALIFY row_number() OVER (PARTITION BY v.__lk_v ORDER BY (" + orderBy
                         + ") " + ("last".equals(dups) ? "DESC" : "ASC") + " NULLS LAST, CAST(r AS VARCHAR)) = 1");
         exec(conn, "CREATE TABLE " + q(data) + " AS"
@@ -1440,9 +1642,8 @@ public final class RowShaper {
     }
 
     /** {@code default:} as a map, or a list of {@code col=value} entries (the Step form has no map field). */
-    private static Map<String, String> joinDefaults(PipelineNode node) {
+    private static Map<String, String> joinDefaults(String id, Object d) {
         Map<String, String> out = new LinkedHashMap<>();
-        Object d = node.cfg("default");
         if (d instanceof Map<?, ?> m) {
             m.forEach((k, v) -> out.put(String.valueOf(k).trim(), v == null ? null : String.valueOf(v)));
         } else if (d instanceof List<?> l) {
@@ -1450,12 +1651,12 @@ public final class RowShaper {
                 String s = String.valueOf(o);
                 int eq = s.indexOf('=');
                 if (eq <= 0)
-                    throw new IllegalArgumentException("transform.join node '" + node.id() + "': default entry '" + s
+                    throw new IllegalArgumentException("transform.join node '" + id + "': default entry '" + s
                             + "' is not column=value");
                 out.put(s.substring(0, eq).trim(), s.substring(eq + 1));
             }
         } else if (d != null) {
-            throw new IllegalArgumentException("transform.join node '" + node.id() + "': default must be a list of "
+            throw new IllegalArgumentException("transform.join node '" + id + "': default must be a list of "
                     + "column=value entries or a map");
         }
         return out;

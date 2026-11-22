@@ -3294,7 +3294,7 @@
         "tags" : [ "components" ],
         "summary" : "Derive a SQL transform's output columns",
         "operationId" : "postComponentsTransformDescribe",
-        "description" : "Runs DuckDB DESCRIBE over body sql against an empty input table built from inputColumns [{name, type}], reading no rows; the SQL passes the same guard as execution. No capability gate. 400 for a missing sql or inputColumns; 422 for a guard refusal or a binder or syntax error.",
+        "description" : "Runs DuckDB DESCRIBE over body sql against an empty input table built from inputColumns [{name, type}], reading no rows; the SQL passes the same guard as execution. No capability gate. 400 for a missing sql or inputColumns; 422 for a guard refusal or a binder or syntax error. With a config body instead (LOOKUP-1 P1d: {config: a keyed transform.join, inputColumns?, referenceColumns?: [{name, type}]}) it lists the columns that join adds as {columns: [{name, type, from, lookedUpBy, match, detail}]}, the Reference's columns read from the producing Pipeline's declared schema when referenceColumns is absent; 422 naming a clash, an unknown column, a non-keyed join or a Reference whose columns are unknown.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
