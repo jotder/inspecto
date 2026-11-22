@@ -114,86 +114,107 @@ code: la/inspecto-la-core
 ## Banking_SanctionedOwner
 
 > **The better name match is the wrong one** · Standard · Banking and finance (`la-banking`) · saved view *Sanctioned owner
-> path* (`sanctioned_owner_path`) · about 5 min
+> path* (`sanctioned_owner_path`) and the Investigation *Sanctions exposure two ownership hops down* · about 5 min
 
-- Cast: the **list entry** SL-0137; the **matched person** PER-03904; the **company** the person owns 60 % of, CO-04431; the **company behind the customer**, CO-04313; the **customer** CUS-00528. Decoys: the **large holding company** (135 stakes, v1); the **near namesake** (list entry SL-0289, match score 0.987, a better score than the real one). All ids readable.
-- Stakes: the investigator is a bank's sanctions-compliance analyst. Screening found nothing at the customer; if the match is real and missed, the bank is exposed through a customer it believes is clean.
-- Vocabulary: *sanctions list* (names a bank may not deal with), *beneficial owner* (the person behind the stakes), *two hops* (two ownership links away). Said in the cold open.
-- Ground truth: `tools/gen-la-ownership-data.ground-truth.json` ▸ `stories.sanctions_two_hops`: entities CO-04313, CO-04431, CUS-00528, PER-03904, SL-0137; `facts` listed_share_of_owner 60, owner_share 50, match_score 0.986, near_namesake_list_id SL-0289 with score 0.987; `lookalikes` CO-04242, CUS-00642, PER-02226. **Plan table corrected:** the decoy is not "a near-match name"; it is a *better* near-match (0.987 against 0.986) with no stake in any customer's chain, which is the stronger story. The person behind SL-0289 is `PER-02226 [check in UI: that id is the namesake]`.
-- Before: Standard, la-banking, Demo Analyst, fresh state; the saved view is cut short at the node cap, so the film starts the focus from the entity, not from the whole view.
-- Lead: *customer CUS-00528 is two ownership hops below a possible match*. **What would change our mind:** the birth year or nationality in the match reasons differing from the list entry, or the 60 % stake having been sold before the customer was onboarded. **Next actions:** (1) escalate CUS-00528 for enhanced due diligence, (2) ask the customer for a certified ownership chain, (3) keep the five ids as an Entity List and watch new stakes in that chain with an Alert Rule.
-- Voice style: ids spoken by the lexicon (PER, CO, CUS, SL as letters then digits); percentages spoken as "sixty percent".
-- Try it / Check: open the saved view, run Busiest nodes, and say why the largest company is not the lead. Answer: its size is not a path to any listed person; the lead is the chain from SL-0137, which the match reasons and the stakes show.
+- **Cast:** the **list entry** SL-0137; the **matched person** PER-03904; the **company** the person owns 60 % of, CO-04431; the
+  **company behind the customer**, CO-04313; the **customer** CUS-00528. Decoys: the **large company** (CO-00859, 135 links, the
+  busiest node of the view) and the **near namesake** (list entry SL-0289, match score 0.987, a better score than the real one,
+  with no stake in any customer's chain). All ids are readable (no masking in this Space).
+- **Stakes:** the investigator is a bank's sanctions-compliance analyst. Screening found nothing at the customer; if the match is
+  real and missed, the bank is exposed through a customer it believes is clean.
+- **Vocabulary:** *sanctions list* (names a bank may not deal with), *beneficial owner* (the person behind the stakes), *two hops*
+  (two ownership links away). Said in S02.
+- **Ground truth:** `tools/gen-la-ownership-data.ground-truth.json` ▸ `stories.sanctions_two_hops`: entities CO-04313, CO-04431,
+  CUS-00528, PER-03904, SL-0137; `facts` listed_share_of_owner 60, owner_share 50, match_score 0.986, near_namesake_list_id
+  SL-0289 with score 0.987. **Plan table corrected:** the decoy is a *better* score, not a near-match name. **Checked live
+  2026-11-22 (fresh Standard unzip):** the saved view is cut short at the node cap (1000), Busiest nodes names CO-00859 (135 links),
+  CO-01142 (56), CO-00240 (47); the Investigation opens with PER-03904, SL-0137, CUS-00528 and CO-04313 (a name-match link
+  PER-03904 to SL-0137, a customer link CUS-00528 to CO-04313), Working Set 4 entities, 2 links; Connect start entities
+  (PER-03904, CUS-00528) answers *3 hops · 1 route* through CO-04431; Expand from these nodes draws the chain; Rows lists
+  CO-04431 owns CO-04313, CUS-00528 customer_is CO-04313, PER-03904 owns CO-04431, PER-03904 name_match SL-0137; the Data page
+  shows the Dataset *ownership_dataset* (owner, owned, percent) with its own mapping; the Space already holds the Entity List
+  *Parties on a sanctions path* (Party, 4 members).
+- **Before:** Standard build, Banking Space from a fresh unzip, Demo Analyst. A single entity cannot be started unsaved here
+  (the start's ring needs a second person), so the film reads the seeded Investigation and does its one state change, Connect
+  and Expand, in S08.
+- **Lead:** *customer CUS-00528 is two ownership hops below a possible match.* **What would change our mind:** the birth year or
+  nationality in the match reasons differing from the list entry, or the 60 % stake having been sold before the customer was
+  onboarded. **Next actions:** (1) escalate CUS-00528 for enhanced due diligence, (2) ask the customer for a certified ownership
+  chain, (3) keep the parties as an Entity List so every later graph marks the chain.
+- **Voice style:** ids spoken by the lexicon (PER, CO, CUS, SL as letters then digits); percentages as "sixty percent".
+- **Try it / Check:** open the saved view, run Busiest nodes, and say why the largest company is not the lead. *Answer: its size is
+  not a path to any listed person; the lead is the chain from the list entry, which the match reasons and the stakes show.*
 
-### S01 · The clean customer                                            ~25 s
-- Voice: The customer is clean. The company that owns it is clean. Screening found nothing. [pause 0.5] But a name on a sanctions list is spelled almost like someone two layers up the ownership chain. A screening check looks at the customer. Who looks two hops up?
-- Chip: none
-- Action: cold open on a still of the saved view; intro card.
+### S01 · Cold open · ~25 s
+- Voice: A bank screens every customer against the sanctions lists. This customer is clean. The company that owns it is clean too, and screening found nothing. [pause 0.6] But a name on a sanctions list is spelled almost like a person two layers up the ownership chain. Screening looks at the customer in front of it. Who looks two hops up?
+- Action: cold open over the Banking Space's home page; the intro card opens the next scene.
 - Impact: none.
 
-### S02 · Why screening misses it                                      ~30 s
-- Voice: Screening compares names to the customer in front of it. The stake is in another record, the owner in a third, the list in a fourth. [pause 0.4] No single row says it. The chain does.
-- Chip: none
-- Action: zoom slowly on the toolbox while the voice runs.
-- Impact: none.
+### S02 · Why screening misses it · ~30 s
+- Beat: steady
+- Intro: The better name match is the wrong one | Banking and finance Space
+- Story: a sanctions list = the names a bank may not deal with | a beneficial owner = the person behind the stakes | two hops = two ownership links away
+- Voice: Screening compares names with the customer in front of it. The stake sits in another record, the owner in a third, and the list in a fourth. [pause 0.4] No single row says it. Only the chain does. A sanctions list names the people a bank may not deal with. A beneficial owner is the person behind the stakes. Two hops means two ownership links away.
+- Action: story card "Who is who" over the home page.
+- Impact: the story card names the three terms.
 
-### S03 · The data, in one breath                                      ~30 s
-- Voice: The ownership register lands as records: an owner, what is owned, the percentage. Beside it, the bank's customers and a sanctions list. [pause 0.4] A Job turns each register row into an owns link, and adds a name-match link where a listed name is close to a person's.
-- Chip: Mappings
-- Action: Data page ▸ the ownership links Dataset ▸ Mappings. `[check in UI]`
-- Impact: mark the owner, owned and percentage columns.
+### S03 · The data, in one breath · ~30 s
+- Voice: The ownership register lands as records: an owner, what is owned, and a percentage. Beside it sit the bank's customers and the sanctions list. [pause 0.4] A Job turns each register row into an owns link. Where a listed name is close to a person's, it adds a name-match link. The percentage rides on every owns link.
+- Chip: Data · Mappings
+- Action: rail Data ▸ the Dataset *ownership_dataset* ▸ hold on its Columns card and its Mappings line. `[checked live: owner_id and owned_id are Entity columns holding Party and Company, percent is a Measure, the mapping reads owner_id to owned_id, measure percent]`
+- Impact: mark the Mappings line.
 
-### S04 · The saved view, and its limit                                ~40 s
-- Voice: The saved view draws people, companies and customers, and who owns whom. It is large: the product says so, and cuts the drawing at its node limit. [pause 0.4] That is honest, and it is the cue to stop looking at the whole and start from one entity.
+### S04 · The saved view, and its limit · ~35 s
+- Voice: The saved view draws people, companies and customers, and who owns whom. It is large, and the product says so. [pause 0.4] The orange line reads: result cut short, node cap one thousand. That is honest. It is also the cue to stop looking at the whole picture and follow one chain.
 - Chip: Saved views · Graph counts
-- Action: File ▸ Open… ▸ Saved views ▸ *Sanctioned owner path* ▸ hold on the banner *Result cut short … node cap (1000)*.
+- Action: open the saved view *Sanctioned owner path* ▸ hold on the banner. `[checked live: the banner reads Result cut short, the graph reached the node cap (1000)]`
 - Impact: mark the banner.
 
-### S05 · First sweep, and the big company                              ~35 s
-- Voice: Who has the most links? The busiest node is a company with a hundred and thirty-five stakes. Large, and nothing more. No listed name leads to it. [pause 0.5] Size is not the question here. Set it aside.
+### S05 · First sweep, and the big company · ~35 s
+- Voice: Who has the most links? [pause 0.4] The busiest node is a company with a hundred and thirty-five stakes. It is large, and nothing more. No listed name leads to it. Size is not the question here. Set it aside.
 - Chip: Busiest nodes
-- Action: toolbox ▸ Busiest nodes ▸ click the first row. `[check in UI: it is a company with 135 stakes; Busiest nodes on a cut graph]`
-- Impact: computed mark on the company, then grey "ruled out".
+- Action: toolbox ▸ Busiest nodes ▸ hold on the first row. `[checked live: CO-00859 takes part in 135 links, then CO-01142 with 56 and CO-00240 with 47]`
+- Impact: grey "ruled out" mark on the first row.
 
-### S06 · Start from the match                                         ~40 s
-- Voice: Start from the person the list entry matches, PER-03904. [pause 0.4] Two links. One is a name match to list entry SL-0137: two spellings of one name, the same birth year, the same nationality. The other is a stake in a company, CO-04431.
-- Chip: Search · Focus
-- Action: Search ▸ PER-03904 ▸ Focus; labels on.
-- Impact: computed mark on the two links; the match link opened to show its reasons. `[check in UI: the match reasons panel]`
+### S06 · The matched person · ~40 s
+- Beat: reveal
+- Story: off
+- Voice: Now open the Investigation, Sanctions exposure two ownership hops down. It starts from two entities, the list entry and the customer. [pause 0.5] The match is already on the graph. One link joins a person to the list entry: two spellings of one name, the same birth year, the same nationality. That is the possible match. The Working Set holds four entities and two links, and the data runs to the end of September.
+- Chip: File · Open… · Investigations
+- Action: File ▸ Open… ▸ Investigations ▸ *Sanctions exposure two ownership hops down* ▸ Open ▸ hold on the canvas. `[checked live: the canvas holds PER-03904, SL-0137, CUS-00528 and CO-04313; the blue link joins PER-03904 to SL-0137]`
+- Impact: mark the name-match link.
 
-### S07 · The better name, and why it is not the one                    ~40 s
-- Voice: Here is the trap. A second list entry, SL-0289, matches an even closer name, with a higher score. [pause 0.4] Follow it, and it ends: that person owns nothing in any customer's chain. A better score is not a better lead. The stake is what counts.
-- Chip: Search
-- Action: Search ▸ the namesake (PER-02226 `[check in UI]`) ▸ Focus ▸ hold on the dead end.
-- Impact: namesake marked grey "ruled out"; the real chain yellow.
+### S07 · The better name, and why it is not the one · ~40 s
+- Voice: Here is the trap. A second list entry matches an even closer name, with a higher score. [pause 0.4] Follow it, and it ends. That person owns nothing in any customer's chain. A better score is not a better lead. The stake is what counts.
+- Action: stay on the Investigation canvas while the voice runs. The namesake is not in this Working Set, so this scene is narration over the canvas; the page for it is not shown.
+- Impact: none.
 
-### S08 · Two hops to the customer                                     ~45 s
-- Voice: Back to the match. That person owns sixty percent of CO-04431, which owns half of CO-04313, the company behind customer CUS-00528. [pause 0.5] Two hops above a clean customer sits a possible match.
-- Chip: Expand · G
-- Action: Expand from PER-03904 two degrees along owns links only. `[check in UI: Expand filter Link kinds owns; Degrees 2]`
-- Impact: before/after hold: the chain appears; mark each hop.
+### S08 · Two hops to the customer · ~55 s
+- Voice: The person owns a company that is not on the graph yet. So ask how the person and the customer connect. [pause 0.5] Connect start entities answers: three hops, one route. It reads: person, company, company, customer. The route runs through the missing company. Connect is a recorded step, so the log now says what was asked and what came back. Expand from these nodes, and the chain draws end to end. The person owns sixty percent of one company, which owns half of the customer's company. [pause 0.5] Two hops above a clean customer sits a possible match.
+- Chip: More steps · Connect start entities · Expand from these nodes
+- Action: More steps ▸ Connect start entities ▸ paste `PER-03904, CUS-00528` ▸ Connect start entities ▸ Expand from these nodes. This is the film's one recorded step. `[checked live: 1 of 1 pairs connected within 3 hops, route PER-03904 to CO-04431 to CO-04313 to CUS-00528, the button reads Expand from these nodes (4)]`
+- Impact: before/after hold: CO-04431 appears between the person and the customer's company; mark it.
 
-### S09 · Evidence you can show                                        ~35 s
-- Voice: The stake and the name match are both rows, and the match shows its reasons. Open the table under the graph: owner, owned, percentage. [pause 0.4] This is what you hand to the reviewer, and it is all in the register.
+### S09 · Evidence you can show · ~35 s
+- Voice: Every link is a row. Open the table under the graph. [pause 0.4] Who owns what, and the kind of link: owns, customer is, name match. The percentage is on each owns link. This is what you hand to the reviewer, and it comes straight from the register.
 - Chip: Rows
-- Action: dock ▸ Rows ▸ select the three links of the chain.
-- Impact: mark the percentage cells.
+- Action: dock ▸ Rows ▸ hold on the rows. `[checked live: CO-04431 owns CO-04313, CUS-00528 customer_is CO-04313, PER-03904 owns CO-04431, PER-03904 name_match SL-0137; the percentage is not a column of this table]`
+- Impact: mark the rows.
 
-### S10 · The lead, and what would change it                           ~40 s
-- Voice: One customer to escalate, never a verdict. [pause 0.5] It weakens if the birth year or the nationality differs in the match reasons, or if the sixty percent was sold before the customer joined. [pause 0.4] The register can show either.
-- Chip: none
-- Action: lower third with the lead and the two checks.
-- Impact: lead yellow, decoys grey.
+### S10 · The lead, and what would change it · ~40 s
+- Voice: One customer to escalate, never a verdict. [pause 0.5] It weakens if the birth year or the nationality differs in the match reasons. It weakens too if the sixty percent stake was sold before the customer joined. [pause 0.4] The register can show either.
+- Action: hold on the drawn chain.
+- Impact: none.
 
-### S11 · Monday morning                                               ~35 s
-- Voice: Escalate the customer for enhanced due diligence. Ask for a certified ownership chain. [pause 0.4] And keep the five ids as an Entity List, so every later graph marks the chain, and a new stake in it raises an Alert Rule.
-- Chip: Entity List
-- Action: New list… `Parties on a sanctions path` with the five ids ▸ done.
-- Impact: mark the list name.
+### S11 · Monday morning · ~35 s
+- Voice: Escalate the customer for enhanced due diligence. Ask for a certified ownership chain. [pause 0.4] And keep the parties as an Entity List, so every later graph marks the chain. This Space already holds one, Parties on a sanctions path.
+- Chip: Entity Lists
+- Action: rail Entity Lists ▸ hold on the list *Parties on a sanctions path*. `[checked live: Party, 4 members]`
+- Impact: mark the list row.
 
-### S12 · Case file                                                   ~15 s
-- Voice: Lead: customer CUS-00528, two hops below a possible match. Evidence: three register rows and the match reasons. Next: escalate, ask, watch. Inspecto LA.
-- Chip: none
+### S12 · Case file · ~25 s
+- Casefile: Lead: customer CUS-00528, two hops below a possible match | Evidence: the register rows and the match reasons | Next: escalate for enhanced due diligence; ask for a certified ownership chain; keep the parties as an Entity List | Try it: open the saved view, run Busiest nodes, and say why the largest company is not the lead
+- Voice: The case file. The lead: one customer, two ownership hops below a possible match. The evidence: the register rows and the match reasons. Next: escalate, ask, and keep watching. [pause 0.6] Your turn. Open the saved view, run Busiest nodes, and say why the largest company is not the lead.
 - Action: case-file card and outro.
 - Impact: none.
 
