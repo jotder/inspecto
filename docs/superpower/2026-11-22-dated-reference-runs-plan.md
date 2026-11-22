@@ -187,7 +187,7 @@ Job cdr_enrich               ▣ cdr ──data──→ join ──→ join ─
 | **P2 — ledger + reconcile loop** | the Job progress record; the loop; `schedule.mode: by_day` with `quiet` / `max_hold` / `order` / `max_parallel` / deadline; Waiting state on Runs | the 06:00 surge is one run per day; an outage backlog drains oldest-first at `max_parallel` |
 | **P3 — output by day + corrections** | output partitioned by event day, replaced per run; version-used record; stale marking; opt-in re-run on Reference change | a corrected Reference for 22 Nov re-runs 22 Nov only |
 | **P4 — screens and alerts** | Runs ▸ Backlog (per Job: days waiting and why, ready, running, oldest waiting age, drain estimate; Run now, Pause, Drain, Give up waiting); Alert Rules over backlog age, missing Reference, deadline | an operator sees and clears a backlog without the CLI |
-| **P5 — the Job graph** (independent; can run in parallel) | Job Pipeline with store inputs and reference edges; Topology joins it to the onboarding Pipelines; the misplaced-sink drawing fixed | the four graphs above draw and save as shown |
+| **P5 — the Job graph** (independent; can run in parallel) | planned in [`2026-11-22-job-graph-plan.md`](2026-11-22-job-graph-plan.md) (`JOB-GRAPH-1`): Job Pipeline with store inputs and reference edges; Topology joins it to the onboarding Pipelines; the misplaced-sink drawing fixed | the four graphs above draw and save as shown |
 
 ## 6. Decisions (open)
 

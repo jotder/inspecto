@@ -39,6 +39,8 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `PIPELINE-INBOX-FIELD-1` | P3 | feature | the Pipeline editor has no field for a Pipeline's inbox folder (dirs.poll), and the Collectors page lists Collectors but cannot create one; | — |
 | `LOOKUP-1` | P2 | feature | Lookup: exact and best-match key resolution over a Reference Dataset (longest prefix, range, as-of, fuzzy), a batch engine and a row-at-a… | — |
 | `DATED-REFERENCE-RUNS-1` | P2 | feature | Each record joins the Reference version of its own day, and a Job's backlog drains itself: daily Reference versions, version_by on the jo… | — |
+| `JOB-GRAPH-1` | P2 | feature | A Job's chain becomes its own Pipeline: store inputs, Reference side inputs drawn as edges into their joins, a persistent output Dataset,… | — |
+| `OUTPUT-STORE-SINK-NOT-DRAWN-1` | P3 | defect | The Pipeline editor draws a steps: + output_store: Pipeline as one line ending in the landed store: the joined rows appear to go to cdr_e… | — |
 | — | P3 | feature | Step Processor catalog | — |
 | `REPROCESS-REFUSAL-TEST-MODE-1` | P3 | defect | ControlApiReprocessRefusalTest.anArrivalReplaceEverythingSetAsideIsRefused fails on master: its upload sends no arrival mode, so Add a fi… | — |
 | `QUARANTINE-RELEASE-1` | P3 | feature | a quarantined file has no console action: the Quarantine tab lists files per Pipeline (no run, Consignment or time) and offers only *View… | — |
