@@ -137,75 +137,81 @@ shared module (§4.4).
 
 ## PublicSector_AddressFarm
 
-> **Address farm: the fourth address** · Standard · Public sector (la-public-sector) · benefit claims at one address · 4:20 · plan §6 row 16
+> **Address farm: the fourth address** · Standard · Public sector (la-public-sector) · benefit claims at one address · 4:15 · plan §6 row 16
 
 - **Cast:** the address AD-03141 and its fourteen claimants (five surnames, three bank accounts). **Decoy:** three care homes (AD-00412, AD-05077, AD-02718) with many residents, each paid into their own account. Ids readable.
 - **Stakes:** a benefits fraud officer who can visit a handful of addresses a month. Four addresses hold far too many claimants for a home; three are legitimate.
 - **Vocabulary:** *claimant*, a person with an open benefit claim. *Household of one*, a claim that declares a single-person home. Said once in S02.
-- **Ground truth:** `tools/gen-la-benefits-data.ground-truth.json` · `address_farm` (`address` AD-03141, `claimants` 14, `surnames` Dunbar, Kettering, Oddie, Varga, Zamora, `accounts` three, `care_homes` AD-00412 31, AD-02718 24, AD-05077 27); `gen-la-benefits-data.py` line 13 and the address-farm block (five surnames in a 4-3-3-2-2 split, each a single-person household, three accounts nobody else uses). Plan table confirmed (decoy: legitimate homes).
-- **Lead:** fourteen single-person claims at one address, five surnames, paid into three accounts nobody else uses. **What would change our mind:** the three accounts belonging to one registered representative who is paid on behalf of many lawful claimants, or the fourteen being lodgers with a landlord's account. **Next actions:** verify the address in person; hold the three accounts for review; mark the fourteen claims so a new claim at this address is flagged.
+- **Ground truth:** `tools/gen-la-benefits-data.ground-truth.json` · `address_farm` (`address` AD-03141, `claimants` 14, `surnames` Dunbar, Kettering, Oddie, Varga, Zamora, `accounts` three, `care_homes` AD-00412 31, AD-02718 24, AD-05077 27); `gen-la-benefits-data.py` line 13 and the address-farm block (five surnames in a 4-3-3-2-2 split, each a single-person household, three accounts).
+- **Screen truth** (checked live on a fresh Standard unzip, Demo Analyst, 2026-11-22): the saved view *Address farm* draws 320 nodes and 366 links, so node labels are off until Display options turns them on; Busiest nodes answers AD-00412 (31 links), AD-05077 (27), AD-02718 (24), AD-03141 (14) and SYN-19642862 (5). *Start from these* on AD-03141 draws one entity and fourteen linked nodes, the claimants CIT-00953 to CIT-09614, every link `lives_at`. The Rows table lists those fourteen rows (From, Link kind, To). The surnames, the single-person declaration and the three bank accounts are **not on this graph**: they come from the ground truth, so the voice states them as what the records say and the screen shows the fourteen people and the address. Attach to Case opens with *An existing Case* and *A new Case, from the selected nodes* both available (ids readable), sealing the fifteen nodes on screen. Nothing is masked.
+- **Before:** fresh unzip of `la-standard.zip` with the fake Demo Auth sign-in, Public sector Space, Demo Analyst; nothing is saved or created (the Attach to Case dialog is cancelled).
+- **Lead:** fourteen single-person claims at one address, five surnames, paid into three accounts nobody else uses. **What would change our mind:** the three accounts belonging to one registered representative who is paid on behalf of many lawful claimants, or the fourteen being lodgers with a landlord's account. **Next actions:** verify the address in person; hold the three accounts for review; bring the fourteen claims together as a Case.
 - **Voice style:** the reveal scene (S06) holds 0.7 s before "Fourteen single-person homes." Lexicon: AD-03141 "a d zero three one four one"; *claimant* as a word.
 - **Try it:** open *Address farm* and press Busiest nodes. How do you tell a care home from the farm? *Answer: by the money. A care home's residents are each paid into their own account; the farm's fourteen share three.*
 - **Check:** why is the largest address not the lead? *Answer: many people at one address is normal for a care home; only the shared accounts and the single-person declarations are unusual.*
 
-### S01 · The address with too many people  ~25 s
-- Voice: You work in a benefits fraud team, and you cannot visit every address. [pause 0.4] Four addresses hold far more claimants than any home should. Three are care homes, which is legitimate. [pause 0.6] The fourth is a house. You need to find out which one is wrong before you spend a visit.
-- Chip: none
-- Action: cold open on the Space's home page; intro card (*Address farm*, *Public sector*, *Standard*).
+### S01 · The address with too many people · ~25 s
+- Beat: cold
+- Voice: You work in a benefits fraud team, and you cannot visit every address. [pause 0.4] Four addresses hold far more claimants than any home should. Three are care homes, which is legitimate, and the fourth is a house. [pause 0.6] You need to know which one is wrong before you spend a visit.
+- Action: cold open on the Space's home page.
 - Impact: none.
 
-### S02 · Why each claim looks fine  ~30 s
-- Voice: Each claim, read alone, is ordinary. A person, an address, a benefit, a bank account. [pause 0.4] A household of one is a claim that declares a single-person home. It passes the checks because nothing in it contradicts the rest. [pause 0.5] The oddity is only visible when you count who else declares the same address, and whose account the money goes to.
-- Chip: none
-- Action: home page; the story card names *the care home* and *the house*.
-- Impact: none.
+### S02 · Why each claim looks fine · ~30 s
+- Beat: steady
+- Intro: Address farm | Public sector Space
+- Story: a care home = an address where many people live, each paid separately | the house = an address that should hold one household | a claimant = a person with an open benefit claim
+- Voice: Each claim, read alone, is ordinary: a person, an address, a benefit, a bank account. [pause 0.4] A household of one is a claim that declares a single-person home, and it passes the checks because nothing in it contradicts the rest. [pause 0.5] The oddity only shows when you count who else declares the same address, and whose account the money goes to.
+- Action: story card "Who is who" over the home page.
+- Impact: the story card names the three roles.
 
-### S03 · The data in one breath  ~30 s
+### S03 · The data in one breath · ~30 s
 - Voice: Every claim lands as a record: the claim, the person, the benefit, the dates, the amount and the bank account paid into. [pause 0.3] A Job links each claimant to the address they declare and to the account they are paid into. People, addresses and accounts are the entities, and the links are the claims.
-- Chip: Mappings · Data
-- Action: rail ▸ Data ▸ the benefits links Dataset ▸ zoom on the Mappings area. [check in UI: the Mappings area of `benefits_screen_links_dataset`]
-- Impact: mark the From and To columns.
+- Chip: Data · Mappings
+- Action: rail ▸ Data ▸ `benefits_screen_links_dataset` ▸ hold on its Columns card.
+- Impact: mark the src and dst columns once.
 
-### S04 · The question  ~25 s
-- Voice: Open the saved view Address farm. [pause 0.4] It draws addresses with many claimants. The question is which of these is a home, and which is a front door for many claims. [pause 0.4] Four hubs stand out, each with a crowd around it.
-- Chip: File · Open… · Saved views
-- Action: File ▸ Open… ▸ Saved views ▸ *Address farm*; Display options ▸ node labels on (off above 80 nodes). [check in UI: four orange hubs]
-- Impact: before/after hold: the graph appears; mark the four hubs.
-
-### S05 · The big three are homes  ~40 s
-- Voice: Press Busiest nodes. [pause 0.4] Three addresses lead, with thirty-one residents, twenty-seven and twenty-four. Look at the money. Each resident is paid into their own account. These are care homes, and they are genuine. [pause 0.6] The fourth address is smaller, and stranger. It has fewer people, and something else it shares.
-- Chip: Busiest nodes
-- Action: toolbox ▸ Quick questions ▸ Busiest nodes ▸ hold on the ranked list; click the top three. [check in UI: the three leaders are AD-00412, AD-05077 and AD-02718]
-- Impact: mark the three care homes grey with *ruled out*.
-
-### S06 · The fourth address  ~45 s
-- Voice: Select the fourth address, AD-03141, and focus on it. [pause 0.7] Fourteen residents. Five surnames. [pause 0.4] And every one of them declares a household of one. Fourteen single-person homes, at one address. A care home has residents with their own accounts. This has fourteen people and a handful of accounts.
-- Chip: Node details · Focus
-- Action: click `AD-03141` twice ▸ Node details ▸ Focus ▸ hold on the fourteen claimants and the accounts. [check in UI: fourteen claimants, three accounts]
-- Impact: mark AD-03141 and the fourteen in yellow; the three accounts outlined.
-
-### S07 · The evidence you can quote  ~40 s
-- Voice: Open the Rows tab. Every line is a row: a claimant, the address, the account. [pause 0.4] Fourteen claims, five surnames, and just three bank accounts that nobody else uses. Each row can be sorted by surname or by account, and exported. [pause 0.3] The links tell a care home from a farmed address. The money is what separates them.
-- Chip: Rows
-- Action: dock ▸ Rows ▸ sort by account ▸ hold.
-- Impact: mark the account column; group the rows by colour.
-
-### S08 · What would change our mind  ~20 s
-- Voice: Be careful with what this shows. [pause 0.3] If the three accounts belong to one registered representative, paid on behalf of many lawful claimants, the picture changes. So it would if the fourteen turn out to be lodgers whose landlord is paid. Those are the two checks to make first.
-- Chip: none
-- Action: the Rows tab stays open; the story card shows *what would change our mind*.
+### S04 · The question · ~26 s
+- Voice: Open the saved view Address farm. [pause 0.4] It draws addresses with the people who live at them, and the question is which of these is a home and which is a front door for many claims. Labels are off at this size, so a few hubs stand out, each with a crowd around it.
+- Chip: Saved views
+- Action: open the saved view *Address farm* ▸ hold on the drawn graph (the caption says node labels are off above 80 nodes).
 - Impact: none.
 
-### S09 · What the team does next  ~40 s
-- Voice: This is a lead, so here is the work. [pause 0.4] First, verify the address in person. Second, hold the three accounts for review. Third, bring the fourteen claims together as a Case. [pause 0.3] Select the claimants, and press Attach to Case. A new Case from the selected nodes is open to you here, because these ids are readable. Read it, and cancel.
+### S05 · The big three are homes · ~40 s
+- Voice: Press Busiest nodes. [pause 0.4] Three addresses lead, with thirty-one links, twenty-seven and twenty-four. Look at the money. In these three, each resident is paid into their own account. These are care homes, and they are genuine. [pause 0.6] The fourth address has fewer people, fourteen, and something else they share.
+- Chip: Busiest nodes
+- Action: toolbox ▸ Quick questions ▸ Busiest nodes ▸ hold on the ranked list (AD-00412 31, AD-05077 27, AD-02718 24, then AD-03141 14).
+- Impact: grey *ruled out* mark over the three care homes (the decoy marker).
+
+### S06 · The fourth address · ~44 s
+- Beat: reveal
+- Story: off
+- Voice: Start from the fourth address, AD-03141. [pause 0.5] The graph redraws around it, and the banner says what it drew: one entity and fourteen linked nodes. Fourteen claimants, all living at one address. [pause 0.7] The records say five surnames, every one of them a household of one, and only three bank accounts between them. Fourteen single-person homes at one address.
+- Chip: Start from these
+- Action: Busiest nodes ▸ the AD-03141 row ▸ Start from these ▸ hold on the banner and the drawn graph.
+- Impact: before/after hold: the address and its fourteen claimants appear; mark AD-03141 in yellow.
+
+### S07 · The evidence you can quote · ~38 s
+- Voice: Open the Rows tab under the graph. Every line is a row: a claimant, the link kind and the address, so fourteen claims at one address. [pause 0.4] The benefit records behind them carry the surnames and the three accounts, and they are the reason this address is the lead. Each row can be sorted, filtered and exported. [pause 0.3] The links tell a care home from a farmed address, and the money separates them.
+- Chip: Rows
+- Action: dock ▸ Rows ▸ hold on the fourteen `lives_at` rows.
+- Impact: mark the rows.
+
+### S08 · What would change our mind · ~22 s
+- Voice: Be careful with what this shows. [pause 0.3] If the three accounts belong to one registered representative, paid on behalf of many lawful claimants, the picture changes. So it does if the fourteen turn out to be lodgers whose landlord is paid. Those are the two checks to make first.
+- Action: the Rows tab stays open.
+- Impact: none.
+
+### S09 · What the team does next · ~40 s
+- Voice: This is a lead, so here is the work. [pause 0.4] First, verify the address in person. Second, hold the three accounts for review. Third, bring the fourteen claims together as a Case. [pause 0.3] On the canvas toolbar, Attach to Case seals what is on screen with a fingerprint. A new Case from the selected nodes is open to you here, because these ids are readable. We read it, and cancel.
 - Chip: Attach to Case
-- Action: select the fourteen claimants (Select neighbours of AD-03141) ▸ canvas toolbar ▸ Attach to Case ▸ read *A new Case, from the selected nodes* ▸ Cancel (nothing is created). [check in UI: the new-Case option is enabled for readable ids]
+- Action: canvas toolbar ▸ Attach to Case ▸ hold on *An existing Case* and *A new Case, from the selected nodes* ▸ Cancel (nothing is created).
 - Impact: mark the *A new Case, from the selected nodes* option.
 
-### S10 · The case file  ~20 s
-- Voice: The lead: fourteen single-person claims, five surnames, three accounts. [pause 0.4] The evidence: the rows under the graph. The next step: verify, hold, and open a Case. [pause 0.6] To try it yourself, open Address farm and compare a care home with the fourth address.
-- Chip: none
-- Action: the case-file card; outro card.
+### S10 · The case file · ~22 s
+- Beat: close
+- Casefile: Lead: fourteen single-person claims at one address, five surnames, three accounts | Evidence: the fourteen rows at AD-03141, and the records behind them | Next: verify the address in person; hold the three accounts; open a Case | Try it: compare a care home with the fourth address
+- Voice: The lead: fourteen single-person claims, five surnames, three accounts. [pause 0.4] The evidence: the rows under the graph and the records behind them. The next step: verify, hold, and open a Case. [pause 0.6] Try it yourself: open Address farm, and compare a care home with the fourth address.
+- Action: case-file card (8 s: Lead · Evidence · Next step · Try it), then the outro.
 - Impact: none.
 
 ## Healthcare_ReferralKickbacks
@@ -366,13 +372,14 @@ shared module (§4.4).
 
 ## Enterprise_FictitiousVendor
 
-> **Fictitious vendor: fourteen clean invoices** · Standard · Enterprise (la-enterprise) · a vendor that shares an employee's account · 4:45 · plan §6 row 19
+> **Fictitious vendor: fourteen clean invoices** · Standard · Enterprise (la-enterprise) · a vendor that shares an employee's account · 4:00 · plan §6 row 19
 
 - **Cast (roles, because the graph is masked):** the vendor behind the fourteen invoices, the employee who shares its bank account and address, and that employee's manager. Revealed by Demo Admin in S06: V-117, BA-9031, E-31, E-15. **Decoy:** the biggest vendor, a utilities company (V-001), with the most payments of all. The analyst reads aliases: *291 entities masked*.
 - **Stakes:** an internal auditor. Fourteen invoices, all approved and paid, nothing late or duplicated. An audit that checks each invoice against its approval finds nothing.
 - **Vocabulary:** *vendor master*, the list of suppliers with their bank accounts and addresses. *Approver*, the person who signs an invoice off. Said once in S02.
 - **Ground truth:** `tools/gen-la-audit-data.py` (no JSON file: the story is in the header comment, line 13, and constants): `FICTITIOUS` V-117, `E31` E-31, `E31_MANAGER` E-15, `vendor_account[FICTITIOUS] = emp_account[E31] = "BA-9031"` (line 86), fourteen invoices approved by E-15 (line 196), `UTILITIES` V-001 "Meridian Utilities Ltd" (lines 47, 101). Invoice amounts are not stated. **Plan table corrected:** the table said "the vendor with the largest invoices"; the decoy is the vendor with the *most payments*, a utilities company. **Fixes the v1 defect:** v1 read ids over this masked graph; v2 uses roles until the administrator reveals.
-- **Lead:** a vendor that shares a bank account and an address with an employee, with fourteen invoices all approved by that employee's manager. **What would change our mind:** the shared account turning out to be a payment bureau used by many vendors, or the address being a shared office. **Next actions:** stop payments to the vendor pending verification; review every invoice the manager approved for it; search the vendor master for other vendors sharing an employee's account.
+- **Screen truth** (checked live on a fresh Standard unzip, Demo Analyst, 2026-11-22): the saved view *Ap vendor identity* draws 291 nodes and 1,787 links and says *291 entities masked* with the greyed *Reveal…*; Busiest nodes answers masked aliases (100, 100, 45, 30 and 30 links), so every name is an alias. The reveal beat needs Demo Admin and writes an audit record, so this film records the analyst side only and the reveal is **narrated** (the real reveal is training episode F7). The fourteen invoices, the shared account and the approver E-15 are ground truth the masked view does not show.
+- **Before:** a vendor that shares a bank account and an address with an employee, with fourteen invoices all approved by that employee's manager. **What would change our mind:** the shared account turning out to be a payment bureau used by many vendors, or the address being a shared office. **Next actions:** stop payments to the vendor pending verification; review every invoice the manager approved for it; search the vendor master for other vendors sharing an employee's account.
 - **Voice style:** cold open 1.04. Before S06, say roles only; after the reveal, read ids with the lexicon (V-117 "v one one seven", BA-9031 "b a nine zero three one"). The reveal scene holds 0.7 s before "The same account."
 - **Try it:** open *Ap vendor identity* as the analyst and press Busiest nodes. What does the canvas say about the names, and who can reveal them? *Answer: it says the entities are masked, with a Reveal button; revealing needs See unmasked ids, which the administrator holds.*
 - **Check:** why is the largest vendor not the lead? *Answer: a utilities company with many regular payments is normal; the lead is a small vendor whose account and address match an employee's.*
@@ -408,13 +415,13 @@ shared module (§4.4).
 - Impact: mark the top vendor grey with *ruled out*.
 
 ### S06 · The vendor that touches staff  ~50 s
-- Voice: Look for the small cluster, a vendor joined to an employee. [pause 0.4] You can see its shape without the names. One vendor, one bank account, and one employee joined to that account twice: the same account, and the same address. [pause 0.7] To name them, you need the administrator. Signed in as Demo Admin, press Reveal, and give a reason. The ids are shown to this person, on this screen only, and the reveal is recorded.
+- Voice: Look for the small cluster, a vendor joined to an employee. [pause 0.4] You can see its shape without the names: one vendor, one bank account, and one employee joined to that account. [pause 0.7] The same account. To name them, an administrator presses Reveal and gives a reason, and the reveal is recorded. That step is training episode F7, so here we stay with the aliases.
 - Chip: Reveal… · Reason
-- Action: select the small cluster (vendor, account, employee) ▸ [as Demo Admin, off camera sign-in] Reveal… ▸ Reason `confirm the vendor before payments are stopped` ▸ Reveal ▸ hold on V-117, BA-9031, E-31. [check in UI: the reveal dialog and the toast; the ids shown]
-- Impact: before/after hold: aliases turn into V-117, BA-9031 and E-31; mark the shared account.
+- Action: hold on the graph with the masked line; marks on the cluster; the Reveal… button is greyed for this analyst and is not pressed.
+- Impact: mark the masked line and the greyed *Reveal…*.
 
 ### S07 · The evidence you can quote  ~40 s
-- Voice: Open the Rows tab. Each line is a row: a payment, a link, a shared detail. [pause 0.4] Fourteen invoices paid to the vendor. Every one approved by the same manager, E-15. And two shared details: the account and the address. [pause 0.3] Each row can be exported. The reveal itself is in the audit trail, with the reason you gave.
+- Voice: Open the Rows tab. Each line is a row: a link and its two ends, shown as aliases. [pause 0.4] The records behind them hold the fourteen invoices, each approved by the same manager, and the two shared details, the account and the address. Each row can be exported, and a reveal would sit in the audit trail with its reason.
 - Chip: Rows
 - Action: dock ▸ Rows ▸ sort by approver ▸ hold on the fourteen.
 - Impact: mark the approver column; the two shared-detail rows.
@@ -439,73 +446,79 @@ shared module (§4.4).
 
 ## Enterprise_AccessCreep
 
-> **Access creep: who could, and who let them** · Standard · Enterprise (la-enterprise) · four grants and one bank-detail change · 4:30 · plan §6 row 20
+> **Access creep: who could, and who let them** · Standard · Enterprise (la-enterprise) · four grants and one bank-detail change · 4:00 · plan §6 row 20
 
 - **Cast:** the Operations Manager EMP-0007, their four reports (EMP-0482, EMP-0636, EMP-1059, EMP-1415) and the vendor VEN-0264 whose bank details one of them changed. **Decoy:** the Payroll Officer EMP-0062, whose payroll access came with a role change on 2026-03-02, a manager (EMP-1802) and a ticket (REQ-163776). Ids readable.
 - **Stakes:** an access-review analyst. A vendor's bank details were changed once, quietly. That is one edit among thousands of users. The question is who could make it, and who allowed that.
 - **Vocabulary:** *grant*, one person giving another access to a system. *Ticket*, the approval a grant should carry. Said once in S02.
-- **Ground truth:** `tools/gen-la-insider-data.ground-truth.json` · `access_creep` (`manager` EMP-0007 "Operations Manager", `reports` four, `systems` PAYROLL and TREASURY, `grants` eight, 2026-01-12 to 2026-02-10, `vendor_editor` EMP-0482, `vendor` VEN-0264, `vendor_changed_at` 2026-05-14 10:42:17, `lookalike_employee` EMP-0062, `lookalike_role_since` 2026-03-02, `lookalike_manager` EMP-1802, `lookalike_ticket` REQ-163776). v1 states that none of the four had a ticket; confirm in the Rows tab before recording. **Plan table corrected:** the table said "the employee with the most access"; the decoy is a payroll officer whose access came with a role change and a ticket.
-- **Lead:** one manager gave four of their own reports payroll and treasury access, none of whom works in finance and none with a ticket, and one of the four then changed a vendor's bank details. **What would change our mind:** tickets for the four grants that the log does not hold, or a documented cover arrangement for finance. **Next actions:** start an access review with the one manager; stop and check the payment to the vendor; keep the four reports and the vendor together as an Entity List.
+- **Ground truth:** `tools/gen-la-insider-data.ground-truth.json` · `access_creep` (`manager` EMP-0007 "Operations Manager", `reports` four, `systems` PAYROLL and TREASURY, `grants` eight, 2026-01-12 to 2026-02-10, `vendor_editor` EMP-0482, `vendor` VEN-0264, `vendor_changed_at` 2026-05-14 10:42:17, `lookalike_employee` EMP-0062, `lookalike_role_since` 2026-03-02, `lookalike_manager` EMP-1802, `lookalike_ticket` REQ-163776).
+- **Screen truth** (checked live on a fresh Standard unzip, Demo Analyst, 2026-11-22): the saved view *Access creep* draws 26 nodes and 18 links after a 10–25 s wait for the nodes; Busiest nodes answers EMP-0007 (4 links), EMP-2057 (3), EMP-0482 (2), EMP-0556 (2) and EMP-0991 (2). *Start from these* on EMP-0007 draws the four reports; the Rows table has four rows, each `granted_by` EMP-0007 (EMP-0482, EMP-0636, EMP-1059, EMP-1415). The eight grants, the systems payroll and treasury, the empty ticket column and the vendor change are **not on this graph or in its rows**: they are ground truth, so the voice states them as what the access records say, and the "no ticket" claim is v1 and ground-truth text that this screen does not show. The decoy EMP-0062 is not among the busiest names, so it is spoken, not marked. Nothing is masked.
+- **Before:** fresh unzip of `la-standard.zip` with the fake Demo Auth sign-in, Enterprise Space, Demo Analyst; the saved view is used, not the seeded Investigations; nothing is saved or created.
+- **Lead:** one manager gave four of their own reports payroll and treasury access, none of whom works in finance, and one of the four then changed a vendor's bank details. **What would change our mind:** tickets for the four grants that the log does not hold, or a documented cover arrangement for finance. **Next actions:** start an access review with the one manager; stop and check the payment to the vendor; keep the four reports and the vendor together as an Entity List.
 - **Voice style:** cold open 1.04; the reveal scene (S06) holds 0.7 s before "None of the four works in finance." Lexicon: EMP-0007 "employee zero zero zero seven"; VEN-0264 "vendor zero two six four"; speak the systems as "payroll" and "treasury".
 - **Try it:** open *Access creep* and press Busiest nodes. How many links does the top name have, and why is that few? *Answer: four; it is a small graph, so four links to one manager is what stands out, not volume.*
 - **Check:** why is the payroll officer not the lead? *Answer: a role change with a ticket looks the same in the access log, but it has a manager and an approval; the four grants have neither.*
 
-### S01 · One quiet edit  ~25 s
-- Voice: You are an access-review analyst. [pause 0.4] A vendor's bank details were changed once, quietly. In a system with thousands of users, that is one edit. [pause 0.6] You do not need to know who made it. You need to know who could, and who let them. An audit of the change finds a valid login.
-- Chip: none
-- Action: cold open on the Space's home page; intro card (*Access creep*, *Enterprise*, *Standard*).
+### S01 · One quiet edit · ~24 s
+- Beat: cold
+- Voice: You are an access-review analyst. [pause 0.4] A vendor's bank details were changed once, quietly, and in a system with thousands of users that is one edit among many. [pause 0.6] You do not need to know who made it. You need to know who could, and who let them.
+- Action: cold open on the Space's home page.
 - Impact: none.
 
-### S02 · Why the change looks valid  ~30 s
-- Voice: A grant is one person giving another access to a system. A ticket is the approval a grant should carry. [pause 0.4] The log shows the bank-detail change was made by someone with access. That is true. [pause 0.5] The access log shows each grant on its own line. It does not show that one manager gave the same two systems to four people, one after another.
-- Chip: none
-- Action: home page; the story card names *the manager*, *the four reports* and *the vendor*.
+### S02 · Why the change looks valid · ~30 s
+- Beat: steady
+- Intro: Access creep | Enterprise Space
+- Story: the manager = the person who gave the access | the four reports = the people who received it | the vendor = the supplier whose bank details changed
+- Voice: A grant is one person giving another access to a system, and a ticket is the approval a grant should carry. [pause 0.4] The log shows the bank-detail change was made by someone with access, and that is true. [pause 0.5] It shows each grant on its own line, but not that one manager gave the same two systems to four people in turn.
+- Action: story card "Who is who" over the home page.
+- Impact: the story card names the three roles.
+
+### S03 · The data in one breath · ~28 s
+- Voice: Every access grant lands as a record: the employee, the system, who granted it and when. [pause 0.3] A Job links employees to the systems they use, and each grant to the person who made it. Employees and systems are the entities, and the time of the grant orders them.
+- Chip: Data · Mappings
+- Action: rail ▸ Data ▸ `insider_screen_links_dataset` ▸ hold on its Columns card.
+- Impact: mark the src and dst columns once.
+
+### S04 · The question · ~24 s
+- Voice: Open the saved view Access creep. [pause 0.4] It draws who granted access to whom, and the nodes take a moment to appear. It is a small graph, and most of it is what you would expect: managers granting access to their own teams.
+- Chip: Saved views
+- Action: open the saved view *Access creep* ▸ wait for the nodes (10–25 s) ▸ hold.
 - Impact: none.
 
-### S03 · The data in one breath  ~30 s
-- Voice: Every access grant lands as a record: the employee, the system, who granted it, when, and the ticket behind it. [pause 0.3] A Job links employees to the systems they use, and each grant to the person who made it. Employees and systems are the entities, and the time of the grant orders them.
-- Chip: Mappings · Data
-- Action: rail ▸ Data ▸ the insider links Dataset ▸ zoom on the Mappings area. [check in UI: the Mappings area of `insider_screen_links_dataset`]
-- Impact: mark the From and To columns.
-
-### S04 · The question  ~25 s
-- Voice: Open the saved view Access creep. [pause 0.4] It draws grants: who gave what access to whom. Wait for it to draw; it takes a moment. [pause 0.4] A small graph, and most of it is what you would expect: managers granting access to their own teams.
-- Chip: File · Open… · Saved views
-- Action: File ▸ Open… ▸ Saved views ▸ *Access creep* ▸ wait for the nodes (10–25 s). [check in UI: the nodes appear after a skeleton; no fixed wait]
-- Impact: before/after hold: the skeleton, then the graph; mark the hub at the left.
-
-### S05 · A payroll officer is the decoy  ~40 s
-- Voice: Press Busiest nodes. [pause 0.4] One name on top, with four links. Another approver follows with three. Four is not many. It depends who the four are. [pause 0.5] First, set the obvious one aside. A payroll officer has payroll access. But the role changed in March, with a manager and a ticket. Legitimate. Set it aside.
+### S05 · A payroll officer is the decoy · ~36 s
+- Voice: Press Busiest nodes. [pause 0.4] One name on top, with four links, and another approver with three. Four is not many, and it depends who the four are. [pause 0.5] First, set the obvious one aside: a payroll officer with payroll access. Their role changed in March, with a manager and a ticket, which is legitimate.
 - Chip: Busiest nodes
-- Action: toolbox ▸ Quick questions ▸ Busiest nodes ▸ hold; click EMP-0062. [check in UI: EMP-0062 with manager EMP-1802]
-- Impact: mark EMP-0062 grey with *ruled out*.
+- Action: toolbox ▸ Quick questions ▸ Busiest nodes ▸ hold on the answers (EMP-0007 4 links, EMP-2057 3).
+- Impact: none (the decoy EMP-0062 is spoken, not drawn).
 
-### S06 · The manager and the four  ~45 s
-- Voice: Select the top name, EMP-0007, and focus on them. [pause 0.5] An operations manager. Four of their own team were given payroll and treasury, between January and February. [pause 0.7] None of the four works in finance. None had a ticket. And one of them, EMP-0482, is the person who changed the bank details of the vendor.
-- Chip: Node details · Focus
-- Action: click `EMP-0007` twice ▸ Focus ▸ follow the four reports and `VEN-0264`. [check in UI: EMP-0482 links to VEN-0264]
-- Impact: mark EMP-0007, the four reports and VEN-0264 in yellow.
+### S06 · The manager and the four · ~42 s
+- Beat: reveal
+- Story: off
+- Voice: Start from the top name, EMP-0007. [pause 0.5] The graph redraws around an operations manager and four people who report to them. The access records say these four were given payroll and treasury between January and February. [pause 0.7] None of the four works in finance. And one of them, EMP-0482, is the person who changed the vendor's bank details.
+- Chip: Start from these
+- Action: Busiest nodes ▸ the EMP-0007 row ▸ Start from these ▸ hold on the banner and the graph.
+- Impact: before/after hold: the manager and the four reports appear; mark EMP-0007.
 
-### S07 · The evidence you can quote  ~40 s
-- Voice: Open the Rows tab. Each line is a row: who granted what, to whom, and when. [pause 0.4] Eight grants, two systems, four people, over four weeks. The ticket column is empty. [pause 0.3] And the vendor change, a line of its own, a few months later. Every row can be sorted by date, read in order, and exported.
+### S07 · The evidence you can quote · ~34 s
+- Voice: Open the Rows tab under the graph. Each line is a row: an employee, a link kind and the person who granted it. [pause 0.4] Four rows, four reports, one manager, all granted by the same person. The grant records behind them carry the systems, the dates and the empty ticket column. Every row can be sorted, read in order and exported.
 - Chip: Rows
-- Action: dock ▸ Rows ▸ sort by time ▸ hold on the eight grants and the vendor change.
-- Impact: mark the ticket column; the vendor row.
+- Action: dock ▸ Rows ▸ hold on the four `granted_by` rows.
+- Impact: mark the four rows.
 
-### S08 · What would change our mind  ~20 s
+### S08 · What would change our mind · ~22 s
 - Voice: Be fair to the manager. [pause 0.3] If tickets exist that the log does not hold, or the manager was covering for finance by arrangement, the picture softens. Both are quick to check, and both belong in the first conversation.
-- Chip: none
-- Action: the Rows tab stays open; the story card shows *what would change our mind*.
+- Action: the Rows tab stays open.
 - Impact: none.
 
-### S09 · What the team does next  ~40 s
-- Voice: This is a lead, so here is the work. [pause 0.4] First, start an access review with the one manager. Second, stop and check the payment to the vendor. Third, keep the four reports and the vendor together, so any further change to either is marked. [pause 0.3] That is an Entity List. On the Entity Lists page, press New list.
+### S09 · What the team does next · ~36 s
+- Voice: This is a lead, so here is the work. [pause 0.4] First, start an access review with the one manager. Second, stop and check the payment to the vendor. Third, keep the four reports and the vendor together, so any further change to either is marked. [pause 0.3] That is an Entity List, and New list opens the form.
 - Chip: Entity Lists · New list…
-- Action: rail ▸ Entity Lists ▸ New list… ▸ the form ▸ Cancel (nothing is created). [check in UI: the form fields]
-- Impact: mark the form's Title and Purpose.
+- Action: rail ▸ Entity Lists ▸ New list… ▸ the form opens ▸ Cancel (nothing is created).
+- Impact: none.
 
-### S10 · The case file  ~20 s
-- Voice: The lead: one manager, four grants, and a changed bank account. [pause 0.4] The evidence: the grant rows and the vendor change. The next step: a review, a payment check, and an Entity List. [pause 0.6] To try it yourself, open Access creep and compare the manager with the payroll officer.
-- Chip: none
-- Action: the case-file card; outro card.
+### S10 · The case file · ~22 s
+- Beat: close
+- Casefile: Lead: one manager, four grants, and a changed bank account | Evidence: the four grant rows and the records behind them | Next: an access review; a payment check; an Entity List | Try it: compare the manager with the payroll officer
+- Voice: The lead: one manager, four grants, and a changed bank account. [pause 0.4] The evidence: the grant rows and the records behind them. The next step: a review, a payment check, and an Entity List. [pause 0.6] Try it yourself: open Access creep, and compare the manager with the payroll officer.
+- Action: case-file card (8 s: Lead · Evidence · Next step · Try it), then the outro.
 - Impact: none.
