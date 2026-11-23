@@ -1,4 +1,4 @@
-import { LookupRow } from 'app/inspecto/api';
+import { LookupMiss, LookupRow } from 'app/inspecto/api';
 
 /** One grid row of the Lookups screen: a keyed lookup Step and its last run's counts, summed over its mappings. */
 export interface LookupGridRow {
@@ -17,6 +17,8 @@ export interface LookupGridRow {
     nullKeys: number | null;
     /** The receipt cut some counts to fit, so the sums may be short. */
     truncated: boolean;
+    /** The last run's unmatched-key sample, fingerprints and shapes only. */
+    unmatched: LookupMiss[];
 }
 
 /** Sums `lookup.<on>.hit|miss` across the Step's mappings; `reference.*` read as they are. */
@@ -46,5 +48,6 @@ export function toGridRow(row: LookupRow): LookupGridRow {
         referenceRows: run?.counts['reference.rows'] ?? null,
         nullKeys: run?.counts['reference.null_keys'] ?? null,
         truncated: run?.truncated ?? false,
+        unmatched: row.unmatched ?? [],
     };
 }

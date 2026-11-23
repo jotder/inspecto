@@ -796,6 +796,33 @@ class RowShaperTest {
         assertTrue(RowShaper.takeLookupStats(conn, "no_such_node").isEmpty());
     }
 
+    /** The unmatched values, per mapping and counted, for the runner to fingerprint (LOOKUP-1 §4.6); taken once. */
+    @Test
+    void aKeyedJoinLeavesItsUnmatchedValuesForTheWalkToTake() throws Exception {
+        seedDialDigits();
+        sql("INSERT INTO cdr VALUES (4, '999', NULL, NULL)");
+        keyedJoin(keyedCfg());
+        String id = "k" + keyedJoins;
+        assertEquals(List.of(new RowShaper.LookupMiss("served_msisdn", "999", 2),
+                        new RowShaper.LookupMiss("third_party_msisdn", "33612345678", 1)),
+                RowShaper.takeLookupMisses(conn, id), "matched values, NULLs and other mappings' values are not in it");
+        assertTrue(RowShaper.takeLookupMisses(conn, id) == null, "taken once, then gone");
+        assertTrue(RowShaper.takeLookupMisses(conn, "no_such_node") == null);
+    }
+
+    /** At most LOOKUP_MISS_SAMPLE distinct values per mapping, the most frequent first. */
+    @Test
+    void theUnmatchedSampleKeepsTheMostFrequentValues() throws Exception {
+        seedDialDigits();
+        sql("DELETE FROM cdr");
+        sql("INSERT INTO cdr SELECT i, '9' || (i % 25), NULL, NULL FROM range(1, 101) t(i)");
+        sql("INSERT INTO cdr SELECT 1000 + i, '90', NULL, NULL FROM range(1, 11) t(i)");
+        keyedJoin(keyedCfg());
+        var misses = RowShaper.takeLookupMisses(conn, "k" + keyedJoins);
+        assertEquals(RowShaper.LOOKUP_MISS_SAMPLE, misses.size());
+        assertEquals(new RowShaper.LookupMiss("served_msisdn", "90", 14), misses.get(0), "4 from the range + 10 added");
+    }
+
     /** The Reference's own quality rides beside the hit counts: size, rows with no key, and nested prefixes. */
     @Test
     void aKeyedJoinReportsTheReferencesNullKeysAndNestedPrefixes() throws Exception {

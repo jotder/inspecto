@@ -315,13 +315,15 @@ public final class PipelineJobRunner implements Job {
         String pipelineIdOpt = cfg.opt("pipeline", null);
         final String pipelineId;
         PipelineGraph g;
+        com.gamma.etl.PipelineConfig flatCfg = null;   // the Space salt for the unmatched-key sample's fingerprints
         if (flatPath != null) {
             if (pipelineIdOpt != null || cfg.opt("flow", null) != null)
                 throw new IllegalArgumentException("pipeline job '" + cfg.name()
                         + "' carries both pipeline_config: and pipeline:/flow: — pick one graph source");   // vocab-allow: names the two config KEYS, `pipeline:` and the legacy `flow:`
             flatPath = PathJail.requireJobPathUnderAny(jailRoots,
                     SpaceConfigRoot.jobPathBase("pipeline_config"), flatPath, "job.pipeline_config").toString();
-            g = com.gamma.pipeline.PipelineLift.stageTwo(com.gamma.etl.PipelineConfig.load(flatPath));
+            flatCfg = com.gamma.etl.PipelineConfig.load(flatPath);
+            g = com.gamma.pipeline.PipelineLift.stageTwo(flatCfg);
             pipelineId = g.name();
         } else {
             pipelineId = pipelineIdOpt != null ? pipelineIdOpt : cfg.require("flow");
@@ -500,6 +502,7 @@ public final class PipelineJobRunner implements Job {
             // X5 (plan §3.5): success or failure, the receipts leave once — a failed run's trail is the one that
             // matters most, and it is the one a flush after the walk would lose.
             if (receipts != null) flushReceipts(receipts);
+            if (receipts != null) flushLookupMisses(receipts, flatCfg);
             if (seedsPinned != null) seedsPinned.close();   // a dry run or a failure ends the run early
             if (dryRunBranchLog != null) DuckDbUtil.deleteTempDb(dryRunBranchLog);
             DuckDbUtil.deleteTempDb(db);
@@ -896,6 +899,23 @@ public final class PipelineJobRunner implements Job {
             com.gamma.consignment.ConsignmentOutputStores.recordSteps(receipts.receipts());
         } catch (RuntimeException e) {
             log.warn("[PIPELINEJOB] could not record the Step Receipts: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * LOOKUP-1 §4.6 — each keyed join's unmatched-key sample, fingerprinted under the Space salt of {@code cfg} and
+     * stored as its last run's; never a raw value. Not for a dry run, nor a canvas-store graph (no Pipeline config to
+     * salt from, so nothing could be fingerprinted). Never throws into the run's own outcome.
+     */
+    static void flushLookupMisses(StepReceiptRecorder receipts, com.gamma.etl.PipelineConfig cfg) {
+        if (cfg == null || receipts.simulated() || receipts.lookupMisses().isEmpty()) return;
+        com.gamma.consignment.DbConsignmentOutputStore store = com.gamma.consignment.ConsignmentOutputStores.shared();
+        if (store == null) return;
+        try {
+            receipts.lookupMisses().forEach((step, misses) -> store.recordLookupMisses(receipts.pipeline(), step,
+                    receipts.consignmentId(), com.gamma.pipeline.exec.LookupMissSample.of(cfg, misses)));
+        } catch (RuntimeException e) {
+            log.warn("[PIPELINEJOB] could not record the unmatched-key sample: {}", e.getMessage());
         }
     }
 

@@ -95,6 +95,29 @@ describe('LookupsComponent', () => {
         expect(text).toContain('Showing the first 1 of 600 lookups');
     });
 
+    it("shows a row's values not found, masked, when it is selected", async () => {
+        const row = {
+            ...ROW,
+            unmatched: [
+                {
+                    mapping: 'SERVED_MSISDN',
+                    fingerprint: 'fp:0123456789abcdef',
+                    length: 12,
+                    shape: '4479••••••••',
+                    n: 5,
+                },
+            ],
+        };
+        const { fixture } = await create({ lookups: [row], total: 1, known: { lastRun: true } });
+        expect(fixture.nativeElement.querySelector('#lookup-unmatched-title')).toBeNull();
+        fixture.componentInstance.select(fixture.componentInstance.rows()[0]);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(fixture.nativeElement.querySelector('#lookup-unmatched-title').textContent).toContain('cdr ▸ join');
+        expect(fixture.componentInstance.selected()!.unmatched[0].shape).toBe('4479••••••••');
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
     it('degrades to an empty list and a toast when the load fails', async () => {
         const { fixture, toastr } = await create(new Error('boom'));
         expect(fixture.componentInstance.rows()).toEqual([]);

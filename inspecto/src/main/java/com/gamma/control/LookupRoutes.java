@@ -94,6 +94,22 @@ final class LookupRoutes implements RouteModule {
                 log.warn("lookups: last run of {}/{} unreadable: {}", receiptPipeline, n.id(), unreadable.getMessage());
             }
             r.put("lastRun", last);
+            // The last run's unmatched-key sample (LOOKUP-1 §4.6): fingerprint, length, masked shape, count — never a value.
+            List<Map<String, Object>> unmatched = new ArrayList<>();
+            try {
+                for (var e : store.lookupMisses(receiptPipeline, n.id())) {
+                    Map<String, Object> m = new LinkedHashMap<>();
+                    m.put("mapping", e.mapping());
+                    m.put("fingerprint", e.fingerprint());
+                    m.put("length", e.length());
+                    m.put("shape", e.shape());
+                    m.put("n", e.n());
+                    unmatched.add(m);
+                }
+            } catch (IllegalStateException unreadable) {
+                log.warn("lookups: unmatched sample of {}/{} unreadable: {}", receiptPipeline, n.id(), unreadable.getMessage());
+            }
+            r.put("unmatched", unmatched);
         }
         return r;
     }

@@ -486,6 +486,11 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
   Step Receipt of that Step (dry runs excluded). Read-only; served by `GET /lookups`. A plain join is not listed. ⚠ A
   receipt keeps at most 8 counts, so a join with more than 3 mappings loses its `reference.*` counts, and past 4 some
   hit / miss counts: the screen then shows the missing counts, and all the Found / Not found sums, blank.
+  - **Values not found (since 2026-11-24)** — click a row to see its last run's most frequent unmatched values, up to
+    20 per looked-up column, each **masked** (`4479••••••••`: the first `min(4, length / 3)` characters), with its
+    length, how many rows carried it, and its fingerprint — the Space-salted one rejected rows carry, so the same value
+    has the same fingerprint in both. The value itself is never stored. Kept for the last run only; a dry run does not
+    replace it; a canvas-store Pipeline keeps none.
 - **`normalize:` (since 2026-11-23, `LOOKUP-1` P1e)** — for `exact` and `longest_prefix`, an ordered list of `trim`,
   `lower`, `upper`, `strip_leading_zeros`, `strip_plus`, applied to the Reference key and to every looked-up value
   alike. Two Reference rows that collapse to one key are refused by the `duplicates` rule; `range` refuses it. The

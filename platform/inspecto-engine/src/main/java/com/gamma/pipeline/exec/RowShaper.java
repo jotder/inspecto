@@ -1691,6 +1691,17 @@ public final class RowShaper {
                     + ", count(*) FILTER (WHERE " + hit + "), count(*) FILTER (WHERE NOT " + hit + " AND " + on
                     + " IS NOT NULL) FROM " + q(data));
         }
+        // The most frequent values that found no row, per mapping, for the run's unmatched-key sample (LOOKUP-1 §4.6).
+        // Raw values stay in this session's tables: the runner fingerprints them before anything is stored.
+        String misses = table(node.id(), "lookup_misses");
+        exec(conn, "DROP TABLE IF EXISTS " + q(misses));
+        exec(conn, "CREATE TABLE " + q(misses) + " (mapping VARCHAR, val VARCHAR, n BIGINT)");
+        for (int n = 0; n < mappings.size(); n++) {
+            String hit = q("__lk_hit" + n), on = q(mappings.get(n).on());
+            exec(conn, "INSERT INTO " + q(misses) + " SELECT " + sqlStr(mappings.get(n).on()) + ", v, c FROM (SELECT CAST("
+                    + on + " AS VARCHAR) AS v, count(*) AS c FROM " + q(data) + " WHERE NOT " + hit + " AND " + on
+                    + " IS NOT NULL GROUP BY 1 ORDER BY c DESC, v LIMIT " + LOOKUP_MISS_SAMPLE + ")");
+        }
         for (int n = 0; n < mappings.size(); n++)
             exec(conn, "ALTER TABLE " + q(data) + " DROP COLUMN " + q("__lk_hit" + n));
         Double max = joinMaxMissRate(node.cfg("max_miss_rate"));
@@ -1730,6 +1741,30 @@ public final class RowShaper {
                 + " l AS (SELECT DISTINCT length(__lk_key) AS n FROM k)"
                 + " SELECT 'reference.nested_prefixes', count(*) FROM k a WHERE EXISTS (SELECT 1 FROM l"
                 + " JOIN k b ON b.__lk_key = left(a.__lk_key, l.n) WHERE l.n < length(a.__lk_key))");
+    }
+
+    /** How many distinct unmatched values per mapping the unmatched-key sample keeps, most frequent first. */
+    public static final int LOOKUP_MISS_SAMPLE = 20;
+
+    /** One distinct value of mapping {@code mapping} (its input column) that found no Reference row, {@code n} times. */
+    public record LookupMiss(String mapping, String value, long n) {}
+
+    /**
+     * The unmatched values a keyed {@code transform.join} node left (at most {@link #LOOKUP_MISS_SAMPLE} per mapping,
+     * most frequent first), read once and dropped; {@code null} for any other node. ⚠ Raw values: the caller must
+     * fingerprint them before storing or serving anything.
+     */
+    public static List<LookupMiss> takeLookupMisses(Connection conn, String nodeId) {
+        String misses = table(nodeId, "lookup_misses");
+        List<LookupMiss> out = new ArrayList<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT mapping, val, n FROM " + q(misses) + " ORDER BY mapping, n DESC, val")) {
+            while (rs.next()) out.add(new LookupMiss(rs.getString(1), rs.getString(2), rs.getLong(3)));
+            exec(conn, "DROP TABLE " + q(misses));
+        } catch (SQLException none) {
+            return null;   // not a keyed join
+        }
+        return out;
     }
 
     /**

@@ -4,7 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, RunsService } from 'app/inspecto/api';
+import { apiErrorMessage, LookupMiss, RunsService } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
@@ -44,6 +44,20 @@ export class LookupsComponent implements OnInit {
     readonly lastRunKnown = signal(true);
     /** More lookups exist than the server listed. */
     readonly cut = signal<number | null>(null);
+    /** The row whose unmatched-key sample is shown below the list. */
+    readonly selected = signal<LookupGridRow | null>(null);
+
+    readonly missColumns: ColDef<LookupMiss>[] = [
+        { field: 'mapping', headerName: 'Looked up by', flex: 1, minWidth: 140 },
+        { field: 'shape', headerName: 'Value (masked)', flex: 1, minWidth: 160 },
+        { field: 'length', headerName: 'Length', minWidth: 90 },
+        { field: 'n', headerName: 'Rows', minWidth: 90, valueFormatter: (p) => count(p.value) },
+        { field: 'fingerprint', headerName: 'Fingerprint', flex: 1, minWidth: 180 },
+    ];
+
+    select(row: LookupGridRow | null): void {
+        this.selected.set(row);
+    }
 
     readonly columnDefs: ColDef<LookupGridRow>[] = [
         { field: 'pipeline', headerName: 'Pipeline', flex: 1, minWidth: 140 },
@@ -87,6 +101,11 @@ export class LookupsComponent implements OnInit {
         this.api.lookups().subscribe({
             next: (page) => {
                 this.rows.set(page.lookups.map(toGridRow));
+                // keep the open sample on a refresh, read from the new rows
+                const was = this.selected();
+                this.selected.set(
+                    was ? (this.rows().find((r) => r.pipeline === was.pipeline && r.step === was.step) ?? null) : null,
+                );
                 this.lastRunKnown.set(page.known.lastRun);
                 this.cut.set(page.total > page.lookups.length ? page.total : null);
                 this.loading.set(false);

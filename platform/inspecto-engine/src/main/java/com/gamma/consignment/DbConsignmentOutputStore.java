@@ -139,6 +139,13 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
             + "recorded_at VARCHAR, simulated BOOLEAN, "
             + "UNIQUE (consignment_id, run_id, lane, seq))";
 
+    /** LOOKUP-1 §4.6 — the unmatched-key sample of each keyed join's LAST run: fingerprint, length and masked shape of
+     *  up to 20 values per mapping, never the value. Replaced whole on every run of that (Pipeline, Step). */
+    private static final String MISSES = "lookup_misses";
+    private static final String CREATE_MISSES = "CREATE TABLE IF NOT EXISTS " + MISSES + " ("
+            + "pipeline VARCHAR, step VARCHAR, consignment_id VARCHAR, recorded_at VARCHAR, mapping VARCHAR, "
+            + "fingerprint VARCHAR, length INTEGER, shape VARCHAR, n BIGINT)";
+
     /** {@code recorded_at}'s fixed-width UTC form: its text order IS its time order, so retention compares text on
      *  every backend ({@code Instant.toString()} varies its fraction digits, so its text order is not). */
     private static final java.time.format.DateTimeFormatter RECORDED_AT =
@@ -154,6 +161,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
             src.run(conn -> {
                 try (Statement st = conn.createStatement()) {
                     st.execute(CREATE_STEPS);
+                    st.execute(CREATE_MISSES);
                     st.execute("CREATE INDEX IF NOT EXISTS consignment_steps_by_consignment ON " + STEPS
                             + " (consignment_id)");
                     st.execute(CREATE);
@@ -440,6 +448,76 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
 
 
     /** Delete the Step Receipts recorded before {@code cutoff}; returns how many went. Best-effort. */
+    /**
+     * Replace the unmatched-key sample of one keyed join with its latest run's ({@code entries} may be empty: a run
+     * where every value matched clears the old sample). Best-effort like {@link #record}: a failure is logged.
+     */
+    public void recordLookupMisses(String pipeline, String step, String consignmentId,
+                                   List<com.gamma.pipeline.exec.LookupMissSample.Entry> entries) {
+        String now = RECORDED_AT.format(java.time.Instant.now());
+        try {
+            src.run(conn -> {
+                boolean auto = conn.getAutoCommit();
+                conn.setAutoCommit(false);
+                try (PreparedStatement del = conn.prepareStatement("DELETE FROM " + MISSES + " WHERE pipeline = ? AND step = ?");
+                     PreparedStatement ins = conn.prepareStatement("INSERT INTO " + MISSES
+                             + " (pipeline, step, consignment_id, recorded_at, mapping, fingerprint, length, shape, n)"
+                             + " VALUES (?,?,?,?,?,?,?,?,?)")) {
+                    del.setString(1, pipeline);
+                    del.setString(2, step);
+                    del.executeUpdate();
+                    for (var e : entries) {
+                        ins.setString(1, pipeline);
+                        ins.setString(2, step);
+                        ins.setString(3, consignmentId);
+                        ins.setString(4, now);
+                        ins.setString(5, e.mapping());
+                        ins.setString(6, e.fingerprint());
+                        ins.setInt(7, e.length());
+                        ins.setString(8, e.shape());
+                        ins.setLong(9, e.n());
+                        ins.executeUpdate();
+                    }
+                    conn.commit();
+                } catch (SQLException e) {
+                    conn.rollback();
+                    throw e;
+                } finally {
+                    conn.setAutoCommit(auto);
+                }
+            });
+        } catch (SQLException e) {
+            log.warn("could not record the unmatched-key sample of {}/{}: {}", pipeline, step, e.getMessage());
+        }
+    }
+
+    /**
+     * The unmatched-key sample of one keyed join's last run, by mapping then most frequent first; empty when none.
+     *
+     * @throws IllegalStateException when the read fails
+     */
+    public List<com.gamma.pipeline.exec.LookupMissSample.Entry> lookupMisses(String pipeline, String step) {
+        List<com.gamma.pipeline.exec.LookupMissSample.Entry> out = new ArrayList<>();
+        try {
+            src.run(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement("SELECT mapping, fingerprint, length, shape, n FROM "
+                        + MISSES + " WHERE pipeline = ? AND step = ? ORDER BY mapping, n DESC, fingerprint")) {
+                    ps.setString(1, pipeline);
+                    ps.setString(2, step);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next())
+                            out.add(new com.gamma.pipeline.exec.LookupMissSample.Entry(rs.getString(1), rs.getString(2),
+                                    rs.getInt(3), rs.getString(4), rs.getLong(5)));
+                    }
+                }
+            });
+        } catch (SQLException e) {
+            throw new IllegalStateException("lookup-misses query failed for " + pipeline + "/" + step + ": "
+                    + e.getMessage(), e);
+        }
+        return out;
+    }
+
     public int pruneSteps(java.time.Instant cutoff) {
         return update("DELETE FROM " + STEPS + " WHERE recorded_at < ?", RECORDED_AT.format(cutoff),
                 "prune Step Receipts before " + cutoff);

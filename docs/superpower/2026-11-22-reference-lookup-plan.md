@@ -187,6 +187,19 @@ found sums rather than an understated one. Gap found: `StepReceipt.MAX_COUNTS = 
 (`reference.*` first) — not changed here. Not built: test-a-key, refresh, cache size, version used (P3). Not driven in
 the preview. `ControlApiLookupsTest`, `lookups.component.spec.ts`.
 
+**Unmatched-key sample built 2026-11-24 (operator: "unmatched-key sample and refresh"; slice "Fingerprint + shape",
+refresh "Defer to P3"):** §4.6's sample, in the only form stored or served — never the value. The keyed join leaves
+its top 20 distinct unmatched values per mapping in a session table (`<node>__lookup_misses`,
+`RowShaper.takeLookupMisses`); the walk hands them to `WalkObserver.lookupMisses`; `StepReceiptRecorder` keeps them;
+`PipelineJobRunner.flushLookupMisses` turns each into `LookupMissSample.Entry` (Space-salted
+`FailureText.fingerprint` — the rejected rows' own — length, prefix-only shape, count) and replaces the Step's row set
+in `lookup_misses` (`DbConsignmentOutputStore`, spec-db-layer §3.9-b). `GET /lookups` serves it as `unmatched`; the
+Lookups screen shows it under a clicked row. Decisions (assistant): last run only (a clean run clears it); not for a
+dry run; none for a canvas-store graph (no Pipeline config to salt from); shape keeps `min(4, length / 3)` characters.
+Refresh stays with P3's shared cache (D-LK8: batch keeps no cache to refresh). `RowShaperTest`, `LookupMissSampleTest`,
+`PipelineJobRunnerLookupMissesTest`, `PipelineJobRunnerTest.aKeyedJoinRunStoresItsUnmatchedSampleFingerprinted`,
+`ControlApiLookupsTest`, `lookups.component.spec.ts`. Not driven in the preview.
+
 **P1h built 2026-11-23 (operator: "Yes, exact only"):** the `lookup()` scalar as the Record Transformer function
 `lookup.reference` (category Lookup; params `reference`, `key`, `returns`, `normalize`), exact match only. It renders
 the marker call `inspecto_lookup(...)`; `RowShaper.project` expands it into a scalar subquery over the resolved

@@ -130,6 +130,20 @@ class ControlApiLookupsTest {
             assertEquals(10, last.get("rowsIn").asLong());
             assertEquals(7, last.get("counts").get("lookup.SERVED_MSISDN.hit").asLong());
             assertEquals(40, last.get("counts").get("reference.rows").asLong());
+
+            // the last run's unmatched-key sample: fingerprint, length, shape and count, never the value
+            assertEquals(0, lookups(c).get("lookups").get(0).get("unmatched").size());
+            c.store.recordLookupMisses(pipeline, "join", "c-new", List.of(
+                    new com.gamma.pipeline.exec.LookupMissSample.Entry("SERVED_MSISDN", "fp:0123456789abcdef", 12,
+                            "4479••••••••", 5)));
+            JsonNode miss = lookups(c).get("lookups").get(0).get("unmatched").get(0);
+            assertEquals("SERVED_MSISDN", miss.get("mapping").asText());
+            assertEquals("fp:0123456789abcdef", miss.get("fingerprint").asText());
+            assertEquals(12, miss.get("length").asInt());
+            assertEquals("4479••••••••", miss.get("shape").asText());
+            assertEquals(5, miss.get("n").asLong());
+            c.store.recordLookupMisses(pipeline, "join", "c-next", List.of());   // a run where every value matched
+            assertEquals(0, lookups(c).get("lookups").get(0).get("unmatched").size(), "a clean run clears the sample");
         }
     }
 

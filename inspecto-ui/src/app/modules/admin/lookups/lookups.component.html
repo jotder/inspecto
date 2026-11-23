@@ -32,6 +32,35 @@
             [loading]="loading()"
             noRowsTitle="No lookups yet"
             noRowsHint="A lookup is a join Step with a key: column — add one to a Pipeline."
+            (rowClick)="select($any($event))"
         />
+        @if (selected(); as s) {
+            <section class="flex flex-col gap-2" aria-labelledby="lookup-unmatched-title">
+                <div class="flex items-center gap-2">
+                    <h2 id="lookup-unmatched-title" class="text-lg font-semibold">
+                        Values not found in {{ s.pipeline }} ▸ {{ s.step }}
+                    </h2>
+                    <button
+                        mat-icon-button
+                        (click)="select(null)"
+                        matTooltip="Close"
+                        aria-label="Close the values not found"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                    </button>
+                </div>
+                <p class="text-secondary text-sm">
+                    The most frequent values of the last run that found no Reference row, up to 20 per column. Each
+                    value is shown masked, with its fingerprint — the same one rejected rows carry.
+                </p>
+                <inspecto-data-table
+                    tier="mini"
+                    [rows]="s.unmatched"
+                    [columns]="missColumns"
+                    noRowsTitle="Every value was found"
+                    noRowsHint="The last run had no values without a Reference row, or it has not run yet."
+                />
+            </section>
+        }
     </div>
 </div>

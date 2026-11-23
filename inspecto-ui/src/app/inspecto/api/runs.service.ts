@@ -164,6 +164,17 @@ export interface LookupRow {
     match: string;
     lookedUpBy: string[];
     lastRun?: LookupLastRun | null;
+    /** The last run's unmatched-key sample (LOOKUP-1 §4.6): never a value. ABSENT when receipts are off. */
+    unmatched?: LookupMiss[];
+}
+
+/** One unmatched value of a lookup's last run: its salted fingerprint, length, masked shape and count. */
+export interface LookupMiss {
+    mapping: string;
+    fingerprint: string;
+    length: number;
+    shape: string;
+    n: number;
 }
 
 export interface LookupsPage {
