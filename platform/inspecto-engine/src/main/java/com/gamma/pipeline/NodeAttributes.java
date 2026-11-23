@@ -916,7 +916,8 @@ public final class NodeAttributes {
                     .help("Column(s) equated between the rows and the Reference. Leave empty when the Step "
                             + "carries lookups: (one mapping per looked-up column, written in the pipeline file)."),
             NodeAttribute.of("match", "Match", "select", "optional").defaultValue("exact")
-                    .options("exact", "Exact", "longest_prefix", "Longest prefix (last key)", "range", "Range (from – to)")
+                    .options("exact", "Exact", "longest_prefix", "Longest prefix (last key)", "range", "Range (from – to)",
+                            "asof", "As of (latest effective at the row's time)")
                     .help("Exact: every key equal. Longest prefix: the last key matches the Reference row "
                             + "whose key is its longest prefix (e.g. phone number to operator). Range: the row whose "
                             + "From – To contains the value (e.g. the rate valid on the call date)."),
@@ -948,6 +949,10 @@ public final class NodeAttributes {
             NodeAttribute.of("details", "Match details", "boolean", "optional")
                     .help("Also add, per looked-up column, the key that matched ({on}_matched_key) and how it "
                             + "matched ({on}_match_kind: exact, prefix, range or none)."),
+            NodeAttribute.of("at", "Row time", "string", "optional").placeholder("txn_date")
+                    .help("As of: the rows' time column. Each row takes the latest Reference row of its key whose "
+                            + "'Range from' is at or before this time (e.g. the rate of its currency in force on the "
+                            + "transaction date). Needs 'Reference key' and 'Range from'."),
             NodeAttribute.of("normalize", "Normalize keys", "list", "optional").placeholder("strip_plus")
                     .help("Exact and longest prefix: rewrite the Reference key and each looked-up value the same way "
                             + "before comparing, in the order given — trim, lower, upper, strip_leading_zeros, "

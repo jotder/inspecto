@@ -1165,6 +1165,9 @@ public final class RowShaper {
         if (JOIN_MATCH_RANGE.equals(match))
             throw new IllegalArgumentException("transform.join node '" + node.id() + "': match: range needs from: "
                     + "and/or to: — the Reference columns holding each range's bounds");
+        if (JOIN_MATCH_ASOF.equals(match))
+            throw new IllegalArgumentException("transform.join node '" + node.id() + "': match: asof needs key:, "
+                    + "from: and at: — the Reference's key and effective-from columns, and the rows' time column");
         for (String k : JOIN_KEYED_KEYS)
             if (node.cfg(k) != null)
                 throw new IllegalArgumentException("transform.join node '" + node.id() + "' sets '" + k
@@ -1407,12 +1410,14 @@ public final class RowShaper {
     public static final String JOIN_MATCH_EXACT = "exact";
     public static final String JOIN_MATCH_LONGEST_PREFIX = "longest_prefix";
     public static final String JOIN_MATCH_RANGE = "range";
-    public static final List<String> JOIN_MATCHES = List.of(JOIN_MATCH_EXACT, JOIN_MATCH_LONGEST_PREFIX, JOIN_MATCH_RANGE);
+    public static final String JOIN_MATCH_ASOF = "asof";
+    public static final List<String> JOIN_MATCHES =
+            List.of(JOIN_MATCH_EXACT, JOIN_MATCH_LONGEST_PREFIX, JOIN_MATCH_RANGE, JOIN_MATCH_ASOF);
 
     /** The keyed form's settings (LOOKUP-1 P1b/P1c); each needs {@code key:}, or {@code from:}/{@code to:} for a range. */
     public static final List<String> JOIN_KEYED_KEYS =
             List.of("columns", "as", "default", "exact_when", "duplicates", "order_by", "from", "to", "filter",
-                    "lookups", "details", "normalize");
+                    "lookups", "details", "normalize", "at");
     /** The keys of one {@code lookups:} entry (LOOKUP-1 P1d). */
     public static final List<String> JOIN_LOOKUP_KEYS = List.of("on", "columns", "as", "default", "details");
     /**
@@ -1492,6 +1497,8 @@ public final class RowShaper {
         String fromCol = strOrNull(node, "from");
         String toCol = strOrNull(node, "to");
         String filter = strOrNull(node, "filter");
+        boolean asof = JOIN_MATCH_ASOF.equals(match);
+        String atCol = strOrNull(node, "at");
         if (range) {
             if (keyCol != null)
                 throw new IllegalArgumentException("transform.join node '" + id + "': match: range reads from:/to:, "
@@ -1499,14 +1506,23 @@ public final class RowShaper {
             if (fromCol == null && toCol == null)
                 throw new IllegalArgumentException("transform.join node '" + id + "': match: range needs from: and/or "
                         + "to: — the Reference columns holding each range's bounds");
+        } else if (asof) {
+            if (keyCol == null || fromCol == null || atCol == null)
+                throw new IllegalArgumentException("transform.join node '" + id + "': match: asof needs key: (the "
+                        + "Reference's key column), from: (its effective-from column) and at: (the rows' time column)");
+            if (toCol != null)
+                throw new IllegalArgumentException("transform.join node '" + id + "': match: asof reads from: only — "
+                        + "a row takes the latest Reference row effective at or before its time, so there is no to:");
         } else {
             if (keyCol == null)
                 throw new IllegalArgumentException("transform.join node '" + id + "': match: " + match + " needs key: "
                         + "— the Reference's key column");
             if (fromCol != null || toCol != null)
                 throw new IllegalArgumentException("transform.join node '" + id + "': from:/to: only apply to "
-                        + "match: range");
+                        + "match: range (from: also to match: asof)");
         }
+        if (atCol != null && !asof)
+            throw new IllegalArgumentException("transform.join node '" + id + "': at: only applies to match: asof");
         List<String> normalizers;
         try {
             normalizers = joinNormalizers(node.cfg("normalize"));
@@ -1535,7 +1551,11 @@ public final class RowShaper {
             if (c != null && refCols.stream().noneMatch(r -> r.equalsIgnoreCase(c)))
                 throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has no column '"
                         + c + "' (it has " + refCols + ")");
-        List<JoinMapping> mappings = joinMappings(node, on, refCols, columnsOf(conn, input));
+        List<String> inputCols = columnsOf(conn, input);
+        if (atCol != null && inputCols.stream().noneMatch(c -> c.equalsIgnoreCase(atCol)))
+            throw new IllegalArgumentException("transform.join node '" + id + "': the rows have no column '" + atCol
+                    + "' to read the time from (at:)");
+        List<JoinMapping> mappings = joinMappings(node, on, refCols, inputCols);
         // every Reference column any mapping returns, fetched once in the one pass over the Reference
         List<String> returned = new ArrayList<>();
         for (JoinMapping m : mappings)
@@ -1561,6 +1581,8 @@ public final class RowShaper {
             // a range compares in the value's own type (dates as dates); prefix and exact compare as text
             joins.append(" LEFT JOIN __lk_hit ").append(h).append(" ON ").append(h).append(".__lk_v = ")
                     .append(range ? "i." + q(o) : normalized("CAST(i." + q(o) + " AS VARCHAR)", normalizers));
+            // an as-of hit belongs to a (key, time) pair; the time compares as the same value, a NULL time to a NULL
+            if (asof) joins.append(" AND ").append(h).append(".__lk_t IS NOT DISTINCT FROM i.").append(q(atCol));
         }
 
         if (range) {
@@ -1571,17 +1593,22 @@ public final class RowShaper {
         String refKey = normalized("CAST(t." + key + " AS VARCHAR)", normalizers);
         String refRows = "SELECT t.*, " + refKey + " AS __lk_key FROM " + q(ref) + " t WHERE t."
                 + key + " IS NOT NULL" + (filter == null ? "" : " AND (" + filter + ")");
+        // an as-of Reference holds many rows per key, one per effective date: two rows of one key AND one date clash
+        String fromQ = asof ? q(fromCol) : null;
         if ("refuse".equals(dups)) {
             try (Statement st = conn.createStatement();
-                 ResultSet rs = st.executeQuery("SELECT __lk_key FROM (" + refRows + ") GROUP BY __lk_key"
+                 ResultSet rs = st.executeQuery("SELECT __lk_key" + (asof ? ", CAST(" + fromQ + " AS VARCHAR)" : "")
+                         + " FROM (" + refRows + ") GROUP BY __lk_key" + (asof ? ", " + fromQ : "")
                          + " HAVING count(*) > 1 ORDER BY __lk_key LIMIT 1")) {
                 if (rs.next())
                     throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has more "
-                            + "than one row for " + keyCol + "=" + rs.getString(1) + " — clean the Reference, or "
+                            + "than one row for " + keyCol + "=" + rs.getString(1)
+                            + (asof ? " effective " + rs.getString(2) : "") + " — clean the Reference, or "
                             + "set duplicates: first|last with order_by:");
             }
         } else {
-            refRows += " QUALIFY row_number() OVER (PARTITION BY " + refKey + " ORDER BY (" + orderBy
+            refRows += " QUALIFY row_number() OVER (PARTITION BY " + refKey + (asof ? ", t." + fromQ : "")
+                    + " ORDER BY (" + orderBy
                     + ") " + ("last".equals(dups) ? "DESC" : "ASC") + " NULLS LAST, CAST(t AS VARCHAR)) = 1";
         }
         // __lk_mk / __lk_kind: the match details (P1d) — the key that matched, and whether it was the whole value
@@ -1590,9 +1617,18 @@ public final class RowShaper {
         for (String o : on) {
             if (values.length() > 0) values.append(" UNION ");
             values.append("SELECT ").append(normalized("CAST(" + q(o) + " AS VARCHAR)", normalizers))
-                    .append(" AS __lk_v FROM ").append(q(input));
+                    .append(" AS __lk_v").append(asof ? ", " + q(atCol) + " AS __lk_t" : "")
+                    .append(" FROM ").append(q(input));
         }
-        String hit = prefix
+        // as of: the latest Reference row of the key effective at or before the time (an empty from: = since forever)
+        String hit = asof
+                ? "SELECT v.__lk_v, v.__lk_t" + kept + ", r.__lk_key || '@' || coalesce(CAST(r." + fromQ
+                  + " AS VARCHAR), '') AS __lk_mk, 'asof' AS __lk_kind"
+                  + " FROM __lk_val v JOIN __lk_ref r ON r.__lk_key = v.__lk_v AND (r." + fromQ + " IS NULL OR r."
+                  + fromQ + " <= " + asofValue(conn, ref, fromCol) + ")"
+                  + " QUALIFY row_number() OVER (PARTITION BY v.__lk_v, v.__lk_t ORDER BY r." + fromQ
+                  + " DESC NULLS LAST) = 1"
+                : prefix
                 ? "SELECT v.__lk_v" + kept + ", r.__lk_key AS __lk_mk, CASE WHEN l.__lk_n = length(v.__lk_v) THEN "
                   + "'exact' ELSE 'prefix' END AS __lk_kind"
                   + " FROM __lk_val v JOIN __lk_len l ON l.__lk_n <= length(v.__lk_v)"
@@ -1604,7 +1640,8 @@ public final class RowShaper {
         exec(conn, "CREATE TABLE " + q(data) + " AS"
                 + " WITH __lk_ref AS MATERIALIZED (SELECT *" + (exactWhen == null ? "" : ", (" + exactWhen + ") AS __lk_exact")
                 + " FROM (" + refRows + ")),"
-                + " __lk_val AS MATERIALIZED (SELECT DISTINCT __lk_v FROM (" + values + ") WHERE __lk_v IS NOT NULL),"
+                + " __lk_val AS MATERIALIZED (SELECT DISTINCT __lk_v" + (asof ? ", __lk_t" : "") + " FROM (" + values
+                + ") WHERE __lk_v IS NOT NULL),"
                 + " __lk_len AS (SELECT DISTINCT length(__lk_key) AS __lk_n FROM __lk_ref),"
                 + " __lk_hit AS MATERIALIZED (" + hit + ")"
                 + " " + select + " FROM " + q(input) + " i" + joins);
@@ -1683,6 +1720,24 @@ public final class RowShaper {
                     return "TRY_CAST(v.__lk_v AS DATE)";
         }
         return "v.__lk_v";
+    }
+
+    /**
+     * The row's time as compared with the effective-from column {@code col} (match: asof): cast to the column's own
+     * DATE or TIMESTAMP so a text time compares as a time, TRY_CAST so a value that is no time matches nothing rather
+     * than raising a raw Binder error; any other type compares as it is.
+     */
+    private static String asofValue(Connection conn, String ref, String col) throws SQLException {
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM " + q(ref) + " LIMIT 0")) {
+            java.sql.ResultSetMetaData md = rs.getMetaData();
+            for (int i = 1; i <= md.getColumnCount(); i++) {
+                if (!md.getColumnName(i).equalsIgnoreCase(col)) continue;
+                String t = md.getColumnTypeName(i).toUpperCase(java.util.Locale.ROOT);
+                if (t.equals("DATE") || t.equals("TIMESTAMP")) return "TRY_CAST(v.__lk_t AS " + t + ")";
+            }
+        }
+        return "v.__lk_t";
     }
 
     private static String span(String from, String to) {

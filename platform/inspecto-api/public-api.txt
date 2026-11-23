@@ -2357,6 +2357,7 @@ com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_LOOKUP
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_MATCHES
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_NORMALIZERS
 com.gamma.pipeline.exec.RowShaper | public static final Set<String> MAP_NODE_CONFIG_KEYS
+com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_ASOF
 com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_EXACT
 com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_LONGEST_PREFIX
 com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_RANGE

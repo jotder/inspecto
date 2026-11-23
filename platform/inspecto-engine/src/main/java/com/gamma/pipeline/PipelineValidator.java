@@ -122,9 +122,21 @@ public final class PipelineValidator {
                 || (n.cfg("to") != null && !n.cfg("to").toString().isBlank());   // blank = unset, as the run reads it
         Object match = n.cfg("match");
         boolean range = "range".equals(String.valueOf(match));
+        boolean asof = "asof".equals(String.valueOf(match));
+        boolean hasFrom = n.cfg("from") != null && !n.cfg("from").toString().isBlank();
+        boolean hasTo = n.cfg("to") != null && !n.cfg("to").toString().isBlank();
+        boolean hasAt = n.cfg("at") != null && !n.cfg("at").toString().isBlank();
+        if (asof) {
+            if (!hasKey || !hasFrom || !hasAt)
+                return "match: asof needs key: (the Reference's key column), from: (its effective-from column) and "
+                        + "at: (the rows' time column)";
+            if (hasTo) return "match: asof reads from: only — there is no to:";
+        } else if (hasAt) {
+            return "at: only applies to match: asof";
+        }
         if (range && !hasBound) return "match: range needs from: and/or to: — the Reference columns holding the bounds";
         if (range && hasKey) return "match: range reads from:/to:, not key:";
-        if (!range && hasBound) return "from:/to: only apply to match: range";
+        if (!range && !asof && hasBound) return "from:/to: only apply to match: range (from: also to match: asof)";
         if (!hasKey && !hasBound) {
             for (String k : com.gamma.pipeline.exec.RowShaper.JOIN_KEYED_KEYS)
                 if (n.cfg(k) != null) return "'" + k + "' needs key: — the Reference's key column";

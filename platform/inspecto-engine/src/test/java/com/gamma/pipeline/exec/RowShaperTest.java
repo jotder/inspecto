@@ -515,6 +515,100 @@ class RowShaperTest {
     // ── join keyed form: several numbers against one dialling-code table (LOOKUP-1 P1b) ──
     // A synthetic table shaped like a telco dial-digit dimension: key, country, operator, an exact-only flag.
 
+    // ── join match: asof (LOOKUP-1 P1) ──
+
+    private Map<Integer, Map<String, String>> asofJoin(String txnTimeType, Object... extra) throws SQLException {
+        sql("DROP TABLE IF EXISTS arate");
+        sql("DROP TABLE IF EXISTS atxn");
+        sql("CREATE TABLE arate AS SELECT * FROM (VALUES"
+                + " ('USD', DATE '2026-01-01', 1.0), ('USD', DATE '2026-03-01', 1.1), ('EUR', DATE '2026-02-01', 2.0)"
+                + ") t(ccy, valid_from, rate)");
+        sql("CREATE TABLE atxn AS SELECT id, ccy, CAST(d AS " + txnTimeType + ") AS txn_date FROM (VALUES"
+                + " (1, 'USD', '2026-02-15'), (2, 'USD', '2026-03-01'), (3, 'USD', '2025-12-31'),"
+                + " (4, 'EUR', '2026-02-01'), (5, 'EUR', '2026-06-01'), (6, 'GBP', '2026-02-15'),"
+                + " (7, 'USD', NULL)) t(id, ccy, d)");
+        Map<String, Object> cfg = new java.util.LinkedHashMap<>(Map.of("reference", "r", "key", "ccy",
+                "match", "asof", "from", "valid_from", "at", "txn_date", "on", List.of("ccy"),
+                "columns", List.of("rate")));
+        for (int i = 0; i < extra.length; i += 2) {
+            if (extra[i + 1] == null) cfg.remove((String) extra[i]);
+            else cfg.put((String) extra[i], extra[i + 1]);
+        }
+        String id = "a" + (++keyedJoins);
+        var out = new RelationByRel(RowShaper.shape(conn, PipelineNode.of(id, "transform.join", cfg), "atxn", id,
+                (c, name) -> "arate"));
+        Map<Integer, Map<String, String>> rows = new java.util.TreeMap<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM \"" + out.table(PipelineRel.DATA) + "\"")) {
+            while (rs.next()) {
+                Map<String, String> r = new java.util.LinkedHashMap<>();
+                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++)
+                    r.put(rs.getMetaData().getColumnName(i), rs.getString(i));
+                rows.put(rs.getInt("id"), r);
+            }
+        }
+        return rows;
+    }
+
+    @Test
+    void asofTakesTheLatestReferenceRowOfTheKeyEffectiveAtOrBeforeTheRowsTime() throws Exception {
+        var rows = asofJoin("DATE");
+        assertEquals(7, rows.size(), "a LEFT join: no transaction dropped or repeated");
+        assertEquals("1.0", rows.get(1).get("ccy_rate"), "between two effective dates: the earlier one");
+        assertEquals("1.1", rows.get(2).get("ccy_rate"), "a row on its effective date takes that row");
+        assertNull(rows.get(3).get("ccy_rate"), "before the key's first effective date: nothing");
+        assertEquals("2.0", rows.get(4).get("ccy_rate"));
+        assertEquals("2.0", rows.get(5).get("ccy_rate"), "after the last: the last stays in force");
+        assertNull(rows.get(6).get("ccy_rate"), "a key the Reference lacks");
+        assertNull(rows.get(7).get("ccy_rate"), "a row with no time matches nothing");
+    }
+
+    @Test
+    void asofReadsATextTimeAsATimeAndAnEmptyFromAsSinceForever() throws Exception {
+        var rows = asofJoin("VARCHAR");
+        assertEquals("1.1", rows.get(2).get("ccy_rate"), "'2026-03-01' text compares as the date");
+        assertEquals("1.0", rows.get(1).get("ccy_rate"));
+        sql("DROP TABLE IF EXISTS arate");
+        sql("CREATE TABLE arate AS SELECT * FROM (VALUES ('USD', CAST(NULL AS DATE), 0.5),"
+                + " ('USD', DATE '2026-03-01', 1.1)) t(ccy, valid_from, rate)");
+        sql("DROP TABLE IF EXISTS atxn");
+        sql("CREATE TABLE atxn AS SELECT * FROM (VALUES (1, 'USD', DATE '2020-01-01'),"
+                + " (2, 'USD', DATE '2026-04-01')) t(id, ccy, txn_date)");
+        var cfg = Map.<String, Object>of("reference", "r", "key", "ccy", "match", "asof", "from", "valid_from",
+                "at", "txn_date", "on", List.of("ccy"), "columns", List.of("rate"));
+        String id = "asofnull";
+        var out = new RelationByRel(RowShaper.shape(conn, PipelineNode.of(id, "transform.join", cfg), "atxn", id,
+                (c, name) -> "arate"));
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT id, ccy_rate FROM \"" + out.table(PipelineRel.DATA) + "\" ORDER BY id")) {
+            assertTrue(rs.next());
+            assertEquals("0.5", rs.getString(2), "an empty from: reaches back forever");
+            assertTrue(rs.next());
+            assertEquals("1.1", rs.getString(2));
+        }
+    }
+
+    @Test
+    void asofRefusesTwoReferenceRowsOfOneKeyAndDateAndMissingOrMisplacedSettings() throws Exception {
+        asofJoin("DATE");
+        sql("DROP TABLE IF EXISTS arate");
+        sql("CREATE TABLE arate AS SELECT * FROM (VALUES ('USD', DATE '2026-01-01', 1.0),"
+                + " ('USD', DATE '2026-01-01', 1.5)) t(ccy, valid_from, rate)");
+        var cfg = Map.<String, Object>of("reference", "r", "key", "ccy", "match", "asof", "from", "valid_from",
+                "at", "txn_date", "on", List.of("ccy"), "columns", List.of("rate"));
+        var dup = assertThrows(IllegalArgumentException.class, () -> RowShaper.shape(conn,
+                PipelineNode.of("asofdup", "transform.join", cfg), "atxn", "asofdup", (c, name) -> "arate"));
+        assertTrue(dup.getMessage().contains("USD") && dup.getMessage().contains("2026-01-01"), dup.getMessage());
+        var noAt = assertThrows(IllegalArgumentException.class, () -> asofJoin("DATE", "at", null));
+        assertTrue(noAt.getMessage().contains("at:"), noAt.getMessage());
+        var badAt = assertThrows(IllegalArgumentException.class, () -> asofJoin("DATE", "at", "nope"));
+        assertTrue(badAt.getMessage().contains("nope"), badAt.getMessage());
+        var to = assertThrows(IllegalArgumentException.class, () -> asofJoin("DATE", "to", "valid_from"));
+        assertTrue(to.getMessage().contains("to:"), to.getMessage());
+        var stray = assertThrows(IllegalArgumentException.class, () -> normalizedJoin("at", "v"));
+        assertTrue(stray.getMessage().contains("asof"), stray.getMessage());
+    }
+
     // ── join normalize: normalized exact (LOOKUP-1 P1) ──
 
     private Map<Integer, Map<String, String>> normalizedJoin(Object... extra) throws SQLException {

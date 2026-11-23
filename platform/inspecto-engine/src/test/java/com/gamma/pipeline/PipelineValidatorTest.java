@@ -397,6 +397,23 @@ class PipelineValidatorTest {
         }
     }
 
+    /** LOOKUP-1 as-of: it needs key, from and at; takes no to; and at belongs to as-of only. */
+    @Test
+    void anAsofJoinsSettingsAreCheckedAtValidation() {
+        Map<String, Object> ok = Map.of("reference", "reference/rates", "key", "ccy", "match", "asof",
+                "from", "valid_from", "at", "txn_date", "on", "ccy");
+        assertFalse(codes(PipelineValidator.validate(joinGraph(ok))).contains(PipelineValidator.JOIN_KEYED_INVALID));
+        for (Map<String, Object> bad : List.<Map<String, Object>>of(
+                without(ok, "at"),                          // no time column
+                without(ok, "from"),                        // no effective-from column
+                without(ok, "key"),                         // no key
+                with(ok, "to", "valid_to"),                 // asof has no end bound
+                with(ok, "match", "exact"))) {              // at: on a non-asof join
+            PipelineValidator.Result r = PipelineValidator.validate(joinGraph(bad));
+            assertTrue(codes(r).contains(PipelineValidator.JOIN_KEYED_INVALID), () -> bad + " → " + r.issues());
+        }
+    }
+
     /** LOOKUP-1 normalized exact: an unknown normalizer, or normalize on a range, is refused at save. */
     @Test
     void aJoinsNormalizeSettingIsCheckedAtValidation() {

@@ -150,7 +150,15 @@ raw DuckDB error that does not name the Step (refuse it by name, or parse the bo
 an ordered list of `trim`, `lower`, `upper`, `strip_leading_zeros`, `strip_plus` applied to BOTH the Reference key and
 every looked-up value; two Reference rows that collapse to one key are refused by the duplicates rule; refused on
 `range`; the returned key column keeps the Reference's own text, while `matched_key` shows the NORMALIZED key. `RowShaperTest`, `PipelineValidatorTest`.
-Still open in P1: as-of, the `lookup()` scalar, hit / miss counts.
+Still open in P1: the `lookup()` scalar, hit / miss counts.
+
+**P1f built 2026-11-23 (operator: "as-of with a key"):** `match: asof` with `key:` (Reference equality column), `from:`
+(its effective-from column; empty = since forever) and `at:` (the rows' time column) — each row takes the latest
+Reference row of its key effective at or before its time; resolved once per distinct (key, time) pair. Decision: a
+second input column rides in `at:` (one time for all `on` columns) rather than a pair per mapping; per-mapping `at:`
+inside `lookups:` is not built. Single-table as-of with no key was already `range` with only `from:`. As built:
+`user-guide-elt-record-transformer.md` §8.7. `RowShaperTest`, `PipelineValidatorTest`.
+Still open in P1: the `lookup()` scalar, hit / miss counts (P1 is otherwise complete).
 
 **P1c built 2026-11-22 (operator: "start range"):** `match: range` on the keyed join — `from`/`to` Reference
 columns, inclusive bounds, an empty bound open-ended, compared in the value's own type; `filter` (a condition on
