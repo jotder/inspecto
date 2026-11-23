@@ -515,6 +515,73 @@ class RowShaperTest {
     // ── join keyed form: several numbers against one dialling-code table (LOOKUP-1 P1b) ──
     // A synthetic table shaped like a telco dial-digit dimension: key, country, operator, an exact-only flag.
 
+    // ── join normalize: normalized exact (LOOKUP-1 P1) ──
+
+    private Map<Integer, Map<String, String>> normalizedJoin(Object... extra) throws SQLException {
+        sql("DROP TABLE IF EXISTS nref");
+        sql("DROP TABLE IF EXISTS nin");
+        sql("CREATE TABLE nref AS SELECT * FROM (VALUES (' AB1 ', 'first'), ('007', 'bond')) t(code, label)");
+        sql("CREATE TABLE nin AS SELECT * FROM (VALUES (1, 'ab1'), (2, '+7'), (3, '7'), (4, '000'), (5, 'zz'))"
+                + " t(id, v)");
+        Map<String, Object> cfg = new java.util.LinkedHashMap<>(Map.of("reference", "r", "key", "code",
+                "match", "exact", "on", List.of("v"), "columns", List.of("label")));
+        for (int i = 0; i < extra.length; i += 2) {
+            if (extra[i + 1] == null) cfg.remove((String) extra[i]);
+            else cfg.put((String) extra[i], extra[i + 1]);
+        }
+        String id = "n" + (++keyedJoins);
+        var out = new RelationByRel(RowShaper.shape(conn, PipelineNode.of(id, "transform.join", cfg), "nin", id,
+                (c, name) -> "nref"));
+        Map<Integer, Map<String, String>> rows = new java.util.TreeMap<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM \"" + out.table(PipelineRel.DATA) + "\"")) {
+            while (rs.next()) {
+                Map<String, String> r = new java.util.LinkedHashMap<>();
+                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++)
+                    r.put(rs.getMetaData().getColumnName(i), rs.getString(i));
+                rows.put(rs.getInt("id"), r);
+            }
+        }
+        return rows;
+    }
+
+    @Test
+    void normalizeMakesBothSidesCompareInOneSpelling() throws Exception {
+        var rows = normalizedJoin("normalize", List.of("trim", "upper", "strip_plus", "strip_leading_zeros"));
+        assertEquals("first", rows.get(1).get("v_label"), "' AB1 ' and 'ab1' are one key once trimmed and upper-cased");
+        assertEquals("bond", rows.get(2).get("v_label"), "'+7' and '007' both reduce to '7'");
+        assertEquals("bond", rows.get(3).get("v_label"));
+        assertNull(rows.get(4).get("v_label"), "'000' reduces to '0', which the Reference lacks");
+        assertNull(rows.get(5).get("v_label"));
+    }
+
+    @Test
+    void withoutNormalizeSpellingsStayDifferent() throws Exception {
+        var rows = normalizedJoin();
+        assertNull(rows.get(1).get("v_label"));
+        assertNull(rows.get(2).get("v_label"));
+    }
+
+    @Test
+    void aReferenceThatCollapsesToOneKeyIsRefusedByName() throws Exception {
+        sql("CREATE TABLE nref AS SELECT * FROM (VALUES ('A', 'x'), (' a', 'y')) t(code, label)");
+        sql("CREATE TABLE nin AS SELECT * FROM (VALUES (1, 'a')) t(id, v)");
+        var cfg = Map.<String, Object>of("reference", "r", "key", "code", "match", "exact", "on", List.of("v"),
+                "normalize", List.of("trim", "upper"));
+        var e = assertThrows(IllegalArgumentException.class, () -> RowShaper.shape(conn,
+                PipelineNode.of("nd", "transform.join", cfg), "nin", "nd", (c, name) -> "nref"));
+        assertTrue(e.getMessage().contains("A"), e.getMessage());
+    }
+
+    @Test
+    void anUnknownNormalizerAndNormalizeOnARangeAreRefused() throws Exception {
+        var unknown = assertThrows(IllegalArgumentException.class, () -> normalizedJoin("normalize", "soundex"));
+        assertTrue(unknown.getMessage().contains("soundex"), unknown.getMessage());
+        var range = assertThrows(IllegalArgumentException.class, () -> normalizedJoin("match", "range",
+                "key", null, "from", "code", "normalize", "trim"));
+        assertTrue(range.getMessage().contains("range"), range.getMessage());
+    }
+
     private void seedDialDigits() throws SQLException {
         sql("CREATE TABLE dd AS SELECT * FROM (VALUES"
                 + " ('249', 'SD', 'Sudan', '0', 10),"

@@ -132,6 +132,12 @@ public final class PipelineValidator {
         }
         if (n.cfg("exact_when") != null && !"longest_prefix".equals(String.valueOf(match)))
             return "exact_when only applies to match: longest_prefix";
+        try {
+            if (!com.gamma.pipeline.exec.RowShaper.joinNormalizers(n.cfg("normalize")).isEmpty() && range)
+                return "normalize: applies to match: exact and longest_prefix, not range";
+        } catch (IllegalArgumentException e) {
+            return e.getMessage();
+        }
         Object dups = n.cfg("duplicates");
         if (dups != null && !com.gamma.pipeline.exec.RowShaper.JOIN_DUPLICATES.contains(dups.toString()))
             return "duplicates '" + dups + "' — use one of " + com.gamma.pipeline.exec.RowShaper.JOIN_DUPLICATES;
