@@ -947,7 +947,11 @@ public final class NodeAttributes {
                     .help("A condition on Reference columns: only the rows meeting it take part in the lookup."),
             NodeAttribute.of("details", "Match details", "boolean", "optional")
                     .help("Also add, per looked-up column, the key that matched ({on}_matched_key) and how it "
-                            + "matched ({on}_match_kind: exact, prefix, range or none)."));
+                            + "matched ({on}_match_kind: exact, prefix, range or none)."),
+            NodeAttribute.of("normalize", "Normalize keys", "list", "optional").placeholder("strip_plus")
+                    .help("Exact and longest prefix: rewrite the Reference key and each looked-up value the same way "
+                            + "before comparing, in the order given — trim, lower, upper, strip_leading_zeros, "
+                            + "strip_plus."));
 
     /**
      * {@code transform.sql} (sql-transform-v1-plan.md, B1) — one author {@code SELECT} over the typed

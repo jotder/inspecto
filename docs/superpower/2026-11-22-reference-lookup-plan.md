@@ -146,6 +146,12 @@ raw DuckDB error that does not name the Step (refuse it by name, or parse the bo
 [`2026-11-22-dated-reference-runs-plan.md`](2026-11-22-dated-reference-runs-plan.md); the Job's own graph is
 [`2026-11-22-job-graph-plan.md`](2026-11-22-job-graph-plan.md).
 
+**P1e built 2026-11-23 (operator: "normalized exact"):** `normalize:` on the keyed join (`match: exact | longest_prefix`) —
+an ordered list of `trim`, `lower`, `upper`, `strip_leading_zeros`, `strip_plus` applied to BOTH the Reference key and
+every looked-up value; two Reference rows that collapse to one key are refused by the duplicates rule; refused on
+`range`; the returned key column keeps the Reference's own text, while `matched_key` shows the NORMALIZED key. `RowShaperTest`, `PipelineValidatorTest`.
+Still open in P1: as-of, the `lookup()` scalar, hit / miss counts.
+
 **P1c built 2026-11-22 (operator: "start range"):** `match: range` on the keyed join — `from`/`to` Reference
 columns, inclusive bounds, an empty bound open-ended, compared in the value's own type; `filter` (a condition on
 Reference rows, every keyed mode); overlapping periods refused by name unless `duplicates: first|last` + `order_by`.

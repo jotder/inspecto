@@ -45,7 +45,7 @@ test('the audio stage masters a synthetic film to -16 LUFS, keeps the chapters a
   try {
     const film = join(dir, 'film.mp4'), out = join(dir, 'final.mp4');
     const mk = spawnSync(ff, ['-y', '-hide_banner', '-loglevel', 'error', '-f', 'lavfi', '-i', 'color=c=0x101820:s=320x180:d=14:r=15',
-      '-f', 'lavfi', '-i', 'anoisesrc=color=pink:amplitude=0.25:duration=14,bandpass=f=1200:w=900,tremolo=f=4:d=0.8',
+      '-f', 'lavfi', '-i', 'anoisesrc=color=pink:amplitude=0.25:duration=14:seed=7,bandpass=f=1200:w=900,tremolo=f=4:d=0.8',
       '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', film], { encoding: 'utf8' });
     assert.equal(mk.status, 0, mk.stderr);
     const plan = mixPlan([{ t0: 0, length: 14, voiceStart: 0.35, voiceLen: 12.5, introSecs: 3, ticks: [2, 6] }]);

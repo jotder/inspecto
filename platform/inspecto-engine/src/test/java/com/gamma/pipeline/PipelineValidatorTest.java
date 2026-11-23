@@ -397,6 +397,22 @@ class PipelineValidatorTest {
         }
     }
 
+    /** LOOKUP-1 normalized exact: an unknown normalizer, or normalize on a range, is refused at save. */
+    @Test
+    void aJoinsNormalizeSettingIsCheckedAtValidation() {
+        Map<String, Object> ok = Map.of("reference", "reference/codes", "key", "code", "match", "exact",
+                "on", "v", "normalize", List.of("trim", "strip_plus"));
+        assertFalse(codes(PipelineValidator.validate(joinGraph(ok))).contains(PipelineValidator.JOIN_KEYED_INVALID));
+        for (Map<String, Object> bad : List.<Map<String, Object>>of(
+                with(ok, "normalize", "soundex"),
+                with(without(without(ok, "key"), "match"), "match", "range"))) {
+            Map<String, Object> cfg = new java.util.LinkedHashMap<>(bad);
+            if ("range".equals(cfg.get("match"))) cfg.put("from", "valid_from");
+            PipelineValidator.Result r = PipelineValidator.validate(joinGraph(cfg));
+            assertTrue(codes(r).contains(PipelineValidator.JOIN_KEYED_INVALID), () -> cfg + " → " + r.issues());
+        }
+    }
+
     private static PipelineGraph joinGraph(Map<String, Object> cfg) {
         return new PipelineGraph("keyed", true, List.of(new PipelineNode("j", "transform.join", cfg, null)), List.of());
     }
