@@ -1200,7 +1200,45 @@ public final class RowShaper {
 
     /** The keyed form's settings (LOOKUP-1 P1b/P1c); each needs {@code key:}, or {@code from:}/{@code to:} for a range. */
     public static final List<String> JOIN_KEYED_KEYS =
-            List.of("columns", "as", "default", "exact_when", "duplicates", "order_by", "from", "to", "filter");
+            List.of("columns", "as", "default", "exact_when", "duplicates", "order_by", "from", "to", "filter",
+                    "normalize");
+    /**
+     * {@code normalize:} values (LOOKUP-1, normalized exact): each rewrites a key's text, and the list is applied in
+     * order to BOTH the Reference key and every looked-up value, so the two sides compare in one spelling.
+     */
+    public static final List<String> JOIN_NORMALIZERS =
+            List.of("trim", "lower", "upper", "strip_leading_zeros", "strip_plus");
+
+    /** The {@code normalize:} setting as a list of normalizer names (a scalar is one); refuses an unknown name. */
+    public static List<String> joinNormalizers(Object raw) {
+        List<String> out = new ArrayList<>();
+        if (raw instanceof List<?> l) {
+            for (Object o : l) if (o != null && !o.toString().isBlank()) out.add(o.toString().trim());
+        } else if (raw != null && !raw.toString().isBlank()) {
+            out.add(raw.toString().trim());
+        }
+        for (String n : out)
+            if (!JOIN_NORMALIZERS.contains(n))
+                throw new IllegalArgumentException("normalize '" + n + "' — use any of " + JOIN_NORMALIZERS);
+        return out;
+    }
+
+    /** {@code expr} (a text expression) with each normalizer applied in order; NULL stays NULL. */
+    private static String normalized(String expr, List<String> normalizers) {
+        String e = expr;
+        for (String n : normalizers) {
+            e = switch (n) {
+                case "trim" -> "trim(" + e + ")";
+                case "lower" -> "lower(" + e + ")";
+                case "upper" -> "upper(" + e + ")";
+                case "strip_plus" -> "regexp_replace(" + e + ", '^[+]', '')";
+                // all zeros stay one zero: "000" is the number 0, not an empty key
+                default -> "CASE WHEN regexp_matches(" + e + ", '^0+$') THEN '0' ELSE regexp_replace(" + e
+                        + ", '^0+', '') END";
+            };
+        }
+        return e;
+    }
     /** Every config key {@code transform.join} reads — what every save path must carry. */
     public static final List<String> JOIN_CONFIG_KEYS;
     static {
@@ -1256,6 +1294,15 @@ public final class RowShaper {
                 throw new IllegalArgumentException("transform.join node '" + id + "': from:/to: only apply to "
                         + "match: range");
         }
+        List<String> normalizers;
+        try {
+            normalizers = joinNormalizers(node.cfg("normalize"));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("transform.join node '" + id + "': " + e.getMessage());
+        }
+        if (range && !normalizers.isEmpty())
+            throw new IllegalArgumentException("transform.join node '" + id + "': normalize: applies to match: exact "
+                    + "and longest_prefix, not range (a range compares in the value's own type)");
         String exactWhen = strOrNull(node, "exact_when");
         if (exactWhen != null && !prefix)
             throw new IllegalArgumentException("transform.join node '" + id + "': exact_when only applies to "
@@ -1320,7 +1367,7 @@ public final class RowShaper {
             }
             // a range compares in the value's own type (dates as dates); prefix and exact compare as text
             joins.append(" LEFT JOIN __lk_hit ").append(h).append(" ON ").append(h).append(".__lk_v = ")
-                    .append(range ? "i." + q(o) : "CAST(i." + q(o) + " AS VARCHAR)");
+                    .append(range ? "i." + q(o) : normalized("CAST(i." + q(o) + " AS VARCHAR)", normalizers));
         }
 
         if (range) {
@@ -1328,7 +1375,8 @@ public final class RowShaper {
             return;
         }
         String key = q(keyCol);
-        String refRows = "SELECT t.*, CAST(t." + key + " AS VARCHAR) AS __lk_key FROM " + q(ref) + " t WHERE t."
+        String refKey = normalized("CAST(t." + key + " AS VARCHAR)", normalizers);
+        String refRows = "SELECT t.*, " + refKey + " AS __lk_key FROM " + q(ref) + " t WHERE t."
                 + key + " IS NOT NULL" + (filter == null ? "" : " AND (" + filter + ")");
         if ("refuse".equals(dups)) {
             try (Statement st = conn.createStatement();
@@ -1340,14 +1388,15 @@ public final class RowShaper {
                             + "set duplicates: first|last with order_by:");
             }
         } else {
-            refRows += " QUALIFY row_number() OVER (PARTITION BY CAST(t." + key + " AS VARCHAR) ORDER BY (" + orderBy
+            refRows += " QUALIFY row_number() OVER (PARTITION BY " + refKey + " ORDER BY (" + orderBy
                     + ") " + ("last".equals(dups) ? "DESC" : "ASC") + " NULLS LAST, CAST(t AS VARCHAR)) = 1";
         }
         String kept = String.join(", ", returned.stream().map(c -> "r." + q(c)).toList());
         StringBuilder values = new StringBuilder();
         for (String o : on) {
             if (values.length() > 0) values.append(" UNION ");
-            values.append("SELECT CAST(").append(q(o)).append(" AS VARCHAR) AS __lk_v FROM ").append(q(input));
+            values.append("SELECT ").append(normalized("CAST(" + q(o) + " AS VARCHAR)", normalizers))
+                    .append(" AS __lk_v FROM ").append(q(input));
         }
         String hit = prefix
                 ? "SELECT v.__lk_v, " + kept + " FROM __lk_val v JOIN __lk_len l ON l.__lk_n <= length(v.__lk_v)"
