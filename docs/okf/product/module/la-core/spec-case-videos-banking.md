@@ -34,81 +34,83 @@ code: la/inspecto-la-core
 ## Banking_TillStructuring
 
 > **The exit, not the entry** · Standard · Other Examples (`la-showcase`) · saved view *Structuring into one account*
-> (`mule_structuring`) · about 4½ min
+> (`mule_structuring`) · about 4 min
 
 - Cast: the **till** where a ring's cash comes out (TILL-06); the **eight cash-out accounts** (CASHER-01…CASHER-08); the **second hub** that funds them (MULE-HUB-02). Decoys: the **first ring's hub** (MULE-HUB-01, in the same view), the **benefits payer** (SKIMMER-01), the five **other tills** (TILL-01…TILL-05). All masked for the analyst: said as roles.
 - Stakes: the investigator is a cash-handling analyst at a bank with hundreds of tills. A ring is paid out in cash somewhere, and every till looks busy; each week it is not found, the cash is gone.
 - Vocabulary: *structuring* (breaking a sum into amounts under a reporting limit), *cash-out* (the withdrawal that turns the money back into cash). Both said once in the cold open.
-- Ground truth: `tools/gen-la-showcase-data.py` (the lists `TILLS`, `CASHERS`, `HUB2`, `SKIMMER`; the cash-out loop at "cash-out through TILL-06", line 83; `payer == HUB2 and payee in CASHERS`, line 192; pinned by `LaShowcaseGoldenTest`); v1 figures: twenty-four links on the till and on the second hub, three cash-outs per account, ninety-seven percent of the till's cash to those eight accounts `[check in UI: the share, from the Rows of the till's links]`. **Plan table corrected:** the v1 story and the generator are about the *exit* (one till that serves a ring), not many tills under a limit; the decoys are the first hub, the benefits payer and the other tills.
-- Before: Standard, la-showcase, Demo Analyst, a fresh state; the saved view opens from File ▸ Open… ▸ Saved views. The ids are masked: the film never reads an alias aloud.
-- Lead: *one till, eight accounts, one funder*. **What would change our mind:** if the eight accounts also cashed out at other tills in the same proportions, the till would be the neighbourhood's habit, not the ring's exit. **Next actions:** (1) send the till and the eight accounts to the branch-risk team for a visit, (2) keep the eight as an Entity List and put the hub on a thirty-day hold, (3) watch the till with an Alert Rule on new accounts that cash out there.
-- Voice style: pace as plan §4.1; cold open slow; lexicon exceptions: *till* (not "teller"), "second hub", "casher" said as "cash-out account".
-- Try it / Check: on `la-standard.zip`, open *Structuring into one account*, press *Busiest nodes*, and find the till. *Why is the first hub not the lead of this film?* Answer: it is the previous story's ring and has no cash-out here; the lead is the till where this ring's money comes out.
+- Ground truth: `tools/gen-la-showcase-data.py` (the lists `TILLS`, `CASHERS`, `HUB2`, `SKIMMER`; the cash-out loop at "cash-out through TILL-06", line 83; `payer == HUB2 and payee in CASHERS`, line 192; pinned by `LaShowcaseGoldenTest`).
+- Screen truth (checked live 2026-11-23, Standard, Demo Analyst): the saved view draws a large tangle, two small fans and a few loose pairs, "112 entities masked", labels off. Busiest nodes lists five by alias: the top one with 100 links (the first ring's hub), then two with 24 links each, then 18. Starting from the second card draws 1 entity and 8 linked accounts: eight accounts all paying into it (the till). Starting from the third card draws 1 entity and 8 linked accounts that it pays out to (the second hub), and **the eight aliases are the same eight**. The product's own words on this Space read *subscribers* and *calls* for the entities and links; the voice says accounts and transfers.
+- Before: Standard, la-showcase, Demo Analyst, a fresh unzip; the saved view opens by its address. The ids are masked: the film never reads an alias aloud.
+- Lead: *one till, eight accounts, one funder*. **What would change our mind:** if the eight accounts also cashed out at other tills in the same proportions, the till would be the neighbourhood's habit, not the ring's exit. **Next actions:** (1) send the till and the eight accounts to the branch-risk team for a visit, (2) keep the eight as an Entity List and put the hub on a thirty-day hold, (3) watch the till for new accounts.
+- Voice style: cold open slow; lexicon exceptions: *till* (not "teller"), "second hub", "casher" said as "cash-out account".
+- Try it / Check: on `la-standard.zip`, open *Structuring into one account*, press *Busiest nodes*, and start from the second name. *Why is the first hub not the lead of this film?* Answer: it is the previous story's ring and has no cash-out here; the lead is the till where this ring's money comes out.
 
 ### S01 · A Friday at the tills                                          ~25 s
-- Voice: A branch manager reads a list of busy tills, and every one of them looks busy. [pause 0.5] Cash was broken into small deposits, passed through accounts, and then it had to turn back into cash somewhere. Every ring needs an exit. [pause 0.6] Which till is this one using?
-- Chip: none (cold open on a plain card, then the intro card)
-- Action: cold open: still of the canvas under a slow push-in; intro card *Banking · Till structuring · Standard*.
+- Voice: A branch manager reads a list of busy tills, and every one of them looks busy. [pause 0.5] Cash was broken into small deposits and passed through accounts, and then it had to turn back into cash somewhere. Every ring needs an exit. [pause 0.6] Which till is this one using?
+- Action: cold open over the Space's home page.
 - Impact: none.
 
 ### S02 · Why nothing fired                                             ~30 s
-- Voice: Each deposit was under the reporting limit. Each withdrawal was an ordinary amount at an ordinary till. [pause 0.4] A check that reads one record at a time passes every one of them. The pattern only exists between the records: which accounts paid out, and where.
-- Chip: none
-- Action: slow zoom on the toolbox quick questions while the voice runs.
+- Beat: steady
+- Intro: The exit, not the entry | Other Examples Space
+- Story: the first hub = last story's ring | the second hub = funds eight accounts | a till = where cash comes out
+- Voice: Each deposit was under the reporting limit, and each withdrawal was an ordinary amount at an ordinary till. [pause 0.4] A check that reads one record at a time passes every one of them. The pattern only exists between the records: which accounts paid out, and where.
+- Action: intro card, then the story card "Who is who"; the saved view opens behind it.
+- Impact: the story card names the roles.
+
+### S03 · The data, in one breath                                       ~28 s
+- Voice: Every transfer lands as a record: who paid, who was paid, the amount and the time. Both ends are accounts, so every row is already a link. [pause 0.4] A cash-out is a link from an account to a till.
+- Chip: Data
+- Action: rail Data ▸ hold on the list of Datasets.
 - Impact: none.
 
-### S03 · The data, in one breath                                       ~30 s
-- Voice: Every transfer lands as a record: who paid, who was paid, the channel, the amount, the time. Both ends are accounts, so every row is already a link. [pause 0.4] A cash-out is a link from an account to a till.
-- Chip: Mappings · Dataset
-- Action: Data page ▸ the transfers Dataset ▸ zoom on the Mappings area. `[check in UI: the Mappings line names the payer, payee and time columns]`
-- Impact: mark the two entity columns and the time column.
+### S04 · The saved view                                                ~36 s
+- Voice: The saved view keeps the accounts and the cash-outs. Each circle is an account or a till, each line a transfer or a withdrawal. [pause 0.4] The first ring from the earlier film is still in here. The ids on this screen are masked for the analyst, so I will say what each thing is, not what it is called.
+- Chip: Saved views
+- Action: open the saved view *Structuring into one account* ▸ hold on the bottom line *112 entities masked · Reveal…*.
+- Impact: mark the masked-entities line.
 
-### S04 · The saved view                                                ~40 s
-- Voice: The saved view keeps the accounts and the cash-outs. Each circle is an account or a till, each line a transfer or a withdrawal. [pause 0.4] The first ring from the earlier film is still in here. Look below it. The ids on this screen are masked for the analyst, so I will say what each thing is, not what it is called.
-- Chip: Saved views · File ▸ Open…
-- Action: File ▸ Open… ▸ Saved views ▸ *Structuring into one account* ▸ hold on the bottom line *112 entities masked · Reveal…* `[check in UI: the count]`
-- Impact: mark the masked-entities line; the story card lists "the first hub", "the second hub", "a till".
-
-### S05 · First sweep, and the decoy                                    ~45 s
-- Voice: Who has the most links? One press on Busiest nodes. The first hub leads, as before, and a benefits payer is high on the list. [pause 0.4] That payer is exactly what it looks like: one payer, many ordinary payees. Set it aside. [pause 0.5] But two others stand out with twenty-four links each. A second hub, and a till.
+### S05 · First sweep, and the decoy                                    ~42 s
+- Voice: Who has the most links? One press on Busiest nodes. The first hub leads, as before, with a hundred. [pause 0.4] That is the previous story, so set it aside. But two others stand out with twenty-four links each: a till, and a second hub.
 - Chip: Busiest nodes
-- Action: toolbox ▸ Busiest nodes ▸ click the rows in turn: the first hub, the benefits payer, the second hub, the till. `[check in UI: the order and that the benefits payer is in the list]`
-- Impact: computed mark on the clicked node; the benefits payer marked grey "ruled out".
+- Action: Busiest nodes ▸ hold on the first three cards (100, 24, 24 links).
+- Impact: grey "ruled out" mark on the first card; yellow on the second and third.
 
-### S06 · Narrow to the till                                            ~40 s
-- Voice: Start a new graph from the till. Before it draws anything, the product says what it knows: how many links, and when it was first and last seen. [pause 0.4] Turn on the labels. Eight accounts, and three cash-outs each. That is every customer this till has.
-- Chip: Search · Display options
-- Action: toolbar ▸ Search ▸ the till ▸ Focus; Display options ▸ node labels on. `[check in UI: Focus on a masked alias works from the search result]`
-- Impact: computed mark on the eight accounts; zoom on the till.
+### S06 · Narrow to the till                                            ~38 s
+- Story: off
+- Voice: Start a new graph from the second name, the till. The graph draws it with eight accounts around it, and every one of them pays into it. [pause 0.5] That is every customer this till has: eight, and nobody else.
+- Chip: Start from these
+- Action: Busiest nodes ▸ the second card *Start from these* ▸ hold.
+- Impact: before/after hold: the till with eight accounts appears.
 
-### S07 · Where the money came from                                     ~35 s
-- Voice: Now follow the eight back. All eight were funded by the same second hub. [pause 0.5] A busy till serves many people, a little each. This one serves one ring.
-- Chip: Expand · G
-- Action: select the eight accounts ▸ Expand (one degree, incoming) ▸ the second hub appears. `[check in UI: Expand filter Direction Incoming]`
-- Impact: before/after hold: the second hub joins; mark it.
+### S07 · Where the money came from                                     ~36 s
+- Voice: Now start from the third name, the second hub. It draws eight accounts too, and they are the same eight. [pause 0.5] The same hub funds them all. A busy till serves many people, a little each. This one serves one ring.
+- Chip: Start from these
+- Action: Busiest nodes (a fresh view) ▸ the third card *Start from these* ▸ hold on the eight.
+- Impact: before/after hold: the second hub with the same eight accounts.
 
-### S08 · Every line is a row                                           ~35 s
-- Voice: Is this a guess? Open the table under the graph. Every line is a row: which account, how much, which day. Each one can be read, sorted, and exported. [pause 0.4] The graph shows the pattern. The table backs it up.
-- Chip: Rows · Results
-- Action: dock ▸ Rows ▸ sort by the till's links.
-- Impact: mark "every line is a row" over the table.
+### S08 · Every line is a row                                           ~32 s
+- Voice: Is this a guess? Open the table under the graph. Every line is a row: which account, which link, which account. Each one can be read, sorted and exported as a file. [pause 0.4] The graph shows the pattern, and the table backs it up.
+- Chip: Rows
+- Action: dock ▸ Rows ▸ hold.
+- Impact: before/after hold: the dock opens.
 
-### S09 · The lead, and what would change it                           ~40 s
-- Voice: Ninety-seven percent of the cash this till paid out went to eight accounts, all funded by one hub. [pause 0.6] That is a lead, not a verdict. It would weaken if those accounts also cashed out elsewhere in the same way. [pause 0.4] So the next step is a visit, not a charge.
-- Chip: none
-- Action: hold on the till, the eight accounts and the second hub; the three bullets of the lead appear as a lower third.
-- Impact: lead marked yellow; decoys grey.
+### S09 · The lead, and what would change it                           ~38 s
+- Voice: The till's eight accounts are all funded by one hub. [pause 0.6] That is a lead, not a verdict. It would weaken if those accounts also cashed out elsewhere in the same way, so the next step is a visit, not a charge.
+- Action: hold on the graph.
+- Impact: none.
 
-### S10 · Monday morning                                                ~40 s
-- Voice: Here is what the team does with it. Send the till and the eight accounts to the branch-risk team. Keep the eight as an Entity List, with the hub on a thirty-day hold. [pause 0.4] And watch the till for new accounts. Every graph in this Space marks that list from now on.
-- Chip: Entity List · New list…
-- Action: Entity Lists page ▸ New list… ▸ the eight accounts. `[check in UI: lists of masked ids may need the Demo Admin sign-in; if so, show the list already made and say so]`
-- Impact: mark the new list's name.
+### S10 · Monday morning                                                ~36 s
+- Voice: Here is what the team does with it. Send the till and the eight accounts to the branch-risk team. Keep the eight as an Entity List, with the hub on a thirty-day hold. [pause 0.4] And watch the till for new accounts, because every graph in this Space marks that list from now on.
+- Chip: Entity Lists
+- Action: rail Entity Lists ▸ hold on the lists of this Space; create nothing.
+- Impact: none.
 
-### S11 · Case file                                                    ~15 s
-- Voice: Lead: one till and the ring behind it. Evidence: the rows of the till's cash-outs. Next: visit, hold, watch. [pause 0.6] To make a case defensible, see the Standard module. Inspecto LA.
-- Chip: none
-- Action: case-file card (8 s) and the outro, *Try it* and the link to the shared Standard module.
+### S11 · The case file                                                 ~28 s
+- Casefile: Lead: one till and the ring behind it | Evidence: the till's eight accounts, all funded by one second hub, every link a row | Next: send the till and the eight accounts for a visit; keep the eight as an Entity List with the hub on hold; watch the till for new accounts | Try it: press Busiest nodes and start from the second name
+- Voice: The case file. Lead: one till and the ring behind it. Evidence: eight accounts, all funded by one hub, every link a row. Next step: visit, hold, watch. [pause 0.6] Each deposit was legal; only the links show where the cash came out. The same steps run on millions of records and answer in moments. Try it: start from the second name in Busiest nodes.
+- Action: case-file card (8 s) and the outro "Next: Make it defensible".
 - Impact: none.
 
 ## Banking_SanctionedOwner
