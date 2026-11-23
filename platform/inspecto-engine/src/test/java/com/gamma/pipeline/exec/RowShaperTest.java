@@ -740,6 +740,23 @@ class RowShaperTest {
         assertNull(rows.get(3).get("third_party_msisdn_dial_digit_key"));
     }
 
+    /** A walk reads these into the Step's receipt; a null value is neither a hit nor a miss; reading drops them. */
+    @Test
+    void aKeyedJoinLeavesPerMappingHitAndMissCountsForTheWalkToTake() throws Exception {
+        seedDialDigits();
+        var rows = keyedJoin(keyedCfg());
+        String id = "k" + keyedJoins;
+        assertTrue(rows.get(1).keySet().stream().noneMatch(c -> c.startsWith("__lk_")),
+                "the counting columns never reach the output");
+        var counts = RowShaper.takeLookupStats(conn, id);
+        assertEquals(2L, counts.get("lookup.served_msisdn.hit"));
+        assertEquals(1L, counts.get("lookup.served_msisdn.miss"), "999 has a value and no Reference row");
+        assertEquals(1L, counts.get("lookup.third_party_msisdn.hit"));
+        assertEquals(1L, counts.get("lookup.third_party_msisdn.miss"), "33… is not in the table; the NULL is neither");
+        assertTrue(RowShaper.takeLookupStats(conn, id).isEmpty(), "taken once, then gone");
+        assertTrue(RowShaper.takeLookupStats(conn, "no_such_node").isEmpty());
+    }
+
     /** Without exact_when the toll-free row is an ordinary prefix; with it, it matches only the whole number. */
     @Test
     void exactWhenRowsMatchOnlyTheWholeNumber() throws Exception {

@@ -158,7 +158,14 @@ Reference row of its key effective at or before its time; resolved once per dist
 second input column rides in `at:` (one time for all `on` columns) rather than a pair per mapping; per-mapping `at:`
 inside `lookups:` is not built. Single-table as-of with no key was already `range` with only `from:`. As built:
 `user-guide-elt-record-transformer.md` §8.7. `RowShaperTest`, `PipelineValidatorTest`.
-Still open in P1: the `lookup()` scalar, hit / miss counts (P1 is otherwise complete).
+Still open in P1: the `lookup()` scalar.
+
+**P1g built 2026-11-23 (operator: "lookup() scalar and per-mapping hit and miss counts" — counts half):** a keyed join
+counts, per mapping, rows that **hit** (found a Reference row) and **miss** (had a value, found none; a NULL value is
+neither). Channel: Step Receipt `diag.counts` as `lookup.<on column>.hit|miss` — no new receipt field. The join writes
+`<node>__lookup_stats`; the walk takes it (`RowShaper.takeLookupStats`) when the Step ends OK; the per-row hit
+columns the join adds are dropped from the output. Not built: counts for the unkeyed (`USING`) join and the
+`longest_prefix`-only legacy path; a sample of unmatched keys (§4.6); the UI reading `counts`.
 
 **P1c built 2026-11-22 (operator: "start range"):** `match: range` on the keyed join — `from`/`to` Reference
 columns, inclusive bounds, an empty bound open-ended, compared in the value's own type; `filter` (a condition on

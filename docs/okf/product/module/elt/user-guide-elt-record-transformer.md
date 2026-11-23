@@ -460,6 +460,9 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
     no time matches nothing, no error). `duplicates: refuse` (default) stops the run when the Reference has two rows
     for one key **and** one date; `first` / `last` with `order_by` keep one. `normalize` applies to the key.
   - `matched_key` is `key@from`. Save refuses `asof` without `key`, `from` or `at`, with `to`, and `at` on any other match.
+- **Hit and miss counts (since 2026-11-23, `LOOKUP-1` P1g)** — a keyed join's Step Receipt carries, per `on` column,
+  `lookup.<column>.hit` (found a Reference row) and `lookup.<column>.miss` (had a value, found none) in `diag.counts`;
+  a NULL value counts as neither. A rising miss count is the sign a Reference has gone stale.
 - **`normalize:` (since 2026-11-23, `LOOKUP-1` P1e)** — for `exact` and `longest_prefix`, an ordered list of `trim`,
   `lower`, `upper`, `strip_leading_zeros`, `strip_plus`, applied to the Reference key and to every looked-up value
   alike. Two Reference rows that collapse to one key are refused by the `duplicates` rule; `range` refuses it. The

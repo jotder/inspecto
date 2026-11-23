@@ -1583,10 +1583,13 @@ public final class RowShaper {
                     .append(range ? "i." + q(o) : normalized("CAST(i." + q(o) + " AS VARCHAR)", normalizers));
             // an as-of hit belongs to a (key, time) pair; the time compares as the same value, a NULL time to a NULL
             if (asof) joins.append(" AND ").append(h).append(".__lk_t IS NOT DISTINCT FROM i.").append(q(atCol));
+            // whether this mapping found a Reference row for the row: counted into the Step's receipt, then dropped
+            select.append(", (").append(h).append(".__lk_v IS NOT NULL) AS ").append(q("__lk_hit" + n));
         }
 
         if (range) {
             rangeJoin(conn, node, input, ref, on, fromCol, toCol, filter, dups, orderBy, returned, select, joins, data);
+            lookupStats(conn, node, data, mappings);
             return;
         }
         String key = q(keyCol);
@@ -1645,6 +1648,48 @@ public final class RowShaper {
                 + " __lk_len AS (SELECT DISTINCT length(__lk_key) AS __lk_n FROM __lk_ref),"
                 + " __lk_hit AS MATERIALIZED (" + hit + ")"
                 + " " + select + " FROM " + q(input) + " i" + joins);
+        lookupStats(conn, node, data, mappings);
+    }
+
+    /**
+     * Per-mapping hit and miss counts of a keyed join (LOOKUP-1 P1g): a row HITS when its value found a Reference row,
+     * MISSES when it had a value and found none; a row with no value is neither. Written to a small table beside the
+     * node's output ({@code <node>__lookup_stats}) for the walk to read with {@link #takeLookupStats}, and the
+     * per-mapping hit columns the join added are dropped from the output.
+     */
+    private static void lookupStats(Connection conn, PipelineNode node, String data, List<JoinMapping> mappings)
+            throws SQLException {
+        String stats = table(node.id(), "lookup_stats");
+        exec(conn, "DROP TABLE IF EXISTS " + q(stats));
+        exec(conn, "CREATE TABLE " + q(stats) + " (mapping VARCHAR, hit BIGINT, miss BIGINT)");
+        for (int n = 0; n < mappings.size(); n++) {
+            String hit = q("__lk_hit" + n), on = q(mappings.get(n).on());
+            exec(conn, "INSERT INTO " + q(stats) + " SELECT " + sqlStr(mappings.get(n).on())
+                    + ", count(*) FILTER (WHERE " + hit + "), count(*) FILTER (WHERE NOT " + hit + " AND " + on
+                    + " IS NOT NULL) FROM " + q(data));
+        }
+        for (int n = 0; n < mappings.size(); n++)
+            exec(conn, "ALTER TABLE " + q(data) + " DROP COLUMN " + q("__lk_hit" + n));
+    }
+
+    /**
+     * The hit and miss counts a keyed {@code transform.join} node left ({@code lookup.<on column>.hit} / {@code .miss}),
+     * read once and dropped; empty for any other node, so the walk can ask after every join without knowing its form.
+     */
+    public static Map<String, Long> takeLookupStats(Connection conn, String nodeId) {
+        String stats = table(nodeId, "lookup_stats");
+        Map<String, Long> out = new java.util.LinkedHashMap<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT mapping, hit, miss FROM " + q(stats))) {
+            while (rs.next()) {
+                out.merge("lookup." + rs.getString(1) + ".hit", rs.getLong(2), Long::sum);
+                out.merge("lookup." + rs.getString(1) + ".miss", rs.getLong(3), Long::sum);
+            }
+            exec(conn, "DROP TABLE " + q(stats));
+        } catch (SQLException none) {
+            // not a keyed join: no stats table, no counts
+        }
+        return out;
     }
 
     /**
