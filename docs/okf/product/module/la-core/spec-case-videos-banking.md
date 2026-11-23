@@ -321,78 +321,98 @@ code: la/inspecto-la-core
 > **The same six containers** · Standard · Banking and finance (`la-banking`) · saved view *Circular trade*
 > (`circular_trade`) · about 4½ min
 
-- Cast: the **loop** CO-00941 → CO-00388 → CO-00213; the **six containers** (KLNU…); the decoy **leasing-pool containers** (PWCU…: ten shippers each, never back to a shipper). Readable ids; both are drawn and labelled in the view.
-- Stakes: the investigator is a trade-finance analyst. Every bill of lading is in order; if the goods never go anywhere, the bank financed paper.
-- Vocabulary: *bill of lading* (the receipt for goods on a ship), *consignee* (who receives them), *leg* (one shipment). Said once.
-- Ground truth: `tools/gen-la-trade-data.ground-truth.json` ▸ `stories.circular_trade`: `cycle` CO-00941, CO-00388, CO-00213; `containers` KLNU7238600, KLNU0722138, KLNU9605085, KLNU6490823, KLNU5682691, KLNU7946736; `legs` 6, `leg_values` from 450,681 to 788,128 (rising, so each leg is invoiced higher), `first_ship_date` 2026-03-18, `last_ship_date` 2026-06-27; `leasing_boxes` PWCU0827459 … PWCU6477031 (the decoys, in `lookalikes`). **Plan table corrected:** the decoy is the leasing-pool boxes (the busiest nodes in the view), not a supplier loop.
-- Before: Standard, la-banking, Demo Analyst; the saved view fits the screen with ids readable.
-- Lead: *three companies and six trades to review*. **What would change our mind:** if the containers' position reports show real voyages between the three companies, or the price rise matches a market move. **Next actions:** (1) ask trade finance to hold new advances to the three companies, (2) review the six trades and their invoices, (3) keep the three as the Entity List *Related-party traders*.
-- Voice style: container ids spoken as four letters and digits ("kay el en you"); amounts "a little under half a million" to "nearly eight hundred thousand".
-- Try it / Check: in the saved view find the four containers with ten shippers each and say why they are not a loop. Answer: a leasing pool lends boxes to many shippers and they never return to a shipper that sent them.
+- **Cast:** the **loop** CO-00941 → CO-00388 → CO-00213; the **six containers** (KLNU…); the decoy **leasing-pool containers**
+  (PWCU…: ten shippers each, never back to a shipper). All ids readable; both groups are drawn and labelled in the view.
+- **Stakes:** the investigator is a trade-finance analyst. Every bill of lading is in order; if the goods never go anywhere, the
+  bank financed paper.
+- **Vocabulary:** *bill of lading* (the receipt for goods on a ship), *consignee* (who receives them), *leg* (one shipment). Said
+  once, in S02.
+- **Ground truth:** `tools/gen-la-trade-data.ground-truth.json` ▸ `stories.circular_trade`: `cycle` CO-00941, CO-00388, CO-00213;
+  `containers` KLNU7238600, KLNU0722138, KLNU9605085, KLNU6490823, KLNU5682691, KLNU7946736; `legs` 6; `leg_values` from 450,681 to
+  788,128; `first_ship_date` 2026-03-18, `last_ship_date` 2026-06-27; `leasing_boxes` and `lookalikes` PWCU0827459, PWCU9046170,
+  PWCU3999100, PWCU2508727, PWCU0444452, PWCU6477031. **Plan table kept.** **Checked live 2026-11-23 (fresh Standard unzip):** the
+  Dataset behind the Data page is *bill_of_lading_dataset* (one row per bill of lading; Entity columns trade_id, vessel,
+  container, shipper, consignee; ports are Details; Time column bl_date; *Keep on each link* Yes; 0 Mappings); the saved view draws
+  five hub-and-spoke clusters (the PWCU boxes) and one small ring at the bottom with the six KLNU boxes and CO-00941, CO-00388,
+  CO-00213 labelled; Busiest nodes lists five boxes at 10 links each (PWCU0444452, PWCU0827459, PWCU2508727, PWCU3999100,
+  PWCU6477031); Search nodes dims the rest and picks out CO-00941; the Rows table lists From, Link kind (traded_with, shipped_in)
+  and To with a Count; it carries no date or value column; the time control (*Filter links by time*) cuts the graph's year into twenty
+  slices (2025-10-02 to 2026-09-29) with a play button; the Entity Lists page already holds *Related-party traders* (Watch these,
+  Trade entity).
+- **Before:** Standard, la-banking, Demo Analyst; the saved view fits the screen with ids readable. The film changes no state.
+- **Lead:** *three companies and six trades to review.* **What would change our mind:** if the containers' position reports show real
+  voyages between the three companies, or the price rise matches a market move. **Next actions:** (1) ask trade finance to hold new
+  advances to the three companies, (2) review the six trades and their invoices, (3) keep the three marked through the Entity List
+  *Related-party traders*, which the Space already holds.
+- **Voice style:** container ids spoken as four letters and digits; amounts "a little under half a million" to "nearly eight hundred
+  thousand". The invoice values are in the trade documents and are narrated, not shown: the saved view's rows carry no value.
+- **Try it / Check:** in the saved view find the boxes that appear with ten shippers each and say why they are not a loop. *Answer:
+  a leasing pool lends boxes to many shippers and they never return to a shipper that sent them.*
 
-### S01 · The goods keep coming back                                    ~25 s
-- Voice: Every bill of lading is in order. The goods are real, the ships sail, the paperwork matches. [pause 0.5] So why do the same six containers keep coming back?
-- Chip: none
-- Action: cold open and intro card.
+### S01 · The goods keep coming back · ~25 s
+- Voice: Every bill of lading is in order. The goods are real, the ships sail, the paperwork matches. [pause 0.5] So why do the same six containers keep coming back, round the same three companies?
+- Action: cold open over the Banking Space's home page; the intro card opens the next scene.
 - Impact: none.
 
-### S02 · Why each document passes                                    ~30 s
-- Voice: Trade-finance teams check documents one at a time, and each one is fine. Nobody checks whether the goods are actually going anywhere. [pause 0.4] That is a question about connections.
-- Chip: none
-- Action: zoom while the voice runs.
-- Impact: none.
+### S02 · Why each document passes · ~30 s
+- Beat: steady
+- Intro: The same six containers | Banking and finance Space
+- Story: a bill of lading = the receipt for goods on a ship | a consignee = the company that receives them | a leg = one shipment of one container
+- Voice: Trade-finance teams check documents one at a time, and each one passes. A bill of lading is the receipt for goods on a ship. The consignee is who receives them, and one shipment of one container is a leg. [pause 0.4] Nobody checks whether the goods ever go anywhere. That is a question about connections.
+- Action: story card "Who is who" over the home page.
+- Impact: the story card names the three terms.
 
-### S03 · The data, in one breath                                     ~30 s
-- Voice: Every bill of lading lands as a record: the vessel, the container, the shipper, the consignee, the ports and the date. A Job links shippers and consignees through the containers they handled.
-- Chip: Mappings
-- Action: Data page ▸ the trade links Dataset ▸ Mappings. `[check in UI]`
-- Impact: mark the shipper, consignee and container columns.
+### S03 · The data, in one breath · ~30 s
+- Voice: Every bill of lading lands as a record. It names the vessel, the container, the shipper, the consignee, two ports and the date. [pause 0.4] Shipper and consignee are companies, so each record becomes a link between two companies. The container rides along on that link.
+- Chip: Data · Columns
+- Action: rail Data ▸ the Dataset *bill_of_lading_dataset* ▸ hold on its Columns card. `[checked live: shipper, consignee, container, vessel and trade_id are Entity columns, bl_date is the Time, the ports are Details; Keep on each link is Yes]`
+- Impact: mark the Columns card.
 
-### S04 · The saved view                                              ~35 s
-- Voice: The saved view draws companies and the containers moving between them. One question: does any container come back to a company that sent it?
+### S04 · The saved view · ~35 s
+- Story: off
+- Voice: The saved view draws the companies and the containers moving between them. Each shape is a company or a container, and each line is a shipment. [pause 0.4] The network falls into clusters. Most look like a hub with spokes. One small cluster, low on the screen, is different. Its lines run in a ring.
 - Chip: Saved views
-- Action: File ▸ Open… ▸ Saved views ▸ *Circular trade* ▸ hold. `[check in UI: labels visible on this view]`
+- Action: open the saved view *Circular trade* ▸ hold. `[checked live: five hub-and-spoke clusters and one small ring at the bottom, ids readable]`
 - Impact: none.
 
-### S05 · The busiest boxes, and the decoy                            ~45 s
-- Voice: Busiest nodes: containers with ten shippers each. Suspicious? [pause 0.4] They belong to a leasing pool, many shippers, and never back to a company that sent them. Ordinary. Look past them.
+### S05 · The busiest boxes, and the decoy · ~45 s
+- Voice: Ask the first question: who is the busiest? Busiest nodes names five containers, each with ten links. [pause 0.4] Ten links means ten different shippers. These boxes belong to a leasing pool. A pool lends the same box to many shippers, and the box never goes back to one that sent it. That is ordinary. Look past them.
 - Chip: Busiest nodes
-- Action: toolbox ▸ Busiest nodes ▸ click a PWCU row. `[check in UI: the PWCU boxes lead]`
-- Impact: the PWCU boxes marked grey "leasing pool, ruled out".
+- Action: toolbox ▸ Busiest nodes ▸ hold on the list. `[checked live: PWCU0444452, PWCU0827459, PWCU2508727, PWCU3999100 and PWCU6477031, 10 links each]`
+- Impact: the hub-and-spoke clusters marked grey "ruled out: leasing pool".
 
-### S06 · The loop                                                    ~40 s
-- Voice: Start from one company in the loop, CO-00941. It trades with just two companies, CO-00388 and CO-00213. And it ships six containers. The same six. [pause 0.5] Round all three.
-- Chip: Search · Focus
-- Action: Search ▸ CO-00941 ▸ Focus ▸ expand one degree.
-- Impact: computed mark on the three companies and the six boxes.
+### S06 · The loop · ~40 s
+- Voice: Now look at the ring. Search for CO-00941. The graph dims everything else and picks out that company. [pause 0.4] It trades with just two others, CO-00388 and CO-00213. And it ships six containers. The same six, all the way round.
+- Chip: Search nodes
+- Action: toolbar Search ▸ type `CO-00941` ▸ Enter ▸ hold. `[checked live: the search dims the rest and highlights CO-00941 with its label]`
+- Impact: the ring marked yellow.
 
-### S07 · Round the loop twice                                        ~40 s
-- Voice: The same six boxes went twice round three companies, between March and June. [pause 0.4] Follow one container leg by leg. Each time it changes hands, the invoice is higher.
-- Chip: Time window
-- Action: Time ▸ the window March to June; select one KLNU box. `[check in UI: Time window control on the toolbar]`
-- Impact: before/after hold: the six legs appear in order.
+### S07 · Round the loop twice · ~40 s
+- Voice: The same six boxes went twice round the three companies, between March and June. Open the time control. It cuts the year into twenty steps. [pause 0.4] Play it, and the shipments appear in the order they happened.
+- Chip: Filter links by time
+- Action: toolbar clock ▸ Play ▸ hold. `[checked live: the control opens with a slice slider, a Play button and the line "20 slices from 2025-10-02 to 2026-09-29"; confirm that Play lights the ring's legs in turn]`
+- Impact: before/after hold: the legs appear as the slices advance.
 
-### S08 · Every leg is a row                                         ~35 s
-- Voice: Open the table. Each leg is a row: shipper, container, consignee, date, value. The values climb from a little under half a million to nearly eight hundred thousand, on the same goods.
+### S08 · Every leg is a row · ~35 s
+- Voice: Open the table. Each line is a row: who ships, the kind of link, and to whom. The ring is in there. CO-00941 trades with CO-00388, and the containers go on from one company to the next. [pause 0.4] The invoices behind those legs rise from a little under half a million to nearly eight hundred thousand, on the same goods.
 - Chip: Rows
-- Action: dock ▸ Rows ▸ sort by date.
-- Impact: mark the value column.
+- Action: dock ▸ Rows ▸ search the table for CO-00941 ▸ hold. `[checked live: columns From, Link kind (traded_with, shipped_in), To, Count; the rows carry no value: the invoice figures are narrated]`
+- Impact: mark the first rows.
 
-### S09 · The lead, and what would change it                        ~40 s
+### S09 · The lead, and what would change it · ~40 s
 - Voice: Three companies and six trades to look at. It is a lead. [pause 0.5] It weakens if vessel positions show a real voyage between them, or if the price rise follows the market. Both can be checked.
-- Chip: none
-- Action: lower third with the lead and the two checks.
-- Impact: loop yellow, leasing pool grey.
+- Action: close the dock; hold on the ring while the voice runs.
+- Impact: ring yellow, leasing pool grey.
 
-### S10 · Monday morning                                             ~35 s
-- Voice: Hold new advances to the three companies. Review the six trades. [pause 0.4] Keep the three as an Entity List, so every later graph marks them.
-- Chip: Entity List
-- Action: New list… `Related-party traders` with the three. `[check in UI]`
-- Impact: mark the list name.
+### S10 · Monday morning · ~35 s
+- Voice: Hold new advances to the three companies. Review the six trades. [pause 0.4] This Space already keeps the three as an Entity List, Related-party traders, so every graph marks them. A new investigation can start from it.
+- Chip: Entity Lists
+- Action: rail Entity Lists ▸ hold on *Related-party traders*. `[checked live: Watch these, Trade entity]`
+- Impact: mark the list row.
 
-### S11 · Case file                                                  ~15 s
-- Voice: Lead: three companies, six trades. Evidence: the legs, in order. Next: hold, review, watch. Inspecto LA.
-- Chip: none
+### S11 · Case file · ~25 s
+- Casefile: Lead: three companies, six trades | Evidence: the legs in the table, round the loop twice | Next: hold new advances to the three; review the six trades; keep the three marked through the Entity List | Try it: find the boxes with ten shippers each and say why they are not a loop
+- Voice: The case file. The lead: three companies, six trades. The evidence: the legs, in order. Next: hold, review, watch. [pause 0.6] Your turn. Find the boxes with ten shippers each, and say why they are not a loop.
 - Action: case-file card and outro.
 - Impact: none.
 
