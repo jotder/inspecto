@@ -419,80 +419,80 @@ code: la/inspecto-la-core
 ## Banking_CryptoCashOut
 
 > **Forty names, one hand** · Standard · Banking and finance (`la-banking`) · saved view *Converging cash out*
-> (`converging_cash_out`) · about 4½ min
+> (`converging_cash_out`) · about 4 min
 
-- Cast: the **cluster** CL-01125 (thirty deposit addresses); the **forty exchange accounts** (XA-03119…XA-03158) in forty names; the **three bank accounts** they cash out to (BK-49804167, BK-77665088, BK-95284540). Decoy: the **payment-desk cluster** CL-01126 (sixty accounts, fifty-four banks). Readable ids; the saved view is large and unlabelled until focused.
+- Cast: the **cluster** CL-01125 (thirty deposit addresses, shown by their codes); the **forty exchange accounts** in forty names and the **three bank accounts** they cash out to (named in the data, not drawn in this film). Decoy: the **payment-desk cluster** CL-01126 (sixty accounts, fifty-four banks), checked in the narration. Ids of the cluster are readable; the addresses show as long codes and are never read aloud.
 - Stakes: the investigator works on virtual-asset flows at a bank. Forty small accounts show nothing large; the stakes are in the one hand behind them.
-- Vocabulary: *cluster* (addresses controlled by one owner, as grouped by the analytics), *off-ramp* (where crypto turns into bank money). Said once.
-- Ground truth: `tools/gen-la-crypto-data.ground-truth.json` ▸ `converging_cash_out`: `cluster` CL-01125, `accounts` 40, `addresses` 30, `banks` three, `exchanges` Fernhill Coin Exchange 22 and Pebblebrook Exchange 18, `persons` 40, `lookalike_cluster` CL-01126 with `lookalike_accounts` 60 and `lookalike_banks` 54; `thresholds` funded_accounts 10, hop_hours 24. **Plan table kept and sharpened:** many accounts, one off-ramp, with a payment desk that looks the same from the chain as the decoy.
-- Before: Standard, la-banking, Demo Analyst; the view is dense, so the film opens the cluster by search.
-- Lead: *one controller behind forty accounts, and three bank accounts to follow*. **What would change our mind:** the forty accounts turning out to be customers of one licensed desk (the lookalike pattern: many banks, not three). **Next actions:** (1) file the cluster and the three bank accounts with the financial-crime unit, (2) ask both exchanges for the account-opening records, (3) keep the forty as an Entity List and an Alert Rule on new accounts funded from the cluster.
+- Vocabulary: *cluster* (addresses controlled by one owner, as grouped by the analytics), *off-ramp* (where crypto turns into bank money). Said once, in S02.
+- Ground truth: `tools/gen-la-crypto-data.ground-truth.json` ▸ `converging_cash_out`: `cluster` CL-01125, `accounts` 40, `addresses` 30, `banks` three, `exchanges` Fernhill Coin Exchange 22 and Pebblebrook Exchange 18, `persons` 40, `lookalike_cluster` CL-01126 with `lookalike_accounts` 60 and `lookalike_banks` 54; `thresholds` funded_accounts 10, hop_hours 24. **Checked live 2026-11-23 (fresh Standard unzip, the Dataset is *crypto_screen_links_dataset*):** its columns are src and dst (Entity, Crypto entity), kind (Category), amount (Measure), ts and event_date (Time), via and screen (Detail); the saved view draws about four hundred nodes with the caption *node labels off above 80 nodes*; Busiest nodes names CL-01125 first (30 links, the most on the graph), then three long address codes with 21, 21 and 20 links; *Start from these* on CL-01125 draws it with 30 linked nodes (the notice reads *Started from CL-01125, the busiest node. Drew 1 entity and 30 linked nodes*); the Rows table lists the 30 addresses as *same_cluster* links to CL-01125; **a step further, Expand on the cluster is held for a second person's approval (the Space's four-eyes limit of 2,000 neighbours), so the film does not press it**; the Entity Lists page holds *Peel-chain exchange accounts* (Watch these, Crypto entity, 6 members) and no list for the forty. **The convergence of the forty accounts on three bank accounts is therefore stated from the data summary, not drawn.**
+- Before: Standard, la-banking, Demo Analyst; the film changes no state. The probe step that turns a queued start into an Investigation creates a held request: do not press it.
+- Lead: *one controller behind forty accounts, and three bank accounts to follow*. **What would change our mind:** the forty accounts turning out to be customers of one licensed desk (the lookalike pattern: many banks, not three). **Next actions:** (1) file the cluster and the three bank accounts with the financial-crime unit, (2) ask both exchanges for the account-opening records, (3) keep the forty accounts as an Entity List and ask a second person to approve the wide expand that draws them.
 - Voice style: addresses are never read; the voice says "thirty addresses".
 - Try it / Check: search CL-01126 and compare it with CL-01125. *What differs?* Answer: it pays sixty accounts that cash out to fifty-four different banks; CL-01125 pays forty that converge on three.
 
-### S01 · Forty small accounts                                        ~25 s
+### S01 · Forty small accounts · ~25 s
 - Voice: Forty exchange accounts. Forty different names. Not one large balance. [pause 0.5] Yet the money behind them arrives from one place and leaves to a handful of bank accounts. Whose hand is behind the forty?
-- Chip: none
-- Action: cold open and intro card.
+- Action: cold open over the Banking Space's home page; the intro card opens the next scene.
 - Impact: none.
 
-### S02 · Why small hides it                                        ~30 s
-- Voice: Each account passes its checks. Each deposit is small. [pause 0.4] A check that reads one account cannot see that thirty addresses belong to one owner, or that forty accounts empty into three.
-- Chip: none
-- Action: zoom while the voice runs.
-- Impact: none.
+### S02 · Why small hides it · ~30 s
+- Beat: steady
+- Intro: Forty names, one hand | Banking and finance Space
+- Story: a cluster = addresses controlled by one owner | an off-ramp = where crypto turns into bank money | an exchange account = an account at a crypto exchange
+- Voice: Each account passes its checks, and each deposit is small. [pause 0.4] A check that reads one account cannot see that thirty addresses belong to one owner. A cluster is a group of addresses that one owner controls. An off-ramp is where crypto turns into bank money.
+- Action: story card "Who is who" over the home page.
+- Impact: the story card names the three terms.
 
-### S03 · The data, in one breath                                  ~30 s
-- Voice: Every exchange account lands as a record: the account, the exchange, the verified person, the deposit address. A Job links accounts to the addresses that funded them, the clusters those belong to, and the bank accounts they cash out to.
-- Chip: Mappings
-- Action: Data page ▸ the screening links Dataset ▸ Mappings. `[check in UI]`
-- Impact: mark the account, address, cluster columns.
+### S03 · The data, in one breath · ~30 s
+- Voice: Every transfer lands as a record. The sender and the receiver are both crypto entities, the kind is a category, and the amount is a measure. [pause 0.4] A Job tags each link with the screen that picked it. This Dataset holds the links of the three saved views.
+- Chip: Data · Columns
+- Action: rail Data ▸ search the Datasets for `crypto_screen` ▸ the Dataset *crypto_screen_links_dataset* ▸ hold on its Columns card. `[checked live: src and dst Entity (Crypto entity), kind Category, amount Measure, ts and event_date Time, via and screen Detail]`
+- Impact: mark the Columns card.
 
-### S04 · The saved view                                           ~35 s
-- Voice: The saved view draws the cash-out side of the chain: clusters of addresses, the exchange accounts they paid, and the bank accounts at the end. It is dense. We will not read it all. We will ask it questions.
+### S04 · The saved view · ~35 s
+- Story: off
+- Voice: The saved view draws the cash-out side of the chain. It is dense: about four hundred shapes. [pause 0.4] We will not read it all. The labels are off above eighty nodes, and Display options turns them on. We will ask the view questions instead.
 - Chip: Saved views
-- Action: File ▸ Open… ▸ Saved views ▸ *Converging cash out*.
+- Action: open the saved view *Converging cash out* ▸ hold on the caption at the bottom. `[checked live: the caption reads node labels off above 80 nodes]`
 - Impact: none.
 
-### S05 · First sweep, and the desk                              ~45 s
-- Voice: Busiest nodes puts one cluster first, CL-01125, with thirty links. A cluster that size is one owner's wallet. [pause 0.4] But hold on. A payment desk paying its customers looks the same from the chain. So check a second cluster, CL-01126, before deciding.
+### S05 · First sweep · ~40 s
+- Voice: Busiest nodes puts one cluster first, CL-01125, with thirty links. A cluster that size is one owner's wallet. [pause 0.4] The names after it are single addresses with about twenty links each. A payment desk can look like this too, so before deciding we also check a second cluster, CL-01126, and ask where its accounts cash out.
 - Chip: Busiest nodes
-- Action: toolbox ▸ Busiest nodes ▸ rows ▸ Search ▸ CL-01126 ▸ Focus. `[check in UI: CL-01126 appears in the view and its fan-out]`
-- Impact: CL-01126 marked grey "a desk".
+- Action: toolbox ▸ Busiest nodes ▸ hold on the first rows. `[checked live: CL-01125 takes part in 30 links, the most on this graph; the next rows are long address codes with 21, 21 and 20 links]`
+- Impact: computed mark on the first row, yellow.
 
-### S06 · The desk fans out; the cluster converges              ~40 s
-- Voice: The desk pays sixty accounts, and they cash out to fifty-four different banks. A desk's customers go everywhere. [pause 0.5] Now the first cluster. Forty accounts, and every one of them cashes out to one of three bank accounts.
-- Chip: Expand · G
-- Action: select CL-01125 ▸ Expand (two degrees, outgoing); then the same for CL-01126.
-- Impact: before/after hold: CL-01125 closes on three bank nodes; mark them.
+### S06 · Start from the cluster · ~40 s
+- Voice: Start from CL-01125. The notice reads: started from the busiest node, one entity and thirty linked nodes. Those thirty are its addresses. [pause 0.5] Thirty ways of sending, and one sender behind them.
+- Chip: Start from these
+- Action: Busiest nodes ▸ first row ▸ *Start from these*. `[checked live: the notice reads Started from CL-01125, the busiest node. Drew 1 entity and 30 linked nodes; the Investigation tab shows CL-01125 as a queued start entity]`
+- Impact: before/after hold: CL-01125 with its thirty addresses.
 
-### S07 · Thirty ways of sending                                    ~35 s
-- Voice: Thirty addresses, all behind CL-01125. Thirty ways of sending. One sender.
-- Chip: Display options
-- Action: Display options ▸ node labels on; zoom on the cluster.
-- Impact: computed mark on the thirty addresses.
-
-### S08 · Every payment is a row                                  ~35 s
-- Voice: Open the table. Every payment from the cluster to an exchange account is a row. Twenty-two went to one exchange, eighteen to the other. Each exchange can confirm its own.
+### S07 · Every address is a row · ~35 s
+- Voice: Open the table. Each line is a row: an address, the kind of link, and the cluster. All thirty are the same kind of link, same cluster, and they all end at CL-01125. Each row can be read, sorted and quoted.
 - Chip: Rows
-- Action: dock ▸ Rows ▸ sort by exchange.
-- Impact: mark the exchange column.
+- Action: dock ▸ Rows ▸ hold on the first rows. `[checked live: syn1… same_cluster CL-01125, one row per address]`
+- Impact: mark the link kind column.
 
-### S09 · The lead, and what would change it                      ~40 s
-- Voice: One sender paid forty accounts opened in forty names, and each cashes out to one of three bank accounts. That is a lead: one controller. [pause 0.5] It weakens if the forty turn out to be customers of one licensed desk. The desk pattern, many banks, is the opposite.
-- Chip: none
-- Action: lower third with the lead and the check.
-- Impact: lead yellow, desk grey.
+### S08 · The next step is held · ~40 s
+- Voice: What does the cluster pay? The data says forty exchange accounts, twenty-two at one exchange and eighteen at the other, and every one cashes out to one of three bank accounts. [pause 0.5] To draw them, you expand the cluster. In this Space a step that wide waits for a second person to approve it, so we do not take it alone. That is the four-eyes rule, and episode F5 shows it.
+- Action: hold on the Rows table while the voice runs.
+- Impact: none.
 
-### S10 · Monday morning                                          ~35 s
-- Voice: File the cluster and the three bank accounts with the financial-crime unit. Ask both exchanges for the account-opening records. [pause 0.4] Keep the forty as an Entity List, and raise an Alert Rule on new accounts funded from the cluster.
-- Chip: Entity List · Alert Rule
-- Action: New list… `Peel-chain exchange accounts` is the v1 name; use `Converging cash-out accounts` `[check in UI: list names are free text]`.
-- Impact: mark the list name.
+### S09 · The lead, and what would change it · ~40 s
+- Voice: One sender paid forty accounts opened in forty names, and each cashes out to one of three bank accounts. That is a lead: one controller. [pause 0.5] It weakens if the forty turn out to be customers of one licensed desk. A desk's customers go to many banks, fifty-four for the lookalike cluster, not three.
+- Action: close the dock; hold while the voice runs.
+- Impact: none.
 
-### S11 · Case file                                              ~15 s
-- Voice: Lead: one controller, forty accounts, three banks. Evidence: the payments, by exchange. Next: file, ask, watch. Inspecto LA.
-- Chip: none
+### S10 · Monday morning · ~35 s
+- Voice: File the cluster and the three bank accounts with the financial-crime unit. Ask both exchanges for the account-opening records. [pause 0.4] Keep the forty as an Entity List, and ask a second person to approve the expand that draws them. This Space already keeps a list for another crypto case, Peel-chain exchange accounts.
+- Chip: Entity Lists
+- Action: rail Entity Lists ▸ hold on *Peel-chain exchange accounts*. `[checked live: Watch these, Crypto entity, 6 members]`
+- Impact: mark the list row.
+
+### S11 · Case file · ~25 s
+- Casefile: Lead: one controller behind forty accounts | Evidence: thirty addresses in one cluster, and the Dataset's cash-out summary | Next: file the cluster and the three bank accounts; ask both exchanges for the account records; keep the forty as an Entity List | Try it: search CL-01126 and compare it with CL-01125
+- Voice: The case file. The lead: one controller. The evidence: thirty addresses in one cluster. Next: file, ask, keep. [pause 0.6] Your turn. Search the second cluster, CL-01126, and compare where it cashes out.
 - Action: case-file card and outro.
 - Impact: none.
 
