@@ -956,7 +956,11 @@ public final class NodeAttributes {
             NodeAttribute.of("normalize", "Normalize keys", "list", "optional").placeholder("strip_plus")
                     .help("Exact and longest prefix: rewrite the Reference key and each looked-up value the same way "
                             + "before comparing, in the order given — trim, lower, upper, strip_leading_zeros, "
-                            + "strip_plus."));
+                            + "strip_plus."),
+            NodeAttribute.of("max_miss_rate", "Stop above this miss rate", "number", "optional").min(0).max(1)
+                    .placeholder("0.1")
+                    .help("Stop the run when more than this share (0 to 1) of a column's values find no Reference "
+                            + "row — a stale or wrong Reference. The failed Step raises the Incident. Empty = never stop."));
 
     /**
      * {@code transform.sql} (sql-transform-v1-plan.md, B1) — one author {@code SELECT} over the typed

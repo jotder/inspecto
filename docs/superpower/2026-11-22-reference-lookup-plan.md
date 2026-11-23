@@ -167,6 +167,8 @@ neither). Channel: Step Receipt `diag.counts` as `lookup.<on column>.hit|miss` �
 columns the join adds are dropped from the output. Not built: counts for the unkeyed (`USING`) join and the
 `longest_prefix`-only legacy path; a sample of unmatched keys (§4.6); the UI reading `counts`.
 
+**P2a built 2026-11-23 (operator: "P2 lifecycle", slice "Miss-rate Expectation"):** `max_miss_rate:` (0 to 1) on a keyed join stops the Step when, for any mapping, more than that share of looked-up values (hit + miss; NULLs excluded) find no Reference row — the stale-Reference detector, built on the P1g counts. The failed Step is what raises the Incident (the existing batch-failed path), with the counts in the message and no values. Decision: node-level, one threshold for every mapping, fail-only (no warn mode); a miss-rate Expectation proper (evaluated outside a run) is not built. Decision (assistant, 2026-11-23): the rest of P2 — shared warm cache, atomic swap, incremental refresh — waits for the P3 point engine, the only consumer (D-LK8); as-of event time and the version in lineage are in `2026-11-22-dated-reference-runs-plan.md`. Still open in P2: load-time quality report (null keys, prefix conflicts as counts and a sample). `RowShaperTest`, `PipelineValidatorTest`, `NodeAttributesContractTest`.
+
 **P1h built 2026-11-23 (operator: "Yes, exact only"):** the `lookup()` scalar as the Record Transformer function
 `lookup.reference` (category Lookup; params `reference`, `key`, `returns`, `normalize`), exact match only. It renders
 the marker call `inspecto_lookup(...)`; `RowShaper.project` expands it into a scalar subquery over the resolved

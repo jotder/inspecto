@@ -2343,6 +2343,7 @@ com.gamma.pipeline.exec.ProvenanceStores | public static void register(String, D
 com.gamma.pipeline.exec.ProvenanceStores | public static void unregister(String)
 com.gamma.pipeline.exec.ProvenanceStores | public static void use(DbProvenanceStore)
 com.gamma.pipeline.exec.RowShaper | public final class RowShaper
+com.gamma.pipeline.exec.RowShaper | public static Double joinMaxMissRate(Object)
 com.gamma.pipeline.exec.RowShaper | public static List<AddedColumn> joinAddedColumns(Map<String, Object>, Map<String, String>, List<String>)
 com.gamma.pipeline.exec.RowShaper | public static List<Relation> merge(Connection, PipelineNode, List<String>, String) throws SQLException
 com.gamma.pipeline.exec.RowShaper | public static List<Relation> shape(Connection, PipelineNode, String, String) throws SQLException

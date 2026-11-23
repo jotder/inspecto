@@ -1417,7 +1417,24 @@ public final class RowShaper {
     /** The keyed form's settings (LOOKUP-1 P1b/P1c); each needs {@code key:}, or {@code from:}/{@code to:} for a range. */
     public static final List<String> JOIN_KEYED_KEYS =
             List.of("columns", "as", "default", "exact_when", "duplicates", "order_by", "from", "to", "filter",
-                    "lookups", "details", "normalize", "at");
+                    "lookups", "details", "normalize", "at", "max_miss_rate");
+
+    /**
+     * {@code max_miss_rate:} (LOOKUP-1 P2): the share of a mapping's looked-up values, from 0 to 1, that may find no
+     * Reference row before the Step stops. {@code null} when unset; refuses anything that is not a number in range.
+     */
+    public static Double joinMaxMissRate(Object raw) {
+        if (raw == null || raw.toString().isBlank()) return null;
+        double rate;
+        try {
+            rate = raw instanceof Number n ? n.doubleValue() : Double.parseDouble(raw.toString().trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("max_miss_rate: must be a number from 0 to 1, not " + raw);
+        }
+        if (!(rate >= 0 && rate <= 1))
+            throw new IllegalArgumentException("max_miss_rate: must be a number from 0 to 1, not " + raw);
+        return rate;
+    }
     /** The keys of one {@code lookups:} entry (LOOKUP-1 P1d). */
     public static final List<String> JOIN_LOOKUP_KEYS = List.of("on", "columns", "as", "default", "details");
     /**
@@ -1532,6 +1549,11 @@ public final class RowShaper {
         if (range && !normalizers.isEmpty())
             throw new IllegalArgumentException("transform.join node '" + id + "': normalize: applies to match: exact "
                     + "and longest_prefix, not range (a range compares in the value's own type)");
+        try {
+            joinMaxMissRate(node.cfg("max_miss_rate"));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("transform.join node '" + id + "': " + e.getMessage());
+        }
         String exactWhen = strOrNull(node, "exact_when");
         if (exactWhen != null && !prefix)
             throw new IllegalArgumentException("transform.join node '" + id + "': exact_when only applies to "
@@ -1670,6 +1692,20 @@ public final class RowShaper {
         }
         for (int n = 0; n < mappings.size(); n++)
             exec(conn, "ALTER TABLE " + q(data) + " DROP COLUMN " + q("__lk_hit" + n));
+        Double max = joinMaxMissRate(node.cfg("max_miss_rate"));
+        if (max == null) return;
+        // A stale or wrong Reference shows first as values finding no row: stop the run rather than ship them. The
+        // failed Step is what raises the Incident. Values are never quoted here — the text is stored in the receipt.
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT mapping, hit, miss FROM " + q(stats))) {
+            while (rs.next()) {
+                long hit = rs.getLong(2), miss = rs.getLong(3);
+                if (hit + miss > 0 && (double) miss / (hit + miss) > max)
+                    throw new IllegalArgumentException("transform.join node " + node.id() + ": " + miss + " of "
+                            + (hit + miss) + " values of column " + rs.getString(1) + " found no Reference row, over "
+                            + "the allowed miss rate " + max + " — the Reference may be stale or the wrong one");
+            }
+        }
     }
 
     /**

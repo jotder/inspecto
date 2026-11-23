@@ -463,6 +463,10 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
 - **Hit and miss counts (since 2026-11-23, `LOOKUP-1` P1g)** — a keyed join's Step Receipt carries, per `on` column,
   `lookup.<column>.hit` (found a Reference row) and `lookup.<column>.miss` (had a value, found none) in `diag.counts`;
   a NULL value counts as neither. A rising miss count is the sign a Reference has gone stale.
+- **`max_miss_rate:` (since 2026-11-23, `LOOKUP-1` P2a)** — a number from 0 to 1. When, for any `on` column, more than
+  this share of the values that had a value find no Reference row, the Step fails and the run raises its Incident; the
+  message gives the counts and names the column, never a value. `0.1` = stop above 10 % misses. Empty = never stop.
+  Needs `key:` like every keyed setting; save refuses a value outside 0 to 1.
 - **`normalize:` (since 2026-11-23, `LOOKUP-1` P1e)** — for `exact` and `longest_prefix`, an ordered list of `trim`,
   `lower`, `upper`, `strip_leading_zeros`, `strip_plus`, applied to the Reference key and to every looked-up value
   alike. Two Reference rows that collapse to one key are refused by the `duplicates` rule; `range` refuses it. The

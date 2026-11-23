@@ -796,6 +796,19 @@ class RowShaperTest {
         assertTrue(RowShaper.takeLookupStats(conn, "no_such_node").isEmpty());
     }
 
+    /** served_msisdn misses 1 of its 3 values: a miss rate cap above that lets the run on, below it stops it. */
+    @Test
+    void maxMissRateStopsTheStepWhenTooManyValuesFindNoReferenceRow() throws Exception {
+        seedDialDigits();
+        assertEquals(3, keyedJoin(keyedCfg("max_miss_rate", 0.5)).size());
+        assertEquals(3, keyedJoin(keyedCfg()).size(), "unset: never stops");
+        var e = assertThrows(IllegalArgumentException.class, () -> keyedJoin(keyedCfg("max_miss_rate", 0.2)));
+        assertTrue(e.getMessage().contains("1 of 3 values of column served_msisdn"), e.getMessage());
+        assertTrue(e.getMessage().contains("stale"), e.getMessage());
+        var bad = assertThrows(IllegalArgumentException.class, () -> keyedJoin(keyedCfg("max_miss_rate", 2)));
+        assertTrue(bad.getMessage().contains("0 to 1"), bad.getMessage());
+    }
+
     /** Without exact_when the toll-free row is an ordinary prefix; with it, it matches only the whole number. */
     @Test
     void exactWhenRowsMatchOnlyTheWholeNumber() throws Exception {

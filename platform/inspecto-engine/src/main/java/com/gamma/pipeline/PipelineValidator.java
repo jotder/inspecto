@@ -150,6 +150,11 @@ public final class PipelineValidator {
         } catch (IllegalArgumentException e) {
             return e.getMessage();
         }
+        try {
+            com.gamma.pipeline.exec.RowShaper.joinMaxMissRate(n.cfg("max_miss_rate"));
+        } catch (IllegalArgumentException e) {
+            return e.getMessage();
+        }
         Object dups = n.cfg("duplicates");
         if (dups != null && !com.gamma.pipeline.exec.RowShaper.JOIN_DUPLICATES.contains(dups.toString()))
             return "duplicates '" + dups + "' — use one of " + com.gamma.pipeline.exec.RowShaper.JOIN_DUPLICATES;

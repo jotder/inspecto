@@ -430,6 +430,20 @@ class PipelineValidatorTest {
         }
     }
 
+    @Test
+    void aJoinsMaxMissRateIsCheckedAtValidation() {
+        Map<String, Object> ok = Map.of("reference", "reference/codes", "key", "code", "on", "v", "max_miss_rate", 0.1);
+        assertFalse(codes(PipelineValidator.validate(joinGraph(ok))).contains(PipelineValidator.JOIN_KEYED_INVALID));
+        for (Object bad : List.of(1.5, -0.1, "often")) {
+            PipelineValidator.Result r = PipelineValidator.validate(joinGraph(with(ok, "max_miss_rate", bad)));
+            assertTrue(codes(r).contains(PipelineValidator.JOIN_KEYED_INVALID), () -> bad + " → " + r.issues());
+        }
+        Map<String, Object> noKey = new java.util.LinkedHashMap<>(ok);
+        noKey.remove("key");
+        assertTrue(codes(PipelineValidator.validate(joinGraph(noKey))).contains(PipelineValidator.JOIN_KEYED_INVALID),
+                "like every keyed setting, it needs key:");
+    }
+
     private static PipelineGraph joinGraph(Map<String, Object> cfg) {
         return new PipelineGraph("keyed", true, List.of(new PipelineNode("j", "transform.join", cfg, null)), List.of());
     }
