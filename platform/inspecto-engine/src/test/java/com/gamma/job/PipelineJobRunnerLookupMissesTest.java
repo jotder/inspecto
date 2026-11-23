@@ -43,10 +43,10 @@ class PipelineJobRunnerLookupMissesTest {
             ConsignmentOutputStores.use(store);
 
             PipelineJobRunner.flushLookupMisses(recorder(true), cfg);
-            assertTrue(store.lookupMisses("calls_stage2", "join").isEmpty(), "a dry run stores no sample");
+            assertTrue(store.lookupMisses("calls_stage2", "join", "c-1").isEmpty(), "a dry run stores no sample");
 
             PipelineJobRunner.flushLookupMisses(recorder(false), cfg);
-            var e = store.lookupMisses("calls_stage2", "join");
+            var e = store.lookupMisses("calls_stage2", "join", "c-1");
             assertEquals(1, e.size());
             assertEquals(FailureText.fingerprint(cfg, "447912345678"), e.get(0).fingerprint());
             assertEquals("4479••••••••", e.get(0).shape());

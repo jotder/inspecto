@@ -86,18 +86,20 @@ final class LookupRoutes implements RouteModule {
         r.put("match", n.cfg("match") == null ? "exact" : n.cfg("match").toString());
         r.put("lookedUpBy", lookedUpBy(n));
         if (store != null) {
-            Map<String, Object> last = null;
+            StepReceipt last = null;
             try {
-                last = store.latestStep(receiptPipeline, n.id()).map(LookupRoutes::lastRun).orElse(null);
+                last = store.latestStep(receiptPipeline, n.id()).orElse(null);
             } catch (IllegalStateException unreadable) {
                 // one failed read must not blank the whole list: this row shows no last run
                 log.warn("lookups: last run of {}/{} unreadable: {}", receiptPipeline, n.id(), unreadable.getMessage());
             }
-            r.put("lastRun", last);
-            // The last run's unmatched-key sample (LOOKUP-1 §4.6): fingerprint, length, masked shape, count — never a value.
+            r.put("lastRun", last == null ? null : lastRun(last));
+            // The LAST run's unmatched-key sample (LOOKUP-1 §4.6): fingerprint, length, masked shape, count — never a
+            // value. Read for that run's Consignment only, so a failed run never shows an older run's sample.
             List<Map<String, Object>> unmatched = new ArrayList<>();
             try {
-                for (var e : store.lookupMisses(receiptPipeline, n.id())) {
+                for (var e : last == null ? List.<com.gamma.pipeline.exec.LookupMissSample.Entry>of()
+                        : store.lookupMisses(receiptPipeline, n.id(), last.consignmentId())) {
                     Map<String, Object> m = new LinkedHashMap<>();
                     m.put("mapping", e.mapping());
                     m.put("fingerprint", e.fingerprint());

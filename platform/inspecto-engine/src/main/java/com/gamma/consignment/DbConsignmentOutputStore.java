@@ -447,7 +447,6 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
     }
 
 
-    /** Delete the Step Receipts recorded before {@code cutoff}; returns how many went. Best-effort. */
     /**
      * Replace the unmatched-key sample of one keyed join with its latest run's ({@code entries} may be empty: a run
      * where every value matched clears the old sample). Best-effort like {@link #record}: a failure is logged.
@@ -492,18 +491,23 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
     }
 
     /**
-     * The unmatched-key sample of one keyed join's last run, by mapping then most frequent first; empty when none.
+     * The unmatched-key sample one keyed join stored for Consignment {@code consignmentId}, by mapping then most
+     * frequent first; empty when none. A caller passes the Step's LAST run, so a run that failed or never reached the
+     * join (and so stored nothing) does not show the sample of an older run.
      *
      * @throws IllegalStateException when the read fails
      */
-    public List<com.gamma.pipeline.exec.LookupMissSample.Entry> lookupMisses(String pipeline, String step) {
+    public List<com.gamma.pipeline.exec.LookupMissSample.Entry> lookupMisses(String pipeline, String step,
+                                                                              String consignmentId) {
         List<com.gamma.pipeline.exec.LookupMissSample.Entry> out = new ArrayList<>();
         try {
             src.run(conn -> {
                 try (PreparedStatement ps = conn.prepareStatement("SELECT mapping, fingerprint, length, shape, n FROM "
-                        + MISSES + " WHERE pipeline = ? AND step = ? ORDER BY mapping, n DESC, fingerprint")) {
+                        + MISSES + " WHERE pipeline = ? AND step = ? AND consignment_id = ?"
+                        + " ORDER BY mapping, n DESC, fingerprint")) {
                     ps.setString(1, pipeline);
                     ps.setString(2, step);
+                    ps.setString(3, consignmentId);
                     try (ResultSet rs = ps.executeQuery()) {
                         while (rs.next())
                             out.add(new com.gamma.pipeline.exec.LookupMissSample.Entry(rs.getString(1), rs.getString(2),
@@ -518,6 +522,7 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
         return out;
     }
 
+    /** Delete the Step Receipts recorded before {@code cutoff}; returns how many went. Best-effort. */
     public int pruneSteps(java.time.Instant cutoff) {
         return update("DELETE FROM " + STEPS + " WHERE recorded_at < ?", RECORDED_AT.format(cutoff),
                 "prune Step Receipts before " + cutoff);

@@ -598,7 +598,7 @@ com.gamma.consignment.DbConsignmentOutputStore | public List<DailyVolume> dailyV
 com.gamma.consignment.DbConsignmentOutputStore | public List<ProducerHighWater> producerHighWater(String)
 com.gamma.consignment.DbConsignmentOutputStore | public List<String> browseTables()
 com.gamma.consignment.DbConsignmentOutputStore | public List<String> unreadablePaths()
-com.gamma.consignment.DbConsignmentOutputStore | public List<com.gamma.pipeline.exec.LookupMissSample.Entry> lookupMisses(String, String)
+com.gamma.consignment.DbConsignmentOutputStore | public List<com.gamma.pipeline.exec.LookupMissSample.Entry> lookupMisses(String, String, String)
 com.gamma.consignment.DbConsignmentOutputStore | public List<com.gamma.pipeline.exec.StepReceipt> steps(String)
 com.gamma.consignment.DbConsignmentOutputStore | public List<com.gamma.pipeline.exec.StepReceipt> steps(String, int)
 com.gamma.consignment.DbConsignmentOutputStore | public Map<String, String> consignmentsOfRuns(java.util.Collection<String>)

@@ -1092,8 +1092,8 @@ class PipelineJobRunnerTest {
                 active: false
                 output_store: joined
                 dirs:
-                  poll: in
-                  database: out
+                  poll: %s
+                  database: %s
                 processing:
                   threads: 1
                 steps[1]:
@@ -1102,7 +1102,8 @@ class PipelineJobRunnerTest {
                       key: id
                       on[1]: id
                       columns[1]: region
-                """.formatted(dim.toString().replace("\\", "/")));
+                """.formatted(tmp.resolve("in").toString().replace("\\", "/"),   // the Space salt lands under tmp
+                tmp.resolve("out").toString().replace("\\", "/"), dim.toString().replace("\\", "/")));
         seedParquet(dataDir, "k1_etl", "(1,150),(2,50),(3,200),(3,10)");
         try (com.gamma.consignment.DbConsignmentOutputStore store =
                      com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:")) {
@@ -1113,7 +1114,8 @@ class PipelineJobRunnerTest {
                     tmp.resolve("audit").toString()).run();
             assertTrue(res.success(), res.message());
 
-            var sample = store.lookupMisses("k1_etl_stage2", "join");
+            String consignment = store.latestStep("k1_etl_stage2", "join").orElseThrow().consignmentId();
+            var sample = store.lookupMisses("k1_etl_stage2", "join", consignment);
             assertEquals(1, sample.size(), sample.toString());
             assertEquals("id", sample.get(0).mapping());
             assertEquals(2, sample.get(0).n(), "id 3 twice");

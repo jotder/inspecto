@@ -325,7 +325,9 @@ row, most frequent first. **Never the value**: `fingerprint` is the Space-salted
 rejected rows' own), `shape` keeps the first `min(4, length / 3)` characters and masks the rest. `pipeline` is the
 receipts' name (`<pipeline>_stage2` at rest). Written by `recordLookupMisses` from `PipelineJobRunner` after the
 walk — delete-then-insert for that (pipeline, step) in one transaction, so a clean run clears the old sample; never
-for a dry run; best-effort (a WARN). Read by `lookupMisses(pipeline, step)` for `GET /lookups`. Bounded by design
+for a dry run; best-effort (a WARN). Read by `lookupMisses(pipeline, step, consignmentId)` for `GET /lookups`, with the
+Consignment of the Step's newest receipt — so a later run that failed before storing a sample shows none, never an
+older run's. Bounded by design
 (one run per keyed Step), so no retention.
 
 ### 3.10 `file_stages` — per-file stage-progression registry  · **M**

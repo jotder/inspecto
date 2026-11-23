@@ -142,7 +142,13 @@ class ControlApiLookupsTest {
             assertEquals(12, miss.get("length").asInt());
             assertEquals("4479••••••••", miss.get("shape").asText());
             assertEquals(5, miss.get("n").asLong());
-            c.store.recordLookupMisses(pipeline, "join", "c-next", List.of());   // a run where every value matched
+            // a sample stored by an OLDER run is not the last run's: a newer run that failed stored nothing
+            c.store.recordLookupMisses(pipeline, "join", "c-old", List.of(
+                    new com.gamma.pipeline.exec.LookupMissSample.Entry("SERVED_MSISDN", "fp:fedcba9876543210", 3,
+                            "9••", 1)));
+            assertEquals(0, lookups(c).get("lookups").get(0).get("unmatched").size(),
+                    "the last run is c-new; c-old's sample is not shown beside it");
+            c.store.recordLookupMisses(pipeline, "join", "c-new", List.of());   // a run where every value matched
             assertEquals(0, lookups(c).get("lookups").get(0).get("unmatched").size(), "a clean run clears the sample");
         }
     }
