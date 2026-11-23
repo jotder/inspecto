@@ -479,92 +479,93 @@ code: la/inspecto-la-core
 ## Banking_MuleRing
 
 > **The funnel that nobody deposited into** · Standard · Other Examples (`la-showcase`) · saved view *Money-mule layering
-> ring* (`mule_layering_ring`) · about 5 min. The v1 film was recorded on Basic; the v2 film is on Standard and its ids are
+> ring* (`mule_layering_ring`) · about 4 min. The v1 film was recorded on Basic; the v2 film is on Standard and its ids are
 > masked for the analyst.
 
-- Cast: the **hub** (MULE-HUB-01); the **twelve feeder accounts** (SMURF-01…SMURF-12); the **two relays** (RELAY-01, RELAY-02); the **exit** (OFFSHORE-77). Decoys: the **tangled core** of ordinary customers, and the **busy but ordinary accounts** just behind the hub. All masked for the analyst: said as roles; the film shows a reveal, as the administrator.
+- Cast: the **hub** (MULE-HUB-01); the **twelve feeder accounts** (SMURF-01…SMURF-12); the **two relays** (RELAY-01, RELAY-02); the **exit** (OFFSHORE-77). Decoys: the **tangled core** of ordinary customers, and the **busy but ordinary accounts** just behind the hub. All masked for the analyst: said as roles.
 - Stakes: the investigator is an anti-money-laundering analyst. Nobody deposits more than a thousand, no alert fires, and over three days a small fortune leaves the country.
 - Vocabulary: *layering* (moving money through accounts to hide where it came from), *mule* (an account used to pass money on). Said once.
-- Ground truth: `tools/gen-la-showcase-data.py`: `SMURFS` 12, `HUB` MULE-HUB-01, `RELAYS` RELAY-01/02, `OFFSHORE` OFFSHORE-77; each feeder pays the hub in cash eight times just under a thousand (v1: ninety-six deposits); pinned by `LaShowcaseGoldenTest` (MULE-HUB-01 ranks in the top three). **Plan table corrected:** nothing in the data is "a ring that looks like a family"; the decoy is the dense core of ordinary customers and the busy ordinary accounts next to the hub in the first sweep.
-- Before: Standard, la-showcase, Demo Analyst for S01–S09, Demo Admin for S10 `[check in UI: the administrator may reveal in this Space, as in F7]`; fresh state; the saved view shows *112 entities masked · Reveal…*.
+- Ground truth: `tools/gen-la-showcase-data.py`: `SMURFS` 12, `HUB` MULE-HUB-01, `RELAYS` RELAY-01/02, `OFFSHORE` OFFSHORE-77; each feeder pays the hub in cash eight times just under a thousand (ninety-six deposits); pinned by `LaShowcaseGoldenTest` (MULE-HUB-01 ranks in the top three). **Plan table corrected:** nothing in the data is "a ring that looks like a family"; the decoy is the dense core of ordinary customers.
+- Screen truth (checked live 2026-11-23, Standard, Demo Analyst): the saved view draws a dense tangle of coloured communities with a few small groups, "112 entities masked", labels off. Busiest nodes lists five by alias: the top one with 14 links (the hub), then 11, 10, 10 and 9. Starting from the top card draws 1 entity and 14 linked accounts: a wheel of twelve feeders pointing in with two dashed arrows going out (the relays). The product's own words on this Space read *subscribers* and *calls*; the voice says accounts and transfers. The reveal needs an Investigation led by the administrator, so it is narrated over the greyed Reveal… button, not performed.
+- Before: Standard, la-showcase, Demo Analyst; fresh state; the saved view opens by its address.
 - Lead: *one hub, twelve feeders, two relays and one exit to report*. **What would change our mind:** if the twelve feeders also receive from the hub (money flowing both ways would look like a payroll, not a funnel). **Next actions:** (1) file the route (feeders, hub, relays, exit) as a report, (2) hold the hub and the relays pending review, (3) keep the feeders as an Entity List.
 - Voice style: no alias is read; amounts "just under a thousand"; "ninety-six deposits" once.
 - Try it / Check: open the saved view and press *Busiest nodes*. *Why is the hub not just another busy account?* Answer: its links all point in from twelve accounts and out to two; busy accounts around it have links in both directions.
 
 ### S01 · An ordinary Tuesday                                         ~25 s
-- Voice: Picture a bank on an ordinary Tuesday. Millions of transfers, almost every one boring. That is what a laundering ring counts on. [pause 0.5] Nobody here ever deposits more than a thousand. No payment crosses a line. No alert fires. And still, over three days, a small fortune leaves the country.
-- Chip: none
-- Action: cold open and intro card.
+- Voice: Picture a bank on an ordinary Tuesday: millions of transfers, almost every one boring. That is what a laundering ring counts on. [pause 0.5] Nobody here ever deposits more than a thousand, no payment crosses a line, and no alert fires. And still, over three days, a small fortune leaves the country.
+- Action: cold open over the Space's home page.
 - Impact: none.
 
 ### S02 · How do you find the invisible                              ~25 s
-- Voice: You cannot find it one transaction at a time; it was designed so that you could not. [pause 0.5] You stop looking at transactions and start looking at connections.
-- Chip: none
-- Action: zoom on the toolbox quick questions.
+- Beat: steady
+- Intro: The funnel nobody deposited into | Other Examples Space
+- Story: the hub = collects the deposits | a feeder = pays in just under a thousand | a relay = passes the money on
+- Voice: You cannot find it one transaction at a time, because it was designed so that you could not. [pause 0.5] You stop looking at transactions and start looking at connections.
+- Action: intro card, then the story card "Who is who"; the saved view opens behind it.
+- Impact: the story card names the roles.
+
+### S03 · The data, in one breath                                  ~26 s
+- Voice: Every transfer lands as a record: who paid, who was paid, the channel, the amount and the time. Both ends are accounts, so every row is already a link.
+- Chip: Data
+- Action: rail Data ▸ hold on the list of Datasets.
 - Impact: none.
 
-### S03 · The data, in one breath                                  ~30 s
-- Voice: Every transfer lands as a record: who paid, who was paid, the channel, the amount, the time. Both ends are accounts, so every row is already a link.
-- Chip: Mappings
-- Action: Data page ▸ the transfers Dataset ▸ Mappings. `[check in UI]`
-- Impact: mark the two account columns and the time.
-
-### S04 · The tangle, and the shape that does not belong           ~40 s
-- Voice: The saved view draws every account and every payment. A dense core of ordinary customers paying each other. Too much to read, and that is the point. [pause 0.5] Look away from the tangle. In the corner, one account in the middle, a ring around it, every line pointing in. A funnel. The ids are masked for the analyst, so I will say roles.
+### S04 · The tangle, and the shape that does not belong           ~36 s
+- Voice: The saved view draws every account and every payment: a dense core of ordinary customers paying each other. Too much to read, and that is the point. [pause 0.5] Look away from the tangle. In a corner, one account in the middle, a ring around it, every line pointing in. A funnel. The ids are masked for the analyst, so I will say roles.
 - Chip: Saved views
-- Action: File ▸ Open… ▸ Saved views ▸ *Money-mule layering ring* ▸ hold on *112 entities masked*. `[check in UI: the funnel at the lower left of the view]`
-- Impact: mark the tangle grey; ring on the funnel; mark the masked-entities line.
+- Action: open the saved view *Money-mule layering ring* ▸ hold on the tangle, then *112 entities masked*.
+- Impact: mark the masked-entities line.
 
-### S05 · First sweep, and the busy accounts                      ~40 s
-- Voice: Who has the most links? One press on Busiest nodes. The hub leads, and just behind it a few ordinary accounts, busy, but busy is not suspicious. What matters is what the hub's links look like.
+### S05 · First sweep, and the busy accounts                      ~36 s
+- Voice: Who has the most links? One press on Busiest nodes. The hub leads with fourteen, and just behind it a few ordinary accounts with ten or eleven: busy, but busy is not suspicious. [pause 0.4] What matters is what the hub's links look like.
 - Chip: Busiest nodes
-- Action: toolbox ▸ Busiest nodes ▸ click the first row and the next two.
-- Impact: hub marked yellow; the busy ordinary accounts grey.
+- Action: Busiest nodes ▸ hold on the first three cards (14, 11, 10 links).
+- Impact: yellow mark on the first card; grey "ruled out" on the second and third.
 
-### S06 · Narrow to the hub                                        ~35 s
-- Voice: Start a new graph from the hub. Before it draws anything, the product tells you what it knows: how many links, and when first and last seen. [pause 0.4] One press on Draw.
-- Chip: Search · Focus
-- Action: Search ▸ the hub (alias from the Busiest nodes row) ▸ Focus. `[check in UI: Focus from a Busiest nodes row]`
-- Impact: before/after hold.
+### S06 · Narrow to the hub                                        ~32 s
+- Story: off
+- Voice: Start a new graph from the hub. Before it draws anything, the product tells you what it knows. [pause 0.4] One press, and it draws the hub with fourteen accounts around it.
+- Chip: Start from these
+- Action: Busiest nodes ▸ the first card *Start from these* ▸ hold.
+- Impact: before/after hold: the wheel appears.
 
-### S07 · Twelve accounts, eight deposits each                      ~45 s
-- Voice: And there it is. Twelve accounts around the hub. Each pays it in cash again and again, eight times apiece, always just under a thousand. That is why nothing fired. [pause 0.5] And look at the dashed arrows going out. The hub is not keeping the money. It wires it on, to two relays.
-- Chip: Display options
-- Action: Display options ▸ node labels on (aliases); zoom out to the ring.
-- Impact: computed mark on the twelve; ring on the two relays.
+### S07 · Twelve accounts, eight deposits each                      ~42 s
+- Voice: And there it is. Twelve accounts around the hub, each paying it in cash again and again, eight times apiece, always just under a thousand. That is why nothing fired. [pause 0.5] And look at the two dashed arrows going out. The hub is not keeping the money. It wires it on, to two relays.
+- Chip: Start from these
+- Action: hold on the wheel and the two dashed arrows.
+- Impact: none.
 
-### S08 · Every line is a row                                    ~35 s
-- Voice: Is this a guess? Open the table under the graph. Every line is a row: from, link kind, to. The hub to one relay, a wire. The hub to the other, a wire. [pause 0.4] The graph shows the pattern. The table backs it up.
+### S08 · Every line is a row                                    ~32 s
+- Voice: Is this a guess? Open the table under the graph. Every line is a row: from, link kind, to. The hub to one relay, a wire; the hub to the other, a wire. [pause 0.4] The graph shows the pattern, and the table backs it up.
 - Chip: Rows
-- Action: dock ▸ Rows.
-- Impact: mark "every line is a row".
+- Action: dock ▸ Rows ▸ hold.
+- Impact: before/after hold: the dock opens.
 
-### S09 · The route to the exit                                  ~40 s
-- Voice: One last question: where does the money end up? Search for OFFSHORE. One box, and one node lights up, at the far end of the same funnel. The relays move the money on by crypto, to one offshore account. [pause 0.5] The whole route is in front of you: twelve small accounts, one hub, two relays, one exit.
-- Chip: Search
-- Action: Search ▸ OFFSHORE ▸ the node lights. `[check in UI: the exit is searchable under its alias]`
-- Impact: computed mark on the exit.
+### S09 · The route to the exit                                  ~36 s
+- Voice: One last question: where does the money end up? In the data, the relays move it on by crypto, to one offshore account. [pause 0.5] The whole route is twelve small accounts, one hub, two relays and one exit. This graph shows the first half of it. The second half is one more Expand away.
+- Action: hold on the graph.
+- Impact: none.
 
-### S10 · A name, with a reason                                  ~35 s
-- Voice: When a name is truly needed, one person asks for it, with a reason, and it is recorded. [pause 0.4] The administrator reveals the ids on this screen: the hub, the relays, the exit. Only that person sees them, only on this screen.
+### S10 · A name, with a reason                                  ~32 s
+- Voice: When a name is truly needed, one person asks for it, with a reason, and it is recorded. [pause 0.4] The Reveal button under the canvas is greyed for this analyst, because the right to see unmasked ids belongs to the administrator, who must also lead the Investigation. Only that person sees the real ids, and only on that screen.
 - Chip: Reveal…
-- Action: sign out ▸ Demo Admin ▸ open the view ▸ Reveal… ▸ Reason `confirm the hub before the accounts are held` ▸ Reveal. `[check in UI: the reveal is allowed in la-showcase for Demo Admin]`
-- Impact: before/after hold: aliases become MULE-HUB-01, RELAY-01, RELAY-02; mark the toast.
+- Action: hover the greyed Reveal… under the canvas (tooltip *Needs See unmasked ids*).
+- Impact: mark the greyed Reveal….
 
-### S11 · The lead, and what would change it                     ~40 s
+### S11 · The lead, and what would change it                     ~36 s
 - Voice: Ninety-six deposits, each just under a thousand, collected by one hub and passed on within hours. That is a lead, not a verdict. [pause 0.5] It weakens if the twelve also receive from the hub: money in both directions would look like a payroll, not a funnel. It does not.
-- Chip: none
-- Action: lower third with the lead and the check.
-- Impact: lead yellow.
+- Action: hold on the graph.
+- Impact: none.
 
-### S12 · Monday morning                                         ~35 s
+### S12 · Monday morning                                         ~30 s
 - Voice: File the route as a report, with the hub, the relays and the exit named. Hold the hub and the relays pending review. [pause 0.4] Keep the twelve feeders as an Entity List, so the next graph marks them.
-- Chip: Entity List
-- Action: New list… `SMURF accounts` with the twelve. `[check in UI]`
-- Impact: mark the list name.
+- Chip: Entity Lists
+- Action: rail Entity Lists ▸ hold on the lists of this Space; create nothing.
+- Impact: none.
 
-### S13 · Case file                                              ~15 s
-- Voice: Lead: one hub, twelve feeders, two relays, one exit. Evidence: the rows behind every link. Next: report, hold, watch. Inspecto LA.
-- Chip: none
-- Action: case-file card and outro.
+### S13 · The case file                                           ~28 s
+- Casefile: Lead: one hub, twelve feeders, two relays, one exit | Evidence: ninety-six deposits just under a thousand, and the rows behind every link | Next: file the route as a report; hold the hub and the relays; keep the twelve feeders as an Entity List | Try it: press Busiest nodes and start from the first name
+- Voice: The case file. Lead: one hub, twelve feeders, two relays, one exit. Evidence: ninety-six deposits just under a thousand, and the rows behind every link. Next step: file, hold, watch. [pause 0.6] No deposit was large and no payment crossed a line; only the links showed the funnel. The same steps run on millions of records and answer in moments. Try it: start from the first name in Busiest nodes.
+- Action: case-file card (8 s) and the outro.
 - Impact: none.
