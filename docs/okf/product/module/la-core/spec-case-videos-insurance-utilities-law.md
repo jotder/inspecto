@@ -135,90 +135,96 @@ code: la/inspecto-la-core
 ## Utilities_MeterTampering
 
 > **Twenty-two meters read low and the transformers do not: one contractor's visits come first** · Standard · Utilities
-> Space (`la-utilities`) · saved view `meter_tampering_contractor` · 4:50
+> Space (`la-utilities`) · saved view `meter_tampering_contractor` · about 4 min
 
 - **Cast:** the contractor C-14, the transformers TX-007 and TX-019, the premises between them. **Decoy:** the busiest
-  contractor C-27. **Near-miss:** PRM-0737, visited by C-14 under the same transformers, whose reads did not fall.
+  contractor C-27. **Near-miss:** the one premise C-14 visited under the same transformers whose reads did not fall (PRM-0737).
 - **Stakes:** a revenue-protection analyst at a distribution company; the power is delivered, less of it is billed.
 - **Vocabulary:** *transformer* (the substation unit that feeds a group of premises), *read* (a meter reading), defined once
   in S02.
 - **Ground truth:** `tools/gen-la-utility-data.ground-truth.json`, key `stories.meter_tampering`: hub `C-14`, 22 premises,
-  transformers `TX-007` and `TX-019`, look-alike `PRM-0773`; `tools/gen-la-utility-data.py` (lines 13 and 170): a C-14
-  visit, then a 40–70 % drop 2–14 days later, supply flat, three of the visits joint with `C-22`. v1's "C-27 with a
-  hundred and sixty-four links" and "C-14 thirty-six premises, twenty-three under the two transformers" are data counts
-  taken from the Space (training episode F3 notes C-27 at 157 premises) [check in UI: C-27's link count and C-14's 36
-  premises]. The plan table (*the busiest contractor C-27 vs …*) is **confirmed**.
-- **Before:** fresh unzip of `la-standard.zip`, Utilities Space, Demo Analyst, saved view, labels off above 80 nodes
-  (Display options turns them on); **do not open the Investigation** *Meter tampering after one contractor's visits*
-  until the Space is reseeded.
+  transformers `TX-007` and `TX-019`; `tools/gen-la-utility-data.py` (lines 13 and 170): a C-14 visit, then a 40–70 % drop
+  2–14 days later, supply flat, three of the visits joint with `C-22`. **Checked live 2026-11-23 (fresh Standard unzip):** the
+  saved view draws about five hundred premises, contractors and transformers with the caption *node labels off above 80 nodes*;
+  Busiest nodes names **C-27 first with 165 links**, then C-21 (93), C-18 (84), C-25 (73) and C-01 (47); *Start from these* on
+  C-27 draws it with 157 linked nodes; the Start-from form on the Investigation tab shows, for a typed C-14, **36 links, first
+  seen 13 October 2025, last seen 30 August 2026**; **pressing Start there is refused with a notice that the start's ring needs a
+  second person's approval, so it cannot run unsaved** (Save first: start from the whole Dataset, Save, then start from the
+  selected entities), so the film shows the preview and the notice and does not start the Investigation; the Dataset
+  *utility_links_dataset* holds src and dst (Entity, Utility entity), kind (Category: supplied_by, account_at, paid_from,
+  visited_by, order_closed_by, vended_by), amount (Measure), kwh and via (Detail), ts and event_date (Time); the Entity Lists page
+  already holds *Tampered premises* (Watch these, Utility entity, 22 members) and *Revenue-protection watch* (3 members).
+  **The 23 premises under the two transformers, the 22 drops and the near-miss are stated from the case data, not drawn.**
+- **Before:** fresh unzip of `la-standard.zip`, Utilities Space, Demo Analyst; saved view and Investigation tab only; **do not
+  open the Investigation** *Meter tampering after one contractor's visits* (a saved Investigation, polluted by earlier
+  recordings); the film changes no state.
 - **Lead:** one contractor to question and 22 premises to inspect. **What would change our mind:** the drops coming
-  before the visits, or the transformers losing supply; PRM-0737 is the premise that keeps the lead honest.
-  **Next actions:** inspect the 22 meters, largest drop first; question C-14, starting with the three visits joint with
-  C-22; keep the premises as the Entity List *Tampered premises* and watch new visits.
-- **Voice style:** ids spoken by the lexicon (C-14 "see fourteen", TX-007 "tee ex oh oh seven"); figures said once,
-  rounded ("forty to seventy percent"); pace defaults.
+  before the visits, or the transformers losing supply; the one visited premise whose reads did not fall keeps the lead honest.
+  **Next actions:** inspect the 22 meters, largest drop first; question C-14, starting with the three visits joint with C-22;
+  keep the premises as the Entity List *Tampered premises* and watch new visits.
+- **Voice style:** ids by the lexicon (C-14 "see fourteen"); figures said once, rounded ("forty to seventy percent").
 - **Try it:** start from C-14 and find the one premise it visited under the same transformers whose reads did not drop.
   **Check:** why is the busiest contractor not the lead? *Answer: busy means it does the most work; the lead is the
   contractor whose visits come before the drops.*
 
-### S01 · Cold open  ~20 s
+### S01 · Cold open · ~20 s
 - Voice: Twenty-two electricity meters start reading low in the same winter. [pause 0.4] The transformers feeding them do not. The power is still flowing. Less of it is being billed. [pause 0.6] A revenue-protection analyst has one question: what do these premises have in common?
-- Chip: none.
-- Action: still of the saved view, blurred; story card: *the contractor · the transformers · the premises*.
+- Action: cold open over the Utilities Space's home page; the intro card opens the next scene.
 - Impact: none.
 
-### S02 · Why the usual checks miss it  ~30 s
-- Voice: Meter reads are checked one premise at a time, and every low read has an excuse: a holiday, a new boiler. A read is a meter's reading; a transformer is the unit that feeds a group of premises. [pause 0.4] The street is not the answer. The tariff is not the answer. And the field visits sit in a different file, so nothing ties a visit to a drop.
-- Chip: none.
-- Action: intro card (title, Utilities Space, *Standard*, amber bar); the saved view fades in.
+### S02 · Why the usual checks miss it · ~30 s
+- Beat: steady
+- Intro: One contractor's visits | Utilities Space
+- Story: a transformer = the unit that feeds a group of premises | a read = a meter's reading | a visit = a field visit by a contractor
+- Voice: Meter reads are checked one premise at a time, and every low read has an excuse: a holiday, a new boiler. A read is a meter's reading, and a transformer is the unit that feeds a group of premises. [pause 0.4] The street is not the answer. The tariff is not the answer. And the field visits sit in a different file, so nothing ties a visit to a drop.
+- Action: story card "Who is who" over the home page.
+- Impact: the story card names the three terms.
+
+### S03 · The data, in one breath · ~30 s
+- Voice: Every field visit lands as a record: the premise, the contractor, the date, the kind of visit. [pause 0.4] A Job links premises to the contractors who visited them, and to the transformers that feed them. All three are entities. The date puts the links in order.
+- Chip: Data · Columns
+- Action: rail Data ▸ the Dataset *utility_links_dataset* ▸ hold on its Columns card. `[checked live: src and dst Utility entity, kind a Category, amount a Measure, kwh and via Details, ts and event_date Time]`
+- Impact: mark the Columns card.
+
+### S04 · The saved view · ~35 s
+- Story: off
+- Voice: Open the saved view Meter tampering contractor. Premises, the contractors who visited them, and the transformers above. [pause 0.4] It is a lot of shapes, so the labels are off. We will ask questions instead. Is there a contractor whose visits come before the drops?
+- Chip: Saved views
+- Action: open the saved view *Meter tampering contractor* ▸ hold on the caption at the bottom. `[checked live: node labels off above 80 nodes]`
 - Impact: none.
 
-### S03 · The data, in one breath  ~30 s
-- Voice: Every field visit lands as one record: the premise, the contractor, the date, the kind of visit. [pause 0.4] A Job links premises to the contractors who visited them, and to the transformers that feed them. All three are entities. The visit date puts the links in order.
-- Chip: Data · Mappings
-- Action: rail ▸ Data ▸ `utility_links_dataset` ▸ zoom on the Mappings area. [check in UI]
-- Impact: mark the from and to columns and the time column.
-
-### S04 · The question  ~35 s
-- Voice: Open the saved view Meter tampering contractor. Premises, the contractors who visited them, and the transformers above. [pause 0.4] Labels switch off above eighty nodes, so open Display options and turn them on. The question is simple: is there a contractor whose visits come before the drops?
-- Chip: File · Open… · Saved views · Display options
-- Action: File ▸ Open… ▸ Saved views ▸ *Meter tampering contractor* ▸ Open ▸ brush icon ▸ Display options ▸ labels on. [check in UI: the labels option's name]
-- Impact: computed impact on the open; mark the label line "node labels off above 80 nodes" before and after.
-
-### S05 · First sweep, and the decoy  ~45 s
-- Voice: Press Busiest nodes. [pause 0.4] The busiest contractor is C-27, by a wide margin. The obvious suspect. [pause 0.5] And wrong. C-27 does the most work in the city. Busy is not the same as connected to the drop. Set C-27 aside, and look for a quieter name.
+### S05 · First sweep, and the decoy · ~45 s
+- Voice: Press Busiest nodes. [pause 0.4] The busiest contractor is C-27, with a hundred and sixty-five links, and the next has ninety-three. It is not close. The obvious suspect. [pause 0.5] And wrong. C-27 does the most work in the city. Busy is not the same as connected to the drop. Set it aside, and look for a quieter name.
 - Chip: Busiest nodes
-- Action: toolbox ▸ On screen ▸ Busiest nodes ▸ hold on the top row (C-27). [check in UI: C-27 leads and is readable]
-- Impact: grey *ruled out* mark on C-27's node; the answer list held 3 s.
+- Action: toolbox ▸ On screen ▸ Busiest nodes ▸ hold on the first rows. `[checked live: C-27 165 links, C-21 93, C-18 84, C-25 73, C-01 47]`
+- Impact: grey *ruled out* mark on the first row (C-27).
 
-### S06 · Start from a quieter name  ~40 s
-- Voice: Start from contractor C-14. In the Investigation tab, choose Start from, one entity, pick the Dataset, and type the id. [pause 0.4] Before you draw anything, the product says how many links this contractor has, and when they were first and last seen.
+### S06 · A quieter name · ~40 s
+- Voice: Start from a quieter name, C-14. In the Investigation tab, choose Start from, one entity, pick the Dataset, and type the id. [pause 0.4] Before anything is drawn, the product tells you what it knows: thirty-six links, first seen in October, last seen in August. An ordinary workload. [pause 0.4] Nothing is recorded yet. The form only reads. It is a first look, and it can be abandoned.
 - Chip: Investigation · Start from · One entity
-- Action: Investigation tab ▸ Start from *One entity* ▸ Dataset `utility_links_dataset` ▸ type `C-14` ▸ hold on the preview line ▸ Start.
-- Impact: mark the preview line; computed impact on Start.
+- Action: new Investigation page ▸ Investigation tab ▸ Start from *One entity* ▸ Dataset `utility_links_dataset` ▸ type `C-14` ▸ hold on the suggestion. `[checked live: C-14, 36 links, first seen 13 Oct 2025, last seen 30 Aug 2026]`
+- Impact: mark the suggestion.
 
-### S07 · The reveal  ~40 s
-- Voice: C-14 visited thirty-six premises. An ordinary workload, until you ask which. [pause 0.7] Twenty-three sit under two transformers, TX-007 and TX-019. Twenty-two of those read forty to seventy percent lower within two weeks of the visit. [pause 0.4] The supply stayed flat.
-- Chip: Select neighbours
-- Action: select C-14 ▸ Select neighbours ▸ hover TX-007 and TX-019 ▸ hold. [check in UI: the premise count under the two transformers]
-- Impact: yellow mark on C-14, TX-007 and TX-019; the story card is replaced.
+### S07 · What the case data says · ~40 s
+- Voice: An ordinary workload, until you ask which premises. [pause 0.7] Twenty-three of them sit under two transformers. Twenty-two of those read forty to seventy percent lower within two weeks of the visit. [pause 0.4] The supply stayed flat. In this Space a start like this needs a second person's approval before it can run, so we stop here and read what the case data says.
+- Action: press Start ▸ hold on the notice. `[checked live: This start's ring needs a second person's approval, so it cannot run unsaved]`
+- Impact: mark the notice.
 
-### S08 · Evidence you can defend  ~45 s
-- Voice: Open the table under the graph. Each visit is a row: the contractor, the premise, the date. [pause 0.4] Put the read history beside it and the drop follows the visit, premise after premise. [pause 0.6] One premise, PRM-0737, was visited too, and its reads did not fall. That is what would overturn this. If the drops came first, or the transformers lost supply, the lead would fail.
-- Chip: Rows
-- Action: dock ▸ Rows ▸ filter the visit rows to C-14 ▸ sort by date ▸ hold. [check in UI: the read history is in the Rows columns or in the details of a premise; if not, show the premise's details dialog]
-- Impact: mark the C-14 visit rows; grey *not affected* mark on PRM-0737.
+### S08 · Evidence you can defend · ~45 s
+- Voice: Each visit is a row in the Dataset: the contractor, the premise, the date. [pause 0.4] Put the read history beside it and the drop follows the visit, premise after premise. [pause 0.6] One premise was visited too, and its reads did not fall. That is what would overturn this. If the drops came first, or the transformers lost supply, the lead would fail.
+- Action: hold on the notice while the voice runs.
+- Impact: none.
 
-### S09 · What the team does next  ~40 s
-- Voice: The lead: one contractor to question, twenty-two premises to inspect. [pause 0.5] Three things on Monday. Inspect the meters, largest drop first. Question C-14, starting with the three visits shared with C-22. And keep the premises as an Entity List, so the next visit to any of them shows on every graph.
+### S09 · What the team does next · ~40 s
+- Voice: The lead: one contractor to question, twenty-two premises to inspect. [pause 0.5] Three things on Monday. Inspect the meters, largest drop first. Question C-14, starting with the three visits shared with C-22. And keep the premises as an Entity List. This Space already keeps them as Tampered premises, so the next visit to any of them shows on every graph.
 - Chip: Entity Lists
-- Action: rail ▸ Entity Lists ▸ *Tampered premises* ▸ hold on its members. [check in UI: the list exists and holds the 22 premises]
-- Impact: mark the list name and its member count.
+- Action: rail Entity Lists ▸ hold on *Tampered premises* and *Revenue-protection watch*. `[checked live: Watch these, Utility entity, 22 members and 3 members]`
+- Impact: mark the two list rows.
 
-### S10 · The case file  ~25 s
-- Voice: That is the case file. [pause 0.4] Lead: one contractor and twenty-two premises. Evidence: the visit rows, and the drop after each. Next: inspect, question, list. To make it defensible for a team, watch Make it defensible. Try it: find the premise C-14 visited whose reads did not fall.
-- Chip: none.
-- Action: case-file card, 8 s; outro with the links to the shared module and to training episode F3.
+### S10 · Case file · ~25 s
+- Casefile: Lead: one contractor, twenty-two premises | Evidence: the visits, each followed by a drop; the transformers flat | Next: inspect the meters; question C-14 about the visits shared with C-22; keep the premises as an Entity List | Try it: find the visited premise whose reads did not drop
+- Voice: The case file. The lead: one contractor and twenty-two premises. The evidence: each visit, then a drop. Next: inspect, question, keep. [pause 0.6] Your turn. Find the one visited premise whose reads did not drop.
+- Action: case-file card and outro.
 - Impact: none.
 
 ## LawEnforcement_BurglarySeries
