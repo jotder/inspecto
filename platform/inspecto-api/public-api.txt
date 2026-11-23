@@ -497,6 +497,7 @@ com.gamma.config.spec.FindingCodes | public static final String ERR_COLLECTOR_CO
 com.gamma.config.spec.FindingCodes | public static final String ERR_DEDUP_WINDOW_UNARMABLE
 com.gamma.config.spec.FindingCodes | public static final String ERR_EDITION_FEATURE
 com.gamma.config.spec.FindingCodes | public static final String ERR_EXCEL_INVALID
+com.gamma.config.spec.FindingCodes | public static final String ERR_LOOKUP_ON_INGEST
 com.gamma.config.spec.FindingCodes | public static final String ERR_ROUTE_PREDICATE_COLUMN
 com.gamma.config.spec.FindingCodes | public static final String ERR_ROUTE_UNARMABLE
 com.gamma.config.spec.FindingCodes | public static final String ERR_SAFETY_STATE_ADVANCE_REFUSED

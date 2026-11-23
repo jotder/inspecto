@@ -96,6 +96,9 @@ for a new Step with an explicit column list over the upstream sample columns, el
   `sql` → verbatim (the deliberate escape hatch, `custom` only). **24**<!--count:sql-mapping-functions--> functions *(per `sql-functions.ts`: 1 Keep, 8 Text, 4 Numbers, 6 Dates, 2 Logic, 1 Convert, 1 Lookup, 1 Custom)* across Keep · Text ·
   Numbers · Dates · Logic · Convert · Lookup · Custom. A row's source column binds to the template's `{source}`
   automatically — that IS the operator's "auto map parameters against sql functions".
+  ⚠ **The Lookup function (`lookup.reference`) runs only in a Pipeline `transform.sql` Step.** The ingest
+  lane (`processing.map.fields[]`) has no Reference resolver, so a save refuses a lookup field there
+  (`ERR_LOOKUP_ON_INGEST` on `processing.map.fields[i].fn`, regardless of `active`; LOOKUP-1).
   ⚠ **Every conversion is `TRY_CAST`, never bare `CAST`, and division guards with `NULLIF`** — a
   catalog-wide unit test asserts it, because a bad cell must null one cell, not kill the batch.
   ⚠ **A `text` parameter is deliberately not trimmed** — a single space is a legitimate separator for

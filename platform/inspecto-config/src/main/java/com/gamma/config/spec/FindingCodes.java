@@ -133,6 +133,11 @@ public final class FindingCodes {
      *  refuses — the pipeline would otherwise not load, or fail its first run ({@code sink.excel}, 2026-10-06). */
     public static final String ERR_EXCEL_INVALID = "ERR_EXCEL_INVALID";
 
+    /** A {@code processing.map.fields[]} row calling the Reference lookup ({@code lookup.reference}): the ingest
+     *  lane has no Reference resolver, so every batch would fail on the unknown function. A lookup runs only
+     *  in a Pipeline {@code transform.sql} Step or a {@code transform.join} (LOOKUP-1, 2026-11-23). */
+    public static final String ERR_LOOKUP_ON_INGEST = "ERR_LOOKUP_ON_INGEST";
+
     // ── Schema ───────────────────────────────────────────────────────────────────────────────
     // (schema-resolution / compatibility findings register here as they are wired)
 

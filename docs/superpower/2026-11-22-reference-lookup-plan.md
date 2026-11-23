@@ -181,7 +181,10 @@ DuckDB refuse the subquery (as `duplicates: refuse`). Decision: only on a pipeli
 has the Reference resolver; the ingest lane (`processing.map`) has none, so a lookup field there fails as an unknown
 function `inspecto_lookup`, and a `sink.view`'s derived SQL skips a node carrying one. The UI's client-side SQL preview
 cannot run it either. Not built: prefix/range/as-of on the scalar (use the join), a not-found default (wrap in
-`logic.default_if_empty`), refusing a lookup field on the ingest lane at save. `RowShaperTest`,
+`logic.default_if_empty`). **Built 2026-11-23 (operator: "take on LOOKUP-1 items"):** a save refuses a lookup field
+on the ingest lane — `ERR_LOOKUP_ON_INGEST` on `processing.map.fields[i].fn`, regardless of `active`, on every save
+path (`SaveGate.ingestLookupFindings`, `ControlApiSaveGateParityTest`); a schema file's own `mapping.fields[]` saved
+on its own is not judged. `RowShaperTest`,
 `RecordTransformContractTest`, the TS contract (`sql-functions.contract.json`) regenerated; the TS spec was not run.
 
 **P1c built 2026-11-22 (operator: "start range"):** `match: range` on the keyed join — `from`/`to` Reference

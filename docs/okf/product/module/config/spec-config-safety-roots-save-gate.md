@@ -236,6 +236,12 @@ refuses or a duplicate, `max_rows` out of bounds, an unknown key; the parser's o
 sheet's `sql` must pass `SqlGuard` (`ERR_EXCEL_INVALID` on `excel.sheets[i].sql`). The run re-checks the
 path with `PathJail` against the data root, symlinks included.
 
+**A lookup field on the ingest lane** (LOOKUP-1, 2026-11-23) is refused regardless of `active`: a
+`processing.map.fields[]` row with `fn: lookup.reference` (`ERR_LOOKUP_ON_INGEST` on
+`processing.map.fields[i].fn`, `SaveGate.ingestLookupFindings`). The ingest SELECT has no Reference resolver,
+so every batch would fail on the unknown function. Not judged: a schema file's own `mapping.fields[]` written
+on its own.
+
 ⛔ **The one deliberate difference is bundle import, and it is a recorded decision, not drift**
 (`SaveGate.Referents.MAY_ARRIVE_LATER`): a pipeline bundle never carries its Connections (secrets never
 travel) and always lands inactive, so a **missing** Connection — collector or webhook — is a
