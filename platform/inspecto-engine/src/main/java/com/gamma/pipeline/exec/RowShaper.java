@@ -1636,6 +1636,7 @@ public final class RowShaper {
                     + " ORDER BY (" + orderBy
                     + ") " + ("last".equals(dups) ? "DESC" : "ASC") + " NULLS LAST, CAST(t AS VARCHAR)) = 1";
         }
+        referenceQuality(conn, node, ref, key, filter, prefix, refRows);
         // __lk_mk / __lk_kind: the match details (P1d) — the key that matched, and whether it was the whole value
         String kept = returned.stream().map(c -> ", r." + q(c)).collect(java.util.stream.Collectors.joining());
         StringBuilder values = new StringBuilder();
@@ -1709,6 +1710,29 @@ public final class RowShaper {
     }
 
     /**
+     * The Reference's own load-time quality (LOOKUP-1 P2b), as counts beside the node's output
+     * ({@code <node>__reference_stats}) for {@link #takeLookupStats}: {@code reference.rows} (after {@code filter}),
+     * {@code reference.null_keys} (rows with no key — they match nothing), and for {@code longest_prefix}
+     * {@code reference.nested_prefixes} (keys that have a shorter key as a prefix, so the shorter one is shadowed for
+     * values that start with the longer). Informational: nothing here fails the Step, and no key value is stored.
+     */
+    private static void referenceQuality(Connection conn, PipelineNode node, String ref, String key, String filter,
+                                         boolean prefix, String refRows) throws SQLException {
+        String stats = table(node.id(), "reference_stats");
+        String where = filter == null ? "" : " WHERE (" + filter + ")";
+        exec(conn, "DROP TABLE IF EXISTS " + q(stats));
+        exec(conn, "CREATE TABLE " + q(stats) + " (name VARCHAR, n BIGINT)");
+        exec(conn, "INSERT INTO " + q(stats) + " SELECT 'reference.rows', count(*) FROM " + q(ref) + " t" + where);
+        exec(conn, "INSERT INTO " + q(stats) + " SELECT 'reference.null_keys', count(*) FROM " + q(ref) + " t"
+                + (filter == null ? " WHERE" : " WHERE (" + filter + ") AND") + " t." + key + " IS NULL");
+        if (!prefix) return;
+        exec(conn, "INSERT INTO " + q(stats) + " WITH k AS (SELECT DISTINCT __lk_key FROM (" + refRows + ")),"
+                + " l AS (SELECT DISTINCT length(__lk_key) AS n FROM k)"
+                + " SELECT 'reference.nested_prefixes', count(*) FROM k a WHERE EXISTS (SELECT 1 FROM l"
+                + " JOIN k b ON b.__lk_key = left(a.__lk_key, l.n) WHERE l.n < length(a.__lk_key))");
+    }
+
+    /**
      * The hit and miss counts a keyed {@code transform.join} node left ({@code lookup.<on column>.hit} / {@code .miss}),
      * read once and dropped; empty for any other node, so the walk can ask after every join without knowing its form.
      */
@@ -1724,6 +1748,13 @@ public final class RowShaper {
             exec(conn, "DROP TABLE " + q(stats));
         } catch (SQLException none) {
             // not a keyed join: no stats table, no counts
+        }
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT name, n FROM " + q(table(nodeId, "reference_stats")))) {
+            while (rs.next()) out.merge(rs.getString(1), rs.getLong(2), Long::sum);
+            exec(conn, "DROP TABLE " + q(table(nodeId, "reference_stats")));
+        } catch (SQLException none) {
+            // a range join, or not a keyed join: no Reference counts
         }
         return out;
     }

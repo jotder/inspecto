@@ -796,6 +796,24 @@ class RowShaperTest {
         assertTrue(RowShaper.takeLookupStats(conn, "no_such_node").isEmpty());
     }
 
+    /** The Reference's own quality rides beside the hit counts: size, rows with no key, and nested prefixes. */
+    @Test
+    void aKeyedJoinReportsTheReferencesNullKeysAndNestedPrefixes() throws Exception {
+        seedDialDigits();
+        sql("INSERT INTO dd VALUES (NULL, 'XX', 'No key', '0', 99)");
+        keyedJoin(keyedCfg());
+        var counts = RowShaper.takeLookupStats(conn, "k" + keyedJoins);
+        assertEquals(5L, counts.get("reference.rows"));
+        assertEquals(1L, counts.get("reference.null_keys"));
+        assertEquals(2L, counts.get("reference.nested_prefixes"), "24991 sits under 249; 2499123 under both");
+        keyedJoin(keyedCfg("match", "exact"));
+        var exact = RowShaper.takeLookupStats(conn, "k" + keyedJoins);
+        assertEquals(1L, exact.get("reference.null_keys"));
+        assertNull(exact.get("reference.nested_prefixes"), "nesting is a prefix-mode notion");
+        keyedJoin(keyedCfg("filter", "iso_country_code = 'GB'"));
+        assertEquals(1L, RowShaper.takeLookupStats(conn, "k" + keyedJoins).get("reference.rows"), "after filter");
+    }
+
     /** served_msisdn misses 1 of its 3 values: a miss rate cap above that lets the run on, below it stops it. */
     @Test
     void maxMissRateStopsTheStepWhenTooManyValuesFindNoReferenceRow() throws Exception {
