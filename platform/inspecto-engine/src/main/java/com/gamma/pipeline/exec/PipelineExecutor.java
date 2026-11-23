@@ -334,7 +334,10 @@ public final class PipelineExecutor {
                 recordCounts(conn, obs, nodeId, rels);
                 emitDedupDropped(conn, g, node, batchId, rels);
                 trail.schema(nodeId, main(rels));
-                trail.end(nodeId, StepReceipt.Outcome.OK, null);
+                Map<String, Long> lookups = BuiltinNodeType.TRANSFORM_JOIN.type().equals(node.type())
+                        ? RowShaper.takeLookupStats(conn, nodeId) : Map.of();
+                trail.end(nodeId, StepReceipt.Outcome.OK,
+                        lookups.isEmpty() ? null : new StepReceipt.Diagnostics(null, null, lookups));
             }
             // control terminals (gap/alert/event) consume but produce no data relation — nothing to route on
         }

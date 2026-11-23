@@ -337,12 +337,12 @@ fifty").
 
 ## Telecom_WangiriNetwork
 
-> **One operation, four masks** · Standard · Other Examples Space (`la-showcase`) · four fraud reports, one network · 5 min
+> **One operation, four masks** · Standard · Other Examples Space (`la-showcase`) · four fraud reports, one network · 4 min 45 s
 
 - **Cast:** the suspect number (WANGIRI-A, 99979100001), a second SIM on its handset (WANGIRI-B, 99979100002), the premium-rate
   number its callbacks are forwarded to (PREMIUM-01, 99891000001), then IRSF-01, five numbers on one identity (SUBFRAUD-01..05),
-  a SIM box (SIMBOX-01) and mules (MULE-01..). **Decoy:** the taxi-dispatch line (99970000100), called by 650 distinct
-  subscribers.
+  a SIM box (SIMBOX-01) and mules (MULE-01..); all masked for the analyst, so the film names roles. **Decoy:** the taxi-dispatch
+  line, called by 650 distinct subscribers; the product holds it back as a *busy* subscriber when the graph is expanded.
 - **Stakes:** four teams hold four reports (a missed-call scam, an international revenue-share ring, a false subscriber identity,
   a SIM box). Each team can close its own ticket; nobody sees that the same operation sits behind all four.
 - **Vocabulary:** *Wangiri* ("the phone rings once and stops so the victim calls back to a premium-rate number"); *revenue-share
@@ -353,79 +353,83 @@ fifty").
   same play earlier on 60 victims; both SIMs share one handset. Degree ladder from WANGIRI-A: d1 WANGIRI-B (shared device) and
   PREMIUM-01 (forwarding); d2 IRSF-01 (voice calls to PREMIUM-01); d3 SUBFRAUD-01..05 (shared identity, IRSF-01's id document);
   d4 SIMBOX-01 (shared payment card) and MULE-01 (SIM history); d5 the other mules. The HUB supernode (a taxi-dispatch line
-  called by 650 distinct subscribers) is flagged and not expanded. **Corrections:** v1 said "four hundred numbers called it
-  back" (it is 400 rung, 40 called back) and used "257 calls" for the taxi line (650 distinct callers). The plan's table angle
-  ("four teams, four reports, one network") is confirmed and gains the decoy.
-- **Screen truth:** saved view *Telecom fraud network*: 767 entities masked for the analyst and a banner *Result cut short:
-  the server stopped reading at its row limit. Narrow the Dataset or add a filter.* The suspect number is typed as a start value
-  (it comes from the report, as in F2) and is accepted while masked.
-- **Before:** Standard build, Other Examples Space from a fresh unzip, Demo Analyst. The film starts and saves one Investigation
-  (the F2 steps); a re-recording needs a fresh unzip.
+  called by 650 distinct subscribers) is flagged and not expanded. **Corrections:** v1 said "four hundred numbers called it back"
+  (it is 400 rung, 40 called back) and used "257 calls" for the taxi line (650 distinct callers).
+- **Screen truth (checked live 2026-11-23, Standard, Demo Analyst):** saved view *Telecom fraud network*: 767 entities masked,
+  a banner *Result cut short*, and Busiest nodes names aliases. Starting from the typed number (Investigation tab ▸ Start from One
+  entity ▸ Dataset `telecom_links_dataset` ▸ Entity Type MSISDN ▸ the value ▸ Start; the first Start can take over fifteen
+  seconds on a cold server) draws *1 entity and 402 linked subscribers* ("403 entities masked"). Expand (G) from "the nodes
+  not expanded yet" takes the first 25 of the 402 (about 41 subscribers and 270 calls) and the next press adds 41 more
+  subscribers; the Expand dialog reports *1 busy subscriber will be held*, and the canvas lists it with *Expand anyway* and
+  *Hide held (1)*. The dock Steps tab reads *Start from 1 entity · Expand 1 degree from 1 entity · Expand 1 degree from the outer
+  ring*, and says *Nothing is recorded yet. Save asks for a Name and a Purpose*. The film does not save. The full chain to the
+  identity ring, the SIM box and the mules is narrated from the generator, not reached on screen.
+- **Before:** Standard build, Other Examples Space from a fresh unzip, Demo Analyst; nothing is saved.
 - **Lead:** one operation to report, link by link, not four cases. *What would change our mind:* if the premium number's other
   callers had no link to the identity or the handset, the four reports would be four separate frauds. *Next actions:* block the
   premium number and the two SIMs; send the identity ring to subscription-fraud review; hand the SIM box and mules to the
   carrier team with the chain as the evidence.
-- **Try it / Check:** *Try it:* start from the suspect number and expand one degree at a time with Expand · G, reading each new
-  link kind. *Check:* why not start from the busiest number? *Answer: it is a taxi line that hundreds of people call; the
-  number that receives calls it never made leads to the fraud.*
+- **Try it / Check:** *Try it:* start from the suspect number and expand one degree at a time with Expand · G, reading what each
+  press adds. *Check:* why not start from the busiest number? *Answer: it is a taxi line that hundreds of people call, so the
+  product holds it back; the number that rings people for a second and hangs up leads to the fraud.*
 
 ### S01 · Cold open · ~25 s
-- Voice: Four reports land on four desks in one week. A missed-call scam. An international revenue-share ring. A false subscriber identity. A SIM box. [pause 0.6] Four teams close four tickets. You wonder whether it is one operation, wearing four masks.
-- Chip: none
-- Action: cold open over the home page; at 0:20 the intro card ("Case file · One operation, four masks · Other Examples · Standard").
+- Voice: Four reports land on four desks in one week: a missed-call scam, an international revenue-share ring, a false subscriber identity, and a SIM box. [pause 0.6] Four teams close four tickets. You wonder whether it is one operation, wearing four masks.
+- Action: cold open over the home page.
 - Impact: none.
 
-### S02 · Each team sees one slice · ~35 s
-- Voice: A network records every call it carries, and each team looks at its own slice. Wangiri, a Japanese word, is the missed call: the phone rings once so you call back a premium number. [pause 0.5] Each trick looks like a separate crime. The forwarding and the shared handset that join them were in the records all along.
-- Chip: none
-- Action: story card "Who is who": *a missed-call number*, *a premium number*, *a shared handset*; the saved view opens behind it.
+### S02 · Each team sees one slice · ~32 s
+- Beat: steady
+- Intro: One operation, four masks | Other Examples Space
+- Story: a missed-call number = rings once and hangs up | a premium number = where the callbacks end | a shared handset = one phone behind two SIMs
+- Voice: A network records every call it carries, and each team looks at its own slice. Wangiri, a Japanese word, is the missed call: the phone rings once so you call back a premium number. [pause 0.5] Each trick looks like a separate crime, but the forwarding and the shared handset that join them were in the records all along.
+- Action: intro card, then the story card "Who is who"; the saved view opens behind it.
 - Impact: the story card names the roles.
 
-### S03 · Calls into links · ~30 s
+### S03 · Calls into links · ~28 s
 - Voice: Each call is a record: who rang, who was rung, when, for how long, and the SIM and handset behind it. [pause 0.4] A Job turns calls into links between numbers: who called whom, who forwarded to whom, and which SIMs share a handset. Numbers are the entities, and the call type names the kind of link.
-- Chip: Data · Mappings
-- Action: rail Data ▸ the telecom links Dataset ▸ zoom on Mappings. [check in UI: the Dataset name `telecom_links_dataset` and its link kinds]
-- Impact: mark the link kinds voice, forwarding and shared device.
+- Chip: Data
+- Action: rail Data ▸ hold on the list of Datasets.
+- Impact: none.
 
-### S04 · A busy view, and a banner · ~40 s
-- Voice: The saved view draws the suspicious corner of the network. It is large, and the server says why it looks cut: it stopped reading at its row limit. [pause 0.5] The product tells you instead of drawing a partial picture quietly. Every number is an alias for this analyst, so you will follow roles, not digits. Narrow it down.
+### S04 · A busy view, and a banner · ~38 s
+- Voice: The saved view draws the suspicious corner of the network. It is large, and the server says why it looks cut: it stopped reading at its row limit. [pause 0.5] The product tells you instead of drawing a partial picture quietly. Every number is an alias for this analyst, so you follow roles, not digits. Narrow it down.
 - Chip: Saved views
-- Action: open the saved view *Telecom fraud network* ▸ hold on the "Result cut short" banner and the "767 entities masked" line. [check in UI: the banner wording and the masked counter]
-- Impact: mark the banner and the masked line.
+- Action: open the saved view *Telecom fraud network* ▸ hold on the banner and the "entities masked" line.
+- Impact: mark the masked line.
 
-### S05 · First sweep: a taxi line · ~40 s
-- Voice: Busiest nodes. [pause 0.4] The top name is a taxi-dispatch line. Hundreds of people call a taxi, so it is busy for a good reason. Set it aside. Look instead for a number that receives calls it never asked for, and that forwards them on.
+### S05 · First sweep: a taxi line · ~36 s
+- Voice: Busiest nodes. [pause 0.4] The top name is a taxi-dispatch line. Hundreds of people call a taxi, so it is busy for a good reason. Set it aside, and look instead for a number that rings people it never meant to talk to, and that forwards what comes back.
 - Chip: Busiest nodes
-- Action: Busiest nodes on the saved view ▸ hold on the first row. [check in UI: the first row is the taxi line, as an alias]
-- Impact: grey "ruled out" marker on the taxi line.
+- Action: Busiest nodes on the saved view ▸ hold on the first rows.
+- Impact: grey "ruled out" marker on the first row (the taxi line).
 
-### S06 · The missed-call number · ~50 s
-- Voice: Start from the number the missed-call reports named. [pause 0.5] It rings four hundred phones for a second or two and hangs up. Forty people call back. Every callback is forwarded to one premium-rate number. And a second SIM, already on a blocklist, sits in the same handset, and ran the same trick earlier. That is how the money is made.
+### S06 · The missed-call number · ~48 s
+- Voice: Start from the number the missed-call reports named. Type it in the Investigation tab, and press Start. [pause 0.5] The graph draws that one number with four hundred and two subscribers around it. It rang them all for a second or two and hung up. Forty people called back, and every callback was forwarded to one premium-rate number. And a second SIM, already on a blocklist, sits in the same handset and ran the same trick earlier. That is how the money is made.
 - Chip: Investigation · Start from · One entity
-- Action: Investigation tab ▸ Start from One entity ▸ Dataset `telecom_links_dataset` ▸ Entity Type MSISDN ▸ `99979100001` ▸ Start ▸ Save… (the F2 steps) ▸ Expand to degree 1 ▸ hold. [check in UI: *Drew 1 entity*, the forward link to the premium number and the shared device link]
-- Impact: before/after hold: the second SIM and the premium number appear; mark them.
+- Action: Investigation tab ▸ Start from One entity ▸ Dataset `telecom_links_dataset` ▸ Entity Type MSISDN ▸ the number ▸ Start ▸ hold on the wheel of 402.
+- Impact: before/after hold: the wheel of subscribers appears around the start number.
 
-### S07 · One degree at a time · ~50 s
-- Voice: Now widen it one degree at a time, and watch what joins. [pause 0.5] The premium number receives voice calls pumped in by a revenue-share ring. That ring's id document belongs to five numbers on one synthetic identity. One of their payment cards pays for a SIM box. Another line passes to a chain of mules. Four reports, one chain.
-- Chip: Expand · G · Step log
-- Action: Expand one degree at a time (G) three or four times, with a pause after each ▸ Open the Step log ▸ hold on the rows. [check in UI: each degree adds the IRSF number, the five identity numbers, the SIM box and the mule chain, as the hub taxi line stays unexpanded]
-- Impact: before/after hold at each degree; mark the new link kind each time.
+### S07 · One degree at a time · ~48 s
+- Voice: Now widen it one degree at a time, and watch what joins. Press Expand, G. [pause 0.5] The product takes the outer ring, adds more subscribers, and holds back one busy number instead of pulling in its whole city: the taxi line, again. Press it a second time. In the full data, the premium number receives voice calls pumped in by a revenue-share ring, whose id document belongs to five numbers on one synthetic identity. One of their payment cards pays for a SIM box. Four reports, one chain.
+- Chip: Expand · G
+- Action: G ▸ Expand ▸ hold ▸ G ▸ Expand ▸ hold on the held number and *Expand anyway*; do not press it.
+- Impact: before/after hold at each press; mark the held number.
 
 ### S08 · Evidence you can defend · ~35 s
-- Voice: Is it a guess? The Step log lists each expand with its limits, in order, and the table holds every link as a row. [pause 0.5] Each call-back, and the forward that follows it, is a line a colleague can read. The chain is a result you can replay, not a drawing.
-- Chip: Step log · Rows
-- Action: dock ▸ Step log ▸ then Rows ▸ hold. [check in UI: the step names Start, Expand, Expand, Expand]
-- Impact: mark the expand rows.
+- Voice: Is it a guess? The dock lists each step in order: the start, and each expand with its limits. [pause 0.5] The table beside it holds every call as a row a colleague can read. Nothing is saved yet. Save asks for a name and a purpose, and then the steps are recorded for an auditor, so a chain is a result you can replay, not a drawing.
+- Chip: Steps
+- Action: dock ▸ Steps ▸ hold on the three rows and the line *Nothing is recorded yet*.
+- Impact: mark the Steps rows.
 
-### S09 · What the team does next · ~40 s
-- Voice: The lead: one operation, link by link, not four cases. [pause 0.5] Block the premium number and the two SIMs on the handset. Send the five identity numbers to subscription-fraud review. Hand the SIM box and the mules to the carrier team, with the chain attached.
-- Chip: Entity Lists
-- Action: rail Entity Lists ▸ the list *Telecom numbers under watch* ▸ hold. [check in UI: the list exists in this Space]
-- Impact: mark the list row.
+### S09 · What the team does next · ~38 s
+- Voice: The lead: one operation to report, link by link, not four cases. [pause 0.5] The premium number and the two SIMs are blocked. The identity ring goes to subscription-fraud review. The SIM box and the mules go to the carrier team, with the chain as the evidence. And the same walk is repeated on every other number that rings people for a second.
+- Action: hold on the graph.
+- Impact: none.
 
-### S10 · The case file · ~25 s
-- Voice: The case file. Lead: one operation behind four reports. Evidence: a chain of links from the missed-call number to the mules, each step a row. Next step: block, review, hand over. [pause 0.6] Each team saw one trick. The links joined them. The same steps run on millions of records and answer in moments. Try it: start from the suspect number and widen it yourself.
-- Chip: none
+### S10 · The case file · ~28 s
+- Casefile: Lead: one operation behind four reports | Evidence: four hundred rung, forty called back, every callback forwarded to one premium number, one handset behind two SIMs | Next: block the premium number and both SIMs; send the identity ring to subscription-fraud review; hand the SIM box and mules to the carrier team | Try it: start from the suspect number and expand one degree at a time
+- Voice: The case file. Lead: one operation behind four reports. Evidence: four hundred rung, forty called back, every callback forwarded to one premium number. Next step: block the number and the two SIMs, send the identity ring to review, hand the SIM box and mules to the carrier team. [pause 0.6] Four teams saw four slices; the links showed one operation. The same steps run on millions of records and answer in moments. Try it: start from the suspect number.
 - Action: case-file card (8 s) and the outro "Next: Expand with intent · training F2".
 - Impact: none.
 

@@ -397,6 +397,53 @@ class PipelineValidatorTest {
         }
     }
 
+    /** LOOKUP-1 as-of: it needs key, from and at; takes no to; and at belongs to as-of only. */
+    @Test
+    void anAsofJoinsSettingsAreCheckedAtValidation() {
+        Map<String, Object> ok = Map.of("reference", "reference/rates", "key", "ccy", "match", "asof",
+                "from", "valid_from", "at", "txn_date", "on", "ccy");
+        assertFalse(codes(PipelineValidator.validate(joinGraph(ok))).contains(PipelineValidator.JOIN_KEYED_INVALID));
+        for (Map<String, Object> bad : List.<Map<String, Object>>of(
+                without(ok, "at"),                          // no time column
+                without(ok, "from"),                        // no effective-from column
+                without(ok, "key"),                         // no key
+                with(ok, "to", "valid_to"),                 // asof has no end bound
+                with(ok, "match", "exact"))) {              // at: on a non-asof join
+            PipelineValidator.Result r = PipelineValidator.validate(joinGraph(bad));
+            assertTrue(codes(r).contains(PipelineValidator.JOIN_KEYED_INVALID), () -> bad + " → " + r.issues());
+        }
+    }
+
+    /** LOOKUP-1 normalized exact: an unknown normalizer, or normalize on a range, is refused at save. */
+    @Test
+    void aJoinsNormalizeSettingIsCheckedAtValidation() {
+        Map<String, Object> ok = Map.of("reference", "reference/codes", "key", "code", "match", "exact",
+                "on", "v", "normalize", List.of("trim", "strip_plus"));
+        assertFalse(codes(PipelineValidator.validate(joinGraph(ok))).contains(PipelineValidator.JOIN_KEYED_INVALID));
+        for (Map<String, Object> bad : List.<Map<String, Object>>of(
+                with(ok, "normalize", "soundex"),
+                with(without(without(ok, "key"), "match"), "match", "range"))) {
+            Map<String, Object> cfg = new java.util.LinkedHashMap<>(bad);
+            if ("range".equals(cfg.get("match"))) cfg.put("from", "valid_from");
+            PipelineValidator.Result r = PipelineValidator.validate(joinGraph(cfg));
+            assertTrue(codes(r).contains(PipelineValidator.JOIN_KEYED_INVALID), () -> cfg + " → " + r.issues());
+        }
+    }
+
+    @Test
+    void aJoinsMaxMissRateIsCheckedAtValidation() {
+        Map<String, Object> ok = Map.of("reference", "reference/codes", "key", "code", "on", "v", "max_miss_rate", 0.1);
+        assertFalse(codes(PipelineValidator.validate(joinGraph(ok))).contains(PipelineValidator.JOIN_KEYED_INVALID));
+        for (Object bad : List.of(1.5, -0.1, "often")) {
+            PipelineValidator.Result r = PipelineValidator.validate(joinGraph(with(ok, "max_miss_rate", bad)));
+            assertTrue(codes(r).contains(PipelineValidator.JOIN_KEYED_INVALID), () -> bad + " → " + r.issues());
+        }
+        Map<String, Object> noKey = new java.util.LinkedHashMap<>(ok);
+        noKey.remove("key");
+        assertTrue(codes(PipelineValidator.validate(joinGraph(noKey))).contains(PipelineValidator.JOIN_KEYED_INVALID),
+                "like every keyed setting, it needs key:");
+    }
+
     private static PipelineGraph joinGraph(Map<String, Object> cfg) {
         return new PipelineGraph("keyed", true, List.of(new PipelineNode("j", "transform.join", cfg, null)), List.of());
     }

@@ -146,6 +146,47 @@ raw DuckDB error that does not name the Step (refuse it by name, or parse the bo
 [`2026-11-22-dated-reference-runs-plan.md`](2026-11-22-dated-reference-runs-plan.md); the Job's own graph is
 [`2026-11-22-job-graph-plan.md`](2026-11-22-job-graph-plan.md).
 
+**P1e built 2026-11-23 (operator: "normalized exact"):** `normalize:` on the keyed join (`match: exact | longest_prefix`) —
+an ordered list of `trim`, `lower`, `upper`, `strip_leading_zeros`, `strip_plus` applied to BOTH the Reference key and
+every looked-up value; two Reference rows that collapse to one key are refused by the duplicates rule; refused on
+`range`; the returned key column keeps the Reference's own text, while `matched_key` shows the NORMALIZED key. `RowShaperTest`, `PipelineValidatorTest`.
+Still open in P1: the `lookup()` scalar, hit / miss counts.
+
+**P1f built 2026-11-23 (operator: "as-of with a key"):** `match: asof` with `key:` (Reference equality column), `from:`
+(its effective-from column; empty = since forever) and `at:` (the rows' time column) — each row takes the latest
+Reference row of its key effective at or before its time; resolved once per distinct (key, time) pair. Decision: a
+second input column rides in `at:` (one time for all `on` columns) rather than a pair per mapping; per-mapping `at:`
+inside `lookups:` is not built. Single-table as-of with no key was already `range` with only `from:`. As built:
+`user-guide-elt-record-transformer.md` §8.7. `RowShaperTest`, `PipelineValidatorTest`.
+Still open in P1: nothing (P1 complete after P1h).
+
+**P1g built 2026-11-23 (operator: "lookup() scalar and per-mapping hit and miss counts" — counts half):** a keyed join
+counts, per mapping, rows that **hit** (found a Reference row) and **miss** (had a value, found none; a NULL value is
+neither). Channel: Step Receipt `diag.counts` as `lookup.<on column>.hit|miss` — no new receipt field. The join writes
+`<node>__lookup_stats`; the walk takes it (`RowShaper.takeLookupStats`) when the Step ends OK; the per-row hit
+columns the join adds are dropped from the output. Not built: counts for the unkeyed (`USING`) join and the
+`longest_prefix`-only legacy path; a sample of unmatched keys (§4.6); the UI reading `counts`.
+
+**P2a built 2026-11-23 (operator: "P2 lifecycle", slice "Miss-rate Expectation"):** `max_miss_rate:` (0 to 1) on a keyed join stops the Step when, for any mapping, more than that share of looked-up values (hit + miss; NULLs excluded) find no Reference row — the stale-Reference detector, built on the P1g counts. The failed Step is what raises the Incident (the existing batch-failed path), with the counts in the message and no values. Decision: node-level, one threshold for every mapping, fail-only (no warn mode); a miss-rate Expectation proper (evaluated outside a run) is not built. Decision (assistant, 2026-11-23): the rest of P2 — shared warm cache, atomic swap, incremental refresh — waits for the P3 point engine, the only consumer (D-LK8); as-of event time and the version in lineage are in `2026-11-22-dated-reference-runs-plan.md`. `RowShaperTest`, `PipelineValidatorTest`, `NodeAttributesContractTest`.
+
+**Form editor for `lookups:` built 2026-11-23 (operator: "form editor for lookups"):** `inspecto-join-lookups-editor` on the join Step's pane (`pipelines/join-lookups-editor.component.ts`, pure rows ↔ value in `join-lookups.ts`), replacing the JSON row in Additional config; same host pattern as the summarize editor (the pane owns Apply, dirty, and the merge into the extras). Stored shape unchanged; a default list `name=value` is written back as a map; an unreadable `lookups:` stays an extra row. Not driven against a live backend yet (specs only). Reference-column and input-column pickers are plain text (input columns suggested when a sample is parsed).
+
+**P2b built 2026-11-23 (operator: "load-time quality report"):** the Reference's own quality as counts on the same `diag.counts` — `reference.rows`, `reference.null_keys`, and for `longest_prefix` `reference.nested_prefixes` (a key with a shorter key as a prefix; one hash probe per distinct key length, no N×M). Keyed `exact | longest_prefix | asof`; not `range`. Decisions (assistant): informational only, no fail threshold; "prefix conflict" read as nesting, since a repeated key is already refused by `duplicates`; counts only, NO sample — a sample of keys would be stored in the receipt, so it waits with the unmatched-key sample (§4.6) for a place that is access-controlled. Still open in P2: nothing in batch; the cache lifecycle waits for P3. `RowShaperTest`.
+
+**P1h built 2026-11-23 (operator: "Yes, exact only"):** the `lookup()` scalar as the Record Transformer function
+`lookup.reference` (category Lookup; params `reference`, `key`, `returns`, `normalize`), exact match only. It renders
+the marker call `inspecto_lookup(...)`; `RowShaper.project` expands it into a scalar subquery over the resolved
+Reference, the row's column qualified with the input table, `normalize` applied to both sides. A repeated key makes
+DuckDB refuse the subquery (as `duplicates: refuse`). Decision: only on a pipeline `transform.sql` projection, which
+has the Reference resolver; the ingest lane (`processing.map`) has none, so a lookup field there fails as an unknown
+function `inspecto_lookup`, and a `sink.view`'s derived SQL skips a node carrying one. The UI's client-side SQL preview
+cannot run it either. Not built: prefix/range/as-of on the scalar (use the join), a not-found default (wrap in
+`logic.default_if_empty`). **Built 2026-11-23 (operator: "take on LOOKUP-1 items"):** a save refuses a lookup field
+on the ingest lane — `ERR_LOOKUP_ON_INGEST` on `processing.map.fields[i].fn`, regardless of `active`, on every save
+path (`SaveGate.ingestLookupFindings`, `ControlApiSaveGateParityTest`); a schema file's own `mapping.fields[]` saved
+on its own is not judged. `RowShaperTest`,
+`RecordTransformContractTest`, the TS contract (`sql-functions.contract.json`) regenerated; the TS spec was not run.
+
 **P1c built 2026-11-22 (operator: "start range"):** `match: range` on the keyed join — `from`/`to` Reference
 columns, inclusive bounds, an empty bound open-ended, compared in the value's own type; `filter` (a condition on
 Reference rows, every keyed mode); overlapping periods refused by name unless `duplicates: first|last` + `order_by`.

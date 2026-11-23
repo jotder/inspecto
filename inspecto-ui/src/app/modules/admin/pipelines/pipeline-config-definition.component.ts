@@ -35,6 +35,8 @@ import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form
 import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { StepPreviewResultComponent } from 'app/inspecto/components/step-preview-result.component';
 import { JoinAddedColumnsComponent } from './join-added-columns.component';
+import { JoinLookupsEditorComponent } from './join-lookups-editor.component';
+import { parseLookups } from './join-lookups';
 import { pipelineOptionLoader, referenceOptionLoader } from 'app/inspecto/components/entity-option-loaders';
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { ENRICHMENT_WIRING_ATTRIBUTES } from 'app/inspecto/enrichment/enrichment-attributes';
@@ -123,6 +125,7 @@ function mergeFormValues(
         PipelineFilterPredicateComponent,
         StepPreviewResultComponent,
         JoinAddedColumnsComponent,
+        JoinLookupsEditorComponent,
         SummarizeEditorComponent,
     ],
     template: `
@@ -175,6 +178,15 @@ function mergeFormValues(
                 (changed)="onInteraction()"
             />
         }
+        @if (lookupsEditable()) {
+            <!-- LOOKUP-1: the per-input mappings as a form (a lookups: this cannot read stays an extra setting) -->
+            <inspecto-join-lookups-editor
+                [initial]="node().config?.['lookups']"
+                [inputColumns]="upstreamColumns()"
+                [readOnly]="readOnly()"
+                (changed)="onInteraction()"
+            />
+        }
         @if (isJoin()) {
             <!-- LOOKUP-1 P1d: what the keyed join adds, from the saved settings and the Reference's columns -->
             <inspecto-join-added-columns [config]="node().config ?? {}" [inputColumns]="upstreamColumns()" />
@@ -211,15 +223,15 @@ function mergeFormValues(
              matching the stored value's TYPE (2026-08-21 — the generic Key/Value grid is gone).
              Adding a key is offered only where this is the node's PRIMARY surface (no schema). A plain
              section header, no chevron (R6): shown whenever it has rows or is the primary surface. -->
-        @if (split().extraRows.length || allowAddExtra()) {
+        @if (extraRows().length || allowAddExtra()) {
             <div class="mb-1 mt-2 text-xs font-semibold uppercase opacity-70">
                 {{ specs().length || isEnrichment() ? 'Additional config' : 'Config' }}
-                @if (split().extraRows.length) {
-                    <span class="opacity-60">({{ split().extraRows.length }})</span>
+                @if (extraRows().length) {
+                    <span class="opacity-60">({{ extraRows().length }})</span>
                 }
             </div>
             <app-pipeline-extra-config
-                [entries]="split().extraRows"
+                [entries]="extraRows()"
                 [allowAdd]="allowAddExtra()"
                 [readOnly]="readOnly()"
                 (changed)="onInteraction()"
@@ -402,6 +414,14 @@ export class PipelineConfigDefinitionComponent {
     private readonly summarizeEditor = viewChild(SummarizeEditorComponent);
     /** Schema seed + free-form rows — the same split the dialog ran (`node-config-build.ts`). */
     readonly split = computed(() => splitNodeConfig(this.node(), this.specs(), false));
+
+    /** A keyed join's `lookups:` is edited by the mappings form when it can read the stored value. */
+    readonly lookupsEditable = computed(() => this.isJoin() && parseLookups(this.node().config?.['lookups']) !== null);
+    private readonly lookupsEditor = viewChild(JoinLookupsEditorComponent);
+    /** The free-form rows: everything the schema and the bespoke editors do not own. */
+    readonly extraRows = computed(() =>
+        this.lookupsEditable() ? this.split().extraRows.filter((r) => r.key !== 'lookups') : this.split().extraRows,
+    );
 
     /** Loaders for the schema-driven config form's entity-reference keys (join's Reference picker). */
     readonly configLoaders = { reference: referenceOptionLoader() };
@@ -721,7 +741,8 @@ export class PipelineConfigDefinitionComponent {
             (this.wiringForm?.isDirty() ?? false) ||
             this.enrichName.dirty ||
             (this.enrichEditor()?.isDirty() ?? false) ||
-            (this.summarizeEditor()?.isDirty() ?? false);
+            (this.summarizeEditor()?.isDirty() ?? false) ||
+            (this.lookupsEditor()?.isDirty() ?? false);
         if (dirty === this.lastDirty) return;
         this.lastDirty = dirty;
         this.dirtyChange.emit(dirty);
@@ -797,13 +818,19 @@ export class PipelineConfigDefinitionComponent {
                 this.schemaForm ? this.schemaForm.value() : null,
                 this.isSummarize() ? this.summarizeEditor()?.value() : undefined,
             ),
-            extras: this.extraConfig?.value() ?? {},
+            extras: this.withLookups(this.extraConfig?.value() ?? {}),
             name: n.name,
             description: n.description,
             use: n.use,
             isAcquisition: false,
             connector: null,
         });
+    }
+
+    /** The mappings form's `lookups`, merged into the extras; no mappings means the key is not written. */
+    private withLookups(extras: Record<string, unknown>): Record<string, unknown> {
+        const lookups = this.lookupsEditable() ? this.lookupsEditor()?.value() : undefined;
+        return lookups === undefined ? extras : { ...extras, lookups };
     }
 
     /** Apply: validate, rebuild the node, emit. Enrichment writes its companion first. */
@@ -815,6 +842,7 @@ export class PipelineConfigDefinitionComponent {
         if (this.schemaForm && !this.schemaForm.validate()) return;
         if (this.extraConfig && !this.extraConfig.validate()) return;
         if (this.isSummarize() && !(this.summarizeEditor()?.validate() ?? true)) return;
+        if (this.lookupsEditable() && !(this.lookupsEditor()?.validate() ?? true)) return;
         const node = this.buildNode();
         this.markPristine();
         this.applied.emit(node);
@@ -826,6 +854,7 @@ export class PipelineConfigDefinitionComponent {
         this.wiringForm?.form.markAsPristine();
         this.enrichName.markAsPristine();
         this.summarizeEditor()?.markPristine();
+        this.lookupsEditor()?.markPristine();
         this.emitDirty();
     }
 

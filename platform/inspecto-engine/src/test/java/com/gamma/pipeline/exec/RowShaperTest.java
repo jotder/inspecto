@@ -515,6 +515,167 @@ class RowShaperTest {
     // ── join keyed form: several numbers against one dialling-code table (LOOKUP-1 P1b) ──
     // A synthetic table shaped like a telco dial-digit dimension: key, country, operator, an exact-only flag.
 
+    // ── join match: asof (LOOKUP-1 P1) ──
+
+    private Map<Integer, Map<String, String>> asofJoin(String txnTimeType, Object... extra) throws SQLException {
+        sql("DROP TABLE IF EXISTS arate");
+        sql("DROP TABLE IF EXISTS atxn");
+        sql("CREATE TABLE arate AS SELECT * FROM (VALUES"
+                + " ('USD', DATE '2026-01-01', 1.0), ('USD', DATE '2026-03-01', 1.1), ('EUR', DATE '2026-02-01', 2.0)"
+                + ") t(ccy, valid_from, rate)");
+        sql("CREATE TABLE atxn AS SELECT id, ccy, CAST(d AS " + txnTimeType + ") AS txn_date FROM (VALUES"
+                + " (1, 'USD', '2026-02-15'), (2, 'USD', '2026-03-01'), (3, 'USD', '2025-12-31'),"
+                + " (4, 'EUR', '2026-02-01'), (5, 'EUR', '2026-06-01'), (6, 'GBP', '2026-02-15'),"
+                + " (7, 'USD', NULL)) t(id, ccy, d)");
+        Map<String, Object> cfg = new java.util.LinkedHashMap<>(Map.of("reference", "r", "key", "ccy",
+                "match", "asof", "from", "valid_from", "at", "txn_date", "on", List.of("ccy"),
+                "columns", List.of("rate")));
+        for (int i = 0; i < extra.length; i += 2) {
+            if (extra[i + 1] == null) cfg.remove((String) extra[i]);
+            else cfg.put((String) extra[i], extra[i + 1]);
+        }
+        String id = "a" + (++keyedJoins);
+        var out = new RelationByRel(RowShaper.shape(conn, PipelineNode.of(id, "transform.join", cfg), "atxn", id,
+                (c, name) -> "arate"));
+        Map<Integer, Map<String, String>> rows = new java.util.TreeMap<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM \"" + out.table(PipelineRel.DATA) + "\"")) {
+            while (rs.next()) {
+                Map<String, String> r = new java.util.LinkedHashMap<>();
+                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++)
+                    r.put(rs.getMetaData().getColumnName(i), rs.getString(i));
+                rows.put(rs.getInt("id"), r);
+            }
+        }
+        return rows;
+    }
+
+    @Test
+    void asofTakesTheLatestReferenceRowOfTheKeyEffectiveAtOrBeforeTheRowsTime() throws Exception {
+        var rows = asofJoin("DATE");
+        assertEquals(7, rows.size(), "a LEFT join: no transaction dropped or repeated");
+        assertEquals("1.0", rows.get(1).get("ccy_rate"), "between two effective dates: the earlier one");
+        assertEquals("1.1", rows.get(2).get("ccy_rate"), "a row on its effective date takes that row");
+        assertNull(rows.get(3).get("ccy_rate"), "before the key's first effective date: nothing");
+        assertEquals("2.0", rows.get(4).get("ccy_rate"));
+        assertEquals("2.0", rows.get(5).get("ccy_rate"), "after the last: the last stays in force");
+        assertNull(rows.get(6).get("ccy_rate"), "a key the Reference lacks");
+        assertNull(rows.get(7).get("ccy_rate"), "a row with no time matches nothing");
+    }
+
+    @Test
+    void asofReadsATextTimeAsATimeAndAnEmptyFromAsSinceForever() throws Exception {
+        var rows = asofJoin("VARCHAR");
+        assertEquals("1.1", rows.get(2).get("ccy_rate"), "'2026-03-01' text compares as the date");
+        assertEquals("1.0", rows.get(1).get("ccy_rate"));
+        sql("DROP TABLE IF EXISTS arate");
+        sql("CREATE TABLE arate AS SELECT * FROM (VALUES ('USD', CAST(NULL AS DATE), 0.5),"
+                + " ('USD', DATE '2026-03-01', 1.1)) t(ccy, valid_from, rate)");
+        sql("DROP TABLE IF EXISTS atxn");
+        sql("CREATE TABLE atxn AS SELECT * FROM (VALUES (1, 'USD', DATE '2020-01-01'),"
+                + " (2, 'USD', DATE '2026-04-01')) t(id, ccy, txn_date)");
+        var cfg = Map.<String, Object>of("reference", "r", "key", "ccy", "match", "asof", "from", "valid_from",
+                "at", "txn_date", "on", List.of("ccy"), "columns", List.of("rate"));
+        String id = "asofnull";
+        var out = new RelationByRel(RowShaper.shape(conn, PipelineNode.of(id, "transform.join", cfg), "atxn", id,
+                (c, name) -> "arate"));
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT id, ccy_rate FROM \"" + out.table(PipelineRel.DATA) + "\" ORDER BY id")) {
+            assertTrue(rs.next());
+            assertEquals("0.5", rs.getString(2), "an empty from: reaches back forever");
+            assertTrue(rs.next());
+            assertEquals("1.1", rs.getString(2));
+        }
+    }
+
+    @Test
+    void asofRefusesTwoReferenceRowsOfOneKeyAndDateAndMissingOrMisplacedSettings() throws Exception {
+        asofJoin("DATE");
+        sql("DROP TABLE IF EXISTS arate");
+        sql("CREATE TABLE arate AS SELECT * FROM (VALUES ('USD', DATE '2026-01-01', 1.0),"
+                + " ('USD', DATE '2026-01-01', 1.5)) t(ccy, valid_from, rate)");
+        var cfg = Map.<String, Object>of("reference", "r", "key", "ccy", "match", "asof", "from", "valid_from",
+                "at", "txn_date", "on", List.of("ccy"), "columns", List.of("rate"));
+        var dup = assertThrows(IllegalArgumentException.class, () -> RowShaper.shape(conn,
+                PipelineNode.of("asofdup", "transform.join", cfg), "atxn", "asofdup", (c, name) -> "arate"));
+        assertTrue(dup.getMessage().contains("USD") && dup.getMessage().contains("2026-01-01"), dup.getMessage());
+        var noAt = assertThrows(IllegalArgumentException.class, () -> asofJoin("DATE", "at", null));
+        assertTrue(noAt.getMessage().contains("at:"), noAt.getMessage());
+        var badAt = assertThrows(IllegalArgumentException.class, () -> asofJoin("DATE", "at", "nope"));
+        assertTrue(badAt.getMessage().contains("nope"), badAt.getMessage());
+        var to = assertThrows(IllegalArgumentException.class, () -> asofJoin("DATE", "to", "valid_from"));
+        assertTrue(to.getMessage().contains("to:"), to.getMessage());
+        var stray = assertThrows(IllegalArgumentException.class, () -> normalizedJoin("at", "v"));
+        assertTrue(stray.getMessage().contains("asof"), stray.getMessage());
+    }
+
+    // ── join normalize: normalized exact (LOOKUP-1 P1) ──
+
+    private Map<Integer, Map<String, String>> normalizedJoin(Object... extra) throws SQLException {
+        sql("DROP TABLE IF EXISTS nref");
+        sql("DROP TABLE IF EXISTS nin");
+        sql("CREATE TABLE nref AS SELECT * FROM (VALUES (' AB1 ', 'first'), ('007', 'bond')) t(code, label)");
+        sql("CREATE TABLE nin AS SELECT * FROM (VALUES (1, 'ab1'), (2, '+7'), (3, '7'), (4, '000'), (5, 'zz'))"
+                + " t(id, v)");
+        Map<String, Object> cfg = new java.util.LinkedHashMap<>(Map.of("reference", "r", "key", "code",
+                "match", "exact", "on", List.of("v"), "columns", List.of("label")));
+        for (int i = 0; i < extra.length; i += 2) {
+            if (extra[i + 1] == null) cfg.remove((String) extra[i]);
+            else cfg.put((String) extra[i], extra[i + 1]);
+        }
+        String id = "n" + (++keyedJoins);
+        var out = new RelationByRel(RowShaper.shape(conn, PipelineNode.of(id, "transform.join", cfg), "nin", id,
+                (c, name) -> "nref"));
+        Map<Integer, Map<String, String>> rows = new java.util.TreeMap<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM \"" + out.table(PipelineRel.DATA) + "\"")) {
+            while (rs.next()) {
+                Map<String, String> r = new java.util.LinkedHashMap<>();
+                for (int i = 1; i <= rs.getMetaData().getColumnCount(); i++)
+                    r.put(rs.getMetaData().getColumnName(i), rs.getString(i));
+                rows.put(rs.getInt("id"), r);
+            }
+        }
+        return rows;
+    }
+
+    @Test
+    void normalizeMakesBothSidesCompareInOneSpelling() throws Exception {
+        var rows = normalizedJoin("normalize", List.of("trim", "upper", "strip_plus", "strip_leading_zeros"));
+        assertEquals("first", rows.get(1).get("v_label"), "' AB1 ' and 'ab1' are one key once trimmed and upper-cased");
+        assertEquals("bond", rows.get(2).get("v_label"), "'+7' and '007' both reduce to '7'");
+        assertEquals("bond", rows.get(3).get("v_label"));
+        assertNull(rows.get(4).get("v_label"), "'000' reduces to '0', which the Reference lacks");
+        assertNull(rows.get(5).get("v_label"));
+    }
+
+    @Test
+    void withoutNormalizeSpellingsStayDifferent() throws Exception {
+        var rows = normalizedJoin();
+        assertNull(rows.get(1).get("v_label"));
+        assertNull(rows.get(2).get("v_label"));
+    }
+
+    @Test
+    void aReferenceThatCollapsesToOneKeyIsRefusedByName() throws Exception {
+        sql("CREATE TABLE nref AS SELECT * FROM (VALUES ('A', 'x'), (' a', 'y')) t(code, label)");
+        sql("CREATE TABLE nin AS SELECT * FROM (VALUES (1, 'a')) t(id, v)");
+        var cfg = Map.<String, Object>of("reference", "r", "key", "code", "match", "exact", "on", List.of("v"),
+                "normalize", List.of("trim", "upper"));
+        var e = assertThrows(IllegalArgumentException.class, () -> RowShaper.shape(conn,
+                PipelineNode.of("nd", "transform.join", cfg), "nin", "nd", (c, name) -> "nref"));
+        assertTrue(e.getMessage().contains("A"), e.getMessage());
+    }
+
+    @Test
+    void anUnknownNormalizerAndNormalizeOnARangeAreRefused() throws Exception {
+        var unknown = assertThrows(IllegalArgumentException.class, () -> normalizedJoin("normalize", "soundex"));
+        assertTrue(unknown.getMessage().contains("soundex"), unknown.getMessage());
+        var range = assertThrows(IllegalArgumentException.class, () -> normalizedJoin("match", "range",
+                "key", null, "from", "code", "normalize", "trim"));
+        assertTrue(range.getMessage().contains("range"), range.getMessage());
+    }
+
     private void seedDialDigits() throws SQLException {
         sql("CREATE TABLE dd AS SELECT * FROM (VALUES"
                 + " ('249', 'SD', 'Sudan', '0', 10),"
@@ -577,6 +738,93 @@ class RowShaperTest {
         assertNull(rows.get(2).get("third_party_msisdn_provider_desc"), "a NULL number matches nothing");
         assertNull(rows.get(3).get("served_msisdn_dial_digit_key"), "no prefix of 999 is in the table");
         assertNull(rows.get(3).get("third_party_msisdn_dial_digit_key"));
+    }
+
+    /** Runs a Fields projection of txn(id, currency) against fx(currency, rate); returns id → looked-up rate. */
+    private Map<Integer, String> lookupField(Map<String, String> args) throws SQLException {
+        Map<String, String> a = new java.util.LinkedHashMap<>(Map.of("reference", "reference/fx", "key", "currency",
+                "returns", "rate", "normalize", "none"));
+        a.putAll(args);
+        String id = "lf" + (++keyedJoins);
+        var out = new RelationByRel(RowShaper.shape(conn, PipelineNode.of(id, "transform.sql", Map.of("fields", List.of(
+                Map.of("name", "id", "from", "id", "fn", "keep"),
+                Map.of("name", "rate", "from", "currency", "fn", "lookup.reference", "args", a)))),
+                "txn", id, (c, name) -> "fx"));
+        Map<Integer, String> rows = new java.util.TreeMap<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT id, rate FROM \"" + out.table(PipelineRel.DATA) + "\"")) {
+            while (rs.next()) rows.put(rs.getInt(1), rs.getString(2));
+        }
+        return rows;
+    }
+
+    @Test
+    void aLookupFieldReturnsTheReferenceValueOfItsRowsKey() throws Exception {
+        sql("CREATE TABLE fx AS SELECT * FROM (VALUES ('USD', '1.0'), ('EUR', '0.9')) t(currency, rate)");
+        sql("CREATE TABLE txn AS SELECT * FROM (VALUES (1, 'USD'), (2, 'eur'), (3, 'XXX'), (4, NULL)) t(id, currency)");
+        var exact = lookupField(Map.of());
+        assertEquals("1.0", exact.get(1));
+        assertNull(exact.get(2), "exact: 'eur' is not 'EUR'");
+        assertNull(exact.get(3), "no Reference row");
+        assertNull(exact.get(4), "no value");
+        assertEquals("0.9", lookupField(Map.of("normalize", "upper")).get(2), "normalized: 'eur' matches 'EUR'");
+    }
+
+    @Test
+    void aLookupFieldOverARepeatedKeyAndAMissingColumnAreRefused() throws Exception {
+        sql("CREATE TABLE fx AS SELECT * FROM (VALUES ('USD', '1.0'), ('USD', '1.1')) t(currency, rate)");
+        sql("CREATE TABLE txn AS SELECT * FROM (VALUES (1, 'USD')) t(id, currency)");
+        assertThrows(SQLException.class, () -> lookupField(Map.of()), "two Reference rows for one key stop the run");
+        var e = assertThrows(IllegalArgumentException.class, () -> lookupField(Map.of("returns", "nope")));
+        assertTrue(e.getMessage().contains("has no column 'nope'"), e.getMessage());
+    }
+
+    /** A walk reads these into the Step's receipt; a null value is neither a hit nor a miss; reading drops them. */
+    @Test
+    void aKeyedJoinLeavesPerMappingHitAndMissCountsForTheWalkToTake() throws Exception {
+        seedDialDigits();
+        var rows = keyedJoin(keyedCfg());
+        String id = "k" + keyedJoins;
+        assertTrue(rows.get(1).keySet().stream().noneMatch(c -> c.startsWith("__lk_")),
+                "the counting columns never reach the output");
+        var counts = RowShaper.takeLookupStats(conn, id);
+        assertEquals(2L, counts.get("lookup.served_msisdn.hit"));
+        assertEquals(1L, counts.get("lookup.served_msisdn.miss"), "999 has a value and no Reference row");
+        assertEquals(1L, counts.get("lookup.third_party_msisdn.hit"));
+        assertEquals(1L, counts.get("lookup.third_party_msisdn.miss"), "33… is not in the table; the NULL is neither");
+        assertTrue(RowShaper.takeLookupStats(conn, id).isEmpty(), "taken once, then gone");
+        assertTrue(RowShaper.takeLookupStats(conn, "no_such_node").isEmpty());
+    }
+
+    /** The Reference's own quality rides beside the hit counts: size, rows with no key, and nested prefixes. */
+    @Test
+    void aKeyedJoinReportsTheReferencesNullKeysAndNestedPrefixes() throws Exception {
+        seedDialDigits();
+        sql("INSERT INTO dd VALUES (NULL, 'XX', 'No key', '0', 99)");
+        keyedJoin(keyedCfg());
+        var counts = RowShaper.takeLookupStats(conn, "k" + keyedJoins);
+        assertEquals(5L, counts.get("reference.rows"));
+        assertEquals(1L, counts.get("reference.null_keys"));
+        assertEquals(2L, counts.get("reference.nested_prefixes"), "24991 sits under 249; 2499123 under both");
+        keyedJoin(keyedCfg("match", "exact"));
+        var exact = RowShaper.takeLookupStats(conn, "k" + keyedJoins);
+        assertEquals(1L, exact.get("reference.null_keys"));
+        assertNull(exact.get("reference.nested_prefixes"), "nesting is a prefix-mode notion");
+        keyedJoin(keyedCfg("filter", "iso_country_code = 'GB'"));
+        assertEquals(1L, RowShaper.takeLookupStats(conn, "k" + keyedJoins).get("reference.rows"), "after filter");
+    }
+
+    /** served_msisdn misses 1 of its 3 values: a miss rate cap above that lets the run on, below it stops it. */
+    @Test
+    void maxMissRateStopsTheStepWhenTooManyValuesFindNoReferenceRow() throws Exception {
+        seedDialDigits();
+        assertEquals(3, keyedJoin(keyedCfg("max_miss_rate", 0.5)).size());
+        assertEquals(3, keyedJoin(keyedCfg()).size(), "unset: never stops");
+        var e = assertThrows(IllegalArgumentException.class, () -> keyedJoin(keyedCfg("max_miss_rate", 0.2)));
+        assertTrue(e.getMessage().contains("1 of 3 values of column served_msisdn"), e.getMessage());
+        assertTrue(e.getMessage().contains("stale"), e.getMessage());
+        var bad = assertThrows(IllegalArgumentException.class, () -> keyedJoin(keyedCfg("max_miss_rate", 2)));
+        assertTrue(bad.getMessage().contains("0 to 1"), bad.getMessage());
     }
 
     /** Without exact_when the toll-free row is an ordinary prefix; with it, it matches only the whole number. */

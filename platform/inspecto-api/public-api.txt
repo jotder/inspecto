@@ -497,6 +497,7 @@ com.gamma.config.spec.FindingCodes | public static final String ERR_COLLECTOR_CO
 com.gamma.config.spec.FindingCodes | public static final String ERR_DEDUP_WINDOW_UNARMABLE
 com.gamma.config.spec.FindingCodes | public static final String ERR_EDITION_FEATURE
 com.gamma.config.spec.FindingCodes | public static final String ERR_EXCEL_INVALID
+com.gamma.config.spec.FindingCodes | public static final String ERR_LOOKUP_ON_INGEST
 com.gamma.config.spec.FindingCodes | public static final String ERR_ROUTE_PREDICATE_COLUMN
 com.gamma.config.spec.FindingCodes | public static final String ERR_ROUTE_UNARMABLE
 com.gamma.config.spec.FindingCodes | public static final String ERR_SAFETY_STATE_ADVANCE_REFUSED
@@ -2343,18 +2344,23 @@ com.gamma.pipeline.exec.ProvenanceStores | public static void register(String, D
 com.gamma.pipeline.exec.ProvenanceStores | public static void unregister(String)
 com.gamma.pipeline.exec.ProvenanceStores | public static void use(DbProvenanceStore)
 com.gamma.pipeline.exec.RowShaper | public final class RowShaper
+com.gamma.pipeline.exec.RowShaper | public static Double joinMaxMissRate(Object)
 com.gamma.pipeline.exec.RowShaper | public static List<AddedColumn> joinAddedColumns(Map<String, Object>, Map<String, String>, List<String>)
 com.gamma.pipeline.exec.RowShaper | public static List<Relation> merge(Connection, PipelineNode, List<String>, String) throws SQLException
 com.gamma.pipeline.exec.RowShaper | public static List<Relation> shape(Connection, PipelineNode, String, String) throws SQLException
 com.gamma.pipeline.exec.RowShaper | public static List<Relation> shape(Connection, PipelineNode, String, String, ReferenceResolver) throws SQLException
 com.gamma.pipeline.exec.RowShaper | public static List<Relation> shape(Connection, PipelineNode, String, String, ReferenceResolver, ExecutionContext) throws SQLException
+com.gamma.pipeline.exec.RowShaper | public static List<String> joinNormalizers(Object)
+com.gamma.pipeline.exec.RowShaper | public static Map<String, Long> takeLookupStats(Connection, String)
 com.gamma.pipeline.exec.RowShaper | public static Optional<String> toSelect(PipelineNode, String)
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_CONFIG_KEYS
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_DUPLICATES
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_KEYED_KEYS
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_LOOKUP_KEYS
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_MATCHES
+com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_NORMALIZERS
 com.gamma.pipeline.exec.RowShaper | public static final Set<String> MAP_NODE_CONFIG_KEYS
+com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_ASOF
 com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_EXACT
 com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_LONGEST_PREFIX
 com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_RANGE

@@ -93,9 +93,12 @@ for a new Step with an explicit column list over the upstream sample columns, el
   template, params}`; `SqlFunctionParam = {name, label, type, default, options, optional}` where `type`
   drives BOTH the rendered control and the escaping: `column` → quoted identifier, `text` → single-quoted
   literal with quotes doubled, `number` → validated then verbatim, `enum` → one of `options` verbatim,
-  `sql` → verbatim (the deliberate escape hatch, `custom` only). **23**<!--count:sql-mapping-functions--> functions *(per `sql-functions.ts`: 1 Keep, 8 Text, 4 Numbers, 6 Dates, 2 Logic, 1 Convert, 1 Custom)* across Keep · Text ·
-  Numbers · Dates · Logic · Convert · Custom. A row's source column binds to the template's `{source}`
+  `sql` → verbatim (the deliberate escape hatch, `custom` only). **24**<!--count:sql-mapping-functions--> functions *(per `sql-functions.ts`: 1 Keep, 8 Text, 4 Numbers, 6 Dates, 2 Logic, 1 Convert, 1 Lookup, 1 Custom)* across Keep · Text ·
+  Numbers · Dates · Logic · Convert · Lookup · Custom. A row's source column binds to the template's `{source}`
   automatically — that IS the operator's "auto map parameters against sql functions".
+  ⚠ **The Lookup function (`lookup.reference`) runs only in a Pipeline `transform.sql` Step.** The ingest
+  lane (`processing.map.fields[]`) has no Reference resolver, so a save refuses a lookup field there
+  (`ERR_LOOKUP_ON_INGEST` on `processing.map.fields[i].fn`, regardless of `active`; LOOKUP-1).
   ⚠ **Every conversion is `TRY_CAST`, never bare `CAST`, and division guards with `NULLIF`** — a
   catalog-wide unit test asserts it, because a bad cell must null one cell, not kill the batch.
   ⚠ **A `text` parameter is deliberately not trimmed** — a single space is a legitimate separator for
@@ -244,7 +247,7 @@ schema field's four keys — description · unit · classification · synonym �
 ### 8.4 Expression building
 
 - **The expression-building surface** is the Transform pane's function picker per row over `SQL_FUNCTIONS`
-  (**23**<!--count:sql-mapping-functions--> functions in 7 categories), with a form control per declared parameter and
+  (**24**<!--count:sql-mapping-functions--> functions in 8 categories), with a form control per declared parameter and
   "Try it on the sample" (§8.2).
 - **CodeMirror has THREE hosts**, not two: the SQL query workbench (`inspecto/data-table/sql/`), the
   enrichment editor (`inspecto/enrichment/enrichment-editor.component.ts`) and **the Transform pane's SQL
@@ -414,8 +417,13 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
   - **Columns this Step adds** — the join Step's pane shows a read-only table (output column · type · from · looked
     up by) for a keyed join, computed by `POST /components/transform/describe` with a `config` body from the
     Reference Pipeline's declared schema (no row is read); a clash or an unknown column shows there as the run's own
-    refusal. It reflects the Step's applied settings (after Apply). `lookups:` itself is written in the pipeline file
-    (the form keeps it as an extra setting); the form adds a *Match details* toggle.
+    refusal. It reflects the Step's applied settings (after Apply).
+  - **Per-input lookups form (since 2026-11-23)** — on a join Step's pane, *Per-input lookups* edits `lookups:` as one
+    block per mapping: *Looked up by*, *Name prefix* (`as`), the columns it returns (Reference column and output
+    name; a blank name takes the engine's own), *When nothing matches* (defaults by output name) and *Add match
+    details*. It refuses a mapping with no input, two outputs with one name, and a default for a column the mapping
+    does not add, before Apply. A `details` map is kept as written; a `lookups:` the form cannot read (not a list of
+    entries) stays an extra setting.
 - **`match: range` (since 2026-11-22, `LOOKUP-1` P1c)** — a value matches the Reference row whose period holds it.
   It is keyed by `from:` / `to:` (Reference columns, either may be omitted), not `key:`.
   ```toon
@@ -442,6 +450,40 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
   - A value in no period (a gap) or a NULL value matches nothing; `default` fills it as in the other keyed modes.
     Each distinct value is resolved once, then joined back per `on` column.
   - Save refuses `match: range` without `from`/`to`, with `key`, and `from`/`to` on any other match (`JOIN_KEYED_INVALID`).
+- **`match: asof` (since 2026-11-23, `LOOKUP-1` P1f)** — each row takes the **latest Reference row of its key that is
+  effective at or before the row's time**: the rate of its currency in force on the transaction date.
+  ```toon
+  - join:
+      reference: reference/fx_rates
+      match: asof
+      key: currency                               # Reference column compared to each `on` column, as text
+      from: valid_from                            # Reference effective-from column; an empty value = since forever
+      at: txn_date                                # the rows' time column, read once per row
+      on[1]: currency
+      columns[1]: rate
+  ```
+  - A row **on** an effective date takes that row; a row before the key's first date, a key the Reference lacks and a
+    NULL time match nothing (`default` fills them). The latest row stays in force after its date, with no end.
+  - The time compares in the `from` column's own type: a text time is read as a `DATE` / `TIMESTAMP` (a value that is
+    no time matches nothing, no error). `duplicates: refuse` (default) stops the run when the Reference has two rows
+    for one key **and** one date; `first` / `last` with `order_by` keep one. `normalize` applies to the key.
+  - `matched_key` is `key@from`. Save refuses `asof` without `key`, `from` or `at`, with `to`, and `at` on any other match.
+- **Hit and miss counts (since 2026-11-23, `LOOKUP-1` P1g)** — a keyed join's Step Receipt carries, per `on` column,
+  `lookup.<column>.hit` (found a Reference row) and `lookup.<column>.miss` (had a value, found none) in `diag.counts`;
+  a NULL value counts as neither. A rising miss count is the sign a Reference has gone stale.
+- **`max_miss_rate:` (since 2026-11-23, `LOOKUP-1` P2a)** — a number from 0 to 1. When, for any `on` column, more than
+  this share of the values that had a value find no Reference row, the Step fails and the run raises its Incident; the
+  message gives the counts and names the column, never a value. `0.1` = stop above 10 % misses. Empty = never stop.
+  Needs `key:` like every keyed setting; save refuses a value outside 0 to 1.
+- **Reference quality counts (since 2026-11-23, `LOOKUP-1` P2b)** — beside the hit and miss counts the Step Receipt's
+  `diag.counts` carries `reference.rows` (after `filter:`), `reference.null_keys` (Reference rows with no key — they match
+  nothing) and, for `longest_prefix`, `reference.nested_prefixes` (keys that have a shorter key as a prefix, so the shorter
+  one is shadowed for values starting with the longer). Informational: nothing fails and no key value is stored. Not
+  reported for `range` (an empty bound is meaningful there).
+- **`normalize:` (since 2026-11-23, `LOOKUP-1` P1e)** — for `exact` and `longest_prefix`, an ordered list of `trim`,
+  `lower`, `upper`, `strip_leading_zeros`, `strip_plus`, applied to the Reference key and to every looked-up value
+  alike. Two Reference rows that collapse to one key are refused by the `duplicates` rule; `range` refuses it. The
+  returned key column keeps the Reference's own text; `matched_key` shows the normalized key.
 - **`reference` is autocomplete with real suggestions, never a hard constraint:**
   `referenceOptionLoader()` (`entity-option-loaders.ts`) calls `CatalogService.references()`
   (backed by `GET /catalog/references`, `CatalogRoutes.java`) and maps results to

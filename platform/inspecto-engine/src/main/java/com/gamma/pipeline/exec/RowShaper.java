@@ -230,14 +230,14 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_HASH.type().equals(type))    return hash(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_MASK.type().equals(type))    return mask(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SELECT.type().equals(type)
-                || BuiltinNodeType.TRANSFORM_DERIVE.type().equals(type)) return project(conn, node, input, outPrefix);
+                || BuiltinNodeType.TRANSFORM_DERIVE.type().equals(type)) return project(conn, node, input, outPrefix, references);
         // A Record Transformer — authored FIELDS, or the projection slot carrying a lifted schema /
         // authored columns / component rules — compiles through the one [{name, expr}] seam, so both
         // lanes run one compiler (RecordTransform) rather than the browser's rendering and the engine's
         // diverging. Only a HAND-WRITTEN sql node takes the opaque-string path — which is also the only
         // one the SQL_STEP_UNAUDITED warning still applies to.
         if (BuiltinNodeType.TRANSFORM_SQL.type().equals(type))
-            return isProjection(node) ? project(conn, node, input, outPrefix)
+            return isProjection(node) ? project(conn, node, input, outPrefix, references)
                                       : sql(conn, node, input, outPrefix);
         // ⚠ Name the seam in the message: a CONTRIBUTED node type reaches here having rendered in the
         // palette, validated and lifted, so "cannot shape" alone reads as a core bug rather than a
@@ -1165,6 +1165,9 @@ public final class RowShaper {
         if (JOIN_MATCH_RANGE.equals(match))
             throw new IllegalArgumentException("transform.join node '" + node.id() + "': match: range needs from: "
                     + "and/or to: — the Reference columns holding each range's bounds");
+        if (JOIN_MATCH_ASOF.equals(match))
+            throw new IllegalArgumentException("transform.join node '" + node.id() + "': match: asof needs key:, "
+                    + "from: and at: — the Reference's key and effective-from columns, and the rows' time column");
         for (String k : JOIN_KEYED_KEYS)
             if (node.cfg(k) != null)
                 throw new IllegalArgumentException("transform.join node '" + node.id() + "' sets '" + k
@@ -1407,14 +1410,70 @@ public final class RowShaper {
     public static final String JOIN_MATCH_EXACT = "exact";
     public static final String JOIN_MATCH_LONGEST_PREFIX = "longest_prefix";
     public static final String JOIN_MATCH_RANGE = "range";
-    public static final List<String> JOIN_MATCHES = List.of(JOIN_MATCH_EXACT, JOIN_MATCH_LONGEST_PREFIX, JOIN_MATCH_RANGE);
+    public static final String JOIN_MATCH_ASOF = "asof";
+    public static final List<String> JOIN_MATCHES =
+            List.of(JOIN_MATCH_EXACT, JOIN_MATCH_LONGEST_PREFIX, JOIN_MATCH_RANGE, JOIN_MATCH_ASOF);
 
     /** The keyed form's settings (LOOKUP-1 P1b/P1c); each needs {@code key:}, or {@code from:}/{@code to:} for a range. */
     public static final List<String> JOIN_KEYED_KEYS =
             List.of("columns", "as", "default", "exact_when", "duplicates", "order_by", "from", "to", "filter",
-                    "lookups", "details");
+                    "lookups", "details", "normalize", "at", "max_miss_rate");
+
+    /**
+     * {@code max_miss_rate:} (LOOKUP-1 P2): the share of a mapping's looked-up values, from 0 to 1, that may find no
+     * Reference row before the Step stops. {@code null} when unset; refuses anything that is not a number in range.
+     */
+    public static Double joinMaxMissRate(Object raw) {
+        if (raw == null || raw.toString().isBlank()) return null;
+        double rate;
+        try {
+            rate = raw instanceof Number n ? n.doubleValue() : Double.parseDouble(raw.toString().trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("max_miss_rate: must be a number from 0 to 1, not " + raw);
+        }
+        if (!(rate >= 0 && rate <= 1))
+            throw new IllegalArgumentException("max_miss_rate: must be a number from 0 to 1, not " + raw);
+        return rate;
+    }
     /** The keys of one {@code lookups:} entry (LOOKUP-1 P1d). */
     public static final List<String> JOIN_LOOKUP_KEYS = List.of("on", "columns", "as", "default", "details");
+    /**
+     * {@code normalize:} values (LOOKUP-1, normalized exact): each rewrites a key's text, and the list is applied in
+     * order to BOTH the Reference key and every looked-up value, so the two sides compare in one spelling.
+     */
+    public static final List<String> JOIN_NORMALIZERS =
+            List.of("trim", "lower", "upper", "strip_leading_zeros", "strip_plus");
+
+    /** The {@code normalize:} setting as a list of normalizer names (a scalar is one); refuses an unknown name. */
+    public static List<String> joinNormalizers(Object raw) {
+        List<String> out = new ArrayList<>();
+        if (raw instanceof List<?> l) {
+            for (Object o : l) if (o != null && !o.toString().isBlank()) out.add(o.toString().trim());
+        } else if (raw != null && !raw.toString().isBlank()) {
+            out.add(raw.toString().trim());
+        }
+        for (String n : out)
+            if (!JOIN_NORMALIZERS.contains(n))
+                throw new IllegalArgumentException("normalize '" + n + "' — use any of " + JOIN_NORMALIZERS);
+        return out;
+    }
+
+    /** {@code expr} (a text expression) with each normalizer applied in order; NULL stays NULL. */
+    private static String normalized(String expr, List<String> normalizers) {
+        String e = expr;
+        for (String n : normalizers) {
+            e = switch (n) {
+                case "trim" -> "trim(" + e + ")";
+                case "lower" -> "lower(" + e + ")";
+                case "upper" -> "upper(" + e + ")";
+                case "strip_plus" -> "regexp_replace(" + e + ", '^[+]', '')";
+                // all zeros stay one zero: "000" is the number 0, not an empty key
+                default -> "CASE WHEN regexp_matches(" + e + ", '^0+$') THEN '0' ELSE regexp_replace(" + e
+                        + ", '^0+', '') END";
+            };
+        }
+        return e;
+    }
     /** Every config key {@code transform.join} reads — what every save path must carry. */
     public static final List<String> JOIN_CONFIG_KEYS;
     static {
@@ -1455,6 +1514,8 @@ public final class RowShaper {
         String fromCol = strOrNull(node, "from");
         String toCol = strOrNull(node, "to");
         String filter = strOrNull(node, "filter");
+        boolean asof = JOIN_MATCH_ASOF.equals(match);
+        String atCol = strOrNull(node, "at");
         if (range) {
             if (keyCol != null)
                 throw new IllegalArgumentException("transform.join node '" + id + "': match: range reads from:/to:, "
@@ -1462,13 +1523,36 @@ public final class RowShaper {
             if (fromCol == null && toCol == null)
                 throw new IllegalArgumentException("transform.join node '" + id + "': match: range needs from: and/or "
                         + "to: — the Reference columns holding each range's bounds");
+        } else if (asof) {
+            if (keyCol == null || fromCol == null || atCol == null)
+                throw new IllegalArgumentException("transform.join node '" + id + "': match: asof needs key: (the "
+                        + "Reference's key column), from: (its effective-from column) and at: (the rows' time column)");
+            if (toCol != null)
+                throw new IllegalArgumentException("transform.join node '" + id + "': match: asof reads from: only — "
+                        + "a row takes the latest Reference row effective at or before its time, so there is no to:");
         } else {
             if (keyCol == null)
                 throw new IllegalArgumentException("transform.join node '" + id + "': match: " + match + " needs key: "
                         + "— the Reference's key column");
             if (fromCol != null || toCol != null)
                 throw new IllegalArgumentException("transform.join node '" + id + "': from:/to: only apply to "
-                        + "match: range");
+                        + "match: range (from: also to match: asof)");
+        }
+        if (atCol != null && !asof)
+            throw new IllegalArgumentException("transform.join node '" + id + "': at: only applies to match: asof");
+        List<String> normalizers;
+        try {
+            normalizers = joinNormalizers(node.cfg("normalize"));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("transform.join node '" + id + "': " + e.getMessage());
+        }
+        if (range && !normalizers.isEmpty())
+            throw new IllegalArgumentException("transform.join node '" + id + "': normalize: applies to match: exact "
+                    + "and longest_prefix, not range (a range compares in the value's own type)");
+        try {
+            joinMaxMissRate(node.cfg("max_miss_rate"));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("transform.join node '" + id + "': " + e.getMessage());
         }
         String exactWhen = strOrNull(node, "exact_when");
         if (exactWhen != null && !prefix)
@@ -1489,7 +1573,11 @@ public final class RowShaper {
             if (c != null && refCols.stream().noneMatch(r -> r.equalsIgnoreCase(c)))
                 throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has no column '"
                         + c + "' (it has " + refCols + ")");
-        List<JoinMapping> mappings = joinMappings(node, on, refCols, columnsOf(conn, input));
+        List<String> inputCols = columnsOf(conn, input);
+        if (atCol != null && inputCols.stream().noneMatch(c -> c.equalsIgnoreCase(atCol)))
+            throw new IllegalArgumentException("transform.join node '" + id + "': the rows have no column '" + atCol
+                    + "' to read the time from (at:)");
+        List<JoinMapping> mappings = joinMappings(node, on, refCols, inputCols);
         // every Reference column any mapping returns, fetched once in the one pass over the Reference
         List<String> returned = new ArrayList<>();
         for (JoinMapping m : mappings)
@@ -1514,37 +1602,59 @@ public final class RowShaper {
                 select.append(", coalesce(").append(h).append(".__lk_kind, 'none') AS ").append(q(m.matchKindAs()));
             // a range compares in the value's own type (dates as dates); prefix and exact compare as text
             joins.append(" LEFT JOIN __lk_hit ").append(h).append(" ON ").append(h).append(".__lk_v = ")
-                    .append(range ? "i." + q(o) : "CAST(i." + q(o) + " AS VARCHAR)");
+                    .append(range ? "i." + q(o) : normalized("CAST(i." + q(o) + " AS VARCHAR)", normalizers));
+            // an as-of hit belongs to a (key, time) pair; the time compares as the same value, a NULL time to a NULL
+            if (asof) joins.append(" AND ").append(h).append(".__lk_t IS NOT DISTINCT FROM i.").append(q(atCol));
+            // whether this mapping found a Reference row for the row: counted into the Step's receipt, then dropped
+            select.append(", (").append(h).append(".__lk_v IS NOT NULL) AS ").append(q("__lk_hit" + n));
         }
 
         if (range) {
             rangeJoin(conn, node, input, ref, on, fromCol, toCol, filter, dups, orderBy, returned, select, joins, data);
+            lookupStats(conn, node, data, mappings);
             return;
         }
         String key = q(keyCol);
-        String refRows = "SELECT t.*, CAST(t." + key + " AS VARCHAR) AS __lk_key FROM " + q(ref) + " t WHERE t."
+        String refKey = normalized("CAST(t." + key + " AS VARCHAR)", normalizers);
+        String refRows = "SELECT t.*, " + refKey + " AS __lk_key FROM " + q(ref) + " t WHERE t."
                 + key + " IS NOT NULL" + (filter == null ? "" : " AND (" + filter + ")");
+        // an as-of Reference holds many rows per key, one per effective date: two rows of one key AND one date clash
+        String fromQ = asof ? q(fromCol) : null;
         if ("refuse".equals(dups)) {
             try (Statement st = conn.createStatement();
-                 ResultSet rs = st.executeQuery("SELECT __lk_key FROM (" + refRows + ") GROUP BY __lk_key"
+                 ResultSet rs = st.executeQuery("SELECT __lk_key" + (asof ? ", CAST(" + fromQ + " AS VARCHAR)" : "")
+                         + " FROM (" + refRows + ") GROUP BY __lk_key" + (asof ? ", " + fromQ : "")
                          + " HAVING count(*) > 1 ORDER BY __lk_key LIMIT 1")) {
                 if (rs.next())
                     throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has more "
-                            + "than one row for " + keyCol + "=" + rs.getString(1) + " — clean the Reference, or "
+                            + "than one row for " + keyCol + "=" + rs.getString(1)
+                            + (asof ? " effective " + rs.getString(2) : "") + " — clean the Reference, or "
                             + "set duplicates: first|last with order_by:");
             }
         } else {
-            refRows += " QUALIFY row_number() OVER (PARTITION BY CAST(t." + key + " AS VARCHAR) ORDER BY (" + orderBy
+            refRows += " QUALIFY row_number() OVER (PARTITION BY " + refKey + (asof ? ", t." + fromQ : "")
+                    + " ORDER BY (" + orderBy
                     + ") " + ("last".equals(dups) ? "DESC" : "ASC") + " NULLS LAST, CAST(t AS VARCHAR)) = 1";
         }
+        referenceQuality(conn, node, ref, key, filter, prefix, refRows);
         // __lk_mk / __lk_kind: the match details (P1d) — the key that matched, and whether it was the whole value
         String kept = returned.stream().map(c -> ", r." + q(c)).collect(java.util.stream.Collectors.joining());
         StringBuilder values = new StringBuilder();
         for (String o : on) {
             if (values.length() > 0) values.append(" UNION ");
-            values.append("SELECT CAST(").append(q(o)).append(" AS VARCHAR) AS __lk_v FROM ").append(q(input));
+            values.append("SELECT ").append(normalized("CAST(" + q(o) + " AS VARCHAR)", normalizers))
+                    .append(" AS __lk_v").append(asof ? ", " + q(atCol) + " AS __lk_t" : "")
+                    .append(" FROM ").append(q(input));
         }
-        String hit = prefix
+        // as of: the latest Reference row of the key effective at or before the time (an empty from: = since forever)
+        String hit = asof
+                ? "SELECT v.__lk_v, v.__lk_t" + kept + ", r.__lk_key || '@' || coalesce(CAST(r." + fromQ
+                  + " AS VARCHAR), '') AS __lk_mk, 'asof' AS __lk_kind"
+                  + " FROM __lk_val v JOIN __lk_ref r ON r.__lk_key = v.__lk_v AND (r." + fromQ + " IS NULL OR r."
+                  + fromQ + " <= " + asofValue(conn, ref, fromCol) + ")"
+                  + " QUALIFY row_number() OVER (PARTITION BY v.__lk_v, v.__lk_t ORDER BY r." + fromQ
+                  + " DESC NULLS LAST) = 1"
+                : prefix
                 ? "SELECT v.__lk_v" + kept + ", r.__lk_key AS __lk_mk, CASE WHEN l.__lk_n = length(v.__lk_v) THEN "
                   + "'exact' ELSE 'prefix' END AS __lk_kind"
                   + " FROM __lk_val v JOIN __lk_len l ON l.__lk_n <= length(v.__lk_v)"
@@ -1556,10 +1666,97 @@ public final class RowShaper {
         exec(conn, "CREATE TABLE " + q(data) + " AS"
                 + " WITH __lk_ref AS MATERIALIZED (SELECT *" + (exactWhen == null ? "" : ", (" + exactWhen + ") AS __lk_exact")
                 + " FROM (" + refRows + ")),"
-                + " __lk_val AS MATERIALIZED (SELECT DISTINCT __lk_v FROM (" + values + ") WHERE __lk_v IS NOT NULL),"
+                + " __lk_val AS MATERIALIZED (SELECT DISTINCT __lk_v" + (asof ? ", __lk_t" : "") + " FROM (" + values
+                + ") WHERE __lk_v IS NOT NULL),"
                 + " __lk_len AS (SELECT DISTINCT length(__lk_key) AS __lk_n FROM __lk_ref),"
                 + " __lk_hit AS MATERIALIZED (" + hit + ")"
                 + " " + select + " FROM " + q(input) + " i" + joins);
+        lookupStats(conn, node, data, mappings);
+    }
+
+    /**
+     * Per-mapping hit and miss counts of a keyed join (LOOKUP-1 P1g): a row HITS when its value found a Reference row,
+     * MISSES when it had a value and found none; a row with no value is neither. Written to a small table beside the
+     * node's output ({@code <node>__lookup_stats}) for the walk to read with {@link #takeLookupStats}, and the
+     * per-mapping hit columns the join added are dropped from the output.
+     */
+    private static void lookupStats(Connection conn, PipelineNode node, String data, List<JoinMapping> mappings)
+            throws SQLException {
+        String stats = table(node.id(), "lookup_stats");
+        exec(conn, "DROP TABLE IF EXISTS " + q(stats));
+        exec(conn, "CREATE TABLE " + q(stats) + " (mapping VARCHAR, hit BIGINT, miss BIGINT)");
+        for (int n = 0; n < mappings.size(); n++) {
+            String hit = q("__lk_hit" + n), on = q(mappings.get(n).on());
+            exec(conn, "INSERT INTO " + q(stats) + " SELECT " + sqlStr(mappings.get(n).on())
+                    + ", count(*) FILTER (WHERE " + hit + "), count(*) FILTER (WHERE NOT " + hit + " AND " + on
+                    + " IS NOT NULL) FROM " + q(data));
+        }
+        for (int n = 0; n < mappings.size(); n++)
+            exec(conn, "ALTER TABLE " + q(data) + " DROP COLUMN " + q("__lk_hit" + n));
+        Double max = joinMaxMissRate(node.cfg("max_miss_rate"));
+        if (max == null) return;
+        // A stale or wrong Reference shows first as values finding no row: stop the run rather than ship them. The
+        // failed Step is what raises the Incident. Values are never quoted here — the text is stored in the receipt.
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT mapping, hit, miss FROM " + q(stats))) {
+            while (rs.next()) {
+                long hit = rs.getLong(2), miss = rs.getLong(3);
+                if (hit + miss > 0 && (double) miss / (hit + miss) > max)
+                    throw new IllegalArgumentException("transform.join node " + node.id() + ": " + miss + " of "
+                            + (hit + miss) + " values of column " + rs.getString(1) + " found no Reference row, over "
+                            + "the allowed miss rate " + max + " — the Reference may be stale or the wrong one");
+            }
+        }
+    }
+
+    /**
+     * The Reference's own load-time quality (LOOKUP-1 P2b), as counts beside the node's output
+     * ({@code <node>__reference_stats}) for {@link #takeLookupStats}: {@code reference.rows} (after {@code filter}),
+     * {@code reference.null_keys} (rows with no key — they match nothing), and for {@code longest_prefix}
+     * {@code reference.nested_prefixes} (keys that have a shorter key as a prefix, so the shorter one is shadowed for
+     * values that start with the longer). Informational: nothing here fails the Step, and no key value is stored.
+     */
+    private static void referenceQuality(Connection conn, PipelineNode node, String ref, String key, String filter,
+                                         boolean prefix, String refRows) throws SQLException {
+        String stats = table(node.id(), "reference_stats");
+        String where = filter == null ? "" : " WHERE (" + filter + ")";
+        exec(conn, "DROP TABLE IF EXISTS " + q(stats));
+        exec(conn, "CREATE TABLE " + q(stats) + " (name VARCHAR, n BIGINT)");
+        exec(conn, "INSERT INTO " + q(stats) + " SELECT 'reference.rows', count(*) FROM " + q(ref) + " t" + where);
+        exec(conn, "INSERT INTO " + q(stats) + " SELECT 'reference.null_keys', count(*) FROM " + q(ref) + " t"
+                + (filter == null ? " WHERE" : " WHERE (" + filter + ") AND") + " t." + key + " IS NULL");
+        if (!prefix) return;
+        exec(conn, "INSERT INTO " + q(stats) + " WITH k AS (SELECT DISTINCT __lk_key FROM (" + refRows + ")),"
+                + " l AS (SELECT DISTINCT length(__lk_key) AS n FROM k)"
+                + " SELECT 'reference.nested_prefixes', count(*) FROM k a WHERE EXISTS (SELECT 1 FROM l"
+                + " JOIN k b ON b.__lk_key = left(a.__lk_key, l.n) WHERE l.n < length(a.__lk_key))");
+    }
+
+    /**
+     * The hit and miss counts a keyed {@code transform.join} node left ({@code lookup.<on column>.hit} / {@code .miss}),
+     * read once and dropped; empty for any other node, so the walk can ask after every join without knowing its form.
+     */
+    public static Map<String, Long> takeLookupStats(Connection conn, String nodeId) {
+        String stats = table(nodeId, "lookup_stats");
+        Map<String, Long> out = new java.util.LinkedHashMap<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT mapping, hit, miss FROM " + q(stats))) {
+            while (rs.next()) {
+                out.merge("lookup." + rs.getString(1) + ".hit", rs.getLong(2), Long::sum);
+                out.merge("lookup." + rs.getString(1) + ".miss", rs.getLong(3), Long::sum);
+            }
+            exec(conn, "DROP TABLE " + q(stats));
+        } catch (SQLException none) {
+            // not a keyed join: no stats table, no counts
+        }
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT name, n FROM " + q(table(nodeId, "reference_stats")))) {
+            while (rs.next()) out.merge(rs.getString(1), rs.getLong(2), Long::sum);
+            exec(conn, "DROP TABLE " + q(table(nodeId, "reference_stats")));
+        } catch (SQLException none) {
+            // a range join, or not a keyed join: no Reference counts
+        }
+        return out;
     }
 
     /**
@@ -1635,6 +1832,24 @@ public final class RowShaper {
                     return "TRY_CAST(v.__lk_v AS DATE)";
         }
         return "v.__lk_v";
+    }
+
+    /**
+     * The row's time as compared with the effective-from column {@code col} (match: asof): cast to the column's own
+     * DATE or TIMESTAMP so a text time compares as a time, TRY_CAST so a value that is no time matches nothing rather
+     * than raising a raw Binder error; any other type compares as it is.
+     */
+    private static String asofValue(Connection conn, String ref, String col) throws SQLException {
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT * FROM " + q(ref) + " LIMIT 0")) {
+            java.sql.ResultSetMetaData md = rs.getMetaData();
+            for (int i = 1; i <= md.getColumnCount(); i++) {
+                if (!md.getColumnName(i).equalsIgnoreCase(col)) continue;
+                String t = md.getColumnTypeName(i).toUpperCase(java.util.Locale.ROOT);
+                if (t.equals("DATE") || t.equals("TIMESTAMP")) return "TRY_CAST(v.__lk_t AS " + t + ")";
+            }
+        }
+        return "v.__lk_t";
     }
 
     private static String span(String from, String to) {
@@ -1909,24 +2124,60 @@ public final class RowShaper {
 
     // ── projection (map / select / derive) ─────────────────────────────────────────
 
-    private static List<Relation> project(Connection conn, PipelineNode node, String input, String prefix) throws SQLException {
+    private static List<Relation> project(Connection conn, PipelineNode node, String input, String prefix,
+                                          ReferenceResolver references) throws SQLException {
         String data = table(prefix, PipelineRel.DATA);
-        exec(conn, "CREATE TABLE " + q(data) + " AS " + projectionSelect(node, input));
+        exec(conn, "CREATE TABLE " + q(data) + " AS "
+                + projectionSelectFrom(node, q(input), input, e -> expandLookups(conn, references, e, input)));
         return List.of(new Relation(PipelineRel.DATA, data));
     }
 
-    /** The {@code SELECT … FROM <input>} for a projection node over the table {@code input} (reused by {@link #fuse}). */
-    private static String projectionSelect(PipelineNode node, String input) {
-        return projectionSelectFrom(node, q(input), input);
+    /** A lookup field's marker call: {@code inspecto_lookup(<column>, '<reference>', '<key>', '<returns>', <normalizer>)}. */
+    private static final java.util.regex.Pattern LOOKUP_FIELD = java.util.regex.Pattern.compile(
+            RecordTransform.LOOKUP_CALL + "\\(([^,()]+),\\s*'((?:[^']|'')*)',\\s*'((?:[^']|'')*)',\\s*'((?:[^']|'')*)',"
+                    + "\\s*(\\w+)\\)");
+
+    /**
+     * Expand each lookup field's marker call in {@code expr} (LOOKUP-1 P1h) into a scalar subquery over the resolved
+     * Reference: the row's value, compared as text after the normalizer, against the Reference key column, returning
+     * one column. The row's column is qualified with {@code sourceTable} so a Reference column of the same name can
+     * never capture it. A Reference with two rows for one key makes DuckDB refuse the subquery — the same stop as the
+     * join's {@code duplicates: refuse}.
+     */
+    private static String expandLookups(Connection conn, ReferenceResolver references, String expr, String sourceTable) {
+        java.util.regex.Matcher m = LOOKUP_FIELD.matcher(expr);
+        StringBuilder out = new StringBuilder();
+        try {
+            while (m.find()) {
+                String reference = m.group(2).replace("''", "'"), key = m.group(3).replace("''", "'"),
+                        returns = m.group(4).replace("''", "'");
+                List<String> normalizers = "none".equals(m.group(5)) ? List.of() : joinNormalizers(m.group(5));
+                String ref = references.resolve(conn, reference);
+                List<String> cols = columnsOf(conn, ref);
+                for (String c : List.of(key, returns))
+                    if (cols.stream().noneMatch(r -> r.equalsIgnoreCase(c)))
+                        throw new IllegalArgumentException("lookup field: the Reference '" + reference
+                                + "' has no column '" + c + "' (it has " + cols + ")");
+                String sub = "(SELECT t." + q(returns) + " FROM " + q(ref) + " t WHERE "
+                        + normalized("CAST(t." + q(key) + " AS VARCHAR)", normalizers) + " = "
+                        + normalized("CAST(" + q(sourceTable) + "." + m.group(1).trim() + " AS VARCHAR)", normalizers) + ")";
+                m.appendReplacement(out, java.util.regex.Matcher.quoteReplacement(sub));
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("lookup field: " + e.getMessage(), e);
+        }
+        return m.appendTail(out).toString();
     }
 
     /**
-     * As {@link #projectionSelect}, but over a pre-rendered FROM target (a quoted table, or a
+     * The {@code SELECT … FROM} for a projection node over a pre-rendered FROM target (a quoted table, or a
      * {@code (subquery) AS _t}). {@code sourceTable} is that target's bare identifier — derived mapping
      * expressions qualify their column references with it, so it must match what {@code fromTarget} reads.
+     * {@code lookups} rewrites each field's expression (the lookup-field expansion).
      */
     @SuppressWarnings("unchecked")
-    private static String projectionSelectFrom(PipelineNode node, String fromTarget, String sourceTable) {
+    private static String projectionSelectFrom(PipelineNode node, String fromTarget, String sourceTable,
+                                               java.util.function.UnaryOperator<String> lookups) {
         String type = node.type();
         List<?> cols = columnsOf(node, sourceTable);
         if (cols == null || cols.isEmpty())
@@ -1943,7 +2194,7 @@ public final class RowShaper {
             for (Object c : cols) {
                 Map<String, Object> m = (Map<String, Object>) c;
                 String name = reqStr(m, "name", node.id());
-                String expr = reqStr(m, "expr", node.id());
+                String expr = lookups.apply(reqStr(m, "expr", node.id()));
                 exprs.add("(" + expr + ") AS " + q(name));
             }
             sel.append(String.join(", ", exprs));
@@ -2065,7 +2316,11 @@ public final class RowShaper {
                 || BuiltinNodeType.TRANSFORM_SELECT.type().equals(type)
                 || BuiltinNodeType.TRANSFORM_DERIVE.type().equals(type)) {
             try {
-                return Optional.of(projectionSelectFrom(node, from, "_t"));
+                return Optional.of(projectionSelectFrom(node, from, "_t", e -> {
+                    // a lookup needs the Reference resolved at run time: no single self-contained SELECT
+                    if (e.contains(RecordTransform.LOOKUP_CALL + "(")) throw new IllegalArgumentException("lookup");
+                    return e;
+                }));
             } catch (RuntimeException e) {
                 return Optional.empty();
             }
