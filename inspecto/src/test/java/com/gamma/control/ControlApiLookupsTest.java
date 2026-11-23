@@ -42,6 +42,7 @@ class ControlApiLookupsTest {
             ? Optional.of(new Subject("nobody", Set.of())) : Optional.empty();
 
     private static final String STEPS = """
+            output_store: enriched_calls
             steps[2]:
               - join:
                   reference: reference/dial_digit
@@ -107,7 +108,11 @@ class ControlApiLookupsTest {
             JsonNode body = lookups(c);
             assertEquals(1, body.get("total").asInt(), body.toString());
             JsonNode row = body.get("lookups").get(0);
-            String pipeline = row.get("pipeline").asText();
+            // Receipts carry the name the job runner gives the Stage-2 chain it lifts, never the row's own name.
+            com.gamma.etl.PipelineConfig cfg = c.svc.loadedPipelines().get(0);
+            String pipeline = com.gamma.pipeline.PipelineLift.stageTwo(cfg).name();
+            assertEquals(cfg.identity().pipelineName(), row.get("pipeline").asText());
+            assertNotEquals(row.get("pipeline").asText(), pipeline, "the test must not reuse the listed name");
             assertEquals("join", row.get("step").asText(), body.toString());
             assertEquals("reference/dial_digit", row.get("reference").asText());
             assertEquals("longest_prefix", row.get("match").asText());

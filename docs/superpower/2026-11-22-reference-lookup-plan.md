@@ -176,7 +176,11 @@ columns the join adds are dropped from the output. Not built: counts for the unk
 **Lookups screen built 2026-11-23 (operator: "Lookups screen", slice "Inventory + last-run counts"):** `GET /lookups`
 (`LookupRoutes`, an open read) lifts each loaded Pipeline and lists every keyed `transform.join` — Pipeline, Step,
 Reference, match, `lookedUpBy` — with `lastRun` from the newest non-simulated Step Receipt of that Pipeline and Step
-(`DbConsignmentOutputStore.latestStep`): outcome, start, rows in, `diag.counts`, `truncated`. Drawn as *Workbench ▸
+(`DbConsignmentOutputStore.latestStep`): outcome, start, rows in, `diag.counts`, `truncated`. ⚠ The joins are read
+from `PipelineLift.stageTwo(cfg)` — a keyed join runs only at rest, and the job runner's receipts carry that graph's
+name `<pipeline>_stage2`, not the Pipeline's own (caught by the verification review; the test names its receipts that
+way). A Pipeline with no at-rest chain (no `output_store:`) lists nothing, and canvas-store Pipelines run by a
+`pipeline: <id>` Job are not listed. Drawn as *Workbench ▸
 Lookups* (`modules/admin/lookups/`, read-only grid). Decisions (assistant): plain joins are not listed (no counts); first
 500 + `total`; with receipts off `lastRun` is absent and `known.lastRun=false`; a truncated receipt shows no Found / Not
 found sums rather than an understated one. Gap found: `StepReceipt.MAX_COUNTS = 8` cuts a join's counts past 3 mappings

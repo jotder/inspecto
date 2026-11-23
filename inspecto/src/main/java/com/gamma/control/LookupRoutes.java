@@ -48,17 +48,19 @@ final class LookupRoutes implements RouteModule {
         List<Map<String, Object>> rows = new ArrayList<>();
         int total = 0;
         for (PipelineConfig cfg : HostContext.of(api).service().loadedPipelines()) {
+            // A keyed join runs only at rest (the ingest lane refuses it), in the Stage-2 chain the job runner lifts with
+            // PipelineLift.stageTwo — whose name (`<pipeline>_stage2`) is the one its Step Receipts carry.
             PipelineGraph g;
             try {
-                g = PipelineLift.lift(cfg);
-            } catch (RuntimeException unliftable) {
-                log.debug("lookups: skipping pipeline {}: {}", cfg.identity().pipelineName(), unliftable.getMessage());
+                g = PipelineLift.stageTwo(cfg);
+            } catch (RuntimeException noChain) {
+                log.debug("lookups: no Stage-2 chain in {}: {}", cfg.identity().pipelineName(), noChain.getMessage());
                 continue;
             }
             for (PipelineNode n : g.nodes()) {
                 if (!BuiltinNodeType.TRANSFORM_JOIN.type().equals(n.type()) || !keyed(n)) continue;
                 if (++total > MAX_LOOKUPS) continue;
-                rows.add(row(g.name(), n, receipts ? store : null));
+                rows.add(row(cfg.identity().pipelineName(), g.name(), n, receipts ? store : null));
             }
         }
         Map<String, Object> out = new LinkedHashMap<>();
@@ -75,14 +77,24 @@ final class LookupRoutes implements RouteModule {
         return false;
     }
 
-    private static Map<String, Object> row(String pipeline, PipelineNode n, DbConsignmentOutputStore store) {
+    private static Map<String, Object> row(String pipeline, String receiptPipeline, PipelineNode n,
+                                           DbConsignmentOutputStore store) {
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("pipeline", pipeline);
         r.put("step", n.id());
         r.put("reference", n.cfg("reference"));
         r.put("match", n.cfg("match") == null ? "exact" : n.cfg("match").toString());
         r.put("lookedUpBy", lookedUpBy(n));
-        if (store != null) r.put("lastRun", store.latestStep(pipeline, n.id()).map(LookupRoutes::lastRun).orElse(null));
+        if (store != null) {
+            Map<String, Object> last = null;
+            try {
+                last = store.latestStep(receiptPipeline, n.id()).map(LookupRoutes::lastRun).orElse(null);
+            } catch (IllegalStateException unreadable) {
+                // one failed read must not blank the whole list: this row shows no last run
+                log.warn("lookups: last run of {}/{} unreadable: {}", receiptPipeline, n.id(), unreadable.getMessage());
+            }
+            r.put("lastRun", last);
+        }
         return r;
     }
 
