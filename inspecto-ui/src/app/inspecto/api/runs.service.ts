@@ -145,6 +145,33 @@ export interface ConsignmentOutputsPage {
     derivedRuns?: JobRunRow[];
 }
 
+/** One keyed Reference lookup Step's last run (`GET /lookups`, LOOKUP-1). Counts only, never a value. */
+export interface LookupLastRun {
+    consignmentId: string;
+    outcome: string;
+    startedAt: string | null;
+    rowsIn: number;
+    /** The Step Receipt's `diag.counts`: `lookup.<on>.hit|miss`, `reference.rows|null_keys|nested_prefixes`. */
+    counts: Record<string, number>;
+    truncated: boolean;
+}
+
+/** One keyed `transform.join` in a loaded Pipeline. `lastRun` is null before a run, ABSENT when receipts are off. */
+export interface LookupRow {
+    pipeline: string;
+    step: string;
+    reference: string | null;
+    match: string;
+    lookedUpBy: string[];
+    lastRun?: LookupLastRun | null;
+}
+
+export interface LookupsPage {
+    lookups: LookupRow[];
+    total: number;
+    known: { lastRun: boolean };
+}
+
 /** One manual run's status (`GET /runs/runs/{runId}`, W5b). `total`/`failed` are -1 while `RUNNING`. */
 export interface PipelineRunStatus {
     runId: string;
@@ -274,6 +301,10 @@ export class RunsService {
         return this.http.get<ConsignmentOutputsPage>(apiUrl(`/runs/${encodeURIComponent(name)}/outputs`), {
             params: toParams({ consignmentId }),
         });
+    }
+    /** Every keyed Reference lookup in the Space's Pipelines, each with its last run's counts (LOOKUP-1). */
+    lookups(): Observable<LookupsPage> {
+        return this.http.get<LookupsPage>(apiUrl('/lookups'));
     }
     quarantine(name: string): Observable<AuditRow[]> {
         return this.http.get<AuditRow[]>(apiUrl(`/runs/${encodeURIComponent(name)}/quarantine`));

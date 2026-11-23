@@ -214,6 +214,13 @@ export const defaultNavigation: GammaNavigationItem[] = [
                         link: '/pipelines',
                     },
                     { id: 'runs', title: 'Runs', type: 'basic', icon: 'heroicons_outline:queue-list', link: '/runs' },
+                    {
+                        id: 'lookups',
+                        title: 'Lookups',
+                        type: 'basic',
+                        icon: 'heroicons_outline:key',
+                        link: '/lookups',
+                    },
                     { id: 'jobs', title: 'Jobs', type: 'basic', icon: 'heroicons_outline:clock', link: '/jobs' },
                     {
                         id: 'expectations',

@@ -480,6 +480,12 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
   nothing) and, for `longest_prefix`, `reference.nested_prefixes` (keys that have a shorter key as a prefix, so the shorter
   one is shadowed for values starting with the longer). Informational: nothing fails and no key value is stored. Not
   reported for `range` (an empty bound is meaningful there).
+- **The Lookups screen (since 2026-11-23, `LOOKUP-1`)** — *Workbench ▸ Lookups* lists every keyed join (`key:`, or
+  `from:`/`to:`) in the Space's Pipelines: Pipeline, Step, Reference, match, the columns looked up, and the last run's
+  outcome, Found / Not found (summed over the mappings), Not found %, Reference rows and Empty keys, read from the newest
+  Step Receipt of that Step (dry runs excluded). Read-only; served by `GET /lookups`. A plain join is not listed. ⚠ A
+  receipt keeps at most 8 counts, so a join with more than 3 mappings loses its `reference.*` counts, and past 4 some
+  hit / miss counts: the screen then shows the missing counts, and all the Found / Not found sums, blank.
 - **`normalize:` (since 2026-11-23, `LOOKUP-1` P1e)** — for `exact` and `longest_prefix`, an ordered list of `trim`,
   `lower`, `upper`, `strip_leading_zeros`, `strip_plus`, applied to the Reference key and to every looked-up value
   alike. Two Reference rows that collapse to one key are refused by the `duplicates` rule; `range` refuses it. The

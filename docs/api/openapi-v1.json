@@ -14561,6 +14561,30 @@
         "x-optional-module" : true
       }
     },
+    "/lookups" : {
+      "get" : {
+        "tags" : [ "Execution & Scheduling" ],
+        "summary" : "Every keyed Reference lookup with its last run",
+        "description" : "LOOKUP-1: every keyed transform.join (key:, or from:/to: for a range) in the Space's loaded Pipelines: pipeline, step, reference, match and lookedUpBy (the input columns looked up), each with lastRun read from the Step Receipts (the newest receipt of that Pipeline and Step, dry runs excluded): consignmentId, outcome, startedAt, rowsIn, counts (the receipt's diag.counts: lookup.<on>.hit|miss and reference.rows|null_keys|nested_prefixes) and truncated. Counts only, never a value; diag.msg is not served. lastRun is null before the first run; with Step Receipts switched off it is absent and known.lastRun is false. A plain (non-keyed) join is not listed. First 500 + total. An open read under Space admission, like GET /consignments/{consignmentId}.",
+        "operationId" : "listLookups",
+        "x-probe" : {
+          "path" : "/api/v1/lookups",
+          "status" : 200
+        },
+        "responses" : {
+          "200" : {
+            "description" : "The keyed lookups and their last runs.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Envelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/mcp" : {
       "post" : {
         "tags" : [ "mcp" ],

@@ -173,6 +173,16 @@ columns the join adds are dropped from the output. Not built: counts for the unk
 
 **P2b built 2026-11-23 (operator: "load-time quality report"):** the Reference's own quality as counts on the same `diag.counts` — `reference.rows`, `reference.null_keys`, and for `longest_prefix` `reference.nested_prefixes` (a key with a shorter key as a prefix; one hash probe per distinct key length, no N×M). Keyed `exact | longest_prefix | asof`; not `range`. Decisions (assistant): informational only, no fail threshold; "prefix conflict" read as nesting, since a repeated key is already refused by `duplicates`; counts only, NO sample — a sample of keys would be stored in the receipt, so it waits with the unmatched-key sample (§4.6) for a place that is access-controlled. Still open in P2: nothing in batch; the cache lifecycle waits for P3. `RowShaperTest`.
 
+**Lookups screen built 2026-11-23 (operator: "Lookups screen", slice "Inventory + last-run counts"):** `GET /lookups`
+(`LookupRoutes`, an open read) lifts each loaded Pipeline and lists every keyed `transform.join` — Pipeline, Step,
+Reference, match, `lookedUpBy` — with `lastRun` from the newest non-simulated Step Receipt of that Pipeline and Step
+(`DbConsignmentOutputStore.latestStep`): outcome, start, rows in, `diag.counts`, `truncated`. Drawn as *Workbench ▸
+Lookups* (`modules/admin/lookups/`, read-only grid). Decisions (assistant): plain joins are not listed (no counts); first
+500 + `total`; with receipts off `lastRun` is absent and `known.lastRun=false`; a truncated receipt shows no Found / Not
+found sums rather than an understated one. Gap found: `StepReceipt.MAX_COUNTS = 8` cuts a join's counts past 3 mappings
+(`reference.*` first) — not changed here. Not built: test-a-key, refresh, cache size, version used (P3). Not driven in
+the preview. `ControlApiLookupsTest`, `lookups.component.spec.ts`.
+
 **P1h built 2026-11-23 (operator: "Yes, exact only"):** the `lookup()` scalar as the Record Transformer function
 `lookup.reference` (category Lookup; params `reference`, `key`, `returns`, `normalize`), exact match only. It renders
 the marker call `inspecto_lookup(...)`; `RowShaper.project` expands it into a scalar subquery over the resolved

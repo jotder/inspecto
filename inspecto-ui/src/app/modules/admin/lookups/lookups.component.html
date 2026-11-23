@@ -1,0 +1,37 @@
+<div class="flex min-w-0 flex-auto flex-col">
+    <inspecto-page-header
+        title="Lookups"
+        subtitle="Every keyed Reference lookup in this Space's Pipelines, with its last run's counts"
+        [terms]="['Reference', 'Pipeline', 'Step']"
+    >
+        <ng-container actions>
+            <button mat-icon-button (click)="load()" matTooltip="Refresh" aria-label="Refresh">
+                <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
+            </button>
+        </ng-container>
+    </inspecto-page-header>
+
+    <div class="flex flex-auto flex-col gap-4 p-6 sm:p-10">
+        @if (!lastRunKnown()) {
+            <inspecto-alert variant="info">
+                Step Receipts are switched off on this server, so no last run can be shown.
+            </inspecto-alert>
+        }
+        @if (cut(); as total) {
+            <inspecto-alert variant="warning"
+                >Showing the first {{ rows().length }} of {{ total }} lookups.</inspecto-alert
+            >
+        }
+        <inspecto-data-table
+            stateKey="lookups"
+            tier="standard"
+            sourceName="lookups"
+            exportName="lookups"
+            [rows]="rows()"
+            [columns]="columnDefs"
+            [loading]="loading()"
+            noRowsTitle="No lookups yet"
+            noRowsHint="A lookup is a join Step with a key: column — add one to a Pipeline."
+        />
+    </div>
+</div>

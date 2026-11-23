@@ -602,6 +602,7 @@ com.gamma.consignment.DbConsignmentOutputStore | public List<com.gamma.pipeline.
 com.gamma.consignment.DbConsignmentOutputStore | public List<com.gamma.pipeline.exec.StepReceipt> steps(String, int)
 com.gamma.consignment.DbConsignmentOutputStore | public Map<String, String> consignmentsOfRuns(java.util.Collection<String>)
 com.gamma.consignment.DbConsignmentOutputStore | public Optional<EventTimeBounds> bounds(String)
+com.gamma.consignment.DbConsignmentOutputStore | public Optional<com.gamma.pipeline.exec.StepReceipt> latestStep(String, String)
 com.gamma.consignment.DbConsignmentOutputStore | public String browseId()
 com.gamma.consignment.DbConsignmentOutputStore | public String browseLabel()
 com.gamma.consignment.DbConsignmentOutputStore | public boolean isReadable(String)

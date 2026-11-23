@@ -331,6 +331,39 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
         return out;
     }
 
+    /**
+     * The newest Step Receipt one Step of one Pipeline left, across every Consignment and lane, dry runs excluded —
+     * empty when it left none, or only one this build cannot read (LOOKUP-1, the Lookups screen's last run).
+     *
+     * @throws IllegalStateException when the read fails
+     */
+    public Optional<com.gamma.pipeline.exec.StepReceipt> latestStep(String pipeline, String step) {
+        String[] json = new String[1];
+        try {
+            src.run(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement("SELECT receipt FROM " + STEPS
+                        + " WHERE pipeline = ? AND step = ? AND NOT coalesce(simulated, false)"
+                        + " ORDER BY recorded_at DESC, seq DESC LIMIT 1")) {
+                    ps.setString(1, pipeline);
+                    ps.setString(2, step);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        if (rs.next()) json[0] = rs.getString(1);
+                    }
+                }
+            });
+        } catch (SQLException e) {
+            throw new IllegalStateException("consignment-steps query failed for " + pipeline + "/" + step + ": "
+                    + e.getMessage(), e);
+        }
+        if (json[0] == null) return Optional.empty();
+        try {
+            return Optional.of(com.gamma.pipeline.exec.StepReceipt.fromJson(json[0]));
+        } catch (RuntimeException unreadable) {
+            log.warn("{}/{}: skipping an unreadable Step Receipt: {}", pipeline, step, unreadable.getMessage());
+            return Optional.empty();
+        }
+    }
+
     /** How many Step Receipts one Consignment has. @throws IllegalStateException when the read fails */
     public long stepCount(String consignmentId) {
         return count("SELECT count(*) FROM " + STEPS + " WHERE consignment_id = ?", consignmentId);
