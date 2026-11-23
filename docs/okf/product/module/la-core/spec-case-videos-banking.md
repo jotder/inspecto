@@ -223,78 +223,94 @@ code: la/inspecto-la-core
 > **One fuel station, sixty cards** · Standard · Banking and finance (`la-banking`) · saved view *Common point of purchase*
 > (`common_point_of_purchase`) · about 4½ min
 
-- Cast: the **point of compromise** (merchant M-317, a fuel station); the **sixty defrauded cards** (CRD-…); the decoy **supermarket** M-052 (the lookalike: many more cards, none defrauded). Readable ids.
-- Stakes: the investigator is a card-fraud analyst. Sixty cards were defrauded weeks apart at different shops; every week without the source, more cards are copied.
-- Vocabulary: *common point of purchase* (the one place the defrauded cards had all been used before the fraud), *point of compromise*. Said in the cold open.
-- Ground truth: `tools/gen-la-card-data.ground-truth.json` ▸ `stories.common_point_of_purchase` (hub M-317, lookalikes M-052; `entities` 61) and ▸ `common_point_of_purchase` (`cards` 60 with `fraud_day`; `window` 2026-03-02 to 2026-03-22; `background_fraud_cards` 40 cards defrauded with no link to M-317; `in_window_not_defrauded` 10 cards that paid at M-317 in the window and were not defrauded). Fraud days run 2026-03-15 to 2026-04-24. **Plan table kept:** the decoy is the busiest merchant (M-052), and the film adds the honest caveat of the ten cards.
-- Before: Standard, la-banking, Demo Analyst; the saved view is above 80 nodes, so labels are off until Display options turns them on.
-- Lead: *the fuel station M-317 is where to look*. **What would change our mind:** if the sixty also share a second merchant, or if any card's fraud date fell before it paid at the station. **Next actions:** (1) send the terminal for inspection, (2) reissue the sixty cards and keep them as the Entity List *Cards to reissue*, (3) watch the ten cards that also paid there and were not defrauded.
-- Voice style: card ids spoken as "card one oh oh oh one two"; dates as "the middle of March".
-- Try it / Check: from M-317, expand once and count what its cards have in common. *Why is the supermarket not the lead?* Answer: it served far more cards and none was defrauded; only the links to the frauds point at the station.
+- **Cast:** the **point of compromise** (merchant M-317, a fuel station); the **sixty defrauded cards** (CRD-…); the decoy
+  **supermarket** M-052 (the lookalike: far more cards, none defrauded). All ids readable.
+- **Stakes:** the investigator is a card-fraud analyst. Sixty cards were defrauded weeks apart at different shops; every week
+  without the source, more cards are copied.
+- **Vocabulary:** *common point of purchase* (the one place the defrauded cards had all been used before the fraud), *point of
+  compromise*. Said in S01 and S02.
+- **Ground truth:** `tools/gen-la-card-data.ground-truth.json` ▸ `stories.common_point_of_purchase` (hub M-317, lookalikes M-052)
+  and ▸ `common_point_of_purchase` (`cards` 60 with `fraud_day`; `window` 2026-03-02 to 2026-03-22; `background_fraud_cards` 40
+  cards defrauded with no link to M-317; `in_window_not_defrauded` 10 cards that paid at M-317 in the window and were not
+  defrauded). **Plan table kept.** **Checked live 2026-11-22 (fresh Standard unzip):** the saved view draws with the caption
+  *node labels off above 80 nodes*; Busiest nodes names M-317 (60 links, the most on the graph) and then three cards and a
+  merchant with 4 links each; the Dataset *card_links_dataset* has link kinds used_at, refunded, used_device, from_ip, account_card,
+  ships_to, charged_back and visited_before_fraud; the Entities page opens M-052 as a Merchant whose profile reads *Active days 365
+  of 365*, Degree 928, *Among its type p100*; *Start from these* on M-317 draws the station with its cards around it; Rows lists
+  CRD-100012 used_at M-317, CRD-100012 visited_before_fraud M-317, CRD-100017 visited_before_fraud M-317; the Space already holds
+  the Entity List *Cards to reissue* (Card entity, 10 members).
+- **Before:** Standard build, Banking Space from a fresh unzip, Demo Analyst. The film changes no state: it reads the saved view,
+  the Entities page and the Entity Lists page.
+- **Lead:** *the fuel station M-317 is where to look.* **What would change our mind:** if the sixty also share a second merchant,
+  or if any card's fraud date fell before it paid at the station. **Next actions:** (1) send the terminal for inspection, (2)
+  reissue the sixty cards and keep them as an Entity List, (3) watch the ten cards that also paid there and were not defrauded.
+- **Voice style:** card ids spoken by the lexicon (CRD letters, then digits); dates as "the middle of March".
+- **Try it / Check:** from M-317, expand once and count what its cards have in common. *Why is the supermarket not the lead?
+  Answer: it served far more cards and none was defrauded; only the links to the frauds point at the station.*
 
-### S01 · Sixty cards                                                    ~25 s
-- Voice: Sixty cards were defrauded online, weeks apart, at different shops. The victims share nothing except that each card was copied somewhere, once, before the fraud. [pause 0.5] Where? The frauds themselves will not tell you.
-- Chip: none
-- Action: cold open and intro card.
+### S01 · Sixty cards · ~25 s
+- Voice: Sixty cards were defrauded online, weeks apart, at different shops. The victims share nothing, except that each card was copied somewhere, once, before the fraud. [pause 0.5] Where? The frauds themselves will not tell you.
+- Action: cold open over the Banking Space's home page; the intro card opens the next scene.
 - Impact: none.
 
-### S02 · Why the frauds hide it                                       ~30 s
-- Voice: Look at the frauds and you see sixty shops, sixty days. [pause 0.4] The place the cards share is earlier, and it is an ordinary purchase. The answer is in what came before.
-- Chip: none
-- Action: zoom while the voice runs.
-- Impact: none.
+### S02 · Why the frauds hide it · ~30 s
+- Beat: steady
+- Intro: One fuel station, sixty cards | Banking and finance Space
+- Story: a common point of purchase = the one place the defrauded cards had all been used | the point of compromise = where the cards were copied | a defrauded card = a card with a confirmed fraud
+- Voice: Look at the frauds and you see sixty shops on sixty different days. [pause 0.4] The place the cards share is earlier, and it is an ordinary purchase. The answer is in what came before. A common point of purchase is the one place all the defrauded cards had been used. The point of compromise is where they were copied.
+- Action: story card "Who is who" over the home page.
+- Impact: the story card names the three terms.
 
-### S03 · The data, in one breath                                      ~30 s
-- Voice: Every card authorisation lands as a record: the card, the merchant, the amount, the time, the result. A Job links each card to the merchants it paid at, and to the frauds reported on it.
-- Chip: Mappings
-- Action: Data page ▸ the card links Dataset ▸ Mappings. `[check in UI]`
-- Impact: mark card and merchant columns.
+### S03 · The data, in one breath · ~30 s
+- Voice: Every card authorisation lands as a record: the card, the merchant, the amount, the time, and the result. [pause 0.4] A Job turns the records into links between a card and the merchants it paid at. It adds a link from a card to a merchant where the card had visited before the fraud.
+- Chip: Data · Columns
+- Action: rail Data ▸ the Dataset *card_links_dataset* ▸ hold on its Columns card. `[checked live: src and dst are Entity columns holding Card entity, kind is a Category, amount a Measure, ts and event_date are Time, via a Detail; the description lists the link kinds]`
+- Impact: mark the Columns card.
 
-### S04 · The saved view                                               ~35 s
+### S04 · The saved view · ~30 s
 - Voice: The saved view keeps the merchants where defrauded cards had paid before the fraud. Each circle is a card or a merchant, each line a purchase. [pause 0.4] It is a lot of shapes, so the labels are off. Turn them on only where you need them.
 - Chip: Saved views · Display options
-- Action: File ▸ Open… ▸ Saved views ▸ *Common point of purchase* ▸ hold on the line *node labels off above 80 nodes*.
+- Action: open the saved view *Common point of purchase* ▸ hold on the line at the bottom. `[checked live: the line reads node labels off above 80 nodes: Display options turns them on]`
 - Impact: mark the line.
 
-### S05 · The busy merchant                                           ~40 s
-- Voice: Who has the most links? The busiest merchant is a supermarket, M-052. [pause 0.4] It served far more cards than anyone. If busy meant guilty, this would be the lead. Open its details: cards, plenty. Defrauded cards, none.
+### S05 · The busy merchant · ~40 s
+- Voice: Who is the busiest merchant? A supermarket, M-052. [pause 0.4] Its profile says it all. Open its profile: first seen a year ago, last seen at the end of September, and active on every single day in between. Under Links, it sits at the very top of all merchants. [pause 0.4] A supermarket should look like that. If busy meant guilty, this would be the lead. [pause 0.5] It is not. Cards plenty, defrauded cards none. Set it aside.
+- Chip: Entities · Open an Entity
+- Action: rail Entities ▸ Entity Types ▸ Merchant ▸ Open an Entity ▸ `M-052` ▸ hold on Seen and Links. `[checked live: Active days 365 of 365, Degree 928, Among its type p100]`
+- Impact: grey "ruled out" mark on the Seen card.
+
+### S06 · The one with sixty · ~35 s
+- Voice: Back in the saved view, ask Busiest nodes again. [pause 0.4] The first name is not the supermarket. It is one merchant, M-317, that takes part in sixty links. The names after it have four each. [pause 0.5] That is not a close race, and the supermarket never appears here: its cards were never defrauded, so they are not in this view.
 - Chip: Busiest nodes
-- Action: Open an Entity ▸ M-052 ▸ read Links and Lists. `[check in UI: Open an Entity route, as in G3]`
-- Impact: M-052 marked grey "ruled out".
+- Action: open the saved view ▸ Busiest nodes ▸ hold on the first row. `[checked live: M-317 takes part in 60 links, the most on this graph; the next rows are CRD-101227, CRD-104942 and M-832 with 4 links each]`
+- Impact: computed mark on the first row, yellow.
 
-### S06 · The one with sixty                                           ~35 s
-- Voice: Now sort by links to defrauded cards. One merchant, M-317, is linked to sixty. The next name on the list has four. [pause 0.5] That is not a close race.
-- Chip: Busiest nodes
-- Action: toolbox ▸ Busiest nodes ▸ read the first rows of the view. `[check in UI: M-317 first with sixty links, the next with four]`
-- Impact: computed mark on M-317 yellow.
+### S07 · Start from the station · ~40 s
+- Voice: Start from M-317. A fuel station. [pause 0.4] The notice reads: started from the busiest node, one entity and its linked nodes. Every spoke is a card that paid at its pumps.
+- Chip: Start from these
+- Action: Busiest nodes ▸ first row ▸ *Start from these*. `[checked live: the notice reads Started from M-317, the busiest node. Drew 1 entity and 120 linked nodes]`
+- Impact: before/after hold: the single drawing of M-317 with its cards.
 
-### S07 · Start from the station                                      ~40 s
-- Voice: Start from M-317. A fuel station. Every line here is a card that paid at its pumps.
-- Chip: Search · Focus
-- Action: Search ▸ M-317 ▸ Focus; labels on.
-- Impact: computed mark on the sixty; zoom.
-
-### S08 · Every line is a row                                          ~35 s
-- Voice: Open the table. Each purchase is a row: the card, the amount, the day. Sixty cards used there in three weeks of March. Each one defrauded one to six weeks later. [pause 0.5] That is the order a copying device gives you.
+### S08 · Every line is a row · ~40 s
+- Voice: Open the table. Each line is a row: the card, the kind of link, and the merchant. Each one can be read, sorted and quoted. [pause 0.4] Two kinds matter here. A card used at M-317, and a card that had visited M-317 before its fraud. [pause 0.5] That is the order a copying device gives you: first the pumps, then the fraud.
 - Chip: Rows
-- Action: dock ▸ Rows ▸ sort by date.
-- Impact: mark the date column.
+- Action: dock ▸ Rows ▸ hold on the first rows. `[checked live: CRD-100012 used_at M-317, CRD-100012 visited_before_fraud M-317, CRD-100017 visited_before_fraud M-317]`
+- Impact: mark the link kinds.
 
-### S09 · The lead, and the honest caveat                              ~40 s
-- Voice: The lead is a terminal to inspect. [pause 0.5] One honest caveat: ten more cards also paid there in those weeks and were not defrauded. The station is where to look, not proof. It would weaken if the sixty also share a second merchant.
-- Chip: none
-- Action: lower third with the lead and the caveat.
-- Impact: M-317 yellow, the ten marked blue "not defrauded".
+### S09 · The lead, and the honest caveat · ~40 s
+- Voice: The lead is a terminal to inspect. [pause 0.5] One honest caveat: ten more cards paid there in those weeks and were not defrauded. The station is where to look, not proof. [pause 0.4] It would weaken if the sixty also share a second merchant, or if a fraud came before its card paid at the station.
+- Action: hold on the rows while the voice runs.
+- Impact: none.
 
-### S10 · Monday morning                                              ~35 s
-- Voice: Send the terminal for inspection. Reissue the sixty cards, and keep them as an Entity List so every graph marks them. [pause 0.4] And watch the ten that were exposed and are not defrauded yet.
-- Chip: Entity List
-- Action: New list… `Cards to reissue`. `[check in UI]`
-- Impact: mark the list name.
+### S10 · Monday morning · ~35 s
+- Voice: Send the terminal for inspection. Reissue the sixty cards. [pause 0.4] And watch the ten that were exposed and are not defrauded yet. This Space already keeps a list for the reissue, Cards to reissue, so every graph marks them.
+- Chip: Entity Lists
+- Action: rail Entity Lists ▸ hold on *Cards to reissue*. `[checked live: Watch these, Card entity, 10 members]`
+- Impact: mark the list row.
 
-### S11 · Case file                                                   ~15 s
-- Voice: Lead: one fuel station. Evidence: its rows, in order. Next: inspect, reissue, watch. Inspecto LA.
-- Chip: none
+### S11 · Case file · ~25 s
+- Casefile: Lead: one fuel station, M-317 | Evidence: sixty cards used there, each defrauded later | Next: send the terminal for inspection; reissue the cards and keep them as an Entity List; watch the ten cards that were exposed and not defrauded | Try it: from M-317, expand once and count what its cards have in common
+- Voice: The case file. The lead: one fuel station. The evidence: its rows, in order. Next: inspect, reissue, watch. [pause 0.6] Your turn. From the station, expand once, and count what its cards have in common.
 - Action: case-file card and outro.
 - Impact: none.
 
