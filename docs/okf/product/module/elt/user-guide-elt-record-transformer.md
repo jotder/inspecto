@@ -414,8 +414,13 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
   - **Columns this Step adds** — the join Step's pane shows a read-only table (output column · type · from · looked
     up by) for a keyed join, computed by `POST /components/transform/describe` with a `config` body from the
     Reference Pipeline's declared schema (no row is read); a clash or an unknown column shows there as the run's own
-    refusal. It reflects the Step's applied settings (after Apply). `lookups:` itself is written in the pipeline file
-    (the form keeps it as an extra setting); the form adds a *Match details* toggle.
+    refusal. It reflects the Step's applied settings (after Apply).
+  - **Per-input lookups form (since 2026-11-23)** — on a join Step's pane, *Per-input lookups* edits `lookups:` as one
+    block per mapping: *Looked up by*, *Name prefix* (`as`), the columns it returns (Reference column and output
+    name; a blank name takes the engine's own), *When nothing matches* (defaults by output name) and *Add match
+    details*. It refuses a mapping with no input, two outputs with one name, and a default for a column the mapping
+    does not add, before Apply. A `details` map is kept as written; a `lookups:` the form cannot read (not a list of
+    entries) stays an extra setting.
 - **`match: range` (since 2026-11-22, `LOOKUP-1` P1c)** — a value matches the Reference row whose period holds it.
   It is keyed by `from:` / `to:` (Reference columns, either may be omitted), not `key:`.
   ```toon
