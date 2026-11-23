@@ -93,8 +93,8 @@ for a new Step with an explicit column list over the upstream sample columns, el
   template, params}`; `SqlFunctionParam = {name, label, type, default, options, optional}` where `type`
   drives BOTH the rendered control and the escaping: `column` → quoted identifier, `text` → single-quoted
   literal with quotes doubled, `number` → validated then verbatim, `enum` → one of `options` verbatim,
-  `sql` → verbatim (the deliberate escape hatch, `custom` only). **23**<!--count:sql-mapping-functions--> functions *(per `sql-functions.ts`: 1 Keep, 8 Text, 4 Numbers, 6 Dates, 2 Logic, 1 Convert, 1 Custom)* across Keep · Text ·
-  Numbers · Dates · Logic · Convert · Custom. A row's source column binds to the template's `{source}`
+  `sql` → verbatim (the deliberate escape hatch, `custom` only). **24**<!--count:sql-mapping-functions--> functions *(per `sql-functions.ts`: 1 Keep, 8 Text, 4 Numbers, 6 Dates, 2 Logic, 1 Convert, 1 Lookup, 1 Custom)* across Keep · Text ·
+  Numbers · Dates · Logic · Convert · Lookup · Custom. A row's source column binds to the template's `{source}`
   automatically — that IS the operator's "auto map parameters against sql functions".
   ⚠ **Every conversion is `TRY_CAST`, never bare `CAST`, and division guards with `NULLIF`** — a
   catalog-wide unit test asserts it, because a bad cell must null one cell, not kill the batch.
@@ -244,7 +244,7 @@ schema field's four keys — description · unit · classification · synonym �
 ### 8.4 Expression building
 
 - **The expression-building surface** is the Transform pane's function picker per row over `SQL_FUNCTIONS`
-  (**23**<!--count:sql-mapping-functions--> functions in 7 categories), with a form control per declared parameter and
+  (**24**<!--count:sql-mapping-functions--> functions in 8 categories), with a form control per declared parameter and
   "Try it on the sample" (§8.2).
 - **CodeMirror has THREE hosts**, not two: the SQL query workbench (`inspecto/data-table/sql/`), the
   enrichment editor (`inspecto/enrichment/enrichment-editor.component.ts`) and **the Transform pane's SQL

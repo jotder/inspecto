@@ -740,6 +740,45 @@ class RowShaperTest {
         assertNull(rows.get(3).get("third_party_msisdn_dial_digit_key"));
     }
 
+    /** Runs a Fields projection of txn(id, currency) against fx(currency, rate); returns id → looked-up rate. */
+    private Map<Integer, String> lookupField(Map<String, String> args) throws SQLException {
+        Map<String, String> a = new java.util.LinkedHashMap<>(Map.of("reference", "reference/fx", "key", "currency",
+                "returns", "rate", "normalize", "none"));
+        a.putAll(args);
+        String id = "lf" + (++keyedJoins);
+        var out = new RelationByRel(RowShaper.shape(conn, PipelineNode.of(id, "transform.sql", Map.of("fields", List.of(
+                Map.of("name", "id", "from", "id", "fn", "keep"),
+                Map.of("name", "rate", "from", "currency", "fn", "lookup.reference", "args", a)))),
+                "txn", id, (c, name) -> "fx"));
+        Map<Integer, String> rows = new java.util.TreeMap<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT id, rate FROM \"" + out.table(PipelineRel.DATA) + "\"")) {
+            while (rs.next()) rows.put(rs.getInt(1), rs.getString(2));
+        }
+        return rows;
+    }
+
+    @Test
+    void aLookupFieldReturnsTheReferenceValueOfItsRowsKey() throws Exception {
+        sql("CREATE TABLE fx AS SELECT * FROM (VALUES ('USD', '1.0'), ('EUR', '0.9')) t(currency, rate)");
+        sql("CREATE TABLE txn AS SELECT * FROM (VALUES (1, 'USD'), (2, 'eur'), (3, 'XXX'), (4, NULL)) t(id, currency)");
+        var exact = lookupField(Map.of());
+        assertEquals("1.0", exact.get(1));
+        assertNull(exact.get(2), "exact: 'eur' is not 'EUR'");
+        assertNull(exact.get(3), "no Reference row");
+        assertNull(exact.get(4), "no value");
+        assertEquals("0.9", lookupField(Map.of("normalize", "upper")).get(2), "normalized: 'eur' matches 'EUR'");
+    }
+
+    @Test
+    void aLookupFieldOverARepeatedKeyAndAMissingColumnAreRefused() throws Exception {
+        sql("CREATE TABLE fx AS SELECT * FROM (VALUES ('USD', '1.0'), ('USD', '1.1')) t(currency, rate)");
+        sql("CREATE TABLE txn AS SELECT * FROM (VALUES (1, 'USD')) t(id, currency)");
+        assertThrows(SQLException.class, () -> lookupField(Map.of()), "two Reference rows for one key stop the run");
+        var e = assertThrows(IllegalArgumentException.class, () -> lookupField(Map.of("returns", "nope")));
+        assertTrue(e.getMessage().contains("has no column 'nope'"), e.getMessage());
+    }
+
     /** A walk reads these into the Step's receipt; a null value is neither a hit nor a miss; reading drops them. */
     @Test
     void aKeyedJoinLeavesPerMappingHitAndMissCountsForTheWalkToTake() throws Exception {

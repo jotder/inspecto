@@ -92,6 +92,10 @@ public final class RecordTransform {
     public static final String CUSTOM = "custom";
     /** The id of the CONCAT_DT analogue — on the ingest lane it compiles through the parser's formats and zones. */
     public static final String CONCAT_PARTS = "date.concat_parts";
+    /** The id of the Reference lookup function; its template calls {@link #LOOKUP_CALL}. */
+    public static final String LOOKUP = "lookup.reference";
+    /** The marker call a lookup field renders — expanded by the pipeline projection, never run by DuckDB as is. */
+    public static final String LOOKUP_CALL = "inspecto_lookup";
 
     /**
      * The catalog, in the TS file's declaration order (the contract compares order too).
@@ -193,6 +197,22 @@ public final class RecordTransform {
                     List.of(Param.of("type", "New type", ParamType.ENUM)
                             .withOptions(SQL_TYPES.toArray(new String[0])).withDefault("VARCHAR")),
                     "A value that cannot be converted becomes empty; the row is kept."),
+
+            // ── Lookup ────────────────────────────────────────────────────────────────────────────────
+            // LOOKUP-1 P1h. Not SQL DuckDB runs: the pipeline's projection (RowShaper) expands this call into a
+            // scalar subquery over the resolved Reference. Anywhere else — the ingest lane has no Reference
+            // resolver — it stays a call to an unknown function and fails by that name.
+            new Fn(LOOKUP, "Look up a value in a Reference", "Lookup",
+                    "inspecto_lookup({source}, {reference}, {key}, {returns}, {normalize})",
+                    List.of(Param.of("reference", "Reference", ParamType.TEXT).withPlaceholder("reference/fx_rates"),
+                            Param.of("key", "Reference column matched to this value", ParamType.TEXT)
+                                    .withPlaceholder("currency"),
+                            Param.of("returns", "Reference column to return", ParamType.TEXT).withPlaceholder("rate"),
+                            Param.of("normalize", "Compare after", ParamType.ENUM)
+                                    .withOptions("none", "trim", "lower", "upper", "strip_leading_zeros", "strip_plus")
+                                    .withDefault("none")),
+                    "The row's value is matched exactly to the Reference column, and that Reference row's value is "
+                            + "returned; empty when nothing matches. A Reference with two rows for one key stops the run."),
 
             // ── Custom ────────────────────────────────────────────────────────────────────────────────
             new Fn(CUSTOM, "Write my own expression", "Custom", "{expression}",

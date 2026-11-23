@@ -230,14 +230,14 @@ public final class RowShaper {
         if (BuiltinNodeType.TRANSFORM_HASH.type().equals(type))    return hash(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_MASK.type().equals(type))    return mask(conn, node, input, outPrefix);
         if (BuiltinNodeType.TRANSFORM_SELECT.type().equals(type)
-                || BuiltinNodeType.TRANSFORM_DERIVE.type().equals(type)) return project(conn, node, input, outPrefix);
+                || BuiltinNodeType.TRANSFORM_DERIVE.type().equals(type)) return project(conn, node, input, outPrefix, references);
         // A Record Transformer — authored FIELDS, or the projection slot carrying a lifted schema /
         // authored columns / component rules — compiles through the one [{name, expr}] seam, so both
         // lanes run one compiler (RecordTransform) rather than the browser's rendering and the engine's
         // diverging. Only a HAND-WRITTEN sql node takes the opaque-string path — which is also the only
         // one the SQL_STEP_UNAUDITED warning still applies to.
         if (BuiltinNodeType.TRANSFORM_SQL.type().equals(type))
-            return isProjection(node) ? project(conn, node, input, outPrefix)
+            return isProjection(node) ? project(conn, node, input, outPrefix, references)
                                       : sql(conn, node, input, outPrefix);
         // ⚠ Name the seam in the message: a CONTRIBUTED node type reaches here having rendered in the
         // palette, validated and lifted, so "cannot shape" alone reads as a core bug rather than a
@@ -2057,24 +2057,60 @@ public final class RowShaper {
 
     // ── projection (map / select / derive) ─────────────────────────────────────────
 
-    private static List<Relation> project(Connection conn, PipelineNode node, String input, String prefix) throws SQLException {
+    private static List<Relation> project(Connection conn, PipelineNode node, String input, String prefix,
+                                          ReferenceResolver references) throws SQLException {
         String data = table(prefix, PipelineRel.DATA);
-        exec(conn, "CREATE TABLE " + q(data) + " AS " + projectionSelect(node, input));
+        exec(conn, "CREATE TABLE " + q(data) + " AS "
+                + projectionSelectFrom(node, q(input), input, e -> expandLookups(conn, references, e, input)));
         return List.of(new Relation(PipelineRel.DATA, data));
     }
 
-    /** The {@code SELECT … FROM <input>} for a projection node over the table {@code input} (reused by {@link #fuse}). */
-    private static String projectionSelect(PipelineNode node, String input) {
-        return projectionSelectFrom(node, q(input), input);
+    /** A lookup field's marker call: {@code inspecto_lookup(<column>, '<reference>', '<key>', '<returns>', <normalizer>)}. */
+    private static final java.util.regex.Pattern LOOKUP_FIELD = java.util.regex.Pattern.compile(
+            RecordTransform.LOOKUP_CALL + "\\(([^,()]+),\\s*'((?:[^']|'')*)',\\s*'((?:[^']|'')*)',\\s*'((?:[^']|'')*)',"
+                    + "\\s*(\\w+)\\)");
+
+    /**
+     * Expand each lookup field's marker call in {@code expr} (LOOKUP-1 P1h) into a scalar subquery over the resolved
+     * Reference: the row's value, compared as text after the normalizer, against the Reference key column, returning
+     * one column. The row's column is qualified with {@code sourceTable} so a Reference column of the same name can
+     * never capture it. A Reference with two rows for one key makes DuckDB refuse the subquery — the same stop as the
+     * join's {@code duplicates: refuse}.
+     */
+    private static String expandLookups(Connection conn, ReferenceResolver references, String expr, String sourceTable) {
+        java.util.regex.Matcher m = LOOKUP_FIELD.matcher(expr);
+        StringBuilder out = new StringBuilder();
+        try {
+            while (m.find()) {
+                String reference = m.group(2).replace("''", "'"), key = m.group(3).replace("''", "'"),
+                        returns = m.group(4).replace("''", "'");
+                List<String> normalizers = "none".equals(m.group(5)) ? List.of() : joinNormalizers(m.group(5));
+                String ref = references.resolve(conn, reference);
+                List<String> cols = columnsOf(conn, ref);
+                for (String c : List.of(key, returns))
+                    if (cols.stream().noneMatch(r -> r.equalsIgnoreCase(c)))
+                        throw new IllegalArgumentException("lookup field: the Reference '" + reference
+                                + "' has no column '" + c + "' (it has " + cols + ")");
+                String sub = "(SELECT t." + q(returns) + " FROM " + q(ref) + " t WHERE "
+                        + normalized("CAST(t." + q(key) + " AS VARCHAR)", normalizers) + " = "
+                        + normalized("CAST(" + q(sourceTable) + "." + m.group(1).trim() + " AS VARCHAR)", normalizers) + ")";
+                m.appendReplacement(out, java.util.regex.Matcher.quoteReplacement(sub));
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("lookup field: " + e.getMessage(), e);
+        }
+        return m.appendTail(out).toString();
     }
 
     /**
-     * As {@link #projectionSelect}, but over a pre-rendered FROM target (a quoted table, or a
+     * The {@code SELECT … FROM} for a projection node over a pre-rendered FROM target (a quoted table, or a
      * {@code (subquery) AS _t}). {@code sourceTable} is that target's bare identifier — derived mapping
      * expressions qualify their column references with it, so it must match what {@code fromTarget} reads.
+     * {@code lookups} rewrites each field's expression (the lookup-field expansion).
      */
     @SuppressWarnings("unchecked")
-    private static String projectionSelectFrom(PipelineNode node, String fromTarget, String sourceTable) {
+    private static String projectionSelectFrom(PipelineNode node, String fromTarget, String sourceTable,
+                                               java.util.function.UnaryOperator<String> lookups) {
         String type = node.type();
         List<?> cols = columnsOf(node, sourceTable);
         if (cols == null || cols.isEmpty())
@@ -2091,7 +2127,7 @@ public final class RowShaper {
             for (Object c : cols) {
                 Map<String, Object> m = (Map<String, Object>) c;
                 String name = reqStr(m, "name", node.id());
-                String expr = reqStr(m, "expr", node.id());
+                String expr = lookups.apply(reqStr(m, "expr", node.id()));
                 exprs.add("(" + expr + ") AS " + q(name));
             }
             sel.append(String.join(", ", exprs));
@@ -2213,7 +2249,11 @@ public final class RowShaper {
                 || BuiltinNodeType.TRANSFORM_SELECT.type().equals(type)
                 || BuiltinNodeType.TRANSFORM_DERIVE.type().equals(type)) {
             try {
-                return Optional.of(projectionSelectFrom(node, from, "_t"));
+                return Optional.of(projectionSelectFrom(node, from, "_t", e -> {
+                    // a lookup needs the Reference resolved at run time: no single self-contained SELECT
+                    if (e.contains(RecordTransform.LOOKUP_CALL + "(")) throw new IllegalArgumentException("lookup");
+                    return e;
+                }));
             } catch (RuntimeException e) {
                 return Optional.empty();
             }

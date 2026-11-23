@@ -52,7 +52,7 @@ export interface SqlFunctionParam {
     readonly optional?: boolean;
 }
 
-export type SqlFunctionCategory = 'Keep' | 'Text' | 'Numbers' | 'Dates' | 'Logic' | 'Convert' | 'Custom';
+export type SqlFunctionCategory = 'Keep' | 'Text' | 'Numbers' | 'Dates' | 'Logic' | 'Convert' | 'Lookup' | 'Custom';
 
 /** One function a Fields row may apply to its source column. */
 export interface SqlFunction {
@@ -281,6 +281,29 @@ export const SQL_FUNCTIONS: readonly SqlFunction[] = [
         template: 'TRY_CAST({source} AS {type})',
         params: [{ name: 'type', label: 'New type', type: 'enum', options: SQL_TYPES, default: 'VARCHAR' }],
         help: 'A value that cannot be converted becomes empty; the row is kept.',
+    },
+
+    // ── Lookup ──────────────────────────────────────────────────────────────────────────────────────
+    {
+        id: 'lookup.reference',
+        label: 'Look up a value in a Reference',
+        category: 'Lookup',
+        template: 'inspecto_lookup({source}, {reference}, {key}, {returns}, {normalize})',
+        params: [
+            { name: 'reference', label: 'Reference', type: 'text', placeholder: 'reference/fx_rates' },
+            { name: 'key', label: 'Reference column matched to this value', type: 'text', placeholder: 'currency' },
+            { name: 'returns', label: 'Reference column to return', type: 'text', placeholder: 'rate' },
+            {
+                name: 'normalize',
+                label: 'Compare after',
+                type: 'enum',
+                options: ['none', 'trim', 'lower', 'upper', 'strip_leading_zeros', 'strip_plus'],
+                default: 'none',
+            },
+        ],
+        help:
+            "The row's value is matched exactly to the Reference column, and that Reference row's value is " +
+            'returned; empty when nothing matches. A Reference with two rows for one key stops the run.',
     },
 
     // ── Custom ──────────────────────────────────────────────────────────────────────────────────────
