@@ -375,6 +375,28 @@ class PipelineValidatorTest {
         }
     }
 
+    /** LOOKUP-1 P1d: lookups: replaces on:, and what its config alone shows cannot run is refused at save. */
+    @Test
+    void aLookupsJoinsImpossibleSettingsAreRefusedAtValidation() {
+        Map<String, Object> served = Map.of("on", "SERVED_MSISDN", "columns", Map.of("provider_desc", "OPER"));
+        Map<String, Object> ok = new java.util.LinkedHashMap<>(Map.of("reference", "reference/dd", "key", "dial_digit_key",
+                "match", "longest_prefix", "lookups", List.of(served,
+                        Map.of("on", "OTHER_MSISDN", "columns", List.of("provider_desc"), "details", true))));
+        var okCodes = codes(PipelineValidator.validate(joinGraph(ok)));
+        assertFalse(okCodes.contains(PipelineValidator.JOIN_KEYED_INVALID), okCodes::toString);
+        assertFalse(okCodes.contains(PipelineValidator.JOIN_ON_MISSING), "lookups: carries each mapping's on");
+        for (Map<String, Object> bad : List.<Map<String, Object>>of(
+                with(ok, "on", "SERVED_MSISDN"),                                                 // mixed with on:
+                with(ok, "lookups", List.of(Map.of("columns", List.of("x")))),                   // entry without on
+                with(ok, "lookups", List.of(Map.of("on", "a", "rename", "x"))),                  // unknown entry key
+                with(ok, "lookups", List.of(served, Map.of("on", "b", "columns", Map.of("iso", "oper")))), // dup output
+                with(ok, "lookups", "SERVED_MSISDN"),                                            // not a list
+                without(ok, "key"))) {                                                           // lookups without key
+            PipelineValidator.Result r = PipelineValidator.validate(joinGraph(bad));
+            assertTrue(codes(r).contains(PipelineValidator.JOIN_KEYED_INVALID), () -> bad + " → " + r.issues());
+        }
+    }
+
     private static PipelineGraph joinGraph(Map<String, Object> cfg) {
         return new PipelineGraph("keyed", true, List.of(new PipelineNode("j", "transform.join", cfg, null)), List.of());
     }

@@ -221,6 +221,7 @@ final class ComponentRoutes implements RouteModule {
      */
     private Object describeTransform(ApiContext api, Map<String, Object> body) {
         if (body == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must not be empty");
+        if (body.get("config") != null) return describeJoin(api, body);
         Object rawSql = body.get("sql");
         if (!(rawSql instanceof String sql) || sql.isBlank()) {
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include non-blank 'sql'");
@@ -259,6 +260,101 @@ final class ComponentRoutes implements RouteModule {
         } catch (IllegalArgumentException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, duckDbMessage(e.getMessage(), api));
         }
+    }
+
+    /**
+     * {@code POST /components/transform/describe} with a {@code config} body (LOOKUP-1 P1d) — "Columns this Step
+     * adds" for a keyed {@code transform.join}: body {@code { config: <the join's config>, inputColumns?: [name |
+     * {name, type}], referenceColumns?: [{name, type}] }} → {@code { columns: [{name, type, from, lookedUpBy, match,
+     * detail}] }} ({@link RowShaper#joinAddedColumns}). Reads no row: without {@code referenceColumns} the Reference's
+     * columns come from the producing Pipeline's declared schema ({@code reference/<pipeline>}). A clash, an unknown
+     * column or a non-keyed join is a 422 naming it — the same refusal the run gives.
+     */
+    private Object describeJoin(ApiContext api, Map<String, Object> body) {
+        if (!(body.get("config") instanceof Map<?, ?> raw))
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'config' must be an object");
+        Map<String, Object> config = new java.util.LinkedHashMap<>();
+        raw.forEach((k, v) -> config.put(String.valueOf(k), v));
+        Object type = config.remove("type");
+        if (type != null && !com.gamma.pipeline.BuiltinNodeType.TRANSFORM_JOIN.type().equals(type))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "describe with a config lists the columns "
+                    + "a transform.join adds; this config is '" + type + "'");
+        List<String> inputColumns = new java.util.ArrayList<>();
+        if (body.get("inputColumns") instanceof List<?> l)
+            for (Object item : l) {
+                Object name = item instanceof Map<?, ?> m ? m.get("name") : item;
+                if (name != null && !name.toString().isBlank()) inputColumns.add(name.toString());
+            }
+        Map<String, String> refColumns = columnTypes(body.get("referenceColumns"));
+        if (refColumns.isEmpty()) refColumns = referenceSchemaColumns(api, config.get("reference"));
+        try {
+            List<Map<String, Object>> cols = new java.util.ArrayList<>();
+            for (com.gamma.pipeline.exec.RowShaper.AddedColumn c : com.gamma.pipeline.exec.RowShaper.joinAddedColumns(config, refColumns, inputColumns)) {
+                Map<String, Object> m = new java.util.LinkedHashMap<>();
+                m.put("name", c.name());
+                m.put("type", c.type());
+                m.put("from", c.from());
+                m.put("lookedUpBy", c.lookedUpBy());
+                m.put("match", c.match());
+                m.put("detail", c.detail());
+                cols.add(m);
+            }
+            return Map.of("columns", cols);
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
+        }
+    }
+
+    /** A {@code [{name, type}]} list as name → type, in order ({@code VARCHAR} when a type is missing). */
+    private static Map<String, String> columnTypes(Object list) {
+        Map<String, String> out = new java.util.LinkedHashMap<>();
+        if (list instanceof List<?> l)
+            for (Object item : l) {
+                if (item instanceof Map<?, ?> m && m.get("name") != null) {
+                    Object t = m.get("type");
+                    out.put(m.get("name").toString(), t == null || t.toString().isBlank() ? "VARCHAR" : t.toString());
+                } else if (item instanceof String name && !name.isBlank()) out.put(name, "VARCHAR");
+            }
+        return out;
+    }
+
+    /**
+     * The declared columns of {@code reference/<pipeline>}: the loaded Pipeline that {@code produces: reference},
+     * read from its schema's {@code raw.fields} (name, type). 422 when it names nothing loaded or declares no fields
+     * — the caller may pass {@code referenceColumns} instead.
+     */
+    private static Map<String, String> referenceSchemaColumns(ApiContext api, Object reference) {
+        if (reference == null || reference.toString().isBlank())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the join names no 'reference'");
+        com.gamma.enrich.EnrichmentConfig.Reference ref;
+        try {
+            ref = com.gamma.enrich.ReferenceReader.parse(reference.toString());
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
+        }
+        String why = "pass referenceColumns";
+        if (ref.byName()) {
+            com.gamma.etl.PipelineConfig target = HostContext.of(api).service().loadedPipelines().stream()
+                    .filter(p -> p.identity().pipelineName().equals(ref.ref()) && p.producesReference())
+                    .findFirst().orElse(null);
+            Map<String, Object> schema = target == null ? null : target.schemas().single();
+            Map<String, String> cols = new java.util.LinkedHashMap<>();
+            if (schema != null && schema.get("raw") instanceof Map<?, ?> rawSchema
+                    && rawSchema.get("fields") instanceof List<?> fields)
+                for (Object f : fields)
+                    if (f instanceof Map<?, ?> fm) {
+                        Object name = fm.get("name") != null ? fm.get("name") : fm.get("selector");
+                        Object t = fm.get("type");
+                        if (name != null) cols.put(name.toString(), t == null ? "VARCHAR" : t.toString());
+                    }
+            if (!cols.isEmpty()) return cols;
+            why = target == null ? "no loaded pipeline '" + ref.ref() + "' declares produces: reference"
+                    : "pipeline '" + ref.ref() + "' declares no schema fields";
+        } else {
+            why = "a path: reference has no declared schema";
+        }
+        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the Reference's columns are unknown ("
+                + why + ") — pass referenceColumns: [{name, type}]");
     }
 
     /**

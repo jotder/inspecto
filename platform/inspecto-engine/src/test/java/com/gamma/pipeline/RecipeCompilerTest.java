@@ -479,6 +479,25 @@ class RecipeCompilerTest {
         assertEquals("dm_ind = '1'", join.get("exact_when"));
     }
 
+    /** LOOKUP-1 P1d: a recipe join with lookups: needs no top-level on: and keeps every mapping. */
+    @Test
+    @SuppressWarnings("unchecked")
+    void aRecipeJoinWithLookupsCompilesWithoutOn() {
+        Map<String, Object> recipe = linearRecipe("/data/db");
+        List<Map<String, Object>> steps = (List<Map<String, Object>>) (List<?>) recipe.get("steps");
+        List<Object> lookups = List.of(Map.of("on", "SERVED_MSISDN", "columns", Map.of("provider_desc", "SERVED_MSISDN_OPER")));
+        steps.add(steps.size() - 1, step("transform", new LinkedHashMap<>(Map.of(
+                "join", "references/dial_digit", "match", "longest_prefix", "key", "dial_digit_key",
+                "lookups", lookups))));
+        Map<String, Object> out = RecipeCompiler.compile(recipe);
+        Map<String, Object> join = null;
+        for (Object s : (List<?>) out.get("steps"))
+            if (s instanceof Map<?, ?> m && m.get("join") instanceof Map<?, ?> j) join = (Map<String, Object>) j;
+        assertNotNull(join, () -> "no steps: join in " + out);
+        assertEquals(lookups, join.get("lookups"));
+        assertFalse(join.containsKey("on"));
+    }
+
     @Test
     void transformJoinWithoutOnRefuses() {
         Map<String, Object> recipe = linearRecipe("/data/db");

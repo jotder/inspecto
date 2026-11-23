@@ -34,6 +34,7 @@ import { InspectoAlertComponent } from 'app/inspecto/components/alert.component'
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { StepPreviewResultComponent } from 'app/inspecto/components/step-preview-result.component';
+import { JoinAddedColumnsComponent } from './join-added-columns.component';
 import { pipelineOptionLoader, referenceOptionLoader } from 'app/inspecto/components/entity-option-loaders';
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { ENRICHMENT_WIRING_ATTRIBUTES } from 'app/inspecto/enrichment/enrichment-attributes';
@@ -121,6 +122,7 @@ function mergeFormValues(
         PipelineExtraConfigComponent,
         PipelineFilterPredicateComponent,
         StepPreviewResultComponent,
+        JoinAddedColumnsComponent,
         SummarizeEditorComponent,
     ],
     template: `
@@ -172,6 +174,10 @@ function mergeFormValues(
                 [initialMeasures]="summarizeSeed().measures"
                 (changed)="onInteraction()"
             />
+        }
+        @if (isJoin()) {
+            <!-- LOOKUP-1 P1d: what the keyed join adds, from the saved settings and the Reference's columns -->
+            <inspecto-join-added-columns [config]="node().config ?? {}" [inputColumns]="upstreamColumns()" />
         }
         @if (!isEnrichment() && formSpecs().length) {
             <!-- Schema-driven config for known node types, rendered FLAT (redesign R6): one idiom
@@ -366,6 +372,7 @@ export class PipelineConfigDefinitionComponent {
     private static readonly SUMMARIZE_KEYS = ['group_by', 'measures'];
 
     readonly isSummarize = computed(() => this.node().type === 'transform.summarize');
+    readonly isJoin = computed(() => this.node().type === 'transform.join');
 
     /** A Filter Step shows its `where` predicate's structure beneath the form (AUTHORING-REDESIGN-1 (c)). */
     readonly isFilter = computed(() => this.node().type === 'transform.filter');

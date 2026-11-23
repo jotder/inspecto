@@ -331,7 +331,8 @@ public final class RecipeCompiler {
             String byName = com.gamma.etl.ReferenceBinding.name(s);
             node.put("reference", byName != null ? com.gamma.etl.ReferenceBinding.PREFIX + byName : s);
             if (on != null) node.put("on", on instanceof List<?> l ? l : List.of(on.toString()));
-            else refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
+            // lookups: (LOOKUP-1 P1d) carries each mapping's on, so it stands in for on:
+            else if (c.get("lookups") == null) refusals.add(new PipelineCompileException.Refusal(MALFORMED_STEP, id,
                     "transform.join needs on: — the join-key column(s)"));
             if (match != null) node.put("match", match.toString());
             // the keyed form (LOOKUP-1 P1b) rides the join verbatim; RowShaper.join and the validator judge it
