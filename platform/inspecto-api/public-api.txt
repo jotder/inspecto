@@ -2343,6 +2343,7 @@ com.gamma.pipeline.exec.ProvenanceStores | public static void register(String, D
 com.gamma.pipeline.exec.ProvenanceStores | public static void unregister(String)
 com.gamma.pipeline.exec.ProvenanceStores | public static void use(DbProvenanceStore)
 com.gamma.pipeline.exec.RowShaper | public final class RowShaper
+com.gamma.pipeline.exec.RowShaper | public static List<AddedColumn> joinAddedColumns(Map<String, Object>, Map<String, String>, List<String>)
 com.gamma.pipeline.exec.RowShaper | public static List<Relation> merge(Connection, PipelineNode, List<String>, String) throws SQLException
 com.gamma.pipeline.exec.RowShaper | public static List<Relation> shape(Connection, PipelineNode, String, String) throws SQLException
 com.gamma.pipeline.exec.RowShaper | public static List<Relation> shape(Connection, PipelineNode, String, String, ReferenceResolver) throws SQLException
@@ -2351,6 +2352,7 @@ com.gamma.pipeline.exec.RowShaper | public static Optional<String> toSelect(Pipe
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_CONFIG_KEYS
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_DUPLICATES
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_KEYED_KEYS
+com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_LOOKUP_KEYS
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_MATCHES
 com.gamma.pipeline.exec.RowShaper | public static final Set<String> MAP_NODE_CONFIG_KEYS
 com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_EXACT
@@ -2358,6 +2360,7 @@ com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_LONGES
 com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_RANGE
 com.gamma.pipeline.exec.RowShaper | public static final java.util.regex.Pattern NEW_COLUMN_NAME
 com.gamma.pipeline.exec.RowShaper | public static final java.util.regex.Pattern UNPIVOT_VALUE_TYPE
+com.gamma.pipeline.exec.RowShaper.AddedColumn | public record AddedColumn(String name, String type, String from, String lookedUpBy, String match, String detail)
 com.gamma.pipeline.exec.RowShaper.ExecutionContext | public ExecutionContext asDryRun()
 com.gamma.pipeline.exec.RowShaper.ExecutionContext | public ExecutionContext(String, String, com.gamma.consignment.DbDedupLedger)
 com.gamma.pipeline.exec.RowShaper.ExecutionContext | public boolean hasLedger()

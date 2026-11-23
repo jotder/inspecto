@@ -140,6 +140,37 @@ public final class PipelineValidator {
         Object as = n.cfg("as");
         if (joinKeys(n).size() > 1 && as != null && !as.toString().contains("{on}"))
             return "with several 'on' columns, as: must contain {on}";
+        if (n.cfg("lookups") != null) return lookupsProblem(n);
+        Object details = n.cfg("details");
+        if (details != null && !(details instanceof Boolean) && !(details instanceof Map<?, ?>)
+                && !List.of("true", "false").contains(details.toString()))
+            return "details: must be true, false or a map {matched_key: name, match_kind: name}";
+        return null;
+    }
+
+    /**
+     * What is wrong with a join's {@code lookups:} (LOOKUP-1 P1d) judged from the config alone: mixed with the
+     * shorthand, an entry without {@code on} or with a key it does not take, or two renamed outputs sharing a name.
+     * Whether the columns exist, and clashes with the rows' own columns, stay the run's question.
+     */
+    private static String lookupsProblem(PipelineNode n) {
+        for (String k : List.of("on", "columns", "as", "default", "details"))
+            if (n.cfg(k) != null) return "lookups: and '" + k + "' both set — each mapping carries its own";
+        if (!(n.cfg("lookups") instanceof List<?> list) || list.isEmpty())
+            return "lookups: must be a list of mappings, each with an 'on' column";
+        java.util.Set<String> names = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        for (Object o : list) {
+            if (!(o instanceof Map<?, ?> e) || e.get("on") == null || e.get("on").toString().isBlank())
+                return "every lookups: entry needs 'on' — the input column it looks up";
+            for (Object k : e.keySet())
+                if (!com.gamma.pipeline.exec.RowShaper.JOIN_LOOKUP_KEYS.contains(String.valueOf(k)))
+                    return "a lookups: entry has '" + k + "' — an entry takes "
+                            + com.gamma.pipeline.exec.RowShaper.JOIN_LOOKUP_KEYS;
+            if (e.get("columns") instanceof Map<?, ?> renamed)
+                for (Object out : renamed.values())
+                    if (out != null && !out.toString().isBlank() && !names.add(out.toString().trim()))
+                        return "two lookups write the output column '" + out + "' — give each a unique name";
+        }
         return null;
     }
 
@@ -341,7 +372,7 @@ public final class PipelineValidator {
                             "Node '" + n.id() + "' (transform.join) names no 'reference' — "
                                     + "reference/<pipeline> or a data-file path."));
                 }
-                if (joinKeys(n).isEmpty()) {
+                if (joinKeys(n).isEmpty() && n.cfg("lookups") == null) {   // lookups: carries each mapping's on
                     issues.add(new Issue(Severity.ERROR, JOIN_ON_MISSING,
                             "Node '" + n.id() + "' (transform.join) names no 'on' key column(s)."));
                 }

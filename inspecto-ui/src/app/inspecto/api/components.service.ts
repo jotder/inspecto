@@ -211,6 +211,16 @@ export interface ParserRowsPreview {
 /** A parse-preview result — flat for tabular formats, tree for hierarchical ones (discriminated on `kind`). */
 export type ParserPreview = ParserTablePreview | ParserTreePreview;
 
+/** One column a keyed join adds: `from` is the Reference column (null for a match detail). */
+export interface JoinAddedColumn {
+    name: string;
+    type: string;
+    from: string | null;
+    lookedUpBy: string;
+    match: string;
+    detail: string | null;
+}
+
 /**
  * Component registry CRUD + per-component dry-run/test (T18/T19, §7.1–7.2). Generalises the connection
  * write pattern to the non-secret kinds; writes are write-root gated (503 when disabled). The `/test`
@@ -361,6 +371,21 @@ export class ComponentsService {
         return this.http.post<{ columns: DerivedColumn[] }>(apiUrl('/components/transform/describe'), {
             inputColumns,
             sql,
+        });
+    }
+
+    /**
+     * "Columns this Step adds" for a keyed `transform.join` (LOOKUP-1 P1d) — `POST /components/transform/describe`
+     * with a `config` body. Reads no row: the Reference's columns come from its Pipeline's declared schema.
+     * A clash or an unknown column is a 422 naming it.
+     */
+    joinAddedColumns(
+        config: Record<string, unknown>,
+        inputColumns: string[],
+    ): Observable<{ columns: JoinAddedColumn[] }> {
+        return this.http.post<{ columns: JoinAddedColumn[] }>(apiUrl('/components/transform/describe'), {
+            config,
+            inputColumns,
         });
     }
 

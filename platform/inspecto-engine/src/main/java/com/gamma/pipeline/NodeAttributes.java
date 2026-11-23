@@ -912,8 +912,9 @@ public final class NodeAttributes {
             NodeAttribute.of("reference", "Reference", "autocomplete", "required")
                     .placeholder("reference/rates")
                     .help("The registered Reference component joined onto the row set."),
-            NodeAttribute.of("on", "Join keys", "list", "required").placeholder("currency")
-                    .help("Column(s) equated between the rows and the Reference."),
+            NodeAttribute.of("on", "Join keys", "list", "required").required(false).placeholder("currency")
+                    .help("Column(s) equated between the rows and the Reference. Leave empty when the Step "
+                            + "carries lookups: (one mapping per looked-up column, written in the pipeline file)."),
             NodeAttribute.of("match", "Match", "select", "optional").defaultValue("exact")
                     .options("exact", "Exact", "longest_prefix", "Longest prefix (last key)", "range", "Range (from – to)")
                     .help("Exact: every key equal. Longest prefix: the last key matches the Reference row "
@@ -943,7 +944,10 @@ public final class NodeAttributes {
             NodeAttribute.of("to", "Range to", "string", "optional").placeholder("valid_to")
                     .help("Range: the Reference column holding each range's end (inclusive; empty = no end)."),
             NodeAttribute.of("filter", "Reference rows", "string", "optional").placeholder("lookup_key = 'SDR_RATE'")
-                    .help("A condition on Reference columns: only the rows meeting it take part in the lookup."));
+                    .help("A condition on Reference columns: only the rows meeting it take part in the lookup."),
+            NodeAttribute.of("details", "Match details", "boolean", "optional")
+                    .help("Also add, per looked-up column, the key that matched ({on}_matched_key) and how it "
+                            + "matched ({on}_match_kind: exact, prefix, range or none)."));
 
     /**
      * {@code transform.sql} (sql-transform-v1-plan.md, B1) — one author {@code SELECT} over the typed

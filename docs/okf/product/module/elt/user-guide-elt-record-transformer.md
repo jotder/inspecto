@@ -379,6 +379,43 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
     the named columns exist is checked when it runs.
   - **`filter`** (since 2026-11-22, `LOOKUP-1` P1c, every keyed mode) — an SQL condition on Reference columns; only the
     rows meeting it take part (one table holding several rate kinds: `filter: "lookup_key = 'SDR_RATE'"`).
+- **Per-number columns under your own names — `lookups:` (since 2026-11-23, `LOOKUP-1` P1d, every keyed `match`)** —
+  one mapping per looked-up column, each with its own columns and output names, so the output can match a legacy
+  layout exactly. Still one pass over the Reference: every distinct value across all mappings is resolved once.
+  ```toon
+  - join:
+      reference: reference/dial_digit
+      key: dial_digit_key
+      match: longest_prefix
+      lookups[2]:
+        - on: SERVED_MSISDN
+          columns:                                # Reference column: output name
+            dial_digit_key: SERVED_MSISDN_DIAL_DIGIT_KEY
+            provider_desc: SERVED_MSISDN_OPER
+          default:                                # keyed by the OUTPUT name
+            SERVED_MSISDN_DIAL_DIGIT_KEY: -99
+        - on: OTHER_MSISDN
+          columns:
+            event_category_key: EVENT_CATEGORY_KEY
+            country_name: OTHER_MSISDN_COUNTRY
+          details: true                           # + OTHER_MSISDN_matched_key, OTHER_MSISDN_match_kind
+  ```
+  - An entry takes `on` (required), `columns` (a map renames; a list keeps the names under `as`, `"{on}_"` by default;
+    absent = every Reference column, so a details-only mapping writes `columns: {}`), `as`, `default` (a map or `name=value` list, keyed by output name) and `details`.
+  - The shorthand (`on` / `columns` / `as` / `default`) stays valid and means one identical mapping per `on` column;
+    `lookups:` with any of those top-level keys is refused. Output names must be unique and must not clash with an
+    input column (case-insensitive) — refused by name, at save for two renamed outputs sharing a name
+    (`JOIN_KEYED_INVALID`), at the run for clashes with the rows' columns.
+  - **`details`** — `true` adds `<prefix>matched_key` and `<prefix>match_kind` (prefix = the mapping's `as`, `"{on}_"`
+    by default); a map `{matched_key: NAME, match_kind: NAME}` names them, and picks just one when one is left out.
+    `matched_key` is the key that matched (the prefix for `longest_prefix`; the period `from..to` for `range`, an open
+    end left empty); `match_kind` is `exact` (the key is the whole value), `prefix`, `range` or `none`. `details`
+    also works on the shorthand.
+  - **Columns this Step adds** — the join Step's pane shows a read-only table (output column · type · from · looked
+    up by) for a keyed join, computed by `POST /components/transform/describe` with a `config` body from the
+    Reference Pipeline's declared schema (no row is read); a clash or an unknown column shows there as the run's own
+    refusal. It reflects the Step's applied settings (after Apply). `lookups:` itself is written in the pipeline file
+    (the form keeps it as an extra setting); the form adds a *Match details* toggle.
 - **`match: range` (since 2026-11-22, `LOOKUP-1` P1c)** — a value matches the Reference row whose period holds it.
   It is keyed by `from:` / `to:` (Reference columns, either may be omitted), not `key:`.
   ```toon

@@ -1705,7 +1705,8 @@
     "label" : "Join keys",
     "type" : "list",
     "tier" : "required",
-    "help" : "Column(s) equated between the rows and the Reference.",
+    "required" : false,
+    "help" : "Column(s) equated between the rows and the Reference. Leave empty when the Step carries lookups: (one mapping per looked-up column, written in the pipeline file).",
     "placeholder" : "currency"
   }, {
     "key" : "match",
@@ -1804,6 +1805,12 @@
     "tier" : "optional",
     "help" : "A condition on Reference columns: only the rows meeting it take part in the lookup.",
     "placeholder" : "lookup_key = 'SDR_RATE'"
+  }, {
+    "key" : "details",
+    "label" : "Match details",
+    "type" : "boolean",
+    "tier" : "optional",
+    "help" : "Also add, per looked-up column, the key that matched ({on}_matched_key) and how it matched ({on}_match_kind: exact, prefix, range or none)."
   } ],
   "transform.sql" : [ {
     "key" : "sql",

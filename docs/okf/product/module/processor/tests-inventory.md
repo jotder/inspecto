@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-475 test class(es): 192 unit, 283 real-HTTP control-plane, 0 IT.
+476 test class(es): 192 unit, 284 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -194,6 +194,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiJobRunReplayTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJobRunReplayTest.java` | Real-HTTP tests for {@code POST /jobs/runs/{runId}/replay} (E3 — the at-rest analog of |
 | `ControlApiJobRunsPageTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJobRunsPageTest.java` | {@code GET /jobs/runs} cursor pagination over real HTTP (api-contract-design §7): the v1 envelope's |
 | `ControlApiJobsPageTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJobsPageTest.java` | {@code GET /jobs} cursor pagination over real HTTP (api-contract-design §7): on the {@code /api/v1} |
+| `ControlApiJoinAddedColumnsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJoinAddedColumnsTest.java` | LOOKUP-1 P1d — "Columns this Step adds" over real HTTP: {@code POST /components/transform/describe} with a |
 | `ControlApiKpiTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiKpiTest.java` | `ASSURE-KPI-DEFINITIONS-1` over real HTTP, every test WITH an armed Authenticator (with no Subject |
 | `ControlApiLaOwnerStampTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiLaOwnerStampTest.java` | T5 owner-spoofing: the SAVE path stamps an {@code la.index.build} Job's {@code owner} from the saving Subject unless |
 | `ControlApiLegacyDashboardScheduleTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiLegacyDashboardScheduleTest.java` | SCHEDULE-EXPORT-DASHBOARD-SCOPE-1 (declined until demand): a legacy report schedule that still carries |

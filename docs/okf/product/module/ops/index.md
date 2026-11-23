@@ -34,5 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `STORE-FAMILY-PARITY-GOLDEN-STALE-1` | P3 | defect | StoreFamilyParityTest.everyFamilyResolvesExactlyAsItDidBeforeTheRosterWasOpened (inspecto-ops) fails on master, alone or in its module: i… | — |
 | `LEGAL-HOLD-SCOPE-1` | P3 | feature | A legal hold does not yet protect a Pipeline's data partitions, and holds have no screen. | — |
