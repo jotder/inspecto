@@ -634,7 +634,12 @@ export class GrammarEditorComponent implements AfterViewInit {
         if (!file) return;
         // Binary: text() would round-trip the bytes through a charset. No truncation — a sliced file is
         // unreadable, so an oversized one is refused whole rather than silently maimed.
-        if (this.frontend() === 'xlsx' || this.frontend() === 'parquet' || /\.(xlsx|parquet)$/i.test(file.name)) {
+        if (
+            this.frontend() === 'xlsx' ||
+            this.frontend() === 'parquet' ||
+            this.activeType() === 'asn1' ||
+            /\.(xlsx|parquet|ber|der|cdr|bin)$/i.test(file.name)
+        ) {
             if (file.size > MAX_SAMPLE_BYTES) {
                 this.error.set(`File too large for a preview sample (max ${MAX_SAMPLE_BYTES / 1024} KB).`);
                 return;
@@ -769,10 +774,29 @@ export class GrammarEditorComponent implements AfterViewInit {
         return !!this.sections();
     }
 
+    readonly sampleAsHex = signal(false);
+
     /** Parse the sample with the in-progress Grammar (no save) → table or tree. */
     test(): void {
-        const text = this.sampleText();
-        const b64 = this.sampleB64() ?? undefined;
+        let text = this.sampleText();
+        let b64 = this.sampleB64() ?? undefined;
+        if (this.sampleAsHex() && !b64 && text.trim()) {
+            const hex = text
+                .split(/\r?\n/)
+                .map((l) => l.replace(/#.*$/, ''))
+                .join('')
+                .replace(/\s+/g, '');
+            if (!hex || hex.length % 2 !== 0 || /[^0-9a-fA-F]/.test(hex)) {
+                this.error.set('Invalid hex bytes — expected even-length 0-9 / A-F pairs.');
+                return;
+            }
+            let bin = '';
+            for (let i = 0; i < hex.length; i += 2) {
+                bin += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16));
+            }
+            b64 = btoa(bin);
+            text = '';
+        }
         if ((!text && !b64) || !this.validate()) return;
         const type = this.activeType();
         // 🔴 Fixed width's slice table is its OWN FormArray, not part of the property sheet, so
