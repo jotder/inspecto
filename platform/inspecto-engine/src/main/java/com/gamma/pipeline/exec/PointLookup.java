@@ -447,7 +447,7 @@ public final class PointLookup {
         for (int i = 0; i < types.length; i++)
             sql.append(i == 0 ? "" : ", ").append(types[i] == null ? "NULL" : "CAST(TRY_CAST(__lk_v AS " + types[i] + ") AS VARCHAR)");
         sql.append(" FROM (SELECT CAST(? AS VARCHAR) AS __lk_v)");
-        try (Connection c = java.sql.DriverManager.getConnection("jdbc:duckdb:");
+        try (Connection c = com.gamma.util.DuckDbUtil.openInMemory(null);
              java.sql.PreparedStatement ps = c.prepareStatement(sql.toString())) {
             ps.setString(1, value);
             try (ResultSet rs = ps.executeQuery()) {
@@ -569,7 +569,7 @@ public final class PointLookup {
      */
     static String normalize(String v, List<String> normalizers) {
         if (normalizers.isEmpty()) return v;
-        try (Connection c = java.sql.DriverManager.getConnection("jdbc:duckdb:");
+        try (Connection c = com.gamma.util.DuckDbUtil.openInMemory(null);
              java.sql.PreparedStatement ps = c.prepareStatement(
                      // the expression repeats its input (strip_leading_zeros twice), so bind the value once
                      "SELECT " + RowShaper.normalized("__lk_v", normalizers)
