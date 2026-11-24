@@ -5,8 +5,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * <b>Per-Step type flow (ELT amendment §3.4 item 4):</b> derive a Step's <em>output schema</em> from the
@@ -50,7 +52,7 @@ public final class TypeFlow {
         // No Space context: memory-capped, spills under java.io.tmpdir (never the CWD).
         try (Connection conn = com.gamma.util.DuckDbUtil.openInMemory(null);
              Statement st = conn.createStatement()) {
-            st.execute(scratchTableDdl(schemaConfig, src, typedSource));
+            st.execute(scratchTableDdl(schemaConfig, src, typedSource, cfg));
             List<Column> out = new ArrayList<>();
             try (ResultSet rs = st.executeQuery("DESCRIBE " + select)) {
                 while (rs.next()) out.add(new Column(rs.getString("column_name"), rs.getString("column_type")));
@@ -120,14 +122,30 @@ public final class TypeFlow {
     }
 
     /** Empty scratch table shaped like the raw ingest table: field columns + the {@code __src_id} tag. */
-    @SuppressWarnings("unchecked")
     private static String scratchTableDdl(Map<String, Object> schemaConfig, String table, boolean typedSource) {
+        return scratchTableDdl(schemaConfig, table, typedSource, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static String scratchTableDdl(Map<String, Object> schemaConfig, String table,
+                                          boolean typedSource, PipelineConfig cfg) {
         List<Map<String, Object>> fields =
                 (List<Map<String, Object>>) ((Map<String, Object>) schemaConfig.get("raw")).get("fields");
         StringBuilder ddl = new StringBuilder("CREATE TABLE \"").append(table).append("\" (");
+        Set<String> seen = new LinkedHashSet<>();
         for (Map<String, Object> f : fields) {
-            String type = typedSource && f.get("type") != null ? f.get("type").toString() : "VARCHAR";
-            ddl.append('"').append(f.get("name")).append("\" ").append(type).append(", ");
+            String effectiveName = DeriveSpec.applyNameAffixes(
+                    (String) f.get("name"), f.get("rename"), f.get("prefix"), f.get("postfix"));
+            seen.add(effectiveName);
+            String rawType = typedSource && f.get("type") != null ? f.get("type").toString() : SchemaFieldTypes.VARCHAR;
+            String norm = SchemaFieldTypes.normalize(rawType);
+            String type = SchemaFieldTypes.isHonored(norm) ? norm : SchemaFieldTypes.VARCHAR;
+            ddl.append('"').append(effectiveName).append("\" ").append(type).append(", ");
+        }
+        for (String extra : DataTransformer.extraDerivedFieldNames(schemaConfig, cfg)) {
+            if (seen.add(extra)) {
+                ddl.append('"').append(extra).append("\" ").append(SchemaFieldTypes.VARCHAR).append(", ");
+            }
         }
         ddl.append("\"__src_id\" INTEGER)");
         return ddl.toString();

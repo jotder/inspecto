@@ -146,7 +146,11 @@ public final class SchemaFieldTypes {
         if (raw instanceof Map<?, ?> rawMap && rawMap.get("fields") instanceof List<?> fields) {
             for (Object f : fields) {
                 if (!(f instanceof Map<?, ?> fm) || !(fm.get("name") instanceof String name)) continue;
-                if (fm.get("format") instanceof String fmt && !fmt.isBlank()) out.put(name, fmt.trim());
+                if (fm.get("format") instanceof String fmt && !fmt.isBlank()) {
+                    String effectiveName = DeriveSpec.applyNameAffixes(
+                            name, fm.get("rename"), fm.get("prefix"), fm.get("postfix"));
+                    out.put(effectiveName, fmt.trim());
+                }
             }
         }
         return out;

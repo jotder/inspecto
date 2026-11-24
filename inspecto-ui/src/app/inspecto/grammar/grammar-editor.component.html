@@ -356,12 +356,12 @@
             </div>
 
             @if (treeNodes(); as nodes) {
-                <app-parser-tree [nodes]="nodes" />
+                <app-parser-tree [nodes]="nodes" (nodeSelected)="treeNodeSelected.emit($event)" />
                 @if (activeType() === 'asn1') {
                     <app-parser-derived-rows [derived]="derivedRows()" [error]="derivedError()" />
                 }
             } @else if (sampleTree() && resultView() === 'tree') {
-                <app-parser-tree [nodes]="sampleTree()!" />
+                <app-parser-tree [nodes]="sampleTree()!" (nodeSelected)="treeNodeSelected.emit($event)" />
             } @else {
                 <inspecto-data-table
                     tier="pro"

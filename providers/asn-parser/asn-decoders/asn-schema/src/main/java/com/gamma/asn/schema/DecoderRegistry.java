@@ -14,10 +14,15 @@ import java.util.Map;
  */
 public final class DecoderRegistry {
 
-    private final Map<String, ValueDecoder> byName;
+    public record DecoderMeta(String id, String description, String sqlType) {
+    }
 
-    private DecoderRegistry(Map<String, ValueDecoder> byName) {
+    private final Map<String, ValueDecoder> byName;
+    private final List<DecoderMeta> metas;
+
+    private DecoderRegistry(Map<String, ValueDecoder> byName, List<DecoderMeta> metas) {
         this.byName = Map.copyOf(byName);
+        this.metas = List.copyOf(metas);
     }
 
     public static Builder builder() {
@@ -27,6 +32,11 @@ public final class DecoderRegistry {
     /** Universal types + generic telecom pseudo-types pre-registered. */
     public static DecoderRegistry withDefaults() {
         return builder().build();
+    }
+
+    /** Catalog of registered decoders with descriptions and SQL target types. */
+    public List<DecoderMeta> listDecoders() {
+        return metas;
     }
 
     public String decode(List<String> nameChain, BuiltinKind kind, byte[] bytes) {
@@ -63,64 +73,82 @@ public final class DecoderRegistry {
     public static final class Builder {
 
         private final Map<String, ValueDecoder> byName = new LinkedHashMap<>();
+        private final Map<String, DecoderMeta> metaById = new LinkedHashMap<>();
 
         private Builder() {
             // universal types — text/format semantics mirror the legacy BERTags methods
-            put(BuiltinKind.INTEGER.name(), Decoders::integer);
-            put(BuiltinKind.ENUMERATED.name(), Decoders::integer);
-            put(BuiltinKind.BOOLEAN.name(), Decoders::bool);
-            put(BuiltinKind.OCTET_STRING.name(), Decoders::latin1); // legacy: OCTET STRING is text
-            put(BuiltinKind.BIT_STRING.name(), Decoders::bitString);
-            put(BuiltinKind.NULL.name(), b -> "");
-            put(BuiltinKind.OBJECT_IDENTIFIER.name(), Decoders::objectIdentifier);
-            put(BuiltinKind.UTF8_STRING.name(), Decoders::utf8);
-            put(BuiltinKind.IA5_STRING.name(), Decoders::ia5);
-            put(BuiltinKind.NUMERIC_STRING.name(), Decoders::ascii);
-            put(BuiltinKind.PRINTABLE_STRING.name(), Decoders::ascii);
-            put(BuiltinKind.VISIBLE_STRING.name(), Decoders::ascii);
-            put(BuiltinKind.GRAPHIC_STRING.name(), Decoders::graphic);
-            put(BuiltinKind.GENERAL_STRING.name(), Decoders::ascii);
-            put(BuiltinKind.TELETEX_STRING.name(), Decoders::ascii);
-            put(BuiltinKind.UTC_TIME.name(), Decoders::ascii);
-            put(BuiltinKind.GENERALIZED_TIME.name(), Decoders::ascii);
+            register(BuiltinKind.INTEGER.name(), "Signed integer", "BIGINT", Decoders::integer);
+            register(BuiltinKind.ENUMERATED.name(), "Enumerated integer", "BIGINT", Decoders::integer);
+            register(BuiltinKind.BOOLEAN.name(), "Boolean flag", "BOOLEAN", Decoders::bool);
+            register(BuiltinKind.OCTET_STRING.name(), "ISO-8859-1 octet string", "VARCHAR", Decoders::latin1);
+            register(BuiltinKind.BIT_STRING.name(), "Bit string as uppercase hex", "VARCHAR", Decoders::bitString);
+            register(BuiltinKind.NULL.name(), "ASN.1 NULL", "VARCHAR", b -> "");
+            register(BuiltinKind.OBJECT_IDENTIFIER.name(), "Dotted object identifier", "VARCHAR", Decoders::objectIdentifier);
+            register(BuiltinKind.UTF8_STRING.name(), "UTF-8 string", "VARCHAR", Decoders::utf8);
+            register(BuiltinKind.IA5_STRING.name(), "7-bit IA5 string", "VARCHAR", Decoders::ia5);
+            register(BuiltinKind.NUMERIC_STRING.name(), "Numeric string", "VARCHAR", Decoders::ascii);
+            register(BuiltinKind.PRINTABLE_STRING.name(), "Printable string", "VARCHAR", Decoders::ascii);
+            register(BuiltinKind.VISIBLE_STRING.name(), "Visible string", "VARCHAR", Decoders::ascii);
+            register(BuiltinKind.GRAPHIC_STRING.name(), "Graphic string (printable ASCII only)", "VARCHAR", Decoders::graphic);
+            register(BuiltinKind.GENERAL_STRING.name(), "General string", "VARCHAR", Decoders::ascii);
+            register(BuiltinKind.TELETEX_STRING.name(), "Teletex string", "VARCHAR", Decoders::ascii);
+            register(BuiltinKind.UTC_TIME.name(), "UTC time string", "TIMESTAMP", Decoders::ascii);
+            register(BuiltinKind.GENERALIZED_TIME.name(), "Generalized time string", "TIMESTAMP", Decoders::ascii);
             // telecom pseudo-types the legacy decoder dispatched by grammar type name
             // (TagHelper strips spaces/dashes and falls back to hex — same effect here)
-            put("TBCDSTRING", Decoders::tbcd);
-            put("TBCD-STRING", Decoders::tbcd);
-            put("TBCD", Decoders::tbcd);
-            put("BCDSTRING", Decoders::bcd);
-            put("HEX", Decoders::hex);
-            put("HEXSTRING", Decoders::hex);
-            put("ADDRESSSTRING", Decoders::addressString);
-            put("ISDN-ADDRESSSTRING", Decoders::addressString);
-            put("DIRECTORYNUMBER", Decoders::directoryNumber);
-            put("IPADDRESS", Decoders::ipAddress);
-            put("PLMN-ID", Decoders::plmnId);
-            put("PLMNID", Decoders::plmnId);
-            put("TIMESTAMP", Decoders::timeStamp);
-            put("CCNTIMESTAMP", Decoders::ccnTimeStamp);
-            put("CHARGINGCHARACTERISTICS", Decoders::chargingCharacteristics);
-            put("USERLOCATIONINFORMATION", Decoders::userLocationInformation);
-            put("LOCATIONAREACODE", Decoders::locationAreaCode);
-            put("TELESERVICECODE", Decoders::teleServiceCode);
-            put("TOPDPTYPE", Decoders::pdpType);
-            put("TOIMEI", Decoders::imei);
+            register("tbcd", "Nibble-swapped TBCD digits", "VARCHAR", Decoders::tbcd,
+                    "TBCDSTRING", "TBCD-STRING", "TBCD");
+            register("bcd", "High-nibble-first BCD digits", "VARCHAR", Decoders::bcd, "BCDSTRING");
+            register("hex", "Uppercase hexadecimal bytes", "VARCHAR", Decoders::hex, "HEX", "HEXSTRING");
+            register("addressString", "Telecom address string", "VARCHAR", Decoders::addressString,
+                    "ADDRESSSTRING", "ISDN-ADDRESSSTRING");
+            register("directoryNumber", "Directory number (TON/NPI + TBCD)", "VARCHAR", Decoders::directoryNumber,
+                    "DIRECTORYNUMBER");
+            register("ipAddress", "IPv4 or IPv6 address", "VARCHAR", Decoders::ipAddress, "IPADDRESS");
+            register("plmnId", "PLMN MCC+MNC identifier", "VARCHAR", Decoders::plmnId, "PLMN-ID", "PLMNID");
+            register("timeStamp", "BCD timestamp with timezone", "TIMESTAMP", Decoders::timeStamp, "TIMESTAMP");
+            register("ccnTimeStamp", "CCN TBCD timestamp with timezone", "TIMESTAMP", Decoders::ccnTimeStamp,
+                    "CCNTIMESTAMP");
+            register("chargingCharacteristics", "Charging characteristics code", "VARCHAR",
+                    Decoders::chargingCharacteristics, "CHARGINGCHARACTERISTICS");
+            register("userLocationInformation", "User location (MCC/MNC/LAC/CI)", "VARCHAR",
+                    Decoders::userLocationInformation, "USERLOCATIONINFORMATION");
+            register("locationAreaCode", "Big-endian unsigned location area code", "BIGINT",
+                    Decoders::locationAreaCode, "LOCATIONAREACODE");
+            register("teleServiceCode", "Teleservice code", "INTEGER", Decoders::teleServiceCode,
+                    "TELESERVICECODE");
+            register("pdpType", "PDP type code", "VARCHAR", Decoders::pdpType, "TOPDPTYPE");
+            register("imei", "IMEI with Luhn check digit", "VARCHAR", Decoders::imei, "TOIMEI");
             // NOT registered although legacy had methods for them: IMEI and NumberString —
             // the corpus grammars DEFINE those names (IMEI ::= TBCD-STRING,
             // NumberString ::= IA5String) and legacy dispatched the resolved base type;
             // registering the name here would hijack the resolution (awcc servedIMEI,
             // sdp subscriberNumber)
-            put("ASCIISTRING", Decoders::asciiPrintable);
+            register("asciiPrintable", "Printable ASCII string ('?' for non-printable)", "VARCHAR",
+                    Decoders::asciiPrintable, "ASCIISTRING");
+        }
+
+        private void register(String id, String description, String sqlType,
+                              ValueDecoder decoder, String... aliases) {
+            metaById.put(id, new DecoderMeta(id, description, sqlType));
+            if (aliases.length == 0) {
+                byName.put(normalize(id), decoder);
+            } else {
+                for (String alias : aliases) {
+                    byName.put(normalize(alias), decoder);
+                }
+            }
         }
 
         /** Registers or overrides a decoder by grammar type name (case-insensitive). */
         public Builder put(String typeName, ValueDecoder decoder) {
             byName.put(normalize(typeName), decoder);
+            metaById.putIfAbsent(typeName, new DecoderMeta(typeName, "Custom decoder", "VARCHAR"));
             return this;
         }
 
         public DecoderRegistry build() {
-            return new DecoderRegistry(byName);
+            return new DecoderRegistry(byName, List.copyOf(metaById.values()));
         }
     }
 }

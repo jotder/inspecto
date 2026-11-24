@@ -72,4 +72,46 @@ describe('DatasetRegistrationService', () => {
     it('gives both hosts the same recovery instruction', () => {
         expect(datasetManualHint('orders')).toContain('physical reference "orders"');
     });
+
+    it('forwards optional physicalRef, sourceName, columns, and partitions and matches idempotently by physicalRef', async () => {
+        const columns = [{ name: 'IMSI', type: 'string', role: 'dimension' }];
+        const partitions = [{ column: 'event_type', source: 'EVENT_TYPE', type: 'VARCHAR' }];
+        const svc = make();
+        const res = await new Promise((r) =>
+            svc
+                .ensure('cdr_Record', 'CDR · Record', {
+                    physicalRef: 'cdr/database/Record',
+                    sourceName: 'cdr',
+                    columns,
+                    partitions,
+                })
+                .subscribe(r),
+        );
+
+        expect(res).toEqual({ status: 'created', store: 'cdr_Record' });
+        expect(components.create).toHaveBeenCalledWith(
+            'dataset',
+            expect.objectContaining({
+                id: 'cdr_Record',
+                name: 'CDR · Record',
+                sourceName: 'cdr',
+                physicalRef: 'cdr/database/Record',
+                columns,
+                partitions,
+            }),
+        );
+
+        components.list = vi.fn(() => of([{ content: { physicalRef: 'cdr/database/Record' } }]));
+        components.create.mockClear();
+        const existing = await new Promise((r) =>
+            svc
+                .ensure('cdr_Record', 'CDR · Record', {
+                    physicalRef: 'cdr/database/Record',
+                    sourceName: 'cdr',
+                })
+                .subscribe(r),
+        );
+        expect(existing).toEqual({ status: 'exists', store: 'cdr_Record' });
+        expect(components.create).not.toHaveBeenCalled();
+    });
 });

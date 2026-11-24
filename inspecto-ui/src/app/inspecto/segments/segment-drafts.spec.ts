@@ -3,6 +3,7 @@ import type { ParserTreeNode } from 'app/inspecto/api';
 import {
     columnNameFor,
     deriveSegments,
+    effectiveColumnName,
     IDENTIFIER_RE,
     schemaDraftFor,
     schemaNameFromPath,
@@ -88,6 +89,44 @@ describe('schemaDraftFor', () => {
             rawName: 'cdr_moCallRecord',
             rules: [{ targetColumn: 'IMSI', sourceExpression: 'IMSI' }],
         });
+    });
+
+    it('uses effective affixed name as sourceExpression when rename/prefix/postfix are set', () => {
+        const affixed = schemaDraftFor(
+            {
+                key: 'moCallRecord',
+                columns: [
+                    {
+                        name: 'CALLING',
+                        selector: 'callingNumber',
+                        type: 'VARCHAR',
+                        rename: 'A_NUM',
+                        prefix: 'MOC_',
+                        postfix: '_STR',
+                    },
+                    { name: 'DURATION', selector: 'duration', type: 'BIGINT', prefix: 'RAW_' },
+                ],
+            },
+            'cdr_moCallRecord',
+        );
+        expect(effectiveColumnName({ name: 'CALLING', rename: 'A_NUM', prefix: 'MOC_', postfix: '_STR' })).toBe(
+            'MOC_A_NUM_STR',
+        );
+        expect((affixed['mapping'] as Record<string, unknown>)['rules']).toEqual([
+            { targetColumn: 'CALLING', sourceExpression: 'MOC_A_NUM_STR' },
+            { targetColumn: 'DURATION', sourceExpression: 'RAW_DURATION' },
+        ]);
+        expect(segmentDraftFrom('moCallRecord', affixed).columns).toEqual([
+            {
+                name: 'CALLING',
+                selector: 'callingNumber',
+                type: 'VARCHAR',
+                rename: 'A_NUM',
+                prefix: 'MOC_',
+                postfix: '_STR',
+            },
+            { name: 'DURATION', selector: 'duration', type: 'BIGINT', prefix: 'RAW_' },
+        ]);
     });
 });
 

@@ -2,6 +2,7 @@ import {
     ChangeDetectionStrategy,
     Component,
     computed,
+    DestroyRef,
     effect,
     HostListener,
     inject,
@@ -11,27 +12,39 @@ import {
     untracked,
     ViewChild,
 } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
+import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { Observable, forkJoin, of, throwError } from 'rxjs';
-import { catchError, map, tap } from 'rxjs/operators';
+import { Observable, forkJoin, of, throwError, timer } from 'rxjs';
+import { catchError, map, switchMap, tap } from 'rxjs/operators';
 import {
+    Asn1DecoderDef,
+    Asn1ValidationResult,
     AuthoredNode,
     ConfigService,
+    DatasetRegistrationService,
+    JobRunById,
+    JobsService,
     ParserDef,
     ParserPreview,
+    ParserRowSet,
     ParserTablePreview,
     ParserTreeNode,
     SchemaDrift,
     ParsersService,
     STALE_WRITE_MESSAGE,
     apiErrorMessage,
+    apiUrl,
+    datasetManualHint,
     isStaleVersionError,
 } from 'app/inspecto/api';
+import { DatasetColumn, inferRoles } from 'app/modules/admin/studio/datasets/dataset-types';
+import { ColumnMeta, ColumnType } from 'app/inspecto/query';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { ChipComponent } from 'app/inspecto/components/chip.component';
 import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
@@ -58,9 +71,12 @@ import {
     parseGrammarCsv,
     parsingAttributesFor,
 } from 'app/inspecto/grammar';
+import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 import {
     InspectoSegmentsEditorComponent,
     SegmentDraft,
+    EVENT_TYPE_COLUMN,
+    effectiveColumnName,
     schemaDraftFor,
     companionSchemaName,
     portableConfigRef,
@@ -561,6 +577,7 @@ export function withDecodeProfile(
                 [readOnly]="readOnly()"
                 (pluginChange)="plugin.set($event)"
                 (previewed)="onPreviewed($event)"
+                (treeNodeSelected)="onTreeNodeSelected($event)"
                 (submitted)="submit()"
             >
                 <!--
@@ -579,9 +596,446 @@ export function withDecodeProfile(
                         </div>
                         <inspecto-segments-editor
                             [tree]="previewTree()"
+                            [rows]="derivedRowSets()"
                             [initial]="initialSegments()"
                             (changed)="emitDirty()"
                         />
+                    }
+                    @if (frontend() === 'asn1') {
+                        <section class="mt-4 space-y-3 border-t border-gray-200 pt-3 dark:border-gray-700" data-test="asn1-interactive-panel">
+                            <div class="flex flex-wrap items-center gap-3">
+                                <mat-checkbox
+                                    data-test="asn1-raw-tlv-toggle"
+                                    [checked]="rawTlvDump()"
+                                    [disabled]="readOnly()"
+                                    (change)="rawTlvDump.set($event.checked)"
+                                >
+                                    Raw TLV Dump
+                                </mat-checkbox>
+                                <mat-checkbox
+                                    data-test="asn1-simplify-aliases-toggle"
+                                    [checked]="simplifyAliases()"
+                                    [disabled]="readOnly()"
+                                    (change)="onSimplifyAliasesToggle($event.checked)"
+                                >
+                                    Simplify Aliases
+                                </mat-checkbox>
+                                <button
+                                    mat-stroked-button
+                                    type="button"
+                                    data-test="asn1-validate-btn"
+                                    [disabled]="validatingGrammar()"
+                                    (click)="validateAsn1Grammar()"
+                                >
+                                    Validate grammar
+                                </button>
+                                <button
+                                    mat-stroked-button
+                                    type="button"
+                                    data-test="create-populate-sink-btn"
+                                    [disabled]="readOnly() || sinkPopulating()"
+                                    (click)="createAndPopulateSink()"
+                                >
+                                    Create &amp; Populate Sink
+                                </button>
+                            </div>
+
+                            @if (sinkStatus(); as st) {
+                                <inspecto-alert [variant]="st.ok ? 'info' : 'warning'" data-test="sink-populate-status">
+                                    {{ st.message }}
+                                </inspecto-alert>
+                            }
+
+                            @if (grammarValidation(); as gv) {
+                                <inspecto-alert
+                                    [variant]="gv.valid ? 'info' : 'warning'"
+                                    data-test="asn1-validation-diagnostics"
+                                >
+                                    @if (gv.valid && !gv.diagnostics.length) {
+                                        Grammar compiled cleanly.
+                                    } @else {
+                                        <ul class="m-0 list-disc pl-4 text-xs">
+                                            @for (d of gv.diagnostics; track $index) {
+                                                <li>
+                                                    <span class="font-semibold">{{ d.severity }}</span>
+                                                    @if (d.line > 0) {
+                                                        <span> ({{ d.line }}:{{ d.column }})</span>
+                                                    }
+                                                    : {{ d.message }}
+                                                </li>
+                                            }
+                                        </ul>
+                                    }
+                                </inspecto-alert>
+                            }
+
+                            <!-- $header.* pin bar -->
+                            <div class="rounded border border-gray-200 p-2 dark:border-gray-700" data-test="asn1-header-pin-bar">
+                                <div class="mb-1 text-xs font-semibold uppercase opacity-70">$header.* Pin Bar</div>
+                                <div class="flex flex-wrap items-center gap-1.5">
+                                    @for (hdr of pinnedHeaders(); track hdr) {
+                                        <span class="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-0.5 font-mono text-xs dark:bg-gray-800">
+                                            {{ hdr }}
+                                            @if (!readOnly()) {
+                                                <button
+                                                    type="button"
+                                                    class="opacity-70 hover:opacity-100"
+                                                    [attr.aria-label]="'Unpin ' + hdr"
+                                                    (click)="unpinHeader(hdr)"
+                                                >
+                                                    ×
+                                                </button>
+                                            }
+                                        </span>
+                                    }
+                                    @if (!readOnly()) {
+                                        <input
+                                            type="text"
+                                            class="rounded border border-gray-300 px-2 py-0.5 font-mono text-xs dark:border-gray-600 dark:bg-transparent"
+                                            placeholder="$header.recordType"
+                                            aria-label="Pin header field"
+                                            data-test="asn1-header-pin-input"
+                                            [ngModel]="headerPinDraft()"
+                                            (ngModelChange)="headerPinDraft.set($event)"
+                                            (keyup.enter)="pinHeader()"
+                                        />
+                                        <button mat-stroked-button type="button" class="!text-xs" (click)="pinHeader()">
+                                            Pin
+                                        </button>
+                                    }
+                                </div>
+                            </div>
+
+                            <!-- Event Roots router -->
+                            <div class="rounded border border-gray-200 p-2 dark:border-gray-700" data-test="asn1-event-roots">
+                                <div class="mb-1 flex items-center justify-between">
+                                    <span class="text-xs font-semibold uppercase opacity-70">Event Roots</span>
+                                    @if (!readOnly()) {
+                                        <button mat-stroked-button type="button" class="!text-xs" (click)="addEventRoot()">
+                                            Add event root
+                                        </button>
+                                    }
+                                </div>
+                                @for (er of eventRoots(); track $index; let i = $index) {
+                                    <div class="mt-1 flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            class="flex-1 rounded border border-gray-300 px-2 py-1 font-mono text-xs dark:border-gray-600 dark:bg-transparent"
+                                            placeholder="Event path (e.g. callEvent.moCall)"
+                                            aria-label="Event root path"
+                                            [readonly]="readOnly()"
+                                            [ngModel]="er.path"
+                                            (ngModelChange)="updateEventRoot(i, 'path', $event)"
+                                        />
+                                        <input
+                                            type="text"
+                                            class="w-40 rounded border border-gray-300 px-2 py-1 font-mono text-xs dark:border-gray-600 dark:bg-transparent"
+                                            placeholder="Segment key"
+                                            aria-label="Event root segment"
+                                            [readonly]="readOnly()"
+                                            [ngModel]="er.segment"
+                                            (ngModelChange)="updateEventRoot(i, 'segment', $event)"
+                                        />
+                                        @if (!readOnly()) {
+                                            <button mat-icon-button type="button" aria-label="Remove event root" (click)="removeEventRoot(i)">
+                                                <mat-icon class="icon-size-4" svgIcon="heroicons_outline:x-mark"></mat-icon>
+                                            </button>
+                                        }
+                                    </div>
+                                }
+                            </div>
+
+                            <!-- Leaf-only V-Decoder picker + Rename/Prefix/Postfix -->
+                            @if (leafTreeNodes().length) {
+                                <div class="rounded border border-gray-200 p-2 dark:border-gray-700" data-test="asn1-leaf-decoders">
+                                    <div class="mb-1 text-xs font-semibold uppercase opacity-70">
+                                        Leaf Value Decoders &amp; Naming
+                                    </div>
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full text-left text-xs">
+                                            <thead>
+                                                <tr>
+                                                    <th class="px-1.5 py-1">Field Path</th>
+                                                    <th class="px-1.5 py-1">V-Decoder</th>
+                                                    <th class="px-1.5 py-1">Rename</th>
+                                                    <th class="px-1.5 py-1">Prefix</th>
+                                                    <th class="px-1.5 py-1">Postfix</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                @for (leaf of leafTreeNodes(); track leaf.path) {
+                                                    <tr
+                                                        [attr.data-test]="'leaf-row-' + leaf.path"
+                                                        [class.bg-blue-50]="selectedTreePath() === leaf.path"
+                                                        [class.dark:bg-blue-950]="selectedTreePath() === leaf.path"
+                                                    >
+                                                        <td class="px-1.5 py-1 font-mono">{{ leaf.path }}</td>
+                                                        <td class="px-1.5 py-1">
+                                                            <select
+                                                                class="rounded border border-gray-300 px-1.5 py-0.5 text-xs dark:border-gray-600 dark:bg-transparent"
+                                                                data-test="leaf-decoder-select"
+                                                                [attr.aria-label]="'Decoder for ' + leaf.path"
+                                                                [disabled]="readOnly()"
+                                                                [ngModel]="leafOverrideOf(leaf.path).decoder ?? leaf.decoderId ?? ''"
+                                                                (ngModelChange)="setLeafOverride(leaf.path, 'decoder', $event)"
+                                                            >
+                                                                <option value="">Default</option>
+                                                                @for (dec of asn1Decoders(); track dec.id) {
+                                                                    <option [value]="dec.id">{{ dec.id }} ({{ dec.sqlType }})</option>
+                                                                }
+                                                            </select>
+                                                        </td>
+                                                        <td class="px-1.5 py-1">
+                                                            <input
+                                                                type="text"
+                                                                class="w-28 rounded border border-gray-300 px-1.5 py-0.5 font-mono text-xs dark:border-gray-600 dark:bg-transparent"
+                                                                data-test="leaf-rename-input"
+                                                                placeholder="Rename"
+                                                                [readonly]="readOnly()"
+                                                                [ngModel]="leafOverrideOf(leaf.path).rename ?? ''"
+                                                                (ngModelChange)="setLeafOverride(leaf.path, 'rename', $event)"
+                                                            />
+                                                        </td>
+                                                        <td class="px-1.5 py-1">
+                                                            <input
+                                                                type="text"
+                                                                class="w-20 rounded border border-gray-300 px-1.5 py-0.5 font-mono text-xs dark:border-gray-600 dark:bg-transparent"
+                                                                data-test="leaf-prefix-input"
+                                                                placeholder="Prefix"
+                                                                [readonly]="readOnly()"
+                                                                [ngModel]="leafOverrideOf(leaf.path).prefix ?? ''"
+                                                                (ngModelChange)="setLeafOverride(leaf.path, 'prefix', $event)"
+                                                            />
+                                                        </td>
+                                                        <td class="px-1.5 py-1">
+                                                            <input
+                                                                type="text"
+                                                                class="w-20 rounded border border-gray-300 px-1.5 py-0.5 font-mono text-xs dark:border-gray-600 dark:bg-transparent"
+                                                                data-test="leaf-postfix-input"
+                                                                placeholder="Postfix"
+                                                                [readonly]="readOnly()"
+                                                                [ngModel]="leafOverrideOf(leaf.path).postfix ?? ''"
+                                                                (ngModelChange)="setLeafOverride(leaf.path, 'postfix', $event)"
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                }
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            }
+
+                            <!-- SET_OF / SEQUENCE_OF Member Fields Table -->
+                            @for (rep of repeatedTreeNodes(); track rep.path) {
+                                <div class="rounded border border-gray-200 p-2 dark:border-gray-700" data-test="asn1-setof-table">
+                                    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                                        <span class="font-mono text-xs font-semibold">{{ rep.path }} ({{ rep.type }})</span>
+                                        <div class="flex items-center gap-2 text-xs">
+                                            <label class="flex items-center gap-1">
+                                                <input
+                                                    type="radio"
+                                                    [name]="'mode-' + rep.path"
+                                                    value="join"
+                                                    [disabled]="readOnly()"
+                                                    [checked]="repeatedConfigOf(rep.path).mode === 'join'"
+                                                    (change)="setRepeatedMode(rep.path, 'join')"
+                                                />
+                                                Join with parent
+                                            </label>
+                                            <label class="flex items-center gap-1">
+                                                <input
+                                                    type="radio"
+                                                    [name]="'mode-' + rep.path"
+                                                    value="fold"
+                                                    [disabled]="readOnly()"
+                                                    [checked]="repeatedConfigOf(rep.path).mode === 'fold'"
+                                                    (change)="setRepeatedMode(rep.path, 'fold')"
+                                                />
+                                                Fold
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    @if (repeatedConfigOf(rep.path).mode === 'fold') {
+                                        <div class="mb-2 flex flex-wrap items-center gap-2 text-xs" data-test="fold-delimiters">
+                                            <label class="flex items-center gap-1">
+                                                <input
+                                                    type="checkbox"
+                                                    [disabled]="readOnly()"
+                                                    [checked]="repeatedConfigOf(rep.path).asJson"
+                                                    (change)="setRepeatedFoldOption(rep.path, 'asJson', $any($event.target).checked)"
+                                                />
+                                                JSON
+                                            </label>
+                                            @if (!repeatedConfigOf(rep.path).asJson) {
+                                                <input
+                                                    type="text"
+                                                    class="w-28 rounded border border-gray-300 px-1.5 py-0.5 font-mono text-xs dark:border-gray-600 dark:bg-transparent"
+                                                    placeholder="Item delimiter (,)"
+                                                    aria-label="Fold item delimiter"
+                                                    data-test="fold-item-delimiter"
+                                                    [readonly]="readOnly()"
+                                                    [ngModel]="repeatedConfigOf(rep.path).itemDelimiter"
+                                                    (ngModelChange)="setRepeatedFoldOption(rep.path, 'itemDelimiter', $event)"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    class="w-28 rounded border border-gray-300 px-1.5 py-0.5 font-mono text-xs dark:border-gray-600 dark:bg-transparent"
+                                                    placeholder="KV delimiter (=)"
+                                                    aria-label="Fold key-value delimiter"
+                                                    data-test="fold-kv-delimiter"
+                                                    [readonly]="readOnly()"
+                                                    [ngModel]="repeatedConfigOf(rep.path).kvDelimiter"
+                                                    (ngModelChange)="setRepeatedFoldOption(rep.path, 'kvDelimiter', $event)"
+                                                />
+                                            }
+                                        </div>
+                                    }
+
+                                    <table class="w-full text-left text-xs">
+                                        <thead>
+                                            <tr>
+                                                <th class="px-1.5 py-1">Use</th>
+                                                <th class="px-1.5 py-1">Member Field</th>
+                                                <th class="px-1.5 py-1">Type</th>
+                                                <th class="px-1.5 py-1">Group By</th>
+                                                <th class="px-1.5 py-1">Aggregation</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @for (m of rep.members; track m.name) {
+                                                <tr [attr.data-test]="'member-row-' + m.name">
+                                                    <td class="px-1.5 py-1">
+                                                        <input
+                                                            type="checkbox"
+                                                            [disabled]="readOnly()"
+                                                            [checked]="memberConfigOf(rep.path, m.name).use"
+                                                            (change)="setMemberConfig(rep.path, m.name, 'use', $any($event.target).checked)"
+                                                        />
+                                                    </td>
+                                                    <td class="px-1.5 py-1 font-mono">{{ m.name }}</td>
+                                                    <td class="px-1.5 py-1 font-mono opacity-80">{{ m.type }}</td>
+                                                    <td class="px-1.5 py-1">
+                                                        <input
+                                                            type="radio"
+                                                            data-test="member-groupby-radio"
+                                                            [name]="'groupby-' + rep.path"
+                                                            [value]="m.name"
+                                                            [disabled]="readOnly()"
+                                                            [checked]="repeatedConfigOf(rep.path).groupBy === m.name"
+                                                            (change)="setRepeatedGroupBy(rep.path, m.name)"
+                                                        />
+                                                    </td>
+                                                    <td class="px-1.5 py-1">
+                                                        <select
+                                                            class="rounded border border-gray-300 px-1.5 py-0.5 text-xs dark:border-gray-600 dark:bg-transparent"
+                                                            data-test="member-agg-select"
+                                                            [disabled]="readOnly()"
+                                                            [ngModel]="memberConfigOf(rep.path, m.name).agg"
+                                                            (ngModelChange)="setMemberConfig(rep.path, m.name, 'agg', $event)"
+                                                        >
+                                                            @for (op of aggOps; track op) {
+                                                                <option [value]="op">{{ op }}</option>
+                                                            }
+                                                        </select>
+                                                    </td>
+                                                </tr>
+                                            }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+
+                            <!-- Sink Table Preview vs Table Metadata tabs -->
+                            @if (derivedRowSets(); as rowSets) {
+                                @if (rowSets.length) {
+                                    <div class="rounded border border-gray-200 p-2 dark:border-gray-700" data-test="sink-preview-panel">
+                                        <div class="mb-2 flex flex-wrap items-center gap-2">
+                                            <button
+                                                mat-stroked-button
+                                                type="button"
+                                                data-test="tab-sink-preview"
+                                                [class.!font-semibold]="sinkPreviewTab() === 'preview'"
+                                                (click)="sinkPreviewTab.set('preview')"
+                                            >
+                                                Sink Table Preview
+                                            </button>
+                                            <button
+                                                mat-stroked-button
+                                                type="button"
+                                                data-test="tab-table-metadata"
+                                                [class.!font-semibold]="sinkPreviewTab() === 'metadata'"
+                                                (click)="sinkPreviewTab.set('metadata')"
+                                            >
+                                                Table Metadata
+                                            </button>
+                                            @if (rowSets.length > 1) {
+                                                <select
+                                                    class="ml-auto rounded border border-gray-300 px-2 py-1 font-mono text-xs dark:border-gray-600 dark:bg-transparent"
+                                                    aria-label="Select routed segment"
+                                                    data-test="sink-rowset-select"
+                                                    [ngModel]="selectedRowSetIndex()"
+                                                    (ngModelChange)="selectRowSet(+$event)"
+                                                >
+                                                    @for (rs of rowSets; track rs.segment; let i = $index) {
+                                                        <option [value]="i">{{ rs.segment }} ({{ rs.rowCount }})</option>
+                                                    }
+                                                </select>
+                                            }
+                                        </div>
+
+                                        @if (activeDerivedRowSet(); as set) {
+                                            @if (sinkPreviewTab() === 'preview') {
+                                                <div class="overflow-x-auto" data-test="sink-table-preview">
+                                                    <table class="w-full text-left text-xs">
+                                                        <thead>
+                                                            <tr>
+                                                                @for (col of set.columns; track col) {
+                                                                    <th class="px-2 py-1 font-mono">{{ col }}</th>
+                                                                }
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @for (row of set.rows; track $index) {
+                                                                <tr>
+                                                                    @for (col of set.columns; track col) {
+                                                                        <td class="px-2 py-0.5 font-mono">{{ row[col] ?? 'NULL' }}</td>
+                                                                    }
+                                                                </tr>
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            } @else {
+                                                <div class="overflow-x-auto" data-test="table-metadata-view">
+                                                    <table class="w-full text-left text-xs">
+                                                        <thead>
+                                                            <tr>
+                                                                <th class="px-2 py-1">Column</th>
+                                                                <th class="px-2 py-1">SQL Type</th>
+                                                                <th class="px-2 py-1">Source Path</th>
+                                                                <th class="px-2 py-1">Decoder</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            @for (col of columnMetaRows(set); track col.name) {
+                                                                <tr>
+                                                                    <td class="px-2 py-0.5 font-mono">{{ col.name }}</td>
+                                                                    <td class="px-2 py-0.5 font-mono">{{ col.sqlType }}</td>
+                                                                    <td class="px-2 py-0.5 font-mono">{{ col.sourcePath }}</td>
+                                                                    <td class="px-2 py-0.5 font-mono">{{ col.decoder }}</td>
+                                                                </tr>
+                                                            }
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            }
+                                        }
+                                    </div>
+                                }
+                            }
+                        </section>
                     }
                 </div>
                 <!--
@@ -774,6 +1228,11 @@ export class PipelineParseDefinitionComponent {
     private configApi = inject(ConfigService);
     private parsersApi = inject(ParsersService);
     private confirm = inject(InspectoConfirmService);
+    private datasetReg = inject(DatasetRegistrationService, { optional: true });
+    private datasetsApi = inject(DatasetsService, { optional: true });
+    private jobsApi = inject(JobsService, { optional: true });
+    private destroyRef = inject(DestroyRef);
+    private http = inject(HttpClient, { optional: true });
 
     /** The per-format parse node being defined (identity fixed; config editable — name/description carried verbatim). */
     readonly node = input.required<AuthoredNode>();
@@ -982,6 +1441,390 @@ export class PipelineParseDefinitionComponent {
 
     /** The decoded record forest from the last Test parse — what "Derive from preview" proposes from. */
     readonly previewTree = signal<ParserTreeNode[] | null>(null);
+    /** Derived RowSet[] from the last hierarchical Test parse (`preview.derived.segments`). */
+    readonly derivedRowSets = signal<ParserRowSet[] | null>(null);
+    readonly sinkPreviewTab = signal<'preview' | 'metadata'>('preview');
+    readonly selectedRowSetIndex = signal(0);
+    readonly activeDerivedRowSet = computed<ParserRowSet | null>(() => {
+        const sets = this.derivedRowSets();
+        if (!sets?.length) return null;
+        return sets[this.selectedRowSetIndex()] ?? sets[0];
+    });
+
+    // ── ASN.1 interactive authoring state ────────────────────────────────────────
+    readonly rawTlvDump = signal(false);
+    readonly simplifyAliases = signal(false);
+    readonly validatingGrammar = signal(false);
+    readonly grammarValidation = signal<Asn1ValidationResult | null>(null);
+    readonly asn1Decoders = signal<Asn1DecoderDef[]>([]);
+    readonly pinnedHeaders = signal<string[]>([]);
+    readonly headerPinDraft = signal('');
+    readonly eventRoots = signal<{ path: string; segment: string }[]>([]);
+    readonly leafOverrides = signal<Record<string, LeafOverride>>({});
+    readonly repeatedConfigs = signal<Record<string, RepeatedNodeConfig>>({});
+    readonly sinkPopulating = signal(false);
+    readonly sinkStatus = signal<{ ok: boolean; message: string } | null>(null);
+    readonly selectedTreePath = signal<string | null>(null);
+    readonly sinkDatasetRows = signal<{ dataset: string; columns: string[]; rows: Record<string, unknown>[] } | null>(
+        null,
+    );
+    readonly aggOps = ['keep', 'sum', 'min', 'max', 'mean', 'count'] as const;
+
+    readonly leafTreeNodes = computed<LeafTreeEntry[]>(() => collectLeafTreeNodes(this.previewTree()));
+    readonly repeatedTreeNodes = computed<RepeatedTreeEntry[]>(() => collectRepeatedTreeNodes(this.previewTree()));
+
+    onTreeNodeSelected(node: ParserTreeNode): void {
+        const path =
+            typeof node.meta?.['fieldPath'] === 'string' && node.meta['fieldPath']
+                ? String(node.meta['fieldPath'])
+                : node.label;
+        this.selectedTreePath.set(path || null);
+    }
+
+    selectRowSet(index: number): void {
+        const sets = this.derivedRowSets();
+        if (!sets?.length) return;
+        const clamped = Math.max(0, Math.min(index, sets.length - 1));
+        this.selectedRowSetIndex.set(clamped);
+        this.bridgeRowSetToThread(sets[clamped], this.frontend());
+    }
+
+    private bridgeRowSetToThread(set: ParserRowSet | undefined, frontend: string): void {
+        const thread = this.sample();
+        if (!thread || !set) return;
+        thread.parsePreview.set({
+            frontend,
+            columns: set.columns,
+            rows: set.rows,
+            rowCount: set.rowCount,
+            rejectedRows: 0,
+            columnTypes: columnTypesFromRowSet(set),
+        });
+        thread.schemaPreview.set(null);
+        thread.schemaError.set(null);
+    }
+
+    onSimplifyAliasesToggle(checked: boolean): void {
+        this.simplifyAliases.set(checked);
+        this.asn1InteractiveDirty = true;
+        this.emitDirty();
+    }
+
+    validateAsn1Grammar(): void {
+        const asn1 = (this.editor?.grammar()['asn1'] ?? this.parsingBlock()['asn1'] ?? {}) as Record<string, unknown>;
+        const grammarText = String(asn1['grammar'] ?? '');
+        const rootType = String(asn1['root_type'] ?? '').trim() || undefined;
+        this.validatingGrammar.set(true);
+        this.parsersApi.validateGrammar(grammarText, rootType, this.simplifyAliases()).subscribe({
+            next: (res) => {
+                this.validatingGrammar.set(false);
+                this.grammarValidation.set(res);
+            },
+            error: (e) => {
+                this.validatingGrammar.set(false);
+                this.grammarValidation.set({
+                    valid: false,
+                    diagnostics: [
+                        { line: 0, column: 0, severity: 'ERROR', message: apiErrorMessage(e, 'Validation failed.') },
+                    ],
+                });
+            },
+        });
+    }
+
+    pinHeader(): void {
+        const raw = this.headerPinDraft().trim();
+        if (!raw) return;
+        const normalized = raw.startsWith('$header.') ? raw : `$header.${raw}`;
+        if (!this.pinnedHeaders().includes(normalized)) {
+            this.pinnedHeaders.update((list) => [...list, normalized]);
+            this.asn1InteractiveDirty = true;
+            this.emitDirty();
+        }
+        this.headerPinDraft.set('');
+    }
+
+    unpinHeader(hdr: string): void {
+        this.pinnedHeaders.update((list) => list.filter((h) => h !== hdr));
+        this.asn1InteractiveDirty = true;
+        this.emitDirty();
+    }
+
+    addEventRoot(): void {
+        this.eventRoots.update((list) => [...list, { path: '', segment: '' }]);
+        this.asn1InteractiveDirty = true;
+        this.emitDirty();
+    }
+
+    updateEventRoot(index: number, field: 'path' | 'segment', value: string): void {
+        this.eventRoots.update((list) => list.map((item, i) => (i === index ? { ...item, [field]: value } : item)));
+        this.asn1InteractiveDirty = true;
+        this.emitDirty();
+    }
+
+    removeEventRoot(index: number): void {
+        this.eventRoots.update((list) => list.filter((_, i) => i !== index));
+        this.asn1InteractiveDirty = true;
+        this.emitDirty();
+    }
+
+    leafOverrideOf(path: string): LeafOverride {
+        return this.leafOverrides()[path] ?? {};
+    }
+
+    setLeafOverride(path: string, field: keyof LeafOverride, value: string): void {
+        this.leafOverrides.update((map) => {
+            const cur = { ...(map[path] ?? {}) };
+            if (value) cur[field] = value;
+            else delete cur[field];
+            return { ...map, [path]: cur };
+        });
+        this.asn1InteractiveDirty = true;
+        this.emitDirty();
+    }
+
+    repeatedConfigOf(path: string): RepeatedNodeConfig {
+        const map = this.repeatedConfigs();
+        const resolved = this.resolveRepeatedKey(map, path);
+        return (
+            map[resolved] ?? {
+                mode: 'join',
+                asJson: false,
+                itemDelimiter: ',',
+                kvDelimiter: '=',
+                members: {},
+            }
+        );
+    }
+
+    private updateRepeatedConfig(path: string, updater: (cur: RepeatedNodeConfig) => RepeatedNodeConfig): void {
+        const { stripped } = this.stripRootPrefix(path, this.asn1RootPrefixes());
+        this.repeatedConfigs.update((map) => {
+            const cur = this.repeatedConfigOf(path);
+            const nextMap = { ...map };
+            if (stripped !== path) delete nextMap[stripped];
+            nextMap[path] = updater(cur);
+            return nextMap;
+        });
+        this.asn1InteractiveDirty = true;
+        this.emitDirty();
+    }
+
+    setRepeatedMode(path: string, mode: 'join' | 'fold'): void {
+        this.updateRepeatedConfig(path, (cur) => ({ ...cur, mode }));
+    }
+
+    setRepeatedFoldOption(path: string, field: 'asJson' | 'itemDelimiter' | 'kvDelimiter', value: boolean | string): void {
+        this.updateRepeatedConfig(path, (cur) => ({ ...cur, [field]: value }));
+    }
+
+    setRepeatedGroupBy(path: string, memberName: string): void {
+        this.updateRepeatedConfig(path, (cur) => ({ ...cur, groupBy: memberName }));
+    }
+
+    memberConfigOf(path: string, member: string): MemberFieldConfig {
+        return this.repeatedConfigOf(path).members[member] ?? { use: true, agg: 'keep' };
+    }
+
+    setMemberConfig(path: string, member: string, field: 'use' | 'agg', value: boolean | string): void {
+        this.updateRepeatedConfig(path, (cur) => {
+            const curMember = cur.members[member] ?? { use: true, agg: 'keep' };
+            return {
+                ...cur,
+                members: {
+                    ...cur.members,
+                    [member]: { ...curMember, [field]: value },
+                },
+            };
+        });
+    }
+
+    columnMetaRows(set: ParserRowSet): { name: string; sqlType: string; sourcePath: string; decoder: string }[] {
+        const meta = set.columnMeta ?? {};
+        const types = (meta['columnTypes'] ?? {}) as Record<string, string>;
+        const paths = (meta['sourcePaths'] ?? {}) as Record<string, string>;
+        const decs = (meta['decoders'] ?? {}) as Record<string, string>;
+        return set.columns.map((name) => ({
+            name,
+            sqlType: String(types[name] ?? 'VARCHAR'),
+            sourcePath: String(paths[name] ?? '—'),
+            decoder: String(decs[name] ?? '—'),
+        }));
+    }
+
+    createAndPopulateSink(): void {
+        const store = (this.pipelineName().trim() || this.node().id).replace(/[^A-Za-z0-9_-]/g, '_');
+        const display = this.pipelineName().trim() || this.node().name || store;
+        if (!this.datasetReg || !this.datasetsApi) {
+            this.sinkStatus.set({ ok: false, message: `Dataset service unavailable — ${datasetManualHint(store)}` });
+            return;
+        }
+        const rowSets = this.derivedRowSets();
+        const segDrafts = this.segmentsEditor?.value() ?? [];
+        const hasSegments = Boolean(rowSets?.length || segDrafts.length);
+        const segmentKeys =
+            rowSets?.length
+                ? rowSets.map((r) => r.segment)
+                : segDrafts.length
+                  ? segDrafts.map((d) => d.key)
+                  : [store];
+        const targets = segmentKeys.map((segKey) => {
+            const safeSeg = segKey.replace(/[^A-Za-z0-9_-]/g, '_');
+            const id = segmentKeys.length === 1 && segKey === store ? store : `${store}_${safeSeg}`;
+            const label = segmentKeys.length === 1 && segKey === store ? display : `${display} · ${segKey}`;
+            const rowSet = rowSets?.find((r) => r.segment === segKey);
+            const draft = segDrafts.find((d) => d.key === segKey);
+            const physicalRef = hasSegments ? `${store}/database/${segKey}` : store;
+            const columns = this.sinkDatasetColumns(rowSet, draft);
+            const partitions = this.sinkDatasetPartitions(rowSet);
+            return { segKey, id, label, rowSet, physicalRef, columns, partitions };
+        });
+
+        this.sinkPopulating.set(true);
+        this.sinkStatus.set(null);
+        this.sinkDatasetRows.set(null);
+
+        forkJoin(
+            targets.map((t) =>
+                this.datasetReg!.ensure(t.id, t.label, {
+                    physicalRef: t.physicalRef,
+                    sourceName: store,
+                    ...(t.columns.length ? { columns: t.columns } : {}),
+                    ...(t.partitions.length ? { partitions: t.partitions } : {}),
+                }),
+            ),
+        )
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: (ensures) => {
+                    const failed = ensures.find((r) => r.status === 'failed');
+                    if (failed) {
+                        this.sinkPopulating.set(false);
+                        this.sinkStatus.set({
+                            ok: false,
+                            message: `Could not register dataset — ${datasetManualHint(failed.store)}`,
+                        });
+                        return;
+                    }
+                    forkJoin(targets.map((t) => this.datasetsApi!.materialize(t.id, `${t.id}_snapshot`)))
+                        .pipe(
+                            switchMap((runs) =>
+                                this.jobsApi
+                                    ? forkJoin(
+                                          runs.map((r) =>
+                                              r?.runId ? this.pollRunStatus(r.runId) : of<JobRunById | null>(null),
+                                          ),
+                                      ).pipe(map((statuses) => ({ runs, statuses })))
+                                    : of({ runs, statuses: runs.map(() => null as JobRunById | null) }),
+                            ),
+                            takeUntilDestroyed(this.destroyRef),
+                        )
+                        .subscribe({
+                            next: ({ runs, statuses }) => {
+                                this.sinkPopulating.set(false);
+                                const failedRun = statuses.find((s) => s?.status === 'FAILED' || s?.status === 'SKIPPED');
+                                if (failedRun) {
+                                    this.sinkStatus.set({
+                                        ok: false,
+                                        message:
+                                            failedRun.message ||
+                                            `Materialization ${failedRun.status.toLowerCase()} (run ${failedRun.runId}).`,
+                                    });
+                                    return;
+                                }
+                                const allDone = statuses.some((s) => s !== null) && statuses.every((s) => s?.status === 'SUCCESS');
+                                const summary = targets
+                                    .map((t, i) => `"${t.id}" (run ${runs[i]?.runId ?? 'ok'})`)
+                                    .join(', ');
+                                this.sinkStatus.set({
+                                    ok: true,
+                                    message: allDone
+                                        ? `Registered & materialized ${targets.length} sink dataset(s): ${summary}.`
+                                        : `Registered & materializing ${targets.length} sink dataset(s): ${summary}.`,
+                                });
+                                const primary = targets[this.selectedRowSetIndex()] ?? targets[0];
+                                if (this.http && primary) {
+                                    this.loadSinkDatasetRows(primary.id, primary.rowSet);
+                                }
+                            },
+                            error: (e) => {
+                                this.sinkPopulating.set(false);
+                                this.sinkStatus.set({
+                                    ok: false,
+                                    message: apiErrorMessage(e, `Dataset(s) registered, but populate failed.`),
+                                });
+                            },
+                        });
+                },
+                error: (e) => {
+                    this.sinkPopulating.set(false);
+                    this.sinkStatus.set({ ok: false, message: apiErrorMessage(e, 'Could not register sink dataset.') });
+                },
+            });
+    }
+
+    private sinkDatasetColumns(rowSet: ParserRowSet | undefined, draft: SegmentDraft | undefined): DatasetColumn[] {
+        const metaCols: ColumnMeta[] = rowSet
+            ? this.columnMetaRows(rowSet).map((c) => ({ name: c.name, type: sqlTypeToColumnType(c.sqlType) }))
+            : draft
+              ? [
+                    ...draft.columns.map((c) => ({
+                        name: effectiveColumnName(c),
+                        type: sqlTypeToColumnType(c.type),
+                    })),
+                    ...(this.frontend() === 'asn1' || this.eventRoots().length > 0
+                        ? [{ name: EVENT_TYPE_COLUMN, type: 'string' as ColumnType }]
+                        : []),
+                ]
+              : [];
+        return metaCols.length ? inferRoles(metaCols) : [];
+    }
+
+    private sinkDatasetPartitions(rowSet: ParserRowSet | undefined): SchemaPartitionRow[] {
+        if (
+            this.authorsSegments() ||
+            this.frontend() === 'asn1' ||
+            this.eventRoots().length > 0 ||
+            rowSet?.columns.includes(EVENT_TYPE_COLUMN)
+        ) {
+            return [{ column: 'event_type', source: EVENT_TYPE_COLUMN, type: 'VARCHAR' }];
+        }
+        return this.partitionSeed();
+    }
+
+    private pollRunStatus(runId: string, attempt = 0): Observable<JobRunById | null> {
+        if (!this.jobsApi) return of(null);
+        return this.jobsApi.run(runId).pipe(
+            switchMap((run) => {
+                if ((run.status === 'PENDING' || run.status === 'RUNNING') && attempt < 10) {
+                    return timer(300).pipe(switchMap(() => this.pollRunStatus(runId, attempt + 1)));
+                }
+                return of(run);
+            }),
+            catchError(() => of(null)),
+        );
+    }
+
+    private loadSinkDatasetRows(datasetId: string, rowSet?: ParserRowSet): void {
+        this.http
+            ?.get<{
+                columns?: (string | { name: string })[];
+                rows?: Record<string, unknown>[];
+            }>(apiUrl(`/datasets/${encodeURIComponent(datasetId)}/rows`))
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe({
+                next: (res) => {
+                    if (!res?.rows) return;
+                    const cols = res.columns?.length
+                        ? res.columns.map((c) => (typeof c === 'string' ? c : c.name))
+                        : (rowSet?.columns ?? []);
+                    this.sinkDatasetRows.set({ dataset: datasetId, columns: cols, rows: res.rows });
+                },
+                error: () => {
+                    // Dataset rows preview is best-effort while materialize runs asynchronously.
+                },
+            });
+    }
 
     // ── Output schema (P4-2a-ii) ─────────────────────────────────────────────────
     /** The last FLAT parse preview — the columns an output schema is derived from. */
@@ -1179,10 +2022,23 @@ export class PipelineParseDefinitionComponent {
             const prior = this.parsingBlock()['asn1'] as Record<string, unknown> | undefined;
             const own = (grammar['asn1'] ?? {}) as Record<string, unknown>;
             const carried = deriveKeysToCarry(own, prior);
-            if (Object.keys(carried).length) grammar = { ...grammar, asn1: { ...own, ...carried } };
+            const segKeys = this.segmentsEditor?.value().map((d) => d.key) ?? [];
+            const interactive = this.compiledAsn1InteractiveConfig(segKeys);
+            const mergedAsn1: Record<string, unknown> = { ...own, ...carried, ...interactive };
+            if (this.rawTlvDump()) {
+                delete mergedAsn1['grammar'];
+                delete mergedAsn1['grammar_file'];
+                delete mergedAsn1['root_type'];
+            }
+            if (this.simplifyAliases()) mergedAsn1['simplify_aliases'] = true;
+            grammar = { ...grammar, asn1: mergedAsn1 };
         }
         return this.parsersApi.preview(type, grammar, text, b64, this.configSubdir().trim()).pipe(
             tap((p) => {
+                if (p.kind === 'tree') {
+                    this.syncTreeRowSets(p.derived?.segments ?? null, type);
+                    return;
+                }
                 if (p.kind !== 'table') return;
                 this.schemaStale.set(false); // these columns and these settings agree again
                 if (!thread) return;
@@ -1220,6 +2076,7 @@ export class PipelineParseDefinitionComponent {
     /** Keep both halves of the discriminated preview: the tree feeds segments, the table feeds schema. */
     onPreviewed(p: ParserPreview): void {
         this.previewTree.set(p.kind === 'tree' ? p.nodes : null);
+        this.syncTreeRowSets(p.kind === 'tree' ? (p.derived?.segments ?? null) : null, this.frontend());
         if (p.kind !== 'table') return;
         this.previewTable.set(p);
         // U3: keep the parse's inferred types (narrowed to the grid vocabulary), by position.
@@ -1412,6 +2269,7 @@ export class PipelineParseDefinitionComponent {
      * found by driving the real UI 2026-08-17).
      */
     private parsedSinceApply = false;
+    private asn1InteractiveDirty = false;
 
     constructor() {
         // A stateless catalog fetch, same as the shared editor's own — used only to build the picker's
@@ -1454,12 +2312,118 @@ export class PipelineParseDefinitionComponent {
             this.schemaHydrated.set(false);
             this.schemaDrift.set(null);
             this.previewTable.set(null);
+            this.derivedRowSets.set(null);
+            this.grammarValidation.set(null);
+            this.sinkStatus.set(null);
+            this.sinkDatasetRows.set(null);
+            this.selectedTreePath.set(null);
+            const asn1Block = this.parsingBlock()['asn1'] as Record<string, unknown> | undefined;
+            const hasGrammar = Boolean(
+                String(asn1Block?.['grammar'] ?? '').trim() ||
+                    String(asn1Block?.['grammar_file'] ?? '').trim() ||
+                    String(asn1Block?.['profile_file'] ?? '').trim(),
+            );
+            this.rawTlvDump.set(
+                this.frontend() === 'asn1' && !hasGrammar && Object.keys(this.parsingBlock()).length > 0,
+            );
+            this.asn1InteractiveDirty = false;
+            this.seedAsn1InteractiveState();
             this.emitDirty();
             this.loadSavedSegments();
             this.loadSavedSchema();
             this.deriveFromCarriedParse();
             this.loadDecodeProfile();
+            this.loadAsn1Decoders();
         }
+    }
+
+    private loadAsn1Decoders(): void {
+        if (this.frontend() !== 'asn1') return;
+        this.parsersApi.decoders().subscribe({
+            next: (list) => this.asn1Decoders.set(list ?? []),
+            error: () => this.asn1Decoders.set([]),
+        });
+    }
+
+    private syncTreeRowSets(rowSets: ParserRowSet[] | null, frontend: string): void {
+        this.derivedRowSets.set(rowSets);
+        if (!rowSets?.length) {
+            this.selectedRowSetIndex.set(0);
+            return;
+        }
+        const idx = Math.max(0, Math.min(this.selectedRowSetIndex(), rowSets.length - 1));
+        this.selectedRowSetIndex.set(idx);
+        this.bridgeRowSetToThread(rowSets[idx], frontend);
+    }
+
+    private seedAsn1InteractiveState(): void {
+        const asn1 = this.parsingBlock()['asn1'] as Record<string, unknown> | undefined;
+        this.simplifyAliases.set(Boolean(asn1?.['simplify_aliases']));
+        const headers = asn1?.['header_fields'];
+        this.pinnedHeaders.set(
+            Array.isArray(headers)
+                ? headers
+                      .map((h) => String(h).trim())
+                      .filter(Boolean)
+                      .map((h) => (h.startsWith('$header.') ? h : `$header.${h}`))
+                : [],
+        );
+        const roots = asn1?.['event_roots'];
+        if (Array.isArray(roots)) {
+            this.eventRoots.set(
+                roots
+                    .filter((r): r is Record<string, unknown> => !!r && typeof r === 'object')
+                    .map((r) => ({ path: String(r['path'] ?? ''), segment: String(r['segment'] ?? '') })),
+            );
+        } else if (roots && typeof roots === 'object') {
+            this.eventRoots.set(
+                Object.entries(roots as Record<string, unknown>).map(([path, segment]) => ({
+                    path,
+                    segment: String(segment ?? ''),
+                })),
+            );
+        } else {
+            this.eventRoots.set([]);
+        }
+        const fieldDecoders = asn1?.['field_decoders'];
+        const legacyLeaves = asn1?.['leaf_overrides'];
+        const seededLeaves: Record<string, LeafOverride> =
+            legacyLeaves && typeof legacyLeaves === 'object' && !Array.isArray(legacyLeaves)
+                ? { ...(legacyLeaves as Record<string, LeafOverride>) }
+                : {};
+        if (fieldDecoders && typeof fieldDecoders === 'object' && !Array.isArray(fieldDecoders)) {
+            for (const [path, dec] of Object.entries(fieldDecoders as Record<string, unknown>)) {
+                if (dec != null && String(dec).trim()) {
+                    seededLeaves[path] = { ...(seededLeaves[path] ?? {}), decoder: String(dec).trim() };
+                }
+            }
+        }
+        this.leafOverrides.set(seededLeaves);
+        const seededRepeated: Record<string, RepeatedNodeConfig> = {};
+        const rep = asn1?.['repeated_fields'];
+        if (rep && typeof rep === 'object' && !Array.isArray(rep)) {
+            Object.assign(seededRepeated, rep as Record<string, RepeatedNodeConfig>);
+        }
+        const children = asn1?.['children'];
+        if (children && typeof children === 'object' && !Array.isArray(children)) {
+            for (const lists of Object.values(children as Record<string, unknown>)) {
+                if (!lists || typeof lists !== 'object' || Array.isArray(lists)) continue;
+                for (const [listPath, rawSpec] of Object.entries(lists as Record<string, unknown>)) {
+                    seededRepeated[listPath] = repeatedConfigFromChildSpec(rawSpec);
+                }
+            }
+        }
+        const derive = asn1?.['derive'];
+        if (derive && typeof derive === 'object' && !Array.isArray(derive)) {
+            for (const cols of Object.values(derive as Record<string, unknown>)) {
+                if (!cols || typeof cols !== 'object' || Array.isArray(cols)) continue;
+                for (const rawSpec of Object.values(cols as Record<string, unknown>)) {
+                    const parsed = repeatedConfigFromDeriveFold(rawSpec);
+                    if (parsed) seededRepeated[parsed.listPath] = parsed.config;
+                }
+            }
+        }
+        this.repeatedConfigs.set(seededRepeated);
     }
 
     /**
@@ -1763,6 +2727,7 @@ export class PipelineParseDefinitionComponent {
             this.templateDirty ||
             this.typesModeTouched ||
             this.parsedSinceApply ||
+            this.asn1InteractiveDirty ||
             (this.editor?.isDirty() ?? false) ||
             (this.segmentsEditor?.isDirty() ?? false) ||
             (this.schemaGrid?.form.dirty ?? false);
@@ -1898,25 +2863,176 @@ export class PipelineParseDefinitionComponent {
      * own are carried VERBATIM — a submit that dropped them would silently turn an ingest-capable
      * config preview-only.
      */
+    private compiledAsn1InteractiveConfig(segmentKeys: string[]): Record<string, unknown> {
+        const out: Record<string, unknown> = {};
+        if (this.simplifyAliases()) out['simplify_aliases'] = true;
+
+        const headerFields = this.pinnedHeaders()
+            .map((h) => (h.startsWith('$header.') ? h.slice('$header.'.length) : h).trim())
+            .filter(Boolean);
+        if (headerFields.length) out['header_fields'] = headerFields;
+
+        const eventRootsMap: Record<string, string> = {};
+        for (const r of this.eventRoots()) {
+            const p = r.path.trim();
+            const s = r.segment.trim();
+            if (p && s) eventRootsMap[p] = s;
+        }
+        if (Object.keys(eventRootsMap).length) out['event_roots'] = eventRootsMap;
+
+        const fieldDecoders: Record<string, string> = {};
+        for (const [path, ov] of Object.entries(this.leafOverrides())) {
+            if (ov.decoder?.trim()) fieldDecoders[path] = ov.decoder.trim();
+        }
+        if (Object.keys(fieldDecoders).length) out['field_decoders'] = fieldDecoders;
+
+        const rootPrefixes = this.asn1RootPrefixes();
+        const sortedEventRoots = Object.entries(eventRootsMap).sort((a, b) => b[0].length - a[0].length);
+        const defaultParent = segmentKeys[0] ?? Object.values(eventRootsMap)[0] ?? rootPrefixes[0] ?? 'Record';
+        const deriveMap: Record<string, Record<string, unknown>> = {};
+        const childrenMap: Record<string, Record<string, unknown>> = {};
+        const seen = new Set<string>();
+        for (const [repPath, cfg] of Object.entries(this.repeatedConfigs())) {
+            const { stripped, matchedRoot } = this.stripRootPrefix(repPath, rootPrefixes);
+            let listPath = stripped;
+            let parentSeg =
+                (matchedRoot ? segmentKeys.find((k) => k.toLowerCase() === matchedRoot.toLowerCase()) : undefined) ??
+                defaultParent;
+            for (const [evPath, evSeg] of sortedEventRoots) {
+                if (repPath.startsWith(`${evPath}.`)) {
+                    parentSeg = evSeg;
+                    listPath = repPath.slice(evPath.length + 1);
+                    break;
+                }
+                if (stripped.startsWith(`${evPath}.`)) {
+                    parentSeg = evSeg;
+                    listPath = stripped.slice(evPath.length + 1);
+                    break;
+                }
+            }
+            const dedupeKey = `${parentSeg}::${listPath}`;
+            if (seen.has(dedupeKey)) continue;
+            seen.add(dedupeKey);
+
+            const usedFields = Object.entries(cfg.members)
+                .filter(([, m]) => m.use)
+                .map(([name]) => name);
+            const aggs: Record<string, string> = {};
+            for (const [name, m] of Object.entries(cfg.members)) {
+                if (m.use && m.agg && m.agg !== 'keep') aggs[name] = m.agg;
+            }
+            const leafName = listPath.split('.').pop() ?? listPath;
+            const matchedChild = segmentKeys.find((k) => k !== parentSeg && k.toLowerCase() === leafName.toLowerCase());
+            if (cfg.mode === 'fold' && !matchedChild) {
+                const colName = sanitizeIdentifier(leafName, 0);
+                (deriveMap[parentSeg] ??= {})[colName] = {
+                    fold: listPath,
+                    mode: cfg.asJson ? 'json' : 'delim',
+                    ...(usedFields.length ? { fields: usedFields } : {}),
+                    ...(cfg.groupBy ? { group_by: cfg.groupBy } : {}),
+                    ...(Object.keys(aggs).length ? { aggs } : {}),
+                    ...(!cfg.asJson ? { item_delim: cfg.itemDelimiter, field_delim: cfg.kvDelimiter } : {}),
+                };
+            } else if (matchedChild) {
+                (childrenMap[parentSeg] ??= {})[listPath] = {
+                    segment: matchedChild,
+                    join_mode: 'left',
+                    ...(cfg.mode === 'fold'
+                        ? {
+                              fold: cfg.asJson
+                                  ? 'json'
+                                  : { mode: 'delim', item_delim: cfg.itemDelimiter, field_delim: cfg.kvDelimiter },
+                          }
+                        : {}),
+                    ...(usedFields.length ? { fields: usedFields } : {}),
+                    ...(cfg.groupBy ? { group_by: cfg.groupBy } : {}),
+                    ...(Object.keys(aggs).length ? { aggs } : {}),
+                };
+            }
+        }
+        if (Object.keys(deriveMap).length) out['derive'] = deriveMap;
+        if (Object.keys(childrenMap).length) out['children'] = childrenMap;
+        return out;
+    }
+
+    private asn1RootPrefixes(): string[] {
+        const prefixes: string[] = [];
+        const add = (raw: unknown): void => {
+            const s = typeof raw === 'string' ? raw.trim() : '';
+            if (s && !prefixes.includes(s)) prefixes.push(s);
+        };
+        const editorAsn1 = this.editor?.grammar()['asn1'] as Record<string, unknown> | undefined;
+        const priorAsn1 = this.parsingBlock()['asn1'] as Record<string, unknown> | undefined;
+        add(editorAsn1?.['root_type']);
+        add(priorAsn1?.['root_type']);
+        for (const n of this.previewTree() ?? []) {
+            add(typeof n.meta?.['fieldPath'] === 'string' ? n.meta['fieldPath'] : n.label);
+            add(n.label);
+        }
+        return prefixes;
+    }
+
+    private stripRootPrefix(path: string, prefixes: string[]): { stripped: string; matchedRoot?: string } {
+        for (const root of prefixes) {
+            if (path.startsWith(`${root}.`)) {
+                return { stripped: path.slice(root.length + 1), matchedRoot: root };
+            }
+        }
+        return { stripped: path };
+    }
+
+    private resolveRepeatedKey(map: Record<string, RepeatedNodeConfig>, path: string): string {
+        if (path in map) return path;
+        const { stripped } = this.stripRootPrefix(path, this.asn1RootPrefixes());
+        return stripped !== path && stripped in map ? stripped : path;
+    }
+
+    private applyLeafAffixesToDrafts(drafts: SegmentDraft[]): SegmentDraft[] {
+        const overrides = this.leafOverrides();
+        if (!Object.keys(overrides).length) return drafts;
+        return drafts.map((d) => ({
+            ...d,
+            columns: d.columns.map((c) => {
+                const ov =
+                    overrides[c.selector] ??
+                    Object.entries(overrides).find(([k]) => k.endsWith(`.${c.selector}`))?.[1];
+                if (!ov) return c;
+                return {
+                    ...c,
+                    ...(ov.rename?.trim() ? { rename: ov.rename.trim() } : {}),
+                    ...(ov.prefix?.trim() ? { prefix: ov.prefix.trim() } : {}),
+                    ...(ov.postfix?.trim() ? { postfix: ov.postfix.trim() } : {}),
+                };
+            }),
+        }));
+    }
+
     private parsingValue(segments?: Record<string, string>): Record<string, unknown> {
         const f = this.frontend();
+        const base = this.editor!.value();
         if (f === 'plugin') {
-            const p = this.plugin();
-            const g = this.editor!.grammar();
             const prior = this.parsingBlock()['plugin'] as Record<string, unknown> | undefined;
-            const block: Record<string, unknown> = { ingester: p?.ingesterClass ?? prior?.['ingester'] };
-            if (g['ingester_config'] !== undefined) block['ingester_config'] = g['ingester_config'];
-            else if (prior?.['ingester_config'] !== undefined) block['ingester_config'] = prior['ingester_config'];
+            const block: Record<string, unknown> = { ...((base['plugin'] as Record<string, unknown> | undefined) ?? {}) };
+            if (block['ingester_config'] === undefined && prior?.['ingester_config'] !== undefined) {
+                block['ingester_config'] = prior['ingester_config'];
+            }
             if (segments) block['segments'] = segments;
             else if (prior?.['segments'] !== undefined) block['segments'] = prior['segments'];
-            return { frontend: 'plugin', plugin: block };
+            return { ...base, frontend: 'plugin', plugin: block };
         }
-        if (f !== 'asn1') return { ...this.editor!.value(), frontend: f };
-        const a = { ...((this.editor!.grammar()['asn1'] as Record<string, unknown> | undefined) ?? {}) };
+        if (f !== 'asn1') return base;
         const prior = this.parsingBlock()['asn1'] as Record<string, unknown> | undefined;
+        const segKeys = segments ? Object.keys(segments) : Object.keys((prior?.['segments'] as object | undefined) ?? {});
+        const interactive = this.compiledAsn1InteractiveConfig(segKeys);
+        const a: Record<string, unknown> = {
+            ...((base['asn1'] as Record<string, unknown> | undefined) ?? {}),
+            ...interactive,
+        };
         if (segments) a['segments'] = segments;
         else if (prior?.['segments'] !== undefined) a['segments'] = prior['segments'];
-        return { frontend: 'asn1', asn1: decodeProfileOverrides(a, prior, this.editor!.dirtyKeys()) };
+        const dirty = new Set(this.editor!.dirtyKeys());
+        for (const k of Object.keys(interactive)) dirty.add(`asn1${KEY_SEP}${k}`);
+        return { ...base, frontend: 'asn1', asn1: decodeProfileOverrides(a, prior, dirty) };
     }
 
     /** `segment key → schema-toon path` for the drafts currently in the editor. */
@@ -1954,7 +3070,7 @@ export class PipelineParseDefinitionComponent {
             this.editor.error.set(segments?.problem() ?? 'Add at least one segment.');
             return;
         }
-        const drafts = segments.value();
+        const drafts = this.applyLeafAffixesToDrafts(segments.value());
         this.writing.set(true);
         forkJoin(
             drafts.map((d) =>
@@ -2087,6 +3203,7 @@ export class PipelineParseDefinitionComponent {
         this.templateDirty = false; // Apply consumed the pick, same as any other edit
         this.parsedSinceApply = false; // …and the derived schema it wrote
         this.typesModeTouched = false; // …and the mode switch, now persisted as raw.types
+        this.asn1InteractiveDirty = false;
         this.emitDirty();
         this.applied.emit(node);
     }
@@ -2115,4 +3232,213 @@ function isBackwardRefusal(e: unknown): boolean {
     const err = e as { status?: number; error?: { error?: { message?: string } } };
     if (err?.status !== 422) return false;
     return /BACKWARD-compatible/i.test(err.error?.error?.message ?? '');
+}
+
+export interface LeafOverride {
+    decoder?: string;
+    rename?: string;
+    prefix?: string;
+    postfix?: string;
+}
+
+export interface MemberFieldConfig {
+    use: boolean;
+    agg: string;
+}
+
+export interface RepeatedNodeConfig {
+    mode: 'join' | 'fold';
+    groupBy?: string;
+    asJson: boolean;
+    itemDelimiter: string;
+    kvDelimiter: string;
+    members: Record<string, MemberFieldConfig>;
+}
+
+export interface LeafTreeEntry {
+    path: string;
+    label: string;
+    decoderId?: string;
+}
+
+export interface RepeatedTreeEntry {
+    path: string;
+    type: string;
+    members: { name: string; type: string }[];
+}
+
+function collectLeafTreeNodes(nodes: ParserTreeNode[] | null): LeafTreeEntry[] {
+    if (!nodes?.length) return [];
+    const seen = new Set<string>();
+    const out: LeafTreeEntry[] = [];
+    const walk = (list: ParserTreeNode[], prefix: string): void => {
+        for (const n of list) {
+            const path =
+                typeof n.meta?.['fieldPath'] === 'string' && n.meta['fieldPath']
+                    ? String(n.meta['fieldPath'])
+                    : prefix
+                      ? `${prefix}.${n.label}`
+                      : n.label;
+            if (n.meta?.['nodeRole'] === 'leaf') {
+                if (!seen.has(path)) {
+                    seen.add(path);
+                    out.push({
+                        path,
+                        label: n.label,
+                        decoderId: typeof n.meta['decoderId'] === 'string' ? n.meta['decoderId'] : undefined,
+                    });
+                }
+            }
+            if (n.children?.length) walk(n.children, path);
+        }
+    };
+    walk(nodes, '');
+    return out;
+}
+
+function collectRepeatedTreeNodes(nodes: ParserTreeNode[] | null): RepeatedTreeEntry[] {
+    if (!nodes?.length) return [];
+    const seen = new Set<string>();
+    const out: RepeatedTreeEntry[] = [];
+    const walk = (list: ParserTreeNode[], prefix: string): void => {
+        for (const n of list) {
+            const path =
+                typeof n.meta?.['fieldPath'] === 'string' && n.meta['fieldPath']
+                    ? String(n.meta['fieldPath'])
+                    : prefix
+                      ? `${prefix}.${n.label}`
+                      : n.label;
+            const role = n.meta?.['nodeRole'];
+            const isRepeated = role === 'repeated' || /SET[_\s]OF|SEQUENCE[_\s]OF/i.test(n.type ?? '');
+            if (isRepeated && !seen.has(path)) {
+                seen.add(path);
+                const members = extractMembers(n);
+                out.push({ path, type: n.type ?? 'SEQUENCE_OF', members });
+            }
+            if (n.children?.length) walk(n.children, path);
+        }
+    };
+    walk(nodes, '');
+    return out;
+}
+
+function extractMembers(repeated: ParserTreeNode): { name: string; type: string }[] {
+    const out: { name: string; type: string }[] = [];
+    const seen = new Set<string>();
+    for (const child of repeated.children ?? []) {
+        const candidates = child.children?.length ? child.children : [child];
+        for (const m of candidates) {
+            if (!seen.has(m.label)) {
+                seen.add(m.label);
+                out.push({ name: m.label, type: m.type ?? 'VARCHAR' });
+            }
+        }
+    }
+    return out;
+}
+
+function columnTypesFromRowSet(set: ParserRowSet): { name: string; type: string }[] | undefined {
+    const ct = set.columnMeta?.['columnTypes'];
+    if (!ct) return undefined;
+    if (Array.isArray(ct)) return ct as { name: string; type: string }[];
+    if (typeof ct === 'object') {
+        return Object.entries(ct as Record<string, string>).map(([name, type]) => ({ name, type }));
+    }
+    return undefined;
+}
+
+function sqlTypeToColumnType(sqlType: string): ColumnType {
+    const t = sqlType.trim().toUpperCase();
+    if (/^(BIGINT|INT|INTEGER|SMALLINT|TINYINT|HUGEINT|DOUBLE|FLOAT|REAL|DECIMAL|NUMERIC)/.test(t)) return 'number';
+    if (/^(DATE|TIMESTAMP|TIMESTAMPTZ|TIME)/.test(t)) return 'date';
+    if (/^(BOOL|BOOLEAN)/.test(t)) return 'boolean';
+    return 'string';
+}
+
+function repeatedConfigFromSpec(mode: 'join' | 'fold', asJson: boolean, spec: Record<string, unknown>): RepeatedNodeConfig {
+    const aggsRaw = spec['aggs'];
+    const aggs =
+        aggsRaw && typeof aggsRaw === 'object' && !Array.isArray(aggsRaw)
+            ? (aggsRaw as Record<string, unknown>)
+            : {};
+    const members: Record<string, MemberFieldConfig> = {};
+    if (Array.isArray(spec['fields'])) {
+        for (const f of spec['fields']) {
+            const name = String(f ?? '').trim();
+            if (!name) continue;
+            members[name] = { use: true, agg: aggs[name] != null ? String(aggs[name]) : 'keep' };
+        }
+    }
+    for (const [k, v] of Object.entries(aggs)) {
+        if (!(k in members)) members[k] = { use: true, agg: v != null ? String(v) : 'keep' };
+    }
+    const groupRaw = spec['group_by'];
+    const groupBy =
+        typeof groupRaw === 'string'
+            ? groupRaw.trim() || undefined
+            : Array.isArray(groupRaw) && groupRaw.length
+              ? String(groupRaw[0] ?? '').trim() || undefined
+              : undefined;
+    const foldObj =
+        spec['fold'] && typeof spec['fold'] === 'object' && !Array.isArray(spec['fold'])
+            ? (spec['fold'] as Record<string, unknown>)
+            : undefined;
+    const itemDelimiter =
+        foldObj?.['item_delim'] != null
+            ? String(foldObj['item_delim'])
+            : spec['item_delim'] != null
+              ? String(spec['item_delim'])
+              : ',';
+    const kvDelimiter =
+        foldObj?.['field_delim'] != null
+            ? String(foldObj['field_delim'])
+            : spec['field_delim'] != null
+              ? String(spec['field_delim'])
+              : '=';
+    return {
+        mode,
+        ...(groupBy ? { groupBy } : {}),
+        asJson,
+        itemDelimiter,
+        kvDelimiter,
+        members,
+    };
+}
+
+function repeatedConfigFromDeriveFold(raw: unknown): { listPath: string; config: RepeatedNodeConfig } | null {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+    const spec = raw as Record<string, unknown>;
+    let listPath = '';
+    let asJson = false;
+    if (typeof spec['list'] === 'string' && spec['list'].trim()) {
+        listPath = spec['list'].trim();
+        asJson = String(spec['fold'] ?? '').trim().toLowerCase() === 'json';
+    } else if (typeof spec['fold'] === 'string' && spec['fold'].trim()) {
+        listPath = spec['fold'].trim();
+        asJson = String(spec['mode'] ?? '').trim().toLowerCase() === 'json';
+    } else {
+        return null;
+    }
+    return { listPath, config: repeatedConfigFromSpec('fold', asJson, spec) };
+}
+
+function repeatedConfigFromChildSpec(raw: unknown): RepeatedNodeConfig {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+        return { mode: 'join', asJson: false, itemDelimiter: ',', kvDelimiter: '=', members: {} };
+    }
+    const spec = raw as Record<string, unknown>;
+    let mode: 'join' | 'fold' = 'join';
+    let asJson = false;
+    const foldRaw = spec['fold'];
+    if (typeof foldRaw === 'string') {
+        mode = 'fold';
+        asJson = foldRaw.trim().toLowerCase() === 'json';
+    } else if (foldRaw && typeof foldRaw === 'object' && !Array.isArray(foldRaw)) {
+        mode = 'fold';
+        asJson = String((foldRaw as Record<string, unknown>)['mode'] ?? '').trim().toLowerCase() === 'json';
+    } else if (typeof spec['mode'] === 'string') {
+        mode = 'fold';
+        asJson = spec['mode'].trim().toLowerCase() === 'json';
+    }
+    return repeatedConfigFromSpec(mode, asJson, spec);
 }

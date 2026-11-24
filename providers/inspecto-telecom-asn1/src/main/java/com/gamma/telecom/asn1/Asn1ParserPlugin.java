@@ -9,7 +9,15 @@ import com.gamma.asn.core.RecoveryPolicy;
 import com.gamma.asn.core.Strictness;
 import com.gamma.asn.core.Tlv;
 import com.gamma.asn.facade.Asn1Decoder;
+import com.gamma.asn.schema.Asn1ParseException;
+import com.gamma.asn.schema.Asn1Parser;
+import com.gamma.asn.schema.CompiledSchema;
+import com.gamma.asn.schema.CompiledType;
+import com.gamma.asn.schema.DecoderRegistry;
+import com.gamma.asn.schema.Diagnostic;
 import com.gamma.asn.schema.NamedNode;
+import com.gamma.asn.schema.SchemaCompiler;
+import com.gamma.asn.schema.ast.ModuleAst;
 import com.gamma.config.spec.FieldSpec;
 import com.gamma.config.spec.FieldType;
 import com.gamma.parse.ParseResult;
@@ -18,7 +26,9 @@ import com.gamma.pipeline.SpaceConfigRoot;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -82,6 +92,10 @@ public final class Asn1ParserPlugin implements ParserPlugin {
         return Optional.of("com.gamma.telecom.asn1.Asn1RecordIngester");
     }
 
+    private static final String SECTION_GRAMMAR = "Grammar & Event Roots";
+    private static final String SECTION_FRAMING = "Header & Framing";
+    private static final String SECTION_LIMITS = "Limits";
+
     @Override
     public List<FieldSpec> grammarSchema() {
         return List.of(
@@ -89,37 +103,49 @@ public final class Asn1ParserPlugin implements ParserPlugin {
                         "The ASN.1 module text (X.680 syntax) defining the record type. "
                                 + "Leave EMPTY to dump the file's raw TLV structure instead — BER is "
                                 + "self-describing, so an unknown file can be inspected before its "
-                                + "module is available. A grammar is still required to ingest."),
+                                + "module is available. A grammar is still required to ingest.")
+                        .withSection(SECTION_GRAMMAR),
                 FieldSpec.of("asn1.grammar_file", "ASN.1 grammar file", FieldType.STRING,
                         "Path to a stored .asn module, relative to the Pipeline's config file like the "
                                 + "segment schema paths (a sibling name, e.g. msc_cdr.asn); a stand-alone "
                                 + "preview reads it from the Space's config directory. The alternative to "
-                                + "pasting the text above. Pasted text wins when both are set."),
+                                + "pasting the text above. Pasted text wins when both are set.")
+                        .withSection(SECTION_GRAMMAR),
                 FieldSpec.of("asn1.profile_file", "Decode Profile", FieldType.STRING,
                         "Path to the vendor's Decode Profile (.toon, one asn1: block holding these same "
                                 + "keys), relative to the Pipeline's config file. Every key set here wins over "
                                 + "the profile's; segments set here replace the profile's whole. Refs inside "
-                                + "the profile resolve beside the profile."),
+                                + "the profile resolve beside the profile.")
+                        .withSection(SECTION_GRAMMAR),
                 FieldSpec.of("asn1.root_type", "Root type", FieldType.STRING,
                         "Name of the type in the grammar each record binds against, e.g. Record. "
-                                + "Required when a grammar is supplied; ignored in structural mode."),
+                                + "Required when a grammar is supplied; ignored in structural mode.")
+                        .withSection(SECTION_GRAMMAR),
+                FieldSpec.withDefault("asn1.simplify_aliases", "Simplify aliases", FieldType.BOOL, false,
+                        "Collapse chained type aliases (A ::= B, B ::= C -> A ::= C) during schema compilation.")
+                        .withSection(SECTION_GRAMMAR),
                 FieldSpec.enumField("asn1.strictness", "Strictness",
                         List.of("BER", "DER", "CER"), "BER",
-                        "Encoding rules enforced while decoding: BER (permissive), DER, or CER."),
+                        "Encoding rules enforced while decoding: BER (permissive), DER, or CER.")
+                        .withSection(SECTION_FRAMING),
                 FieldSpec.withDefault("asn1.file_header_length", "File header bytes", FieldType.INT, 0,
                         "Bytes to skip at the start of the file before the first record "
-                                + "(e.g. 50 for Huawei-framed files). 0 = none."),
+                                + "(e.g. 50 for Huawei-framed files). 0 = none.")
+                        .withSection(SECTION_FRAMING),
                 FieldSpec.withDefault("asn1.record_header_length", "Record header bytes", FieldType.INT, 0,
                         "Bytes preceding each record's TLV, skipped (e.g. 4 for Huawei-framed files). "
-                                + "0 = bare back-to-back TLVs. Records stay delimited by their own BER length."),
+                                + "0 = bare back-to-back TLVs. Records stay delimited by their own BER length.")
+                        .withSection(SECTION_FRAMING),
                 FieldSpec.withDefault("asn1.max_value_bytes", "Max value bytes", FieldType.INT,
                         BerReader.DEFAULT_MAX_VALUE_BYTES,
                         "Largest single primitive value accepted, in bytes (default 64 MiB). A value "
                                 + "declaring more fails its record with a parse error naming the tag, the "
                                 + "declared length and this cap — before any memory is allocated for it. "
-                                + "Real CDR values are well under 1 KB."),
+                                + "Real CDR values are well under 1 KB.")
+                        .withSection(SECTION_LIMITS),
                 FieldSpec.withDefault("asn1.max_records", "Preview records", FieldType.INT, DEFAULT_RECORDS,
-                        "Records materialized into the preview tree (max " + MAX_RECORDS + ")."));
+                        "Records materialized into the preview tree (max " + MAX_RECORDS + ").")
+                        .withSection(SECTION_LIMITS));
     }
 
     @Override
@@ -159,25 +185,25 @@ public final class Asn1ParserPlugin implements ParserPlugin {
         if (rootType.isEmpty())
             throw new IllegalArgumentException("asn1.root_type is required when a grammar is supplied");
 
-        Asn1Decoder decoder;
-        try {
-            decoder = Asn1Decoder.compile(module.source(), rootType);
-        } catch (Exception badGrammar) {
-            throw new IllegalArgumentException("invalid ASN.1 grammar: " + badGrammar.getMessage(), badGrammar);
-        }
+        Asn1Decoder decoder = compileDecoder(module.source(), rootType, bool(asn1.get("simplify_aliases")));
+        Map<String, String> fieldDecoders = com.gamma.etl.DecodeProfile.fieldDecoders(asn1);
 
         List<ParseError> errors = new ArrayList<>();
         List<NamedNode> records;
         try (ByteSource src = ByteSource.of(sample)) {
-            records = decoder.decode(src, framing, strictness, RecoveryPolicy.SKIP_RECORD, errors::add,
-                    maxValueBytes).toList();
+            records = Asn1RecordIngester.decodeWithOverrides(decoder, src, framing, strictness,
+                    RecoveryPolicy.SKIP_RECORD, errors::add, maxValueBytes, fieldDecoders).toList();
         }
         if (records.isEmpty()) {
             throw new IllegalArgumentException(errors.isEmpty()
                     ? "no records of type '" + rootType + "' found in the sample"
                     : "sample did not decode against root type '" + rootType + "': " + errors.get(0).message());
         }
-        List<ParseResult.Node> nodes = records.stream().limit(maxRecords).map(Asn1ParserPlugin::toNode).toList();
+        Map<String, String> decoderAliases = decoderAliasMap(decoder.registry());
+        List<ParseResult.Node> nodes = records.stream()
+                .limit(maxRecords)
+                .map(n -> toNode(n, null, decoderAliases, fieldDecoders))
+                .toList();
         return new ParseResult.Tree(records.size(), nodes);
     }
 
@@ -198,15 +224,20 @@ public final class Asn1ParserPlugin implements ParserPlugin {
             throw new IllegalArgumentException("sample content is required");
         Path base = configDir != null ? configDir : SpaceConfigRoot.current();
         Map<String, Object> asn1 = com.gamma.etl.DecodeProfile.overlay(sub(grammar, "asn1"), base).asn1();
-        if (asn1.get("derive") == null && asn1.get("children") == null) return Optional.empty();
+        Map<String, String> eventRoots = com.gamma.etl.DecodeProfile.eventRoots(asn1);
+        List<String> headerFields = com.gamma.etl.DecodeProfile.headerFields(asn1);
+        Map<String, String> fieldDecoders = com.gamma.etl.DecodeProfile.fieldDecoders(asn1);
+        if (asn1.get("derive") == null && asn1.get("children") == null
+                && eventRoots.isEmpty() && headerFields.isEmpty() && fieldDecoders.isEmpty())
+            return Optional.empty();
         Asn1GrammarSource.Module module = Asn1GrammarSource.resolve(
                 asn1.get("grammar"), "asn1.grammar", asn1.get("grammar_file"), "asn1.grammar_file", base);
         String rootType = trimOrEmpty(asn1.get("root_type"));
         if (module == null || rootType.isEmpty())
-            throw new IllegalArgumentException("derive / children need asn1.grammar (or grammar_file) and asn1.root_type "
-                    + "to preview their rows");
+            throw new IllegalArgumentException("derive / children / event_roots need asn1.grammar (or grammar_file) "
+                    + "and asn1.root_type to preview their rows");
         if (!(asn1.get("segments") instanceof Map<?, ?> refs) || refs.isEmpty())
-            throw new IllegalArgumentException("derive / children need asn1.segments to preview their rows");
+            throw new IllegalArgumentException("derive / children / event_roots need asn1.segments to preview their rows");
 
         Map<String, Map<String, Object>> segments = new java.util.LinkedHashMap<>();
         for (Map.Entry<?, ?> e : refs.entrySet()) {
@@ -220,26 +251,23 @@ public final class Asn1ParserPlugin implements ParserPlugin {
             segments.put(String.valueOf(e.getKey()), com.gamma.util.ToonHelper.load(file.toString()));
         }
 
-        Asn1Decoder decoder;
-        try {
-            decoder = Asn1Decoder.compile(module.source(), rootType);
-        } catch (Exception badGrammar) {
-            throw new IllegalArgumentException("invalid ASN.1 grammar: " + badGrammar.getMessage(), badGrammar);
-        }
+        Asn1Decoder decoder = compileDecoder(module.source(), rootType, bool(asn1.get("simplify_aliases")));
         List<ParseError> errors = new ArrayList<>();
         List<NamedNode> records;
         try (ByteSource src = ByteSource.of(sample)) {
-            records = decoder.decode(src, framing(asn1), strictness(trimOrEmpty(asn1.get("strictness"))),
+            records = Asn1RecordIngester.decodeWithOverrides(decoder, src, framing(asn1),
+                    strictness(trimOrEmpty(asn1.get("strictness"))),
                     RecoveryPolicy.SKIP_RECORD, errors::add,
-                    maxValueBytes(asn1.get("max_value_bytes"), "asn1.max_value_bytes")).toList();
+                    maxValueBytes(asn1.get("max_value_bytes"), "asn1.max_value_bytes"),
+                    fieldDecoders).toList();
         }
         Map<String, Object> ic = new java.util.LinkedHashMap<>();
         for (String k : new String[]{"derive", "max_list_elements", "max_derived_columns", "children",
-                "max_child_rows_per_record"})
+                "max_child_rows_per_record", "event_roots", "header_fields", "field_decoders"})
             if (asn1.get(k) != null) ic.put(k, asn1.get(k));
         CollectingSink sink = new CollectingSink();
         Asn1RecordIngester.emitRecords(records.stream().limit(clampRecords(asn1.get("max_records"))).iterator(),
-                ic, segments, sink);
+                ic, segments, sink, !fieldDecoders.isEmpty());
 
         com.gamma.etl.DeriveSpec derive = com.gamma.etl.DeriveSpec.parse(ic.get("derive"), segments.keySet(),
                 ic.get("max_list_elements"), ic.get("max_derived_columns"));
@@ -247,22 +275,103 @@ public final class Asn1ParserPlugin implements ParserPlugin {
                 ic.get("max_child_rows_per_record")).childSegments();
         List<ParseResult.RowSet> sets = new ArrayList<>();
         for (Map.Entry<String, List<String>> d : sink.columns.entrySet()) {
-            List<Map<String, Object>> rows = sink.rows.get(d.getKey());
-            sets.add(new ParseResult.RowSet(d.getKey(), childSegments.contains(d.getKey()), d.getValue(),
-                    derive.columns(d.getKey()), rows, sink.counts.getOrDefault(d.getKey(), 0L)));
+            String segKey = d.getKey();
+            List<String> cols = d.getValue();
+            List<Map<String, Object>> rows = sink.rows.get(segKey);
+            Map<String, Object> columnMeta = buildColumnMeta(
+                    cols, sink.sqlTypes.get(segKey), segments.get(segKey), derive.columns(segKey), fieldDecoders);
+            sets.add(new ParseResult.RowSet(segKey, childSegments.contains(segKey), cols,
+                    derive.columns(segKey), rows, sink.counts.getOrDefault(segKey, 0L), columnMeta));
         }
         return Optional.of(new ParseResult.Rows(sets));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> buildColumnMeta(List<String> columns,
+                                                       Map<String, String> definedSqlTypes,
+                                                       Map<String, Object> segmentSchema,
+                                                       List<String> derivedColumns,
+                                                       Map<String, String> fieldDecoders) {
+        Map<String, String> columnTypes = new java.util.LinkedHashMap<>();
+        Map<String, String> sourcePaths = new java.util.LinkedHashMap<>();
+        Map<String, String> decoders = new java.util.LinkedHashMap<>();
+        Map<String, Boolean> nullable = new java.util.LinkedHashMap<>();
+
+        Map<String, String> fieldSelectors = new java.util.LinkedHashMap<>();
+        Map<String, Boolean> fieldNullable = new java.util.LinkedHashMap<>();
+        if (segmentSchema != null && segmentSchema.get("raw") instanceof Map<?, ?> raw
+                && raw.get("fields") instanceof List<?> fl) {
+            for (Object o : fl) {
+                if (!(o instanceof Map<?, ?> f)) continue;
+                String name = trimOrEmpty(f.get("name"));
+                String selector = trimOrEmpty(f.get("selector"));
+                if (selector.isEmpty()) selector = name;
+                String effectiveName = com.gamma.etl.DeriveSpec.applyNameAffixes(
+                        name, f.get("rename"), f.get("prefix"), f.get("postfix"));
+                fieldSelectors.put(effectiveName, selector);
+                if (f.get("nullable") instanceof Boolean b) {
+                    fieldNullable.put(effectiveName, b);
+                }
+            }
+        }
+        Set<String> derivedSet = new java.util.HashSet<>(derivedColumns == null ? List.of() : derivedColumns);
+        for (String col : columns) {
+            String sqlType = definedSqlTypes != null && definedSqlTypes.containsKey(col)
+                    ? definedSqlTypes.get(col)
+                    : com.gamma.etl.SchemaFieldTypes.VARCHAR;
+            columnTypes.put(col, sqlType);
+
+            String path = fieldSelectors.get(col);
+            if (path == null) {
+                path = derivedSet.contains(col) ? "derive" : col;
+            }
+            sourcePaths.put(col, path);
+
+            String lookupPath = path.startsWith("$header.") ? path.substring("$header.".length()) : path;
+            String dec = Asn1RecordIngester.resolveFieldDecoderId(lookupPath, fieldDecoders);
+            if (dec == null && fieldDecoders != null && !lookupPath.isEmpty()) {
+                for (Map.Entry<String, String> e : fieldDecoders.entrySet()) {
+                    String k = e.getKey();
+                    if (k.equals(lookupPath) || k.endsWith("." + lookupPath)) {
+                        dec = e.getValue();
+                        break;
+                    }
+                }
+            }
+            if (dec != null && !dec.isEmpty()) {
+                decoders.put(col, dec);
+            }
+
+            boolean isNullable = fieldNullable.containsKey(col)
+                    ? fieldNullable.get(col)
+                    : !Asn1RecordIngester.EVENT_TYPE.equals(col);
+            nullable.put(col, isNullable);
+        }
+
+        Map<String, Object> meta = new java.util.LinkedHashMap<>();
+        meta.put("columnTypes", java.util.Collections.unmodifiableMap(columnTypes));
+        meta.put("sourcePaths", java.util.Collections.unmodifiableMap(sourcePaths));
+        meta.put("decoders", java.util.Collections.unmodifiableMap(decoders));
+        meta.put("nullable", java.util.Collections.unmodifiableMap(nullable));
+        return meta;
     }
 
     /** Collects a bounded row sample per segment and counts every row. */
     private static final class CollectingSink implements com.gamma.etl.RecordSink {
         final Map<String, List<String>> columns = new java.util.LinkedHashMap<>();
+        final Map<String, Map<String, String>> sqlTypes = new java.util.LinkedHashMap<>();
         final Map<String, List<Map<String, Object>>> rows = new java.util.LinkedHashMap<>();
         final Map<String, Long> counts = new java.util.HashMap<>();
 
         @Override
         public void define(String segmentKey, List<String> cols) {
+            defineTyped(segmentKey, cols, Map.of());
+        }
+
+        @Override
+        public void defineTyped(String segmentKey, List<String> cols, Map<String, String> types) {
             columns.put(segmentKey, List.copyOf(cols));
+            sqlTypes.put(segmentKey, types == null ? Map.of() : Map.copyOf(types));
             rows.put(segmentKey, new ArrayList<>());
         }
 
@@ -298,7 +407,7 @@ public final class Asn1ParserPlugin implements ParserPlugin {
             while (reader.hasNext()) {
                 Tlv record = reader.next();
                 total++;
-                if (nodes.size() < maxRecords) nodes.add(toNode(record, src));
+                if (nodes.size() < maxRecords) nodes.add(toNode(record, src, null, null));
             }
             if (total == 0)
                 throw new IllegalArgumentException(errors.isEmpty()
@@ -310,13 +419,23 @@ public final class Asn1ParserPlugin implements ParserPlugin {
     }
 
     /** One raw TLV to a preview node: tag as the label, decoded bytes as the value. */
-    private static ParseResult.Node toNode(Tlv t, ByteSource src) {
+    private static ParseResult.Node toNode(Tlv t, ByteSource src, String parentFieldPath, String parentTagPath) {
+        String fieldPath = parentFieldPath == null ? t.tagString() : parentFieldPath + "." + t.tagString();
+        String tagPath = parentTagPath == null ? String.valueOf(t.tagNumber()) : parentTagPath + "." + t.tagNumber();
+        Map<String, Object> meta = new LinkedHashMap<>();
+        meta.put("fieldPath", fieldPath);
+        meta.put("tagPath", tagPath);
+        meta.put("matched", false);
         if (t.constructed()) {
-            List<ParseResult.Node> children = t.children().stream().map(c -> toNode(c, src)).toList();
-            return ParseResult.Node.container(t.tagString(), "constructed", children);
+            meta.put("nodeRole", "container");
+            List<ParseResult.Node> children = t.children().stream()
+                    .map(c -> toNode(c, src, fieldPath, tagPath))
+                    .toList();
+            return ParseResult.Node.container(t.tagString(), "constructed", children, meta);
         }
+        meta.put("nodeRole", "leaf");
         return ParseResult.Node.leaf(t.tagString(), "primitive · " + t.valueLength() + "B",
-                renderValue(t, src));
+                renderValue(t, src), meta);
     }
 
     /**
@@ -352,11 +471,149 @@ public final class Asn1ParserPlugin implements ParserPlugin {
         return true;
     }
 
-    private static ParseResult.Node toNode(NamedNode n) {
-        List<ParseResult.Node> children = n.children().stream().map(Asn1ParserPlugin::toNode).toList();
-        return children.isEmpty()
-                ? ParseResult.Node.leaf(n.name(), n.typeName(), n.value())
-                : ParseResult.Node.container(n.name(), n.typeName(), children);
+    private static ParseResult.Node toNode(NamedNode n, String parentFieldPath, Map<String, String> decoderAliases,
+                                           Map<String, String> fieldDecoders) {
+        String fieldPath = parentFieldPath == null ? n.name() : parentFieldPath + "." + n.name();
+        boolean matched = n.type() != null;
+        boolean repeated = matched
+                && (n.type().kind() == CompiledType.Kind.SEQUENCE_OF
+                || n.type().kind() == CompiledType.Kind.SET_OF);
+        boolean isLeaf = !repeated && n.children().isEmpty() && n.value() != null;
+        String nodeRole = repeated ? "repeated" : (isLeaf ? "leaf" : "container");
+
+        Map<String, Object> meta = new LinkedHashMap<>();
+        meta.put("fieldPath", fieldPath);
+        meta.put("tagPath", n.path());
+        meta.put("nodeRole", nodeRole);
+        meta.put("matched", matched);
+        if (isLeaf && matched) {
+            String override = Asn1RecordIngester.resolveFieldDecoderId(fieldPath, fieldDecoders);
+            meta.put("decoderId", override != null ? override : resolveDecoderId(n.type(), decoderAliases));
+        }
+
+        if (isLeaf) {
+            return ParseResult.Node.leaf(n.name(), n.typeName(), n.value(), meta);
+        }
+        List<ParseResult.Node> children = n.children().stream()
+                .map(c -> toNode(c, fieldPath, decoderAliases, fieldDecoders))
+                .toList();
+        return ParseResult.Node.container(n.name(), n.typeName(), children, meta);
+    }
+
+    /** Catalog of registered ASN.1 value decoders for {@code GET /parsers/asn1/decoders}. */
+    public List<Map<String, Object>> decoders() {
+        List<DecoderRegistry.DecoderMeta> list = DecoderRegistry.withDefaults().listDecoders();
+        List<Map<String, Object>> out = new ArrayList<>(list.size());
+        for (DecoderRegistry.DecoderMeta m : list) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("id", m.id());
+            row.put("description", m.description());
+            row.put("sqlType", m.sqlType());
+            out.add(row);
+        }
+        return out;
+    }
+
+    /**
+     * Leniently parse and compile {@code grammarText} for {@code POST /parsers/asn1/validate},
+     * returning {@code {valid, diagnostics}}.
+     */
+    public Map<String, Object> validateGrammar(String grammarText, String rootType, boolean simplifyAliases) {
+        List<Diagnostic> diagnostics = new ArrayList<>();
+        if (grammarText == null || grammarText.isBlank()) {
+            diagnostics.add(new Diagnostic(0, 0, "ERROR", "grammar_text is required"));
+        } else {
+            try {
+                List<ModuleAst> modules = Asn1Parser.parseLenientDiagnostics(grammarText, diagnostics);
+                if (rootType != null && !rootType.isBlank()) {
+                    SchemaCompiler.compileLenient(modules, rootType.trim(), simplifyAliases, diagnostics);
+                }
+            } catch (Asn1ParseException e) {
+                diagnostics.add(new Diagnostic(0, 0, "ERROR", e.getMessage()));
+            }
+        }
+        boolean valid = diagnostics.stream().noneMatch(d -> "ERROR".equalsIgnoreCase(d.severity()));
+        List<Map<String, Object>> diagMaps = new ArrayList<>(diagnostics.size());
+        for (Diagnostic d : diagnostics) {
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("line", d.line());
+            row.put("column", d.column());
+            row.put("severity", d.severity());
+            row.put("message", d.message());
+            diagMaps.add(row);
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("valid", valid);
+        out.put("diagnostics", diagMaps);
+        return out;
+    }
+
+    static Asn1Decoder compileDecoder(String source, String rootType, boolean simplifyAliases) {
+        try {
+            if (!simplifyAliases) {
+                return Asn1Decoder.compile(source, rootType);
+            }
+            List<ModuleAst> modules = Asn1Parser.parse(source);
+            List<Diagnostic> diagnostics = new ArrayList<>();
+            CompiledSchema schema = SchemaCompiler.compileLenient(modules, rootType, true, diagnostics);
+            for (Diagnostic d : diagnostics) {
+                if ("ERROR".equalsIgnoreCase(d.severity())) {
+                    throw new com.gamma.asn.schema.Asn1ParseException(d.message());
+                }
+            }
+            return Asn1Decoder.of(schema, DecoderRegistry.withDefaults());
+        } catch (Exception badGrammar) {
+            throw new IllegalArgumentException("invalid ASN.1 grammar: " + badGrammar.getMessage(), badGrammar);
+        }
+    }
+
+    private static boolean bool(Object v) {
+        if (v == null) return false;
+        if (v instanceof Boolean b) return b;
+        return "true".equalsIgnoreCase(String.valueOf(v).trim());
+    }
+
+    private static Map<String, String> decoderAliasMap(DecoderRegistry registry) {
+        Map<String, String> map = new LinkedHashMap<>();
+        for (DecoderRegistry.DecoderMeta m : registry.listDecoders()) {
+            map.put(normalizeDecoderName(m.id()), m.id());
+        }
+        map.put("TBCDSTRING", "tbcd");
+        map.put("TBCD", "tbcd");
+        map.put("BCDSTRING", "bcd");
+        map.put("HEX", "hex");
+        map.put("HEXSTRING", "hex");
+        map.put("ADDRESSSTRING", "addressString");
+        map.put("ISDNADDRESSSTRING", "addressString");
+        map.put("DIRECTORYNUMBER", "directoryNumber");
+        map.put("IPADDRESS", "ipAddress");
+        map.put("PLMNID", "plmnId");
+        map.put("TIMESTAMP", "timeStamp");
+        map.put("CCNTIMESTAMP", "ccnTimeStamp");
+        map.put("CHARGINGCHARACTERISTICS", "chargingCharacteristics");
+        map.put("USERLOCATIONINFORMATION", "userLocationInformation");
+        map.put("LOCATIONAREACODE", "locationAreaCode");
+        map.put("TELESERVICECODE", "teleServiceCode");
+        map.put("TOPDPTYPE", "pdpType");
+        map.put("TOIMEI", "imei");
+        map.put("ASCIISTRING", "asciiPrintable");
+        return map;
+    }
+
+    private static String resolveDecoderId(CompiledType type, Map<String, String> aliases) {
+        for (String name : type.nameChain()) {
+            String id = aliases.get(normalizeDecoderName(name));
+            if (id != null) return id;
+        }
+        if (type.primitive() != null) {
+            String id = aliases.get(normalizeDecoderName(type.primitive().name()));
+            if (id != null) return id;
+        }
+        return "hex";
+    }
+
+    private static String normalizeDecoderName(String name) {
+        return name.toUpperCase(Locale.ROOT).replace(" ", "").replace("-", "");
     }
 
     /**

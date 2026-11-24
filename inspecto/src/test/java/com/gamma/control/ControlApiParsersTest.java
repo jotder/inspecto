@@ -404,6 +404,53 @@ class ControlApiParsersTest {
         }
     }
 
+    @Test
+    void asn1DecodersEndpointListsRegisteredDecoders(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg)) {
+            JsonNode list = json(send(c.port, "GET", "/parsers/asn1/decoders", null));
+            assertTrue(list.isArray() && list.size() > 0, list.toString());
+            boolean hasTbcd = false;
+            for (JsonNode row : list) {
+                assertTrue(row.hasNonNull("id"));
+                assertTrue(row.hasNonNull("description"));
+                assertTrue(row.hasNonNull("sqlType"));
+                if ("tbcd".equals(row.get("id").asText())) hasTbcd = true;
+            }
+            assertTrue(hasTbcd, "expected tbcd in " + list);
+        }
+    }
+
+    @Test
+    void asn1ValidateEndpointValidatesValidAndBrokenGrammars(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg)) {
+            ObjectMapper m = new ObjectMapper();
+            String validGrammar = "TEST DEFINITIONS IMPLICIT TAGS ::= BEGIN\n"
+                    + "Record ::= [APPLICATION 1] SEQUENCE { id [0] INTEGER }\n"
+                    + "END\n";
+            JsonNode ok = json(send(c.port, "POST", "/parsers/asn1/validate", m.writeValueAsString(Map.of(
+                    "grammar_text", validGrammar,
+                    "root_type", "Record"))));
+            assertTrue(ok.get("valid").asBoolean(), ok.toString());
+            assertEquals(0, ok.get("diagnostics").size(), ok.toString());
+
+            String brokenGrammar = "TEST DEFINITIONS IMPLICIT TAGS ::= BEGIN\n"
+                    + "Record ::= [APPLICATION 1] SEQUENCE { id [0] MissingType }\n";
+            JsonNode bad = json(send(c.port, "POST", "/parsers/asn1/validate", m.writeValueAsString(Map.of(
+                    "grammar_text", brokenGrammar,
+                    "root_type", "Record"))));
+            assertFalse(bad.get("valid").asBoolean(), bad.toString());
+            assertTrue(bad.get("diagnostics").size() > 0, bad.toString());
+            boolean hasError = false;
+            for (JsonNode d : bad.get("diagnostics")) {
+                if ("ERROR".equalsIgnoreCase(d.get("severity").asText())) {
+                    hasError = true;
+                    break;
+                }
+            }
+            assertTrue(hasError, "expected ERROR diagnostic in " + bad);
+        }
+    }
+
     // ── plumbing ──────────────────────────────────────────────────────────────────
 
     // ⚠ Every route is served under `/api/v1` — a bare `/api` returns "unknown API version", which

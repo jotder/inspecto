@@ -42,6 +42,8 @@ final class ParserRoutes implements RouteModule {
         api.get("/parsers", (e, m) -> catalog());
         api.post("/parsers/([^/]+)/preview", (e, m) -> preview(api, e, ApiContext.name(m), api.body(e)));
         api.get("/parsers/asn1/profile", (e, m) -> decodeProfile(api, e));
+        api.get("/parsers/asn1/decoders", (e, m) -> asn1Decoders());
+        api.post("/parsers/asn1/validate", (e, m) -> asn1Validate(api.body(e)));
     }
 
     private static List<Map<String, Object>> catalog() {
@@ -131,6 +133,54 @@ final class ParserRoutes implements RouteModule {
         }
     }
 
+    /**
+     * {@code GET /parsers/asn1/decoders} — the ASN.1 value decoder catalog ({@code id}, {@code description},
+     * {@code sqlType}) from {@link com.gamma.asn.schema.DecoderRegistry}. Invoked through the registered
+     * {@code asn1} plugin so {@code inspecto} keeps {@code inspecto-telecom-asn1} optional at compile time.
+     */
+    private static Object asn1Decoders() {
+        ParserPlugin asn1 = Parsers.get("asn1")
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown parser: asn1"));
+        try {
+            return asn1.getClass().getMethod("decoders").invoke(asn1);
+        } catch (java.lang.reflect.InvocationTargetException ite) {
+            Throwable cause = ite.getCause();
+            if (cause instanceof IllegalArgumentException bad) {
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
+            }
+            throw new ApiException(500, ErrorCodes.INTERNAL,
+                    cause == null ? "failed to list ASN.1 decoders" : cause.getMessage());
+        } catch (ReflectiveOperationException e) {
+            throw new ApiException(500, ErrorCodes.INTERNAL, "ASN.1 plugin does not expose decoders()");
+        }
+    }
+
+    /**
+     * {@code POST /parsers/asn1/validate} — leniently parses and compiles {@code grammar_text} against
+     * {@code root_type} (with optional {@code simplify_aliases}), returning {@code {valid, diagnostics}}.
+     */
+    private static Object asn1Validate(Map<String, Object> body) {
+        ParserPlugin asn1 = Parsers.get("asn1")
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown parser: asn1"));
+        String grammarText = ApiContext.str(body, "grammar_text");
+        String rootType = ApiContext.str(body, "root_type");
+        boolean simplifyAliases = Boolean.parseBoolean(String.valueOf(body.getOrDefault("simplify_aliases", false)));
+        try {
+            return asn1.getClass()
+                    .getMethod("validateGrammar", String.class, String.class, boolean.class)
+                    .invoke(asn1, grammarText, rootType, simplifyAliases);
+        } catch (java.lang.reflect.InvocationTargetException ite) {
+            Throwable cause = ite.getCause();
+            if (cause instanceof IllegalArgumentException bad) {
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
+            }
+            throw new ApiException(500, ErrorCodes.INTERNAL,
+                    cause == null ? "failed to validate ASN.1 grammar" : cause.getMessage());
+        } catch (ReflectiveOperationException e) {
+            throw new ApiException(500, ErrorCodes.INTERNAL, "ASN.1 plugin does not expose validateGrammar()");
+        }
+    }
+
     /** The sample bytes: {@code sample_text} (text formats) or {@code sample_b64} (binary), capped. */
     private static byte[] sampleOf(Map<String, Object> body) {
         String text = ApiContext.str(body, "sample_text");
@@ -209,6 +259,7 @@ final class ParserRoutes implements RouteModule {
             set.put("derivedColumns", s.derivedColumns());
             set.put("rows", s.rows());
             set.put("rowCount", s.rowCount());
+            if (!s.columnMeta().isEmpty()) set.put("columnMeta", s.columnMeta());
             sets.add(set);
         }
         Map<String, Object> out = new LinkedHashMap<>();
@@ -225,6 +276,7 @@ final class ParserRoutes implements RouteModule {
             if (n.type() != null) node.put("type", n.type());
             if (n.value() != null) node.put("value", n.value());
             if (!n.children().isEmpty()) node.put("children", nodesJson(n.children()));
+            if (!n.meta().isEmpty()) node.put("meta", n.meta());
             out.add(node);
         }
         return out;

@@ -16,6 +16,7 @@ export interface ServedFieldSpec {
     pattern?: string | null;
     uiHint?: string | null;
     visibleWhen?: string | null; // "otherPath=value" — a rendering hint only
+    section?: string | null;
 }
 
 /** Served `FieldType` → the schema-form's control vocabulary. Absent = not generically renderable. */
@@ -53,6 +54,7 @@ export function fieldSpecsToAttributes(specs: ServedFieldSpec[] | undefined): At
             pattern: f.pattern ?? undefined,
             dependsOn: dependsOnOf(f.visibleWhen),
             help: f.description || undefined,
+            ...(f.section ? { section: f.section } : {}),
         });
     }
     return out;

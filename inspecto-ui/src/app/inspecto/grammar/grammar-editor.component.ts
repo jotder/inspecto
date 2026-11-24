@@ -201,6 +201,8 @@ export class GrammarEditorComponent implements AfterViewInit {
      * in its template — which would evaluate before the query resolves.
      */
     @Output() readonly pluginChange = new EventEmitter<ParserDef | null>();
+    /** Emitted when a user clicks a node in the parsed tree. */
+    @Output() readonly treeNodeSelected = new EventEmitter<ParserTreeNode>();
 
     // ── state ────────────────────────────────────────────────────────────────
 
@@ -243,6 +245,18 @@ export class GrammarEditorComponent implements AfterViewInit {
         const specs = this.specs();
         const ids = new Set(specs.map((s) => s.section).filter((t): t is string => !!t));
         if (ids.size < 2) return null;
+        if (this.pluginDef()) {
+            const ordered: string[] = [];
+            for (const s of specs) {
+                if (s.section && !ordered.includes(s.section)) ordered.push(s.section);
+            }
+            const fallback = ordered[0];
+            return ordered.map((id) => ({
+                id,
+                label: id,
+                specs: specs.filter((s) => (s.section ?? fallback) === id),
+            }));
+        }
         const shell = grammarTabsFor(this.frontend());
         const fallback = shell[0].id;
         return shell
@@ -709,6 +723,21 @@ export class GrammarEditorComponent implements AfterViewInit {
      */
     value(): Record<string, unknown> {
         const nested = this.grammar();
+        const plugin = this.pluginDef();
+        if (plugin) {
+            if (plugin.id === 'asn1') {
+                nested['frontend'] = 'asn1';
+                return nested;
+            }
+            const block: Record<string, unknown> = {
+                ...(nested['plugin'] && typeof nested['plugin'] === 'object'
+                    ? (nested['plugin'] as Record<string, unknown>)
+                    : {}),
+                ...(plugin.ingesterClass ? { ingester: plugin.ingesterClass } : {}),
+            };
+            if (nested['ingester_config'] !== undefined) block['ingester_config'] = nested['ingester_config'];
+            return { frontend: 'plugin', plugin: block };
+        }
         nested['frontend'] = this.frontend();
         if (this.frontend() === 'fixedwidth') {
             const fw = (nested['fixedwidth'] ??= {}) as Record<string, unknown>;

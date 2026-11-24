@@ -1,0 +1,11 @@
+MSC-MOC-SYNTHETIC DEFINITIONS IMPLICIT TAGS ::= BEGIN
+CallEventRecord ::= CHOICE {
+  moCallRecord [0] MOCallRecord
+}
+MOCallRecord ::= SET {
+  recordType [0] INTEGER,
+  servedIMSI [1] TBCD-STRING,
+  callDuration [2] INTEGER
+}
+TBCD-STRING ::= OCTET STRING
+END

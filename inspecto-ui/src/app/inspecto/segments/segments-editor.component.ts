@@ -1,5 +1,5 @@
-import { ChangeDetectionStrategy, Component, Input, inject, input, signal } from '@angular/core';
-import { outputFromObservable } from '@angular/core/rxjs-interop';
+import { ChangeDetectionStrategy, Component, Input, computed, inject, input, signal } from '@angular/core';
+import { outputFromObservable, toSignal } from '@angular/core/rxjs-interop';
 import { FormArray, FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { map } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
@@ -8,7 +8,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import type { ParserTreeNode } from 'app/inspecto/api';
+import type { ParserRowSet, ParserTreeNode } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import {
@@ -60,13 +60,91 @@ export class InspectoSegmentsEditorComponent {
 
     /** The plugin preview's record forest — the source "Derive from preview" reads. */
     readonly tree = input<ParserTreeNode[] | null>(null);
+    /** Optional derived row sets from preview — provides column-level sample hints and drift signals. */
+    readonly rows = input<ParserRowSet[] | null>(null);
     /** Whether the operator may edit (lens gate lives in the host). */
     readonly editable = input(true);
+
+    /** Sample values by selector/fieldPath or column name, derived from `tree()` and `rows()`. */
+    readonly sampleHints = computed<Record<string, string>>(() => {
+        const out: Record<string, string> = {};
+        const walk = (nodes: ParserTreeNode[], prefix: string): void => {
+            for (const n of nodes) {
+                const path =
+                    typeof n.meta?.['fieldPath'] === 'string' && n.meta['fieldPath']
+                        ? String(n.meta['fieldPath'])
+                        : prefix
+                          ? `${prefix}.${n.label}`
+                          : n.label;
+                if (n.value != null && out[path] === undefined) {
+                    out[path] = String(n.value);
+                }
+                if (n.children?.length) walk(n.children, path);
+            }
+        };
+        const tree = this.tree();
+        if (tree?.length) walk(tree, '');
+        for (const set of this.rows() ?? []) {
+            const first = set.rows?.[0];
+            if (!first) continue;
+            const sourcePaths = set.columnMeta?.['sourcePaths'] as Record<string, string> | undefined;
+            for (const col of set.columns) {
+                const v = first[col];
+                if (v === null || v === undefined) continue;
+                if (out[col] === undefined) out[col] = String(v);
+                const sp = sourcePaths?.[col];
+                if (sp && out[sp] === undefined) out[sp] = String(v);
+            }
+        }
+        return out;
+    });
+
+    /** Drift between configured segment selectors and leaf paths present in the latest preview tree. */
+    readonly drift = computed<{ missingSelectors: string[]; extraPaths: string[] }>(() => {
+        this.formValue();
+        const tree = this.tree();
+        if (!tree?.length) return { missingSelectors: [], extraPaths: [] };
+        const treePaths = new Set<string>();
+        const walk = (nodes: ParserTreeNode[], prefix: string): void => {
+            for (const n of nodes) {
+                const path =
+                    typeof n.meta?.['fieldPath'] === 'string' && n.meta['fieldPath']
+                        ? String(n.meta['fieldPath'])
+                        : prefix
+                          ? `${prefix}.${n.label}`
+                          : n.label;
+                if (!n.children?.length) treePaths.add(path);
+                else walk(n.children, path);
+            }
+        };
+        walk(tree, '');
+        const configured = new Set<string>();
+        for (const g of this.segments.controls) {
+            for (const c of this.columnsOf(g).controls) {
+                const sel = String(c.value['selector'] ?? '').trim();
+                if (sel) configured.add(sel);
+            }
+        }
+        if (configured.size === 0) return { missingSelectors: [], extraPaths: [] };
+        const missingSelectors = [...configured].filter((s) => !treePaths.has(s));
+        const extraPaths = [...treePaths].filter((p) => !configured.has(p));
+        return { missingSelectors, extraPaths };
+    });
+
+    sampleHintFor(selector: string, name?: string): string | null {
+        const hints = this.sampleHints();
+        const sel = selector.trim();
+        if (sel && hints[sel] !== undefined) return hints[sel];
+        const col = (name ?? '').trim();
+        if (col && hints[col] !== undefined) return hints[col];
+        return null;
+    }
 
     readonly types = SEGMENT_COLUMN_TYPES;
     readonly eventTypeColumn = EVENT_TYPE_COLUMN;
 
     readonly form: FormGroup = this.fb.group({ segments: this.fb.array<FormGroup>([]) });
+    private readonly formValue = toSignal(this.form.valueChanges, { initialValue: null });
     /**
      * Fired on every change to the segments, so a host re-derives its dirty state: the key row commits on
      * Enter / blur, which bubbles no `input` (and a Tab or Enter no `click`) for a host listener to catch.
@@ -98,7 +176,7 @@ export class InspectoSegmentsEditorComponent {
             columns,
         });
         this.segments.push(group);
-        for (const c of draft?.columns ?? []) this.addColumn(group, c.name, c.selector, c.type);
+        for (const c of draft?.columns ?? []) this.addColumn(group, c.name, c.selector, c.type, c);
         if (!draft) this.addColumn(group);
     }
 
@@ -107,12 +185,21 @@ export class InspectoSegmentsEditorComponent {
         this.form.markAsDirty();
     }
 
-    addColumn(segment: FormGroup, name = '', selector = '', type: SegmentColumnType = 'VARCHAR'): void {
+    addColumn(
+        segment: FormGroup,
+        name = '',
+        selector = '',
+        type: SegmentColumnType = 'VARCHAR',
+        affixes?: { rename?: string; prefix?: string; postfix?: string },
+    ): void {
         this.columnsOf(segment).push(
             this.fb.group({
                 name: [name, [Validators.required, Validators.pattern(IDENTIFIER_RE)]],
                 selector: [selector, [Validators.required]],
                 type: [type],
+                rename: [affixes?.rename ?? ''],
+                prefix: [affixes?.prefix ?? ''],
+                postfix: [affixes?.postfix ?? ''],
             }),
         );
     }
@@ -182,11 +269,19 @@ export class InspectoSegmentsEditorComponent {
     value(): SegmentDraft[] {
         return this.segments.controls.map((g) => ({
             key: String(g.value['key'] ?? '').trim(),
-            columns: this.columnsOf(g).controls.map((c) => ({
-                name: String(c.value['name'] ?? '').trim(),
-                selector: String(c.value['selector'] ?? '').trim(),
-                type: (c.value['type'] ?? 'VARCHAR') as SegmentColumnType,
-            })),
+            columns: this.columnsOf(g).controls.map((c) => {
+                const rename = String(c.value['rename'] ?? '').trim();
+                const prefix = String(c.value['prefix'] ?? '');
+                const postfix = String(c.value['postfix'] ?? '');
+                return {
+                    name: String(c.value['name'] ?? '').trim(),
+                    selector: String(c.value['selector'] ?? '').trim(),
+                    type: (c.value['type'] ?? 'VARCHAR') as SegmentColumnType,
+                    ...(rename ? { rename } : {}),
+                    ...(prefix.trim() ? { prefix } : {}),
+                    ...(postfix.trim() ? { postfix } : {}),
+                };
+            }),
         }));
     }
 

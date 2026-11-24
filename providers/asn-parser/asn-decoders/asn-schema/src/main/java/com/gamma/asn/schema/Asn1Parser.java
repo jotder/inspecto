@@ -26,22 +26,51 @@ import java.util.Map;
 public final class Asn1Parser {
 
     private final List<Token> tokens;
-    private final List<String> warnings; // null = strict mode
+    private final List<String> warnings; // null unless parseLenient
+    private final List<Diagnostic> diagnostics; // null unless parseLenientDiagnostics
     private int i;
 
-    private Asn1Parser(String text, List<String> warnings) {
+    private Asn1Parser(String text, List<String> warnings, List<Diagnostic> diagnostics) {
         this.tokens = Tokenizer.tokenize(text);
         this.warnings = warnings;
+        this.diagnostics = diagnostics;
     }
 
     /** Parses every module in {@code text} (a file may hold more than one). Strict. */
     public static List<ModuleAst> parse(String text) {
-        return new Asn1Parser(text, null).modules();
+        return new Asn1Parser(text, null, null).modules();
     }
 
     /** Parse with per-definition error recovery; skipped constructs land in {@code warningsOut}. */
     public static List<ModuleAst> parseLenient(String text, List<String> warningsOut) {
-        return new Asn1Parser(text, warningsOut).modules();
+        return new Asn1Parser(text, warningsOut, null).modules();
+    }
+
+    /** Parse with per-definition error recovery; structured diagnostics land in {@code out}. */
+    public static List<ModuleAst> parseLenientDiagnostics(String text, List<Diagnostic> out) {
+        return new Asn1Parser(text, null, out).modules();
+    }
+
+    private boolean isLenient() {
+        return warnings != null || diagnostics != null;
+    }
+
+    private void warn(int line, int col, String message) {
+        if (warnings != null) {
+            warnings.add(message);
+        }
+        if (diagnostics != null) {
+            diagnostics.add(new Diagnostic(line, col, "WARNING", message));
+        }
+    }
+
+    private void error(int line, int col, String message) {
+        if (warnings != null) {
+            warnings.add(message);
+        }
+        if (diagnostics != null) {
+            diagnostics.add(new Diagnostic(line, col, "ERROR", message));
+        }
     }
 
     private List<ModuleAst> modules() {
@@ -93,8 +122,8 @@ public final class Asn1Parser {
 
         while (!peek().isWord("END")) {
             if (peek().is(Token.Kind.EOF)) {
-                if (warnings != null) { // hand-doctored files may just stop
-                    warnings.add("missing END for module " + name);
+                if (isLenient()) { // hand-doctored files may just stop
+                    error(peek().line(), peek().col(), "missing END for module " + name);
                     return new ModuleAst(name, tagDefault, types, imports, exports);
                 }
                 throw err("missing END for module " + name);
@@ -119,13 +148,13 @@ public final class Asn1Parser {
             } else if (peek().isWord("IMPORTS")) {
                 next();
                 imports(imports);
-            } else if (warnings == null) {
+            } else if (!isLenient()) {
                 assignment(types);
             } else {
                 try {
                     assignment(types);
                 } catch (Asn1ParseException e) {
-                    warnings.add("skipped assignment: " + e.getMessage());
+                    error(e.line(), e.col(), "skipped assignment: " + e.getMessage());
                     skipToNextAssignment();
                 }
             }
@@ -425,13 +454,13 @@ public final class Asn1Parser {
                 out.add(ComponentAst.componentsOf(type()));
                 continue;
             }
-            if (warnings == null) {
+            if (!isLenient()) {
                 out.add(component());
             } else {
                 try {
                     out.add(component());
                 } catch (Asn1ParseException e) {
-                    warnings.add("skipped component: " + e.getMessage());
+                    error(e.line(), e.col(), "skipped component: " + e.getMessage());
                     skipToNextComponent();
                 }
             }
@@ -439,14 +468,16 @@ public final class Asn1Parser {
     }
 
     private ComponentAst component() {
+        Token nameTok = peek();
         String name = expectIdent("component name");
         // `Junk name [tag] ...`: an IDENT directly followed by `X [` can only mean the
         // first IDENT is stray (a `--a, --`-style comment pair leaves one behind, e.g.
         // mtnOCC's usedOffers line) — a real untagged component is never followed by '['
-        while (warnings != null && peek().is(Token.Kind.IDENT)
+        while (isLenient() && peek().is(Token.Kind.IDENT)
                 && peek(1).is(Token.Kind.LBRACKET)) {
-            warnings.add("dropped stray token '" + name + "' before component '"
-                    + peek().text() + "'");
+            warn(nameTok.line(), nameTok.col(), "dropped stray token '" + name
+                    + "' before component '" + peek().text() + "'");
+            nameTok = peek();
             name = next().text();
         }
         TypeAst compType = type();

@@ -6,7 +6,10 @@ import com.gamma.util.ToonHelper;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -61,9 +64,13 @@ public final class DecodeProfile {
         Object raw = asn1.get(KEY);
         String ref = raw == null ? "" : String.valueOf(raw).trim();
         if (ref.isEmpty()) {
-            if (!asn1.containsKey(KEY)) return new Resolved(asn1, null);
+            if (!asn1.containsKey(KEY)) {
+                validateRoutingAndDecoders(asn1);
+                return new Resolved(asn1, null);
+            }
             Map<String, Object> without = new LinkedHashMap<>(asn1);
             without.remove(KEY);
+            validateRoutingAndDecoders(without);
             return new Resolved(without, null);
         }
         Profile profile = read(ref, configDir);
@@ -93,6 +100,7 @@ public final class DecodeProfile {
             if (!KEY.equals(e.getKey()) && e.getValue() != null
                     && !(e.getValue() instanceof String s && s.isBlank()))
                 merged.put(e.getKey(), e.getValue());
+        validateRoutingAndDecoders(merged);
         return new Resolved(merged, file);
     }
 
@@ -151,6 +159,7 @@ public final class DecodeProfile {
      * profile that previews is the profile that ingests. Segment keys are checked when the block names them.
      */
     public static void validateDerive(Map<String, Object> asn1) {
+        validateRoutingAndDecoders(asn1);
         if (asn1.get("derive") == null && asn1.get("max_list_elements") == null
                 && asn1.get("max_derived_columns") == null && asn1.get("children") == null
                 && asn1.get("max_child_rows_per_record") == null) return;
@@ -159,6 +168,75 @@ public final class DecodeProfile {
         DeriveSpec.parse(asn1.get("derive"), segs, asn1.get("max_list_elements"), asn1.get("max_derived_columns"));
         // Parsing D9 slice 2: the explode block rides the same read-time validation.
         ChildSpec.parse(asn1.get("children"), segs, asn1.get("max_child_rows_per_record"));
+    }
+
+    /**
+     * Validate {@code event_roots}, {@code header_fields}, and {@code field_decoders} on an {@code asn1:} block.
+     */
+    public static void validateRoutingAndDecoders(Map<String, Object> asn1) {
+        if (asn1 == null) return;
+        Map<String, String> roots = eventRoots(asn1);
+        headerFields(asn1);
+        fieldDecoders(asn1);
+        if (!roots.isEmpty() && asn1.get("segments") instanceof Map<?, ?> segs) {
+            for (String sinkKey : roots.values()) {
+                if (!segs.containsKey(sinkKey))
+                    throw new IllegalArgumentException(
+                            "asn1.event_roots references undeclared segment '" + sinkKey + "'");
+            }
+        }
+    }
+
+    /** Parse {@code event_roots} ({@code eventRootPathOrType -> segmentKey}); empty if absent. */
+    public static Map<String, String> eventRoots(Map<String, Object> asn1) {
+        Object raw = asn1 == null ? null : asn1.get("event_roots");
+        if (raw == null) return Map.of();
+        if (!(raw instanceof Map<?, ?> m))
+            throw new IllegalArgumentException("asn1.event_roots must be a map of {eventRoot: segmentKey}");
+        Map<String, String> out = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> e : m.entrySet()) {
+            String key = e.getKey() == null ? "" : String.valueOf(e.getKey()).trim();
+            String val = e.getValue() == null ? "" : String.valueOf(e.getValue()).trim();
+            if (key.isEmpty() || val.isEmpty())
+                throw new IllegalArgumentException(
+                        "asn1.event_roots entries must have non-blank event root and segment key");
+            out.put(key, val);
+        }
+        return Collections.unmodifiableMap(out);
+    }
+
+    /** Parse {@code header_fields} (list of dotted header paths); empty if absent. */
+    public static List<String> headerFields(Map<String, Object> asn1) {
+        Object raw = asn1 == null ? null : asn1.get("header_fields");
+        if (raw == null) return List.of();
+        if (!(raw instanceof List<?> list))
+            throw new IllegalArgumentException("asn1.header_fields must be a list of dotted field paths");
+        List<String> out = new ArrayList<>(list.size());
+        for (Object o : list) {
+            String path = o == null ? "" : String.valueOf(o).trim();
+            if (path.isEmpty())
+                throw new IllegalArgumentException("asn1.header_fields entries must be non-blank");
+            out.add(path);
+        }
+        return List.copyOf(out);
+    }
+
+    /** Parse {@code field_decoders} ({@code leafFieldPath -> decoderId}); empty if absent. */
+    public static Map<String, String> fieldDecoders(Map<String, Object> asn1) {
+        Object raw = asn1 == null ? null : asn1.get("field_decoders");
+        if (raw == null) return Map.of();
+        if (!(raw instanceof Map<?, ?> m))
+            throw new IllegalArgumentException("asn1.field_decoders must be a map of {fieldPath: decoderId}");
+        Map<String, String> out = new LinkedHashMap<>();
+        for (Map.Entry<?, ?> e : m.entrySet()) {
+            String key = e.getKey() == null ? "" : String.valueOf(e.getKey()).trim();
+            String val = e.getValue() == null ? "" : String.valueOf(e.getValue()).trim();
+            if (key.isEmpty() || val.isEmpty())
+                throw new IllegalArgumentException(
+                        "asn1.field_decoders entries must have non-blank fieldPath and decoderId");
+            out.put(key, val);
+        }
+        return Collections.unmodifiableMap(out);
     }
 
     private static String besideProfile(Path profileDir, String ref, String field) {
