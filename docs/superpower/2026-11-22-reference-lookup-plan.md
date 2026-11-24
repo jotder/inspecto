@@ -247,6 +247,19 @@ registry read; a walk per test is cheap at a Reference's file count. Known limit
 warm-up at start. `PointLookupParityTest.theReferenceStampChangesWithItsFilesAndIsNullWhenNoneAreDeclared`,
 `ControlApiLookupsTest`, `lookups.component.spec.ts`. Not driven in the preview.
 
+**P3d — memory cap and preload built 2026-11-24 (operator: "a memory cap based on size instead of row count, and
+loading indexes before first use"); P3 is complete.** The row cap is gone: `PointLookup` estimates the heap each row
+holds as it loads (64 bytes a row, 8 a value slot, a String's 40 plus two bytes a character — UTF-16, the worst case, so
+the estimate errs high) and refuses past `-Dlookup.point.max_bytes` (default 256 MiB); the answer and the list carry
+`bytes`. `-Dlookup.point.preload=true` starts a daemon thread at route registration that builds every keyed lookup's
+index in Pipeline order, up to the 8 kept; a refusal is logged and kept, and the next lookup goes on. `GET /lookups`
+gives each row `index {state: ready | building | failed | cold, rows, bytes, loadedAt, error}` — the build path shared
+with `POST /lookups/test` (`LookupRoutes.warmUp`) maintains it — and the screen shows **Test index** and **Index
+memory** columns. Decisions (assistant): the cap is per index (8 kept × 256 MiB is the worst case; a global budget was
+not asked for); preload off by default, since it spends memory at start for lookups nobody may test; a Pipeline loaded
+after start is not preloaded. `PointLookupParityTest`, `ControlApiLookupsTest` (cold → ready, preload ready, over-cap
+failed), `lookups.component.spec.ts`. Not driven in the preview.
+
 **P1h built 2026-11-23 (operator: "Yes, exact only"):** the `lookup()` scalar as the Record Transformer function
 `lookup.reference` (category Lookup; params `reference`, `key`, `returns`, `normalize`), exact match only. It renders
 the marker call `inspecto_lookup(...)`; `RowShaper.project` expands it into a scalar subquery over the resolved

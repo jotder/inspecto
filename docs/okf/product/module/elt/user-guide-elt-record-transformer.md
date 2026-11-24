@@ -497,8 +497,10 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
     index of the Reference that the parity suite holds equal to the batch join. The Reference is loaded on the first
     test and kept (up to 8 lookups), and loaded again by the next test after its files change (a new commit of a
     Reference Dataset, an edited file) — the answer then says so. **Reload Reference and test** forces a reload; it
-    is needed only where the answer says changes are not detected. Every match mode: for `range` the value is compared as the batch join compares it (a date for a DATE bound, a number by its exact value), and for `asof` a **Time** box asks for the row's time (without one, only Reference rows with no from-date match). ⚠ A CSV `path:` Reference is read as text, so its range bounds compare as text — `10` sorts before `9` — in the batch join and the test alike. A Reference over
-    `-Dlookup.point.max_rows` rows (default 1,000,000) is refused rather than loaded. Served by `POST /lookups/test`;
+    is needed only where the answer says changes are not detected. Every match mode: for `range` the value is compared as the batch join compares it (a date for a DATE bound, a number by its exact value), and for `asof` a **Time** box asks for the row's time (without one, only Reference rows with no from-date match). ⚠ A CSV `path:` Reference is read as text, so its range bounds compare as text — `10` sorts before `9` — in the batch join and the test alike. An index whose estimated memory passes
+    `-Dlookup.point.max_bytes` (default 256 MiB) is refused rather than loaded. The list's **Test index** column shows
+    each index as ready (with **Index memory**), building, failed (hover for why) or cold; start the server with
+    `-Dlookup.point.preload=true` to build them at start (up to 8) instead of on the first test. Served by `POST /lookups/test`;
     the value travels in the request body and is not logged.
 - **`normalize:` (since 2026-11-23, `LOOKUP-1` P1e)** — for `exact` and `longest_prefix`, an ordered list of `trim`,
   `lower`, `upper`, `strip_leading_zeros`, `strip_plus`, applied to the Reference key and to every looked-up value

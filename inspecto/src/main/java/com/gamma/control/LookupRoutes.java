@@ -45,6 +45,107 @@ final class LookupRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get("/lookups", (e, m) -> list(api));
         api.post("/lookups/test", (e, m) -> test(api, api.body(e)));
+        if (Boolean.getBoolean(PROP_PRELOAD)) {
+            Thread t = new Thread(() -> preload(api), "lookup-preload");
+            t.setDaemon(true);
+            t.start();
+        }
+    }
+
+    /** System property: build the keyed lookups' point indexes at start (up to {@link #MAX_WARM}), not on first test. */
+    static final String PROP_PRELOAD = "lookup.point.preload";
+
+    /** Lookups whose index is being built, and the last refusal of each that failed (key = pipeline/step). */
+    private static final java.util.Set<String> BUILDING = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final Map<String, String> FAILED = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Build every keyed lookup's index at start, in Pipeline order, up to {@link #MAX_WARM} (more would only evict the
+     * first). A refusal (over the cap, a duplicate key) is kept for {@code GET /lookups} and the next lookup goes on.
+     */
+    static void preload(ApiContext api) {
+        int built = 0;
+        for (PipelineConfig cfg : HostContext.of(api).service().loadedPipelines()) {
+            PipelineGraph g;
+            try {
+                g = PipelineLift.stageTwo(cfg);
+            } catch (RuntimeException noChain) {
+                continue;
+            }
+            for (PipelineNode n : g.nodes()) {
+                if (!BuiltinNodeType.TRANSFORM_JOIN.type().equals(n.type()) || !keyed(n)) continue;
+                if (built++ >= MAX_WARM) return;
+                try {
+                    warmUp(api, cfg.identity().pipelineName(), n, false);
+                } catch (RuntimeException refused) {
+                    log.warn("lookups: preloading {}/{} refused: {}", cfg.identity().pipelineName(), n.id(),
+                            refused.getMessage());
+                }
+            }
+        }
+    }
+
+    /** The index that answers, why this call built it ({@code null}: kept), and the Reference stamp it was built at. */
+    private record Warmed(Warm warm, String reason, String stamp) {}
+
+    /**
+     * The kept index of {@code node}, built first when it is new, asked for, its Step changed or its Reference's files
+     * changed. Tracks {@link #BUILDING} and {@link #FAILED} for the readiness {@code GET /lookups} reports.
+     *
+     * @throws ApiException 422 when the point engine refuses the join
+     */
+    private static Warmed warmUp(ApiContext api, String pipeline, PipelineNode node, boolean refresh) {
+        String key = pipeline + "/" + node.id();
+        Map<String, Object> config = new LinkedHashMap<>(node.config());
+        Warm warm;
+        synchronized (WARM) { warm = WARM.get(key); }
+        RowShaper.ReferenceResolver refs = PipelineGraphRoutes.dryRunReferences(api);
+        // stamped BEFORE the build: a Reference committed while it builds differs from this stamp next time
+        Object reference = node.cfg("reference");   // none: the build refuses it (422), so there is nothing to stamp
+        String stamp = reference == null || reference.toString().isBlank() ? null
+                : PointLookup.referenceStamp(reference.toString().trim(), refs);
+        String reason = warm == null ? "first use"
+                : refresh ? "reload asked"
+                : !warm.config().equals(config) ? "step changed"
+                : stamp != null && !stamp.equals(warm.stamp()) ? "reference changed"
+                : null;
+        if (reason != null) {
+            BUILDING.add(key);
+            try {
+                warm = new Warm(config, PointLookup.load(node, refs), stamp);
+                FAILED.remove(key);
+            } catch (IllegalArgumentException refused) {
+                FAILED.put(key, refused.getMessage());
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, refused.getMessage());
+            } catch (RuntimeException e) {
+                FAILED.put(key, String.valueOf(e.getMessage()));
+                throw e;
+            } catch (Exception e) {
+                FAILED.put(key, String.valueOf(e.getMessage()));
+                throw new IllegalStateException(e.getMessage(), e);
+            } finally {
+                BUILDING.remove(key);
+            }
+            // the old index answers until this put: the swap is one map write, never a half-built index
+            synchronized (WARM) { WARM.put(key, warm); }
+        }
+        return new Warmed(warm, reason, stamp);
+    }
+
+    /** {@code GET /lookups}'s per-row index readiness: ready (with its size), building, failed (with why) or cold. */
+    private static Map<String, Object> indexState(String pipeline, String step) {
+        String key = pipeline + "/" + step;
+        Warm warm;
+        synchronized (WARM) { warm = WARM.get(key); }
+        Map<String, Object> s = new LinkedHashMap<>();
+        s.put("state", BUILDING.contains(key) ? "building" : warm != null ? "ready" : FAILED.containsKey(key) ? "failed" : "cold");
+        if (warm != null) {
+            s.put("rows", warm.index().rows());
+            s.put("bytes", warm.index().bytes());
+            s.put("loadedAt", warm.index().loadedAt().toString());
+        }
+        if (FAILED.containsKey(key)) s.put("error", FAILED.get(key));
+        return s;
     }
 
     /** Built point indexes kept warm, at most this many (least recently used dropped first). */
@@ -57,7 +158,11 @@ final class LookupRoutes implements RouteModule {
     };
 
     /** For tests: drop every warm index. */
-    static void clearWarm() { synchronized (WARM) { WARM.clear(); } }
+    static void clearWarm() {
+        synchronized (WARM) { WARM.clear(); }
+        BUILDING.clear();
+        FAILED.clear();
+    }
 
     /**
      * {@code POST /lookups/test} {@code {pipeline, step, value, at?, refresh?}} — LOOKUP-1 P3 test-a-key: the keyed join's
@@ -66,7 +171,7 @@ final class LookupRoutes implements RouteModule {
      * kept warm; it is rebuilt when the Step's config changed, its Reference's files changed (the stamp of
      * {@link PointLookup#referenceStamp}; the new index replaces the old in one write), or {@code refresh: true} asks; a
      * Reference whose files the resolver does not declare is not watched ({@code index.watchesReference=false}). 404 for an unknown keyed Step, 422 for a join the point
-     * engine refuses (a duplicate key or overlapping ranges, over the row cap); {@code at} is the row time for {@code match: asof}. An open read, like the dry run.
+     * engine refuses (a duplicate key or overlapping ranges, over the memory cap); {@code at} is the row time for {@code match: asof}. An open read, like the dry run.
      */
     private static Object test(ApiContext api, Map<String, Object> body) throws Exception {
         String pipeline = body == null || body.get("pipeline") == null ? null : body.get("pipeline").toString();
@@ -87,29 +192,9 @@ final class LookupRoutes implements RouteModule {
         }
         if (node == null)
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no keyed lookup '" + step + "' in pipeline '" + pipeline + "'");
-        String key = pipeline + "/" + step;
-        Map<String, Object> config = new LinkedHashMap<>(node.config());
-        Warm warm;
-        synchronized (WARM) { warm = WARM.get(key); }
-        RowShaper.ReferenceResolver refs = PipelineGraphRoutes.dryRunReferences(api);
-        // stamped BEFORE the build: a Reference committed while it builds differs from this stamp next time
-        Object reference = node.cfg("reference");   // none: the build refuses it (422), so there is nothing to stamp
-        String stamp = reference == null || reference.toString().isBlank() ? null
-                : PointLookup.referenceStamp(reference.toString().trim(), refs);
-        String reason = warm == null ? "first use"
-                : Boolean.TRUE.equals(body.get("refresh")) ? "reload asked"
-                : !warm.config().equals(config) ? "step changed"
-                : stamp != null && !stamp.equals(warm.stamp()) ? "reference changed"
-                : null;
-        if (reason != null) {
-            try {
-                warm = new Warm(config, PointLookup.load(node, refs), stamp);
-            } catch (IllegalArgumentException refused) {
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, refused.getMessage());
-            }
-            // the old index answers until this put: the swap is one map write, never a half-built index
-            synchronized (WARM) { WARM.put(key, warm); }
-        }
+        Warmed w = warmUp(api, pipeline, node, Boolean.TRUE.equals(body.get("refresh")));
+        Warm warm = w.warm();
+        String reason = w.reason(), stamp = w.stamp();
         PointLookup.Answer a = warm.index().test(value == null ? null : value.toString(),
                 at == null || at.toString().isBlank() ? null : at.toString());
         Map<String, Object> out = new LinkedHashMap<>();
@@ -130,6 +215,7 @@ final class LookupRoutes implements RouteModule {
         out.put("mappings", mappings);
         Map<String, Object> index = new LinkedHashMap<>();
         index.put("rows", warm.index().rows());
+        index.put("bytes", warm.index().bytes());
         index.put("loadedAt", warm.index().loadedAt().toString());
         index.put("buildMs", warm.index().buildMillis());
         index.put("reloaded", reason);                 // why this answer built the index, or null when it was kept
@@ -181,6 +267,7 @@ final class LookupRoutes implements RouteModule {
         r.put("reference", n.cfg("reference"));
         r.put("match", n.cfg("match") == null ? "exact" : n.cfg("match").toString());
         r.put("lookedUpBy", lookedUpBy(n));
+        r.put("index", indexState(pipeline, n.id()));
         if (store != null) {
             StepReceipt last = null;
             try {

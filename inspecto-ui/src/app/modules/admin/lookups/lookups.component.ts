@@ -140,6 +140,21 @@ export class LookupsComponent implements OnInit {
         },
         { field: 'referenceRows', headerName: 'Reference rows', minWidth: 130, valueFormatter: (p) => count(p.value) },
         { field: 'nullKeys', headerName: 'Empty keys', minWidth: 110, valueFormatter: (p) => count(p.value) },
+        {
+            field: 'indexState',
+            headerName: 'Test index',
+            minWidth: 120,
+            maxWidth: 140,
+            tooltipField: 'indexError',
+            cellRenderer: (p: ICellRendererParams<LookupGridRow>) => statusBadgeHtml(p.value as string),
+        },
+        {
+            field: 'indexBytes',
+            headerName: 'Index memory',
+            minWidth: 120,
+            valueFormatter: (p) =>
+                p.value == null ? '—' : formatNumber((p.value as number) / (1024 * 1024), { decimals: 1 }) + ' MiB',
+        },
     ];
 
     ngOnInit(): void {

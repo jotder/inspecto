@@ -19,6 +19,12 @@ export interface LookupGridRow {
     truncated: boolean;
     /** The last run's unmatched-key sample, fingerprints and shapes only. */
     unmatched: LookupMiss[];
+    /** The in-memory test index: ready, building, failed or cold. */
+    indexState: string;
+    /** Its estimated memory in bytes, when ready. */
+    indexBytes: number | null;
+    /** Why it was refused, when failed. */
+    indexError: string | null;
 }
 
 /** Sums `lookup.<on>.hit|miss` across the Step's mappings; `reference.*` read as they are. */
@@ -49,5 +55,8 @@ export function toGridRow(row: LookupRow): LookupGridRow {
         nullKeys: run?.counts['reference.null_keys'] ?? null,
         truncated: run?.truncated ?? false,
         unmatched: row.unmatched ?? [],
+        indexState: row.index?.state ?? 'cold',
+        indexBytes: row.index?.bytes ?? null,
+        indexError: row.index?.error ?? null,
     };
 }
