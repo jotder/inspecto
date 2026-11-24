@@ -195,7 +195,7 @@ git commit -m "feat(asn1): surface node metadata, sectioned grammarSchema, and d
 
 ---
 
-### Task 3: Header Context (`$header.*`), Leaf `V`-Decoder Overrides & Event-Root Routing (`inspecto-telecom-asn1`, `inspecto-etl`)
+### Task 3: Header Context (`$header.*`), Leaf `V` decoder Overrides & Event-Root Routing (`inspecto-telecom-asn1`, `inspecto-etl`)
 
 **Files:**
 - Modify: `providers/inspecto-telecom-asn1/src/main/java/com/gamma/telecom/asn1/Asn1RecordIngester.java`
@@ -417,7 +417,7 @@ Expected: FAIL
   - Support sectioned `FieldSpec` rendering and unified serialization in `GrammarEditorComponent`, and enable saving in `GrammarEditorDialog`.
   - In `PipelineParseDefinitionComponent`:
     - Add Raw TLV Dump toggle, Simplify Aliases toggle, Event Roots selector, and `$header.*` pin bar.
-    - Render Leaf `V`-Decoder + Rename/Prefix/Postfix inspector on `nodeRole === 'leaf'`, and scrollable **Member Fields Table** (`Use`, `Member Field`, `Type`, `Group By` radio, `Aggregation`, `Join`/`Fold` + delimiter inputs) on `nodeRole === 'repeated'`/`'container'`.
+    - Render Leaf `V` decoder + Rename/Prefix/Postfix inspector on `nodeRole === 'leaf'`, and scrollable **Member Fields Table** (`Use`, `Member Field`, `Type`, `Group By` radio, `Aggregation`, `Join`/`Fold` + delimiter inputs) on `nodeRole === 'repeated'`/`'container'`.
     - Add **Sink Table Preview** vs **Table Metadata** tabs, bridge `preview.derived` into `DefinitionStateService.parsePreview`, and wire **Create & Populate Sink** (`DatasetRegistrationService.ensure` + `POST /datasets/{id}/materialize`).
   - Add sample-value hints & drift detection to `InspectoSegmentsEditorComponent`.
 
