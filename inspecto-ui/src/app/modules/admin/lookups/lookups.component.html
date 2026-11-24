@@ -77,6 +77,17 @@
                         formControlName="value"
                         [error]="testValue.touched && testValue.hasError('required') ? 'Enter a value to look up.' : ''"
                     ></inspecto-pen-field>
+                    @if (s.match === 'asof') {
+                        <inspecto-pen-field
+                            class="min-w-48"
+                            label="Time"
+                            [open]="true"
+                            [mono]="true"
+                            placeholder="e.g. 2026-02-15"
+                            help="The row's time: the Reference row in effect then is used."
+                            formControlName="at"
+                        ></inspecto-pen-field>
+                    }
                     <button mat-flat-button color="primary" type="submit" [disabled]="testing()">Test</button>
                     <button mat-stroked-button type="button" [disabled]="testing()" (click)="test(true)">
                         Reload Reference and test
@@ -88,7 +99,7 @@
                 @if (answer(); as a) {
                     <inspecto-alert [variant]="a.hit ? 'success' : 'warning'">
                         @if (a.hit) {
-                            Found: key {{ a.matchedKey }} ({{ a.matchKind === 'exact' ? 'whole value' : 'prefix' }}).
+                            Found: key {{ a.matchedKey }} ({{ matchedHow(a.matchKind) }}).
                         } @else {
                             Not found: no Reference row matches.
                         }

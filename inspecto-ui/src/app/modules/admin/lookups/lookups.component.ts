@@ -67,7 +67,14 @@ export class LookupsComponent implements OnInit {
 
     /** Test a value (LOOKUP-1 P3): the value to look up in the selected lookup's in-memory index. */
     readonly testValue = new FormControl('', { nonNullable: true, validators: Validators.required });
-    readonly testForm = new FormGroup({ value: this.testValue });
+    /** The row's time for an `asof` lookup (optional: without it only undated Reference rows match). */
+    readonly testAt = new FormControl('', { nonNullable: true });
+    readonly testForm = new FormGroup({ value: this.testValue, at: this.testAt });
+
+    /** How the answer matched, in words. */
+    matchedHow(kind: LookupTestAnswer['matchKind']): string {
+        return { exact: 'whole value', prefix: 'prefix', range: 'range', asof: 'effective date', none: '' }[kind];
+    }
     readonly testing = signal(false);
     readonly fmtDateTime = fmtDateTime;
     readonly answer = signal<LookupTestAnswer | null>(null);
@@ -89,7 +96,7 @@ export class LookupsComponent implements OnInit {
         }
         this.testing.set(true);
         this.testError.set(null);
-        this.api.testLookup(s.pipeline, s.step, this.testValue.value, refresh).subscribe({
+        this.api.testLookup(s.pipeline, s.step, this.testValue.value, refresh, this.testAt.value || null).subscribe({
             next: (a) => {
                 this.answer.set(a);
                 this.testing.set(false);

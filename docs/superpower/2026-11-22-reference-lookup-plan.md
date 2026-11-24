@@ -219,6 +219,20 @@ invalidation on Reference commit and atomic swap, a size-aware cap, readiness / 
 answer's `index`. `PointLookupParityTest`, `ControlApiLookupsTest`, `lookups.component.spec.ts`. Not driven in the
 preview.
 
+**P3b — `range` and `asof` in the point engine built 2026-11-24 (operator: "Range + asof"):** the batch join compares
+in the bound column's own type, so a tested value is cast to each bound's DuckDB type IN DuckDB (`TRY_CAST`, as text)
+and the Java side compares those canonical texts — numbers as `BigDecimal`, everything else (text, ISO dates and
+timestamps) by code point. `range`: every row kept with its pick order (`row_number()` over the batch's own
+`order_by` tie-break), the value checked against each row — a linear scan, fine for a test, not for a hot path;
+`duplicates: refuse` reuses the batch overlap check, now `RowShaper.refuseRangeOverlap`. `asof`: the rows of each
+(normalized) key; the latest from-date at or before the time wins, an undated row last; a missing time matches only
+undated rows, as `from <= NULL` does in SQL. `POST /lookups/test` takes `at`; the screen shows a **Time** box for an
+`asof` lookup. Found on the way: a CSV `path:` Reference is read as text, so numeric range bounds compare as text in
+the batch join too (`10` < `9`) — recorded in the guide, not changed. Still open in P3: invalidation on Reference
+commit with atomic swap, a size-aware cap, readiness / warm-up. `PointLookupParityTest` (numeric, from-only, overlap
+pick and refusal, date ranges; asof with an undated row, a NULL time, normalize, repeated key-and-date refused and
+picked), `ControlApiLookupsTest`, `lookups.component.spec.ts`. Not driven in the preview.
+
 **P1h built 2026-11-23 (operator: "Yes, exact only"):** the `lookup()` scalar as the Record Transformer function
 `lookup.reference` (category Lookup; params `reference`, `key`, `returns`, `normalize`), exact match only. It renders
 the marker call `inspecto_lookup(...)`; `RowShaper.project` expands it into a scalar subquery over the resolved

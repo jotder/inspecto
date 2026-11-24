@@ -175,12 +175,146 @@ class PointLookupParityTest {
         }
     }
 
+    // ── range and asof (LOOKUP-1 P3b): typed bounds, so the Reference is read with its types detected ──────────
+
+    private RowShaper.ReferenceResolver typedResolver(Path csv) {
+        return new RowShaper.ReferenceResolver() {
+            @Override
+            public String resolve(Connection c, String reference) throws SQLException {
+                try (Statement st = c.createStatement()) {
+                    st.execute("CREATE OR REPLACE VIEW tr AS SELECT * FROM read_csv('" + csv.toString().replace('\\', '/')
+                            + "', header=true)");
+                }
+                return "tr";
+            }
+
+            @Override public List<Path> readFiles(String reference) { return List.of(csv); }
+        };
+    }
+
+    /**
+     * Runs {@code cfg} over typed input rows ({@code inputSql} creates table {@code tin (id, v, ts)}) through the batch
+     * join and the point engine, which gets each row's {@code v} and {@code at} as text, and asserts every added column
+     * equal.
+     */
+    private void assertTypedParity(Map<String, Object> cfg, String csvText, String inputSql) throws Exception {
+        Path csv = dir.resolve("t" + System.nanoTime() + ".csv");
+        Files.writeString(csv, csvText);
+        RowShaper.ReferenceResolver refs = typedResolver(csv);
+        PointLookup point = PointLookup.load(PipelineNode.of("j", "transform.join", cfg), refs);
+        List<String> added = new ArrayList<>(point.test("x").mappings().get(0).columns().keySet());
+        if (conn == null) conn = DuckDbUtil.openConnection(DuckDbUtil.tempDbFile("parity_", dir));
+        try (Statement st = conn.createStatement()) {
+            st.execute("CREATE OR REPLACE TABLE tin AS " + inputSql);
+        }
+        String id = "p" + System.nanoTime();
+        var rel = RowShaper.shape(conn, PipelineNode.of(id, "transform.join", cfg), "tin", id, refs);
+        String table = rel.stream().filter(r -> r.rel().equals(PipelineRel.DATA)).findFirst().orElseThrow().table();
+        int n = 0;
+        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(
+                "SELECT *, CAST(v AS VARCHAR) AS __v, CAST(ts AS VARCHAR) AS __at FROM \"" + table + "\" ORDER BY id")) {
+            while (rs.next()) {
+                Map<String, String> want = new LinkedHashMap<>();
+                for (String c : added) want.put(c, rs.getString(c));
+                Map<String, String> got = point.test(rs.getString("__v"), rs.getString("__at")).mappings().get(0).columns();
+                assertEquals(want, got, "row " + rs.getInt("id") + " (v=" + rs.getString("__v") + ", at="
+                        + rs.getString("__at") + ") under " + cfg);
+                n++;
+            }
+        }
+        assertTrue(n > 0, "the input had rows");
+    }
+
+    private static final String BANDS = """
+            lo,hi,band,prio
+            1,9,small,1
+            10,99,mid,1
+            100,,big,1
+            ,0,negative,1
+            """;
+
+    private static final String BAND_INPUT = "SELECT * FROM (VALUES (1, -5, NULL), (2, 0, NULL), (3, 1, NULL),"
+            + " (4, 9, NULL), (5, 10, NULL), (6, 50, NULL), (7, 100, NULL), (8, 100000, NULL), (9, NULL, NULL))"
+            + " t(id, v, ts)";
+
+    private static Map<String, Object> rangeCfg(Object... kv) {
+        Map<String, Object> m = new LinkedHashMap<>(Map.of("reference", "r", "match", "range", "on", "v",
+                "from", "lo", "to", "hi", "details", true, "default", List.of("band=NONE")));
+        for (int i = 0; i < kv.length; i += 2) {
+            if (kv[i + 1] == null) m.remove((String) kv[i]);
+            else m.put((String) kv[i], kv[i + 1]);
+        }
+        return m;
+    }
+
     @Test
-    void rangeIsNotServedYet() throws Exception {
-        Path csv = dir.resolve("r.csv");
-        Files.writeString(csv, DIAL);
-        var e = assertThrows(IllegalArgumentException.class, () -> PointLookup.load(PipelineNode.of("j", "transform.join",
-                Map.of("reference", "r", "from", "rank", "on", "v", "match", "range")), resolver(csv)));
-        assertTrue(e.getMessage().contains("range"), e.getMessage());
+    void aNumericRangeAgreesIncludingOpenBoundsAndTheDefault() throws Exception {
+        assertTypedParity(rangeCfg(), BANDS, BAND_INPUT);
+        // from: only — every two rows overlap, so the band is the one with the highest lower bound at or below v
+        assertTypedParity(rangeCfg("to", null, "duplicates", "last", "order_by", "lo"),
+                BANDS.replace(",0,negative", "-100,0,negative"), BAND_INPUT);
+    }
+
+    @Test
+    void overlappingRangesPickTheSameRowAndRefuseTheSameWay() throws Exception {
+        String overlap = BANDS + "5,20,overlap,2\n";
+        assertTypedParity(rangeCfg("duplicates", "last", "order_by", "prio"), overlap, BAND_INPUT);
+        assertTypedParity(rangeCfg("duplicates", "first", "order_by", "prio"), overlap, BAND_INPUT);
+        Path csv = dir.resolve("ov.csv");
+        Files.writeString(csv, overlap);
+        var e = assertThrows(IllegalArgumentException.class,
+                () -> PointLookup.load(PipelineNode.of("j", "transform.join", rangeCfg()), typedResolver(csv)));
+        assertTrue(e.getMessage().contains("overlap"), e.getMessage());
+    }
+
+    @Test
+    void aDateRangeAgrees() throws Exception {
+        String periods = """
+                start,finish,band,prio
+                2026-01-01,2026-01-31,jan,1
+                2026-02-01,2026-02-28,feb,1
+                2026-03-01,,from-march,1
+                """;
+        assertTypedParity(rangeCfg("from", "start", "to", "finish"), periods, "SELECT * FROM (VALUES"
+                + " (1, DATE '2025-12-31', NULL), (2, DATE '2026-01-01', NULL), (3, DATE '2026-01-31', NULL),"
+                + " (4, DATE '2026-02-15', NULL), (5, DATE '2026-03-01', NULL), (6, DATE '2030-01-01', NULL))"
+                + " t(id, v, ts)");
+    }
+
+    private static final String RATES = """
+            code,eff,rate
+            A,2026-01-01,1
+            A,2026-03-01,2
+            A,,0
+            B,2026-02-01,5
+            """;
+
+    private static final String RATE_INPUT = "SELECT * FROM (VALUES (1, 'A', DATE '2025-12-01'), (2, 'A', DATE '2026-01-01'),"
+            + " (3, 'A', DATE '2026-02-15'), (4, 'A', DATE '2026-03-01'), (5, 'B', DATE '2026-01-01'),"
+            + " (6, 'B', DATE '2026-12-31'), (7, 'B', NULL), (8, 'A', NULL), (9, 'C', DATE '2026-05-05'),"
+            + " (10, ' a', DATE '2026-02-15'), (11, NULL, DATE '2026-02-15')) t(id, v, ts)";
+
+    private static Map<String, Object> asofCfg(Object... kv) {
+        Map<String, Object> m = new LinkedHashMap<>(Map.of("reference", "r", "match", "asof", "on", "v", "key", "code",
+                "from", "eff", "at", "ts", "details", true, "columns", List.of("rate")));
+        for (int i = 0; i < kv.length; i += 2) m.put((String) kv[i], kv[i + 1]);
+        return m;
+    }
+
+    @Test
+    void asofAgreesIncludingTheUndatedRowANullTimeAndNormalize() throws Exception {
+        assertTypedParity(asofCfg(), RATES, RATE_INPUT);
+        assertTypedParity(asofCfg("normalize", List.of("trim", "upper")), RATES, RATE_INPUT);
+    }
+
+    @Test
+    void asofRefusesARepeatedKeyAndDateAndPicksTheSameRowWhenAskedTo() throws Exception {
+        String dup = RATES + "A,2026-03-01,9\n";
+        Path csv = dir.resolve("dup.csv");
+        Files.writeString(csv, dup);
+        var e = assertThrows(IllegalArgumentException.class,
+                () -> PointLookup.load(PipelineNode.of("j", "transform.join", asofCfg()), typedResolver(csv)));
+        assertTrue(e.getMessage().contains("code=A"), e.getMessage());
+        assertTypedParity(asofCfg("duplicates", "last", "order_by", "rate"), dup, RATE_INPUT);
     }
 }

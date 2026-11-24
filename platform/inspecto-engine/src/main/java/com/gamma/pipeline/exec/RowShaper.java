@@ -1816,7 +1816,34 @@ public final class RowShaper {
         String fromV = rangeValue(conn, ref, fromCol), toV = rangeValue(conn, ref, toCol);
         String inside = (fromCol == null ? "TRUE" : "(r." + q(fromCol) + " IS NULL OR " + fromV + " >= r." + q(fromCol) + ")")
                 + " AND " + (toCol == null ? "TRUE" : "(r." + q(toCol) + " IS NULL OR " + toV + " <= r." + q(toCol) + ")");
-        if ("refuse".equals(dups)) {
+        if ("refuse".equals(dups)) refuseRangeOverlap(conn, id, refRows, fromCol, toCol);
+        String kept = returned.stream().map(c -> ", r." + q(c)).collect(java.util.stream.Collectors.joining());
+        // the matched key of a range is its period, "from..to" (an open end left empty)
+        String span = (fromCol == null ? "''" : "coalesce(CAST(r." + q(fromCol) + " AS VARCHAR), '')") + " || '..' || "
+                + (toCol == null ? "''" : "coalesce(CAST(r." + q(toCol) + " AS VARCHAR), '')");
+        StringBuilder values = new StringBuilder();
+        for (String o : on) {
+            if (values.length() > 0) values.append(" UNION ");
+            values.append("SELECT ").append(q(o)).append(" AS __lk_v FROM ").append(q(input));
+        }
+        String hit = "SELECT v.__lk_v" + kept + ", " + span + " AS __lk_mk, 'range' AS __lk_kind"
+                + " FROM __lk_val v JOIN __lk_ref r ON " + inside
+                + ("refuse".equals(dups) ? "" : " QUALIFY row_number() OVER (PARTITION BY v.__lk_v ORDER BY (" + orderBy
+                        + ") " + ("last".equals(dups) ? "DESC" : "ASC") + " NULLS LAST, CAST(r AS VARCHAR)) = 1");
+        exec(conn, "CREATE TABLE " + q(data) + " AS"
+                + " WITH __lk_ref AS MATERIALIZED (" + refRows + "),"
+                + " __lk_val AS MATERIALIZED (SELECT DISTINCT __lk_v FROM (" + values + ") WHERE __lk_v IS NOT NULL),"
+                + " __lk_hit AS MATERIALIZED (" + hit + ")"
+                + " " + select + " FROM " + q(input) + " i" + joins);
+    }
+
+    /**
+     * {@code duplicates: refuse} for {@code match: range}: refuses the first two Reference rows (of {@code refRows}, which
+     * carries {@code __lk_rn}) whose ranges overlap, naming both. Shared by the batch join and {@link PointLookup}.
+     */
+    static void refuseRangeOverlap(Connection conn, String id, String refRows, String fromCol, String toCol)
+            throws SQLException {
+        {
             // two ranges overlap when each starts no later than the other ends (an empty bound reaches forever)
             String aStartsByBEnd = fromCol == null || toCol == null ? "TRUE"
                     : "(a." + q(fromCol) + " IS NULL OR b." + q(toCol) + " IS NULL OR a." + q(fromCol) + " <= b." + q(toCol) + ")";
@@ -1836,24 +1863,6 @@ public final class RowShaper {
                             + "first|last with order_by:");
             }
         }
-        String kept = returned.stream().map(c -> ", r." + q(c)).collect(java.util.stream.Collectors.joining());
-        // the matched key of a range is its period, "from..to" (an open end left empty)
-        String span = (fromCol == null ? "''" : "coalesce(CAST(r." + q(fromCol) + " AS VARCHAR), '')") + " || '..' || "
-                + (toCol == null ? "''" : "coalesce(CAST(r." + q(toCol) + " AS VARCHAR), '')");
-        StringBuilder values = new StringBuilder();
-        for (String o : on) {
-            if (values.length() > 0) values.append(" UNION ");
-            values.append("SELECT ").append(q(o)).append(" AS __lk_v FROM ").append(q(input));
-        }
-        String hit = "SELECT v.__lk_v" + kept + ", " + span + " AS __lk_mk, 'range' AS __lk_kind"
-                + " FROM __lk_val v JOIN __lk_ref r ON " + inside
-                + ("refuse".equals(dups) ? "" : " QUALIFY row_number() OVER (PARTITION BY v.__lk_v ORDER BY (" + orderBy
-                        + ") " + ("last".equals(dups) ? "DESC" : "ASC") + " NULLS LAST, CAST(r AS VARCHAR)) = 1");
-        exec(conn, "CREATE TABLE " + q(data) + " AS"
-                + " WITH __lk_ref AS MATERIALIZED (" + refRows + "),"
-                + " __lk_val AS MATERIALIZED (SELECT DISTINCT __lk_v FROM (" + values + ") WHERE __lk_v IS NOT NULL),"
-                + " __lk_hit AS MATERIALIZED (" + hit + ")"
-                + " " + select + " FROM " + q(input) + " i" + joins);
     }
 
     /** The value as compared with bound column {@code col}: as a DATE when the bound is a DATE, else as it is. */

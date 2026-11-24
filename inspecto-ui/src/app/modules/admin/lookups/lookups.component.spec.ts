@@ -148,11 +148,36 @@ describe('LookupsComponent', () => {
         c.testValue.setValue('249915555');
         c.test(true);
         fixture.detectChanges();
-        expect(api.testLookup).toHaveBeenCalledWith('cdr', 'join', '249915555', true);
+        expect(api.testLookup).toHaveBeenCalledWith('cdr', 'join', '249915555', true, null);
         const text = fixture.nativeElement.textContent as string;
         expect(text).toContain('Found: key 24991 (prefix)');
         expect(text).toContain('Operator A');
         expect(text).toContain('Index of 2 Reference rows');
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('asks for a time for an asof lookup and sends it', async () => {
+        const asof: LookupRow = { ...ROW, match: 'asof', lookedUpBy: ['CODE'] };
+        const { fixture, api } = await create(
+            { lookups: [asof], total: 1, known: { lastRun: true } },
+            {
+                ...ANSWER,
+                match: 'asof',
+                matchedKey: 'A@2026-01-01',
+                matchKind: 'asof',
+            },
+        );
+        const c = fixture.componentInstance;
+        c.select(c.rows()[0]);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(fixture.nativeElement.textContent).toContain('Time');
+        c.testValue.setValue('A');
+        c.testAt.setValue('2026-02-15');
+        c.test();
+        fixture.detectChanges();
+        expect(api.testLookup).toHaveBeenCalledWith('cdr', 'join', 'A', false, '2026-02-15');
+        expect(fixture.nativeElement.textContent).toContain('Found: key A@2026-01-01 (effective date)');
         await expectNoA11yViolations(fixture.nativeElement);
     });
 

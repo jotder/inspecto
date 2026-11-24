@@ -217,11 +217,12 @@ class ControlApiLookupsTest {
     }
 
     @Test
-    void aRangeLookupIsRefusedByThePointEngine(@TempDir Path dir) throws Exception {
+    void aRangeAndAnAsofLookupAnswerAndOverlappingRangesAreRefused(@TempDir Path dir) throws Exception {
         System.setProperty("assist.safety.roots", dir.toString());
         Path ref = dir.resolve("refdata").resolve("band.csv");
         Files.createDirectories(ref.getParent());
-        Files.writeString(ref, "lo,hi,band\n1,9,small\n");
+        // a CSV path reference is read as text, so bounds compare as text (the batch join too): pad them
+        Files.writeString(ref, "lo,hi,band\n01,09,small\n10,99,mid\n");
         String steps = """
                 output_store: enriched_calls
                 steps[1]:
@@ -234,9 +235,50 @@ class ControlApiLookupsTest {
                 """.formatted(ref.toString().replace('\\', '/'));
         try (Ctx c = open(dir, steps)) {
             String name = c.svc.loadedPipelines().get(0).identity().pipelineName();
-            HttpResponse<String> r = test(c, "{\"pipeline\":\"" + name + "\",\"step\":\"join\",\"value\":\"3\"}");
-            assertEquals(422, r.statusCode(), r.body());
-            assertTrue(r.body().contains("range"), r.body());
+            HttpResponse<String> r = test(c, "{\"pipeline\":\"" + name + "\",\"step\":\"join\",\"value\":\"12\"}");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode a = V1Body.of(r.body());
+            assertEquals("range", a.get("matchKind").asText(), a.toString());
+            assertEquals("10..99", a.get("matchedKey").asText());
+            assertEquals("mid", a.get("mappings").get(0).get("columns").get("id_band").asText(), a.toString());
+
+            // a Reference whose ranges overlap is refused, as the batch join refuses it
+            Files.writeString(ref, "lo,hi,band\n01,09,small\n05,99,mid\n");
+            HttpResponse<String> overlap = test(c, "{\"pipeline\":\"" + name + "\",\"step\":\"join\",\"value\":\"7\","
+                    + "\"refresh\":true}");
+            assertEquals(422, overlap.statusCode(), overlap.body());
+            assertTrue(overlap.body().contains("overlap"), overlap.body());
+        }
+    }
+
+    @Test
+    void anAsofLookupAnswersForTheTimeGiven(@TempDir Path dir) throws Exception {
+        System.setProperty("assist.safety.roots", dir.toString());
+        Path ref = dir.resolve("refdata").resolve("rates.csv");
+        Files.createDirectories(ref.getParent());
+        Files.writeString(ref, "code,eff,rate\nA,2026-01-01,1\nA,2026-03-01,2\n");
+        String steps = """
+                output_store: enriched_calls
+                steps[1]:
+                  - join:
+                      reference: %s
+                      key: code
+                      from: eff
+                      at: CALL_TIME
+                      match: asof
+                      on: SERVED_MSISDN
+                      columns: rate
+                """.formatted(ref.toString().replace('\\', '/'));
+        try (Ctx c = open(dir, steps)) {
+            String name = c.svc.loadedPipelines().get(0).identity().pipelineName();
+            String body = "{\"pipeline\":\"" + name + "\",\"step\":\"join\",\"value\":\"A\",\"at\":\"%s\"}";
+            JsonNode feb = V1Body.of(test(c, body.formatted("2026-02-15")).body());
+            assertEquals("1", feb.get("mappings").get(0).get("columns").get("SERVED_MSISDN_rate").asText(), feb.toString());
+            assertEquals("A@2026-01-01", feb.get("matchedKey").asText());
+            JsonNode mar = V1Body.of(test(c, body.formatted("2026-03-01")).body());
+            assertEquals("2", mar.get("mappings").get(0).get("columns").get("SERVED_MSISDN_rate").asText(), mar.toString());
+            JsonNode before = V1Body.of(test(c, body.formatted("2025-12-31")).body());
+            assertFalse(before.get("hit").asBoolean(), before.toString());
         }
     }
 

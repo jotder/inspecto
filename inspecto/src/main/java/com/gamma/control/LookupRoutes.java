@@ -59,12 +59,12 @@ final class LookupRoutes implements RouteModule {
     static void clearWarm() { synchronized (WARM) { WARM.clear(); } }
 
     /**
-     * {@code POST /lookups/test} {@code {pipeline, step, value, refresh?}} — LOOKUP-1 P3 test-a-key: the keyed join's
+     * {@code POST /lookups/test} {@code {pipeline, step, value, at?, refresh?}} — LOOKUP-1 P3 test-a-key: the keyed join's
      * answer for one value from the point engine ({@link PointLookup}), which the parity suite holds equal to the
      * batch join. The value travels in the body, never the URL, and is not logged. The index is built on first use and
      * kept warm; it is rebuilt when the Step's config changed or {@code refresh: true} asks (a Reference that changed
      * since {@code index.loadedAt} is not seen until then). 404 for an unknown keyed Step, 422 for a join the point
-     * engine refuses (range / as-of, a duplicate key, over the row cap). An open read, like the dry run.
+     * engine refuses (a duplicate key or overlapping ranges, over the row cap); {@code at} is the row time for {@code match: asof}. An open read, like the dry run.
      */
     private static Object test(ApiContext api, Map<String, Object> body) throws Exception {
         String pipeline = body == null || body.get("pipeline") == null ? null : body.get("pipeline").toString();
@@ -72,6 +72,7 @@ final class LookupRoutes implements RouteModule {
         if (pipeline == null || pipeline.isBlank() || step == null || step.isBlank())
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "pipeline and step are required");
         Object value = body.get("value");
+        Object at = body.get("at");
         PipelineNode node = null;
         for (PipelineConfig cfg : HostContext.of(api).service().loadedPipelines()) {
             if (!cfg.identity().pipelineName().equals(pipeline)) continue;
@@ -96,7 +97,8 @@ final class LookupRoutes implements RouteModule {
             }
             synchronized (WARM) { WARM.put(key, warm); }
         }
-        PointLookup.Answer a = warm.index().test(value == null ? null : value.toString());
+        PointLookup.Answer a = warm.index().test(value == null ? null : value.toString(),
+                at == null || at.toString().isBlank() ? null : at.toString());
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("pipeline", pipeline);
         out.put("step", step);
