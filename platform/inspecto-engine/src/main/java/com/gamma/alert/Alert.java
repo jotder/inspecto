@@ -45,9 +45,18 @@ public record Alert(String rule, String severity, String pipeline, String metric
     /** Ledger metric id → the words an operator reads; anything else goes through {@link #metricLabel}'s fallback. */
     private static final Map<String, String> METRIC_LABELS = Map.of(
             "error_rate", "Error rate",
-            "failed_batches", "Failed batches",
+            "failed_batches", "Failed Consignments",
             "rejected_files", "Rejected files",
             "duration_ms", "Average duration (ms)");
+
+    /** LA-18 value Measure id → the words an operator reads; anything else falls back to camelCase as words. */
+    private static final Map<String, String> VALUE_MEASURE_LABELS = Map.of(
+            "passThrough", "Pass-through",
+            "velocity", "Velocity",
+            "timeToCashOut", "Time to withdrawal",
+            "cashOutConcentration", "Withdrawal concentration",
+            "structuring", "Structuring",
+            "benefitTransfer", "Benefit transfer");
 
     private static final Pattern MEASURE = Pattern.compile("([A-Za-z][A-Za-z0-9]*)\\(([A-Za-z_][A-Za-z0-9_]*)\\)");
 
@@ -67,13 +76,13 @@ public record Alert(String rule, String severity, String pipeline, String metric
         if (r.isFreshnessRule()) {
             String freshMsg = r.indexLag()
                     ? String.format(java.util.Locale.ROOT,
-                    "%s: dataset %s has had Files waiting for the Link Analysis index for %s (limit %s)",
+                    "%s: Dataset %s has had Files waiting for the Link Analysis index for %s (limit %s)",
                     r.severity(), scopeLabel, duration(value), r.maximumAge())
                     : r.eventDateColumn() != null
-                    ? String.format(java.util.Locale.ROOT, "%s: dataset %s holds no event newer than %s ago (event-date freshness limit %s)",
+                    ? String.format(java.util.Locale.ROOT, "%s: Dataset %s holds no event newer than %s ago (event-date freshness limit %s)",
                     r.severity(), scopeLabel, duration(value), r.maximumAge())
                     : String.format(java.util.Locale.ROOT,
-                    "%s: dataset %s has not published for %s (freshness limit %s)",
+                    "%s: Dataset %s has not published for %s (freshness limit %s)",
                     r.severity(), scopeLabel, duration(value), r.maximumAge());
             return new Alert(r.name(), r.severity(), pipeline, r.indexLag() ? "index-lag" : "freshness", value, r.comparator(),
                     r.threshold(), r.maximumAge(), epochMillis, freshMsg);
@@ -86,7 +95,9 @@ public record Alert(String rule, String severity, String pipeline, String metric
                 : r.isValueMeasureRule() ? "entities breaching " + r.valueMeasure().get("name")
                 : r.isInvestigationRule() ? r.relation() + " " + r.measure() : r.measure();
         String windowLabel = r.window() != null
-                ? (r.batchWindow() ? "the last " + r.windowBatches() + " batches" : "the last " + r.window())
+                ? (r.batchWindow()
+                        ? "the last " + r.windowBatches() + (r.windowBatches() == 1 ? " Consignment" : " Consignments")
+                        : "the last " + r.window())
                 : r.isValueMeasureRule() ? (r.valueMeasure().get("last") != null
                         ? "the whole Dataset, window: last " + r.valueMeasure().get("last") + ", UTC"
                         : "the whole Dataset, window: " + r.valueMeasure().get("from") + " to " + r.valueMeasure().get("to"))
@@ -154,9 +165,21 @@ public record Alert(String rule, String severity, String pipeline, String metric
     /** What was measured, where: {@code Sum of exposure_sar on fraud_cases_open}, {@code Error rate on EVENTS}. */
     private static String subject(AlertRule r, String scope) {
         if (r.metric() != null) return metricLabel(r.metric()) + " on " + scope;
-        if (r.isValueMeasureRule()) return "Entities breaching " + r.valueMeasure().get("name") + " in " + scope;
+        if (r.isValueMeasureRule()) return "Entities breaching " + valueMeasureLabel(String.valueOf(r.valueMeasure().get("name"))) + " in " + scope;
         if (r.isInvestigationRule()) return measureLabel(r.measure()) + " of " + r.relation() + " in " + scope;
         return measureLabel(r.measure()) + " on " + scope;
+    }
+
+    /**
+     * The words for a Value Measure id ({@link AlertRule#VALUE_MEASURES}): {@code passThrough} → {@code Pass-through}.
+     * An unmapped id falls back to its camelCase read as words.
+     */
+    static String valueMeasureLabel(String name) {
+        if (name == null || name.isBlank()) return "";
+        String known = VALUE_MEASURE_LABELS.get(name);
+        if (known != null) return known;
+        String words = name.replaceAll("([a-z])([A-Z])", "$1_$2").replace('_', ' ').toLowerCase(Locale.ROOT).trim();
+        return words.isEmpty() ? name : Character.toUpperCase(words.charAt(0)) + words.substring(1);
     }
 
     /**
