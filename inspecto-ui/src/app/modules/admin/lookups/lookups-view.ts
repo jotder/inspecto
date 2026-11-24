@@ -6,6 +6,7 @@ export interface LookupGridRow {
     step: string;
     reference: string;
     match: string;
+    block: string[];
     lookedUpBy: string;
     lastRunAt: string | null;
     outcome: string | null;
@@ -45,6 +46,7 @@ export function toGridRow(row: LookupRow): LookupGridRow {
         step: row.step,
         reference: row.reference ?? '',
         match: row.match.replace('_', ' '),
+        block: row.block ?? [],
         lookedUpBy: row.lookedUpBy.join(', '),
         lastRunAt: run?.startedAt ?? null,
         outcome: run?.outcome ?? null,

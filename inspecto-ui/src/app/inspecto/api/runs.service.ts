@@ -162,6 +162,7 @@ export interface LookupRow {
     step: string;
     reference: string | null;
     match: string;
+    block?: string[];
     lookedUpBy: string[];
     lastRun?: LookupLastRun | null;
     /** The last run's unmatched-key sample (LOOKUP-1 §4.6): never a value. ABSENT when receipts are off. */
@@ -197,9 +198,17 @@ export interface LookupTestAnswer {
     compared: string | null;
     hit: boolean;
     matchedKey: string | null;
-    matchKind: 'exact' | 'prefix' | 'range' | 'asof' | 'none';
+    matchKind: 'exact' | 'prefix' | 'range' | 'asof' | 'fuzzy' | 'none';
+    matchScore?: number | null;
     /** What each looked-up column would add: output column → text, not-found defaults applied. */
     mappings: { on: string; columns: Record<string, string | null> }[];
+    /** Top-k candidates for `match: fuzzy`. */
+    candidates?: {
+        matchedKey: string | null;
+        matchKind: string;
+        matchScore?: number | null;
+        mappings: { on: string; columns: Record<string, string | null> }[];
+    }[];
     /**
      * The index that answered: `reloaded` says why this answer built it (`first use`, `reload asked`, `step changed`,
      * `reference changed`), null when it was kept; `watchesReference` false means a Reference change is only seen on
@@ -365,8 +374,16 @@ export class RunsService {
         value: string,
         refresh = false,
         at: string | null = null,
+        blockValues: Record<string, string> | null = null,
     ): Observable<LookupTestAnswer> {
-        return this.http.post<LookupTestAnswer>(apiUrl('/lookups/test'), { pipeline, step, value, at, refresh });
+        return this.http.post<LookupTestAnswer>(apiUrl('/lookups/test'), {
+            pipeline,
+            step,
+            value,
+            at,
+            refresh,
+            ...(blockValues ? { blockValues } : {}),
+        });
     }
     quarantine(name: string): Observable<AuditRow[]> {
         return this.http.get<AuditRow[]>(apiUrl(`/runs/${encodeURIComponent(name)}/quarantine`));
