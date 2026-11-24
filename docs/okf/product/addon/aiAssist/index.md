@@ -34,4 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `a
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `AI-OPTIN-VERIFY-1` | P3 | chore | Run the -Pai builds once on a machine with com.eoiagent in ~/.m2. | — |
 | `AGENTIC-INVESTIGATION-1` | P2 | feature | An agent that works an Incident and proposes the next action for a human to approve: slices S2-S6 remain. | — |

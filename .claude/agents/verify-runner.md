@@ -25,6 +25,9 @@ relies on you so it never has to read a full build log.
   node tools/check-reactor-verdict.mjs build.log --expect-modules 57
   ```
   Report the guard's exit code (0 = PASS · 1 = NON-VERDICT or failure · 2 = could not run).
+  ⚠ **AI is opt-in (`-Pai`, AI-OPTIN-1):** the command above builds no AI module (`inspecto-agent`, `-agent-hosted`,
+  `-intelligence`). When the task names AI or `-Pai`, use `-Pedition-advanced,ai` (needs `com.eoiagent` in `~/.m2`); if
+  eoiagent is missing, report the AI modules as NOT built — never as passing.
 - **Package JAR:** `mvn -o clean package -q`.
 - **Deployment bundle:** `pwsh -File inspecto\package.ps1 [-NoBuild|-NoUi|-NoRuntime]` (pwsh 7 only —
   the script is BOM-less UTF-8; PowerShell 5.1 garbles it).

@@ -447,20 +447,21 @@ if ($Edition -ne 'Basic') {
     # EDG-01 cell 7: inspecto-ops (CP-11 operational objects), Standard and above.
     # PKG-5 (operator decision 2026-09-12): the assistant is STANDARD AND ABOVE. Taken first as
     # "all editions, optional" and narrowed the same day once the sidecar's weight was measured -
-    # Basic already carries the ~32 MB connector sidecar. NB inspecto-agent is in the DEFAULT
-    # reactor (not profile-scoped like the modules beside it); it is listed here only so this pass
-    # builds its `sidecar` artifact for the editions that stage it.
+    # Basic already carries the ~32 MB connector sidecar.
     # ASSURE-INTELLIGENCE-BUNDLE-1 (D-P2): inspecto-intelligence (the /agent/* agent, onnxruntime inside)
-    # is ADVANCED only - also a default-reactor module, listed so this pass builds its `sidecar`.
+    # is ADVANCED only.
+    # AI-OPTIN-1 (operator, 2026-11-24): both live in the opt-in root-pom profile `ai`, not the default reactor, so every
+    # non-Basic build passes -P<edition>,ai (tools/bundle-modules.mjs mavenProfiles says the same) - which needs com.eoiagent
+    # in ~/.m2 (node tools/dev-doctor.mjs). Without -Pai, `-pl :inspecto-agent` fails loudly; the assistant is never dropped silently.
     # MODULE-REORG-P3d stage 1: the `-pl` list comes from the Offering (tools/offering-classpath.mjs resolves offerings/<edition>.toon,
     # asserts it equals tools/bundle-modules.mjs's set, and prints every module the edition adds beyond the default reactor) - it is
     # no longer a second hand-kept list beside the staging steps and the launchers.
     $modules = ((& node (Join-Path $sandboxRoot 'tools\offering-classpath.mjs') --edition $Edition --list-mvn) | Out-String).Trim()
     if ($LASTEXITCODE -ne 0 -or -not $modules) { throw "tools/offering-classpath.mjs --list-mvn failed for the $Edition edition (see above)" }
     if (-not $NoBuild) {
-        Write-Host "Building $modules ($Edition edition, -P$editionProfile)..." -ForegroundColor Cyan
+        Write-Host "Building $modules ($Edition edition, -P$editionProfile,ai)..." -ForegroundColor Cyan
         Push-Location $sandboxRoot
-        & mvn clean package "-P$editionProfile" "-Dinspecto.build.id=$buildId" -pl $modules -am -DskipTests -q
+        & mvn clean package "-P$editionProfile,ai" "-Dinspecto.build.id=$buildId" -pl $modules -am -DskipTests -q
         if ($LASTEXITCODE -ne 0) { throw "mvn build of the $Edition edition modules failed" }
         Pop-Location
     }
@@ -550,7 +551,7 @@ if ($Edition -ne 'Basic') {
     $agentTargetDir = Join-Path $sandboxRoot 'features\inspecto-agent\target'
     $agentJarSrc = Get-ChildItem -Path $agentTargetDir -Filter 'inspecto-agent-*-sidecar.jar' -ErrorAction SilentlyContinue |
         Select-Object -First 1 -ExpandProperty FullName
-    if (-not $agentJarSrc) { throw "Assistant sidecar not found matching $agentTargetDir\inspecto-agent-*-sidecar.jar. Run without -NoBuild, or build with: mvn package -pl :inspecto-agent -am -DskipTests" }
+    if (-not $agentJarSrc) { throw "Assistant sidecar not found matching $agentTargetDir\inspecto-agent-*-sidecar.jar. Run without -NoBuild, or build with: mvn package -Pai -pl :inspecto-agent -am -DskipTests" }
 
     $opsJarSrc = Get-ChildItem -Path $opsTargetDir -Filter 'inspecto-ops-*.jar' -ErrorAction SilentlyContinue |
                       Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
@@ -658,7 +659,7 @@ if ($Edition -ne 'Basic') {
         $intelligenceTargetDir = Join-Path $sandboxRoot 'features\inspecto-intelligence\target'
         $intelligenceJarSrc = Get-ChildItem -Path $intelligenceTargetDir -Filter 'inspecto-intelligence-*-sidecar.jar' -ErrorAction SilentlyContinue |
             Select-Object -First 1 -ExpandProperty FullName
-        if (-not $intelligenceJarSrc) { throw "Intelligence sidecar not found matching $intelligenceTargetDir\inspecto-intelligence-*-sidecar.jar. Run without -NoBuild, or build with: mvn package -pl :inspecto-intelligence -am -DskipTests" }
+        if (-not $intelligenceJarSrc) { throw "Intelligence sidecar not found matching $intelligenceTargetDir\inspecto-intelligence-*-sidecar.jar. Run without -NoBuild, or build with: mvn package -Pai -pl :inspecto-intelligence -am -DskipTests" }
     }
 }
 

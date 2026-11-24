@@ -88,7 +88,9 @@ A `fix:` lands on the **oldest still-supported branch it affects**, then merges 
    merge-forward set**, then execute merges up to `master`.
 5. **Refuse** to commit/push/tag on retired `1.x` / `2.x` / `3.x`. A security backport to an EOL line
    needs a **human** to set `UCC_RELEASE_GUARD_DISABLE=1` and document it — agents ask, never self-authorize.
-6. **Editions** are build flavors — never create/push `basic`/`standard` branches.
+6. **Editions** are build flavors — never create/push `basic`/`standard` branches. **AI is the opt-in `-Pai` profile**
+   (AI-OPTIN-1, 2026-11-24): the release / once-a-day full gate is `mvn -o clean test -Pedition-advanced,ai` (needs
+   `com.eoiagent` in `~/.m2`); a gate run without `,ai` leaves the AI modules unverified, and the report must say so.
 7. **Tag** releases `vX.Y.Z` on the branch they ship from.
 8. **Old-reader check** (release gate, `docs/okf/product/module/config/plan-space-evolution.md` §3) — for a release that
    *writes* a new Space file shape: "the previous release's bundle boots a Space the new release wrote, or the Space

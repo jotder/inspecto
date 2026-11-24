@@ -57,7 +57,8 @@ export function checkMaven(p) {
         : r(FAIL, 'maven', v ? `${v.join('.')}, need 3.9+` : 'not found', 'install Apache Maven 3.9+ and add its bin to PATH'));
     const repo = mavenLocalRepo(p);
     out.push(p.exists(join(repo, 'com', 'eoiagent')) ? r(OK, 'maven repo com/eoiagent', `present in ${repo}`)
-        : r(FAIL, 'maven repo com/eoiagent', `missing in ${repo} (built from source jotder/inspect-agent)`,
+        // AI-OPTIN-1: only the opt-in -Pai build (the AI modules; Standard+ packaging) needs eoiagent - the default reactor does not
+        : r(WARN, 'maven repo com/eoiagent', `missing in ${repo} - needed only for -Pai builds (the AI modules; package.ps1 Standard/Advanced/Preview); built from source jotder/inspect-agent`,
             'gh repo clone jotder/inspect-agent && cd inspect-agent && mvn -DskipTests install'));
     out.push(p.exists(join(repo, 'com', 'gamma', 'inspector')) ? r(OK, 'maven repo com/gamma/inspector', `present in ${repo}`)
         : r(FAIL, 'maven repo com/gamma/inspector', `no previous inspecto install in ${repo}`, 'mvn -DskipTests install  (repo root, online once)'));

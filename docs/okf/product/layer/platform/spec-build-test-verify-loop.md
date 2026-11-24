@@ -21,6 +21,14 @@ mvn -o clean test          # full reactor; "verified" = this passes
 mvn -o clean package -q    # → inspecto/target/inspecto-processor-*.jar (processor + third-party; the 15 core libraries are thin jars in platform/*/target and spi/*/target)
 ```
 
+**With and without AI (`AI-OPTIN-1`, operator 2026-11-24).** The AI add-on — `inspecto-agent`,
+`inspecto-agent-hosted`, `inspecto-intelligence` — is the opt-in root-pom profile `ai`. Every command on this page
+builds **without AI** unless it says `ai`, and needs no `com.eoiagent` in `~/.m2`. **With AI:** add `ai` to the
+profile list — `mvn -o clean test -Pedition-advanced,ai` — which needs eoiagent installed from source
+(jotder/inspect-agent; `node tools/dev-doctor.mjs` warns when it is missing). The once-a-day / release gate is the
+`,ai` run; a run without it must report the AI modules as **not built**, never as green. Packaging a Standard,
+Advanced or Preview bundle always builds AI (`package.ps1` passes `-P<edition>,ai`), so it needs eoiagent too.
+
 Always offline (`-o`). Tests spin up a real `CollectorService`/[`ControlApi`](../../module/processor/api-control-api.md) on
 an ephemeral port. (Java **27** toolchain + Maven, `release=27` — moved 2026-09-17. The local JDK is
 `C:\.jdks\jdk-27-win` (Oracle 27+35-2325) and CI sets up **Oracle** JDK 27, not Temurin:
@@ -49,7 +57,12 @@ It prints a **mode** and the exact commands:
 |---|---|---|
 | `none` | only docs, product map, offerings, `.claude/`, node tools, Space content no test reads | the node guards (`ci.yml` `guards` job, or locally) |
 | `affected` | module sources changed | `mvn install -DskipTests -Pedition-advanced -pl <set> -am && mvn test -Pedition-advanced -pl <set>` — upstream compiled + installed without tests (test-jars still built), then the set tested; ⛔ chained: if the install fails the tests must not run (they would resolve stale sibling jars from ~/.m2) |
-| `full` | root/aggregator/module `pom.xml` or `.mvn/` changed beyond comments · an unclassified path (fail-safe) · the set is >70% of the reactor · `--full` | `mvn install -Pedition-advanced` (+ `-Pcoverage` in CI) |
+| `full` | root/aggregator/module `pom.xml` or `.mvn/` changed beyond comments · an unclassified path (fail-safe) · the set is >70% of the reactor · `--full` | `mvn install -Pedition-advanced,ai` (+ `-Pcoverage` in CI) |
+
+**`-Pai` in the plan (`AI-OPTIN-1`).** The tool reads the AI modules from the root pom's `ai` profile and adds `ai`
+to `-P` whenever one is in the test set (a `full` plan always holds them). It also prints — and `--json` carries as
+`noAiCommands` — the same plan without them, for a machine with no eoiagent; running that one means the AI modules
+were **not** tested, and the report says so. CI passes `-Pedition-advanced,ai` always (it installs eoiagent first).
 
 **The test set** = changed modules **+ every module that depends on them, transitively** (read from the poms,
 test-jar dependencies included) **+ modules whose tests READ a changed file**. The last group is discovered, not

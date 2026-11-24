@@ -60,10 +60,9 @@
         <module>platform/inspecto-acquire</module>
         <module>platform/inspecto-engine</module>
         <module>inspecto</module>
-        <module>features/inspecto-agent</module>
-        <module>providers/inspecto-agent-hosted</module>
+        <!-- AI-OPTIN-1 (operator, 2026-11-24): inspecto-agent, inspecto-agent-hosted and inspecto-intelligence are NOT here -
+             they live in the opt-in profile `ai` below, so this reactor builds with no com.eoiagent artifacts present. -->
         <module>providers/inspecto-connectors</module>
-        <module>features/inspecto-intelligence</module>
         <!-- MODULE-REORG-1 P7: the Telecom ASN.1 decoder (Telecom industry pack). Default reactor so its tests and the
              inspecto module's ASN.1 tests always run; bundled (bundle-modules.mjs) in Advanced and Preview only (DATA-TIERS-1 DT-12), NOT in Basic or Standard. -->
         <module>providers/inspecto-telecom-asn1</module>
@@ -250,7 +249,25 @@
                 <module>features/inspecto-mcp</module>
             </modules>
         </profile>
-        
+
+        <!-- AI-OPTIN-1 (operator, 2026-11-24): the AI add-on - the Assist agent (inspecto-agent), its hosted model providers
+             (inspecto-agent-hosted) and the embedded Intelligence agent (inspecto-intelligence). They are the ONLY modules
+             that resolve com.eoiagent:* (built from source, jotder/inspect-agent; tools/dev-doctor.mjs), and no other module
+             depends on them, so they are OPT-IN: build them with -Pai, combined with an edition when wanted
+             ("mvn -o clean test -Pedition-advanced,ai"). Deliberately NOT activeByDefault - that activation switches off as
+             soon as any other -P is given, which would drop AI silently from every edition build. The edition profiles do
+             NOT pull it in either: the shipping callers (inspecto/package.ps1 for Standard/Advanced/Preview, tools/sbom.mjs,
+             tools/check-dependencies.mjs, ci.yml, release.yml) pass -Pai themselves; tools/affected-modules.mjs reads this
+             list to add -Pai when an AI module is in its test set. -->
+        <profile>
+            <id>ai</id>
+            <modules>
+                <module>features/inspecto-agent</module>
+                <module>providers/inspecto-agent-hosted</module>
+                <module>features/inspecto-intelligence</module>
+            </modules>
+        </profile>
+
         <!-- M5 (A2): JaCoCo lives in the PARENT so every module instruments in one reactor pass —
              'mvn -Pcoverage test'. A normal 'mvn test' is unaffected (profile inactive; the default
              empty <argLine> below keeps surefire's @{argLine} resolving cleanly). Formerly duplicated

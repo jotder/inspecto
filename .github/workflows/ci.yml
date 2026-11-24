@@ -658,17 +658,19 @@ jobs:
         env:
           DUCKDB_EXTENSION_CACHE: ${{ runner.temp }}/duckdb-extensions
           PG: '-Dinspecto.test.pg.url=jdbc:postgresql://localhost:5432/postgres?user=postgres&password=postgres'
+        # AI-OPTIN-1 (operator, 2026-11-24): `ai` on every command - the AI modules (inspecto-agent, -agent-hosted,
+        # -intelligence) are opt-in in the root pom, this job installs eoiagent above, and the plan's -pl list may name them.
         run: |
           set -o pipefail
           if [ "${{ steps.plan.outputs.mode }}" = "full" ]; then
-            mvn --batch-mode --no-transfer-progress install -Pedition-advanced -Pcoverage "$PG" \
+            mvn --batch-mode --no-transfer-progress install -Pedition-advanced,ai -Pcoverage "$PG" \
               2>&1 | tee "$RUNNER_TEMP/reactor.log"
           else
             # upstream of the test set, compiled and installed WITHOUT tests (test-jars still built)
-            mvn --batch-mode --no-transfer-progress install -DskipTests -Pedition-advanced \
+            mvn --batch-mode --no-transfer-progress install -DskipTests -Pedition-advanced,ai \
               -pl "${{ steps.plan.outputs.pl }}" -am
             # the test set: changed modules + every dependent + modules whose tests read a changed file
-            mvn --batch-mode --no-transfer-progress install -Pedition-advanced "$PG" \
+            mvn --batch-mode --no-transfer-progress install -Pedition-advanced,ai "$PG" \
               -pl "${{ steps.plan.outputs.pl }}" 2>&1 | tee "$RUNNER_TEMP/reactor.log"
           fi
 

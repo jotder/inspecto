@@ -140,6 +140,23 @@ export function editionProfile(edition) {
     return null;
 }
 
+/** AI-OPTIN-1: the module dirs of the root pom's opt-in `ai` profile (built only with -Pai). */
+export function aiProfileDirs(rootPom) {
+    const x = rootPom.replace(/<!--[\s\S]*?-->/g, '');
+    const p = [...x.matchAll(/<profile>([\s\S]*?)<\/profile>/g)].find((m) => /<id>\s*ai\s*<\/id>/.test(m[1]));
+    return p ? [...p[1].matchAll(/<module>([^<]+)<\/module>/g)].map((m) => m[1].trim()) : [];
+}
+
+/**
+ * AI-OPTIN-1: the `-P` value that builds everything `edition` ships - its edition profile, plus the opt-in `ai` profile when the
+ * edition ships a module that only `-Pai` puts in the reactor (Standard and up ship the assistant). null for Basic.
+ */
+export function mavenProfiles(edition, root = REPO_ROOT) {
+    const ai = new Set(aiProfileDirs(readFileSync(join(root, 'pom.xml'), 'utf8')));
+    const profiles = [editionProfile(edition), bundleModules(edition).some((m) => ai.has(m.dir)) ? 'ai' : null].filter(Boolean);
+    return profiles.length ? profiles.join(',') : null;
+}
+
 /**
  * The first-party modules staged for `edition`, in classpath order.
  * Basic 7, Standard 27, Advanced 31, Preview 31 — first-party only; add PG_SIDECAR for the jar count.

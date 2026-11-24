@@ -65,6 +65,8 @@ this file is a claim, checked by `tools/check-backlog-homes.mjs`.
 
 - **`IMPORT-LOADER-INVENTORY-RED-1`** — `ImportLoaderInventoryTest` red on master since 2026-11-19; cause not yet found.
 - **`UI-BUNDLE-BUDGETS-RED-1`** — the la-app and gamma bundle-size checks red on master since 2026-11-19.
+- **`DUCKDB-RAW-OPEN-POINTLOOKUP-1`** — `NoRawInMemoryDuckDbOpenContractTest` red on master since 2026-11-24: `PointLookup.java:450`/`:572` open an in-memory DuckDB without `DuckDbUtil.openInMemory(spillDir)`.
+- **`AI-OPTIN-VERIFY-1`** — the `-Pai` builds of `AI-OPTIN-1` (reactor `-Pedition-advanced,ai`, `package.ps1 -Edition Standard`, `check-dependencies.mjs`) not yet run on a machine with eoiagent; see [packaging](spec-build-test-packaging.md).
 
 - ~~**`TESTCONFIGS-PREFIX-SUFFIX-TRAP-1`**~~ CLOSED 2026-10-04: `TestConfigs.write()` now emits `<hash>_pipeline.toon`, the SUFFIX every scanning loader matches; pinned by `TestConfigsNameTest`.
 
