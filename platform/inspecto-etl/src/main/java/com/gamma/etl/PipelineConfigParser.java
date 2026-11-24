@@ -2008,7 +2008,7 @@ final class PipelineConfigParser {
         ic.put("root_type", rootType);
         for (String k : new String[]{"strictness", "file_header_length", "record_header_length",
                 "max_value_bytes", "derive", "max_list_elements", "max_derived_columns", "children",
-                "max_child_rows_per_record"})
+                "max_child_rows_per_record", "event_roots", "header_fields", "field_decoders", "simplify_aliases"})
             if (a.get(k) != null) ic.put(k, a.get(k));
         DecodeProfile.validateDerive(a);   // Parsing D9 slice 1: closed vocabulary, refused at load
         Map<String, Object> plugin = new LinkedHashMap<>();

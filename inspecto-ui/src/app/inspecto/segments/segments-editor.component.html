@@ -29,6 +29,15 @@
         <inspecto-alert variant="info">{{ note }}</inspecto-alert>
     }
 
+    @if (drift(); as d) {
+        @if (d.missingSelectors.length || d.extraPaths.length) {
+            <inspecto-alert variant="warning" data-test="segments-drift">
+                Preview drift: {{ d.missingSelectors.length }} missing selector(s),
+                {{ d.extraPaths.length }} unmapped field(s).
+            </inspecto-alert>
+        }
+    }
+
     <div formArrayName="segments" class="flex flex-col gap-4">
         @for (segment of segments.controls; track $index; let si = $index) {
             <div
@@ -64,7 +73,7 @@
 
                 <div formArrayName="columns" class="flex flex-col gap-2">
                     @for (column of columnsOf(segment).controls; track $index; let ci = $index) {
-                        <div [formGroupName]="ci" class="flex items-start gap-2">
+                        <div [formGroupName]="ci" class="flex flex-wrap items-start gap-2">
                             <!-- form-allow: a table-cell field of a repeating row (one segment column) --><mat-form-field
                                 class="flex-1"
                                 subscriptSizing="dynamic"
@@ -79,6 +88,8 @@
                                 />
                                 @if (column.get('selector')?.hasError('required') && column.get('selector')?.touched) {
                                     <mat-error>A selector is required.</mat-error>
+                                } @else if (sampleHintFor(column.get('selector')?.value ?? '', column.get('name')?.value ?? ''); as hint) {
+                                    <mat-hint class="font-mono text-[11px]">Sample: {{ hint }}</mat-hint>
                                 }
                             </mat-form-field>
                             <!-- form-allow: a table-cell field of a repeating row (one segment column) --><mat-form-field
@@ -114,6 +125,27 @@
                                         <mat-option [value]="t">{{ t }}</mat-option>
                                     }
                                 </mat-select>
+                            </mat-form-field>
+                            <!-- form-allow: optional affix controls for one segment column --><mat-form-field
+                                class="w-28"
+                                subscriptSizing="dynamic"
+                            >
+                                <mat-label>Rename</mat-label>
+                                <input matInput formControlName="rename" [readonly]="!editable()" />
+                            </mat-form-field>
+                            <!-- form-allow: optional affix controls for one segment column --><mat-form-field
+                                class="w-24"
+                                subscriptSizing="dynamic"
+                            >
+                                <mat-label>Prefix</mat-label>
+                                <input matInput formControlName="prefix" [readonly]="!editable()" />
+                            </mat-form-field>
+                            <!-- form-allow: optional affix controls for one segment column --><mat-form-field
+                                class="w-24"
+                                subscriptSizing="dynamic"
+                            >
+                                <mat-label>Postfix</mat-label>
+                                <input matInput formControlName="postfix" [readonly]="!editable()" />
                             </mat-form-field>
                             @if (editable()) {
                                 <button

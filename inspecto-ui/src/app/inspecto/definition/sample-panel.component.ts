@@ -161,16 +161,27 @@ const RAW_PREVIEW_LINES = 40;
                         placeholder="Paste a few representative lines…"
                         aria-label="Paste sample text"
                     ></textarea>
-                    <button
-                        mat-flat-button
-                        color="primary"
-                        type="button"
-                        class="self-start"
-                        [disabled]="!pasteText.trim()"
-                        (click)="usePasted()"
-                    >
-                        Use pasted sample
-                    </button>
+                    <div class="flex items-center gap-3">
+                        <button
+                            mat-flat-button
+                            color="primary"
+                            type="button"
+                            class="self-start"
+                            [disabled]="!pasteText.trim()"
+                            (click)="usePasted()"
+                        >
+                            Use pasted sample
+                        </button>
+                        <label class="flex cursor-pointer items-center gap-1.5 text-xs">
+                            <input
+                                type="checkbox"
+                                data-test="sample-hex-toggle"
+                                [checked]="pasteAsHex()"
+                                (change)="pasteAsHex.set($any($event.target).checked)"
+                            />
+                            <span>Hex bytes</span>
+                        </label>
+                    </div>
                 </div>
             }
 
@@ -198,6 +209,7 @@ export class InspectoSamplePanelComponent {
     private toastr = inject(ToastrService);
 
     readonly pasting = signal(false);
+    readonly pasteAsHex = signal(false);
     /** Raw preview visibility — collapsible so a long sample doesn't push the stage pane away. */
     readonly expanded = signal(true);
     pasteText = '';
@@ -224,7 +236,7 @@ export class InspectoSamplePanelComponent {
         // Binary formats (an .xlsx workbook — multiformat X4) capture BYTES: text() would round-trip
         // the zip through a charset and corrupt it. No truncation either — a sliced zip is unreadable,
         // so an oversized workbook is refused whole rather than silently maimed.
-        if (/\.xlsx$/i.test(file.name)) {
+        if (/\.(xlsx|parquet|ber|der|cdr|bin)$/i.test(file.name)) {
             if (file.size > MAX_SAMPLE_BYTES) {
                 this.toastr.error(`Workbook too large for a preview sample (max ${MAX_SAMPLE_BYTES / 1024} KB).`);
                 return;
@@ -259,6 +271,26 @@ export class InspectoSamplePanelComponent {
     usePasted(): void {
         const text = this.pasteText.slice(0, MAX_SAMPLE_BYTES);
         if (!text.trim()) return;
+        if (this.pasteAsHex()) {
+            const hex = text
+                .split(/\r?\n/)
+                .map((l) => l.replace(/#.*$/, ''))
+                .join('')
+                .replace(/\s+/g, '');
+            if (!hex || hex.length % 2 !== 0 || /[^0-9a-fA-F]/.test(hex)) {
+                this.toastr.error('Invalid hex bytes — expected even-length 0-9 / A-F pairs.');
+                return;
+            }
+            let bin = '';
+            for (let i = 0; i < hex.length; i += 2) {
+                bin += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16));
+            }
+            this.state().captureBinarySample('pasted hex sample', btoa(bin), `[binary hex — ${hex.length / 2} B]`);
+            this.pasting.set(false);
+            this.expanded.set(false);
+            this.pasteText = '';
+            return;
+        }
         this.state().captureSample('pasted sample', text);
         this.pasting.set(false);
         this.expanded.set(true);

@@ -1,6 +1,7 @@
 package com.gamma.inspector;
 
 import com.gamma.etl.*;
+import com.gamma.util.SqlIdent;
 import org.duckdb.DuckDBAppender;
 import org.duckdb.DuckDBConnection;
 import org.slf4j.Logger;
@@ -9,7 +10,9 @@ import org.slf4j.LoggerFactory;
 import java.io.Closeable;
 import java.nio.file.Paths;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -79,6 +82,8 @@ final class DuckDbRecordSink implements RecordSink, Closeable {
         final List<String> partCols;
         final String dbDir;
         List<String> columns;            // explicit (define) or derived (lazy)
+        Map<String, String> sqlTypes;    // null when untyped (all VARCHAR)
+        boolean hasTypedColumns;         // true when any column is non-VARCHAR
         boolean created;
         DuckDBAppender appender;
         final List<Object[]> buffer = new ArrayList<>();
@@ -87,6 +92,10 @@ final class DuckDbRecordSink implements RecordSink, Closeable {
 
         Seg(String key, Map<String, Object> schema, List<String> partCols, String dbDir) {
             this.key = key; this.schema = schema; this.partCols = partCols; this.dbDir = dbDir;
+        }
+
+        String sqlTypeOf(String col) {
+            return sqlTypes == null ? SchemaFieldTypes.VARCHAR : sqlTypes.getOrDefault(col, SchemaFieldTypes.VARCHAR);
         }
     }
 
@@ -133,6 +142,32 @@ final class DuckDbRecordSink implements RecordSink, Closeable {
         if (columns == null || columns.isEmpty())
             throw new IllegalArgumentException("columns for segment '" + segmentKey + "' must be non-empty");
         s.columns = List.copyOf(columns);
+        s.sqlTypes = null;
+        s.hasTypedColumns = false;
+    }
+
+    @Override
+    public void defineTyped(String segmentKey, List<String> columns, Map<String, String> sqlTypes) {
+        Seg s = require(segmentKey);
+        if (s.created)
+            throw new IllegalStateException("defineTyped(\"" + segmentKey + "\") called after emit");
+        if (columns == null || columns.isEmpty())
+            throw new IllegalArgumentException("columns for segment '" + segmentKey + "' must be non-empty");
+        s.columns = List.copyOf(columns);
+        Map<String, String> resolved = new LinkedHashMap<>(columns.size());
+        boolean typed = false;
+        for (String col : s.columns) {
+            String rawType = sqlTypes == null ? null : sqlTypes.get(col);
+            String norm = SchemaFieldTypes.normalize(rawType);
+            if (!SchemaFieldTypes.isHonored(norm)) {
+                throw new IllegalArgumentException(
+                        "unsupported SQL type '" + rawType + "' for column '" + col + "' in segment '" + segmentKey + "'");
+            }
+            if (!SchemaFieldTypes.VARCHAR.equals(norm)) typed = true;
+            resolved.put(col, norm);
+        }
+        s.sqlTypes = Map.copyOf(resolved);
+        s.hasTypedColumns = typed;
     }
 
     @Override
@@ -224,12 +259,16 @@ final class DuckDbRecordSink implements RecordSink, Closeable {
                     "segment '%s' emit has %d value(s) but %d column(s) (%s)",
                     s.key, valueCount, s.columns.size(), s.columns));
         String table = raw(s);
-        StringBuilder ddl = new StringBuilder("CREATE TABLE \"").append(table).append("\" (");
-        for (String c : s.columns) ddl.append('"').append(c).append("\" VARCHAR, ");
+        StringBuilder ddl = new StringBuilder("CREATE TABLE ").append(SqlIdent.q(table)).append(" (");
+        for (String c : s.columns) {
+            ddl.append(SqlIdent.q(c)).append(' ').append(stagingTypeOf(s, c)).append(", ");
+        }
         ddl.append("\"__src_id\" INTEGER)");
         try (Statement st = conn.createStatement()) {
             st.execute(ddl.toString());
-            s.appender = ((DuckDBConnection) conn).createAppender("", table);
+            if (!s.hasTypedColumns) {
+                s.appender = ((DuckDBConnection) conn).createAppender("", table);
+            }
         } catch (Exception e) {
             throw new SinkFlushException("CREATE TABLE failed for " + table, e);
         }
@@ -241,25 +280,104 @@ final class DuckDbRecordSink implements RecordSink, Closeable {
         List<Map<String, Object>> fields =
                 (List<Map<String, Object>>) ((Map<String, Object>) s.schema.get("raw")).get("fields");
         List<String> cols = new ArrayList<>(fields.size());
-        for (Map<String, Object> f : fields) cols.add((String) f.get("name"));
+        for (Map<String, Object> f : fields) {
+            cols.add(com.gamma.etl.DeriveSpec.applyNameAffixes(
+                    (String) f.get("name"), f.get("rename"), f.get("prefix"), f.get("postfix")));
+        }
         return cols;
+    }
+
+    /**
+     * SQL type used to create and bind the {@code raw_<KEY>_f<srcId>} staging table. Keeps {@code VARCHAR}
+     * for {@code DATE}/{@code TIMESTAMP}/{@code TIMESTAMPTZ} and for fields with explicit {@code format},
+     * {@code decimal_separator}, or a non-point pipeline {@code csv_settings.decimal_separator} so
+     * {@code DataTransformer.materialize} can apply {@code TRY_STRPTIME}/{@code DecimalMarkText.sql} via
+     * {@code SchemaFieldTypes.castSql} without raw {@code TRY_CAST} nulling values on {@code emit()}.
+     */
+    @SuppressWarnings("unchecked")
+    private String stagingTypeOf(Seg s, String col) {
+        String type = s.sqlTypeOf(col);
+        if (SchemaFieldTypes.VARCHAR.equals(type) || SchemaFieldTypes.isDateLike(type)) {
+            return SchemaFieldTypes.VARCHAR;
+        }
+        PipelineConfig.CsvSettings csv = cfg == null ? null : cfg.csv();
+        if (csv != null) {
+            String decSep = csv.decimalSeparator();
+            if (SchemaFieldTypes.isNumber(type) && decSep != null && !decSep.isBlank() && !".".equals(decSep.trim())) {
+                return SchemaFieldTypes.VARCHAR;
+            }
+        }
+        if (s.schema != null && s.schema.get("raw") instanceof Map<?, ?> raw
+                && raw.get("fields") instanceof List<?> fields) {
+            for (Object o : fields) {
+                if (!(o instanceof Map<?, ?> f)) continue;
+                String effectiveName = com.gamma.etl.DeriveSpec.applyNameAffixes(
+                        f.get("name") == null ? null : String.valueOf(f.get("name")),
+                        f.get("rename"), f.get("prefix"), f.get("postfix"));
+                if (!col.equals(effectiveName)) continue;
+                Object fmt = f.get("format");
+                Object decSep = f.get("decimal_separator");
+                boolean hasFmt = fmt != null && !String.valueOf(fmt).isBlank();
+                boolean hasDecSep = decSep != null && !String.valueOf(decSep).isBlank();
+                if (hasFmt || hasDecSep) {
+                    return SchemaFieldTypes.VARCHAR;
+                }
+            }
+        }
+        return type;
     }
 
     private void appendFlush(Seg s) {
         if (s.buffer.isEmpty()) return;
         try {
             int n = s.columns.size();
-            for (Object[] row : s.buffer) {
-                s.appender.beginRow();
-                for (int i = 0; i < n; i++) s.appender.append((String) row[i]);
-                s.appender.append(srcId);
-                s.appender.endRow();
+            if (!s.hasTypedColumns) {
+                for (Object[] row : s.buffer) {
+                    s.appender.beginRow();
+                    for (int i = 0; i < n; i++) s.appender.append((String) row[i]);
+                    s.appender.append(srcId);
+                    s.appender.endRow();
+                }
+                s.appender.flush();
+            } else {
+                String sql = typedInsertSql(s);
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    for (Object[] row : s.buffer) {
+                        for (int i = 0; i < n; i++) {
+                            if (row[i] == null) {
+                                ps.setNull(i + 1, Types.VARCHAR);
+                            } else {
+                                ps.setString(i + 1, (String) row[i]);
+                            }
+                        }
+                        ps.setInt(n + 1, srcId);
+                        ps.addBatch();
+                    }
+                    ps.executeBatch();
+                }
             }
-            s.appender.flush();
             s.buffer.clear();
         } catch (Exception e) {
             throw new SinkFlushException("INSERT failed for " + raw(s), e);
         }
+    }
+
+    private String typedInsertSql(Seg s) {
+        StringBuilder sql = new StringBuilder("INSERT INTO ").append(SqlIdent.q(raw(s))).append(" (");
+        for (String c : s.columns) {
+            sql.append(SqlIdent.q(c)).append(", ");
+        }
+        sql.append("\"__src_id\") VALUES (");
+        for (String c : s.columns) {
+            String type = stagingTypeOf(s, c);
+            if (SchemaFieldTypes.VARCHAR.equals(type)) {
+                sql.append("CAST(? AS VARCHAR), ");
+            } else {
+                sql.append("TRY_CAST(NULLIF(CAST(? AS VARCHAR), '') AS ").append(type).append("), ");
+            }
+        }
+        sql.append("?)");
+        return sql.toString();
     }
 
     /** Transform → write → lineage for the rows currently in the raw table, then reset it. */

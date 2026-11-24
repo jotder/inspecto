@@ -117,7 +117,7 @@ public final class DataTransformer {
     @SuppressWarnings("unchecked")
     public static String selectFor(Map<String, Object> schemaConfig, PipelineConfig cfg, String sourceTable) {
 
-        Map<String, String> fieldTypes = rawFieldTypes(schemaConfig);
+        Map<String, String> fieldTypes = rawFieldTypes(schemaConfig, cfg);
         SourceZones zones = SourceZones.of(schemaConfig, cfg.csv().sourceTimezone());
         Map<String, String> fieldFormats = SchemaFieldTypes.formatsOf(schemaConfig);
 
@@ -317,14 +317,115 @@ public final class DataTransformer {
      */
     @SuppressWarnings("unchecked")
     private static Map<String, String> rawFieldTypes(Map<String, Object> schemaConfig) {
+        return rawFieldTypes(schemaConfig, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, String> rawFieldTypes(Map<String, Object> schemaConfig, PipelineConfig cfg) {
         if (!(schemaConfig.get("raw") instanceof Map<?, ?> raw) || !(raw.get("fields") instanceof List<?> fields))
             throw new IllegalArgumentException("schema '" + schemaName(schemaConfig) + "' has no raw.fields[] "
                     + "— the raw column list the mapping compiles against is missing; declare raw.fields[] "
                     + "inline or place a sibling <name>_structure.csv next to the schema file");
         Map<String, String> fieldTypes = new LinkedHashMap<>();
-        for (Map<String, Object> f : (List<Map<String, Object>>) fields)
-            fieldTypes.put((String) f.get("name"), (String) f.get("type"));
+        for (Map<String, Object> f : (List<Map<String, Object>>) fields) {
+            String effectiveName = DeriveSpec.applyNameAffixes(
+                    (String) f.get("name"), f.get("rename"), f.get("prefix"), f.get("postfix"));
+            fieldTypes.put(effectiveName, (String) f.get("type"));
+        }
+        for (String extra : extraDerivedFieldNames(schemaConfig, cfg)) {
+            fieldTypes.putIfAbsent(extra, SchemaFieldTypes.VARCHAR);
+        }
         return fieldTypes;
+    }
+
+    /** Optional derive / children / derivedColumns names attached to a segment schema map. */
+    static List<String> extraDerivedFieldNames(Map<String, Object> schemaConfig) {
+        return extraDerivedFieldNames(schemaConfig, null);
+    }
+
+    /** Optional derive / children / derivedColumns names and {@code EVENT_TYPE} for ASN.1 event-routed pipelines. */
+    static List<String> extraDerivedFieldNames(Map<String, Object> schemaConfig, PipelineConfig cfg) {
+        if (schemaConfig == null) return List.of();
+        List<String> out = new ArrayList<>();
+        collectDerivedNames(schemaConfig.get("derive"), out, true);
+        collectDerivedNames(schemaConfig.get("children"), out, false);
+        if (schemaConfig.get("derivedColumns") instanceof List<?> dc) {
+            for (Object o : dc) {
+                if (o != null && !String.valueOf(o).isBlank()) out.add(String.valueOf(o).trim());
+            }
+        }
+        if (needsEventTypeColumn(schemaConfig, cfg) && !out.contains("EVENT_TYPE")) {
+            out.add("EVENT_TYPE");
+        }
+        return out;
+    }
+
+    private static boolean needsEventTypeColumn(Map<String, Object> schemaConfig, PipelineConfig cfg) {
+        if (cfg != null && cfg.schemas() != null) {
+            if ("com.gamma.telecom.asn1.Asn1RecordIngester".equals(cfg.schemas().ingesterClass())) return true;
+            Map<String, Object> ic = cfg.schemas().ingesterConfig();
+            if (ic != null && hasNonEmptyValue(ic.get("event_roots"))) return true;
+        }
+        if (schemaConfig.get("frontend") instanceof String fe && "asn1".equalsIgnoreCase(fe.trim())) return true;
+        return schemaConfig.get("ingester_config") instanceof Map<?, ?> sic && hasNonEmptyValue(sic.get("event_roots"));
+    }
+
+    private static boolean hasNonEmptyValue(Object v) {
+        if (v instanceof Map<?, ?> m) return !m.isEmpty();
+        if (v instanceof Collection<?> c) return !c.isEmpty();
+        return v != null && !String.valueOf(v).isBlank();
+    }
+
+    private static void collectDerivedNames(Object spec, List<String> out, boolean allowInnerColMapKey) {
+        if (spec instanceof Map<?, ?> m) {
+            String direct = affixedColumnName(m.get("target_column"), m);
+            if (direct != null) {
+                out.add(direct);
+                return;
+            }
+            for (Map.Entry<?, ?> e : m.entrySet()) {
+                Object v = e.getValue();
+                if (v instanceof List<?> subList) {
+                    collectDerivedNames(subList, out, allowInnerColMapKey);
+                } else if (v instanceof Map<?, ?> sub) {
+                    String explicit = affixedColumnName(sub.get("target_column"), sub);
+                    if (explicit != null) {
+                        out.add(explicit);
+                    } else if (allowInnerColMapKey && isDeriveRuleMap(sub)) {
+                        String keyCol = affixedColumnName(e.getKey(), sub);
+                        if (keyCol != null) out.add(keyCol);
+                    } else {
+                        collectDerivedNames(sub, out, allowInnerColMapKey);
+                    }
+                }
+            }
+        } else if (spec instanceof List<?> list) {
+            for (Object item : list) {
+                if (item instanceof String s && !s.isBlank()) {
+                    out.add(s.trim());
+                } else if (item instanceof Map<?, ?> im) {
+                    Object base = im.get("target_column") != null ? im.get("target_column") : im.get("name");
+                    String col = affixedColumnName(base, im);
+                    if (col != null) out.add(col);
+                }
+            }
+        }
+    }
+
+    private static boolean isDeriveRuleMap(Map<?, ?> sub) {
+        return sub.containsKey("select")
+                || sub.containsKey("reduce")
+                || sub.containsKey("fold")
+                || sub.containsKey("op");
+    }
+
+    private static String affixedColumnName(Object rawName, Map<?, ?> cfg) {
+        if (rawName == null) return null;
+        String base = String.valueOf(rawName).trim();
+        if (base.isEmpty()) return null;
+        String effective = DeriveSpec.applyNameAffixes(
+                base, cfg.get("rename"), cfg.get("prefix"), cfg.get("postfix")).trim();
+        return effective.isEmpty() ? null : effective;
     }
 
     /** A schema's display name for errors: its {@code name}, else {@code raw.name}, else {@code mapping.canonicalName}. */

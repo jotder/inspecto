@@ -6,7 +6,15 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { Observable, of, throwError } from 'rxjs';
 import { delay } from 'rxjs/operators';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AuthoredNode, ConfigService, ParsersService, SpacesService } from 'app/inspecto/api';
+import {
+    AuthoredNode,
+    ConfigService,
+    DatasetRegistrationService,
+    JobsService,
+    ParsersService,
+    SpacesService,
+} from 'app/inspecto/api';
+import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 import { ToastrService } from 'ngx-toastr';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { DefinitionStateService } from 'app/inspecto/definition/definition-state.service';
@@ -288,6 +296,12 @@ async function create(
                         decodeProfileCalls.push({ file, subdir });
                         return profileReply;
                     },
+                    decoders: () =>
+                        of([
+                            { id: 'tbcd', description: 'TBCD digits', sqlType: 'VARCHAR' },
+                            { id: 'utc_time', description: 'UTC timestamp', sqlType: 'TIMESTAMP' },
+                        ]),
+                    validateGrammar: () => of({ valid: true, diagnostics: [] }),
                 },
             },
             {
@@ -349,6 +363,24 @@ async function create(
             },
             // The sample strip (rendered only with a thread) reports an unreadable file through toastr.
             { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() } },
+            {
+                provide: DatasetRegistrationService,
+                useValue: { ensure: vi.fn(() => of({ status: 'created', store: 'record' })) },
+            },
+            {
+                provide: DatasetsService,
+                useValue: {
+                    materialize: vi.fn(() =>
+                        of({ runId: 'run-1', dataset: 'record', target: 'record_snapshot', status: 'running' }),
+                    ),
+                },
+            },
+            {
+                provide: JobsService,
+                useValue: {
+                    run: vi.fn(() => of({ runId: 'run-1', jobName: 'materialize', status: 'SUCCESS', message: null })),
+                },
+            },
         ],
     });
     await TestBed.compileComponents();
@@ -2224,5 +2256,311 @@ describe('deriveKeysToCarry (PARSING-PREVIEW-DERIVED-1)', () => {
         expect(deriveKeysToCarry({}, { strictness: 'DER' })).toEqual({});
         expect(deriveKeysToCarry({}, undefined)).toEqual({});
         expect(deriveKeysToCarry({}, { derive: '', children: null })).toEqual({});
+    });
+});
+
+describe('ASN.1 interactive pipeline UI & parse-to-dataset flow (Task 6)', () => {
+    const TREE_WITH_DERIVED = {
+        kind: 'tree' as const,
+        recordCount: 1,
+        nodes: [
+            {
+                label: 'Record',
+                type: 'SEQUENCE',
+                meta: { fieldPath: 'Record', nodeRole: 'container' },
+                children: [
+                    {
+                        label: 'callingNumber',
+                        type: 'OCTET STRING',
+                        value: '123456',
+                        meta: { fieldPath: 'Record.callingNumber', nodeRole: 'leaf', decoderId: 'tbcd' },
+                    },
+                    {
+                        label: 'listOfServiceData',
+                        type: 'SEQUENCE_OF',
+                        meta: { fieldPath: 'Record.listOfServiceData', nodeRole: 'repeated' },
+                        children: [
+                            {
+                                label: 'ServiceData',
+                                type: 'SEQUENCE',
+                                children: [
+                                    { label: 'ratingGroup', type: 'INTEGER', value: '100' },
+                                    { label: 'dataVolume', type: 'INTEGER', value: '2048' },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            },
+        ],
+        derived: {
+            kind: 'rows' as const,
+            segments: [
+                {
+                    segment: 'Record',
+                    child: false,
+                    columns: ['callingNumber', 'EVENT_TYPE'],
+                    derivedColumns: [],
+                    rows: [{ callingNumber: '123456', EVENT_TYPE: 'Record' }],
+                    rowCount: 1,
+                    columnMeta: {
+                        columnTypes: { callingNumber: 'VARCHAR', EVENT_TYPE: 'VARCHAR' },
+                        sourcePaths: { callingNumber: 'Record.callingNumber', EVENT_TYPE: '$event' },
+                        decoders: { callingNumber: 'tbcd' },
+                    },
+                },
+            ],
+        },
+    };
+
+    it('bridges preview.derived RowSet[] into DefinitionStateService.parsePreview', async () => {
+        const thread = new DefinitionStateService();
+        thread.captureSample('sample.ber', 'raw');
+        const fixture = await create(asn1Node(), [ASN1_DEF], 0, thread);
+        fixture.detectChanges();
+        const pane = fixture.debugElement.query(By.directive(PipelineParseDefinitionComponent))
+            .componentInstance as PipelineParseDefinitionComponent;
+
+        const parsers = TestBed.inject(ParsersService);
+        vi.spyOn(parsers, 'preview').mockReturnValue(of(TREE_WITH_DERIVED));
+
+        pane.previewFn('asn1', { asn1: { grammar: 'X' } }, 'raw').subscribe();
+        fixture.detectChanges();
+
+        expect(thread.parsePreview()).toEqual({
+            frontend: 'asn1',
+            columns: ['callingNumber', 'EVENT_TYPE'],
+            rows: [{ callingNumber: '123456', EVENT_TYPE: 'Record' }],
+            rowCount: 1,
+            rejectedRows: 0,
+            columnTypes: [
+                { name: 'callingNumber', type: 'VARCHAR' },
+                { name: 'EVENT_TYPE', type: 'VARCHAR' },
+            ],
+        });
+    });
+
+    it('renders leaf-only V-decoder picker and SET_OF Member Fields Table with groupBy, agg, and join/fold delimiters', async () => {
+        const fixture = await create(asn1Node(), [ASN1_DEF]);
+        fixture.detectChanges();
+        const pane = fixture.debugElement.query(By.directive(PipelineParseDefinitionComponent))
+            .componentInstance as PipelineParseDefinitionComponent;
+
+        pane.onPreviewed(TREE_WITH_DERIVED);
+        fixture.detectChanges();
+
+        const root = fixture.nativeElement as HTMLElement;
+        const leafRows = root.querySelectorAll('[data-test^="leaf-row-"]');
+        expect(leafRows.length).toBe(1);
+        expect(leafRows[0].getAttribute('data-test')).toBe('leaf-row-Record.callingNumber');
+        expect(root.querySelector('[data-test="leaf-row-Record"]')).toBeNull();
+        expect(root.querySelector('[data-test="leaf-row-Record.listOfServiceData"]')).toBeNull();
+
+        const setOfTable = root.querySelector('[data-test="asn1-setof-table"]');
+        expect(setOfTable).not.toBeNull();
+        expect(setOfTable!.querySelectorAll('[data-test="member-groupby-radio"]').length).toBe(2);
+        expect(setOfTable!.querySelectorAll('[data-test="member-agg-select"]').length).toBe(2);
+
+        expect(root.querySelector('[data-test="fold-delimiters"]')).toBeNull();
+        pane.setRepeatedMode('Record.listOfServiceData', 'fold');
+        fixture.detectChanges();
+        expect(root.querySelector('[data-test="fold-delimiters"]')).not.toBeNull();
+        expect(root.querySelector('[data-test="fold-item-delimiter"]')).not.toBeNull();
+        expect(root.querySelector('[data-test="fold-kv-delimiter"]')).not.toBeNull();
+    });
+
+    it('toggles between Sink Table Preview and Table Metadata tabs', async () => {
+        const fixture = await create(asn1Node(), [ASN1_DEF]);
+        fixture.detectChanges();
+        const pane = fixture.debugElement.query(By.directive(PipelineParseDefinitionComponent))
+            .componentInstance as PipelineParseDefinitionComponent;
+
+        pane.onPreviewed(TREE_WITH_DERIVED);
+        fixture.detectChanges();
+
+        const root = fixture.nativeElement as HTMLElement;
+        expect(root.querySelector('[data-test="sink-table-preview"]')).not.toBeNull();
+        expect(root.querySelector('[data-test="table-metadata-view"]')).toBeNull();
+
+        (root.querySelector('[data-test="tab-table-metadata"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+
+        expect(root.querySelector('[data-test="sink-table-preview"]')).toBeNull();
+        const metaView = root.querySelector('[data-test="table-metadata-view"]');
+        expect(metaView).not.toBeNull();
+        expect(metaView!.textContent).toContain('Record.callingNumber');
+        expect(metaView!.textContent).toContain('tbcd');
+    });
+
+    it('emits DeriveSpec-valid fold config without list/target_column, strips root prefix, and never invents child segments on join', async () => {
+        const fixture = await create(asn1Node(), [ASN1_DEF]);
+        fixture.detectChanges();
+        const paneInstance = pane(fixture);
+        paneInstance.onPreviewed(TREE_WITH_DERIVED);
+        fixture.detectChanges();
+
+        paneInstance.setRepeatedMode('Record.listOfServiceData', 'fold');
+        paneInstance.setRepeatedFoldOption('Record.listOfServiceData', 'itemDelimiter', '|');
+        paneInstance.setRepeatedFoldOption('Record.listOfServiceData', 'kvDelimiter', ':');
+        paneInstance.setMemberConfig('Record.listOfServiceData', 'ratingGroup', 'use', true);
+        paneInstance.submit();
+
+        const appliedAsn1 = (fixture.componentInstance.applied!.config!['parsing'] as Record<string, unknown>)[
+            'asn1'
+        ] as Record<string, unknown>;
+        const derive = appliedAsn1['derive'] as Record<string, Record<string, Record<string, unknown>>>;
+        expect(derive['Record']['listOfServiceData']).toEqual({
+            fold: 'listOfServiceData',
+            mode: 'delim',
+            fields: ['ratingGroup'],
+            item_delim: '|',
+            field_delim: ':',
+        });
+        expect('list' in derive['Record']['listOfServiceData']).toBe(false);
+        expect('target_column' in derive['Record']['listOfServiceData']).toBe(false);
+        expect(appliedAsn1['children']).toBeUndefined();
+
+        paneInstance.setRepeatedMode('Record.listOfServiceData', 'join');
+        paneInstance.submit();
+        const joinNoChildAsn1 = (fixture.componentInstance.applied!.config!['parsing'] as Record<string, unknown>)[
+            'asn1'
+        ] as Record<string, unknown>;
+        expect(joinNoChildAsn1['children']).toBeUndefined();
+    });
+
+    it('emits normalized children when a declared child segment matches and rehydrates derive/children on load', async () => {
+        const withChildNode = asn1Node();
+        const asn1Cfg = (withChildNode.config!['parsing'] as Record<string, unknown>)['asn1'] as Record<string, unknown>;
+        asn1Cfg['segments'] = { Record: 'config/record_schema.toon', usage: 'config/usage_schema.toon' };
+        asn1Cfg['derive'] = {
+            Record: {
+                LISTOFSERVICEDATA: {
+                    fold: 'listOfServiceData',
+                    mode: 'json',
+                    fields: ['ratingGroup'],
+                    group_by: 'ratingGroup',
+                    aggs: { ratingGroup: 'count' },
+                },
+            },
+        };
+        asn1Cfg['children'] = {
+            Record: {
+                usage: { segment: 'usage', join_mode: 'left' },
+            },
+        };
+
+        const fixture = await create(withChildNode, [ASN1_DEF]);
+        fixture.detectChanges();
+        const paneInstance = pane(fixture);
+
+        expect(paneInstance.repeatedConfigOf('Record.listOfServiceData')).toMatchObject({
+            mode: 'fold',
+            asJson: true,
+            groupBy: 'ratingGroup',
+            members: { ratingGroup: { use: true, agg: 'count' } },
+        });
+        expect(paneInstance.repeatedConfigOf('Record.usage')).toMatchObject({ mode: 'join' });
+
+        paneInstance.submit();
+        const appliedAsn1 = (fixture.componentInstance.applied!.config!['parsing'] as Record<string, unknown>)[
+            'asn1'
+        ] as Record<string, unknown>;
+        expect((appliedAsn1['children'] as Record<string, unknown>)['Record']).toEqual({
+            usage: { segment: 'usage', join_mode: 'left' },
+        });
+    });
+
+    it('strips root_type alongside grammar and grammar_file when rawTlvDump is enabled', async () => {
+        const fixture = await create(asn1Node(), [ASN1_DEF]);
+        fixture.detectChanges();
+        const paneInstance = pane(fixture);
+        const parsers = TestBed.inject(ParsersService);
+        const previewSpy = vi.spyOn(parsers, 'preview').mockReturnValue(of(TREE_WITH_DERIVED));
+
+        paneInstance.rawTlvDump.set(true);
+        paneInstance
+            .previewFn('asn1', { asn1: { grammar: 'X', grammar_file: 'x.asn', root_type: 'Record' } }, 'raw')
+            .subscribe();
+
+        const sentGrammar = previewSpy.mock.calls[0]?.[1] as Record<string, Record<string, unknown>>;
+        expect(sentGrammar['asn1']['grammar']).toBeUndefined();
+        expect(sentGrammar['asn1']['grammar_file']).toBeUndefined();
+        expect(sentGrammar['asn1']['root_type']).toBeUndefined();
+    });
+
+    it('preserves selectedRowSetIndex across onPreviewed when multi-segment tree results arrive', async () => {
+        const thread = new DefinitionStateService();
+        thread.captureSample('sample.ber', 'raw');
+        const fixture = await create(asn1Node(), [ASN1_DEF], 0, thread);
+        fixture.detectChanges();
+        const paneInstance = pane(fixture);
+
+        const twoSegments = {
+            ...TREE_WITH_DERIVED,
+            derived: {
+                kind: 'rows' as const,
+                segments: [
+                    TREE_WITH_DERIVED.derived.segments[0],
+                    {
+                        segment: 'ServiceData',
+                        child: true,
+                        columns: ['ratingGroup', 'EVENT_TYPE'],
+                        derivedColumns: [],
+                        rows: [{ ratingGroup: '100', EVENT_TYPE: 'ServiceData' }],
+                        rowCount: 1,
+                        columnMeta: { columnTypes: { ratingGroup: 'BIGINT', EVENT_TYPE: 'VARCHAR' } },
+                    },
+                ],
+            },
+        };
+
+        paneInstance.onPreviewed(twoSegments);
+        paneInstance.selectRowSet(1);
+        expect(paneInstance.selectedRowSetIndex()).toBe(1);
+
+        paneInstance.onPreviewed(twoSegments);
+        expect(paneInstance.selectedRowSetIndex()).toBe(1);
+        expect(thread.parsePreview()?.columns).toEqual(['ratingGroup', 'EVENT_TYPE']);
+    });
+
+    it('passes physicalRef, sourceName, columns, partitions to DatasetRegistrationService and polls materialize status', async () => {
+        const fixture = await create(asn1Node(), [ASN1_DEF], 0, null, 'My Pipeline');
+        fixture.detectChanges();
+        const paneInstance = pane(fixture);
+        paneInstance.onPreviewed(TREE_WITH_DERIVED);
+        fixture.detectChanges();
+
+        const reg = TestBed.inject(DatasetRegistrationService);
+        const ensureSpy = vi.spyOn(reg, 'ensure');
+        const jobs = TestBed.inject(JobsService);
+        const jobSpy = vi.spyOn(jobs, 'run');
+
+        paneInstance.createAndPopulateSink();
+
+        expect(ensureSpy).toHaveBeenCalledWith('My_Pipeline_Record', 'My Pipeline · Record', {
+            physicalRef: 'My_Pipeline/database/Record',
+            sourceName: 'My_Pipeline',
+            columns: [
+                { name: 'callingNumber', type: 'string', role: 'dimension' },
+                { name: 'EVENT_TYPE', type: 'string', role: 'dimension' },
+            ],
+            partitions: [{ column: 'event_type', source: 'EVENT_TYPE', type: 'VARCHAR' }],
+        });
+        expect(jobSpy).toHaveBeenCalledWith('run-1');
+        expect(paneInstance.sinkStatus()).toMatchObject({ ok: true });
+
+        jobSpy.mockReturnValueOnce(of({
+            runId: 'run-1',
+            job: 'materialize',
+            type: 'materialize',
+            trigger: 'manual',
+            status: 'FAILED',
+            startedAt: null,
+            finishedAt: null,
+            durationMs: 0,
+            message: 'No parquet files',
+        }));
+        paneInstance.createAndPopulateSink();
+        expect(paneInstance.sinkStatus()).toEqual({ ok: false, message: 'No parquet files' });
     });
 });

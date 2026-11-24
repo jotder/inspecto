@@ -593,6 +593,7 @@ public final class CapabilityManifest {
             new Exemption("POST", "/components/grammar/preview", "read-shaped", "previews an unsaved draft"),
             new Exemption("POST", "/components/sink/preview", "read-shaped", "previews an unsaved draft"),
             new Exemption("POST", "/components/mapping/validate", "read-shaped", "validates a draft, writes nothing"),
+            new Exemption("POST", "/parsers/asn1/validate", "read-shaped", "validates an ASN.1 grammar draft, writes nothing"),
             new Exemption("POST", "/components/transform/describe", "read-shaped", "describes a draft's derived shape"),
             new Exemption("POST", "/components/sql/ast", "read-shaped", "parses author SQL into DuckDB's read-only tree; nothing binds or executes"),
             new Exemption("POST", "/validate", "read-shaped", "validates a config draft, writes nothing"),

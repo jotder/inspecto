@@ -32,11 +32,13 @@ import java.util.List;
  *                     element, and applies each item field to every element
  *                     ({@code ConfigLoader.validate}); {@link ConfigJsonSchema} projects it as the
  *                     array's {@code items} object.
+ * @param section      optional UI section heading grouping related fields (may be {@code null})
  */
 @PublicApi(since = "4.0.0")
 public record FieldSpec(String path, String label, String description, FieldType type,
                         boolean required, Object defaultValue, List<String> enumValues,
-                        String pattern, String uiHint, String visibleWhen, List<FieldSpec> items) {
+                        String pattern, String uiHint, String visibleWhen, List<FieldSpec> items,
+                        String section) {
 
     public FieldSpec {
         path = path == null ? "" : path;
@@ -47,12 +49,26 @@ public record FieldSpec(String path, String label, String description, FieldType
         items = items == null ? List.of() : List.copyOf(items);
     }
 
+    /** A field with no section. */
+    public FieldSpec(String path, String label, String description, FieldType type,
+                     boolean required, Object defaultValue, List<String> enumValues,
+                     String pattern, String uiHint, String visibleWhen, List<FieldSpec> items) {
+        this(path, label, description, type, required, defaultValue, enumValues, pattern, uiHint, visibleWhen,
+                items, null);
+    }
+
     /** A field with no element fields — every shape except a list of objects. */
     public FieldSpec(String path, String label, String description, FieldType type,
                      boolean required, Object defaultValue, List<String> enumValues,
                      String pattern, String uiHint, String visibleWhen) {
         this(path, label, description, type, required, defaultValue, enumValues, pattern, uiHint, visibleWhen,
-                List.of());
+                List.of(), null);
+    }
+
+    /** Returns a copy of this field assigned to {@code section}. */
+    public FieldSpec withSection(String section) {
+        return new FieldSpec(path, label, description, type, required, defaultValue, enumValues,
+                pattern, uiHint, visibleWhen, items, section);
     }
 
     // ── concise builders for the common shapes (keeps ConfigSpecs readable) ──────

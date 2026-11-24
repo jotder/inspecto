@@ -91,6 +91,15 @@
                         >
                             <mat-icon class="icon-size-5" svgIcon="heroicons_outline:clipboard-document"></mat-icon>
                         </button>
+                        <label class="ml-2 flex cursor-pointer items-center gap-1 text-xs">
+                            <input
+                                type="checkbox"
+                                data-test="sample-hex-toggle"
+                                [checked]="sampleAsHex()"
+                                (change)="sampleAsHex.set($any($event.target).checked)"
+                            />
+                            <span>Hex bytes</span>
+                        </label>
                         <!-- Import/Export = the existing Grammar CSV round-trip (`grammar-csv.ts`) — the
                              host projects its own buttons here; the editor has no write path of its own. -->
                         <ng-content select="[sampleCsvActions]"></ng-content>
@@ -356,12 +365,12 @@
             </div>
 
             @if (treeNodes(); as nodes) {
-                <app-parser-tree [nodes]="nodes" />
+                <app-parser-tree [nodes]="nodes" (nodeSelected)="treeNodeSelected.emit($event)" />
                 @if (activeType() === 'asn1') {
                     <app-parser-derived-rows [derived]="derivedRows()" [error]="derivedError()" />
                 }
             } @else if (sampleTree() && resultView() === 'tree') {
-                <app-parser-tree [nodes]="sampleTree()!" />
+                <app-parser-tree [nodes]="sampleTree()!" (nodeSelected)="treeNodeSelected.emit($event)" />
             } @else {
                 <inspecto-data-table
                     tier="pro"

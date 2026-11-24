@@ -112,6 +112,41 @@ describe('InspectoSegmentsEditorComponent', () => {
         expect(component.isDirty()).toBe(false);
     });
 
+    it('preserves optional rename, prefix, and postfix across initial -> value round-trip', () => {
+        fixture.componentRef.setInput('initial', [
+            {
+                key: 'moCallRecord',
+                columns: [
+                    {
+                        name: 'CALLING',
+                        selector: 'callingNumber',
+                        type: 'VARCHAR',
+                        rename: 'A_NUMBER',
+                        prefix: 'MOC_',
+                        postfix: '_RAW',
+                    },
+                ],
+            },
+        ]);
+        fixture.detectChanges();
+        expect(component.value()).toEqual([
+            {
+                key: 'moCallRecord',
+                columns: [
+                    {
+                        name: 'CALLING',
+                        selector: 'callingNumber',
+                        type: 'VARCHAR',
+                        rename: 'A_NUMBER',
+                        prefix: 'MOC_',
+                        postfix: '_RAW',
+                    },
+                ],
+            },
+        ]);
+        expect(component.isDirty()).toBe(false);
+    });
+
     it('has no accessibility violations', async () => {
         component.deriveFromPreview();
         fixture.detectChanges();

@@ -55,6 +55,11 @@ class SyntheticCorpusTest {
     private static void runCase(Path dir) throws IOException {
         JsonNode spec = JSON.readTree(Files.readString(dir.resolve("case.json"), StandardCharsets.UTF_8));
         String grammar = Files.readString(dir.resolve("grammar.asn"), StandardCharsets.UTF_8);
+        if (spec.path("expectCompileError").asBoolean(false)) {
+            assertThrows(com.gamma.asn.schema.Asn1ParseException.class,
+                    () -> SchemaCompiler.compile(Asn1Parser.parse(grammar), spec.path("root").asText()));
+            return;
+        }
         byte[] bytes = parseHex(Files.readString(dir.resolve("data.hex"), StandardCharsets.UTF_8));
 
         CompiledSchema schema = SchemaCompiler.compile(Asn1Parser.parse(grammar), spec.path("root").asText());

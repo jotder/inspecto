@@ -68,13 +68,21 @@ public sealed interface ParseResult permits ParseResult.Table, ParseResult.Tree,
      * @param derivedColumns the subset of {@code columns} a {@code derive} block adds
      * @param rows           a bounded sample, column name to value ({@code null} = SQL NULL)
      * @param rowCount       every row the previewed records produce for this segment (not just the sample)
+     * @param columnMeta     optional table metadata ({@code columnTypes}, {@code sourcePaths}, {@code decoders}, {@code nullable})
      */
     record RowSet(String segment, boolean child, List<String> columns, List<String> derivedColumns,
-                  List<Map<String, Object>> rows, long rowCount) {
+                  List<Map<String, Object>> rows, long rowCount, Map<String, Object> columnMeta) {
         public RowSet {
             columns = columns == null ? List.of() : List.copyOf(columns);
             derivedColumns = derivedColumns == null ? List.of() : List.copyOf(derivedColumns);
             rows = rows == null ? List.of() : List.copyOf(rows);
+            columnMeta = columnMeta == null ? Map.of() : java.util.Collections.unmodifiableMap(
+                    new java.util.LinkedHashMap<>(columnMeta));
+        }
+
+        public RowSet(String segment, boolean child, List<String> columns, List<String> derivedColumns,
+                      List<Map<String, Object>> rows, long rowCount) {
+            this(segment, child, columns, derivedColumns, rows, rowCount, Map.of());
         }
     }
 
@@ -93,21 +101,39 @@ public sealed interface ParseResult permits ParseResult.Table, ParseResult.Tree,
      *                 {@code string}, {@code SEQUENCE}); may be {@code null}
      * @param value    the decoded scalar at a leaf; {@code null} for container nodes
      * @param children child nodes (empty at a leaf)
+     * @param meta     optional node metadata (e.g. {@code fieldPath}, {@code tagPath},
+     *                 {@code nodeRole}, {@code matched}, {@code decoderId}); never {@code null}
      */
-    record Node(String label, String type, String value, List<Node> children) {
+    record Node(String label, String type, String value, List<Node> children, Map<String, Object> meta) {
         public Node {
             label = label == null ? "" : label;
             children = children == null ? List.of() : List.copyOf(children);
+            meta = meta == null ? Map.of() : java.util.Collections.unmodifiableMap(
+                    new java.util.LinkedHashMap<>(meta));
+        }
+
+        public Node(String label, String type, String value, List<Node> children) {
+            this(label, type, value, children, Map.of());
         }
 
         /** A leaf node carrying a scalar value. */
         public static Node leaf(String label, String type, String value) {
-            return new Node(label, type, value, List.of());
+            return new Node(label, type, value, List.of(), Map.of());
+        }
+
+        /** A leaf node carrying a scalar value and metadata. */
+        public static Node leaf(String label, String type, String value, Map<String, Object> meta) {
+            return new Node(label, type, value, List.of(), meta);
         }
 
         /** A container node with children. */
         public static Node container(String label, String type, List<Node> children) {
-            return new Node(label, type, null, children);
+            return new Node(label, type, null, children, Map.of());
+        }
+
+        /** A container node with children and metadata. */
+        public static Node container(String label, String type, List<Node> children, Map<String, Object> meta) {
+            return new Node(label, type, null, children, meta);
         }
     }
 }

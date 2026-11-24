@@ -3,6 +3,7 @@ package com.gamma.etl;
 import com.gamma.api.PublicApi;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * The framework-provided callback a {@link StreamingFileIngester} writes records into, one
@@ -53,6 +54,18 @@ public interface RecordSink {
      * @param columns    ordered, non-empty list of column names (must not include {@code __src_id})
      */
     void define(String segmentKey, List<String> columns) throws Exception;
+
+    /**
+     * Declare the column layout with SQL types for {@code segmentKey} before emitting any record for it.
+     * Implementations that do not support typed staging tables fall back to {@link #define(String, List)}.
+     *
+     * @param segmentKey a key declared in {@code processing.segments}
+     * @param columns    ordered, non-empty list of column names (must not include {@code __src_id})
+     * @param sqlTypes   column name to SQL type (absent entries default to {@code VARCHAR})
+     */
+    default void defineTyped(String segmentKey, List<String> columns, Map<String, String> sqlTypes) throws Exception {
+        define(segmentKey, columns);
+    }
 
     /**
      * Emit one parsed record for {@code segmentKey}. {@code values} are positional and must match

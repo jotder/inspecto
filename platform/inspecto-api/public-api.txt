@@ -478,8 +478,10 @@ com.gamma.config.spec.ConfigSpecs | public static final List<String> DASHBOARD_R
 com.gamma.config.spec.ConfigSpecs | public static final List<String> LINK_ANALYSIS_LIMIT_GROUPS
 com.gamma.config.spec.ConfigSpecs | public static final List<String> LINK_ANALYSIS_MASKING_MODES
 com.gamma.config.spec.ConfigSpecs | public static final List<String> TYPES
+com.gamma.config.spec.FieldSpec | public FieldSpec withSection(String)
 com.gamma.config.spec.FieldSpec | public FieldSpec(String, String, String, FieldType, boolean, Object, List<String>, String, String, String)
-com.gamma.config.spec.FieldSpec | public record FieldSpec(String path, String label, String description, FieldType type, boolean required, Object defaultValue, List<String> enumValues, String pattern, String uiHint, String visibleWhen, List<FieldSpec> items)
+com.gamma.config.spec.FieldSpec | public FieldSpec(String, String, String, FieldType, boolean, Object, List<String>, String, String, String, List<FieldSpec>)
+com.gamma.config.spec.FieldSpec | public record FieldSpec(String path, String label, String description, FieldType type, boolean required, Object defaultValue, List<String> enumValues, String pattern, String uiHint, String visibleWhen, List<FieldSpec> items, String section)
 com.gamma.config.spec.FieldSpec | public static FieldSpec enumField(String, String, List<String>, Object, String)
 com.gamma.config.spec.FieldSpec | public static FieldSpec listOf(String, String, String, List<FieldSpec>)
 com.gamma.config.spec.FieldSpec | public static FieldSpec of(String, String, FieldType, String)
@@ -1061,6 +1063,7 @@ com.gamma.etl.PipelineConfig.Webhook | public static final List<String> RETRY_KE
 com.gamma.etl.PipelineConfig.Webhook | public static final int DEFAULT_BATCH_SIZE
 com.gamma.etl.PipelineConfig.Webhook | public static final int MAX_BATCH_SIZE
 com.gamma.etl.PipelineConfig.Xlsx | public record Xlsx(String sheet, String range, boolean header, boolean stopAtEmpty, boolean ignoreErrors, boolean normalizeNames)
+com.gamma.etl.RecordSink | default void defineTyped(String, List<String>, Map<String, String>) throws Exception
 com.gamma.etl.RecordSink | default void junk() throws Exception
 com.gamma.etl.RecordSink | default void reject(String) throws Exception
 com.gamma.etl.RecordSink | public interface RecordSink
@@ -1909,10 +1912,14 @@ com.gamma.ops.tag.TagRule.Filter | public record Filter(String type, String q, S
 com.gamma.ops.tag.TagRule.Filter | public static Map<String, Object> context(OperationalObject)
 com.gamma.ops.tag.TagRule.Filter | public static final java.util.Set<String> KEYS
 com.gamma.parse.ParseResult | public sealed interface ParseResult permits ParseResult.Table, ParseResult.Tree, ParseResult.Rows
+com.gamma.parse.ParseResult.Node | public Node(String, String, String, List<Node>)
 com.gamma.parse.ParseResult.Node | public static Node container(String, String, List<Node>)
+com.gamma.parse.ParseResult.Node | public static Node container(String, String, List<Node>, Map<String, Object>)
 com.gamma.parse.ParseResult.Node | public static Node leaf(String, String, String)
-com.gamma.parse.ParseResult.Node | record Node(String label, String type, String value, List<Node> children)
-com.gamma.parse.ParseResult.RowSet | record RowSet(String segment, boolean child, List<String> columns, List<String> derivedColumns, List<Map<String, Object>> rows, long rowCount)
+com.gamma.parse.ParseResult.Node | public static Node leaf(String, String, String, Map<String, Object>)
+com.gamma.parse.ParseResult.Node | record Node(String label, String type, String value, List<Node> children, Map<String, Object> meta)
+com.gamma.parse.ParseResult.RowSet | public RowSet(String, boolean, List<String>, List<String>, List<Map<String, Object>>, long)
+com.gamma.parse.ParseResult.RowSet | record RowSet(String segment, boolean child, List<String> columns, List<String> derivedColumns, List<Map<String, Object>> rows, long rowCount, Map<String, Object> columnMeta)
 com.gamma.parse.ParseResult.Rows | record Rows(List<RowSet> segments) implements ParseResult
 com.gamma.parse.ParseResult.Table | public Table(List<String>, List<Map<String, Object>>, long, long)
 com.gamma.parse.ParseResult.Table | public Table(List<String>, List<Map<String, Object>>, long, long, List<Map<String, String>>)

@@ -201,6 +201,8 @@ export class GrammarEditorComponent implements AfterViewInit {
      * in its template — which would evaluate before the query resolves.
      */
     @Output() readonly pluginChange = new EventEmitter<ParserDef | null>();
+    /** Emitted when a user clicks a node in the parsed tree. */
+    @Output() readonly treeNodeSelected = new EventEmitter<ParserTreeNode>();
 
     // ── state ────────────────────────────────────────────────────────────────
 
@@ -243,6 +245,18 @@ export class GrammarEditorComponent implements AfterViewInit {
         const specs = this.specs();
         const ids = new Set(specs.map((s) => s.section).filter((t): t is string => !!t));
         if (ids.size < 2) return null;
+        if (this.pluginDef()) {
+            const ordered: string[] = [];
+            for (const s of specs) {
+                if (s.section && !ordered.includes(s.section)) ordered.push(s.section);
+            }
+            const fallback = ordered[0];
+            return ordered.map((id) => ({
+                id,
+                label: id,
+                specs: specs.filter((s) => (s.section ?? fallback) === id),
+            }));
+        }
         const shell = grammarTabsFor(this.frontend());
         const fallback = shell[0].id;
         return shell
@@ -620,7 +634,12 @@ export class GrammarEditorComponent implements AfterViewInit {
         if (!file) return;
         // Binary: text() would round-trip the bytes through a charset. No truncation — a sliced file is
         // unreadable, so an oversized one is refused whole rather than silently maimed.
-        if (this.frontend() === 'xlsx' || this.frontend() === 'parquet' || /\.(xlsx|parquet)$/i.test(file.name)) {
+        if (
+            this.frontend() === 'xlsx' ||
+            this.frontend() === 'parquet' ||
+            this.activeType() === 'asn1' ||
+            /\.(xlsx|parquet|ber|der|cdr|bin)$/i.test(file.name)
+        ) {
             if (file.size > MAX_SAMPLE_BYTES) {
                 this.error.set(`File too large for a preview sample (max ${MAX_SAMPLE_BYTES / 1024} KB).`);
                 return;
@@ -709,6 +728,21 @@ export class GrammarEditorComponent implements AfterViewInit {
      */
     value(): Record<string, unknown> {
         const nested = this.grammar();
+        const plugin = this.pluginDef();
+        if (plugin) {
+            if (plugin.id === 'asn1') {
+                nested['frontend'] = 'asn1';
+                return nested;
+            }
+            const block: Record<string, unknown> = {
+                ...(nested['plugin'] && typeof nested['plugin'] === 'object'
+                    ? (nested['plugin'] as Record<string, unknown>)
+                    : {}),
+                ...(plugin.ingesterClass ? { ingester: plugin.ingesterClass } : {}),
+            };
+            if (nested['ingester_config'] !== undefined) block['ingester_config'] = nested['ingester_config'];
+            return { frontend: 'plugin', plugin: block };
+        }
         nested['frontend'] = this.frontend();
         if (this.frontend() === 'fixedwidth') {
             const fw = (nested['fixedwidth'] ??= {}) as Record<string, unknown>;
@@ -740,10 +774,29 @@ export class GrammarEditorComponent implements AfterViewInit {
         return !!this.sections();
     }
 
+    readonly sampleAsHex = signal(false);
+
     /** Parse the sample with the in-progress Grammar (no save) → table or tree. */
     test(): void {
-        const text = this.sampleText();
-        const b64 = this.sampleB64() ?? undefined;
+        let text = this.sampleText();
+        let b64 = this.sampleB64() ?? undefined;
+        if (this.sampleAsHex() && !b64 && text.trim()) {
+            const hex = text
+                .split(/\r?\n/)
+                .map((l) => l.replace(/#.*$/, ''))
+                .join('')
+                .replace(/\s+/g, '');
+            if (!hex || hex.length % 2 !== 0 || /[^0-9a-fA-F]/.test(hex)) {
+                this.error.set('Invalid hex bytes — expected even-length 0-9 / A-F pairs.');
+                return;
+            }
+            let bin = '';
+            for (let i = 0; i < hex.length; i += 2) {
+                bin += String.fromCharCode(parseInt(hex.slice(i, i + 2), 16));
+            }
+            b64 = btoa(bin);
+            text = '';
+        }
         if ((!text && !b64) || !this.validate()) return;
         const type = this.activeType();
         // 🔴 Fixed width's slice table is its OWN FormArray, not part of the property sheet, so

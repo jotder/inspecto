@@ -1,0 +1,7 @@
+{
+  "root": "Record",
+  "fileHeaderLength": 0,
+  "recordHeaderLength": null,
+  "padding": [0, 255],
+  "expectCompileError": true
+}
