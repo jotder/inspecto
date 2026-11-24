@@ -63,7 +63,8 @@ public record Expectation(String name, String description, String targetType, St
     public Expectation {
         require(name != null && !name.isBlank(), "expectation.name is required");
         kind = lower(kind);
-        require(KINDS.contains(kind), "expectation.kind must be one of " + KINDS);
+        // null first: Set.of(...).contains(null) throws, which turned a draft with no kind into a 500 (golden run 2026-11-24)
+        require(kind != null && KINDS.contains(kind), "expectation.kind must be one of " + KINDS);
         targetType = targetType == null ? "pipeline" : targetType.trim().toLowerCase(Locale.ROOT);
         require(TARGET_TYPES.contains(targetType), "expectation.targetType must be one of " + TARGET_TYPES);
         require(target != null && !target.isBlank(), "expectation.target is required");
