@@ -207,6 +207,17 @@ class ControlApiKpiTest {
         }
     }
 
+    /** BI-INSIGHTS-1 I-3: the kpi_history_ stores belong to the kpi.snapshot Job; the save route refuses a Dataset over one. */
+    @Test
+    void aDatasetOverAKpiHistoryStoreIsRefusedAtSave(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            assertTrue(error(send(c, "POST", "/components/dataset",
+                    "{\"id\":\"copy\",\"physicalRef\":\"kpi_history_revenue\"}", ALICE), 422)
+                    .contains("reserved prefix 'kpi_history_'"));
+            assertFalse(new ComponentStore(root.resolve("registry")).exists("dataset", "copy"), "nothing written");
+        }
+    }
+
     @Test
     void aMissingMeasureIsRefusedAtSave(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {

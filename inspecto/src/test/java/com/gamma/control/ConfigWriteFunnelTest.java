@@ -245,6 +245,9 @@ class ConfigWriteFunnelTest {
             Map.entry("DecisionRoutes#write", HELPER), Map.entry("ExpectationRoutes#write", HELPER),
             Map.entry("DecisionRoutes#simulate", "a lastSimulation RESULT stamp (archive=false) — operating, not authoring"),
             Map.entry("ExpectationRunner#runAndPersist", "a lastResult RESULT stamp (archive=false) — operating, not authoring"),
+            Map.entry("KpiSnapshotJobType#register", MACHINE + "; the kpi_history_<kpi> system Dataset is registered "
+                    + "regardless of a Dataset approval policy by operator ruling D-BI11 (2026-11-24, BI-INSIGHTS-1 I-3); it "
+                    + "only copies the source Dataset's owner/shares and never overwrites a Dataset that reads another store"),
             Map.entry("NotificationRoutes#write", HELPER), Map.entry("NotificationRoutes#writeRule", HELPER),
             Map.entry("RequirementRoutes#write", "requirement: " + NOT_GOVERNED),
             Map.entry("PipelineListRoutes#deletePipeline", "a grandfathered PipelineStore graph (authored-pipeline) — "

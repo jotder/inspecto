@@ -88,7 +88,24 @@ public final class KpiEvaluator {
      * the Dataset holds no dated row. The caller caps it at today.
      */
     public static LocalDate latestDay(KpiDefinition kpi, String relationSql) throws SQLException, IOException {
-        String sql = "SELECT CAST(CAST(CAST(max(" + com.gamma.util.SqlIdent.q(kpi.timeField()) + ") AS TIMESTAMPTZ) AS DATE) AS VARCHAR) AS d FROM "
+        return edgeDay(kpi, relationSql, "max");
+    }
+
+    /**
+     * The oldest day present in the KPI's {@code timeField}, in its zone; {@code null} when the Dataset holds no dated
+     * row. KPI History starts here: a period before the data began has no value, not a {@code count} of 0.
+     */
+    public static LocalDate earliestDay(KpiDefinition kpi, String relationSql) throws SQLException, IOException {
+        return edgeDay(kpi, relationSql, "min");
+    }
+
+    /** The Measure over one window, without a comparison: {@code null} when the window holds no value. */
+    public static Double valueOf(KpiDefinition kpi, String relationSql, KpiDefinition.Window w) throws SQLException, IOException {
+        return run(kpi, relationSql, w);
+    }
+
+    private static LocalDate edgeDay(KpiDefinition kpi, String relationSql, String agg) throws SQLException, IOException {
+        String sql = "SELECT CAST(CAST(CAST(" + agg + "(" + com.gamma.util.SqlIdent.q(kpi.timeField()) + ") AS TIMESTAMPTZ) AS DATE) AS VARCHAR) AS d FROM "
                 + com.gamma.util.SqlIdent.q(kpi.dataset());
         List<Finding> findings = SqlGuard.check(sql);
         if (!findings.isEmpty())

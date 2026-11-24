@@ -73,7 +73,7 @@ class ControlApiJobProvenanceTest {
 
             for (JsonNode t : json(get(c.port, "/jobs/types")))
                 // these are contributed by this host module (META-INF/services JobTypeProvider), not by the engine
-                assertEquals(java.util.Set.of("expectation.evaluate", "space.test").contains(t.get("id").asText()) ? "classpath" : "builtin",
+                assertEquals(java.util.Set.of("expectation.evaluate", "space.test", "kpi.snapshot").contains(t.get("id").asText()) ? "classpath" : "builtin",
                         t.get("source").asText(), t.get("id").asText() + " is registered by the engine in this build");
         }
     }

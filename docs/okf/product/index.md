@@ -126,7 +126,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (173 open row
 * [Collector and export connectors](module/connectors/index.md) - `module.connectors` · 9 doc(s) · 2 open row(s)
 * [Demo authenticator](module/demo-auth/index.md) - `module.demo-auth` · 7 doc(s) · 0 open row(s)
 * [ELT — ingestion, Pipelines and step registry](module/elt/index.md) - `module.elt` · 74 doc(s) · 39 open row(s)
-* [Execution engine](module/engine/index.md) - `module.engine` · 13 doc(s) · 17 open row(s)
+* [Execution engine](module/engine/index.md) - `module.engine` · 14 doc(s) · 17 open row(s)
 * [Entity lists](module/entity-list/index.md) - `module.entity-list` · 9 doc(s) · 0 open row(s)
 * [Entity store](module/entity-store/index.md) - `module.entity-store` · 8 doc(s) · 1 open row(s)
 * [Event model and log](module/event/index.md) - `module.event` · 14 doc(s) · 1 open row(s)

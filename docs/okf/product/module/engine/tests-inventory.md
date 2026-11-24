@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-427 test class(es): 427 unit, 0 real-HTTP control-plane, 0 IT.
+428 test class(es): 428 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -429,6 +429,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `ExpressionGuardTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/ExpressionGuardTest.java` | {@link ExpressionGuard} (DAT-5): the accept set (arithmetic, whitelisted scalar functions, CASE flow, <!-- vocab-allow: quoted Javadoc --> |
 | `KpiDefinitionTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/KpiDefinitionTest.java` | `ASSURE-KPI-DEFINITIONS-1` — the pure half of a KPI: structural validation (fail closed), the RAG band at its |
 | `KpiEvaluatorTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/KpiEvaluatorTest.java` | `ASSURE-KPI-DEFINITIONS-1` — a KPI evaluated through the real DuckDB sandbox: the window filters on the time field |
+| `KpiHistoryTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/KpiHistoryTest.java` | KPI History (`BI-INSIGHTS-1` P0, I-3): period selection, partial periods, retention, the stored file. |
 | `KpiPeriodStartGoldenTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/KpiPeriodStartGoldenTest.java` | Golden figures for {@link KpiDefinition.Grain#start} (ANALYTICS-CORE-1 M5), written BEFORE the period start moved to |
 | `MeasureCompilerBindTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/MeasureCompilerBindTest.java` | {@code MEASURE-SQL-BIND-1}: {@link MeasureCompiler#compile} binds every {@code filters} and {@code when} |
 | `MeasureCompilerGrainExecutionTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/MeasureCompilerGrainExecutionTest.java` | The half of the time-grain fix {@link MeasureCompilerTest} cannot prove: that DuckDB actually |

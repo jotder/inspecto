@@ -363,8 +363,9 @@ public final class PostgresPublishJobType implements JobTypeProvider {
     /**
      * {@link #canView}, and for a Mapping its base too (LA-PIPELINE-MAPPINGS-1, as {@code ComponentAccess.baseVisible}): a
      * publish never reads through a Mapping what its author could not read directly. An unresolvable base refuses.
+     * Public for the other Jobs that run as their author ({@code kpi.snapshot}).
      */
-    static boolean canRead(Author a, ComponentStore store, Map<String, Object> content) {
+    public static boolean canRead(Author a, ComponentStore store, Map<String, Object> content) {
         if (!canView(a, content)) return false;
         if (a.open() || !"mapping".equals(String.valueOf(content.get("origin")))) return true;
         try {
@@ -377,7 +378,7 @@ public final class PostgresPublishJobType implements JobTypeProvider {
     }
 
     /** {@code ComponentAccess.level >= VIEW}, decided for the Job's author. */
-    static boolean canView(Author a, Map<String, Object> content) {
+    public static boolean canView(Author a, Map<String, Object> content) {
         if (a.open()) return true;
         String owner = str(content.get("owner"));
         if (!content.containsKey("shares")) return true;
