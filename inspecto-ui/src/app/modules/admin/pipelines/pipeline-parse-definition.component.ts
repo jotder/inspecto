@@ -695,8 +695,8 @@ export function withDecodeProfile(
                                             placeholder="$header.recordType"
                                             aria-label="Pin header field"
                                             data-test="asn1-header-pin-input"
-                                            [ngModel]="headerPinDraft()"
-                                            (ngModelChange)="headerPinDraft.set($event)"
+                                            [value]="headerPinDraft()"
+                                            (input)="headerPinDraft.set($any($event.target).value)"
                                             (keyup.enter)="pinHeader()"
                                         />
                                         <button mat-stroked-button type="button" class="!text-xs" (click)="pinHeader()">
