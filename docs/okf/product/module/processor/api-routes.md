@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-396 route(s) registered; 394 in the OpenAPI contract, 2 not.
+401 route(s) registered; 399 in the OpenAPI contract, 2 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -272,6 +272,11 @@ tags: [api, routes, generated]
 | GET | `/parsers` | List parsers | parsers | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
 | POST | `/parsers/{parserId}/preview` | Preview a sample with a parser | parsers | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
 | GET | `/parsers/asn1/profile` | Read an ASN.1 Decode Profile | parsers | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
+| GET | `/pending-actions` | List Pending Actions | pending-actions | — | `inspecto/src/main/java/com/gamma/control/PendingActionRoutes.java` |
+| GET | `/pending-actions/{pendingactionId}` | Get a Pending Action | pending-actions | — | `inspecto/src/main/java/com/gamma/control/PendingActionRoutes.java` |
+| POST | `/pending-actions/{pendingactionId}/approve` | Approve a Pending Action and run it | pending-actions | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingActionRoutes.java` |
+| POST | `/pending-actions/{pendingactionId}/decline` | Decline a Pending Action | pending-actions | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingActionRoutes.java` |
+| POST | `/pending-actions/{pendingactionId}/withdraw` | Withdraw your own Pending Action | pending-actions | — | `inspecto/src/main/java/com/gamma/control/PendingActionRoutes.java` |
 | GET | `/pending-changes` | List the Space's Pending Changes | pending-changes | — | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java` |
 | GET | `/pending-changes/{pendingchangeId}` | Read one Pending Change with its content | pending-changes | — | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java` |
 | POST | `/pending-changes/{pendingchangeId}/approve` | Approve a Pending Change and apply it | pending-changes | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java` |

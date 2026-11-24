@@ -14857,6 +14857,108 @@
         }
       }
     },
+    "/pending-actions" : {
+      "get" : {
+        "tags" : [ "pending-actions" ],
+        "summary" : "List Pending Actions",
+        "operationId" : "getPendingActions",
+        "description" : "Every Pending Action of the Space (a machine agent's held operational action, AGENT-KIT-1 AK-2d), newest first, optionally only those in one `status` (pending, approved, declined, withdrawn, expired, stale, failed). At most 500 items, with `total` and `truncated`; no item carries the raw request. A still-pending record past its `expiresAt` is closed `expired` as it is read.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/pending-actions/{pendingactionId}" : {
+      "get" : {
+        "tags" : [ "pending-actions" ],
+        "summary" : "Get a Pending Action",
+        "operationId" : "getPendingActionsByPendingactionId",
+        "description" : "One Pending Action: the action (`METHOD path`), the machine that asked (`author` `client:<id>`, `agentClient`), reason, status and outcome (`appliedStatus`). The request shows its method and path only, never its body. Unsafe id 422, unknown 404.",
+        "parameters" : [ {
+          "name" : "pendingactionId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/pending-actions/{pendingactionId}/approve" : {
+      "post" : {
+        "tags" : [ "pending-actions" ],
+        "summary" : "Approve a Pending Action and run it",
+        "operationId" : "postPendingActionsByPendingactionIdApprove",
+        "description" : "A change approver (`canApproveChanges`, on the approver roster, not the machine that asked — four-eyes) approves a held operational action; it is replayed as that machine, re-admitted by the Space and filtered to what a machine agent keeps. An agent token is refused. Outcome `approved` (2xx), `stale` (the route answered 409) or `failed` (any other status). Gates: no Subject 403 → agent 403 → write root 503 → `reason` over 500 chars 422 → unsafe id 422 → unknown 404 → integrity 409 → not pending 409 → four-eyes 403 → roster 403 → the record no longer names an action route 409 (nothing dispatched).",
+        "parameters" : [ {
+          "name" : "pendingactionId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/pending-actions/{pendingactionId}/decline" : {
+      "post" : {
+        "tags" : [ "pending-actions" ],
+        "summary" : "Decline a Pending Action",
+        "operationId" : "postPendingActionsByPendingactionIdDecline",
+        "description" : "A change approver (`canApproveChanges`, four-eyes, the approver roster) declines a held operational action: closed `declined`, nothing runs, audited `pending-action.declined`. Same gates as approve, before the replay.",
+        "parameters" : [ {
+          "name" : "pendingactionId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/pending-actions/{pendingactionId}/withdraw" : {
+      "post" : {
+        "tags" : [ "pending-actions" ],
+        "summary" : "Withdraw your own Pending Action",
+        "operationId" : "postPendingActionsByPendingactionIdWithdraw",
+        "description" : "The machine that asked takes back its still-pending action: closed `withdrawn`, nothing runs, audited `pending-action.withdrawn`. No capability is needed — only the Subject who asked may withdraw it. Gates: no Subject 403 → write root 503 → `reason` over 500 chars 422 → unsafe id 422 → unknown 404 → integrity 409 → not pending 409 → not the asker 403.",
+        "parameters" : [ {
+          "name" : "pendingactionId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
     "/predictions/{kind}/{model}/{entityKey}" : {
       "get" : {
         "tags" : [ "predictions" ],
