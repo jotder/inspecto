@@ -17,8 +17,8 @@ graph, prove it on sample rows, and propose it (skill `safe-config-change`).
    query is read-only and masked columns come back masked; never ask for them unmasked.
 3. **Draft the graph.** Keep the node ids readable; one Step per idea. For a derived Dataset (a join, a daily summary,
    a pivot), follow the recipe page below rather than guessing Step names.
-4. **Validate and dry-run in one call** with `dry_run_pipeline`: body
-   `{pipeline: <draft graph>, sampleRows: [<rows from step 2>]}`. The draft graph is parsed and validated before it
+4. **Validate and dry-run in one call** with `dry_run_pipeline`: argument `pipeline` = the Pipeline id (a new one
+   too), and `body` `{pipeline: <draft graph>, sampleRows: [<rows from step 2>]}`. The draft graph is parsed and validated before it
    runs, so a refusal (400 or 422) names what to fix. (`validate_config` with `type: pipeline` judges the Pipeline's
    *config file* form, not the graph `propose_change` takes — do not use it for a graph.)
 5. **Read the result.** Check the per-step row counts and the output columns against what the person asked for. If a

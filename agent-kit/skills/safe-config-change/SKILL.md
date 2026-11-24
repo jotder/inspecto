@@ -24,7 +24,8 @@ approves it. That person is never you and never the person you act for (four eye
 2. **Validate** with `validate_config`: `type` is `expectation`, `alert`, `job`, `widget` or `dashboard`, `config` is
    the draft. The answer is `{findings, clean}`. Fix every finding whose severity is an error and validate again.
    Never propose a draft that is not clean.
-3. **Dry-run** a Pipeline with `dry_run_pipeline`: body `{pipeline: <draft graph>, sampleRows: [...]}`. This is also a
+3. **Dry-run** a Pipeline with `dry_run_pipeline`: argument `pipeline` = the Pipeline id, and `body`
+   `{pipeline: <draft graph>, sampleRows: [...]}`. This is also a
    Pipeline graph's validation: the draft is parsed and validated, then executed on a scratch database; nothing is
    written. Read each step's row count; a step that drops every row is a mistake until proven otherwise.
 4. **Propose** with `propose_change`: `kind` (pipeline, expectation, alert-rule, job, widget, dashboard), `operation`
@@ -54,7 +55,7 @@ changes their mind or you proposed something wrong — then propose the correcte
 
 - approve, decline or decide anything; reveal a masked value; promote; change Apps, Roles or Access — the server
   refuses these to an agent, and trying them is a safety failure;
-- propose without a clean `validate_config` (and, for a Pipeline, a dry run);
+- propose without a clean `validate_config` — or, for a Pipeline graph, a clean dry run, which is its validation;
 - put a secret, password or token in any content, reason or reply.
 
 ## Read more

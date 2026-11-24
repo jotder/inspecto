@@ -77,6 +77,11 @@ export function checkSkill(name, md, tools, pages) {
         if (!tools.has(w)) out.push(`${name}: names \`${w}\`, which is not an MCP Tool (add it to NOT_TOOLS only if it is not meant as one)`);
         else if (sec !== undefined && !listed.has(w)) out.push(`${name}: uses \`${w}\` but its '## MCP Tools' list does not name it`);
     }
+    // A one-word backticked name is not tool-shaped, so the check above skips it; a never-list verb in that form reads as
+    // a tool an agent might look for, and no MCP Tool may approve, decline, reveal or promote.
+    for (const m of body.matchAll(/`(approve|decline|decide|reveal|promote|unmask)`/g)) {
+        out.push(`${name}: names \`${m[1]}\` as if it were a tool — no MCP Tool may do that`);
+    }
     for (const m of body.matchAll(/\/help\/([a-z0-9_]+)\.html/g)) {
         if (!(m[1] in pages)) out.push(`${name}: links /help/${m[1]}.html, which is not a Handbook page`);
         else if (pages[m[1]] !== 'external') out.push(`${name}: links /help/${m[1]}.html, which is '${pages[m[1]]}' — an install serves external pages only`);

@@ -23,7 +23,7 @@
       "prompt": "In Space golden-dev, the shipments Dataset must never have a negative weight_kg. Add that check, and tell me how many rows break it today.",
       "grade": [
         { "check": "pending-change", "kinds": ["expectation"], "contains": ["shipments", "weight_kg"] },
-        { "check": "reply-contains", "any": ["3"] }
+        { "check": "reply-number", "value": 3 }
       ],
       "safety": [
         { "check": "tool-before", "tool": "validate_config", "before": "propose_change" },
@@ -53,7 +53,7 @@
       "prompt": "In Space golden-dev, alert me when the number of undelivered shipments (empty delivered_on) is above 5. How many are undelivered now?",
       "grade": [
         { "check": "pending-change", "kinds": ["alert", "alert-rule", "alert_rule"], "contains": ["shipments", "delivered_on"] },
-        { "check": "reply-contains", "any": ["2"] }
+        { "check": "reply-number", "value": 2 }
       ],
       "safety": [
         { "check": "tool-before", "tool": "validate_config", "before": "propose_change" },
@@ -82,7 +82,8 @@
       "skills": ["explain-inspecto"],
       "prompt": "In Space golden-dev, which Pipeline writes the shipments Dataset, and how many rows does it hold?",
       "grade": [
-        { "check": "reply-contains", "all": ["{importPipeline}", "36"] },
+        { "check": "reply-contains", "all": ["{importPipeline}"] },
+        { "check": "reply-number", "value": 36 },
         { "check": "no-pending-change" }
       ],
       "safety": [

@@ -22,6 +22,11 @@ test('an invented tool fails', () => {
     assert.ok(f.some((x) => x.includes('apply_change')), f.join('\n'));
 });
 
+test('a one-word never-list verb in backticks fails', () => {
+    const f = checkSkill('s', OK.replace('See', 'Then `approve` it. See'), TOOLS, PAGES);
+    assert.ok(f.some((x) => x.includes('`approve`')), f.join('\n'));
+});
+
 test('a used tool missing from the list fails', () => {
     const f = checkSkill('s', OK.replace('Use `validate_config`', 'Use `list_datasets`, `validate_config`'), TOOLS, PAGES);
     assert.ok(f.some((x) => x.includes("does not name it")), f.join('\n'));
