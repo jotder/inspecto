@@ -1,9 +1,11 @@
 # Agent Kit AK-2 — agents propose changes, people approve them, one role at a time (plan)
 
 > **Status: APPROVED for phase 1 on 2026-11-20 — D-AK1…D-AK4 signed (operator, "Sign recommended");
-> D-AK5, D-AK6 and D-AK7 open, needed before phase 2 (§8); AK-2a and AK-2b built 2026-11-20 (§6) — phase 1 is built;
+> D-AK5, D-AK6 and D-AK7 signed 2026-11-24 (§8; D-AK5 as "allow within rights", machines held, not the two tiers); AK-2a and AK-2b built 2026-11-20 (§6) — phase 1 is built;
 > its close was built 2026-11-24 (§6.1: Agent Skills, golden tasks and grader, the Handbook how-to, a security review)
-> except the first live golden run and the vendor packages; phases 2–3 remain.
+> and the first live golden run (6 of 7, 0 safety failures), the four vendor packages and the Kit in the bundle followed
+> the same day; phase 1 still owes a sign-in through a vendor package and the other vendors' matrix rows (§6.1); phases
+> 2–3 remain.
 > As built, beyond the text below: the allowed bucket also holds `POST /db/query` (the read the AK-1
 > `query_dataset` tool replays, which the gate would otherwise refuse), and an agent token drops
 > `canApproveChanges`, `canApproveLinkExpansions` and `canRevealLinkEntities` at authentication, so every
@@ -295,6 +297,10 @@ bucket into a fourth bucket, **actions**: writes that change a run's or a Case's
   for a non-config action today — a Pending Change is config only (`GLOSSARY.md`). How it is held is D-AK6.
 - **Machines**: propose only — every action from a machine is held, whatever its tier.
 
+> **Signed 2026-11-24 (§8): D-AK5 is "allow within rights", not the two tiers above.** A person's agent takes every
+> action in this table that the person's rights allow, at once and audited; only a **machine's** actions are held (as a
+> Pending Action, D-AK6). The tier column is kept as the record of what was weighed.
+
 ### 4.7 The endpoint's manifest category
 
 `POST /mcp` stays an Exemption (it has no capability of its own), re-categorised from `read-shaped` to a new
@@ -348,8 +354,9 @@ notifications and the tasks extension stay deferred to AK-3 / AK-4.
   the agent's audit rows (tool order: `validate_config` or `dry_run_pipeline` before `propose_change`), refusals on the
   never-list (an *attempt* fails safety even though the server refused it), and fixed strings in the final reply. The
   grader reads with a person's token, so the agent cannot hide what it did. Grading logic tested on recorded states
-  (`tools/run-agent-golden.test.mjs`); **the grader has not yet run against a live install**, and its "no applied
-  write" check matches audit action names by pattern — confirm it on the first live run.
+  (`tools/run-agent-golden.test.mjs`); the "no applied write" check matches audit action names by pattern and skips a
+  held write's own 202 row. *(The first live run, 2026-11-24, below, exercised it and fixed its audit query and session
+  window.)*
 - **Found writing the skills:** `validate_config` with `type: pipeline` judges the Pipeline *config file* form, while
   `propose_change` takes the *graph*; for a graph the dry run is the validation (the candidate is parsed and validated
   before it runs). The alert config type is `alert`, the `propose_change` kind `alert-rule`. Both are written into the
@@ -372,9 +379,9 @@ notifications and the tasks extension stay deferred to AK-3 / AK-4.
   honours its server's `oauth` block is documented for `.mcp.json` generally, not for plugins); PKCE is not stated by
   either vendor's pages. Caveat: Gemini CLI's site carries a notice that Antigravity CLI replaced it on 2026-06-18 for
   unpaid and Google One users — confirm the target before a customer release.
-- **Still open for phase 1:** the first live golden run on Standard with Keycloak (which is also AK-2b's end-to-end
-  proof) and its compatibility-matrix row (model, client, versions, pass rate, safety failures, date) — run it through
-  these packages.
+- **Still open for phase 1 (updated 2026-11-24):** a sign-in and golden run through a vendor package's own OAuth (the
+  first live run, below, used the harness's sign-in); the Gemini CLI, Codex CLI and local-model matrix rows; whether
+  Gemini CLI or Antigravity CLI is the Gemini target.
 - **First live golden run (2026-11-24)** — developer suite, Claude (`sonnet`) through headless Claude Code against a
   Standard bundle with Keycloak: **6 of 7 pass, 0 safety failures**; dev-04 (Dashboard) hit the 20-minute limit. Every
   write was held as a Pending Change naming the agent client; the agent never tried an approval. Server fault found:
@@ -414,7 +421,8 @@ notifications and the tasks extension stay deferred to AK-3 / AK-4.
 
 **D-AK1…D-AK4 signed 2026-11-20** (operator, "Sign recommended"): each as its *Recommended* column says. For D-AK1 that
 is **four-eyes always**; the single-administrator alternative is not signed and is not built unless the operator asks.
-**D-AK5, D-AK6 and D-AK7 stay open**; D-AK5 and D-AK6 are needed before phase 2, D-AK7 before the analytics builder's Skills.
+**D-AK5, D-AK6 and D-AK7 signed 2026-11-24** (operator interview) — D-AK6 and D-AK7 as recommended; **D-AK5 NOT as
+recommended**, see the **Signed** lines under the table. Phase 2 is no longer blocked on a decision.
 
 | # | Question | Recommended |
 |---|---|---|
@@ -425,6 +433,21 @@ is **four-eyes always**; the single-administrator alternative is not signed and 
 | **D-AK5** | How are an agent's operational and case actions governed (phases 2–3)? | The two tiers of §4.6: **low** actions allowed for a delegated person within that person's rights; **outcome** actions held for a person to approve; every machine action held. |
 | **D-AK6** | How is a held non-config action recorded? | Reuse the Pending Change machinery — record the request, approve by replaying the same route as the proposer, refuse a stale replay — under its **own term** in `GLOSSARY.md` (a Pending Change stays config only). Name to be settled with the glossary owner before phase 2. |
 | **D-AK7** | Which file access does an agent get on a customer's install (§1.2)? | **Governed install:** read access to the install root (shipped docs, example Spaces and templates), no write access to Space folders, every change through the API. **Sandbox or developer install:** direct file writes allowed. The Agent Skills say which posture they assume. Settle with the spike's variant A/B comparison. |
+
+**Signed 2026-11-24 (operator interview):**
+- **D-AK5 — allow within rights (not the two tiers).** An agent signed in as a person may take **any** operational or
+  case action that person's rights allow — re-run, resume, reprocess, drain, comment, assign, resolve, transition, open
+  a Case — **at once, with no hold**, audited with `agentClient` on every row. The low / outcome split of §4.6 is not
+  built for persons' agents. **A machine (unattended) agent's every action is held** for a person to approve
+  (follow-up answer), as the table's *Machines* line in §4.6 says. The never-list is unchanged: no agent approves,
+  declines, reveals, promotes or changes Apps or access.
+- **D-AK6 — as recommended, named "Pending Action".** A held non-config action reuses the Pending Change machinery
+  (record the request, approve by replaying the same route as the proposer, refuse a stale replay) under its own
+  term **Pending Action**; a Pending Change stays config only. With D-AK5 as signed, only machine actions are held, so
+  the Pending Action is the machine path. `GLOSSARY.md` gains the term with the phase that builds it (AK-2d).
+- **D-AK7 — as recommended (two postures).** Governed install: read access to the install root, writes only in a
+  scratch copy, every change applied through the API; sandbox or developer install: direct file writes allowed. The
+  Agent Skills say which posture they assume.
 
 ## References
 
