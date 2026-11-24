@@ -4,7 +4,7 @@
 //
 //   node tools/package-agent-kit.mjs --mcp-url https://inspecto.example.com/api/v1/spaces/sales/mcp \
 //        --client-id claude-code --discovery-url https://id.example.com/realms/inspecto/.well-known/openid-configuration \
-//        [--gemini-client-id gemini-cli] [--scopes "openid"] [--callback-port 8765] [--version 4.0.0] [--out target/agent-kit]
+//        [--gemini-client-id gemini-cli] [--codex-client-id codex] [--local-client-id opencode] [--scopes "openid"] [--callback-port 8765] [--version 4.0.0] [--out target/agent-kit]
 //
 // In an installed bundle the same file is agent-kit/package-agent-kit.mjs (package.ps1 step 7): run it as
 // `node agent-kit/package-agent-kit.mjs …`; it reads skills/ and VERSION beside itself and writes agent-kit/packages/.
@@ -23,9 +23,10 @@
 // `.mcp.json` env expansion in `url` is not documented for Claude Code plugins. The install's identity provider needs a
 // PRE-REGISTERED agent client (Inspecto lists it in -Dauth.oidc.agentClients; no dynamic registration), so the client id
 // and a fixed localhost callback are baked in too: Claude Code calls back on http://localhost:<port>/callback, Gemini CLI
-// on the `redirectUri` given here (http://localhost:<port>/oauth/callback) — register both on the agent client(s).
+// on the `redirectUri` given here (http://localhost:<port>/oauth/callback) , OpenCode on http://127.0.0.1:<port>/callback, Codex on the address `codex mcp login` prints — register each on the
+// agent client(s).
 // The authorization and token endpoints Gemini needs are read from the OIDC discovery document (or --authorization-url /
-// --token-url). No secret is written: both are public clients.
+// --token-url). No secret is written: every client is public.
 //
 // Tests: tools/package-agent-kit.test.mjs. Nothing here needs the server.
 
@@ -72,7 +73,7 @@ export function geminiContext() {
     return `# Inspecto
 
 You are connected to a running Inspecto through the MCP server \`${NAME}\`, signed in as a person. Use the skills in
-this extension; \`build-an-app\` is the place to start for an outcome, \`safe-config-change\` for any change.
+this package; \`build-an-app\` is the place to start for an outcome, \`safe-config-change\` for any change.
 
 - Validate (\`validate_config\`) — and for a Pipeline graph dry-run (\`dry_run_pipeline\`) — before \`propose_change\`.
 - You propose; another person approves. Never try to approve, decline, reveal a masked value, promote, or change Apps,
@@ -90,6 +91,9 @@ export function buildPackages(opts, skills) {
     const { mcpUrl, clientId, authorizationUrl, tokenUrl, version } = opts;
     const geminiClientId = opts.geminiClientId ?? clientId;
     const scopes = (opts.scopes ?? '').trim() || 'openid';
+    // RFC 6749 §3.3 scope-token characters only (keeps quotes, backslashes and control characters out of every format)
+    if (!scopes.split(/\s+/).every((t) => /^[\x21\x23-\x5B\x5D-\x7E]+$/.test(t))) throw new Error(`--scopes holds a character a scope may not: ${opts.scopes}`);
+    if (/[\x00-\x1F\x7F]/.test(opts.mcpUrl ?? '')) throw new Error('--mcp-url holds a control character');
     const port = Number(opts.callbackPort ?? 8765);
     if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error(`--callback-port must be 1024-65535: ${opts.callbackPort}`);
     requireHttps('mcp-url', mcpUrl, { localOk: true });
@@ -140,7 +144,7 @@ export function buildPackages(opts, skills) {
     files[`${ext}/GEMINI.md`] = geminiContext();
     // OpenAI Codex CLI: a project folder (learn.chatgpt.com/docs/extend/mcp, build-skills, agent-configuration/agents-md):
     // .codex/config.toml (read in a TRUSTED project), .agents/skills/, AGENTS.md. Strings are JSON-quoted, which is a valid
-    // TOML basic string for the validated inputs.
+    // TOML basic string for the validated inputs (no control character or DEL in the URL, RFC 6749 scope tokens only).
     const codexClientId = opts.codexClientId ?? clientId;
     const q = (v) => JSON.stringify(v);
     files['codex/.codex/config.toml'] = `# Inspecto Agent Kit - the MCP server for this install (Codex CLI).

@@ -103,6 +103,9 @@ test('bad inputs are refused', () => {
     bad({ clientId: undefined }, /client id/);
     bad({ tokenUrl: 'ftp://x' }, /must be https/);
     bad({ callbackPort: 80 }, /callback-port/);
+    bad({ scopes: 'openid a\x7fb' }, /--scopes/);
+    bad({ scopes: 'openid "x"' }, /--scopes/);
+    bad({ mcpUrl: 'https://inspecto.example.com/api/\x7f/mcp' }, /control character/);
     bad({ version: 'latest' }, /SemVer/);
     assert.throws(() => buildPackages(OPTS, {}), /no skills/);
     // blank scopes fall back to openid rather than an empty scope
