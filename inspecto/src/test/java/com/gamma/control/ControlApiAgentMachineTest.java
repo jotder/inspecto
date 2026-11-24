@@ -120,6 +120,8 @@ class ControlApiAgentMachineTest {
             JsonNode held = data(send(c, "POST", "/components/pattern-pack", pack("bot-pack"), BOT), 202);
             assertEquals("ops-bot", held.at("/pendingChange/agentClient").asText(), held.toString());
             assertEquals("client:ops-bot", held.at("/pendingChange/author").asText(), held.toString());
+            assertEquals("svc-ops", held.at("/pendingChange/authorMachine").asText(),
+                    "the record keeps the machine, so its approved replay is re-admitted and filtered (authorNow)");
             assertFalse(exists(c, "bot-pack"), "nothing written");
             String id = held.at("/pendingChange/id").asText();
 
