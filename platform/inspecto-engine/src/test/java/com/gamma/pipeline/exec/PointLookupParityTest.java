@@ -40,10 +40,15 @@ class PointLookupParityTest {
             44,GB,United Kingdom,0,4
             0044,GB,UK zero form,0,5
             44,GB,United Kingdom (newer),0,6
+            i,TR,dotted i,0,7
+            οδοσ,GR,road,0,8
+            STRAẞE,DE,street,0,9
             """;
 
     private static final List<String> VALUES = List.of("249915555555", "2499123", "249912300000", "24991", "999",
-            "447700900123", "+447700900123", " 44 ", "0044", "", "4");
+            "447700900123", "+447700900123", " 44 ", "0044", "", "4",
+            // Unicode, where Java's trim/lower/upper differ from DuckDB's (found by verification, 2026-11-24)
+            "44\u00A0", "\u00A044", "44\u3000", "\u0130", "\u039F\u0394\u039F\u03A3", "stra\u00DFe", "STRASSE", "44 \n");
 
     private RowShaper.ReferenceResolver resolver(Path csv) {
         return new RowShaper.ReferenceResolver() {
@@ -120,6 +125,33 @@ class PointLookupParityTest {
                 "duplicates", "first"), DIAL);
         assertParity(cfg("match", "longest_prefix", "normalize", List.of("trim", "strip_plus"),
                 "filter", "iso_country_code = 'GB'"), DIAL);
+    }
+
+    @Test
+    void unicodeTrimLowerAndUpperAgree() throws Exception {
+        assertParity(cfg("match", "exact", "normalize", List.of("trim", "lower")), DIAL);
+        assertParity(cfg("match", "exact", "normalize", List.of("trim", "upper")), DIAL);
+        assertParity(cfg("match", "longest_prefix", "normalize", List.of("trim")), DIAL);
+    }
+
+    @Test
+    void aBuildLeavesNoScratchBehind() throws Exception {
+        Path csv = dir.resolve("s.csv");
+        Files.writeString(csv, DIAL);
+        Path tmp = Path.of(System.getProperty("java.io.tmpdir"));
+        java.util.function.Supplier<java.util.Set<Path>> scratch = () -> {
+            try (var l = Files.list(tmp)) {
+                return l.filter(p -> p.getFileName().toString().startsWith("lookup_"))
+                        .collect(java.util.stream.Collectors.toSet());
+            } catch (java.io.IOException e) {
+                throw new java.io.UncheckedIOException(e);
+            }
+        };
+        var before = scratch.get();
+        PointLookup.load(PipelineNode.of("j", "transform.join", cfg("match", "exact")), resolver(csv));
+        var after = scratch.get();
+        after.removeAll(before);
+        assertEquals(java.util.Set.of(), after, "the build's scratch dir is removed");
     }
 
     @Test

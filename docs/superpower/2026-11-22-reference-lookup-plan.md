@@ -205,7 +205,8 @@ row-at-a-time caller (D-LK8; the ingest lane refuses lookups), so its first call
 (`com.gamma.pipeline.exec`) builds from the keyed join's node config, reusing `RowShaper`'s own parsing
 (`joinMappings`, `joinNormalizers`, `normalized`, widened to package scope) and the batch join's Reference SQL verbatim
 (key normalized in SQL, `filter`, `duplicates` + `order_by`, `exact_when`), read once over a connection sealed by
-`PipelineDryRun.seal`; values are probed in Java (hash map; for `longest_prefix` the key lengths present, longest
+`PipelineDryRun.seal`; a tested value is normalized by DuckDB through the same `normalized` SQL (a Java copy
+disagreed on Unicode — no-break spaces, dotted I, final sigma, ß — found by verification), then probed in Java (hash map; for `longest_prefix` the key lengths present, longest
 first, code points as DuckDB's `length`). Every returned value is held as text. `POST /lookups/test`
 `{pipeline, step, value, refresh?}` (read-shaped exemption, value in the body) answers through it; `LookupRoutes`
 keeps at most 8 indexes warm (LRU), rebuilt when the Step config changes or `refresh: true`. Decisions (assistant):

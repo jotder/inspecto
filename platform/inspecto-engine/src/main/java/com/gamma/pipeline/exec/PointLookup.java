@@ -16,7 +16,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.TreeSet;
 
@@ -188,7 +187,7 @@ public final class PointLookup {
                         (System.nanoTime() - t0) / 1_000_000);
             }
         } finally {
-            PipelineDryRun.removeScratch(scratch);
+            deleteScratch(scratch);   // PipelineDryRun.removeScratch only removes dryrun_* / flowjob_* dirs
         }
     }
 
@@ -238,18 +237,35 @@ public final class PointLookup {
         throw new IllegalStateException("no returned column " + col);
     }
 
-    /** {@link RowShaper#normalized}'s SQL, in Java: each normalizer in order. DuckDB's {@code trim} strips spaces only. */
+    /**
+     * The value through {@link RowShaper#normalized}'s own SQL, evaluated by DuckDB — never a Java copy of it: DuckDB's
+     * {@code trim}, {@code lower} and {@code upper} differ from Java's on Unicode (no-break spaces, dotted I, final
+     * sigma, ß), and the point engine must compare exactly as the batch join does. A bare in-memory connection running
+     * one parameterized, config-built expression; the value is a bound parameter, never SQL text.
+     */
     static String normalize(String v, List<String> normalizers) {
-        String e = v;
-        for (String n : normalizers) {
-            e = switch (n) {
-                case "trim" -> e.replaceAll("^ +| +$", "");
-                case "lower" -> e.toLowerCase(Locale.ROOT);
-                case "upper" -> e.toUpperCase(Locale.ROOT);
-                case "strip_plus" -> e.startsWith("+") ? e.substring(1) : e;
-                default -> e.matches("0+") ? "0" : e.replaceFirst("^0+", "");
-            };
+        if (normalizers.isEmpty()) return v;
+        try (Connection c = java.sql.DriverManager.getConnection("jdbc:duckdb:");
+             java.sql.PreparedStatement ps = c.prepareStatement(
+                     // the expression repeats its input (strip_leading_zeros twice), so bind the value once
+                     "SELECT " + RowShaper.normalized("__lk_v", normalizers)
+                             + " FROM (SELECT CAST(? AS VARCHAR) AS __lk_v)")) {
+            ps.setString(1, v);
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return rs.getString(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("could not normalize the value: " + e.getMessage(), e);
         }
-        return e;
+    }
+
+    /** Remove the scratch dir and everything in it (the build's temporary DuckDB file). */
+    private static void deleteScratch(Path scratch) {
+        try (java.util.stream.Stream<Path> walk = Files.walk(scratch)) {
+            walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+        } catch (java.io.IOException ignored) {
+            // best effort: a leftover temp dir is not a failed lookup
+        }
     }
 }
