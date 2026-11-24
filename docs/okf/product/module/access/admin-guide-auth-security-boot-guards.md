@@ -158,12 +158,14 @@ folder (`inbox/<dataset>`); a Pipeline inbox that lies outside that folder is le
 - The 404 keeps a signed-in person's ordinary use from confirming that a closed Space exists. It does not hide a
   Space id from a caller who tries: with no credential the same route answers 401 for a Space that exists and 404
   for one that does not; a path no route answers gives `not found` under an existing Space and `no such space`
-  under an unknown one; and `/spaces/<id>/bootstrap` gives an anonymous caller that Space's pre-sign-in context
-  (edition, features, branding).
+  under an unknown one; `/spaces/<id>/bootstrap` gives an anonymous caller that Space's pre-sign-in context
+  (edition, features, branding); and un-prefixed `/bootstrap` with a closed fallback Space shows its feature flags
+  to a signed-in outsider (settings, not data).
 - A Space id also appears outside its own routes: metric labels, the owning Space of an Exchange offer, an App
   upgrade preview.
-- Admission is by role, not by person, and no screen shows that a Space is closed (the `GET /spaces` row of a closed
-  Space carries `admission` and `createdBy`; the create answer does too).
+- Admission is by role, not by person, and the creator match compares the Subject id (`sub`), not the issuer. The
+  Spaces screen marks a closed Space with a *Closed* badge (the `GET /spaces` row of a closed Space carries
+  `admission` and `createdBy`; the create answer does too).
 - Code: `SpaceAdmission`, `ServerPaths`, `ControlApi.spaceRefusal` (`inspecto/src/main/java/com/gamma/control/`);
   the two keys live on `SpaceContext.SpaceManifest`. Tests: `ControlApiSpaceAdmissionTest`,
   `DemoSpaceAdmissionHttpTest`, `ControlApiPipelineInboxTest`.
