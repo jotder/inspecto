@@ -108,9 +108,8 @@ import { provideAddDataLinkAnalysis } from '@inspecto/link-analysis/link-analysi
                     Add data
                 </a>
             </div>
-            <p class="text-secondary m-0 text-sm">
-                Each Dataset you added or a Pipeline keeps up to date, what its columns hold, and its Mappings: the ways
-                its rows are read as links. A Mapping is a Dataset of its own over the same data.
+            <p class="text-secondary m-0 max-w-3xl text-sm">
+                Pick a Dataset to inspect its columns and configure its Mappings (how its rows are read as links).
             </p>
             @if (error()) {
                 <inspecto-alert variant="error">{{ error() }}</inspecto-alert>
@@ -633,13 +632,18 @@ import { provideAddDataLinkAnalysis } from '@inspecto/link-analysis/link-analysi
                 </div>
             }
             @if (others().length) {
-                <section class="flex flex-col gap-1" aria-labelledby="data-others">
-                    <h2 class="m-0 text-base font-semibold" id="data-others">Other Datasets</h2>
-                    <p class="text-secondary m-0 text-sm">
-                        No Mapping is offered for these: each is computed when read, has no stored data, is an Entity
-                        List's store, or lists fewer than two columns to read as From and To.
-                        {{ others().join(', ') }}
-                    </p>
+                <section class="flex flex-col gap-1.5 border-t pt-3" aria-labelledby="data-others">
+                    <div class="flex flex-wrap items-baseline gap-2">
+                        <h2 class="m-0 text-sm font-semibold" id="data-others">Other Datasets</h2>
+                        <span class="text-secondary text-xs">
+                            Computed on read, empty, Entity List stores, or fewer than two link columns:
+                        </span>
+                    </div>
+                    <ul class="m-0 flex list-none flex-wrap gap-1.5 p-0">
+                        @for (name of others(); track name) {
+                            <li class="bg-card rounded border px-2 py-0.5 font-mono text-xs">{{ name }}</li>
+                        }
+                    </ul>
                 </section>
             }
         </div>

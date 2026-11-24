@@ -290,7 +290,10 @@ export class LaShellComponent {
     protected readonly product = PRODUCT.brand.name;
     /** The Handbook's home (USER-HANDBOOK-1): the static site every bundle ships at /help/. */
     protected readonly helpHome = HELP_HOME;
-    protected readonly logo = this.env.appLogo;
+    protected readonly logo =
+        this.env.appLogo === 'assets/images/logo/inspecto-logo.svg'
+            ? 'assets/images/logo/inspecto-emblem.svg'
+            : this.env.appLogo;
     protected readonly footer = this.env.footerText;
     private readonly rail = inject(LaRailService);
     protected readonly expanded = this.rail.expanded;

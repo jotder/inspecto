@@ -1097,7 +1097,7 @@ describe('InvestigationSessionStore - walk-through 6', () => {
         sets['inv-7'] = { ...ws([]), entities: [at('s', 0, 1), at('a', 1, 2), at('b', 1, 2)] };
         expect(await store.open('inv-7')).toBe(true);
         expect(store.degreeOutcomes().map(degreeOutcomeMessage)).toEqual([
-            'Degree 1 (all available data): 2 new entities, 0 links added.',
+            'Degree 1 (all available data): Added 2 new entities and 0 links.',
         ]);
     });
 

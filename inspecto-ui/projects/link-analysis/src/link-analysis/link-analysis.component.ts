@@ -2071,6 +2071,8 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
     linkKindLabel(kind: string): string {
         return termLabel(domainProfile(activeDomainProfileId()), `link_kind.${kind}`, kind || 'unlabelled');
     }
+    /** Drawn start entities carrying the "start" tab — the legend's start-entity row. */
+    readonly startNodesDrawn = computed(() => this.canvasSource()?.nodes.filter((n) => n.data.start).length ?? 0);
     /** Drawn Working Set entities flagged high connectivity — the legend's ringed-node row. */
     readonly hubsDrawn = computed(
         () => this.investigation.canvas()?.nodes.filter((n) => n.data.highConnectivity).length ?? 0,
