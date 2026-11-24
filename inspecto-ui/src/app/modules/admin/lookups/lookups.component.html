@@ -1,0 +1,139 @@
+<div class="flex min-w-0 flex-auto flex-col">
+    <inspecto-page-header
+        title="Lookups"
+        subtitle="Every keyed Reference lookup in this Space's Pipelines, with its last run's counts"
+        [terms]="['Reference', 'Pipeline', 'Step']"
+    >
+        <ng-container actions>
+            <button mat-icon-button (click)="load()" matTooltip="Refresh" aria-label="Refresh">
+                <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
+            </button>
+        </ng-container>
+    </inspecto-page-header>
+
+    <div class="flex flex-auto flex-col gap-4 p-6 sm:p-10">
+        @if (!lastRunKnown()) {
+            <inspecto-alert variant="info">
+                Step Receipts are switched off on this server, so no last run can be shown.
+            </inspecto-alert>
+        }
+        @if (cut(); as total) {
+            <inspecto-alert variant="warning"
+                >Showing the first {{ rows().length }} of {{ total }} lookups.</inspecto-alert
+            >
+        }
+        <inspecto-data-table
+            stateKey="lookups"
+            tier="standard"
+            sourceName="lookups"
+            exportName="lookups"
+            [rows]="rows()"
+            [columns]="columnDefs"
+            [loading]="loading()"
+            noRowsTitle="No lookups yet"
+            noRowsHint="A lookup is a join Step with a key: column — add one to a Pipeline."
+            (rowClick)="select($any($event))"
+        />
+        @if (selected(); as s) {
+            <section class="flex flex-col gap-2" aria-labelledby="lookup-unmatched-title">
+                <div class="flex items-center gap-2">
+                    <h2 id="lookup-unmatched-title" class="text-lg font-semibold">
+                        Values not found in {{ s.pipeline }} ▸ {{ s.step }}
+                    </h2>
+                    <button
+                        mat-icon-button
+                        (click)="select(null)"
+                        matTooltip="Close"
+                        aria-label="Close the values not found"
+                    >
+                        <mat-icon svgIcon="heroicons_outline:x-mark"></mat-icon>
+                    </button>
+                </div>
+                <p class="text-secondary text-sm">
+                    The most frequent values of the last run that found no Reference row, up to 20 per column. Each
+                    value is shown masked, with its fingerprint — the same one rejected rows carry.
+                </p>
+                <inspecto-data-table
+                    tier="mini"
+                    [rows]="s.unmatched"
+                    [columns]="missColumns"
+                    noRowsTitle="Every value was found"
+                    noRowsHint="The last run had no values without a Reference row, or it has not run yet."
+                />
+            </section>
+            <section class="flex flex-col gap-2" aria-labelledby="lookup-test-title">
+                <h2 id="lookup-test-title" class="text-lg font-semibold">Test a value</h2>
+                <p class="text-secondary text-sm">
+                    Look one value up the way this Step looks up each row. The Reference is loaded into memory on the
+                    first test and kept, and loaded again when the Reference's files change.
+                </p>
+                <form class="flex flex-wrap items-start gap-2" [formGroup]="testForm" (ngSubmit)="test()">
+                    <inspecto-pen-field
+                        class="min-w-64 flex-auto"
+                        label="Value"
+                        [required]="true"
+                        [open]="true"
+                        [mono]="true"
+                        formControlName="value"
+                        [error]="testValue.touched && testValue.hasError('required') ? 'Enter a value to look up.' : ''"
+                    ></inspecto-pen-field>
+                    @if (s.match === 'asof') {
+                        <inspecto-pen-field
+                            class="min-w-48"
+                            label="Time"
+                            [open]="true"
+                            [mono]="true"
+                            placeholder="e.g. 2026-02-15"
+                            help="The row's time: the Reference row in effect then is used."
+                            formControlName="at"
+                        ></inspecto-pen-field>
+                    }
+                    <button mat-flat-button color="primary" type="submit" [disabled]="testing()">Test</button>
+                    <button mat-stroked-button type="button" [disabled]="testing()" (click)="test(true)">
+                        Reload Reference and test
+                    </button>
+                </form>
+                @if (testError(); as err) {
+                    <inspecto-alert variant="error">{{ err }}</inspecto-alert>
+                }
+                @if (answer(); as a) {
+                    <inspecto-alert [variant]="a.hit ? 'success' : 'warning'">
+                        @if (a.hit) {
+                            Found: key {{ a.matchedKey }} ({{ matchedHow(a.matchKind) }}).
+                        } @else {
+                            Not found: no Reference row matches.
+                        }
+                        Compared as “{{ a.compared }}”.
+                    </inspecto-alert>
+                    <table class="text-sm" aria-label="Columns this value would get">
+                        <thead>
+                            <tr>
+                                <th scope="col" class="pr-6 text-left">Looked up by</th>
+                                <th scope="col" class="pr-6 text-left">Column</th>
+                                <th scope="col" class="text-left">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (r of answerRows(a); track r.on + r.column) {
+                                <tr>
+                                    <td class="pr-6">{{ r.on }}</td>
+                                    <td class="pr-6">{{ r.column }}</td>
+                                    <td>{{ r.value }}</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    <p class="text-secondary text-xs">
+                        Index of {{ a.index.rows }} Reference rows, loaded {{ fmtDateTime(a.index.loadedAt) }}.
+                        @if (a.index.reloaded === 'reference changed') {
+                            Loaded again for this test: the Reference changed.
+                        }
+                        @if (!a.index.watchesReference) {
+                            Changes to this Reference are not detected; use Reload Reference and test.
+                        }
+                    </p>
+                }
+            </section>
+        }
+    </div>
+</div>

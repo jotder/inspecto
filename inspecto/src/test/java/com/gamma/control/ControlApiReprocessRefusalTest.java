@@ -160,7 +160,7 @@ class ControlApiReprocessRefusalTest {
         try (Ctx c = open(cfg, root)) {
             String id = imported(c, transfers(1, 5, true));
             String first = commits(c, id).get(0);
-            add(c, id, "fresh.csv", null, transfers(2, 3, true));   // no mode: Replace everything
+            add(c, id, "fresh.csv", "replace", transfers(2, 3, true));   // mode replace: Replace everything
             assertEquals(3, rowsRead(c, id));
             assertTrue(states(first).stream().allMatch(st -> st == ConsignmentOutput.State.REPLACED), states(first).toString());
 

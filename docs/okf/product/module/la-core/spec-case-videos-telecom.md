@@ -54,8 +54,10 @@ fifty").
 > **The report is green** · Standard · Mobile Money Space (`la-mobile-money`) · cash-ins just under the limit · 4 min 45 s
 
 - **Cast:** the hub wallet (HUB-01), the agent who handled the cash-ins (AG-18), the twenty-five structuring wallets
-  (STRUCT-01 to STRUCT-25), the relays (RELAY-1, RELAY-2). **Decoy:** the biggest receiver of all, a utility shop
-  (MER-ELECTRIC): hundreds of payers, one way, ordinary amounts. The relay is second in the sweep but only passes money on.
+  (STRUCT-01 to STRUCT-25), the relays (RELAY-1, RELAY-2); all masked for the analyst, so the film names roles.
+  **Decoy on screen:** the second name of Busiest nodes, a relay with three linked wallets that only passes money on.
+  **Decoy in the data, narrated:** the biggest receiver of all, a utility shop (MER-ELECTRIC): hundreds of payers, one
+  way, ordinary amounts; it is not on this saved view.
 - **Stakes:** the investigator is the operator's AML analyst, who owns the limit alerts. A cash-in limit that every check says
   is respected, and that is still beaten, is a limit nobody is enforcing.
 - **Vocabulary:** *structuring* ("splitting one sum into amounts that each stay under a reporting limit"); *cash-in* ("a customer
@@ -64,78 +66,83 @@ fifty").
   inside 36 hours, each amount in the band 4 750 ≤ amount < 5 000 (`BAND_LO` = 0.95 × `TIER_LIMIT` 5 000); each wallet pays
   HUB-01 (the alert Measure fires on HUB-01, 25 legs, 25 payers); HUB-01 forwards 98 % within ten minutes to RELAY-1 and
   RELAY-2; the benign hub is MER-ELECTRIC (300 payers, one way, amounts under 4 400). No ground-truth JSON exists for this
-  Space; the golden test is `LaMobileMoneyGoldenTest`. The plan's table said the relay is the busiest; the data says the
-  hub leads and the relay follows, and the true decoy is the utility shop.
-- **Screen truth:** saved view *Mm structuring band*; as Demo Analyst the wallets are `masked:…` ("31 entities masked",
-  Reveal… greyed with *Needs See unmasked ids*). The reveal beat runs as Demo Admin on the Investigation *Mule hub and its
-  chain* (as in F7). Quick question *Busiest nodes* names aliases.
-- **Before:** Standard build, Mobile Money Space from a fresh unzip, Demo Analyst signed in, no Investigation open; the
-  administrator scene reopens the seeded Investigation (the F7 reveal adds an audit entry, nothing else).
+  Space; the golden test is `LaMobileMoneyGoldenTest`.
+- **Screen truth (checked live 2026-11-22, Standard, Demo Analyst):** saved view *Mm structuring band* draws a diamond (the
+  agent, a column of 25 wallets, the hub and two relays), labels off, "31 entities masked" with Reveal… greyed. Busiest nodes
+  lists five wallets by alias: 42 transfers (starting from it draws 1 entity and 27 linked wallets: the hub), 34 (3 linked
+  wallets: a relay), 25 (25 linked wallets: the agent), 20, 17. The Data page lists four streams; `mm_links_dataset` has `src` and
+  `dst` as Entity (Wallet), `kind` and `amount` as Detail, `ts` and `event_date` as Time. The dock Rows tab lists From, Link kind,
+  To and Count (Cash-in, 1). Search nodes on the saved view finds nothing for the shop: it is outside the band.
+- **Before:** Standard build, Mobile Money Space from a fresh unzip, Demo Analyst signed in; the administrator scene reopens the
+  seeded Investigation *Mule hub and its chain* (the F7 reveal adds an audit entry, nothing else).
 - **Lead:** one agent (AG-18) to review, the hub and its twenty-five wallets to hold. *What would change our mind:* if the
   twenty-five deposits came from twenty-five different agents over weeks, or from amounts all over the range, it would be a busy
   shop, not structuring. *Next actions:* review the agent's other cash-ins; hold the hub and its wallets; keep the wallets as the
   Entity List *STRUCT wallets* and watch the pattern with the existing Alert Rule `mm-structuring`.
-- **Try it / Check:** *Try it:* open the saved view, press Busiest nodes, and start from the third name. *Check:* why is the utility
-  shop not suspicious although it has the most payers? *Answer: its payers each pay once, in ordinary amounts, and nothing
-  leaves; the pattern is many deposits under the limit meeting in one wallet.*
+- **Try it / Check:** *Try it:* open the saved view, press Busiest nodes, and start from the third name. *Check:* why is the second
+  name not suspicious although it is busy? *Answer: it only passes money on; the pattern is many deposits under the limit meeting in
+  one wallet, and the agent who made them.*
 
-### S01 · Cold open · ~25 s
-- Voice: Monday, nine in the morning. The cash-in limit on a basic wallet is five thousand, and not one deposit this month has crossed it. [pause 0.6] The compliance report is green. You are the analyst who has to say whether that is good news. [pause 0.5] It is not. It is what success looks like to someone who has read the rules.
-- Chip: none
-- Action: cold open over the Space's home page, the saved view *Mm structuring band* in My work; at 0:20 the intro card (4 s, teal bar, "Case file · The report is green · Mobile Money · Standard").
+### S01 · Cold open · ~26 s
+- Voice: Monday, nine in the morning. The cash-in limit on a basic wallet is five thousand, and not one deposit this month has crossed it, so the compliance report is green. [pause 0.6] You are the analyst who has to say whether that is good news. It is not: it is what success looks like to someone who has read the rules.
+- Action: cold open over the Space's home page, the saved view *Mm structuring band* in My work.
 - Impact: none.
 
 ### S02 · Why every check stays green · ~30 s
-- Voice: Every check looks at one deposit at a time. This deposit is under the limit, so it passes. The next one is under the limit, so it passes. [pause 0.5] Twenty-five wallets can each do that once, and no check ever sees the twenty-five. Splitting one sum into small amounts like this is called structuring. The pattern is not in any row. It is between them.
-- Chip: none
-- Action: story card "Who is who": *the hub wallet*, *the agent*, *the structuring wallets*, kept until the reveal; the saved view opens behind it.
+- Beat: steady
+- Intro: The report is green | Mobile Money Space
+- Story: the agent = who handled the cash-ins | the structuring wallets = twenty-five, each used once | the hub = where they all pay
+- Voice: Every check looks at one deposit at a time. This deposit is under the limit, so it passes, and so does the next one. [pause 0.5] Twenty-five wallets can each do that once, and no check ever sees the twenty-five. Splitting one sum into amounts that stay under a limit is called structuring, and the pattern is not in any row: it is between them.
+- Action: intro card, then the story card "Who is who"; the saved view opens behind it.
 - Impact: the story card names the three roles; nothing on the canvas is marked yet.
 
 ### S03 · The data in one breath · ~30 s
-- Voice: Each wallet transaction is a record: a sending wallet, a receiving wallet, an amount and a time. [pause 0.4] A Job reads them into links between two wallets, and the amount and the time ride along on every link. That is the whole mapping. Say which two columns are the ends, and a table becomes a network you can walk.
-- Chip: Data · Mappings
-- Action: rail Data ▸ the transactions Dataset ▸ zoom on its Mappings area. [check in UI: the mapping's name and its From and To columns]
-- Impact: mark the From and To columns of the mapping.
+- Voice: Each wallet transaction is a record: a sending wallet, a receiving wallet, a kind, an amount and a time. [pause 0.4] A Job reads them into links, and the Data page shows how. The sending and receiving wallets are the two ends, and the time puts every link in order. Tell the product which two columns are the ends, and a table becomes a network you can walk.
+- Chip: Data · Columns
+- Action: rail Data ▸ the Dataset *mm_links_dataset* ▸ hold on its Columns card (src and dst hold a Wallet, ts is a Time).
+- Impact: mark the src and dst columns.
 
-### S04 · A view that asks one question · ~40 s
-- Voice: This saved view keeps only the cash-ins just under the limit: four thousand seven hundred and fifty up to five thousand. [pause 0.5] It asks one question: who is collecting them? Every wallet shows as an alias. This analyst works without seeing wallet ids, and the pattern does not need them. A funnel is a shape, not a name.
+### S04 · A view that asks one question · ~38 s
+- Voice: This saved view keeps only the cash-ins just under the limit, four thousand seven hundred and fifty up to five thousand, and it asks one question: who is collecting them? [pause 0.5] Every wallet shows as an alias, and the line under the canvas says thirty-one entities are masked. This analyst works without seeing wallet ids, and the pattern does not need them, because a funnel is a shape, not a name.
 - Chip: Saved views · Reveal…
-- Action: open the saved view *Mm structuring band*; hover the greyed Reveal… under the canvas. [check in UI: "31 entities masked" and the tooltip *Needs See unmasked ids*]
-- Impact: mark the "entities masked" line and the greyed Reveal…; the funnel shape is the picture.
+- Action: open the saved view *Mm structuring band*; hover the greyed Reveal… under the canvas (tooltip *Needs See unmasked ids*).
+- Impact: mark the "entities masked" line and the greyed Reveal….
 
-### S05 · First sweep, and the shop that is not a funnel · ~50 s
-- Voice: First question: Busiest nodes. [pause 0.4] The top names are the hub wallet, a relay, and an agent. The relay only passes money on, so it is busy by design. Now clear the amount filter and ask again. The busiest receiver of all is a utility shop with hundreds of payers. Each pays once, in an ordinary amount, and nothing leaves. A popular shop is not a funnel. Set it aside.
+### S05 · First sweep, and the name to set aside · ~45 s
+- Voice: First question: Busiest nodes. [pause 0.4] Three names lead. The top one has twenty-seven wallets around it. The second has only three: it passes money on, so it is busy by design, and it is set aside. The third has exactly twenty-five links, and every one is a cash-in. [pause 0.4] Elsewhere in the data a utility shop has more payers, but each pays once, in an ordinary amount, and nothing leaves. A popular shop is not a funnel.
 - Chip: Busiest nodes
-- Action: Busiest nodes on the saved view (the answer lists three rows: hub, relay, agent); then turn the band filter off (Display options or the saved view's filter) and press Busiest nodes again. [check in UI: how the filter is cleared and that the utility shop leads without it]
-- Impact: grey "ruled out" marker on the utility shop; yellow on the hub; the relay marked "passes it on".
+- Action: Busiest nodes ▸ hold on the three top cards (42, 34, 25 transfers).
+- Impact: yellow mark on the top card (the hub), grey "ruled out: passes it on" on the second, yellow on the third (the agent).
 
-### S06 · The agent · ~45 s
-- Voice: Look at the third name: the agent. Twenty-five links, exactly, and every one is a cash-in. [pause 0.5] Start a graph from the agent, and the funnel appears. Twenty-five wallets, each used once, all within thirty-six hours, all just under the limit. They pay one hub, and the hub passes it straight on.
-- Chip: Start from these
-- Action: Busiest nodes ▸ the agent's row ▸ Start from these ▸ hold on the drawn funnel ▸ labels on the hub. [check in UI: that Start from these draws the one-agent graph with the hub and relays]
-- Impact: before/after hold: the funnel appears; mark the agent and the hub.
+### S06 · The agent, and the funnel · ~42 s
+- Beat: reveal
+- Story: off
+- Voice: Start from the third name, the agent. The graph draws it with twenty-five wallets around it, each used once, and every link is a cash-in. [pause 0.4] Now expand one degree. The wallets all pay one hub, and the hub passes the money straight on to two relays. [pause 0.5] That is the funnel: twenty-five deposits under the limit, meeting in one wallet.
+- Chip: Start from these · Expand · G
+- Action: Busiest nodes ▸ the third card *Start from these* ▸ hold ▸ G ▸ Expand ▸ hold on the funnel.
+- Impact: before/after hold: the hub and the two relays appear.
 
-### S07 · Evidence you can defend · ~40 s
-- Voice: Is this a guess? Open the table under the graph. Every line is a row: from, link kind, to, the amount and the time. [pause 0.5] Twenty-five deposits in the band, an hour or two apart. Nothing is estimated. The graph shows the shape, and the table lets a colleague check every line.
+### S07 · Evidence you can defend · ~38 s
+- Voice: Is this a guess? Open the table under the graph. Every line is a row: from, link kind, to, and how many times. [pause 0.5] The first lines are the agent's twenty-five cash-ins, one to each wallet, and further down the same wallets pay one hub. Nothing is estimated. The graph shows the shape, and the table lets a colleague check every line and export it as a file.
 - Chip: Rows · Export
-- Action: dock ▸ Rows ▸ sort by amount ▸ hold on the band values; point at Export. [check in UI: the dock tab name and the sort control]
-- Impact: before/after hold: the dock opens; mark the amount column.
+- Action: dock ▸ Rows ▸ hold on the rows; point at the download icon.
+- Impact: before/after hold: the dock opens; mark the Link kind column.
 
 ### S08 · Names, with a reason · ~40 s
-- Voice: Now a name is needed, so the administrator reveals. [pause 0.5] Press Reveal, and the dialog says it plainly: the real ids, on this screen only, each one recorded with your reason. Type the reason: confirm the hub before the wallets are frozen. The labels change, and the audit trail knows who looked, and why.
+- Voice: Now a name is needed, so the administrator signs in and opens the same case. [pause 0.5] Press Reveal, and the dialog says it plainly: the real ids, on this screen only, each one recorded with your reason. Type the reason: confirm the hub before the wallets are frozen. The labels change to the real ids, and the audit trail knows who looked, and why. [pause 0.4] Everyone else keeps the aliases.
 - Chip: Reveal…
-- Action: sign out ▸ Demo Admin ▸ File ▸ Open… ▸ Investigations ▸ *Mule hub and its chain* ▸ Reveal… ▸ Reason `confirm the hub before the wallets are frozen` ▸ Reveal (the F7 steps).
+- Action: User menu ▸ Sign out ▸ Demo Admin ▸ File ▸ Open… ▸ Investigations ▸ *Mule hub and its chain* ▸ Reveal… ▸ Reason `confirm the hub before the wallets are frozen` ▸ Reveal (the F7 steps; the dock must be closed, or Reveal… sits higher).
 - Impact: before/after hold: aliases turn into HUB-01, RELAY-1 and the STRUCT ids; mark the confirmation message.
 
-### S09 · What the team does next · ~45 s
-- Voice: Here is the lead, and what happens to it. [pause 0.5] One agent to review. The hub and its twenty-five wallets to hold. Keep the wallets as an Entity List, and every graph in this Space marks them from now on. Then watch for the next twenty-five: an Alert Rule on this pattern fires the day it starts, not the month after.
-- Chip: Entity Lists · Alert Rule
-- Action: rail Entity Lists ▸ the list *STRUCT wallets* ▸ hold; then Settings ▸ Investigation settings ▸ Measures and templates ▸ the Alert Rule `mm-structuring` named on screen. [check in UI: the rule is listed as bound; do not create one]
+### S09 · What the team does next · ~42 s
+- Voice: Here is the lead, and what happens to it. [pause 0.5] One agent to review, and the hub with its twenty-five wallets to hold. The wallets are kept as an Entity List, so every graph in this Space marks them from now on. Then watch for the next twenty-five: the Alert Rule on this pattern fires the day it starts, not the month after.
+- Chip: Entity Lists · Alerts
+- Action: rail Entity Lists ▸ the list *STRUCT wallets* ▸ hold; rail Alerts ▸ hold on the Alert Rule `mm-structuring` in the rules table; create nothing.
 - Impact: mark the list's row and the Alert Rule's name.
 
-### S10 · The case file · ~25 s
-- Voice: The case file. Lead: one agent, one hub, twenty-five wallets. Evidence: twenty-five deposits in the band, inside thirty-six hours, every one a row. Next step: review the agent, hold the wallets, keep the list. [pause 0.6] Each deposit was legal. Only the links show them meeting. The same steps run on millions of records and answer in moments. Try it: start from the third name in Busiest nodes. To make a case like this defensible, see the training episode on the step log.
-- Chip: none
+### S10 · The case file · ~28 s
+- Casefile: Lead: one agent, one hub, twenty-five wallets | Evidence: twenty-five deposits in the band, inside thirty-six hours, every one a row | Next: review the agent; hold the hub and its wallets; keep the Entity List and watch it with the Alert Rule | Try it: start from the third name in Busiest nodes
+- Voice: The case file. Lead: one agent, one hub, twenty-five wallets. Evidence: twenty-five deposits in the band, inside thirty-six hours, every one a row. Next step: review the agent, hold the wallets, keep the list. [pause 0.6] Each deposit was legal; only the links show them meeting. The same steps run on millions of records and answer in moments. Try it: start from the third name in Busiest nodes.
 - Action: case-file card (8 s: Lead · Evidence · Next step · Try it), then the outro "Next: Make it defensible · training F4".
 - Impact: none.
 
@@ -145,9 +152,9 @@ fifty").
 
 > **Nine people who never met** · Standard · Mobile Money Space (`la-mobile-money`) · one handset behind nine wallets · 4 min 30 s
 
-- **Cast:** nine wallets (FARM-1 to FARM-9) on one handset (DEV-FARM-01). **Decoys:** a household of three wallets on one national
-  id, and a family phone carried by four wallets. The placeholder values (UNKNOWN, blank) the Job leaves out are the third
-  trap.
+- **Cast:** nine wallets (FARM-1 to FARM-9) on one handset (DEV-FARM-01), all masked for the analyst, so the film names roles.
+  **Decoys on screen:** a household of three wallets on one national id, and a family phone carried by four wallets; the
+  placeholder values (UNKNOWN, blank) the Job leaves out are the third trap, narrated.
 - **Stakes:** the investigator is in fraud operations; a sign-up bonus has paid out nine times to what the register says are nine
   people. The register checks each person once, so it cannot see that the people share a phone.
 - **Vocabulary:** *KYC* ("the identity check an operator makes when it opens a wallet"); *handset* ("the physical phone,
@@ -155,11 +162,13 @@ fifty").
 - **Ground truth:** `tools/gen-la-mm-data.py` header story 3 and lines 129-135 and 217-250: FARM-1..9 share DEV-FARM-01 and
   hold nine different national ids; all are tier T1; each takes three cash-ins at AG-05, pays MER-03 and MER-05 four times and
   cashes out twice at AG-30. Benign: a household of three on `NID-HOUSEHOLD-01`, a family phone `DEV-FAMILY-01` on four
-  wallets; placeholders (UNKNOWN, blank, 000000000000000, PENDING) are held by 5-8 wallets each and excluded by the Job. The
-  plan's table is confirmed; what separates the farm from the family phone is scale and sameness: nine wallets, all lowest tier,
-  the same two agents and two merchants.
-- **Screen truth:** saved view *Mm device farm*, 16 entities masked for the analyst (`masked:…` labels, labels on at this
-  size); Reveal… greyed. The tail uses Settings ▸ Identities as Demo Admin (as F7 S08).
+  wallets; placeholders are held by 5-8 wallets each and excluded by the Job.
+- **Screen truth (checked live 2026-11-22, Standard, Demo Analyst):** saved view *Mm device farm*: 16 entities masked, labels on,
+  Reveal… greyed; the Legend lists the link kinds *Shared device* and *Shared identity*. Tight groups returns three groups: 9
+  wallets with 36 transfers among them, 4 wallets with 6, 3 wallets with 3. Starting from a wallet of the nine draws 1 entity
+  and its linked wallets; the Expand dialog offers "The nodes not expanded yet" and adds about 38 wallets and 279 transfers. The
+  Entity Lists page shows *STRUCT wallets* (26 members) and *Device farm wallets* (9 members). Settings ▸ Identities as Demo Admin
+  shows one group of 2 identifiers: `#7 … = … — same handset DEV-FARM-01 (showcase)`, asserted by analyst, with Retract.
 - **Before:** Standard build, Mobile Money Space from a fresh unzip, Demo Analyst; the tail scene signs in as Demo Admin.
 - **Lead:** one group of nine wallets, to review together, not nine customers: for the fraud and identity teams, with the shared
   handset and the shared agents as evidence. *What would change our mind:* if the nine wallets had different handsets most days,
@@ -170,62 +179,65 @@ fifty").
   same agents and merchants.*
 
 ### S01 · Cold open · ~25 s
-- Voice: Nine customers. Nine different national ids. Every one of them passed the identity check. [pause 0.6] You work in fraud operations, and a sign-up bonus has just paid out nine times. On paper, those nine people have never met.
-- Chip: none
-- Action: cold open over the saved view's thumbnail; at 0:20 the intro card ("Case file · Nine people who never met · Mobile Money · Standard").
+- Voice: Nine customers, nine different national ids, and every one passed the identity check. [pause 0.6] You work in fraud operations, and a sign-up bonus has just paid out nine times. On paper, those nine people have never met.
+- Action: cold open over the Space's home page, the saved view *Mm device farm* in My work.
 - Impact: none.
 
 ### S02 · Why the register cannot see it · ~30 s
+- Beat: steady
+- Intro: Nine people who never met | Mobile Money Space
+- Story: a wallet = one customer's account | the shared handset = the phone behind several wallets | a family = people who share a phone and a home
 - Voice: The register holds people, one clean row each. The check made when a wallet is opened is called KYC, short for know your customer, and it checks the person. [pause 0.5] Nothing in it says which phone opened which wallet. The phone is the handset, and the connection between these nine only exists as a link.
-- Chip: none
-- Action: story card "Who is who": *a wallet*, *the shared handset*, *a family*; saved view opens behind it.
+- Action: intro card, then the story card "Who is who"; the saved view opens behind it.
 - Impact: the story card names the roles.
 
-### S03 · Links the transactions do not hold · ~35 s
-- Voice: Transactions say who paid whom. They do not say who shares a phone. [pause 0.4] A Job adds those links: two wallets on one handset, two wallets on one identity. Placeholder values such as unknown are left out on purpose. Without that, half the Space would look related to the other half.
-- Chip: Data · Mappings
-- Action: rail Data ▸ the wallets Dataset ▸ zoom on Mappings. [check in UI: the link kinds the Job adds, shared handset and shared identity, and the exclusions]
-- Impact: mark the two added link kinds.
+### S03 · Links the transactions do not hold · ~32 s
+- Voice: Transactions say who paid whom, but not who shares a phone. [pause 0.4] A Job adds those links: two wallets on one handset, and two wallets on one identity. Placeholder values such as unknown are left out on purpose, because without that, half the Space would look related to the other half. The Data page shows the Dataset they all land in.
+- Chip: Data · Columns
+- Action: rail Data ▸ the Dataset *mm_links_dataset* ▸ hold on its description and Columns card.
+- Impact: mark the Dataset's description line.
 
-### S04 · Groups that look alike · ~45 s
-- Voice: The saved view draws exactly those links. Small groups appear. A household of three wallets shares one national id. A family phone carries four wallets. [pause 0.5] Both are ordinary, and both are on screen. Sharing is not fraud. The question is which group is different, and how.
+### S04 · Groups that look alike · ~42 s
+- Voice: The saved view draws exactly those links. The legend names two kinds, a shared device and a shared identity. [pause 0.5] Small groups appear: a household of three wallets, a family phone with four, and one larger tangle. The first two are ordinary, and both are on screen. Sharing is not fraud, so the question is which group is different, and how.
 - Chip: Saved views · Legend
-- Action: open the saved view *Mm device farm* ▸ Legend (the two link kinds) ▸ hold on the groups. [check in UI: 16 entities masked, the group sizes 3, 4 and 9]
-- Impact: grey "ruled out" markers on the household and on the family phone, after S05's evidence; yellow on the nine.
+- Action: open the saved view *Mm device farm* ▸ Legend ▸ hold on the groups.
+- Impact: none yet; the groups are marked in S05.
 
-### S05 · First sweep: a dead heat · ~40 s
-- Voice: Ask Busiest nodes. [pause 0.4] There is no leader. Five wallets are tied at eight links each, and every one of them is linked to every other. A shop or an agent does not look like that. A shared device does.
-- Chip: Busiest nodes · Tight groups
-- Action: Busiest nodes ▸ hold on the tied rows; then Tight groups ▸ hold on the group of nine. [check in UI: five tied rows at eight links; Tight groups returns one group of nine]
-- Impact: mark the tied rows; mark the group of nine.
+### S05 · First sweep: a tight group · ~40 s
+- Voice: Ask Tight groups. [pause 0.4] The product finds three groups of wallets that link mostly among themselves. The smallest is three wallets, the household. The next is four, the family phone. [pause 0.4] The largest is nine wallets with thirty-six transfers among them: every wallet is tied to every other. A shop or an agent does not look like that. A shared device does.
+- Chip: Tight groups
+- Action: Tight groups ▸ hold on the three cards (9, 4 and 3 wallets).
+- Impact: yellow mark on the group of nine; grey "ruled out" marks on the four and the three.
 
-### S06 · Same handset, same habits · ~50 s
-- Voice: Start from one of them. Nine wallets on one handset, and nine different national ids. [pause 0.5] Now look at what they do. Each takes cash in from the same agent and pays the same two merchants. Each cashes out at the same second agent. A family phone is shared by people who live differently. These wallets live exactly alike, and all of them are at the lowest identity tier.
+### S06 · Same handset, same habits · ~45 s
+- Beat: reveal
+- Story: off
+- Voice: Start from one wallet of the nine. The graph draws it with the wallets that share its handset. [pause 0.5] Now expand one degree, and the agents and merchants appear around the group. Each wallet takes cash in from the same agent, pays the same two merchants, and cashes out at a second agent. A family phone is shared by people who live differently. These wallets live exactly alike, and all of them sit at the lowest identity tier.
 - Chip: Start from these · Expand · G
-- Action: Busiest nodes ▸ a tied row ▸ Start from these ▸ Expand one degree (G) to bring in the agents and merchants ▸ hold. [check in UI: the shared agent AG-05, merchants MER-03 and MER-05, agent AG-30 appear around the nine, masked or readable]
-- Impact: before/after hold: the shared agents and merchants appear around the nine; mark them.
+- Action: Tight groups ▸ the first card *Start from these* ▸ G ▸ Expand ▸ hold.
+- Impact: before/after hold: the agents and merchants appear around the nine.
 
-### S07 · Evidence you can defend · ~35 s
-- Voice: Open the table under the graph. Each link from one wallet to another has a row, with the shared handset behind it. [pause 0.5] Nine wallets, one device, nine identities, and the same few counterparties. A colleague can check every line.
+### S07 · Evidence you can defend · ~32 s
+- Voice: Open the table under the graph. Each link has a row: from, link kind, to, and how many. [pause 0.5] Nine wallets, one device, nine identities, and the same few counterparties. A colleague can check every line, and export it as a file.
 - Chip: Rows
-- Action: dock ▸ Rows ▸ filter to the shared-handset links. [check in UI: the link kind name in the Rows filter]
-- Impact: before/after hold: the dock opens; mark the handset column.
+- Action: dock ▸ Rows ▸ hold on the rows.
+- Impact: before/after hold: the dock opens.
 
 ### S08 · One entity, said once · ~40 s
-- Voice: The nine wallets are one operation, so tell the product. As the administrator, open Settings, then Identities. [pause 0.5] An identity fact says that two identifiers are one entity, with a reason. Here, the farm wallets, one handset. The group shows who said so and why, and the assertion can be taken back.
+- Voice: The nine wallets are one operation, so tell the product. As the administrator, open Settings, then Identities. [pause 0.5] An identity fact says that two identifiers are one entity, with a reason. Here, two farm wallets on one handset. The group shows who said so and why, and the assertion can be taken back with Retract. We do not press it here.
 - Chip: Settings · Identities
-- Action: sign out ▸ Demo Admin ▸ open any Investigation ▸ Settings ▸ Identities ▸ hold on the group and its reason (as F7 S08). [check in UI: the seeded group reads two farm wallets and the assertion by analyst]
+- Action: User menu ▸ Sign out ▸ Demo Admin ▸ File ▸ Open… ▸ *Mule hub and its chain* ▸ Settings ▸ Identities ▸ hold on the group and its reason (as F7).
 - Impact: mark the group, its reason and the Retract button (not pressed).
 
-### S09 · What the team does next · ~40 s
-- Voice: The lead: one group of nine wallets, to review together. Not nine customers. [pause 0.5] The fraud team freezes the bonus for the group. The identity team looks at who opened them. And a watch on that handset catches the tenth wallet before it is paid.
+### S09 · What the team does next · ~38 s
+- Voice: The lead: one group of nine wallets, to review together, not nine customers. [pause 0.5] The fraud team freezes the bonus for the group. The identity team looks at who opened them. And a watch on that handset catches the tenth wallet before it is paid. The nine are already kept as an Entity List, so the next case starts from them.
 - Chip: Entity Lists
-- Action: rail Entity Lists ▸ the list *Device farm wallets* ▸ hold. [check in UI: the list exists in this Space and holds the farm wallets]
+- Action: rail Entity Lists ▸ hold on *Device farm wallets* (9 members).
 - Impact: mark the list row.
 
-### S10 · The case file · ~25 s
+### S10 · The case file · ~28 s
+- Casefile: Lead: one handset, nine wallets, nine identities | Evidence: the shared-handset links, and the same agents and merchants | Next: freeze the bonus for the group; record one entity; watch the handset | Try it: find the group of a farm wallet in Identities
 - Voice: The case file. Lead: one handset, nine wallets, nine identities. Evidence: the shared-handset links, and the same agents and merchants. Next step: freeze the bonus, record one entity, watch the handset. [pause 0.6] In the register each wallet is a clean row. The handset that joins them only exists as a link. The same steps run on millions of records and answer in moments. Try it: find the group of a farm wallet in Identities.
-- Chip: none
 - Action: case-file card (8 s) and the outro "Next: Masked data and resolving identities · training F7".
 - Impact: none.
 
@@ -325,12 +337,12 @@ fifty").
 
 ## Telecom_WangiriNetwork
 
-> **One operation, four masks** · Standard · Other Examples Space (`la-showcase`) · four fraud reports, one network · 5 min
+> **One operation, four masks** · Standard · Other Examples Space (`la-showcase`) · four fraud reports, one network · 4 min 45 s
 
 - **Cast:** the suspect number (WANGIRI-A, 99979100001), a second SIM on its handset (WANGIRI-B, 99979100002), the premium-rate
   number its callbacks are forwarded to (PREMIUM-01, 99891000001), then IRSF-01, five numbers on one identity (SUBFRAUD-01..05),
-  a SIM box (SIMBOX-01) and mules (MULE-01..). **Decoy:** the taxi-dispatch line (99970000100), called by 650 distinct
-  subscribers.
+  a SIM box (SIMBOX-01) and mules (MULE-01..); all masked for the analyst, so the film names roles. **Decoy:** the taxi-dispatch
+  line, called by 650 distinct subscribers; the product holds it back as a *busy* subscriber when the graph is expanded.
 - **Stakes:** four teams hold four reports (a missed-call scam, an international revenue-share ring, a false subscriber identity,
   a SIM box). Each team can close its own ticket; nobody sees that the same operation sits behind all four.
 - **Vocabulary:** *Wangiri* ("the phone rings once and stops so the victim calls back to a premium-rate number"); *revenue-share
@@ -341,79 +353,83 @@ fifty").
   same play earlier on 60 victims; both SIMs share one handset. Degree ladder from WANGIRI-A: d1 WANGIRI-B (shared device) and
   PREMIUM-01 (forwarding); d2 IRSF-01 (voice calls to PREMIUM-01); d3 SUBFRAUD-01..05 (shared identity, IRSF-01's id document);
   d4 SIMBOX-01 (shared payment card) and MULE-01 (SIM history); d5 the other mules. The HUB supernode (a taxi-dispatch line
-  called by 650 distinct subscribers) is flagged and not expanded. **Corrections:** v1 said "four hundred numbers called it
-  back" (it is 400 rung, 40 called back) and used "257 calls" for the taxi line (650 distinct callers). The plan's table angle
-  ("four teams, four reports, one network") is confirmed and gains the decoy.
-- **Screen truth:** saved view *Telecom fraud network*: 767 entities masked for the analyst and a banner *Result cut short:
-  the server stopped reading at its row limit. Narrow the Dataset or add a filter.* The suspect number is typed as a start value
-  (it comes from the report, as in F2) and is accepted while masked.
-- **Before:** Standard build, Other Examples Space from a fresh unzip, Demo Analyst. The film starts and saves one Investigation
-  (the F2 steps); a re-recording needs a fresh unzip.
+  called by 650 distinct subscribers) is flagged and not expanded. **Corrections:** v1 said "four hundred numbers called it back"
+  (it is 400 rung, 40 called back) and used "257 calls" for the taxi line (650 distinct callers).
+- **Screen truth (checked live 2026-11-23, Standard, Demo Analyst):** saved view *Telecom fraud network*: 767 entities masked,
+  a banner *Result cut short*, and Busiest nodes names aliases. Starting from the typed number (Investigation tab ▸ Start from One
+  entity ▸ Dataset `telecom_links_dataset` ▸ Entity Type MSISDN ▸ the value ▸ Start; the first Start can take over fifteen
+  seconds on a cold server) draws *1 entity and 402 linked subscribers* ("403 entities masked"). Expand (G) from "the nodes
+  not expanded yet" takes the first 25 of the 402 (about 41 subscribers and 270 calls) and the next press adds 41 more
+  subscribers; the Expand dialog reports *1 busy subscriber will be held*, and the canvas lists it with *Expand anyway* and
+  *Hide held (1)*. The dock Steps tab reads *Start from 1 entity · Expand 1 degree from 1 entity · Expand 1 degree from the outer
+  ring*, and says *Nothing is recorded yet. Save asks for a Name and a Purpose*. The film does not save. The full chain to the
+  identity ring, the SIM box and the mules is narrated from the generator, not reached on screen.
+- **Before:** Standard build, Other Examples Space from a fresh unzip, Demo Analyst; nothing is saved.
 - **Lead:** one operation to report, link by link, not four cases. *What would change our mind:* if the premium number's other
   callers had no link to the identity or the handset, the four reports would be four separate frauds. *Next actions:* block the
   premium number and the two SIMs; send the identity ring to subscription-fraud review; hand the SIM box and mules to the
   carrier team with the chain as the evidence.
-- **Try it / Check:** *Try it:* start from the suspect number and expand one degree at a time with Expand · G, reading each new
-  link kind. *Check:* why not start from the busiest number? *Answer: it is a taxi line that hundreds of people call; the
-  number that receives calls it never made leads to the fraud.*
+- **Try it / Check:** *Try it:* start from the suspect number and expand one degree at a time with Expand · G, reading what each
+  press adds. *Check:* why not start from the busiest number? *Answer: it is a taxi line that hundreds of people call, so the
+  product holds it back; the number that rings people for a second and hangs up leads to the fraud.*
 
 ### S01 · Cold open · ~25 s
-- Voice: Four reports land on four desks in one week. A missed-call scam. An international revenue-share ring. A false subscriber identity. A SIM box. [pause 0.6] Four teams close four tickets. You wonder whether it is one operation, wearing four masks.
-- Chip: none
-- Action: cold open over the home page; at 0:20 the intro card ("Case file · One operation, four masks · Other Examples · Standard").
+- Voice: Four reports land on four desks in one week: a missed-call scam, an international revenue-share ring, a false subscriber identity, and a SIM box. [pause 0.6] Four teams close four tickets. You wonder whether it is one operation, wearing four masks.
+- Action: cold open over the home page.
 - Impact: none.
 
-### S02 · Each team sees one slice · ~35 s
-- Voice: A network records every call it carries, and each team looks at its own slice. Wangiri, a Japanese word, is the missed call: the phone rings once so you call back a premium number. [pause 0.5] Each trick looks like a separate crime. The forwarding and the shared handset that join them were in the records all along.
-- Chip: none
-- Action: story card "Who is who": *a missed-call number*, *a premium number*, *a shared handset*; the saved view opens behind it.
+### S02 · Each team sees one slice · ~32 s
+- Beat: steady
+- Intro: One operation, four masks | Other Examples Space
+- Story: a missed-call number = rings once and hangs up | a premium number = where the callbacks end | a shared handset = one phone behind two SIMs
+- Voice: A network records every call it carries, and each team looks at its own slice. Wangiri, a Japanese word, is the missed call: the phone rings once so you call back a premium number. [pause 0.5] Each trick looks like a separate crime, but the forwarding and the shared handset that join them were in the records all along.
+- Action: intro card, then the story card "Who is who"; the saved view opens behind it.
 - Impact: the story card names the roles.
 
-### S03 · Calls into links · ~30 s
+### S03 · Calls into links · ~28 s
 - Voice: Each call is a record: who rang, who was rung, when, for how long, and the SIM and handset behind it. [pause 0.4] A Job turns calls into links between numbers: who called whom, who forwarded to whom, and which SIMs share a handset. Numbers are the entities, and the call type names the kind of link.
-- Chip: Data · Mappings
-- Action: rail Data ▸ the telecom links Dataset ▸ zoom on Mappings. [check in UI: the Dataset name `telecom_links_dataset` and its link kinds]
-- Impact: mark the link kinds voice, forwarding and shared device.
+- Chip: Data
+- Action: rail Data ▸ hold on the list of Datasets.
+- Impact: none.
 
-### S04 · A busy view, and a banner · ~40 s
-- Voice: The saved view draws the suspicious corner of the network. It is large, and the server says why it looks cut: it stopped reading at its row limit. [pause 0.5] The product tells you instead of drawing a partial picture quietly. Every number is an alias for this analyst, so you will follow roles, not digits. Narrow it down.
+### S04 · A busy view, and a banner · ~38 s
+- Voice: The saved view draws the suspicious corner of the network. It is large, and the server says why it looks cut: it stopped reading at its row limit. [pause 0.5] The product tells you instead of drawing a partial picture quietly. Every number is an alias for this analyst, so you follow roles, not digits. Narrow it down.
 - Chip: Saved views
-- Action: open the saved view *Telecom fraud network* ▸ hold on the "Result cut short" banner and the "767 entities masked" line. [check in UI: the banner wording and the masked counter]
-- Impact: mark the banner and the masked line.
+- Action: open the saved view *Telecom fraud network* ▸ hold on the banner and the "entities masked" line.
+- Impact: mark the masked line.
 
-### S05 · First sweep: a taxi line · ~40 s
-- Voice: Busiest nodes. [pause 0.4] The top name is a taxi-dispatch line. Hundreds of people call a taxi, so it is busy for a good reason. Set it aside. Look instead for a number that receives calls it never asked for, and that forwards them on.
+### S05 · First sweep: a taxi line · ~36 s
+- Voice: Busiest nodes. [pause 0.4] The top name is a taxi-dispatch line. Hundreds of people call a taxi, so it is busy for a good reason. Set it aside, and look instead for a number that rings people it never meant to talk to, and that forwards what comes back.
 - Chip: Busiest nodes
-- Action: Busiest nodes on the saved view ▸ hold on the first row. [check in UI: the first row is the taxi line, as an alias]
-- Impact: grey "ruled out" marker on the taxi line.
+- Action: Busiest nodes on the saved view ▸ hold on the first rows.
+- Impact: grey "ruled out" marker on the first row (the taxi line).
 
-### S06 · The missed-call number · ~50 s
-- Voice: Start from the number the missed-call reports named. [pause 0.5] It rings four hundred phones for a second or two and hangs up. Forty people call back. Every callback is forwarded to one premium-rate number. And a second SIM, already on a blocklist, sits in the same handset, and ran the same trick earlier. That is how the money is made.
+### S06 · The missed-call number · ~48 s
+- Voice: Start from the number the missed-call reports named. Type it in the Investigation tab, and press Start. [pause 0.5] The graph draws that one number with four hundred and two subscribers around it. It rang them all for a second or two and hung up. Forty people called back, and every callback was forwarded to one premium-rate number. And a second SIM, already on a blocklist, sits in the same handset and ran the same trick earlier. That is how the money is made.
 - Chip: Investigation · Start from · One entity
-- Action: Investigation tab ▸ Start from One entity ▸ Dataset `telecom_links_dataset` ▸ Entity Type MSISDN ▸ `99979100001` ▸ Start ▸ Save… (the F2 steps) ▸ Expand to degree 1 ▸ hold. [check in UI: *Drew 1 entity*, the forward link to the premium number and the shared device link]
-- Impact: before/after hold: the second SIM and the premium number appear; mark them.
+- Action: Investigation tab ▸ Start from One entity ▸ Dataset `telecom_links_dataset` ▸ Entity Type MSISDN ▸ the number ▸ Start ▸ hold on the wheel of 402.
+- Impact: before/after hold: the wheel of subscribers appears around the start number.
 
-### S07 · One degree at a time · ~50 s
-- Voice: Now widen it one degree at a time, and watch what joins. [pause 0.5] The premium number receives voice calls pumped in by a revenue-share ring. That ring's id document belongs to five numbers on one synthetic identity. One of their payment cards pays for a SIM box. Another line passes to a chain of mules. Four reports, one chain.
-- Chip: Expand · G · Step log
-- Action: Expand one degree at a time (G) three or four times, with a pause after each ▸ Open the Step log ▸ hold on the rows. [check in UI: each degree adds the IRSF number, the five identity numbers, the SIM box and the mule chain, as the hub taxi line stays unexpanded]
-- Impact: before/after hold at each degree; mark the new link kind each time.
+### S07 · One degree at a time · ~48 s
+- Voice: Now widen it one degree at a time, and watch what joins. Press Expand, G. [pause 0.5] The product takes the outer ring, adds more subscribers, and holds back one busy number instead of pulling in its whole city: the taxi line, again. Press it a second time. In the full data, the premium number receives voice calls pumped in by a revenue-share ring, whose id document belongs to five numbers on one synthetic identity. One of their payment cards pays for a SIM box. Four reports, one chain.
+- Chip: Expand · G
+- Action: G ▸ Expand ▸ hold ▸ G ▸ Expand ▸ hold on the held number and *Expand anyway*; do not press it.
+- Impact: before/after hold at each press; mark the held number.
 
 ### S08 · Evidence you can defend · ~35 s
-- Voice: Is it a guess? The Step log lists each expand with its limits, in order, and the table holds every link as a row. [pause 0.5] Each call-back, and the forward that follows it, is a line a colleague can read. The chain is a result you can replay, not a drawing.
-- Chip: Step log · Rows
-- Action: dock ▸ Step log ▸ then Rows ▸ hold. [check in UI: the step names Start, Expand, Expand, Expand]
-- Impact: mark the expand rows.
+- Voice: Is it a guess? The dock lists each step in order: the start, and each expand with its limits. [pause 0.5] The table beside it holds every call as a row a colleague can read. Nothing is saved yet. Save asks for a name and a purpose, and then the steps are recorded for an auditor, so a chain is a result you can replay, not a drawing.
+- Chip: Steps
+- Action: dock ▸ Steps ▸ hold on the three rows and the line *Nothing is recorded yet*.
+- Impact: mark the Steps rows.
 
-### S09 · What the team does next · ~40 s
-- Voice: The lead: one operation, link by link, not four cases. [pause 0.5] Block the premium number and the two SIMs on the handset. Send the five identity numbers to subscription-fraud review. Hand the SIM box and the mules to the carrier team, with the chain attached.
-- Chip: Entity Lists
-- Action: rail Entity Lists ▸ the list *Telecom numbers under watch* ▸ hold. [check in UI: the list exists in this Space]
-- Impact: mark the list row.
+### S09 · What the team does next · ~38 s
+- Voice: The lead: one operation to report, link by link, not four cases. [pause 0.5] The premium number and the two SIMs are blocked. The identity ring goes to subscription-fraud review. The SIM box and the mules go to the carrier team, with the chain as the evidence. And the same walk is repeated on every other number that rings people for a second.
+- Action: hold on the graph.
+- Impact: none.
 
-### S10 · The case file · ~25 s
-- Voice: The case file. Lead: one operation behind four reports. Evidence: a chain of links from the missed-call number to the mules, each step a row. Next step: block, review, hand over. [pause 0.6] Each team saw one trick. The links joined them. The same steps run on millions of records and answer in moments. Try it: start from the suspect number and widen it yourself.
-- Chip: none
+### S10 · The case file · ~28 s
+- Casefile: Lead: one operation behind four reports | Evidence: four hundred rung, forty called back, every callback forwarded to one premium number, one handset behind two SIMs | Next: block the premium number and both SIMs; send the identity ring to subscription-fraud review; hand the SIM box and mules to the carrier team | Try it: start from the suspect number and expand one degree at a time
+- Voice: The case file. Lead: one operation behind four reports. Evidence: four hundred rung, forty called back, every callback forwarded to one premium number. Next step: block the number and the two SIMs, send the identity ring to review, hand the SIM box and mules to the carrier team. [pause 0.6] Four teams saw four slices; the links showed one operation. The same steps run on millions of records and answer in moments. Try it: start from the suspect number.
 - Action: case-file card (8 s) and the outro "Next: Expand with intent · training F2".
 - Impact: none.
 
@@ -421,89 +437,93 @@ fifty").
 
 ## Telecom_DealerCommission
 
-> **Two record months** · Standard · Telecom Space (`la-telecom`) · commissions on SIMs nobody used · 4 min 45 s
+> **Two record months** · Standard · Telecom Space (`la-telecom`) · commissions on SIMs nobody used · 4 min 30 s
 
-- **Cast:** the dealer (DL-112), its single shop (POS-0008), three activation devices (DEV-00204 to DEV-00206), four hundred SIMs.
+- **Cast:** the dealer (DL-112), its single shop (POS-0008), activation devices, four hundred SIMs; readable ids.
   **Decoy:** a campus dealer (DL-163) with a record month of its own: 350 SIMs topped up at ten shops and used every month.
 - **Stakes:** the investigator audits dealer commissions, which are paid for each SIM activated. A record month is good news, so a
   report of activations cannot separate the dealer who earned it from the one who manufactured it.
-- **Vocabulary:** *commission* ("a payment per SIM activated"); *top-up* ("credit added to a prepaid number"). Defined in S01.
+- **Vocabulary:** *commission* ("a payment per SIM activated"); *top-up* ("credit added to a prepaid number"). Defined in S01 and S02.
 - **Ground truth:** `tools/gen-la-telco-ra-data.ground-truth.json`, key `dealer_commission_fraud` and
-  `stories.dealer_commission_fraud` (view `dealer_commission_fraud`): dealer DL-112; devices DEV-00204, DEV-00205, DEV-00206;
-  shop `POS-0008`; 400 subscribers; weeks 2026-02-02 to 2026-03-09 (six weeks); lookalike dealer DL-163 with 350 subscribers
-  and ten campus shops (`campus_pos`). From `gen-la-telco-ra-data.py` lines 234-260 and 358-359: each fraud SIM has exactly one
-  top-up of 5.00 at POS-0008 within two days of activation and one usage month; each DL-163 SIM tops up at campus shops
-  (amounts 10 or 20) with at least six top-ups and thirteen usage months. The plan's table said "the top-selling dealer vs the
-  dealer whose SIMs are never used": the data says the decoy is the *other record-month dealer* (DL-163), not a quiet one.
-- **Screen truth:** saved view *Dealer commission fraud*: two large hairballs, no masking counter (readable ids), labels on hover
-  above 1 000 links; Busiest nodes names DL-112, POS-0008 and DL-163. The Investigations in this Space are *SIM-swap wallet takeover*
-  and *Unbilled usage at one dealer* (another story), so the film does not open one.
-- **Before:** Standard build, Telecom Space from a fresh unzip, Demo Analyst; the film saves one Investigation from DL-112 (the
-  F2 steps) in S08; a re-recording needs a fresh unzip.
-- **Lead:** one dealer's commissions to audit, with four hundred SIMs, three devices and one shop as the evidence. *What would
-  change our mind:* if the SIMs were topped up at many shops and used every month, as DL-163's are, the spike would be
-  honest demand. *Next actions:* hold the dealer's commission; send the three devices and the shop to the dealer-audit team;
-  keep the SIMs as an Entity List and compare other dealers against the same shape.
-- **Try it / Check:** *Try it:* press Busiest nodes, start from the dealer with the matching shop, and count the devices. *Check:*
-  why is the second record-month dealer not suspect? *Answer: its SIMs top up at ten shops and are used every month; the
-  suspect's SIMs top up once, at its own shop, and are never used again.*
+  `stories.dealer_commission_fraud` (view `dealer_commission_fraud`): dealer DL-112; shop `POS-0008`; 400 subscribers; weeks
+  2026-02-02 to 2026-03-09 (six weeks); lookalike dealer DL-163 with 350 subscribers and ten campus shops (`campus_pos`). From
+  `gen-la-telco-ra-data.py` lines 234-260 and 358-359: each fraud SIM has exactly one top-up of 5.00 at POS-0008 within two days
+  of activation and one usage month; each DL-163 SIM tops up at campus shops (amounts 10 or 20) with at least six top-ups and
+  thirteen usage months. The plan's table said "the top-selling dealer vs the dealer whose SIMs are never used": the data says
+  the decoy is the *other record-month dealer* (DL-163).
+- **Screen truth (checked live 2026-11-22, Standard, Demo Analyst):** saved view *Dealer commission fraud*: two large clusters
+  (about 400 and 350 SIMs around a dealer each), no masking line, labels off ("node labels off above 80 nodes"). Busiest nodes
+  lists DL-112 (400 links, the most), POS-0008 (400), DL-163 (350), then two devices with 188 and 162 links. Start from these on a
+  dealer draws 1 entity and its linked SIMs in one star (400 for DL-112, 350 for DL-163), with the link kind `activated_by` in the
+  Rows table. The view reads `telco_ra_screen_links_dataset`. The Data page lists 20 streams, the first `agent_commission_dataset`.
+  This film does not open or save an Investigation.
+- **Before:** Standard build, Telecom Space from a fresh unzip, Demo Analyst; nothing is saved.
+- **Lead:** one dealer's commissions to audit, with four hundred SIMs and one shop as the evidence. *What would change our mind:*
+  if the SIMs were topped up at many shops and used every month, as DL-163's are, the spike would be honest demand. *Next actions:*
+  hold the dealer's commission; send the shop and its devices to the dealer-audit team; compare other dealers against the same shape.
+- **Try it / Check:** *Try it:* press Busiest nodes, start from the dealer with the matching shop, and open the Rows table. *Check:*
+  why is the second record-month dealer not suspect? *Answer: its SIMs top up at ten shops and are used every month; the suspect's SIMs
+  top up once, at its own shop, and are never used again.*
 
 ### S01 · Cold open · ~25 s
-- Voice: Two dealers had a record month. Dealers are paid commission for every SIM they activate, so a record month is a good month. [pause 0.6] One of them earned it. The other found a way to manufacture it. A report of activations cannot tell them apart.
-- Chip: none
-- Action: cold open over the Telecom Space home page; at 0:20 the intro card ("Case file · Two record months · Telecom · Standard").
+- Voice: Two dealers had a record month. Dealers are paid commission for every SIM they activate, so a record month is a good month. [pause 0.6] One of them earned it. The other found a way to manufacture it, and a report of activations cannot tell them apart.
+- Action: cold open over the Telecom Space home page.
 - Impact: none.
 
 ### S02 · A spike looks the same · ~30 s
-- Voice: In the commission report, both dealers are a spike of new SIMs. Each SIM has an activation, a dealer, a device and, for real customers, a top-up and some use. [pause 0.5] The report counts the activations. It does not ask who paid for them, or whether anyone used them. Those answers live in the links.
-- Chip: none
-- Action: story card "Who is who": *a dealer*, *a shop*, *a device*, *a SIM*; the saved view opens behind it.
+- Beat: steady
+- Intro: Two record months | Telecom Space
+- Story: a dealer = paid commission per activated SIM | a shop = where a SIM is topped up | a device = the phone that activates SIMs
+- Voice: In the commission report, both dealers are a spike of new SIMs. Each SIM has an activation, a dealer and a device, and for a real customer a top-up and some use. [pause 0.5] The report counts the activations. It does not ask who paid for them, or whether anyone used them, and those answers live in the links.
+- Action: intro card, then the story card "Who is who"; the saved view opens behind it.
 - Impact: the story card names the roles.
 
 ### S03 · From subscribers to links · ~30 s
-- Voice: Each subscriber is a record: the number, the SIM, the dealer who activated it, when, the plan, and the device. [pause 0.4] A Job reads each one into links: a SIM to its dealer, to its device, and to the shop where it was topped up. Numbers, dealers, devices and shops are all entities.
-- Chip: Data · Mappings
-- Action: rail Data ▸ the dealer Dataset ▸ zoom on Mappings. [check in UI: the Dataset name and the link kinds dealer, device and shop]
-- Impact: mark the three link kinds.
+- Voice: Each subscriber is a record: the number, the SIM, the dealer who activated it, when, the plan and the device. [pause 0.4] A Job reads each one into links, from a SIM to its dealer, its device and the shop where it was topped up. Numbers, dealers, devices and shops are all entities, and the Data page lists every Dataset they land in.
+- Chip: Data
+- Action: rail Data ▸ hold on the list of Datasets (Search finds the one the view reads, `telco_ra_screen_links_dataset`).
+- Impact: mark the first Dataset card.
 
 ### S04 · Two giants · ~35 s
-- Voice: The saved view draws dealers, their SIMs, the devices and the shops that topped them up. Two dealers tower over it, each with hundreds of SIMs. [pause 0.5] It is too much to read, and both look alike. Ask a question.
+- Voice: The saved view draws dealers and their SIMs. Two dealers tower over it, each with hundreds of SIMs around it. [pause 0.5] It is too much to read, and both look alike. Ask a question.
 - Chip: Saved views
-- Action: open the saved view *Dealer commission fraud* ▸ hold on the two clusters. [check in UI: two clusters, labels on hover]
-- Impact: no mark; the two clusters are the picture.
+- Action: open the saved view *Dealer commission fraud* ▸ hold on the two clusters.
+- Impact: none; the two clusters are the picture.
 
-### S05 · First sweep: a dealer and a shop · ~45 s
-- Voice: Busiest nodes. [pause 0.4] A dealer with four hundred links. And a shop with exactly four hundred too. The second dealer has three hundred and fifty, and no shop anywhere near that. A dealer and one shop with the same number is not how a market looks. It is how a loop looks.
+### S05 · First sweep: a dealer and a shop · ~42 s
+- Voice: Busiest nodes. [pause 0.4] A dealer with four hundred links, and a shop with exactly four hundred too. The second dealer has three hundred and fifty, and no shop anywhere near that. [pause 0.4] A dealer and one shop with the same number is not how a market looks. It is how a loop looks.
 - Chip: Busiest nodes
-- Action: Busiest nodes ▸ hold on DL-112 (400), POS-0008 (400), DL-163 (350). [check in UI: the three rows]
-- Impact: yellow on DL-112 and POS-0008; DL-163 marked for the next scene.
+- Action: Busiest nodes ▸ hold on DL-112 (400), POS-0008 (400), DL-163 (350).
+- Impact: yellow on DL-112 and POS-0008; grey "ruled out" on DL-163.
 
-### S06 · The campus dealer · ~40 s
-- Voice: Start from the second dealer first. Its SIMs are topped up at ten different shops, every month, and used every month. A student campus. Real people. [pause 0.5] That is what an earned record month looks like. Set it aside, and keep it as the yardstick.
+### S06 · The campus dealer · ~38 s
+- Voice: Start from the second dealer first. The graph draws its three hundred and fifty SIMs in one wheel. [pause 0.5] Its SIMs are topped up at ten different shops, every month, and used every month. A student campus. Real people. That is what an earned record month looks like, so set it aside and keep it as the yardstick.
 - Chip: Start from these
-- Action: Busiest nodes ▸ DL-163 ▸ Start from these ▸ hold on the ten shops. [check in UI: the ten campus shops around the dealer]
-- Impact: grey "ruled out" marker on the dealer; mark the ten shops.
+- Action: Busiest nodes ▸ DL-163 ▸ Start from these ▸ hold on the wheel.
+- Impact: before/after hold: the wheel appears; grey "ruled out" on the dealer.
 
-### S07 · Four hundred SIMs, one shop · ~50 s
-- Voice: Now start from the dealer with the matching shop. Four hundred SIMs, every one activated by this dealer, from just three devices, in six weeks. [pause 0.5] Each SIM was topped up once, with five, at the dealer's own shop, and never used again. Nobody was meant to use these SIMs. They exist to be counted.
+### S07 · Four hundred SIMs, one shop · ~42 s
+- Voice: Now start from the dealer with the matching shop. Four hundred SIMs, every one activated by this dealer, in six weeks. [pause 0.5] Open the table under the graph. Every line is a SIM, activated by the dealer. Each was topped up once, with five, at the dealer's own shop, and never used again. Nobody was meant to use these SIMs. They exist to be counted.
 - Chip: Start from these · Rows
-- Action: Busiest nodes ▸ DL-112 ▸ Start from these ▸ hold on the three devices and the shop ▸ dock ▸ Rows ▸ hold on a few rows. [check in UI: three devices, one shop, the top-up amount 5.00 in the rows]
-- Impact: before/after hold: the three devices and the shop appear; mark them.
+- Action: Busiest nodes ▸ DL-112 ▸ Start from these ▸ hold ▸ dock ▸ Rows ▸ hold on the rows (`activated_by`).
+- Impact: before/after hold: the wheel of 400 appears; mark the Link kind column.
 
-### S08 · Evidence, saved · ~45 s
-- Voice: Every activation is a row: the SIM, the dealer, the device. [pause 0.5] To keep the work, save it as an Investigation. Start from the dealer, and save it with a purpose: commissions on SIMs that were never used. Now the steps are recorded, and an auditor can open them.
-- Chip: Investigation · Save…
-- Action: Investigation tab ▸ Start from One entity ▸ Dataset ▸ Entity Type ▸ `DL-112` ▸ Start ▸ Save… ▸ name and purpose ▸ Save (the F2 steps). [check in UI: the Dataset and entity type names for dealers]
-- Impact: mark the saved-name header and the first step row.
+### S08 · Evidence you can keep · ~38 s
+- Voice: Every activation is a row: the SIM, the link kind, the dealer. [pause 0.5] To keep the work, you would save it as an Investigation. The Investigation tab already holds the dealer as the first step, and asks for a purpose: commissions on SIMs that were never used. Then every step is recorded, and an auditor can open it. We leave it unsaved here.
+- Chip: Investigation
+- Action: toolbox ▸ Investigation tab ▸ hold on Name, Purpose and the queued start entity `DL-112`; do not save.
+- Impact: mark the Purpose field and the queued entity.
 
-### S09 · What the team does next · ~40 s
-- Voice: The lead: one dealer's commissions to audit. [pause 0.5] Hold the payment. Send the three devices and the shop to the dealer-audit team. Keep the SIMs as an Entity List, and compare every other dealer against this shape: many SIMs, one shop, no use.
-- Chip: Entity Lists · Add to a list
-- Action: Busiest nodes or the table ▸ Add to a list ▸ choose an Entity List (or point at *Add to a list* without pressing). [check in UI: whether a suitable list exists in this Space; do not create one]
-- Impact: mark Add to a list.
+### S09 · What the team does next · ~38 s
+- Voice: The lead: one dealer, four hundred SIMs and one shop. [pause 0.5] The audit team holds the dealer's commission today. The shop and its devices go to the dealer-audit team. And the same shape, many activations, one top-up, no use, is checked for every other dealer.
+- Chip: Busiest nodes
+- Action: hold on the Busiest nodes answer.
+- Impact: mark DL-112 and POS-0008.
 
-### S10 · The case file · ~25 s
-- Voice: The case file. Lead: one dealer, one shop, three devices. Evidence: four hundred SIMs topped up once and never used, in six weeks. Next step: hold, audit, compare. [pause 0.6] In the commission report both dealers are a spike. The links show who paid for them. The same steps run on millions of records and answer in moments. Try it: start from the dealer with the matching shop and count the devices.
-- Chip: none
-- Action: case-file card (8 s) and the outro "Next: Recorded clean-up and scope · training F3".
+### S10 · The case file · ~28 s
+- Casefile: Lead: one dealer, one shop, four hundred SIMs | Evidence: every SIM activated by the dealer, topped up once at its own shop, never used again | Next: hold the commission; audit the shop and its devices; compare every other dealer against the same shape | Try it: press Busiest nodes and start from the dealer with the matching shop
+- Voice: The case file. Lead: one dealer, one shop, four hundred SIMs. Evidence: every SIM activated by the dealer, topped up once at its own shop, never used again. Next step: hold the commission, audit the shop, compare the other dealers. [pause 0.6] A record month looked the same for both dealers; only the links told them apart. The same steps run on millions of records and answer in moments. Try it: start from the dealer with the matching shop.
+- Action: case-file card (8 s) and the outro "Next: Evidence, Dossier and the sealed bundle · training F8".
 - Impact: none.
+
+---

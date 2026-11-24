@@ -1077,6 +1077,56 @@ class PipelineJobRunnerTest {
                 readColumn(dataDir, "joined", "region"));
     }
 
+    /**
+     * LOOKUP-1 §4.6 end to end: a keyed join's run stores its unmatched-key sample under the receipts' Pipeline name,
+     * fingerprinted with the Space salt — never the value.
+     */
+    @Test
+    void aKeyedJoinRunStoresItsUnmatchedSampleFingerprinted() throws Exception {
+        String dataDir = tmp.resolve("data").toString();
+        Path dim = tmp.resolve("region_dim.parquet");
+        seedDim(dim, "(1,'EMEA'),(2,'APAC')");
+        Path flat = tmp.resolve("k1_pipeline.toon");
+        Files.writeString(flat, """
+                name: k1_etl
+                active: false
+                output_store: joined
+                dirs:
+                  poll: %s
+                  database: %s
+                processing:
+                  threads: 1
+                steps[1]:
+                  - join:
+                      reference: %s
+                      key: id
+                      on[1]: id
+                      columns[1]: region
+                """.formatted(tmp.resolve("in").toString().replace("\\", "/"),   // the Space salt lands under tmp
+                tmp.resolve("out").toString().replace("\\", "/"), dim.toString().replace("\\", "/")));
+        seedParquet(dataDir, "k1_etl", "(1,150),(2,50),(3,200),(3,10)");
+        try (com.gamma.consignment.DbConsignmentOutputStore store =
+                     com.gamma.consignment.DbConsignmentOutputStore.open("jdbc:duckdb:")) {
+            com.gamma.consignment.ConsignmentOutputStores.use(store);
+            JobConfig cfg = new JobConfig("k1", JobType.PIPELINE, null, null, true, false,
+                    Map.of("pipeline_config", flat.toString(), "data_dir", dataDir));
+            JobResult res = new PipelineJobRunner(cfg, new ConsignmentEventBus(), null, dataDir,
+                    tmp.resolve("audit").toString()).run();
+            assertTrue(res.success(), res.message());
+
+            String consignment = store.latestStep("k1_etl_stage2", "join").orElseThrow().consignmentId();
+            var sample = store.lookupMisses("k1_etl_stage2", "join", consignment);
+            assertEquals(1, sample.size(), sample.toString());
+            assertEquals("id", sample.get(0).mapping());
+            assertEquals(2, sample.get(0).n(), "id 3 twice");
+            assertEquals(com.gamma.etl.FailureText.fingerprint(com.gamma.etl.PipelineConfig.load(flat.toString()), "3"),
+                    sample.get(0).fingerprint());
+            assertEquals("•", sample.get(0).shape(), "a 1-character value is fully masked");
+        } finally {
+            com.gamma.consignment.ConsignmentOutputStores.use(null);
+        }
+    }
+
     /** A by-name reference (reference/<pipeline>) resolves through the loaded-pipeline context. */
     @Test
     void aStageTwoJoinResolvesAByNameReferenceFromThePipelineContext() throws Exception {

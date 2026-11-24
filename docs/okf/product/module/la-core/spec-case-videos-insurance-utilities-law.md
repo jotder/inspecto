@@ -35,275 +35,300 @@ code: la/inspecto-la-core
 ## Insurance_ClaimantRing
 
 > **A staged-accident ring: twelve claimants, one passenger, one garage, one clinic, one lawyer** · Standard · Insurance
-> Space (`la-insurance`) · saved view `claimant_ring_shared_identity` · 4:45
+> Space (`la-insurance`) · saved view `claimant_ring_shared_identity` · about 4 min
 
-- **Cast:** the repeat passenger (CL-0134, an alias for the analyst), the lawyer LAW-02, the garage GAR-03, the clinic
-  CLI-04. **Decoys:** the family of four on one phone and one address (two claims in 18 months) and the busy general
-  practice CLI-01.
+- **Cast:** the repeat passenger, the lawyer LAW-02, the garage GAR-03, the clinic CLI-04 (named in the case data; every claimant
+  id shows as an alias for the analyst). **Decoys:** the family of four on one phone and one address (two claims in 18 months) and
+  the busy general practice CLI-01.
 - **Stakes:** a counter-fraud analyst at an insurer with a week to decide whether nine small files are one story. Each
   claim pays out; each is plausible; the loss is the nine payments and the ninth file's successor.
-- **Vocabulary:** *staged accident* (a crash arranged for the payout), defined once in S02. *Passenger* is a claim role.
+- **Vocabulary:** *staged accident* (a crash arranged for the payout), defined once in S02.
 - **Ground truth:** `tools/gen-la-claims-data.py` header (stories 1, 2, 3, 4, 7): 12 claimants over 9 claims share 4
-  phones and 3 addresses; one garage `GAR-03`, one clinic `CLI-04`, one lawyer `LAW-02`; one ring member is the
-  passenger on 6 of the claims with 6 different drivers in under 7 months; 11 accidents within 400 m of one junction at
-  02:00–04:00, none with a police report; `CLI-04` bills about 3.4 times its peers and is referred to only by
-  `LAW-02`; benign look-alikes: the family of four and the busy clinic `CLI-01`. The plan table said "one witness and one
-  phone": **corrected** (the data has one passenger, a phone and address share, and a garage, clinic and lawyer in
-  common). v1's "twenty links to fourteen people and firms" for CL-0134 is not in the generator header
-  [check in UI: the node's link count].
-- **Before:** fresh unzip of `la-standard.zip`, Insurance Space, signed in as Demo Analyst, no Investigation open; start on
-  the saved view; claimant ids are masked (say so, use roles).
+  phones and 3 addresses; one garage `GAR-03`, one clinic `CLI-04`, one lawyer `LAW-02`; one ring member is the passenger on 6 of
+  the claims with 6 different drivers in under 7 months; `CLI-04` bills about 3.4 times its peers and is referred to only by
+  `LAW-02`; benign look-alikes: the family of four and the busy clinic `CLI-01`. **Checked live 2026-11-23 (fresh Standard
+  unzip):** the saved view draws about two hundred claimants with the lines *227 entities masked* (with a greyed Reveal…) and
+  *node labels off above 80 nodes*; two yellow-linked groups stand out, a small one of four at the lower left (the household) and
+  a larger one at the bottom (the ring); Busiest nodes names five aliases with 9, 8, 8, 7 and 7 links, so counting does not
+  pick the ring out; the busiest alias sits in the central tangle, in neither group; *Start from these* on it draws it with 18
+  linked nodes (links *same_accident* and *claimed_with*); the Insurance Space holds nine Datasets, among them
+  *claims_links_dataset*; the Entity Lists page already holds *Ring claimants* (Watch these, Party, 12 members) and *Ring
+  providers* (3 members). **What the analyst cannot do here:** reveal the aliases (Needs See unmasked ids), so the passenger and
+  the providers are described from the case data, not named on screen.
+- **Before:** Standard, la-insurance, Demo Analyst, no Investigation open; the film changes no state and never presses the
+  Investigation Start button.
 - **Lead:** one ring of twelve claimants on nine claims, to refer to the special investigations unit.
-  **What would change our mind:** if the garage repaired most claims in the district the shared garage would mean little
-  [check in generator: all nine ring claims name `GAR-03` and the other eight garages see none of them].
-  **Next actions:** refer the nine files together; keep the twelve as the Entity List *Ring claimants*; watch for the next
-  claim that names the same garage, clinic and lawyer.
-- **Voice style:** cold open 1.04 / 0.45 s; the S07 reveal holds 0.7 s before its second sentence; the close 0.96.
-  Lexicon: the passenger's id is never spoken (masked); providers are said as "the garage", "the clinic", "the lawyer",
-  with ids only in the chip and marks.
-- **Try it:** open the saved view and say which of the two yellow groups is the household, and why. **Check:** can the
-  claim form show this ring? *Answer: no. Each claim is clean on its own; only the shared phones, addresses and the
-  garage, clinic and lawyer across claims show it.*
+  **What would change our mind:** if the garage repaired most claims in the district the shared garage would mean little.
+  **Next actions:** refer the nine files together; keep the twelve as the Entity List *Ring claimants*; watch for the next claim
+  that names the same garage, clinic and lawyer.
+- **Voice style:** the passenger's id is never spoken (masked); providers are said as "the garage", "the clinic", "the lawyer".
+- **Try it:** open the saved view and say which of the two yellow groups is the household, and why. **Check:** can the claim form
+  show this ring? *Answer: no. Each claim is clean on its own; only the shared phones, addresses and the garage, clinic and lawyer
+  across claims show it.*
 
-### S01 · Cold open  ~20 s
+### S01 · Cold open · ~20 s
 - Voice: A claims handler opens the ninth file in seven months from the same dark junction. [pause 0.4] A minor collision. A sore neck. A repair bill. Every file passes every check. [pause 0.6] Counter-fraud has a week to decide whether these nine files are one story.
-- Chip: none (title over the first frame of the saved view, blurred).
-- Action: still of the saved view under a soft blur; the story card appears: *the passenger · the garage · the lawyer*.
+- Action: cold open over the Insurance Space's home page; the intro card opens the next scene.
 - Impact: none.
 
-### S02 · Why the usual checks miss it  ~30 s
-- Voice: Each claim is small. Each claimant has a clean record, a real address and a real phone. Each garage invoice is plausible. [pause 0.4] Checks read one claim at a time. A staged accident, a crash arranged for the payout, only shows when claims are read together. [pause 0.4] So what do these claimants share that the claim form never asks about?
-- Chip: none.
-- Action: intro card (case title, Insurance Space, *Standard*, teal-violet bar); then the saved view fades in.
-- Impact: none.
+### S02 · Why the usual checks miss it · ~30 s
+- Beat: steady
+- Intro: A staged-accident ring | Insurance Space
+- Story: a staged accident = a crash arranged for the payout | a passenger = a claim role | a ring = people who share more than chance allows
+- Voice: Each claim is small. Each claimant has a clean record, a real address and a real phone. Each garage invoice is plausible. [pause 0.4] Checks read one claim at a time. A staged accident is a crash arranged for the payout, and it only shows when claims are read together. [pause 0.4] So what do these claimants share that the claim form never asks about?
+- Action: story card "Who is who" over the home page.
+- Impact: the story card names the three terms.
 
-### S03 · The data, in one breath  ~30 s
-- Voice: Every claim party lands as one record: the person, the role, a phone, an address, and the garage, clinic and lawyer on the claim. [pause 0.4] A Job turns sameness into links. People who share a phone. People who share an address. Everyone who shares a claim. Both ends of a link are entities, and the kind of link keeps its name.
-- Chip: Data · Mappings
-- Action: rail ▸ Data ▸ `claims_links_dataset` ▸ zoom on the Mappings area. [check in UI: the Mappings area names the from and to columns]
-- Impact: mark the from and to columns once, as the voice says "both ends".
+### S03 · The data, in one breath · ~30 s
+- Voice: Every claim party lands as a record: the person, the role, a phone, an address, and the garage, clinic and lawyer on the claim. [pause 0.4] A Job turns sameness into links. People who share a phone. People who share an address. People who share a claim.
+- Chip: Data · Columns
+- Action: rail Data ▸ the Dataset *claims_links_dataset* ▸ hold on its Columns card. `[check in UI: the Columns card of claims_links_dataset]`
+- Impact: mark the Columns card.
 
-### S04 · The question  ~35 s
-- Voice: Open the saved view Claimant ring shared identity. Claimants are joined when they share a phone or an address. [pause 0.4] The names read as aliases, because this Space hides claimant ids from the analyst. The shape is what matters. Two small groups stand out, drawn with yellow links. One is a family. One is not.
-- Chip: File · Open… · Saved views
-- Action: File ▸ Open… ▸ Saved views ▸ *Claimant ring shared identity* ▸ Open ▸ hold. [check in UI: the two yellow groups at lower left and bottom of the canvas; the line "N entities masked"]
-- Impact: computed impact on the open; mark both yellow groups; hold on the line "entities masked · Reveal…".
+### S04 · The saved view · ~35 s
+- Story: off
+- Voice: Open the saved view Claimant ring shared identity. Claimants are joined when they share a phone or an address. [pause 0.4] The names read as aliases, two hundred and twenty-seven of them, because this Space hides claimant ids from the analyst. The shape is what matters. Two small groups stand out, drawn with yellow links. One is a family. One is not.
+- Chip: Saved views
+- Action: open the saved view *Claimant ring shared identity* ▸ hold on the line at the bottom. `[checked live: 227 entities masked, with a greyed Reveal…]`
+- Impact: marks on the two yellow groups: the household (lower left) and the larger group (bottom).
 
-### S05 · First sweep, and the decoy  ~45 s
-- Voice: First question: who has the most links? Press Busiest nodes. [pause 0.4] Seven to nine links each, for a handful of claimants. Nobody stands out, so counting will not find this ring. [pause 0.5] Now the two groups. Four people on one phone and one address, with two claims in eighteen months. That is a household. And the busy clinic beside them treats half the town. Both are ordinary. Set them aside.
+### S05 · First sweep, and the decoy · ~45 s
+- Voice: First question: who has the most links? Press Busiest nodes. [pause 0.4] Nine, eight, eight, seven and seven links. Nobody stands out, so counting will not find this ring. [pause 0.5] Now the two groups. Four people on one phone and one address, with two claims in eighteen months. That is a household, and it is ordinary. Set it aside.
 - Chip: Busiest nodes
-- Action: toolbox ▸ On screen ▸ Busiest nodes ▸ hold on the answer; then point at the four-person group and at the clinic. [check in UI: whether the family group sits at the left and the clinic is readable]
-- Impact: grey *ruled out* marks on the family group and the clinic; the answer list is held 3 s.
+- Action: toolbox ▸ On screen ▸ Busiest nodes ▸ hold on the answer. `[checked live: 9, 8, 8, 7, 7 links]`
+- Impact: grey *ruled out* mark on the household group; the answer list held.
 
-### S06 · Follow one claimant  ~40 s
-- Voice: Now start from the claimant who appears on the most claims. In the Investigation tab, choose Start from, one entity, and pick the Dataset. [pause 0.4] Before anything is drawn, the product tells you what it knows: how many links, and when it was first and last seen.
-- Chip: Investigation · Start from · One entity
-- Action: Investigation tab ▸ Start from *One entity* ▸ Dataset `claims_links_dataset` ▸ the claimant id ▸ hold on the preview line. [check in UI: a masked Space may refuse a typed raw id; if so start from the Entity List *Ring claimants* ▸ Start, and say "start from the kept list" in the voice]
-- Impact: mark the preview line "links · first seen · last seen".
+### S06 · Follow one claimant · ~40 s
+- Voice: Start from the busiest claimant. Press Start from these. [pause 0.4] The notice reads: started from the busiest node, one entity and eighteen linked nodes. Nothing is created yet. This is a first look, and it can be undone.
+- Chip: Start from these
+- Action: Busiest nodes ▸ first row ▸ *Start from these*. `[checked live: Started from masked:…, the busiest node. Drew 1 entity and 18 linked nodes; the Investigation tab shows it as a queued start entity]`
+- Impact: before/after hold: the single claimant with its eighteen neighbours.
 
-### S07 · The reveal  ~40 s
-- Voice: There. One claimant, a passenger, on six claims in under seven months. [pause 0.4] Six different drivers. [pause 0.7] Around them, four phones and three addresses shared by twelve people. And on every one of the nine claims, the same garage, the same clinic, the same lawyer.
-- Chip: Start · Select neighbours
-- Action: Start ▸ wait for the draw ▸ Display options: labels on ▸ hover the passenger, the garage, the clinic, the lawyer in turn. [check in UI: providers are readable ids]
-- Impact: computed impact on Start; yellow marks on the passenger and the three providers; the story card is replaced by the marks.
-
-### S08 · Evidence you can defend  ~40 s
-- Voice: Open the table under the graph. Each shared phone, each shared address, each repair line is a row you can read, sort and filter. [pause 0.4] Sort by date and the six passenger claims fall inside seven months. The clinic bills about three times its peers, and takes referrals from one lawyer only. [pause 0.6] What would change this? If that garage repaired most of the district, sharing it would mean little. It repairs none of the other claims.
+### S07 · Every line is a row · ~40 s
+- Voice: Open the table. Each line is a row: a claimant, the kind of link, and another claimant. Two kinds appear here. Same accident, and claimed with. [pause 0.4] Each row can be read, sorted and quoted. The ring is read the same way: shared phones, shared addresses and shared claims.
 - Chip: Rows
-- Action: dock ▸ Rows ▸ sort by date ▸ hold on the six passenger rows. [check in UI: the Rows columns and that the date column sorts]
-- Impact: mark the six rows; hold the table 3 s.
+- Action: dock ▸ Rows ▸ hold on the first rows. `[checked live: same_accident and claimed_with rows between aliases]`
+- Impact: mark the link kind column.
 
-### S09 · What the team does next  ~40 s
-- Voice: The lead is one ring: twelve claimants on nine claims, to refer to the special investigations unit. [pause 0.5] Three things on Monday. Refer the nine files together, not one by one. Keep the twelve as an Entity List, so every graph in this Space marks them. And watch for the next claim that names the same garage, clinic and lawyer.
+### S08 · What the case data says · ~35 s
+- Voice: The aliases hide who is who, and this analyst cannot reveal them. So read what the case data says about the large group. Twelve claimants over nine claims, sharing four phones and three addresses. One of them is the passenger on six of the claims, with six different drivers in under seven months. [pause 0.7] And on every claim, the same garage, the same clinic, the same lawyer.
+- Action: hold on the Rows table while the voice runs.
+- Impact: none.
+
+### S09 · The lead, and what would change it · ~40 s
+- Voice: Twelve claimants on nine claims, with one garage, one clinic and one lawyer in common. It is a lead. [pause 0.5] It weakens if that garage repaired most of the claims in the district, because then a shared garage would mean little. That can be checked.
+- Action: close the dock; hold while the voice runs.
+- Impact: none.
+
+### S10 · Monday morning · ~35 s
+- Voice: Refer the nine files together to the special investigations unit. [pause 0.4] This Space already keeps the twelve as an Entity List, Ring claimants, and the three providers as Ring providers, so every graph marks them. Watch for the next claim that names the same garage, clinic and lawyer.
 - Chip: Entity Lists
-- Action: rail ▸ Entity Lists ▸ *Ring claimants* ▸ hold on its members. [check in UI: the list exists and holds twelve members]
-- Impact: mark the list name and its member count.
+- Action: rail Entity Lists ▸ hold on *Ring claimants* and *Ring providers*. `[checked live: Watch these, Party, 12 members and 3 members]`
+- Impact: mark the two list rows.
 
-### S10 · The case file  ~25 s
-- Voice: That is the case file. [pause 0.4] Lead: one ring. Evidence: shared phones and addresses, and one garage, clinic and lawyer, each a row. Next: refer, list, watch. To make a finding like this one defensible for a team, watch Make it defensible. Try it: say which yellow group is the household, and why.
-- Chip: none.
-- Action: case-file card (*Lead · Evidence · Next step · Try it*), 8 s; outro with the link to the shared module and to training episode F8.
+### S11 · Case file · ~25 s
+- Casefile: Lead: a ring of twelve claimants on nine claims | Evidence: the shared phones, addresses and providers across the claims | Next: refer the nine files together; keep the twelve as an Entity List; watch for the same garage, clinic and lawyer | Try it: say which yellow group is the household, and why
+- Voice: The case file. The lead: a ring of twelve. The evidence: what the claims share. Next: refer, keep, watch. [pause 0.6] Your turn. Which yellow group is the household, and why?
+- Action: case-file card and outro.
 - Impact: none.
 
 ## Utilities_MeterTampering
 
 > **Twenty-two meters read low and the transformers do not: one contractor's visits come first** · Standard · Utilities
-> Space (`la-utilities`) · saved view `meter_tampering_contractor` · 4:50
+> Space (`la-utilities`) · saved view `meter_tampering_contractor` · about 4 min
 
 - **Cast:** the contractor C-14, the transformers TX-007 and TX-019, the premises between them. **Decoy:** the busiest
-  contractor C-27. **Near-miss:** PRM-0737, visited by C-14 under the same transformers, whose reads did not fall.
+  contractor C-27. **Near-miss:** the one premise C-14 visited under the same transformers whose reads did not fall (PRM-0737).
 - **Stakes:** a revenue-protection analyst at a distribution company; the power is delivered, less of it is billed.
 - **Vocabulary:** *transformer* (the substation unit that feeds a group of premises), *read* (a meter reading), defined once
   in S02.
 - **Ground truth:** `tools/gen-la-utility-data.ground-truth.json`, key `stories.meter_tampering`: hub `C-14`, 22 premises,
-  transformers `TX-007` and `TX-019`, look-alike `PRM-0773`; `tools/gen-la-utility-data.py` (lines 13 and 170): a C-14
-  visit, then a 40–70 % drop 2–14 days later, supply flat, three of the visits joint with `C-22`. v1's "C-27 with a
-  hundred and sixty-four links" and "C-14 thirty-six premises, twenty-three under the two transformers" are data counts
-  taken from the Space (training episode F3 notes C-27 at 157 premises) [check in UI: C-27's link count and C-14's 36
-  premises]. The plan table (*the busiest contractor C-27 vs …*) is **confirmed**.
-- **Before:** fresh unzip of `la-standard.zip`, Utilities Space, Demo Analyst, saved view, labels off above 80 nodes
-  (Display options turns them on); **do not open the Investigation** *Meter tampering after one contractor's visits*
-  until the Space is reseeded.
+  transformers `TX-007` and `TX-019`; `tools/gen-la-utility-data.py` (lines 13 and 170): a C-14 visit, then a 40–70 % drop
+  2–14 days later, supply flat, three of the visits joint with `C-22`. **Checked live 2026-11-23 (fresh Standard unzip):** the
+  saved view draws about five hundred premises, contractors and transformers with the caption *node labels off above 80 nodes*;
+  Busiest nodes names **C-27 first with 165 links**, then C-21 (93), C-18 (84), C-25 (73) and C-01 (47); *Start from these* on
+  C-27 draws it with 157 linked nodes; the Start-from form on the Investigation tab shows, for a typed C-14, **36 links, first
+  seen 13 October 2025, last seen 30 August 2026**; **pressing Start there is refused with a notice that the start's ring needs a
+  second person's approval, so it cannot run unsaved** (Save first: start from the whole Dataset, Save, then start from the
+  selected entities), so the film shows the preview and the notice and does not start the Investigation; the Dataset
+  *utility_links_dataset* holds src and dst (Entity, Utility entity), kind (Category: supplied_by, account_at, paid_from,
+  visited_by, order_closed_by, vended_by), amount (Measure), kwh and via (Detail), ts and event_date (Time); the Entity Lists page
+  already holds *Tampered premises* (Watch these, Utility entity, 22 members) and *Revenue-protection watch* (3 members).
+  **The 23 premises under the two transformers, the 22 drops and the near-miss are stated from the case data, not drawn.**
+- **Before:** fresh unzip of `la-standard.zip`, Utilities Space, Demo Analyst; saved view and Investigation tab only; **do not
+  open the Investigation** *Meter tampering after one contractor's visits* (a saved Investigation, polluted by earlier
+  recordings); the film changes no state.
 - **Lead:** one contractor to question and 22 premises to inspect. **What would change our mind:** the drops coming
-  before the visits, or the transformers losing supply; PRM-0737 is the premise that keeps the lead honest.
-  **Next actions:** inspect the 22 meters, largest drop first; question C-14, starting with the three visits joint with
-  C-22; keep the premises as the Entity List *Tampered premises* and watch new visits.
-- **Voice style:** ids spoken by the lexicon (C-14 "see fourteen", TX-007 "tee ex oh oh seven"); figures said once,
-  rounded ("forty to seventy percent"); pace defaults.
+  before the visits, or the transformers losing supply; the one visited premise whose reads did not fall keeps the lead honest.
+  **Next actions:** inspect the 22 meters, largest drop first; question C-14, starting with the three visits joint with C-22;
+  keep the premises as the Entity List *Tampered premises* and watch new visits.
+- **Voice style:** ids by the lexicon (C-14 "see fourteen"); figures said once, rounded ("forty to seventy percent").
 - **Try it:** start from C-14 and find the one premise it visited under the same transformers whose reads did not drop.
   **Check:** why is the busiest contractor not the lead? *Answer: busy means it does the most work; the lead is the
   contractor whose visits come before the drops.*
 
-### S01 · Cold open  ~20 s
+### S01 · Cold open · ~20 s
 - Voice: Twenty-two electricity meters start reading low in the same winter. [pause 0.4] The transformers feeding them do not. The power is still flowing. Less of it is being billed. [pause 0.6] A revenue-protection analyst has one question: what do these premises have in common?
-- Chip: none.
-- Action: still of the saved view, blurred; story card: *the contractor · the transformers · the premises*.
+- Action: cold open over the Utilities Space's home page; the intro card opens the next scene.
 - Impact: none.
 
-### S02 · Why the usual checks miss it  ~30 s
-- Voice: Meter reads are checked one premise at a time, and every low read has an excuse: a holiday, a new boiler. A read is a meter's reading; a transformer is the unit that feeds a group of premises. [pause 0.4] The street is not the answer. The tariff is not the answer. And the field visits sit in a different file, so nothing ties a visit to a drop.
-- Chip: none.
-- Action: intro card (title, Utilities Space, *Standard*, amber bar); the saved view fades in.
+### S02 · Why the usual checks miss it · ~30 s
+- Beat: steady
+- Intro: One contractor's visits | Utilities Space
+- Story: a transformer = the unit that feeds a group of premises | a read = a meter's reading | a visit = a field visit by a contractor
+- Voice: Meter reads are checked one premise at a time, and every low read has an excuse: a holiday, a new boiler. A read is a meter's reading, and a transformer is the unit that feeds a group of premises. [pause 0.4] The street is not the answer. The tariff is not the answer. And the field visits sit in a different file, so nothing ties a visit to a drop.
+- Action: story card "Who is who" over the home page.
+- Impact: the story card names the three terms.
+
+### S03 · The data, in one breath · ~30 s
+- Voice: Every field visit lands as a record: the premise, the contractor, the date, the kind of visit. [pause 0.4] A Job links premises to the contractors who visited them, and to the transformers that feed them. All three are entities. The date puts the links in order.
+- Chip: Data · Columns
+- Action: rail Data ▸ the Dataset *utility_links_dataset* ▸ hold on its Columns card. `[checked live: src and dst Utility entity, kind a Category, amount a Measure, kwh and via Details, ts and event_date Time]`
+- Impact: mark the Columns card.
+
+### S04 · The saved view · ~35 s
+- Story: off
+- Voice: Open the saved view Meter tampering contractor. Premises, the contractors who visited them, and the transformers above. [pause 0.4] It is a lot of shapes, so the labels are off. We will ask questions instead. Is there a contractor whose visits come before the drops?
+- Chip: Saved views
+- Action: open the saved view *Meter tampering contractor* ▸ hold on the caption at the bottom. `[checked live: node labels off above 80 nodes]`
 - Impact: none.
 
-### S03 · The data, in one breath  ~30 s
-- Voice: Every field visit lands as one record: the premise, the contractor, the date, the kind of visit. [pause 0.4] A Job links premises to the contractors who visited them, and to the transformers that feed them. All three are entities. The visit date puts the links in order.
-- Chip: Data · Mappings
-- Action: rail ▸ Data ▸ `utility_links_dataset` ▸ zoom on the Mappings area. [check in UI]
-- Impact: mark the from and to columns and the time column.
-
-### S04 · The question  ~35 s
-- Voice: Open the saved view Meter tampering contractor. Premises, the contractors who visited them, and the transformers above. [pause 0.4] Labels switch off above eighty nodes, so open Display options and turn them on. The question is simple: is there a contractor whose visits come before the drops?
-- Chip: File · Open… · Saved views · Display options
-- Action: File ▸ Open… ▸ Saved views ▸ *Meter tampering contractor* ▸ Open ▸ brush icon ▸ Display options ▸ labels on. [check in UI: the labels option's name]
-- Impact: computed impact on the open; mark the label line "node labels off above 80 nodes" before and after.
-
-### S05 · First sweep, and the decoy  ~45 s
-- Voice: Press Busiest nodes. [pause 0.4] The busiest contractor is C-27, by a wide margin. The obvious suspect. [pause 0.5] And wrong. C-27 does the most work in the city. Busy is not the same as connected to the drop. Set C-27 aside, and look for a quieter name.
+### S05 · First sweep, and the decoy · ~45 s
+- Voice: Press Busiest nodes. [pause 0.4] The busiest contractor is C-27, with a hundred and sixty-five links, and the next has ninety-three. It is not close. The obvious suspect. [pause 0.5] And wrong. C-27 does the most work in the city. Busy is not the same as connected to the drop. Set it aside, and look for a quieter name.
 - Chip: Busiest nodes
-- Action: toolbox ▸ On screen ▸ Busiest nodes ▸ hold on the top row (C-27). [check in UI: C-27 leads and is readable]
-- Impact: grey *ruled out* mark on C-27's node; the answer list held 3 s.
+- Action: toolbox ▸ On screen ▸ Busiest nodes ▸ hold on the first rows. `[checked live: C-27 165 links, C-21 93, C-18 84, C-25 73, C-01 47]`
+- Impact: grey *ruled out* mark on the first row (C-27).
 
-### S06 · Start from a quieter name  ~40 s
-- Voice: Start from contractor C-14. In the Investigation tab, choose Start from, one entity, pick the Dataset, and type the id. [pause 0.4] Before you draw anything, the product says how many links this contractor has, and when they were first and last seen.
+### S06 · A quieter name · ~40 s
+- Voice: Start from a quieter name, C-14. In the Investigation tab, choose Start from, one entity, pick the Dataset, and type the id. [pause 0.4] Before anything is drawn, the product tells you what it knows: thirty-six links, first seen in October, last seen in August. An ordinary workload. [pause 0.4] Nothing is recorded yet. The form only reads. It is a first look, and it can be abandoned.
 - Chip: Investigation · Start from · One entity
-- Action: Investigation tab ▸ Start from *One entity* ▸ Dataset `utility_links_dataset` ▸ type `C-14` ▸ hold on the preview line ▸ Start.
-- Impact: mark the preview line; computed impact on Start.
+- Action: new Investigation page ▸ Investigation tab ▸ Start from *One entity* ▸ Dataset `utility_links_dataset` ▸ type `C-14` ▸ hold on the suggestion. `[checked live: C-14, 36 links, first seen 13 Oct 2025, last seen 30 Aug 2026]`
+- Impact: mark the suggestion.
 
-### S07 · The reveal  ~40 s
-- Voice: C-14 visited thirty-six premises. An ordinary workload, until you ask which. [pause 0.7] Twenty-three sit under two transformers, TX-007 and TX-019. Twenty-two of those read forty to seventy percent lower within two weeks of the visit. [pause 0.4] The supply stayed flat.
-- Chip: Select neighbours
-- Action: select C-14 ▸ Select neighbours ▸ hover TX-007 and TX-019 ▸ hold. [check in UI: the premise count under the two transformers]
-- Impact: yellow mark on C-14, TX-007 and TX-019; the story card is replaced.
+### S07 · What the case data says · ~40 s
+- Voice: An ordinary workload, until you ask which premises. [pause 0.7] Twenty-three of them sit under two transformers. Twenty-two of those read forty to seventy percent lower within two weeks of the visit. [pause 0.4] The supply stayed flat. In this Space a start like this needs a second person's approval before it can run, so we stop here and read what the case data says.
+- Action: press Start ▸ hold on the notice. `[checked live: This start's ring needs a second person's approval, so it cannot run unsaved]`
+- Impact: mark the notice.
 
-### S08 · Evidence you can defend  ~45 s
-- Voice: Open the table under the graph. Each visit is a row: the contractor, the premise, the date. [pause 0.4] Put the read history beside it and the drop follows the visit, premise after premise. [pause 0.6] One premise, PRM-0737, was visited too, and its reads did not fall. That is what would overturn this. If the drops came first, or the transformers lost supply, the lead would fail.
-- Chip: Rows
-- Action: dock ▸ Rows ▸ filter the visit rows to C-14 ▸ sort by date ▸ hold. [check in UI: the read history is in the Rows columns or in the details of a premise; if not, show the premise's details dialog]
-- Impact: mark the C-14 visit rows; grey *not affected* mark on PRM-0737.
+### S08 · Evidence you can defend · ~45 s
+- Voice: Each visit is a row in the Dataset: the contractor, the premise, the date. [pause 0.4] Put the read history beside it and the drop follows the visit, premise after premise. [pause 0.6] One premise was visited too, and its reads did not fall. That is what would overturn this. If the drops came first, or the transformers lost supply, the lead would fail.
+- Action: hold on the notice while the voice runs.
+- Impact: none.
 
-### S09 · What the team does next  ~40 s
-- Voice: The lead: one contractor to question, twenty-two premises to inspect. [pause 0.5] Three things on Monday. Inspect the meters, largest drop first. Question C-14, starting with the three visits shared with C-22. And keep the premises as an Entity List, so the next visit to any of them shows on every graph.
+### S09 · What the team does next · ~40 s
+- Voice: The lead: one contractor to question, twenty-two premises to inspect. [pause 0.5] Three things on Monday. Inspect the meters, largest drop first. Question C-14, starting with the three visits shared with C-22. And keep the premises as an Entity List. This Space already keeps them as Tampered premises, so the next visit to any of them shows on every graph.
 - Chip: Entity Lists
-- Action: rail ▸ Entity Lists ▸ *Tampered premises* ▸ hold on its members. [check in UI: the list exists and holds the 22 premises]
-- Impact: mark the list name and its member count.
+- Action: rail Entity Lists ▸ hold on *Tampered premises* and *Revenue-protection watch*. `[checked live: Watch these, Utility entity, 22 members and 3 members]`
+- Impact: mark the two list rows.
 
-### S10 · The case file  ~25 s
-- Voice: That is the case file. [pause 0.4] Lead: one contractor and twenty-two premises. Evidence: the visit rows, and the drop after each. Next: inspect, question, list. To make it defensible for a team, watch Make it defensible. Try it: find the premise C-14 visited whose reads did not fall.
-- Chip: none.
-- Action: case-file card, 8 s; outro with the links to the shared module and to training episode F3.
+### S10 · Case file · ~25 s
+- Casefile: Lead: one contractor, twenty-two premises | Evidence: the visits, each followed by a drop; the transformers flat | Next: inspect the meters; question C-14 about the visits shared with C-22; keep the premises as an Entity List | Try it: find the visited premise whose reads did not drop
+- Voice: The case file. The lead: one contractor and twenty-two premises. The evidence: each visit, then a drop. Next: inspect, question, keep. [pause 0.6] Your turn. Find the one visited premise whose reads did not drop.
+- Action: case-file card and outro.
 - Impact: none.
 
 ## LawEnforcement_BurglarySeries
 
-> **Eighteen burglaries, no suspect: a seller, a dealer and a car that is read near eleven scenes** · Standard · Law
-> enforcement Space (`la-law-enforcement`) · saved view `burglary_series` · 4:50
+> **Eighteen burglaries, no suspect: a seller, a dealer and a car** · Standard · Law enforcement Space (`la-law-enforcement`) · saved view `burglary_series` · 4:45
 
-- **Cast:** the seller P-00476 (nine serial matches, all at the dealer DLR-04), the car ZX 9117 X kept by P-05167, a
-  partner at the same address ADR-1377; the second dealer DLR-09 with the sellers P-04874 and P-00785. **Decoy:** the taxi
-  ZX 3465 D, kept by P-05203, read near 54 incidents in the year and none in this series.
+- **Cast:** the seller P-00476 (nine serial matches), the address ADR-1377 where the seller lives, a second person at that
+  address, P-05167, who keeps the car ZX 9117 X, and the dealers DLR-04 and DLR-09 beside the seller. **Decoy:** the taxi
+  ZX 3465 D, kept by P-05203, read near 54 incidents in the year and none in this series; it has no link to this
+  series, so it is not on the saved view and is spoken, not marked.
 - **Stakes:** a detective sergeant leading a burglary series; the scene evidence is exhausted.
-- **Vocabulary:** *serial match* (a stolen item's serial number found in a dealer's sale), *plate reader camera* (a camera
+- **Vocabulary:** *serial match* (a stolen item's serial number turning up in a sale), *plate reader camera* (a camera
   that logs number plates with place and time), defined once in S02.
 - **Ground truth:** `tools/la-police-ground-truth.json`, key `burglary_series`: 18 incidents, vehicle read near 11 of
   them (`vehicle_scenes`), plate `ZX 9117 X`, keeper `P-05167`, home `ADR-1377`, sellers `P-00476` / `P-04874` /
-  `P-00785`, dealers `DLR-04` / `DLR-09`, 13 serial matches (P-00476: 9, all at DLR-04; P-04874: 3 and P-00785: 1, at
-  DLR-09), `lookalike_taxi` plate `ZX 3465 D` keeper `P-05203` near 54 incidents; `tools/gen-la-police-data.py` header
-  (story 1: the car is read within 2 km and 30 minutes of 11 of the 18 scenes; the keeper is the seller's partner at the
-  same address). **Corrected against v1 and the plan table:** the plan table's "vehicle seen at four scenes" is wrong
-  (eleven); v1 says P-00476 sold "at two dealers" but the data puts P-00476 at DLR-04 only and the two other sellers at
-  DLR-09. The decoy is the taxi, not "the nearest suspect".
-- **Before:** fresh unzip of `la-standard.zip`, Law enforcement Space, Demo Analyst, saved view; ids read in full.
-  [check in UI: whether the taxi plate is drawn in the saved view; if not, the S05 voice names it and the mark falls on
-  an empty place, so say "not drawn" in the voice]
+  `P-00785`, dealers `DLR-04` / `DLR-09`, 13 serial matches (P-00476: 9; P-04874: 3 and P-00785: 1),
+  `lookalike_taxi` plate `ZX 3465 D` keeper `P-05203` near 54 incidents; `tools/gen-la-police-data.py` header (story 1: the
+  car is read within 2 km and 30 minutes of 11 of the 18 scenes; the keeper is the seller's partner at the same address).
+  **Corrected against v1 and the plan table:** "vehicle seen at four scenes" is wrong (eleven); the decoy is the taxi, not
+  "the nearest suspect". The saved view shows P-00476 linked to both dealers (`sold_item` links to DLR-04 and DLR-09), so
+  the voice says two dealers sit beside the seller and does not claim all sales were at one.
+- **Screen truth** (checked live on a fresh Standard unzip, Demo Analyst, 2026-11-22): the saved view *Burglary series* is
+  already drawn, every id readable (no masking); Busiest nodes answers ZX 9117 X (15 links), P-00476 (12), P-04874 (6),
+  DLR-04 (5), ADR-2129 (4). *Start from these* on the P-00476 row draws one entity and twelve linked nodes: nine incidents
+  (kind `item_match`), ADR-1377 (`lives_at`), DLR-04 and DLR-09. A double-click on ADR-1377 brings P-05167 in; a
+  double-click on P-05167 brings the car ZX 9117 X in (`keeper_of`). The Data page describes the Dataset
+  `police_property_links_dataset`: src and dst are Entities (Police entity), kind a Category, amount a Measure, ts and
+  event_date Time. The Entity Lists page holds *Burglary series sellers* (Watch these, Police entity, 3 members).
+- **Before:** fresh unzip of `la-standard.zip` with the fake Demo Auth sign-in, Law enforcement Space, Demo Analyst,
+  saved view; nothing is saved or changed in this film.
 - **Lead:** three lines of enquiry (the dealers, the sellers, the car and its keeper's address), shown as actions.
   **What would change our mind:** if the serials matched only by make and model they would be coincidences; here the
   serial numbers match. **Next actions:** visit DLR-04 and DLR-09; keep the three sellers as the Entity List *Burglary
-  series sellers*; ask the camera team for the car's reads against the seven scenes it was not read near.
+  series sellers* (it already exists, shown in S09); ask the camera team for the car's reads against the seven scenes
+  it was not read near.
 - **Voice style:** plates spoken by the lexicon ("zed ex nine one one seven ex"); "eleven of the eighteen" is a story
   figure, not a Dataset size; pace defaults, the reveal slower.
 - **Try it:** in the saved view, find the seller whose address is the car keeper's address. **Check:** why is the
   taxi, seen near more incidents, not a lead? *Answer: it was near none of this series' scenes; the links tell a busy
   car from a connected one.*
 
-### S01 · Cold open  ~20 s
-- Voice: Eighteen burglaries in three months, across two neighbourhoods. No usable fingerprints. No witness. [pause 0.4] A detective sergeant has a map of pins and no suspect. [pause 0.6] But stolen goods have to be sold, and a sale leaves a record.
-- Chip: none.
-- Action: still of the saved view, blurred; story card: *the seller · the dealer · the car*.
+### S01 · Cold open · ~22 s
+- Beat: cold
+- Voice: Eighteen burglaries in three months, across two neighbourhoods, and no usable fingerprints or witnesses. A detective sergeant has a map full of pins and no suspect. [pause 0.6] But stolen goods have to be sold, and every sale leaves a record.
+- Action: cold open over the Law enforcement Space's home page.
 - Impact: none.
 
-### S02 · Why the usual checks miss it  ~30 s
-- Voice: Each burglary is one report. Each second-hand sale is one dealer entry. Nobody reads the two together. [pause 0.4] A serial match is a stolen item's serial number turning up in a sale. A plate reader camera logs cars all day, and most of what it logs is noise. [pause 0.4] Kept apart, the records hide the series.
-- Chip: none.
-- Action: intro card (title, Law enforcement Space, *Standard*, slate bar); the saved view fades in.
-- Impact: none.
+### S02 · Why the usual checks miss it · ~32 s
+- Beat: steady
+- Intro: Eighteen burglaries, no suspect | Law enforcement Space
+- Story: the seller = a person who sells second-hand goods to a dealer | the dealer = a second-hand shop that logs every sale | the car = a vehicle read by plate reader cameras near the scenes
+- Voice: Each burglary is one report, and each second-hand sale is one entry in a dealer's book, and nobody reads the two together. [pause 0.4] A serial match is a stolen item's serial number turning up in a sale. A plate reader camera logs cars all day, and almost all of it is noise. [pause 0.4] Kept apart, these records hide the series.
+- Action: intro card (title, Law enforcement Space, *Standard*, slate bar); the saved view fades in behind the story card.
+- Impact: the story card names the three roles.
 
-### S03 · The data, in one breath  ~30 s
-- Voice: Dealers log every sale: the seller, the item, the serial number, the date. Burglary reports log the stolen serials. Cameras log plates with a place and a time. [pause 0.4] A Job links sellers to dealers, items to the burglaries they came from, people to addresses, and cars to the people who keep them.
+### S03 · The data, in one breath · ~32 s
+- Voice: Dealers log every sale: the seller, the item, the serial number. Burglary reports log the stolen serials, and cameras log plates with a place and a time. [pause 0.4] A Job links sellers to dealers, items to the incidents they came from, people to addresses, and cars to the people who keep them. Each link has two ends, and both are police entities.
 - Chip: Data · Mappings
-- Action: rail ▸ Data ▸ `police_property_links_dataset` ▸ zoom on the Mappings area. [check in UI]
-- Impact: mark the from and to columns once.
+- Action: rail ▸ Data ▸ `police_property_links_dataset` ▸ hold on its Columns card (src and dst are Entities, kind a Category, ts a Time).
+- Impact: mark the src and dst columns once.
 
-### S04 · The question  ~35 s
-- Voice: Open the saved view Burglary series. The incidents, the items, the sellers, the dealers, the addresses, and the cars read near the scenes. [pause 0.4] The view draws itself, and every id reads in full. A busy picture. Who is behind it?
-- Chip: File · Open… · Saved views
-- Action: File ▸ Open… ▸ Saved views ▸ *Burglary series* ▸ Open ▸ hold. [check in UI: the labels are on at this size]
-- Impact: computed impact on the open.
+### S04 · The question · ~30 s
+- Voice: Open the saved view Burglary series. [pause 0.4] The incidents, the stolen items, the sellers, the dealers, the addresses and the cars draw themselves, and every id reads in full. It is a busy picture, so who is behind it?
+- Chip: Saved views
+- Action: open the saved view *Burglary series* ▸ hold.
+- Impact: none.
 
-### S05 · First sweep, and the decoy  ~45 s
-- Voice: Press Busiest nodes. [pause 0.4] A number plate leads, ZX 9117 X. Then a seller, P-00476. A car, and a seller. Are they connected? [pause 0.5] First, one more car: a taxi read near fifty-four incidents this year, none of them in this series. A busy car is not a connected car. Set the taxi aside.
+### S05 · First sweep, and the decoy · ~48 s
+- Voice: Press Busiest nodes, and a number plate leads: ZX 9117 X, with fifteen links, then a seller, P-00476, with twelve. A car and a seller. [pause 0.5] One more car deserves a thought: a taxi the cameras read near fifty-four incidents this year. None of them is in this series, so it is not even on this graph. A busy car is not a connected car.
 - Chip: Busiest nodes
-- Action: toolbox ▸ On screen ▸ Busiest nodes ▸ hold on the top rows (ZX 9117 X, P-00476). [check in UI: the order of the top rows]
-- Impact: grey *ruled out* mark on the taxi's plate (or the note "not drawn"); the answer list held 3 s.
+- Action: toolbox ▸ On screen ▸ Busiest nodes ▸ hold on the top two answers (ZX 9117 X 15 links, P-00476 12 links).
+- Impact: mark the two top answers.
 
-### S06 · Start from the seller  ~40 s
-- Voice: Start from the seller. In the Investigation tab, choose Start from, one entity, pick the Dataset, and type the id. [pause 0.4] The product says how many links this seller has, and when they were first and last seen, before anything is drawn.
-- Chip: Investigation · Start from · One entity
-- Action: Investigation tab ▸ Start from *One entity* ▸ Dataset `police_property_links_dataset` ▸ type `P-00476` ▸ hold on the preview ▸ Start.
-- Impact: mark the preview line; computed impact on Start.
+### S06 · Start from the seller · ~34 s
+- Voice: Start from the seller. Press Start from these beside P-00476 on the answer, and the graph redraws around that one person. [pause 0.4] The banner says what it drew: one entity and twelve linked nodes.
+- Chip: Start from these
+- Action: Busiest nodes ▸ the P-00476 row ▸ Start from these ▸ hold on the banner and the drawn graph.
+- Impact: before/after hold: the seller's graph appears.
 
-### S07 · The reveal  ~40 s
-- Voice: P-00476 sold items from one burglary after another, nine times, all at one dealer, DLR-04. And lives at ADR-1377. [pause 0.7] At the same address, a partner keeps the car, ZX 9117 X. The cameras read that car near eleven of the eighteen scenes.
-- Chip: Select neighbours
-- Action: select P-00476 ▸ Select neighbours ▸ hover DLR-04, ADR-1377 and the car. [check in UI: the car links through the partner or the address]
-- Impact: yellow marks on P-00476, DLR-04, ADR-1377 and ZX 9117 X.
+### S07 · The reveal · ~48 s
+- Beat: reveal
+- Story: off
+- Voice: Look at what surrounds the seller: nine incidents, each tied by a serial match, and the address ADR-1377 where the seller lives. Two dealers sit beside the seller too, DLR-04 and DLR-09. [pause 0.5] Double-click the address, and a second person who lives there appears, P-05167. Double-click that person, and the car they keep appears. [pause 0.7] The car is ZX 9117 X, the plate the cameras read near eleven of the eighteen scenes.
+- Chip: Expand · double-click
+- Action: close the banner ▸ double-click ADR-1377 ▸ P-05167 appears ▸ double-click P-05167 ▸ ZX 9117 X appears.
+- Impact: marks on P-05167 and on the car ZX 9117 X.
 
-### S08 · Evidence you can defend  ~40 s
-- Voice: Open the table under the graph. Each sale is a row: the seller, the dealer, the item, the serial. [pause 0.4] The serials match the stolen reports, number for number. What would change this? If they matched only by make and model, they would be coincidences. They match by serial. [pause 0.4] Two more sellers use the second dealer, DLR-09. They are leads of their own.
+### S08 · Evidence you can defend · ~42 s
+- Voice: Is this a guess, or can a colleague check it? Open the table under the graph, and each serial match is a row with the incident, the link kind and the seller: nine rows, nine incidents. [pause 0.4] What would change this? If the serials matched only by make and model, they would be coincidences. They match by serial number, so every line can be checked.
 - Chip: Rows
-- Action: dock ▸ Rows ▸ filter to P-00476 ▸ hold on the sale rows; then filter to DLR-09. [check in UI: the Rows columns show the serial]
-- Impact: mark the sale rows; hold the table 3 s.
+- Action: the dock chevron ▸ Rows ▸ hold on the item_match rows.
+- Impact: mark the rows.
 
-### S09 · What the team does next  ~40 s
-- Voice: The lead is three lines of enquiry: the dealers, the sellers, and the car with its keeper's address. [pause 0.5] On Monday: visit DLR-04 and DLR-09. Keep the three sellers as an Entity List, so every graph marks them. And ask the camera team for the car's reads against the seven scenes it was not seen near.
+### S09 · What the team does next · ~42 s
+- Voice: The lead is three lines of enquiry: the dealers, the sellers, and the car with its keeper's address. [pause 0.5] On Monday, visit DLR-04 and DLR-09. Keep the three sellers as an Entity List, so every graph in this Space marks them. And ask the camera team for the car's reads against the seven scenes it was not seen near.
 - Chip: Entity Lists
-- Action: rail ▸ Entity Lists ▸ *Burglary series sellers* ▸ hold on its members. [check in UI: the list holds the three sellers]
-- Impact: mark the list name and its member count.
+- Action: rail ▸ Entity Lists ▸ hold on *Burglary series sellers* (Watch these, Police entity, 3 members).
+- Impact: mark the list's row.
 
-### S10 · The case file  ~25 s
-- Voice: That is the case file. [pause 0.4] Lead: a seller, two dealers and a car. Evidence: serial matches, and the car read near eleven scenes. Next: visit, list, ask. To make it defensible for a team, watch Make it defensible. Try it: find the seller who lives at the keeper's address.
-- Chip: none.
-- Action: case-file card, 8 s; outro with the links to the shared module and to training episode D3.
+### S10 · The case file · ~28 s
+- Beat: close
+- Casefile: Lead: a seller, two dealers and a car | Evidence: nine serial matches, and the car read near eleven of the eighteen scenes | Next: visit the two dealers; keep the three sellers as a list; ask for the car's other reads | Try it: find the seller who lives at the keeper's address
+- Voice: That is the case file. [pause 0.4] Lead: a seller, two dealers and a car. Evidence: nine serial matches, and a car read near eleven scenes. Next step: visit, list, ask. [pause 0.6] Each sale and each camera read was ordinary alone. Only the links joined them. The same steps run on millions of records and answer in moments. Try it: find the seller who lives at the keeper's address.
+- Action: case-file card (8 s: Lead · Evidence · Next step · Try it), then the outro "Next: Make it defensible".
 - Impact: none.
 
 ## Shared_MakeItDefensible

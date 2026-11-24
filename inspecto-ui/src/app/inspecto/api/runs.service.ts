@@ -145,6 +145,82 @@ export interface ConsignmentOutputsPage {
     derivedRuns?: JobRunRow[];
 }
 
+/** One keyed Reference lookup Step's last run (`GET /lookups`, LOOKUP-1). Counts only, never a value. */
+export interface LookupLastRun {
+    consignmentId: string;
+    outcome: string;
+    startedAt: string | null;
+    rowsIn: number;
+    /** The Step Receipt's `diag.counts`: `lookup.<on>.hit|miss`, `reference.rows|null_keys|nested_prefixes`. */
+    counts: Record<string, number>;
+    truncated: boolean;
+}
+
+/** One keyed `transform.join` in a loaded Pipeline. `lastRun` is null before a run, ABSENT when receipts are off. */
+export interface LookupRow {
+    pipeline: string;
+    step: string;
+    reference: string | null;
+    match: string;
+    lookedUpBy: string[];
+    lastRun?: LookupLastRun | null;
+    /** The last run's unmatched-key sample (LOOKUP-1 §4.6): never a value. ABSENT when receipts are off. */
+    unmatched?: LookupMiss[];
+    /** The in-memory test index (LOOKUP-1 P3): ready (with its size), building, failed (with why) or cold. */
+    index?: LookupIndexState;
+}
+
+export interface LookupIndexState {
+    state: 'ready' | 'building' | 'failed' | 'cold';
+    rows?: number;
+    /** Estimated memory, in bytes. */
+    bytes?: number;
+    loadedAt?: string;
+    error?: string;
+}
+
+/** One unmatched value of a lookup's last run: its salted fingerprint, length, masked shape and count. */
+export interface LookupMiss {
+    mapping: string;
+    fingerprint: string;
+    length: number;
+    shape: string;
+    n: number;
+}
+
+/** `POST /lookups/test` (LOOKUP-1 P3): one value's answer from the lookup's in-memory index. */
+export interface LookupTestAnswer {
+    pipeline: string;
+    step: string;
+    match: string;
+    /** The value as compared, after the lookup's `normalize:`. */
+    compared: string | null;
+    hit: boolean;
+    matchedKey: string | null;
+    matchKind: 'exact' | 'prefix' | 'range' | 'asof' | 'none';
+    /** What each looked-up column would add: output column → text, not-found defaults applied. */
+    mappings: { on: string; columns: Record<string, string | null> }[];
+    /**
+     * The index that answered: `reloaded` says why this answer built it (`first use`, `reload asked`, `step changed`,
+     * `reference changed`), null when it was kept; `watchesReference` false means a Reference change is only seen on
+     * reload.
+     */
+    index: {
+        rows: number;
+        bytes: number;
+        loadedAt: string;
+        buildMs: number;
+        reloaded: string | null;
+        watchesReference: boolean;
+    };
+}
+
+export interface LookupsPage {
+    lookups: LookupRow[];
+    total: number;
+    known: { lastRun: boolean };
+}
+
 /** One manual run's status (`GET /runs/runs/{runId}`, W5b). `total`/`failed` are -1 while `RUNNING`. */
 export interface PipelineRunStatus {
     runId: string;
@@ -274,6 +350,23 @@ export class RunsService {
         return this.http.get<ConsignmentOutputsPage>(apiUrl(`/runs/${encodeURIComponent(name)}/outputs`), {
             params: toParams({ consignmentId }),
         });
+    }
+    /** Every keyed Reference lookup in the Space's Pipelines, each with its last run's counts (LOOKUP-1). */
+    lookups(): Observable<LookupsPage> {
+        return this.http.get<LookupsPage>(apiUrl('/lookups'));
+    }
+    /**
+     * Look one value up through a lookup's in-memory index; `refresh` reloads the Reference first, `at` is the row's
+     * time for an `asof` lookup (LOOKUP-1 P3).
+     */
+    testLookup(
+        pipeline: string,
+        step: string,
+        value: string,
+        refresh = false,
+        at: string | null = null,
+    ): Observable<LookupTestAnswer> {
+        return this.http.post<LookupTestAnswer>(apiUrl('/lookups/test'), { pipeline, step, value, at, refresh });
     }
     quarantine(name: string): Observable<AuditRow[]> {
         return this.http.get<AuditRow[]>(apiUrl(`/runs/${encodeURIComponent(name)}/quarantine`));

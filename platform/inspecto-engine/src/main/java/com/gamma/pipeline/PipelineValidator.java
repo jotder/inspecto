@@ -122,9 +122,21 @@ public final class PipelineValidator {
                 || (n.cfg("to") != null && !n.cfg("to").toString().isBlank());   // blank = unset, as the run reads it
         Object match = n.cfg("match");
         boolean range = "range".equals(String.valueOf(match));
+        boolean asof = "asof".equals(String.valueOf(match));
+        boolean hasFrom = n.cfg("from") != null && !n.cfg("from").toString().isBlank();
+        boolean hasTo = n.cfg("to") != null && !n.cfg("to").toString().isBlank();
+        boolean hasAt = n.cfg("at") != null && !n.cfg("at").toString().isBlank();
+        if (asof) {
+            if (!hasKey || !hasFrom || !hasAt)
+                return "match: asof needs key: (the Reference's key column), from: (its effective-from column) and "
+                        + "at: (the rows' time column)";
+            if (hasTo) return "match: asof reads from: only — there is no to:";
+        } else if (hasAt) {
+            return "at: only applies to match: asof";
+        }
         if (range && !hasBound) return "match: range needs from: and/or to: — the Reference columns holding the bounds";
         if (range && hasKey) return "match: range reads from:/to:, not key:";
-        if (!range && hasBound) return "from:/to: only apply to match: range";
+        if (!range && !asof && hasBound) return "from:/to: only apply to match: range (from: also to match: asof)";
         if (!hasKey && !hasBound) {
             for (String k : com.gamma.pipeline.exec.RowShaper.JOIN_KEYED_KEYS)
                 if (n.cfg(k) != null) return "'" + k + "' needs key: — the Reference's key column";
@@ -138,6 +150,11 @@ public final class PipelineValidator {
         } catch (IllegalArgumentException e) {
             return e.getMessage();
         }
+        try {
+            com.gamma.pipeline.exec.RowShaper.joinMaxMissRate(n.cfg("max_miss_rate"));
+        } catch (IllegalArgumentException e) {
+            return e.getMessage();
+        }
         Object dups = n.cfg("duplicates");
         if (dups != null && !com.gamma.pipeline.exec.RowShaper.JOIN_DUPLICATES.contains(dups.toString()))
             return "duplicates '" + dups + "' — use one of " + com.gamma.pipeline.exec.RowShaper.JOIN_DUPLICATES;
@@ -146,6 +163,37 @@ public final class PipelineValidator {
         Object as = n.cfg("as");
         if (joinKeys(n).size() > 1 && as != null && !as.toString().contains("{on}"))
             return "with several 'on' columns, as: must contain {on}";
+        if (n.cfg("lookups") != null) return lookupsProblem(n);
+        Object details = n.cfg("details");
+        if (details != null && !(details instanceof Boolean) && !(details instanceof Map<?, ?>)
+                && !List.of("true", "false").contains(details.toString()))
+            return "details: must be true, false or a map {matched_key: name, match_kind: name}";
+        return null;
+    }
+
+    /**
+     * What is wrong with a join's {@code lookups:} (LOOKUP-1 P1d) judged from the config alone: mixed with the
+     * shorthand, an entry without {@code on} or with a key it does not take, or two renamed outputs sharing a name.
+     * Whether the columns exist, and clashes with the rows' own columns, stay the run's question.
+     */
+    private static String lookupsProblem(PipelineNode n) {
+        for (String k : List.of("on", "columns", "as", "default", "details"))
+            if (n.cfg(k) != null) return "lookups: and '" + k + "' both set — each mapping carries its own";
+        if (!(n.cfg("lookups") instanceof List<?> list) || list.isEmpty())
+            return "lookups: must be a list of mappings, each with an 'on' column";
+        java.util.Set<String> names = new java.util.TreeSet<>(String.CASE_INSENSITIVE_ORDER);
+        for (Object o : list) {
+            if (!(o instanceof Map<?, ?> e) || e.get("on") == null || e.get("on").toString().isBlank())
+                return "every lookups: entry needs 'on' — the input column it looks up";
+            for (Object k : e.keySet())
+                if (!com.gamma.pipeline.exec.RowShaper.JOIN_LOOKUP_KEYS.contains(String.valueOf(k)))
+                    return "a lookups: entry has '" + k + "' — an entry takes "
+                            + com.gamma.pipeline.exec.RowShaper.JOIN_LOOKUP_KEYS;
+            if (e.get("columns") instanceof Map<?, ?> renamed)
+                for (Object out : renamed.values())
+                    if (out != null && !out.toString().isBlank() && !names.add(out.toString().trim()))
+                        return "two lookups write the output column '" + out + "' — give each a unique name";
+        }
         return null;
     }
 
@@ -347,7 +395,7 @@ public final class PipelineValidator {
                             "Node '" + n.id() + "' (transform.join) names no 'reference' — "
                                     + "reference/<pipeline> or a data-file path."));
                 }
-                if (joinKeys(n).isEmpty()) {
+                if (joinKeys(n).isEmpty() && n.cfg("lookups") == null) {   // lookups: carries each mapping's on
                     issues.add(new Issue(Severity.ERROR, JOIN_ON_MISSING,
                             "Node '" + n.id() + "' (transform.join) names no 'on' key column(s)."));
                 }

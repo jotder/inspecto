@@ -502,6 +502,7 @@ async function main() {
 
   await send('Page.enable'); await send('Runtime.enable');
   await send('Emulation.setDeviceMetricsOverride', { width: VW, height: VH, deviceScaleFactor: DPR, mobile: false });
+  await send('Emulation.setDefaultBackgroundColorOverride', { color: { r: 13, g: 19, b: 34, a: 1 } });   // a dark page behind the app, so a navigation never flashes white
   // a visible cursor and click ripple (headless screencasts have no pointer)
   await send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
     const mk = () => { if (document.getElementById('__cur')) return;

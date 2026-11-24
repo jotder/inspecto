@@ -77,7 +77,12 @@ class ControlApiSaveGateParityTest {
                 "excel", FindingCodes.ERR_EXCEL_INVALID, false),
         EXCEL_SHEET_NOT_A_SELECT(d -> d.put("excel", map("path", "reports/a.xlsx",
                         "sheets", List.of(map("name", "A", "sql", "DELETE FROM input")))),
-                "excel.sheets[0].sql", FindingCodes.ERR_EXCEL_INVALID, false);
+                "excel.sheets[0].sql", FindingCodes.ERR_EXCEL_INVALID, false),
+        LOOKUP_ON_INGEST(d -> ((Map<String, Object>) d.get("processing")).put("map", map("fields", List.of(
+                        map("name", "id", "from", "id", "fn", "keep"),
+                        map("name", "rate", "from", "id", "fn", "lookup.reference",
+                                "args", map("reference", "reference/fx", "key", "code", "returns", "rate"))))),
+                "processing.map.fields[1].fn", FindingCodes.ERR_LOOKUP_ON_INGEST, false);
 
         final Consumer<Map<String, Object>> apply;
         final String fieldPath;

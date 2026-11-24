@@ -93,9 +93,12 @@ for a new Step with an explicit column list over the upstream sample columns, el
   template, params}`; `SqlFunctionParam = {name, label, type, default, options, optional}` where `type`
   drives BOTH the rendered control and the escaping: `column` → quoted identifier, `text` → single-quoted
   literal with quotes doubled, `number` → validated then verbatim, `enum` → one of `options` verbatim,
-  `sql` → verbatim (the deliberate escape hatch, `custom` only). **23**<!--count:sql-mapping-functions--> functions *(per `sql-functions.ts`: 1 Keep, 8 Text, 4 Numbers, 6 Dates, 2 Logic, 1 Convert, 1 Custom)* across Keep · Text ·
-  Numbers · Dates · Logic · Convert · Custom. A row's source column binds to the template's `{source}`
+  `sql` → verbatim (the deliberate escape hatch, `custom` only). **24**<!--count:sql-mapping-functions--> functions *(per `sql-functions.ts`: 1 Keep, 8 Text, 4 Numbers, 6 Dates, 2 Logic, 1 Convert, 1 Lookup, 1 Custom)* across Keep · Text ·
+  Numbers · Dates · Logic · Convert · Lookup · Custom. A row's source column binds to the template's `{source}`
   automatically — that IS the operator's "auto map parameters against sql functions".
+  ⚠ **The Lookup function (`lookup.reference`) runs only in a Pipeline `transform.sql` Step.** The ingest
+  lane (`processing.map.fields[]`) has no Reference resolver, so a save refuses a lookup field there
+  (`ERR_LOOKUP_ON_INGEST` on `processing.map.fields[i].fn`, regardless of `active`; LOOKUP-1).
   ⚠ **Every conversion is `TRY_CAST`, never bare `CAST`, and division guards with `NULLIF`** — a
   catalog-wide unit test asserts it, because a bad cell must null one cell, not kill the batch.
   ⚠ **A `text` parameter is deliberately not trimmed** — a single space is a legitimate separator for
@@ -244,7 +247,7 @@ schema field's four keys — description · unit · classification · synonym �
 ### 8.4 Expression building
 
 - **The expression-building surface** is the Transform pane's function picker per row over `SQL_FUNCTIONS`
-  (**23**<!--count:sql-mapping-functions--> functions in 7 categories), with a form control per declared parameter and
+  (**24**<!--count:sql-mapping-functions--> functions in 8 categories), with a form control per declared parameter and
   "Try it on the sample" (§8.2).
 - **CodeMirror has THREE hosts**, not two: the SQL query workbench (`inspecto/data-table/sql/`), the
   enrichment editor (`inspecto/enrichment/enrichment-editor.component.ts`) and **the Transform pane's SQL
@@ -379,6 +382,48 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
     the named columns exist is checked when it runs.
   - **`filter`** (since 2026-11-22, `LOOKUP-1` P1c, every keyed mode) — an SQL condition on Reference columns; only the
     rows meeting it take part (one table holding several rate kinds: `filter: "lookup_key = 'SDR_RATE'"`).
+- **Per-number columns under your own names — `lookups:` (since 2026-11-23, `LOOKUP-1` P1d, every keyed `match`)** —
+  one mapping per looked-up column, each with its own columns and output names, so the output can match a legacy
+  layout exactly. Still one pass over the Reference: every distinct value across all mappings is resolved once.
+  ```toon
+  - join:
+      reference: reference/dial_digit
+      key: dial_digit_key
+      match: longest_prefix
+      lookups[2]:
+        - on: SERVED_MSISDN
+          columns:                                # Reference column: output name
+            dial_digit_key: SERVED_MSISDN_DIAL_DIGIT_KEY
+            provider_desc: SERVED_MSISDN_OPER
+          default:                                # keyed by the OUTPUT name
+            SERVED_MSISDN_DIAL_DIGIT_KEY: -99
+        - on: OTHER_MSISDN
+          columns:
+            event_category_key: EVENT_CATEGORY_KEY
+            country_name: OTHER_MSISDN_COUNTRY
+          details: true                           # + OTHER_MSISDN_matched_key, OTHER_MSISDN_match_kind
+  ```
+  - An entry takes `on` (required), `columns` (a map renames; a list keeps the names under `as`, `"{on}_"` by default;
+    absent = every Reference column, so a details-only mapping writes `columns: {}`), `as`, `default` (a map or `name=value` list, keyed by output name) and `details`.
+  - The shorthand (`on` / `columns` / `as` / `default`) stays valid and means one identical mapping per `on` column;
+    `lookups:` with any of those top-level keys is refused. Output names must be unique and must not clash with an
+    input column (case-insensitive) — refused by name, at save for two renamed outputs sharing a name
+    (`JOIN_KEYED_INVALID`), at the run for clashes with the rows' columns.
+  - **`details`** — `true` adds `<prefix>matched_key` and `<prefix>match_kind` (prefix = the mapping's `as`, `"{on}_"`
+    by default); a map `{matched_key: NAME, match_kind: NAME}` names them, and picks just one when one is left out.
+    `matched_key` is the key that matched (the prefix for `longest_prefix`; the period `from..to` for `range`, an open
+    end left empty); `match_kind` is `exact` (the key is the whole value), `prefix`, `range` or `none`. `details`
+    also works on the shorthand.
+  - **Columns this Step adds** — the join Step's pane shows a read-only table (output column · type · from · looked
+    up by) for a keyed join, computed by `POST /components/transform/describe` with a `config` body from the
+    Reference Pipeline's declared schema (no row is read); a clash or an unknown column shows there as the run's own
+    refusal. It reflects the Step's applied settings (after Apply).
+  - **Per-input lookups form (since 2026-11-23)** — on a join Step's pane, *Per-input lookups* edits `lookups:` as one
+    block per mapping: *Looked up by*, *Name prefix* (`as`), the columns it returns (Reference column and output
+    name; a blank name takes the engine's own), *When nothing matches* (defaults by output name) and *Add match
+    details*. It refuses a mapping with no input, two outputs with one name, and a default for a column the mapping
+    does not add, before Apply. A `details` map is kept as written; a `lookups:` the form cannot read (not a list of
+    entries) stays an extra setting.
 - **`match: range` (since 2026-11-22, `LOOKUP-1` P1c)** — a value matches the Reference row whose period holds it.
   It is keyed by `from:` / `to:` (Reference columns, either may be omitted), not `key:`.
   ```toon
@@ -405,6 +450,62 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
   - A value in no period (a gap) or a NULL value matches nothing; `default` fills it as in the other keyed modes.
     Each distinct value is resolved once, then joined back per `on` column.
   - Save refuses `match: range` without `from`/`to`, with `key`, and `from`/`to` on any other match (`JOIN_KEYED_INVALID`).
+- **`match: asof` (since 2026-11-23, `LOOKUP-1` P1f)** — each row takes the **latest Reference row of its key that is
+  effective at or before the row's time**: the rate of its currency in force on the transaction date.
+  ```toon
+  - join:
+      reference: reference/fx_rates
+      match: asof
+      key: currency                               # Reference column compared to each `on` column, as text
+      from: valid_from                            # Reference effective-from column; an empty value = since forever
+      at: txn_date                                # the rows' time column, read once per row
+      on[1]: currency
+      columns[1]: rate
+  ```
+  - A row **on** an effective date takes that row; a row before the key's first date, a key the Reference lacks and a
+    NULL time match nothing (`default` fills them). The latest row stays in force after its date, with no end.
+  - The time compares in the `from` column's own type: a text time is read as a `DATE` / `TIMESTAMP` (a value that is
+    no time matches nothing, no error). `duplicates: refuse` (default) stops the run when the Reference has two rows
+    for one key **and** one date; `first` / `last` with `order_by` keep one. `normalize` applies to the key.
+  - `matched_key` is `key@from`. Save refuses `asof` without `key`, `from` or `at`, with `to`, and `at` on any other match.
+- **Hit and miss counts (since 2026-11-23, `LOOKUP-1` P1g)** — a keyed join's Step Receipt carries, per `on` column,
+  `lookup.<column>.hit` (found a Reference row) and `lookup.<column>.miss` (had a value, found none) in `diag.counts`;
+  a NULL value counts as neither. A rising miss count is the sign a Reference has gone stale.
+- **`max_miss_rate:` (since 2026-11-23, `LOOKUP-1` P2a)** — a number from 0 to 1. When, for any `on` column, more than
+  this share of the values that had a value find no Reference row, the Step fails and the run raises its Incident; the
+  message gives the counts and names the column, never a value. `0.1` = stop above 10 % misses. Empty = never stop.
+  Needs `key:` like every keyed setting; save refuses a value outside 0 to 1.
+- **Reference quality counts (since 2026-11-23, `LOOKUP-1` P2b)** — beside the hit and miss counts the Step Receipt's
+  `diag.counts` carries `reference.rows` (after `filter:`), `reference.null_keys` (Reference rows with no key — they match
+  nothing) and, for `longest_prefix`, `reference.nested_prefixes` (keys that have a shorter key as a prefix, so the shorter
+  one is shadowed for values starting with the longer). Informational: nothing fails and no key value is stored. Not
+  reported for `range` (an empty bound is meaningful there).
+- **The Lookups screen (since 2026-11-23, `LOOKUP-1`)** — *Workbench ▸ Lookups* lists every keyed join (`key:`, or
+  `from:`/`to:`) in the Space's Pipelines: Pipeline, Step, Reference, match, the columns looked up, and the last run's
+  outcome, Found / Not found (summed over the mappings), Not found %, Reference rows and Empty keys, read from the newest
+  Step Receipt of that Step (dry runs excluded). Read-only; served by `GET /lookups`. A plain join is not listed. ⚠ A
+  receipt keeps at most 8 counts, so a join with more than 3 mappings loses its `reference.*` counts, and past 4 some
+  hit / miss counts: the screen then shows the missing counts, and all the Found / Not found sums, blank.
+  - **Values not found (since 2026-11-24)** — click a row to see its last run's most frequent unmatched values, up to
+    20 per looked-up column, each **masked** (`4479••••••••`: the first `min(4, length / 3)` characters), with its
+    length, how many rows carried it, and its fingerprint — the Space-salted one rejected rows carry, so the same value
+    has the same fingerprint in both. The value itself is never stored. Kept for the last run only; a dry run does not
+    replace it; a canvas-store Pipeline keeps none.
+  - **Test a value (since 2026-11-24, `LOOKUP-1` P3)** — under the selected row, type a value and **Test**: the answer
+    says Found (the key that matched, whole value or prefix) or Not found, the value as compared after `normalize:`,
+    and every column the Step would add for it, not-found defaults applied. Answered by the point engine, an in-memory
+    index of the Reference that the parity suite holds equal to the batch join. The Reference is loaded on the first
+    test and kept (up to 8 lookups), and loaded again by the next test after its files change (a new commit of a
+    Reference Dataset, an edited file) — the answer then says so. **Reload Reference and test** forces a reload; it
+    is needed only where the answer says changes are not detected. Every match mode: for `range` the value is compared as the batch join compares it (a date for a DATE bound, a number by its exact value), and for `asof` a **Time** box asks for the row's time (without one, only Reference rows with no from-date match). ⚠ A CSV `path:` Reference is read as text, so its range bounds compare as text — `10` sorts before `9` — in the batch join and the test alike. An index whose estimated memory passes
+    `-Dlookup.point.max_bytes` (default 256 MiB) is refused rather than loaded. The list's **Test index** column shows
+    each index as ready (with **Index memory**), building, failed (hover for why) or cold; start the server with
+    `-Dlookup.point.preload=true` to build them at start (up to 8) instead of on the first test. Served by `POST /lookups/test`;
+    the value travels in the request body and is not logged.
+- **`normalize:` (since 2026-11-23, `LOOKUP-1` P1e)** — for `exact` and `longest_prefix`, an ordered list of `trim`,
+  `lower`, `upper`, `strip_leading_zeros`, `strip_plus`, applied to the Reference key and to every looked-up value
+  alike. Two Reference rows that collapse to one key are refused by the `duplicates` rule; `range` refuses it. The
+  returned key column keeps the Reference's own text; `matched_key` shows the normalized key.
 - **`reference` is autocomplete with real suggestions, never a hard constraint:**
   `referenceOptionLoader()` (`entity-option-loaders.ts`) calls `CatalogService.references()`
   (backed by `GET /catalog/references`, `CatalogRoutes.java`) and maps results to

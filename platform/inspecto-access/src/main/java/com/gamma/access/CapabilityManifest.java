@@ -651,6 +651,8 @@ public final class CapabilityManifest {
                     "operator 2026-09-16: applying a tag rule is a collaboration act like assignments, not run operation"),
             new Exemption("POST", "/queries/([^/]+)/run", "read-shaped", "runs a saved read query"),
             new Exemption("POST", "/pipelines/authored/([^/]+)/dry-run", "read-shaped", "a dry run writes nothing (PIPELINE-DRYRUN-1)"),
+            new Exemption("POST", "/lookups/test", "read-shaped",
+                    "looks one value up in a keyed join's in-memory index (LOOKUP-1 P3); the value rides the body, not the URL; persists nothing"),
             // 2026-09-17: the three evaluate routes LEFT this list. They were never read-shaped: an Expectation
             // evaluation persists lastResult, opens Incidents and emits EXPECTATION_FAILED; an Alert evaluation
             // emits ALERT_FIRED — and both events match the DEFAULT NotificationRules, so an ungated caller could

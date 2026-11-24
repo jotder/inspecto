@@ -101,6 +101,12 @@ public final class PipelineExecutor {
         /** {@code nodeId} ended with {@code outcome}; {@code diag} is {@code null} when there is nothing to say. */
         default void stepEnded(String nodeId, StepReceipt.Outcome outcome, StepReceipt.Diagnostics diag) {}
 
+        /**
+         * The keyed join {@code nodeId} ended OK and left these unmatched values (LOOKUP-1 §4.6; possibly none).
+         * ⚠ Raw values — an observer must fingerprint them before storing anything.
+         */
+        default void lookupMisses(String nodeId, List<RowShaper.LookupMiss> misses) {}
+
         /** {@code nodeId} (of type {@code kind}, at index {@code seq}) never started: the walk failed before it. */
         default void notReached(String nodeId, String kind, int seq) {}
 
@@ -334,7 +340,14 @@ public final class PipelineExecutor {
                 recordCounts(conn, obs, nodeId, rels);
                 emitDedupDropped(conn, g, node, batchId, rels);
                 trail.schema(nodeId, main(rels));
-                trail.end(nodeId, StepReceipt.Outcome.OK, null);
+                Map<String, Long> lookups = BuiltinNodeType.TRANSFORM_JOIN.type().equals(node.type())
+                        ? RowShaper.takeLookupStats(conn, nodeId) : Map.of();
+                if (BuiltinNodeType.TRANSFORM_JOIN.type().equals(node.type())) {
+                    List<RowShaper.LookupMiss> misses = RowShaper.takeLookupMisses(conn, nodeId);
+                    if (misses != null) obs.lookupMisses(nodeId, misses);
+                }
+                trail.end(nodeId, StepReceipt.Outcome.OK,
+                        lookups.isEmpty() ? null : new StepReceipt.Diagnostics(null, null, lookups));
             }
             // control terminals (gap/alert/event) consume but produce no data relation — nothing to route on
         }

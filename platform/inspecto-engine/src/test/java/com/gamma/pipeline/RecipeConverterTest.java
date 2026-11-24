@@ -369,6 +369,36 @@ class RecipeConverterTest {
         assertEquals(cfg, back);
     }
 
+
+    /** LOOKUP-1 P1d: a join with per-input mappings (lookups:, rename maps, details). */
+    private static Map<String, Object> lookupsJoin() {
+        Map<String, Object> served = new LinkedHashMap<>();
+        served.put("on", "SERVED_MSISDN");
+        Map<String, Object> cols = new LinkedHashMap<>();
+        cols.put("dial_digit_key", "SERVED_MSISDN_DIAL_DIGIT_KEY");
+        cols.put("provider_desc", "SERVED_MSISDN_OPER");
+        served.put("columns", cols);
+        served.put("default", Map.of("SERVED_MSISDN_DIAL_DIGIT_KEY", "-99"));
+        Map<String, Object> other = new LinkedHashMap<>();
+        other.put("on", "OTHER_MSISDN");
+        other.put("columns", Map.of("event_category_key", "EVENT_CATEGORY_KEY"));
+        other.put("details", true);
+        Map<String, Object> join = new LinkedHashMap<>();
+        join.put("reference", "reference/dial_digit");
+        join.put("match", "longest_prefix");
+        join.put("key", "dial_digit_key");
+        join.put("lookups", List.of(served, other));
+        return join;
+    }
+
+    /** LOOKUP-1 P1d: lookups: (rename maps, output-keyed defaults, details) round-trips through the recipe. */
+    @Test
+    void aLookupsJoinStepRoundTrips() {
+        Map<String, Object> cfg = stepsConfig(new LinkedHashMap<>(Map.of("join", lookupsJoin())));
+        Map<String, Object> back = RecipeCompiler.compile(RecipeConverter.toRecipe(cfg), cfg, false);
+        assertEquals(cfg, back);
+    }
+
     /** LOOKUP-1 P1c: a range join's bounds and row filter round-trip through the recipe. */
     @Test
     void aRangeJoinStepRoundTripsWithItsBoundsAndFilter() {

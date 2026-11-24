@@ -21,9 +21,9 @@ tags: [product-item, module]
 | features | missing | |
 | feature-db | current | [MCP endpoint — feature database](feature-db.md) |
 | user-guide | missing | |
-| admin-guide | current | [MCP endpoint — administrator guide](admin-guide-mcp.md) |
+| admin-guide | current | [Let an AI agent propose changes](admin-guide-howto-agent-propose-changes.md) · [MCP endpoint — administrator guide](admin-guide-mcp.md) |
 | api | current | [HTTP routes — module.mcp](api-routes.md) |
-| tests | current | [MCP endpoint — tests inventory](tests-inventory.md) |
+| tests | current | [Agent Kit golden runs — the compatibility matrix](tests-agent-golden.md) · [MCP endpoint — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
 Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
@@ -35,3 +35,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
+| `AGENT-GATEWAY-UNMARKED-1` | P3 | defect | behind an API gateway (-Dauth.oidc.gateway.*) an agent client's token is never marked: | — |
+| `PENDING-CHANGE-SECRET-READBACK-1` | P3 | defect | a Job's secret parameter can be read back through its Pending Change: | — |
+| `DRYRUN-PREVIEW-UNMASKED-1` | P3 | defect | Pipeline dry-run and test-run previews are not masked: | — |
+| `AGENT-KIT-FULL-GATE-1` | P1 | chore | Run the full reactor gate once over the Agent Kit and agent-fix changes before the next release: none of them ran it. | — |

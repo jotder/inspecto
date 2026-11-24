@@ -374,7 +374,7 @@ a production CDR store.
 The generators write one **`keep`** field per raw column (⛔ decided 2026-09-10, `MAPPING-GEN-1`; they wrote the
 legacy `rules[]` until then, a shape **0 of 24** committed schemas used). Every field carries an **`fn`** marker — that
 marker, not the key name, is what `RecordTransform.isFieldList` keys on, so a row without one is not a field list.
-The **23**<!--count:sql-mapping-functions--> verbs are the served catalog (`GET /components/transform/describe`,
+The **24**<!--count:sql-mapping-functions--> verbs are the served catalog (`GET /components/transform/describe`,
 `sql-functions.contract.json`): `keep` · `text.*` (trim, upper, lower, replace, substring, split_part, join, pad_left)
 · `num.*` (round, multiply, divide, abs) · `date.*` (parse, format, part, truncate, `concat_parts`, `from_filename`)
 · `logic.*` (default_if_empty, if_then_else) · `convert.type` · `custom` (any per-row DuckDB scalar expression, emitted

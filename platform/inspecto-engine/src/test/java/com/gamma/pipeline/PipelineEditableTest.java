@@ -423,6 +423,38 @@ class PipelineEditableTest {
         assertEquals(cfg, ((Map<?, ?>) steps.get(0)).get("join"));
     }
 
+
+    /** LOOKUP-1 P1d: a join with per-input mappings (lookups:, rename maps, details). */
+    private static Map<String, Object> lookupsJoin() {
+        Map<String, Object> served = new LinkedHashMap<>();
+        served.put("on", "SERVED_MSISDN");
+        Map<String, Object> cols = new LinkedHashMap<>();
+        cols.put("dial_digit_key", "SERVED_MSISDN_DIAL_DIGIT_KEY");
+        cols.put("provider_desc", "SERVED_MSISDN_OPER");
+        served.put("columns", cols);
+        served.put("default", Map.of("SERVED_MSISDN_DIAL_DIGIT_KEY", "-99"));
+        Map<String, Object> other = new LinkedHashMap<>();
+        other.put("on", "OTHER_MSISDN");
+        other.put("columns", Map.of("event_category_key", "EVENT_CATEGORY_KEY"));
+        other.put("details", true);
+        Map<String, Object> join = new LinkedHashMap<>();
+        join.put("reference", "reference/dial_digit");
+        join.put("match", "longest_prefix");
+        join.put("key", "dial_digit_key");
+        join.put("lookups", List.of(served, other));
+        return join;
+    }
+
+    /** LOOKUP-1 P1d: a join with lookups: lowers to steps: with every mapping kept verbatim. */
+    @Test
+    void aLookupsJoinLowersToStepsWithEveryMapping() {
+        Map<String, Object> cfg = lookupsJoin();
+        Map<String, Object> out = PipelineEditable.lower(graphWith(node("j1", "transform.join", cfg)),
+                new LinkedHashMap<>(), true);
+        assertFalse(((Map<?, ?>) out.get("processing")).containsKey("join"), "a lookups join is not processing.join");
+        assertEquals(cfg, ((Map<?, ?>) ((List<?>) out.get("steps")).get(0)).get("join"));
+    }
+
     /** LOOKUP-1 P1c: a range join (no key:) still lowers to steps: with its bounds and filter. */
     @Test
     void aRangeJoinLowersToStepsWithItsBoundsAndFilter() {

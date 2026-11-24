@@ -156,7 +156,7 @@ is passed on as the replayed route's JSON body, unchanged.
 |---|---|---|---|
 | `validate_config` | read | `type`, `config` | `POST /validate` (`{type, config}`); refusal findings come back as data |
 | `dry_run_pipeline` | read | `pipeline`, `body?` | `POST /pipelines/authored/{pipeline}/dry-run` |
-| `propose_change` | write | `kind`, `operation`, `id?`, `content?`, `reason?` | the kind's own write route, below; `reason` rides as `X-Change-Reason` |
+| `propose_change` | write | `kind`, `operation`, `id?`, `content?`, `reason?` | the kind's own write route, below; `reason` rides as the request attribute `RequestAttrs.ATTR_CHANGE_REASON`, which `PendingChanges.hold` reads before the `X-Change-Reason` header (an in-process replay need not be header-safe; a header holding "—" or "→" made the replay throw — `AGENT-PROPOSE-500-1`, fixed 2026-11-24) |
 | `list_pending_changes` | read | `status?` | `GET /pending-changes` |
 | `get_pending_change`, `diff_pending_change` | read | `change` | `GET /pending-changes/{change}`, `…/diff` |
 | `withdraw_change` | write | `change` | `POST /pending-changes/{change}/withdraw` (author only) |
@@ -187,6 +187,13 @@ console token refused every write tool but keeping the reads; validate, dry-run 
 withdraw; malformed proposals are `-32602`), `McpToolRoutesTest` (unit). Mutants that turned a test red: D-AK3 off,
 the refusal list off, the reason header dropped, the replay not answering a hold, the replay skipping the
 read-only check (on a read-only install `propose_change` is a 423 and no Pending Change is recorded; the reads answer).
+`aReasonNoHeaderCanCarryIsHeldAndKeptExactly` (2026-11-24): a reason with "—", "→" and "€" is held and kept exactly;
+putting the reason back on the header turns it red with the live run's "Illegal character found in header".
+
+**A replay that fails** with anything but an `ApiException` answers the tool `isError` with HTTP 500 and the exception's
+class name plus the correlation id, and is **logged at ERROR with its stack under that correlation id**
+(`McpRoutes.replay`), as a direct request's fault is (`ControlApi.fail500`). Until 2026-11-24 it was answered and
+dropped, which is why the first live golden run's 500s left no trace.
 
 ## Audit
 
@@ -362,6 +369,22 @@ attributes, so an approval marker never reaches an MCP replay, and the approve r
 `replay-gated` category changes no audit row and makes a write tool on a read-only install a 423, stricter than
 before. Accepted, below confidence 8: `export_bundle` replays an ungated read-shaped route, as the person could call
 directly; whether an agent's person may approve its Action Request is the Action Request policy's question.
+
+## Security review, phase 1 close (2026-11-24)
+
+An independent read-only review of AK-2 phase 1 as a whole (AK-2a and AK-2b together, plan
+[§6.1](../../../../superpower/2026-11-20-agent-kit-ak2-plan.md)) found **no vulnerability at confidence 8 or above** in a
+bearer-token OIDC deployment. It re-checked: the gate keying on the matched route's registered method and pattern
+(path quirks change only which route matches, never the bucket; every RouteModule registers through one router; no
+HEAD route, OPTIONS answered before routing, no method override; the gate before the idempotency cache); the never-list
+and its alternate doors (`ConfigTargetGuard` refusing `roles.toon`, `access-policies.toon`, `approval.toon` and
+`registry/`; access kinds refused on the generic component door); a sweep of every held route for a write before the
+hold; the allowed bucket; approval and replay (agent refused in `decide`, four eyes on the person, `verifyApproved`'s
+kind, name and hashes, the MAC, `authorNow` and the replay passing the gate again); MCP argument handling; the audit
+stamp. Observations below 8, filed: `AGENT-GATEWAY-UNMARKED-1` (gateway-assertion mode never marks an agent — confirmed
+in `OidcAuthenticator.verify`), `PENDING-CHANGE-SECRET-READBACK-1`, `DRYRUN-PREVIEW-UNMASKED-1`. Already known and
+accepted: marking depends on the IdP naming the client in `azp` / `client_id` and on no service account on an agent
+client (admin guide); an approved rename or Dataset delete has side effects the diff does not show (above).
 
 ## Deferred
 

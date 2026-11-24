@@ -3750,7 +3750,7 @@
         "tags" : [ "components" ],
         "summary" : "Derive a SQL transform's output columns",
         "operationId" : "postComponentsTransformDescribe",
-        "description" : "Runs DuckDB DESCRIBE over body sql against an empty input table built from inputColumns [{name, type}], reading no rows; the SQL passes the same guard as execution. No capability gate. 400 for a missing sql or inputColumns; 422 for a guard refusal or a binder or syntax error.",
+        "description" : "Runs DuckDB DESCRIBE over body sql against an empty input table built from inputColumns [{name, type}], reading no rows; the SQL passes the same guard as execution. No capability gate. 400 for a missing sql or inputColumns; 422 for a guard refusal or a binder or syntax error. With a config body instead (LOOKUP-1 P1d: {config: a keyed transform.join, inputColumns?, referenceColumns?: [{name, type}]}) it lists the columns that join adds as {columns: [{name, type, from, lookedUpBy, match, detail}]}, the Reference's columns read from the producing Pipeline's declared schema when referenceColumns is absent; 422 naming a clash, an unknown column, a non-keyed join or a Reference whose columns are unknown.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -9398,6 +9398,50 @@
           },
           "404" : {
             "$ref" : "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/lookups" : {
+      "get" : {
+        "tags" : [ "Execution & Scheduling" ],
+        "summary" : "Every keyed Reference lookup with its last run",
+        "description" : "LOOKUP-1: every keyed transform.join (key:, or from:/to: for a range) in the Space's loaded Pipelines: pipeline, step, reference, match and lookedUpBy (the input columns looked up), each with lastRun read from the Step Receipts (the newest receipt of that Pipeline and Step, dry runs excluded): consignmentId, outcome, startedAt, rowsIn, counts (the receipt's diag.counts: lookup.<on>.hit|miss and reference.rows|null_keys|nested_prefixes) and truncated. Counts only, never a value; diag.msg is not served. lastRun is null before the first run; with Step Receipts switched off it is absent and known.lastRun is false. Each row also carries index {state: ready | building | failed | cold, rows, bytes, loadedAt, error} — the in-memory test index of POST /lookups/test; with -Dlookup.point.preload=true the indexes are built at start (up to 8). A plain (non-keyed) join is not listed. First 500 + total. An open read under Space admission, like GET /consignments/{consignmentId}.",
+        "operationId" : "listLookups",
+        "x-probe" : {
+          "path" : "/api/v1/lookups",
+          "status" : 200
+        },
+        "responses" : {
+          "200" : {
+            "description" : "The keyed lookups and their last runs.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Envelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/lookups/test" : {
+      "post" : {
+        "tags" : [ "Execution & Scheduling" ],
+        "summary" : "Test one value against a keyed lookup",
+        "description" : "LOOKUP-1 P3 test-a-key. Body {pipeline, step, value, at?, refresh?}: the keyed transform.join Step's answer for one value from the point engine (an in-memory index of the Reference, held equal to the batch join by a parity suite): compared (the value after normalize:), hit, matchedKey, matchKind (exact|prefix|range|asof|none), mappings[] {on, columns} (each output column as text, not-found defaults applied) and index {rows, bytes (estimated memory), loadedAt, buildMs, reloaded (why this answer built it: first use | reload asked | step changed | reference changed; null when kept), watchesReference}. Every match mode: exact, longest_prefix, range (the value compared as the batch join compares it: cast to DATE for a DATE bound, a number by value, never rounded) and asof (at = the row time, cast to DATE or TIMESTAMP when the from-column is one; without it only undated rows match). The index is built on first use and kept warm (at most 8); it is rebuilt when the Step config changed, the Reference files changed (count, bytes and newest modification time of the files its resolver declares; the new index replaces the old in one write), or refresh is true. watchesReference is false when no files are declared: then only refresh sees a change. The value rides the body, never the URL, and is not logged. 400 without pipeline and step; 404 for an unknown keyed Step; 422 for a join the point engine refuses (a duplicate key or key-and-date, overlapping ranges under duplicates: refuse, an index whose estimated memory passes -Dlookup.point.max_bytes, default 268435456 = 256 MiB). No capability gate: read-shaped, persists nothing.",
+        "operationId" : "testLookup",
+        "responses" : {
+          "200" : {
+            "description" : "The value's answer.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Envelope"
+                }
+              }
+            }
           }
         }
       }

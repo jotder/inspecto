@@ -1372,6 +1372,11 @@ chapters:
         type: unsorted
         tracks[1]: operator
         audience: internal
+      howto_agent_propose_changes:
+        file: docs/okf/product/module/mcp/admin-guide-howto-agent-propose-changes.md
+        type: howto
+        tracks[2]: operator,builder
+        audience: external
       admin_guide_auth_security_abac_decisions:
         file: docs/okf/product/module/access/admin-guide-auth-security-abac-decisions.md
         type: unsorted

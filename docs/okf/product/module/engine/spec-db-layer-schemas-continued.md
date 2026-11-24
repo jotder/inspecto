@@ -311,6 +311,25 @@ run, lane and `seq` (a failed read throws: an empty list must never stand for "c
   appends its SUCCESS after the PARKED row; member files keep the newest row per `filename`) — the batches and files tables hold
   the id only inside the JSON payload, and no index or column is added.
 
+### 3.9-b `lookup_misses` — unmatched-key sample (LOOKUP-1)  · **A**
+File: `inspecto-consignment-outputs.db`, beside `consignment_steps` (same `ConnectionSource`).
+
+```sql
+CREATE TABLE IF NOT EXISTS lookup_misses (
+  pipeline VARCHAR, step VARCHAR, consignment_id VARCHAR, recorded_at VARCHAR, mapping VARCHAR, fingerprint VARCHAR, length INTEGER, shape VARCHAR, n BIGINT
+);
+```
+
+The last run's sample of each keyed `transform.join`: up to 20 distinct values per mapping that found no Reference
+row, most frequent first. **Never the value**: `fingerprint` is the Space-salted `FailureText.fingerprint` (the
+rejected rows' own), `shape` keeps the first `min(4, length / 3)` characters and masks the rest. `pipeline` is the
+receipts' name (`<pipeline>_stage2` at rest). Written by `recordLookupMisses` from `PipelineJobRunner` after the
+walk — delete-then-insert for that (pipeline, step) in one transaction, so a clean run clears the old sample; never
+for a dry run; best-effort (a WARN). Read by `lookupMisses(pipeline, step, consignmentId)` for `GET /lookups`, with the
+Consignment of the Step's newest receipt — so a later run that failed before storing a sample shows none, never an
+older run's. Bounded by design
+(one run per keyed Step), so no retention.
+
 ### 3.10 `file_stages` — per-file stage-progression registry  · **M**
 File: `inspecto-file-stages.db`
 

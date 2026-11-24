@@ -499,6 +499,7 @@ com.gamma.config.spec.FindingCodes | public static final String ERR_COLLECTOR_CO
 com.gamma.config.spec.FindingCodes | public static final String ERR_DEDUP_WINDOW_UNARMABLE
 com.gamma.config.spec.FindingCodes | public static final String ERR_EDITION_FEATURE
 com.gamma.config.spec.FindingCodes | public static final String ERR_EXCEL_INVALID
+com.gamma.config.spec.FindingCodes | public static final String ERR_LOOKUP_ON_INGEST
 com.gamma.config.spec.FindingCodes | public static final String ERR_ROUTE_PREDICATE_COLUMN
 com.gamma.config.spec.FindingCodes | public static final String ERR_ROUTE_UNARMABLE
 com.gamma.config.spec.FindingCodes | public static final String ERR_SAFETY_STATE_ADVANCE_REFUSED
@@ -599,10 +600,12 @@ com.gamma.consignment.DbConsignmentOutputStore | public List<DailyVolume> dailyV
 com.gamma.consignment.DbConsignmentOutputStore | public List<ProducerHighWater> producerHighWater(String)
 com.gamma.consignment.DbConsignmentOutputStore | public List<String> browseTables()
 com.gamma.consignment.DbConsignmentOutputStore | public List<String> unreadablePaths()
+com.gamma.consignment.DbConsignmentOutputStore | public List<com.gamma.pipeline.exec.LookupMissSample.Entry> lookupMisses(String, String, String)
 com.gamma.consignment.DbConsignmentOutputStore | public List<com.gamma.pipeline.exec.StepReceipt> steps(String)
 com.gamma.consignment.DbConsignmentOutputStore | public List<com.gamma.pipeline.exec.StepReceipt> steps(String, int)
 com.gamma.consignment.DbConsignmentOutputStore | public Map<String, String> consignmentsOfRuns(java.util.Collection<String>)
 com.gamma.consignment.DbConsignmentOutputStore | public Optional<EventTimeBounds> bounds(String)
+com.gamma.consignment.DbConsignmentOutputStore | public Optional<com.gamma.pipeline.exec.StepReceipt> latestStep(String, String)
 com.gamma.consignment.DbConsignmentOutputStore | public String browseId()
 com.gamma.consignment.DbConsignmentOutputStore | public String browseLabel()
 com.gamma.consignment.DbConsignmentOutputStore | public boolean isReadable(String)
@@ -619,6 +622,7 @@ com.gamma.consignment.DbConsignmentOutputStore | public static final int DEFAULT
 com.gamma.consignment.DbConsignmentOutputStore | public void close()
 com.gamma.consignment.DbConsignmentOutputStore | public void maintenance()
 com.gamma.consignment.DbConsignmentOutputStore | public void record(List<ConsignmentOutput>)
+com.gamma.consignment.DbConsignmentOutputStore | public void recordLookupMisses(String, String, String, List<com.gamma.pipeline.exec.LookupMissSample.Entry>)
 com.gamma.consignment.DbConsignmentOutputStore | public void recordSteps(List<com.gamma.pipeline.exec.StepReceipt>)
 com.gamma.consignment.DbConsignmentOutputStore.DailyVolume | public record DailyVolume(String recordDay, long files, long rows)
 com.gamma.consignment.DbDedupLedger | public DbDedupLedger(Connection) throws SQLException
@@ -2325,6 +2329,7 @@ com.gamma.pipeline.exec.PipelineExecutor.SinkWriter | public interface SinkWrite
 com.gamma.pipeline.exec.PipelineExecutor.SinkWriter | void write(PipelineNode, String) throws Exception
 com.gamma.pipeline.exec.PipelineExecutor.WalkObserver | WalkObserver NONE
 com.gamma.pipeline.exec.PipelineExecutor.WalkObserver | default void counts(String, String, long)
+com.gamma.pipeline.exec.PipelineExecutor.WalkObserver | default void lookupMisses(String, List<RowShaper.LookupMiss>)
 com.gamma.pipeline.exec.PipelineExecutor.WalkObserver | default void notReached(String, String, int)
 com.gamma.pipeline.exec.PipelineExecutor.WalkObserver | default void schema(String, int, String)
 com.gamma.pipeline.exec.PipelineExecutor.WalkObserver | default void stepEnded(String, StepReceipt.Outcome, StepReceipt.Diagnostics)
@@ -2350,29 +2355,38 @@ com.gamma.pipeline.exec.ProvenanceStores | public static void register(String, D
 com.gamma.pipeline.exec.ProvenanceStores | public static void unregister(String)
 com.gamma.pipeline.exec.ProvenanceStores | public static void use(DbProvenanceStore)
 com.gamma.pipeline.exec.RowShaper | public final class RowShaper
+com.gamma.pipeline.exec.RowShaper | public static Double joinMaxMissRate(Object)
+com.gamma.pipeline.exec.RowShaper | public static List<AddedColumn> joinAddedColumns(Map<String, Object>, Map<String, String>, List<String>)
+com.gamma.pipeline.exec.RowShaper | public static List<LookupMiss> takeLookupMisses(Connection, String)
 com.gamma.pipeline.exec.RowShaper | public static List<Relation> merge(Connection, PipelineNode, List<String>, String) throws SQLException
 com.gamma.pipeline.exec.RowShaper | public static List<Relation> shape(Connection, PipelineNode, String, String) throws SQLException
 com.gamma.pipeline.exec.RowShaper | public static List<Relation> shape(Connection, PipelineNode, String, String, ReferenceResolver) throws SQLException
 com.gamma.pipeline.exec.RowShaper | public static List<Relation> shape(Connection, PipelineNode, String, String, ReferenceResolver, ExecutionContext) throws SQLException
 com.gamma.pipeline.exec.RowShaper | public static List<String> joinNormalizers(Object)
+com.gamma.pipeline.exec.RowShaper | public static Map<String, Long> takeLookupStats(Connection, String)
 com.gamma.pipeline.exec.RowShaper | public static Optional<String> toSelect(PipelineNode, String)
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_CONFIG_KEYS
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_DUPLICATES
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_KEYED_KEYS
+com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_LOOKUP_KEYS
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_MATCHES
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_NORMALIZERS
 com.gamma.pipeline.exec.RowShaper | public static final Set<String> MAP_NODE_CONFIG_KEYS
+com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_ASOF
 com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_EXACT
 com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_LONGEST_PREFIX
 com.gamma.pipeline.exec.RowShaper | public static final String JOIN_MATCH_RANGE
+com.gamma.pipeline.exec.RowShaper | public static final int LOOKUP_MISS_SAMPLE
 com.gamma.pipeline.exec.RowShaper | public static final java.util.regex.Pattern NEW_COLUMN_NAME
 com.gamma.pipeline.exec.RowShaper | public static final java.util.regex.Pattern UNPIVOT_VALUE_TYPE
+com.gamma.pipeline.exec.RowShaper.AddedColumn | public record AddedColumn(String name, String type, String from, String lookedUpBy, String match, String detail)
 com.gamma.pipeline.exec.RowShaper.ExecutionContext | public ExecutionContext asDryRun()
 com.gamma.pipeline.exec.RowShaper.ExecutionContext | public ExecutionContext(String, String, com.gamma.consignment.DbDedupLedger)
 com.gamma.pipeline.exec.RowShaper.ExecutionContext | public boolean hasLedger()
 com.gamma.pipeline.exec.RowShaper.ExecutionContext | public record ExecutionContext(String pipeline, String consignmentId, com.gamma.consignment.DbDedupLedger ledger, boolean dryRun)
 com.gamma.pipeline.exec.RowShaper.ExecutionContext | public static ExecutionContext forRun(String, String)
 com.gamma.pipeline.exec.RowShaper.ExecutionContext | public static final ExecutionContext NONE
+com.gamma.pipeline.exec.RowShaper.LookupMiss | public record LookupMiss(String mapping, String value, long n)
 com.gamma.pipeline.exec.RowShaper.ReferenceResolver | ReferenceResolver NONE
 com.gamma.pipeline.exec.RowShaper.ReferenceResolver | String resolve(Connection, String) throws SQLException
 com.gamma.pipeline.exec.RowShaper.ReferenceResolver | default List<java.nio.file.Path> readDirs(String)
@@ -2768,6 +2782,7 @@ com.gamma.spi.auth.RequestAttrs | public static final ConcurrentHashMap<HttpExch
 com.gamma.spi.auth.RequestAttrs | public static final String ATTR_APPROVED_CHANGE
 com.gamma.spi.auth.RequestAttrs | public static final String ATTR_AUDIT_ATTRS
 com.gamma.spi.auth.RequestAttrs | public static final String ATTR_CAPABILITY
+com.gamma.spi.auth.RequestAttrs | public static final String ATTR_CHANGE_REASON
 com.gamma.spi.auth.RequestAttrs | public static final String ATTR_CLIENT_IP
 com.gamma.spi.auth.RequestAttrs | public static final String ATTR_CORRELATION_ID
 com.gamma.spi.auth.RequestAttrs | public static final String ATTR_EMBED_GRANT

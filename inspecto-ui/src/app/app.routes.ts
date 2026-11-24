@@ -131,6 +131,7 @@ export const appRoutes: Route[] = [
             { path: 'cases', loadChildren: () => import('app/modules/admin/objects/cases.routes') },
             { path: 'incidents', loadChildren: () => import('app/modules/admin/objects/incidents.routes') },
             { path: 'tags', loadChildren: () => import('app/modules/admin/tags/tags.routes') },
+            { path: 'lookups', loadChildren: () => import('app/modules/admin/lookups/lookups.routes') },
             { path: 'runs', loadChildren: () => import('app/modules/admin/runs/runs.routes') }, // also matches runs/:name (side-panel detail, R5)
             { path: 'pipelines', loadChildren: () => import('app/modules/admin/pipelines/pipelines.routes') },
             { path: 'components', loadChildren: () => import('app/modules/admin/components/components.routes') },

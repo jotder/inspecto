@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-125 test file(s). Run one, or all:
+128 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -22,6 +22,7 @@ node --test tools/
 |---|---|
 | `tools/affected-modules.test.mjs` | Fixture test for tools/affected-modules.mjs. Run: node --test tools/affected-modules.test.mjs |
 | `tools/assemble.test.mjs` | Tests for tools/assemble.mjs — PRODUCT-ASSEMBLY-1 PA-2. Run: node --test tools/assemble.test.mjs |
+| `tools/check-agent-kit.test.mjs` | Negative fixtures for tools/check-agent-kit.mjs, plus the real Kit passing. |
 | `tools/check-backlog-items.test.mjs` | Fixture test for tools/check-backlog-items.mjs. Run: node --test tools/check-backlog-items.test.mjs |
 | `tools/check-bundle-handbook.test.mjs` | Tests for tools/check-bundle-handbook.mjs — the D-UE7 rule (which bundle's /help carries the training pages) and the |
 | `tools/check-bundle-spaces.test.mjs` | node --test tools/check-bundle-spaces.test.mjs |
@@ -99,6 +100,7 @@ node --test tools/
 | `tools/la_gen_io.test.mjs` | Unit test of tools/la_gen_io.py, the safe output helper of the gen-la-*-data.py generators (LA-GENERATOR-DELETE-FIRST-1). |
 | `tools/maven-repo.test.mjs` | Run: node --test tools/maven-repo.test.mjs |
 | `tools/offering-classpath.test.mjs` | Fixture test for tools/offering-classpath.mjs. Run: node --test tools/offering-classpath.test.mjs |
+| `tools/package-agent-kit.test.mjs` | Tests for tools/package-agent-kit.mjs — the per-vendor packages built from the Kit, no network, no disk. |
 | `tools/package-la-showcase.test.mjs` | Unit tests for tools/package-la-showcase.mjs (LA-SHOWCASE-DIST-1): the Space / data split and the space.toon it writes. |
 | `tools/pick-addons.test.mjs` | tools/pick-addons.mjs - the Add-on picker (PRODUCT-ASSEMBLY-1 PA-6c). |
 | `tools/precommit.test.mjs` | Fixture test for tools/precommit.mjs. Run: node --test tools/precommit.test.mjs |
@@ -117,6 +119,7 @@ node --test tools/
 | `tools/render-space-links.test.mjs` | Tests for tools/render-space-links.mjs (LC-7): the census parse reads every link line and refuses one it cannot |
 | `tools/render-tests-inventory.test.mjs` | Fixture test for tools/render-tests-inventory.mjs. Run: node --test tools/render-tests-inventory.test.mjs |
 | `tools/roll-backlog-ledger.test.mjs` | Tests for tools/roll-backlog-ledger.mjs. Run: node --test tools/roll-backlog-ledger.test.mjs |
+| `tools/run-agent-golden.test.mjs` | Tests for tools/run-agent-golden.mjs grading — recorded states, no server. |
 | `tools/run-handbook-checks.test.mjs` | Tests for tools/run-handbook-checks.mjs. Run: node --test tools/run-handbook-checks.test.mjs |
 | `tools/sbom-modules.test.mjs` | Fixtures for tools/sbom-modules.mjs (P3f per-module SBOMs). Run: node --test tools/sbom-modules.test.mjs |
 | `tools/seed-la-audit.test.mjs` | node --test tools/seed-la-audit.test.mjs  -  request building of the la-audit seed script against a MOCKED fetch (no server). |

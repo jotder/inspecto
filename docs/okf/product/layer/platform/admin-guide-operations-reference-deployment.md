@@ -70,6 +70,9 @@ inspecto-deploy/
                                 the server serves docs/api/openapi-v1.json at GET /api/v1/openapi.json, cwd-relative)
   sbom/                       ← the combined CycloneDX + SPDX SBOMs and one SBOM per jar
   licenses/                   ← third-party licence texts for bundled native libraries (Advanced/Preview)
+  agent-kit/                  ← the Agent Kit, only where lib/modules.list carries inspecto-mcp (Standard and up):
+                                README.md, skills/ (Agent Skills), package-agent-kit.mjs (Claude Code / Gemini CLI
+                                packages for this install, Node.js), VERSION
 ```
 
 The worked examples (`inspecto/examples/`) are **not** in the bundle; they stay in the repository with their

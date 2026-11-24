@@ -912,10 +912,12 @@ public final class NodeAttributes {
             NodeAttribute.of("reference", "Reference", "autocomplete", "required")
                     .placeholder("reference/rates")
                     .help("The registered Reference component joined onto the row set."),
-            NodeAttribute.of("on", "Join keys", "list", "required").placeholder("currency")
-                    .help("Column(s) equated between the rows and the Reference."),
+            NodeAttribute.of("on", "Join keys", "list", "required").required(false).placeholder("currency")
+                    .help("Column(s) equated between the rows and the Reference. Leave empty when the Step "
+                            + "carries lookups: (one mapping per looked-up column, written in the pipeline file)."),
             NodeAttribute.of("match", "Match", "select", "optional").defaultValue("exact")
-                    .options("exact", "Exact", "longest_prefix", "Longest prefix (last key)", "range", "Range (from – to)")
+                    .options("exact", "Exact", "longest_prefix", "Longest prefix (last key)", "range", "Range (from – to)",
+                            "asof", "As of (latest effective at the row's time)")
                     .help("Exact: every key equal. Longest prefix: the last key matches the Reference row "
                             + "whose key is its longest prefix (e.g. phone number to operator). Range: the row whose "
                             + "From – To contains the value (e.g. the rate valid on the call date)."),
@@ -948,6 +950,21 @@ public final class NodeAttributes {
                     .help("Exact and longest prefix: rewrite the Reference key and each looked-up value the same way "
                             + "before comparing, in the order given — trim, lower, upper, strip_leading_zeros, "
                             + "strip_plus."));
+            NodeAttribute.of("details", "Match details", "boolean", "optional")
+                    .help("Also add, per looked-up column, the key that matched ({on}_matched_key) and how it "
+                            + "matched ({on}_match_kind: exact, prefix, range or none)."),
+            NodeAttribute.of("at", "Row time", "string", "optional").placeholder("txn_date")
+                    .help("As of: the rows' time column. Each row takes the latest Reference row of its key whose "
+                            + "'Range from' is at or before this time (e.g. the rate of its currency in force on the "
+                            + "transaction date). Needs 'Reference key' and 'Range from'."),
+            NodeAttribute.of("normalize", "Normalize keys", "list", "optional").placeholder("strip_plus")
+                    .help("Exact and longest prefix: rewrite the Reference key and each looked-up value the same way "
+                            + "before comparing, in the order given — trim, lower, upper, strip_leading_zeros, "
+                            + "strip_plus."),
+            NodeAttribute.of("max_miss_rate", "Stop above this miss rate", "number", "optional").min(0).max(1)
+                    .placeholder("0.1")
+                    .help("Stop the run when more than this share (0 to 1) of a column's values find no Reference "
+                            + "row — a stale or wrong Reference. The failed Step raises the Incident. Empty = never stop."));
 
     /**
      * {@code transform.sql} (sql-transform-v1-plan.md, B1) — one author {@code SELECT} over the typed

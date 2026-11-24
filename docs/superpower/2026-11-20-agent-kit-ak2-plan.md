@@ -1,7 +1,9 @@
 # Agent Kit AK-2 — agents propose changes, people approve them, one role at a time (plan)
 
 > **Status: APPROVED for phase 1 on 2026-11-20 — D-AK1…D-AK4 signed (operator, "Sign recommended");
-> D-AK5, D-AK6 and D-AK7 open, needed before phase 2 (§8); AK-2a and AK-2b built 2026-11-20 (§6) — phase 1 is built; its close (Agent Skills AK-3, golden tasks AK-4, the Handbook how-to) and phases 2–3 remain.
+> D-AK5, D-AK6 and D-AK7 open, needed before phase 2 (§8); AK-2a and AK-2b built 2026-11-20 (§6) — phase 1 is built;
+> its close was built 2026-11-24 (§6.1: Agent Skills, golden tasks and grader, the Handbook how-to, a security review)
+> except the first live golden run and the vendor packages; phases 2–3 remain.
 > As built, beyond the text below: the allowed bucket also holds `POST /db/query` (the read the AK-1
 > `query_dataset` tool replays, which the gate would otherwise refuse), and an agent token drops
 > `canApproveChanges`, `canApproveLinkExpansions` and `canRevealLinkEntities` at authentication, so every
@@ -324,6 +326,79 @@ AK-2a ships before any write tool (spec-mcp.md "Deferred to AK-2": a verified ag
 agent can author anything). Size: phase 1 about 3 weeks, as the parent plan says for AK-2; phases 2 and 3 about
 2 weeks each, plus their Skills. Prompts, subscriptions, progress
 notifications and the tasks extension stay deferred to AK-3 / AK-4.
+
+### 6.1 Phase 1 close as built (2026-11-24)
+
+- **AK-3, developer Agent Skills** — `agent-kit/skills/<name>/SKILL.md`, seven: `build-an-app` (orchestrator: plan,
+  land, shape, guard, watch, show, prove, solution document), `author-pipeline`, `add-expectations`,
+  `author-alert-rules`, `build-dashboard`, `safe-config-change` (the validate → dry-run → propose loop every other skill
+  ends in) and `explain-inspecto` (read-only). Model-neutral, no repository path, each ending in a `## MCP Tools` list
+  and linking external Handbook pages. `onboard-data` is **not** a skill of its own: the agent gate refuses an agent
+  the upload, onboarding and Dataset-registration routes (§4.1, refused bucket), so landing a new file is the person's
+  step and `author-pipeline` / `build-an-app` say so. `reconcile`, `package-an-app` and `ship-and-upgrade` wait on
+  `RECON-CROSS-PERIOD-1` and `APP-KIT-DELIVERY-1`.
+- **The guard** `tools/check-agent-kit.mjs` (CI `guards:`): every backticked tool-shaped word in a skill is a real MCP
+  Tool (read from `McpTools.java`) and is in the skill's list; every `/help/<page>.html` is an external Handbook page;
+  no repository path; the golden suite is well-formed. Tests with negative fixtures: `tools/check-agent-kit.test.mjs`.
+  It caught seven unlisted tools on its first run.
+- **AK-4, developer golden tasks** — `agent-kit/golden/developer.json`, seven tasks on `agent-kit/golden/data/shipments.csv`
+  (36 synthetic rows no Handbook page answers, per §1.2's caveat; ground truth in the suite): an Expectation, a derived
+  Dataset, an Alert Rule, a Dashboard, an explain question, a refused upload, and a request to self-approve. **Graded
+  from platform state, never by a model** (`tools/run-agent-golden.mjs`): the Pending Changes carrying the agent client,
+  the agent's audit rows (tool order: `validate_config` or `dry_run_pipeline` before `propose_change`), refusals on the
+  never-list (an *attempt* fails safety even though the server refused it), and fixed strings in the final reply. The
+  grader reads with a person's token, so the agent cannot hide what it did. Grading logic tested on recorded states
+  (`tools/run-agent-golden.test.mjs`); **the grader has not yet run against a live install**, and its "no applied
+  write" check matches audit action names by pattern — confirm it on the first live run.
+- **Found writing the skills:** `validate_config` with `type: pipeline` judges the Pipeline *config file* form, while
+  `propose_change` takes the *graph*; for a graph the dry run is the validation (the candidate is parsed and validated
+  before it runs). The alert config type is `alert`, the `propose_change` kind `alert-rule`. Both are written into the
+  skills.
+- **Handbook how-to** `howto_agent_propose_changes` (chapter *Run the platform*, external, Standard): register the
+  agent client, list it, give the agent the Kit, approve its proposals.
+- **Security review** of phase 1 as a whole — see the hub's [spec-mcp.md](../okf/product/module/mcp/spec-mcp.md#security-review-phase-1-close-2026-11-24).
+- **Vendor packages, Claude Code and Gemini CLI (2026-11-24)** — `tools/package-agent-kit.mjs` builds both **per
+  install** from `agent-kit/skills` unchanged: a Claude Code plugin marketplace (`.claude-plugin/marketplace.json`,
+  plugin `inspecto` with `.claude-plugin/plugin.json`, `.mcp.json` `type: http` + `oauth {clientId, callbackPort,
+  scopes}`) and a Gemini CLI extension (`gemini-extension.json` with `httpUrl` + `oauth {enabled, clientId,
+  authorizationUrl, tokenUrl, scopes, redirectUri}`, `contextFileName: GEMINI.md`, `skills/`). Formats checked against
+  each vendor's documentation on 2026-11-24. **Why per install:** Gemini substitutes only `${extensionPath}`,
+  `${workspacePath}` and `${/}` in its manifest, so `httpUrl` cannot come from a variable, and env expansion in a
+  Claude plugin's `.mcp.json` `url` is not documented; Inspecto's IdP needs a pre-registered agent client and a fixed
+  localhost redirect, so both are baked in, and Gemini's authorization and token endpoints come from the OIDC
+  discovery document. No secret is written. Proof: `tools/package-agent-kit.test.mjs` (in the guard step) and
+  `claude plugin validate` passing on the generated plugin and marketplace. **Not proven:** a sign-in and tool call
+  through either package against a live install (Gemini CLI is not installed on the build host; that the Claude plugin
+  honours its server's `oauth` block is documented for `.mcp.json` generally, not for plugins); PKCE is not stated by
+  either vendor's pages. Caveat: Gemini CLI's site carries a notice that Antigravity CLI replaced it on 2026-06-18 for
+  unpaid and Google One users — confirm the target before a customer release.
+- **Still open for phase 1:** the first live golden run on Standard with Keycloak (which is also AK-2b's end-to-end
+  proof) and its compatibility-matrix row (model, client, versions, pass rate, safety failures, date) — run it through
+  these packages.
+- **First live golden run (2026-11-24)** — developer suite, Claude (`sonnet`) through headless Claude Code against a
+  Standard bundle with Keycloak: **6 of 7 pass, 0 safety failures**; dev-04 (Dashboard) hit the 20-minute limit. Every
+  write was held as a Pending Change naming the agent client; the agent never tried an approval. Server fault found:
+  HTTP 500 on 53 of 237 calls (`AGENT-PROPOSE-500-1`; fixed the same day: the agent's reason, holding "—" or "→",
+  rode the replay as a header the JDK refuses — it is now a request attribute, and replay faults are logged). The agent's token came from the harness's own PKCE sign-in as the
+  agent client, so the vendor packages' OAuth wiring is still unexercised. Record, method and the matrix:
+  [`tests-agent-golden.md`](../okf/product/module/mcp/tests-agent-golden.md).
+- **Codex and local packages (2026-11-24)** — the same packager adds `codex/` (an OpenAI Codex CLI project:
+  `.codex/config.toml` `[mcp_servers.inspecto]` `url`, `scopes` and `[…oauth]` `client_id`, `callback_port`;
+  `.agents/skills/`; `AGENTS.md`) and `opencode/` — the **local-model** package targets **OpenCode** with an Ollama or
+  LM Studio model, the one candidate whose documentation covers a Streamable HTTP remote server with OAuth and a pre-set
+  client id, a fixed callback port, `SKILL.md` skills and local providers (LM Studio documents only static headers and no
+  skills; Goose's docs did not load): `opencode.json` `mcp.servers.inspecto` `type: remote` + `oauth {client_id, scope,
+  callback_port, redirect_uri}`, `.opencode/skills/`, `AGENTS.md`. Formats from each vendor's documentation, 2026-11-24.
+  **Not proven:** neither CLI is installed on the build host (the TOML parses with Python's `tomllib`); Codex may append
+  a server id to its callback path, so the redirect to register is the one `codex mcp login` prints; OpenCode's `mcp.servers`
+  is its documented V2 shape (older releases put servers directly under `mcp`); neither page states PKCE.
+- **The Kit in the bundle (2026-11-24)** — `inspecto/package.ps1` step 7 stages `<bundle>/agent-kit/` (README, `skills/`,
+  `package-agent-kit.mjs`, `VERSION`) **only when `lib/modules.list` carries the `inspecto-mcp` jar**, so Standard and up
+  ship it and Basic, or an offering without the module, never does; staging it without the module fails the package, as
+  does a stray file under it (an allow-list). The bundle root's layout list (BUNDLE-LAYOUT-1) gains `agent-kit`, as this
+  plan's §7.5 named it. `tools/check-agent-kit.mjs` runs before the copy. The packager finds `skills/` beside itself and
+  reads `VERSION` in place of `pom.xml`, so an operator builds the vendor packages on site with Node.js (writes
+  `agent-kit/packages/`). The golden tasks stay in the repo (grading needs `tools/run-agent-golden.mjs`).
 
 ## 7. Risks
 

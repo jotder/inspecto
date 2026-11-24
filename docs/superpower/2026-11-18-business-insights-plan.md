@@ -1,7 +1,7 @@
 # Business insights in Widgets and Dashboards — research and design
 
-> **Status: DESIGN APPROVED 2026-11-18 — D-BI1, D-BI2, D-BI3 signed (operator, recommended options); nothing
-> built.** D-BI4…D-BI10 (§11) stay open and are answered at the phase that needs them. Board row: `BI-INSIGHTS-1`
+> **Status: DESIGN APPROVED 2026-11-18 — D-BI1, D-BI2, D-BI3 signed (operator, recommended options); D-BI4…D-BI10
+> signed 2026-11-24 (operator, recommended options); nothing built.** Every decision in §11 is closed. Board row: `BI-INSIGHTS-1`
 > (§12). The new terms are in `GLOSSARY.md` §7.
 > Scope: insights on **business data** — the Measures over Datasets (revenue, usage, subscribers, transactions,
 > margin, leakage, partners, churn). Not observability: pipeline health stays with Metrics and Alert Rules.
@@ -273,13 +273,13 @@ already exists there, and Q2/Q4 answer the questions an RA or finance lead asks 
 | D-BI1 | Names | ✅ **SIGNED 2026-11-18: (a)** Insight Type / Insight / Insight Profile / Chart Marker / KPI History, added to `GLOSSARY.md` §7 · (b) other names |
 | D-BI2 | Where the scan lives | ✅ **SIGNED 2026-11-18: (a)** new `features/inspecto-insights` add-on; kernel and engine extended for overlays · (b) everything inside engine + analytics |
 | D-BI3 | Edition placement | ✅ **SIGNED 2026-11-18: (a)** overlays and KPI History in Standard BI; Insight Profiles / scan / explain as a "Business Insights" add-on (Standard+); language features with AI Assist; scenarios Advanced · (b) all in one add-on |
-| D-BI4 | Who may tune | (a) Builders author, owners tune within bounds, Business users give feedback · (b) Builders only |
-| D-BI5 | Language features in the first release | (a) no — templated sentences first, Brief in P4 · (b) yes |
-| D-BI6 | Pilot | (a) `business-assurance` + `telco-ra` revenue · (b) `mobile-money` transaction value |
-| D-BI7 | Compute placement | (a) overlays at query time, scans and depth-2 explanations as Jobs · (b) everything precomputed |
-| D-BI8 | Insights stored as an auto-registered Dataset | (a) yes · (b) object store only |
-| D-BI9 | Chart Markers implementation | (a) a Chart.js overlay plugin behind the viz contract · (b) custom drawing |
-| D-BI10 | KPI History grain and retention | (a) the KPI's own grain, 3 years · (b) day only, retention per Space |
+| D-BI4 | Who may tune | ✅ **SIGNED 2026-11-24: (a)** Builders author, owners tune within bounds, Business users give feedback · (b) Builders only |
+| D-BI5 | Language features in the first release | ✅ **SIGNED 2026-11-24: (a)** no — templated sentences first, Brief in P4 · (b) yes |
+| D-BI6 | Pilot | ✅ **SIGNED 2026-11-24: (a)** `business-assurance` + `telco-ra` revenue · (b) `mobile-money` transaction value |
+| D-BI7 | Compute placement | ✅ **SIGNED 2026-11-24: (a)** overlays at query time, scans and depth-2 explanations as Jobs · (b) everything precomputed |
+| D-BI8 | Insights stored as an auto-registered Dataset | ✅ **SIGNED 2026-11-24: (a)** yes · (b) object store only |
+| D-BI9 | Chart Markers implementation | ✅ **SIGNED 2026-11-24: (a)** a Chart.js overlay plugin behind the viz contract · (b) custom drawing |
+| D-BI10 | KPI History grain and retention | ✅ **SIGNED 2026-11-24: (a)** the KPI's own grain, 3 years · (b) day only, retention per Space |
 
 ## 12. Board row
 

@@ -375,6 +375,45 @@ class PipelineValidatorTest {
         }
     }
 
+    /** LOOKUP-1 P1d: lookups: replaces on:, and what its config alone shows cannot run is refused at save. */
+    @Test
+    void aLookupsJoinsImpossibleSettingsAreRefusedAtValidation() {
+        Map<String, Object> served = Map.of("on", "SERVED_MSISDN", "columns", Map.of("provider_desc", "OPER"));
+        Map<String, Object> ok = new java.util.LinkedHashMap<>(Map.of("reference", "reference/dd", "key", "dial_digit_key",
+                "match", "longest_prefix", "lookups", List.of(served,
+                        Map.of("on", "OTHER_MSISDN", "columns", List.of("provider_desc"), "details", true))));
+        var okCodes = codes(PipelineValidator.validate(joinGraph(ok)));
+        assertFalse(okCodes.contains(PipelineValidator.JOIN_KEYED_INVALID), okCodes::toString);
+        assertFalse(okCodes.contains(PipelineValidator.JOIN_ON_MISSING), "lookups: carries each mapping's on");
+        for (Map<String, Object> bad : List.<Map<String, Object>>of(
+                with(ok, "on", "SERVED_MSISDN"),                                                 // mixed with on:
+                with(ok, "lookups", List.of(Map.of("columns", List.of("x")))),                   // entry without on
+                with(ok, "lookups", List.of(Map.of("on", "a", "rename", "x"))),                  // unknown entry key
+                with(ok, "lookups", List.of(served, Map.of("on", "b", "columns", Map.of("iso", "oper")))), // dup output
+                with(ok, "lookups", "SERVED_MSISDN"),                                            // not a list
+                without(ok, "key"))) {                                                           // lookups without key
+            PipelineValidator.Result r = PipelineValidator.validate(joinGraph(bad));
+            assertTrue(codes(r).contains(PipelineValidator.JOIN_KEYED_INVALID), () -> bad + " → " + r.issues());
+        }
+    }
+
+    /** LOOKUP-1 as-of: it needs key, from and at; takes no to; and at belongs to as-of only. */
+    @Test
+    void anAsofJoinsSettingsAreCheckedAtValidation() {
+        Map<String, Object> ok = Map.of("reference", "reference/rates", "key", "ccy", "match", "asof",
+                "from", "valid_from", "at", "txn_date", "on", "ccy");
+        assertFalse(codes(PipelineValidator.validate(joinGraph(ok))).contains(PipelineValidator.JOIN_KEYED_INVALID));
+        for (Map<String, Object> bad : List.<Map<String, Object>>of(
+                without(ok, "at"),                          // no time column
+                without(ok, "from"),                        // no effective-from column
+                without(ok, "key"),                         // no key
+                with(ok, "to", "valid_to"),                 // asof has no end bound
+                with(ok, "match", "exact"))) {              // at: on a non-asof join
+            PipelineValidator.Result r = PipelineValidator.validate(joinGraph(bad));
+            assertTrue(codes(r).contains(PipelineValidator.JOIN_KEYED_INVALID), () -> bad + " → " + r.issues());
+        }
+    }
+
     /** LOOKUP-1 normalized exact: an unknown normalizer, or normalize on a range, is refused at save. */
     @Test
     void aJoinsNormalizeSettingIsCheckedAtValidation() {
@@ -389,6 +428,20 @@ class PipelineValidatorTest {
             PipelineValidator.Result r = PipelineValidator.validate(joinGraph(cfg));
             assertTrue(codes(r).contains(PipelineValidator.JOIN_KEYED_INVALID), () -> cfg + " → " + r.issues());
         }
+    }
+
+    @Test
+    void aJoinsMaxMissRateIsCheckedAtValidation() {
+        Map<String, Object> ok = Map.of("reference", "reference/codes", "key", "code", "on", "v", "max_miss_rate", 0.1);
+        assertFalse(codes(PipelineValidator.validate(joinGraph(ok))).contains(PipelineValidator.JOIN_KEYED_INVALID));
+        for (Object bad : List.of(1.5, -0.1, "often")) {
+            PipelineValidator.Result r = PipelineValidator.validate(joinGraph(with(ok, "max_miss_rate", bad)));
+            assertTrue(codes(r).contains(PipelineValidator.JOIN_KEYED_INVALID), () -> bad + " → " + r.issues());
+        }
+        Map<String, Object> noKey = new java.util.LinkedHashMap<>(ok);
+        noKey.remove("key");
+        assertTrue(codes(PipelineValidator.validate(joinGraph(noKey))).contains(PipelineValidator.JOIN_KEYED_INVALID),
+                "like every keyed setting, it needs key:");
     }
 
     private static PipelineGraph joinGraph(Map<String, Object> cfg) {

@@ -2904,9 +2904,38 @@ if (Test-Path $docsSrc) {
     Write-Host "  docs: staged $docsShippedCount files ($($docsShipped -join ', ')); left out $docsSkipped" -ForegroundColor DarkGray
 }
 
+# AGENT-KIT-1: the Agent Kit ships beside the MCP endpoint it is written for - in a bundle whose modules.list carries the
+# inspecto-mcp jar (Standard and up, D-UE4; never Basic, never an offering without the module) and in no other. What ships is
+# an ALLOW-LIST: the README, the Agent Skills, the per-install vendor packager (tools/package-agent-kit.mjs, which finds
+# skills/ beside itself) and a VERSION file it reads in place of pom.xml. The golden tasks stay in the repo: grading needs
+# tools/run-agent-golden.mjs and is the team's job, not the operator's. tools/check-agent-kit.mjs judges the skills first.
+$modulesListFile = Join-Path $libDir 'modules.list'
+$shipsMcp = (Test-Path $modulesListFile) -and [bool](Get-Content $modulesListFile | Where-Object { $_ -match '(^|/)inspecto-mcp[^/]*\.jar$' })
+$kitOut = Join-Path $bundleDir 'agent-kit'
+if ($shipsMcp) {
+    & node (Join-Path $sandboxRoot 'tools\check-agent-kit.mjs')
+    if ($LASTEXITCODE -ne 0) { throw "check-agent-kit.mjs failed (see above) - the bundle would ship Agent Skills naming tools or pages that do not exist" }
+    $kitSrc = Join-Path $sandboxRoot 'agent-kit'
+    $null = New-Item -ItemType Directory $kitOut -Force
+    Copy-Item (Join-Path $kitSrc 'README.md') (Join-Path $kitOut 'README.md')
+    Copy-Item (Join-Path $kitSrc 'skills') (Join-Path $kitOut 'skills') -Recurse
+    Copy-Item (Join-Path $sandboxRoot 'tools\package-agent-kit.mjs') (Join-Path $kitOut 'package-agent-kit.mjs')
+    Set-Content -Path (Join-Path $kitOut 'VERSION') -Value "$sbomVersion`n" -NoNewline
+    $kitSkills = @(Get-ChildItem (Join-Path $kitOut 'skills') -Directory)
+    if ($kitSkills.Count -lt 1 -or @($kitSkills | Where-Object { -not (Test-Path (Join-Path $_.FullName 'SKILL.md')) }).Count -gt 0) {
+        throw "AGENT KIT: agent-kit\skills is empty or holds a folder without SKILL.md (AGENT-KIT-1)"
+    }
+    $kitStray = @(Get-ChildItem $kitOut -Force | Where-Object { @('README.md', 'skills', 'package-agent-kit.mjs', 'VERSION') -notcontains $_.Name } | ForEach-Object { $_.Name })
+    if ($kitStray.Count -gt 0) { throw "AGENT KIT: agent-kit\ holds $($kitStray -join ', '), which the allow-list does not name (AGENT-KIT-1)" }
+    Write-Host "  agent-kit: $($kitSkills.Count) Agent Skills + the vendor packager (the bundle carries the MCP endpoint)" -ForegroundColor DarkGray
+} elseif (Test-Path $kitOut) {
+    throw "AGENT KIT: agent-kit\ is staged but this bundle has no inspecto-mcp module - the Kit would describe an endpoint that is not there (AGENT-KIT-1)"
+}
+
 # BUNDLE-LAYOUT-1: the bundle ROOT holds README.md and folders only (a demo build adds DEMO-BUILD.txt beside it). Asserted, not
 # assumed: a step that writes a launcher, a list or a jar at the root again fails the package here instead of shipping.
-$rootAllowed = @('README.md', 'DEMO-BUILD.txt', 'bin', 'lib', 'deploy', 'logs', 'runtime', 'ui', 'spaces', 'docs', 'sbom', 'licenses')
+# agent-kit/ (AGENT-KIT-1, plan 2026-11-19-user-enablement-and-agent-kit-plan.md §7.5) only where the MCP module ships.
+$rootAllowed = @('README.md', 'DEMO-BUILD.txt', 'bin', 'lib', 'deploy', 'logs', 'runtime', 'ui', 'spaces', 'docs', 'sbom', 'licenses', 'agent-kit')
 $rootStray = @(Get-ChildItem -Path $bundleDir -Force | Where-Object { $rootAllowed -notcontains $_.Name } | ForEach-Object { $_.Name })
 if ($rootStray.Count -gt 0) { throw "BUNDLE LAYOUT: unexpected entries at the bundle root: $($rootStray -join ', '). Every jar/list goes to lib\, every launcher to bin\, deployment files to deploy\ (BUNDLE-LAYOUT-1)." }
 foreach ($need in 'README.md', 'bin', 'lib', 'logs', 'docs', 'sbom') {

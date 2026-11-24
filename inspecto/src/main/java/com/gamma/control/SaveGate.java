@@ -12,6 +12,7 @@ import com.gamma.config.spec.FindingCodes;
 import com.gamma.config.spec.Severity;
 import com.gamma.etl.EditionFeatures;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.etl.RecordTransform;
 import com.gamma.service.ClassificationVocabulary;
 
 import java.nio.file.Path;
@@ -108,6 +109,7 @@ final class SaveGate {
         if (referents == Referents.MUST_EXIST) f.addAll(ConfigRoutes.chainWithoutJobFindings(type, draft, api, writeRoot));
         f.addAll(webhookFindings(type, draft, api, referents));
         f.addAll(excelFindings(type, draft));
+        f.addAll(ingestLookupFindings(type, draft));   // LOOKUP-1
         f.addAll(selectorFindings(type, draft, configDir));   // LA-ONBOARD-FIXES-1 (F-4)
         // A block no component reads is a SILENT LOSS (`DUCKLE-C3-DEAD-PROPERTY-1`).
         f.addAll(AcceptedConfigKeys.unknownKeyFindings(type, draft, Severity.ERROR));
@@ -212,6 +214,26 @@ final class SaveGate {
                 out.add(new Finding(Severity.ERROR, "excel.sheets[" + i + "].sql", "sheet '"
                         + e.sheets().get(i).name() + "' refused: " + problem, FindingCodes.ERR_EXCEL_INVALID, fix));
         }
+        return out;
+    }
+
+    /**
+     * A {@code processing.map.fields[]} row calling {@code lookup.reference} (LOOKUP-1). The ingest lane compiles
+     * those rows into its own SELECT, which has no Reference resolver, so the lookup's marker call would fail every
+     * batch as an unknown function. Refused regardless of {@code active}: the field can never run there.
+     */
+    static List<Finding> ingestLookupFindings(String type, Map<String, Object> draft) {
+        if (!"pipeline".equals(type) || !(draft.get("processing") instanceof Map<?, ?> proc)
+                || !(proc.get("map") instanceof Map<?, ?> map) || !(map.get("fields") instanceof List<?> fields))
+            return List.of();
+        List<Finding> out = new ArrayList<>();
+        for (int i = 0; i < fields.size(); i++)
+            if (fields.get(i) instanceof Map<?, ?> row && RecordTransform.LOOKUP.equals(row.get("fn")))
+                out.add(new Finding(Severity.ERROR, "processing.map.fields[" + i + "].fn",
+                        "field '" + row.get("name") + "' looks up a Reference, which the ingest lane cannot do",
+                        FindingCodes.ERR_LOOKUP_ON_INGEST,
+                        "add the lookup in a Pipeline Step instead: a transform.sql field, or a transform.join "
+                                + "with match: exact"));
         return out;
     }
 

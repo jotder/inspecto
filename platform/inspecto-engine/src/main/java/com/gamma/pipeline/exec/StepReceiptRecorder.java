@@ -72,6 +72,28 @@ public final class StepReceiptRecorder implements PipelineExecutor.WalkObserver 
         this.forward = forward == null ? PipelineExecutor.ProvenanceCollector.NONE : forward;
     }
 
+    /** Keyed join id → its unmatched values (raw; fingerprinted by the runner before storing). */
+    private final Map<String, List<RowShaper.LookupMiss>> lookupMisses = new LinkedHashMap<>();
+
+    @Override
+    public void lookupMisses(String nodeId, List<RowShaper.LookupMiss> misses) {
+        lookupMisses.put(nodeId, List.copyOf(misses));
+    }
+
+    /** Each keyed join that ended OK → its unmatched values, in walk order. ⚠ Raw values. */
+    public Map<String, List<RowShaper.LookupMiss>> lookupMisses() {
+        return java.util.Collections.unmodifiableMap(lookupMisses);
+    }
+
+    /** The Pipeline id these receipts are written under. */
+    public String pipeline() { return pipeline; }
+
+    /** The Consignment these receipts belong to. */
+    public String consignmentId() { return consignmentId; }
+
+    /** Whether this is a dry run's recorder. */
+    public boolean simulated() { return simulated; }
+
     @Override
     public void counts(String nodeId, String rel, long rows) {
         counts.put(nodeId + "|" + rel, rows);

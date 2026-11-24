@@ -275,6 +275,34 @@
   } ],
   "help" : "A value that cannot be converted becomes empty; the row is kept."
 }, {
+  "id" : "lookup.reference",
+  "label" : "Look up a value in a Reference",
+  "category" : "Lookup",
+  "template" : "inspecto_lookup({source}, {reference}, {key}, {returns}, {normalize})",
+  "params" : [ {
+    "name" : "reference",
+    "label" : "Reference",
+    "type" : "text",
+    "placeholder" : "reference/fx_rates"
+  }, {
+    "name" : "key",
+    "label" : "Reference column matched to this value",
+    "type" : "text",
+    "placeholder" : "currency"
+  }, {
+    "name" : "returns",
+    "label" : "Reference column to return",
+    "type" : "text",
+    "placeholder" : "rate"
+  }, {
+    "name" : "normalize",
+    "label" : "Compare after",
+    "type" : "enum",
+    "default" : "none",
+    "options" : [ "none", "trim", "lower", "upper", "strip_leading_zeros", "strip_plus" ]
+  } ],
+  "help" : "The row's value is matched exactly to the Reference column, and that Reference row's value is returned; empty when nothing matches. A Reference with two rows for one key stops the run."
+}, {
   "id" : "custom",
   "label" : "Write my own expression",
   "category" : "Custom",
