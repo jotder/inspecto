@@ -375,7 +375,12 @@ public final class PointLookup {
         return castIn(value, type)[0];
     }
 
-    private static final java.util.Set<String> RANGE_CASTS = java.util.Set.of("DATE");
+    /**
+     * A range value is cast to a DATE bound (the batch casts it) and to a timestamp bound: there the batch's typed value
+     * is widened by DuckDB (a DATE becomes midnight), which text comparison would miss. Never to a number — that rounds.
+     */
+    private static final java.util.Set<String> RANGE_CASTS = java.util.Set.of("DATE", "TIMESTAMP",
+            "TIMESTAMP WITH TIME ZONE", "TIMESTAMP_S", "TIMESTAMP_MS", "TIMESTAMP_NS");
     private static final java.util.Set<String> ASOF_CASTS = java.util.Set.of("DATE", "TIMESTAMP");
 
     /** {@code SELECT CAST(TRY_CAST(? AS type) AS VARCHAR)} per type in DuckDB: the value as the batch join compares it. */

@@ -304,6 +304,19 @@ class PointLookupParityTest {
                 + " t(id, v, ts)");
     }
 
+    /** Found by verification (2026-11-24): a date on a midnight TIMESTAMP lower bound matches, as DuckDB widens it. */
+    @Test
+    void aDateOnAMidnightTimestampBoundAgrees() throws Exception {
+        String periods = """
+                start,finish,band,prio
+                2026-01-01 00:00:00,2026-01-31 12:00:00,jan,1
+                2026-02-01 00:00:00,,from-feb,1
+                """;
+        assertTypedParity(rangeCfg("from", "start", "to", "finish"), periods, "SELECT * FROM (VALUES"
+                + " (1, DATE '2026-01-01', NULL), (2, DATE '2026-01-31', NULL), (3, DATE '2026-02-01', NULL),"
+                + " (4, DATE '2025-12-31', NULL)) t(id, v, ts)");
+    }
+
     private static final String RATES = """
             code,eff,rate
             A,2026-01-01,1

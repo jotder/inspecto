@@ -221,7 +221,8 @@ preview.
 
 **P3b — `range` and `asof` in the point engine built 2026-11-24 (operator: "Range + asof"):** the batch join compares
 a value in its own type, casting only to DATE for a DATE range bound and to DATE or TIMESTAMP for such an as-of
-from-column; the point engine casts in DuckDB exactly there and otherwise compares the text as it is — a number by its
+from-column; the point engine casts in DuckDB there, and also to a TIMESTAMP range bound (DuckDB widens the
+batch's typed DATE to midnight, which text comparison misses), and otherwise compares the text as it is — a number by its
 exact value (`BigDecimal`, with `-inf` < finite < `inf` < `nan`), everything else by code point. (A first cut cast to
 every bound's type, which rounded 9.5 into an INTEGER band and nulled 1e19; found by verification.) `range`: every row kept with its pick order (`row_number()` over the batch's own
 `order_by` tie-break), the value checked against each row — a linear scan, fine for a test, not for a hot path;
