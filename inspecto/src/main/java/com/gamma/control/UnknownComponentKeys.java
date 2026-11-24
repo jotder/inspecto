@@ -38,7 +38,7 @@ final class UnknownComponentKeys {
             "importPipeline", "importFormat", "importSource", "origin", "lastImport", "basedOn", "mapping", "eventDateColumn",
             "dataAsOf", "identifyingColumn", "recordType", "feed", "storage", "retention", "compaction", "poll", "tags",
             // written by the console's details dialog, the import-filter editor and the inbox watch (found by the step-2 review)
-            "title", "importFilter", "watchInbox");
+            "title", "importFilter", "watchInbox", "partitions");
 
     static final Set<String> RECONCILIATION = Set.of(
             "datasets", "leftDataset", "rightDataset", "thirdDataset", "columnMap", "filters", "compareColumns",
