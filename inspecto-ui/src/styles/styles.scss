@@ -327,6 +327,22 @@ body.dark {
     }
 }
 
+/* Space switcher menu (`space-switcher.component.ts`): allow two-line Space names (e.g. "Mobile financial
+ * services fraud") to grow comfortably instead of being squeezed into Material's 48 px single-line item
+ * (LA-SPACE-SWITCHER-NAMES-1). */
+.inspecto-space-switcher-menu.mat-mdc-menu-panel {
+    .mat-mdc-menu-item {
+        height: auto;
+        min-height: 3rem;
+        padding-top: 0.5rem;
+        padding-bottom: 0.5rem;
+    }
+    .mat-mdc-menu-item .mat-mdc-menu-item-text {
+        white-space: normal;
+        line-height: 1.35;
+    }
+}
+
 .inspecto-dialog-resize-grip {
     position: absolute;
     right: 0;

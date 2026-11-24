@@ -62,11 +62,11 @@ export function spacesByName(spaces: readonly Space[]): Space[] {
                 data-testid="space-switcher"
             >
                 <mat-icon class="icon-size-5" svgIcon="heroicons_outline:square-3-stack-3d"></mat-icon>
-                <!-- label collapses to the icon on phones so the header row fits 375px (Wave 5 P2) -->
-                <span class="ml-2 hidden md:inline" data-testid="space-switcher-name">{{ label() }}</span>
+                <!-- LA-SPACE-SWITCHER-NAMES-1: keep the Space name visible on phones (a tooltip does not show on touch) -->
+                <span class="ml-1.5 sm:ml-2" data-testid="space-switcher-name">{{ label() }}</span>
                 <mat-icon class="icon-size-5" iconPositionEnd svgIcon="heroicons_outline:chevron-down"></mat-icon>
             </button>
-            <mat-menu #menu="matMenu">
+            <mat-menu #menu="matMenu" class="inspecto-space-switcher-menu">
                 @for (s of sortedSpaces(); track s.id) {
                     <button
                         mat-menu-item
@@ -74,6 +74,7 @@ export function spacesByName(spaces: readonly Space[]): Space[] {
                         [attr.aria-current]="s.id === spaces.currentSpaceId() ? 'true' : null"
                     >
                         <mat-icon
+                            class="shrink-0"
                             [svgIcon]="
                                 s.id === spaces.currentSpaceId()
                                     ? 'heroicons_outline:check-circle'
@@ -99,14 +100,20 @@ export function spacesByName(spaces: readonly Space[]): Space[] {
             </mat-menu>
         }
     `,
-    // LA-SPACE-SWITCHER-1: a long Space name never pushes the button past its container (it covered page content beside
-    // a 195 px rail); it ends in an ellipsis, and the tooltip and the accessible name carry it whole.
+    // LA-SPACE-SWITCHER-1 / LA-SPACE-SWITCHER-NAMES-1: a long Space name never pushes the button past its container
+    // (it covered page content beside a 195 px rail, and on a 375 px phone it shares the top bar); it ends in an
+    // ellipsis, and the tooltip and the accessible name carry it whole.
     styles: `
         .space-switcher ::ng-deep .mdc-button__label {
             min-width: 0;
-            max-width: 10rem;
+            max-width: 7.5rem;
             overflow: hidden;
             text-overflow: ellipsis;
+        }
+        @media (min-width: 640px) {
+            .space-switcher ::ng-deep .mdc-button__label {
+                max-width: 10rem;
+            }
         }
     `,
 })

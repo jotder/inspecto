@@ -242,14 +242,16 @@ export const railLink = (n: ProductNavEntry): RailLink => ({ path: n.path, label
         </div>
     `,
     styles: `
-        /* Slim rail: the Space switcher shows only its icon (its label and chevron belong to the expanded rail). */
-        .slim-switcher ::ng-deep button {
-            min-width: 0 !important;
-            padding-inline: 0.625rem !important;
-        }
-        .slim-switcher ::ng-deep button span,
-        .slim-switcher ::ng-deep button mat-icon ~ mat-icon {
-            display: none !important;
+        /* Slim rail (sm+): the Space switcher shows only its icon; on phones (<600px) the top bar keeps the name. */
+        @media (min-width: 600px) {
+            .slim-switcher ::ng-deep button {
+                min-width: 0 !important;
+                padding-inline: 0.625rem !important;
+            }
+            .slim-switcher ::ng-deep button span,
+            .slim-switcher ::ng-deep button mat-icon ~ mat-icon {
+                display: none !important;
+            }
         }
     `,
 })
