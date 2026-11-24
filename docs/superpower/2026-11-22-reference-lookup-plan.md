@@ -220,9 +220,10 @@ answer's `index`. `PointLookupParityTest`, `ControlApiLookupsTest`, `lookups.com
 preview.
 
 **P3b — `range` and `asof` in the point engine built 2026-11-24 (operator: "Range + asof"):** the batch join compares
-in the bound column's own type, so a tested value is cast to each bound's DuckDB type IN DuckDB (`TRY_CAST`, as text)
-and the Java side compares those canonical texts — numbers as `BigDecimal`, everything else (text, ISO dates and
-timestamps) by code point. `range`: every row kept with its pick order (`row_number()` over the batch's own
+a value in its own type, casting only to DATE for a DATE range bound and to DATE or TIMESTAMP for such an as-of
+from-column; the point engine casts in DuckDB exactly there and otherwise compares the text as it is — a number by its
+exact value (`BigDecimal`, with `-inf` < finite < `inf` < `nan`), everything else by code point. (A first cut cast to
+every bound's type, which rounded 9.5 into an INTEGER band and nulled 1e19; found by verification.) `range`: every row kept with its pick order (`row_number()` over the batch's own
 `order_by` tie-break), the value checked against each row — a linear scan, fine for a test, not for a hot path;
 `duplicates: refuse` reuses the batch overlap check, now `RowShaper.refuseRangeOverlap`. `asof`: the rows of each
 (normalized) key; the latest from-date at or before the time wins, an undated row last; a missing time matches only

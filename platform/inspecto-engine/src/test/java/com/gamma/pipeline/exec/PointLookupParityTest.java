@@ -212,7 +212,10 @@ class PointLookupParityTest {
         String table = rel.stream().filter(r -> r.rel().equals(PipelineRel.DATA)).findFirst().orElseThrow().table();
         int n = 0;
         try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(
-                "SELECT *, CAST(v AS VARCHAR) AS __v, CAST(ts AS VARCHAR) AS __at FROM \"" + table + "\" ORDER BY id")) {
+                // the added columns as DuckDB's own text, the form the point engine holds (JDBC would print inf as Infinity)
+                "SELECT id, " + added.stream().map(c -> "CAST(\"" + c + "\" AS VARCHAR) AS \"" + c + "\"")
+                        .collect(java.util.stream.Collectors.joining(", "))
+                        + ", CAST(v AS VARCHAR) AS __v, CAST(ts AS VARCHAR) AS __at FROM \"" + table + "\" ORDER BY id")) {
             while (rs.next()) {
                 Map<String, String> want = new LinkedHashMap<>();
                 for (String c : added) want.put(c, rs.getString(c));
@@ -253,6 +256,26 @@ class PointLookupParityTest {
         // from: only — every two rows overlap, so the band is the one with the highest lower bound at or below v
         assertTypedParity(rangeCfg("to", null, "duplicates", "last", "order_by", "lo"),
                 BANDS.replace(",0,negative", "-100,0,negative"), BAND_INPUT);
+    }
+
+    /** Found by verification (2026-11-24): a value is never rounded to the bound's type, and inf / huge values compare. */
+    @Test
+    void aFractionalOrHugeValueOverIntegerBoundsAndInfinityAgree() throws Exception {
+        assertTypedParity(rangeCfg(), BANDS, "SELECT * FROM (VALUES (1, 9.50::DECIMAL(10,2), NULL), (2, 9.49::DECIMAL(10,2), NULL),"
+                + " (3, 0.40::DECIMAL(10,2), NULL), (4, 99.5::DECIMAL(10,2), NULL), (5, 9.00::DECIMAL(10,2), NULL))"
+                + " t(id, v, ts)");
+        assertTypedParity(rangeCfg(), BANDS, "SELECT * FROM (VALUES (1, 1e19::DOUBLE, NULL), (2, -1e19::DOUBLE, NULL),"
+                + " (3, 'inf'::DOUBLE, NULL), (4, 5.5::DOUBLE, NULL)) t(id, v, ts)");
+        String doubles = "lo,hi,band,prio\n-1.5,0.5,low,1\n0.75,inf,pos,1\n";
+        assertTypedParity(rangeCfg(), doubles, "SELECT * FROM (VALUES (1, 1e200::DOUBLE, NULL), (2, 'inf'::DOUBLE, NULL),"
+                + " (3, 0.6::DOUBLE, NULL), (4, '-inf'::DOUBLE, NULL), (5, 0.0::DOUBLE, NULL)) t(id, v, ts)");
+    }
+
+    @Test
+    void asofWithANumericFromColumnComparesTheTimeUnrounded() throws Exception {
+        String numeric = "code,eff,rate\nA,10,1\nA,20,2\n";
+        assertTypedParity(asofCfg(), numeric, "SELECT * FROM (VALUES (1, 'A', 19.6::DOUBLE), (2, 'A', 9.6::DOUBLE),"
+                + " (3, 'A', 20.0::DOUBLE), (4, 'A', 10::DOUBLE)) t(id, v, ts)");
     }
 
     @Test

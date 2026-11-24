@@ -28,8 +28,9 @@ import static com.gamma.util.SqlIdent.q;
  * {@link RowShaper}'s keyed join (key text normalized in SQL, {@code filter}, {@code duplicates} + {@code order_by},
  * {@code exact_when}), then probed in Java: a hash map for {@code match: exact}, the key lengths present longest first
  * for {@code longest_prefix}; for {@code range} every row is checked against the value (its pick order kept for overlaps)
- * and for {@code asof} the key's rows; a tested value is cast to each bound's DuckDB type in DuckDB, as the batch join
- * compares it.
+ * and for {@code asof} the key's rows. A tested value is compared as the batch join compares it: cast in DuckDB only
+ * where the batch casts (to DATE for a DATE range bound; to DATE or TIMESTAMP for such an as-of from-column), a number
+ * by value without rounding to the bound's type.
  *
  * <p>Every returned value is held as text ({@code CAST … AS VARCHAR}), the form a test answer shows. The Reference is
  * read once, through a connection sealed exactly as a dry run's ({@link PipelineDryRun#seal}); more than
@@ -323,8 +324,8 @@ public final class PointLookup {
      * Two values in one bound's DuckDB text form, compared as DuckDB orders them: numbers by value, everything else
      * (text, and ISO dates and times, whose text sorts as they do) by code point, DuckDB's binary UTF-8 order.
      */
-    private static int compare(String a, String b, boolean numeric) {
-        if (numeric) return new java.math.BigDecimal(a).compareTo(new java.math.BigDecimal(b));
+    private static Integer compare(String a, String b, boolean numeric) {
+        if (numeric) return numCompare(a, b);
         int i = 0, j = 0;
         while (i < a.length() && j < b.length()) {
             int x = a.codePointAt(i), y = b.codePointAt(j);
@@ -334,6 +335,48 @@ public final class PointLookup {
         }
         return Integer.compare(a.length() - i, b.length() - j);
     }
+
+    /**
+     * Two numbers by value, never rounded to either side's type (the batch join compares a number in its own type):
+     * {@code -inf} &lt; every finite number &lt; {@code inf} &lt; {@code nan}, DuckDB's order. {@code null} — unknown,
+     * so no match — when either is not a number.
+     */
+    private static Integer numCompare(String a, String b) {
+        java.math.BigDecimal[] x = new java.math.BigDecimal[1], y = new java.math.BigDecimal[1];
+        int ca = numClass(a, x), cb = numClass(b, y);
+        if (ca < 0 || cb < 0) return null;
+        if (ca != cb) return Integer.compare(ca, cb);
+        return ca == 1 ? x[0].compareTo(y[0]) : 0;
+    }
+
+    /** 0 = -inf, 1 = finite (its value in {@code out[0]}), 2 = inf, 3 = nan, -1 = not a number. */
+    private static int numClass(String s, java.math.BigDecimal[] out) {
+        String t = s.trim().toLowerCase(Locale.ROOT);
+        switch (t) {
+            case "nan", "-nan", "+nan": return 3;
+            case "inf", "+inf", "infinity", "+infinity": return 2;
+            case "-inf", "-infinity": return 0;
+            default:
+                try {
+                    out[0] = new java.math.BigDecimal(t);
+                    return 1;
+                } catch (NumberFormatException e) {
+                    return -1;
+                }
+        }
+    }
+
+    /**
+     * The value as the batch join compares it with a bound of {@code type}: cast in DuckDB only when the batch casts it
+     * ({@code castTypes}: DATE for a range bound, DATE or TIMESTAMP for an as-of from-column), else as it is.
+     */
+    private static String asCompared(String value, String type, java.util.Set<String> castTypes) {
+        if (value == null || type == null || !castTypes.contains(type)) return value;
+        return castIn(value, type)[0];
+    }
+
+    private static final java.util.Set<String> RANGE_CASTS = java.util.Set.of("DATE");
+    private static final java.util.Set<String> ASOF_CASTS = java.util.Set.of("DATE", "TIMESTAMP");
 
     /** {@code SELECT CAST(TRY_CAST(? AS type) AS VARCHAR)} per type in DuckDB: the value as the batch join compares it. */
     private static String[] castIn(String value, String... types) {
@@ -394,12 +437,14 @@ public final class PointLookup {
     private Answer rangeTest(String value) {
         RangeRow best = null;
         if (value != null) {
-            String[] typed = castIn(value, hasFrom ? fromType : null, hasTo ? toType : null);
-            String vf = typed[0], vt = typed[1];
-            // as the batch SQL: (from IS NULL OR v >= from) AND (to IS NULL OR v <= to), a v the cast nulled is unknown
+            String vf = hasFrom ? asCompared(value, fromType, RANGE_CASTS) : null;
+            String vt = hasTo ? asCompared(value, toType, RANGE_CASTS) : null;
+            // as the batch SQL: (from IS NULL OR v >= from) AND (to IS NULL OR v <= to); an unknown comparison fails
             for (RangeRow r : ranges) {
-                boolean in = (!hasFrom || r.from() == null || (vf != null && compare(vf, r.from(), fromNumeric) >= 0))
-                        && (!hasTo || r.to() == null || (vt != null && compare(vt, r.to(), toNumeric) <= 0));
+                Integer cf = !hasFrom || r.from() == null || vf == null ? null : compare(vf, r.from(), fromNumeric);
+                Integer ct = !hasTo || r.to() == null || vt == null ? null : compare(vt, r.to(), toNumeric);
+                boolean in = (!hasFrom || r.from() == null || (cf != null && cf >= 0))
+                        && (!hasTo || r.to() == null || (ct != null && ct <= 0));
                 if (in && (best == null || r.ord() < best.ord())) best = r;
             }
         }
@@ -413,9 +458,13 @@ public final class PointLookup {
         String k = value == null ? null : normalize(value, normalizers);
         AsofRow best = null;
         if (k != null) {
-            String t = at == null ? null : castIn(at, fromType)[0];
+            String t = asCompared(at, fromType, ASOF_CASTS);
             for (AsofRow r : asof.getOrDefault(k, List.of())) {
-                if (r.from() != null && (t == null || compare(r.from(), t, fromNumeric) > 0)) continue;
+                if (r.from() != null) {
+                    // from <= t: false, or unknown (no time, not a number), skips the dated row
+                    Integer c = t == null ? null : compare(r.from(), t, fromNumeric);
+                    if (c == null || c > 0) continue;
+                }
                 // ORDER BY from DESC NULLS LAST: a dated row beats the undated one, the later date the earlier
                 if (best == null || (best.from() == null && r.from() != null)
                         || (best.from() != null && r.from() != null && compare(r.from(), best.from(), fromNumeric) > 0))
