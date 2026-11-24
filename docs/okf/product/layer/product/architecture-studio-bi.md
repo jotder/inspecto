@@ -194,3 +194,6 @@ there; its relation is validated when it is read, by
 - *Compare with* is not offered on a table, and the public share viewer does not forward it (it forwards only
   `tableSort`); a time bucket is the wall-clock `DATE_TRUNC` the grain already uses (DuckDB's session zone for a
   `TIMESTAMPTZ`, the host's).
+- A comparison grouped by a withheld (`masked:withheld`) key shows equal `average`/`previous` values for rows sharing
+  that key: it tells which rows share a key, never the key (open question for the masking owner). `average` is the
+  mean over every result row before the row limit, not only the rows shown.

@@ -418,9 +418,13 @@ public final class MeasureCompiler {
         } else field = null;
         Compare compare = new Compare(kind, field, target);
         Spec shape = new Spec("x", measures, groupBy, grains, List.of(), List.of(), 1, null, null, ratios, compare);
+        // A grouped column, Measure or ratio named like a compare column would come back renamed (DuckDB adds _1), and the
+        // change would be read against the wrong column: refuse every such clash.
+        List<String> taken = new ArrayList<>(groupBy);
+        taken.addAll(valueIds(shape));
         for (String col : compareColumns(shape).keySet())
-            if (groupBy.stream().anyMatch(g -> g.equalsIgnoreCase(col)))
-                throw new IllegalArgumentException("groupBy column '" + col + "' clashes with a compare column name");
+            if (taken.stream().anyMatch(g -> g.equalsIgnoreCase(col)))
+                throw new IllegalArgumentException("result column '" + col + "' clashes with a compare column name");
         return compare;
     }
 

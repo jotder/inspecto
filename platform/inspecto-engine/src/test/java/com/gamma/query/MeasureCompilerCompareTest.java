@@ -165,5 +165,9 @@ class MeasureCompilerCompareTest {
         assertThrows(IllegalArgumentException.class, () -> MeasureCompiler.parse(noMeasure, 5, 10));
         assertThrows(IllegalArgumentException.class, () -> MeasureCompiler.parse(body(Map.of("kind", "previous"),
                 List.of("ts", "sum_amount__cmp")), 5, 10), "a groupBy column may not take a compare column's name");
+        Map<String, Object> twin = body(Map.of("kind", "previous"), ts);
+        twin.put("measures", List.of(Map.of("agg", "sum", "field", "v"), Map.of("agg", "sum", "field", "v__cmp")));
+        assertThrows(IllegalArgumentException.class, () -> MeasureCompiler.parse(twin, 5, 10),
+                "a Measure id equal to another's compare column would be renamed and the change read against it");
     }
 }
