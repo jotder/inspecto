@@ -44,7 +44,13 @@ approves it. That person is never you and never the person you act for (four eye
 | 403 "needs sign-in through an agent client" | the token is the console's, not an agent client's | ask the administrator to register an agent client |
 | 403 "missing capability …" | the person you act for lacks the right | tell the person; never look for another route |
 | 422 | the content is refused; the message names the field | fix it, validate again |
+| 409 "already pending approval (pc-…)" | your earlier proposal for that id is still waiting | do not propose it again, and do not dodge it under a new id: read it with `get_pending_change`; if it is wrong, `withdraw_change` it, then propose the corrected one |
 | 423 | the install is read-only | stop; tell the person |
+| 500 | a server fault, not your draft | stop after one retry and tell the person, with the reason text |
+
+**One proposal per thing.** Get the draft right with `validate_config` (or a dry run) first; each `propose_change` that
+is refused costs a round trip, and each one accepted is a Pending Change a person must read. A Dashboard and its
+Widgets are a few proposals, not dozens.
 
 ## Taking a proposal back
 

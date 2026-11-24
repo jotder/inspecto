@@ -49,6 +49,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `APPS-UPGRADE-CONSOLE-1` | P3 | feature | Apps, a Space's template upgrade and the audit-chain check have no console: | — |
 | `SPACE-EXPORT-CLEAN-1` | P3 | feature | a Space is not cleanly exportable as a Space Template: | — |
 | `APPROVAL-POLICY-PRESET-1` | P3 | feature | a Standard install is not gated by default: | — |
+| `AGENT-PROPOSE-500-1` | P2 | defect | an agent's proposals fail with HTTP 500 a quarter of the time: | — |
 | `PENDING-CHANGE-SECRET-READBACK-1` | P3 | defect | a Job's secret parameter can be read back through its Pending Change: | — |
 | `ORIGIN-UPGRADE-UNHELD-1` | P3 | defect | a Space Template upgrade that adds and updates nothing rewrites the Space origin record without holdSet, even under an approval policy. | — |
 | `SPACE-ROOTED-DATA-ROOT-MIGRATION-1` | P3 | feature | An install whose data_root is rooted or absent is still not relocatable, and no route migrates it. | demand |

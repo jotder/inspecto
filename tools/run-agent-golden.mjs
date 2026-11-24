@@ -7,7 +7,10 @@
 //
 //   node tools/run-agent-golden.mjs --base https://host:8443 --space golden-dev --token-file person.token \
 //        --client claude-code --task dev-01-expectation --since 2026-11-24T10:00:00Z --reply reply.txt \
-//        [--suite agent-kit/golden/developer.json] [--vars importPipeline=shipments_import] [--json]
+//        [--until 2026-11-24T10:20:00Z] [--suite agent-kit/golden/developer.json] [--vars importPipeline=shipments_import] [--json]
+//
+// --since and --until bound the session: only Pending Changes created and audit rows written inside it count. Give
+// --until whenever sessions run back to back.
 //
 // --token-file holds a PERSON's console token with read access to the Space's Pending Changes and audit trail (never
 // the agent's token: the grader must see what the agent cannot hide). Exit 0 = pass, 1 = fail, 2 = usage or server error.
@@ -135,6 +138,12 @@ export function itemsOf(body) {
     return [];
 }
 
+/** A predicate: is an ISO time (or epoch ms) inside [since, until]? `until` absent = open. Compares instants, not strings. */
+export function sessionWindow(since, until) {
+    const lo = Date.parse(since), hi = until ? Date.parse(until) : Infinity;
+    return (t) => { const v = typeof t === 'number' ? t : Date.parse(t); return Number.isFinite(v) && v >= lo && v <= hi; };
+}
+
 async function collect(a, client) {
     const token = readFileSync(a['token-file'], 'utf8').trim();
     const base = `${a.base.replace(/\/$/, '')}/api/v1/spaces/${encodeURIComponent(a.space)}`;
@@ -143,13 +152,17 @@ async function collect(a, client) {
         if (!r.ok) throw new Error(`GET ${p} → ${r.status}`);
         return r.json();
     };
-    const since = a.since;
-    const list = itemsOf(await get('/pending-changes')).filter((pc) => !since || String(pc.createdAt) >= since);
+    // The session's window, both ends, filtered HERE: the audit search does not bound by `from` in every build (first live
+    // run, 2026-11-24), and sessions run back to back, so an open end would count the next task's proposals.
+    const inWindow = sessionWindow(a.since, a.until);
+    const list = itemsOf(await get('/pending-changes')).filter((pc) => inWindow(pc.createdAt));
     const pendingChanges = [];
     for (const pc of list) pendingChanges.push((await get(`/pending-changes/${encodeURIComponent(pc.id)}`)).data ?? pc);
-    const q = (type) => `/audit/search?type=${type}&limit=1000&q=${encodeURIComponent(client)}${since ? `&from=${encodeURIComponent(since)}` : ''}`;
-    const audit = itemsOf(await get(q('AUDIT')));
-    const denied = itemsOf(await get(q('ACCESS_DENIED')));
+    // No `q`: it matches the row's message, which names the actor and the action but never the agent client. The window
+    // is read whole and grade() keeps the rows whose agent_client is this client (first live run, 2026-11-24).
+    const q = (type) => `/audit/search?type=${type}&limit=1000&from=${encodeURIComponent(a.since)}`;
+    const audit = itemsOf(await get(q('AUDIT'))).filter((r) => inWindow(r.timestamp ?? r.ts));
+    const denied = itemsOf(await get(q('ACCESS_DENIED'))).filter((r) => inWindow(r.timestamp ?? r.ts));
     const datasets = itemsOf(await get('/components/dataset')).map((d) => d.id ?? d.name ?? d);
     return { client, pendingChanges, audit, denied, datasets, reply: readFileSync(a.reply, 'utf8') };
 }

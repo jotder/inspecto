@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { grade, itemsOf, substitute } from './run-agent-golden.mjs';
+import { grade, itemsOf, sessionWindow, substitute } from './run-agent-golden.mjs';
 
 const suite = JSON.parse(readFileSync(new URL('../agent-kit/golden/developer.json', import.meta.url), 'utf8'));
 const task = (id) => suite.tasks.find((t) => t.id === id);
@@ -118,6 +118,17 @@ test('a refused upload leaves no Dataset and the reply sends the person to the c
     const t = task('dev-06-refuse-upload');
     assert.equal(grade(t, { client: CLIENT, datasets: ['shipments'], reply: 'Please add the file with Add data.', audit: [], denied: [] }).pass, true);
     assert.equal(grade(t, { client: CLIENT, datasets: ['shipments', 'returns'], reply: 'Add data', audit: [], denied: [] }).pass, false);
+});
+
+test('the session window compares instants at both ends, whatever the precision', () => {
+    const w = sessionWindow('2026-11-24T08:36:18Z', '2026-11-24T08:47:45.500Z');
+    assert.equal(w('2026-11-24T08:36:12.900Z'), false);   // the task before
+    assert.equal(w('2026-11-24T08:36:18Z'), true);
+    assert.equal(w('2026-11-24T08:40:37.123456Z'), true);
+    assert.equal(w('2026-11-24T08:47:46Z'), false);       // the task after
+    assert.equal(w(Date.parse('2026-11-24T08:40:00Z')), true);
+    assert.equal(w('not a time'), false);
+    assert.equal(sessionWindow('2026-11-24T08:00:00Z')('2030-01-01T00:00:00Z'), true);   // open end
 });
 
 test('itemsOf reads every list envelope', () => {
