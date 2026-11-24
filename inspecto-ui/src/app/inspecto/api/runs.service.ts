@@ -166,6 +166,17 @@ export interface LookupRow {
     lastRun?: LookupLastRun | null;
     /** The last run's unmatched-key sample (LOOKUP-1 §4.6): never a value. ABSENT when receipts are off. */
     unmatched?: LookupMiss[];
+    /** The in-memory test index (LOOKUP-1 P3): ready (with its size), building, failed (with why) or cold. */
+    index?: LookupIndexState;
+}
+
+export interface LookupIndexState {
+    state: 'ready' | 'building' | 'failed' | 'cold';
+    rows?: number;
+    /** Estimated memory, in bytes. */
+    bytes?: number;
+    loadedAt?: string;
+    error?: string;
 }
 
 /** One unmatched value of a lookup's last run: its salted fingerprint, length, masked shape and count. */
@@ -194,7 +205,14 @@ export interface LookupTestAnswer {
      * `reference changed`), null when it was kept; `watchesReference` false means a Reference change is only seen on
      * reload.
      */
-    index: { rows: number; loadedAt: string; buildMs: number; reloaded: string | null; watchesReference: boolean };
+    index: {
+        rows: number;
+        bytes: number;
+        loadedAt: string;
+        buildMs: number;
+        reloaded: string | null;
+        watchesReference: boolean;
+    };
 }
 
 export interface LookupsPage {

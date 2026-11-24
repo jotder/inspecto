@@ -45,6 +45,7 @@ const ANSWER: LookupTestAnswer = {
     mappings: [{ on: 'SERVED_MSISDN', columns: { SERVED_MSISDN_provider_desc: 'Operator A' } }],
     index: {
         rows: 2,
+        bytes: 400,
         loadedAt: '2026-11-24T10:00:00Z',
         buildMs: 5,
         reloaded: 'reference changed',
@@ -91,6 +92,14 @@ describe('toGridRow', () => {
         const r = toGridRow({ ...ROW, lastRun: { ...ROW.lastRun!, truncated: true } });
         expect([r.hits, r.misses, r.missRate]).toEqual([null, null, null]);
         expect(r.referenceRows).toBe(40);
+    });
+
+    it('reads the test index state, size and refusal', () => {
+        expect(toGridRow(ROW).indexState).toBe('cold');
+        const ready = toGridRow({ ...ROW, index: { state: 'ready', rows: 40, bytes: 2_097_152 } });
+        expect([ready.indexState, ready.indexBytes]).toEqual(['ready', 2_097_152]);
+        const failed = toGridRow({ ...ROW, index: { state: 'failed', error: 'over the cap' } });
+        expect([failed.indexState, failed.indexError]).toEqual(['failed', 'over the cap']);
     });
 
     it('leaves the counts blank before the first run', () => {

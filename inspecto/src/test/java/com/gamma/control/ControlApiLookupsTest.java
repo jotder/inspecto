@@ -64,6 +64,8 @@ class ControlApiLookupsTest {
         Authenticators.forTest(null);
         ConsignmentOutputStores.use(null);
         System.clearProperty("consignment.steps");
+        System.clearProperty(LookupRoutes.PROP_PRELOAD);
+        System.clearProperty(com.gamma.pipeline.exec.PointLookup.PROP_MAX_BYTES);
         // surefire sets the roots for every test: restore them, never clear
         if (PRIOR_ROOTS != null) System.setProperty("assist.safety.roots", PRIOR_ROOTS);
         else System.clearProperty("assist.safety.roots");
@@ -167,6 +169,64 @@ class ControlApiLookupsTest {
                 .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
     }
 
+    private static String dialSteps(Path ref) {
+        return """
+                output_store: enriched_calls
+                steps[1]:
+                  - join:
+                      reference: %s
+                      key: dial_digit_key
+                      match: exact
+                      on: SERVED_MSISDN
+                """.formatted(ref.toString().replace('\\', '/'));
+    }
+
+    /** Polls GET /lookups until the first row's index leaves cold/building, at most ten seconds. */
+    private JsonNode settledIndex(Ctx c) throws Exception {
+        JsonNode s = null;
+        for (int i = 0; i < 100; i++) {
+            s = lookups(c).get("lookups").get(0).get("index");
+            String state = s.get("state").asText();
+            if (!state.equals("cold") && !state.equals("building")) return s;
+            Thread.sleep(100);
+        }
+        return s;
+    }
+
+    /** LOOKUP-1 P3 — with lookup.point.preload the index is built at start, and GET /lookups reports it ready. */
+    @Test
+    void preloadBuildsTheIndexAtStartAndReportsItReady(@TempDir Path dir) throws Exception {
+        System.setProperty("assist.safety.roots", dir.toString());
+        System.setProperty(LookupRoutes.PROP_PRELOAD, "true");
+        Path ref = dir.resolve("refdata").resolve("dial.csv");
+        Files.createDirectories(ref.getParent());
+        Files.writeString(ref, "dial_digit_key,provider_desc\n249,Sudan\n44,UK\n");
+        try (Ctx c = open(dir, dialSteps(ref))) {
+            JsonNode s = settledIndex(c);
+            assertEquals("ready", s.get("state").asText(), s.toString());
+            assertEquals(2, s.get("rows").asLong());
+            String name = c.svc.loadedPipelines().get(0).identity().pipelineName();
+            JsonNode a = V1Body.of(test(c, "{\"pipeline\":\"" + name + "\",\"step\":\"join\",\"value\":\"44\"}").body());
+            assertTrue(a.get("index").get("reloaded").isNull(), "the first test uses the preloaded index: " + a);
+        }
+    }
+
+    /** LOOKUP-1 P3 — an index over the memory cap is refused at preload, and GET /lookups says why. */
+    @Test
+    void anIndexOverTheMemoryCapIsReportedFailed(@TempDir Path dir) throws Exception {
+        System.setProperty("assist.safety.roots", dir.toString());
+        System.setProperty(LookupRoutes.PROP_PRELOAD, "true");
+        System.setProperty(com.gamma.pipeline.exec.PointLookup.PROP_MAX_BYTES, "100");
+        Path ref = dir.resolve("refdata").resolve("dial.csv");
+        Files.createDirectories(ref.getParent());
+        Files.writeString(ref, "dial_digit_key,provider_desc\n249,Sudan\n44,UK\n");
+        try (Ctx c = open(dir, dialSteps(ref))) {
+            JsonNode s = settledIndex(c);
+            assertEquals("failed", s.get("state").asText(), s.toString());
+            assertTrue(s.get("error").asText().contains(com.gamma.pipeline.exec.PointLookup.PROP_MAX_BYTES), s.toString());
+        }
+    }
+
     /** LOOKUP-1 P3 — test-a-key: the point engine's answer for one value, the index kept warm and rebuilt when its Reference changes. */
     @Test
     void aValueIsTestedThroughThePointEngineAndRefreshSeesANewReference(@TempDir Path dir) throws Exception {
@@ -188,7 +248,12 @@ class ControlApiLookupsTest {
                 """.formatted(ref.toString().replace('\\', '/'));
         try (Ctx c = open(dir, steps)) {
             String name = c.svc.loadedPipelines().get(0).identity().pipelineName();
+            assertEquals("cold", lookups(c).get("lookups").get(0).get("index").get("state").asText(), "nothing built yet");
             HttpResponse<String> r = test(c, "{\"pipeline\":\"" + name + "\",\"step\":\"join\",\"value\":\"249915555\"}");
+            JsonNode state = lookups(c).get("lookups").get(0).get("index");
+            assertEquals("ready", state.get("state").asText(), state.toString());
+            assertEquals(2, state.get("rows").asLong());
+            assertTrue(state.get("bytes").asLong() > 0, state.toString());
             assertEquals(200, r.statusCode(), r.body());
             JsonNode a = V1Body.of(r.body());
             assertTrue(a.get("hit").asBoolean(), a.toString());

@@ -33,14 +33,14 @@ import static com.gamma.util.SqlIdent.q;
  * by value without rounding to the bound's type.
  *
  * <p>Every returned value is held as text ({@code CAST … AS VARCHAR}), the form a test answer shows. The Reference is
- * read once, through a connection sealed exactly as a dry run's ({@link PipelineDryRun#seal}); more than
- * {@link #maxRows()} Reference rows refuses the build rather than fill the heap.
+ * read once, through a connection sealed exactly as a dry run's ({@link PipelineDryRun#seal}); an index whose estimated
+ * memory passes {@link #maxBytes()} refuses the build rather than fill the heap.
  */
 public final class PointLookup {
 
-    /** System property capping the Reference rows one point index may hold. */
-    public static final String PROP_MAX_ROWS = "lookup.point.max_rows";
-    static final long DEFAULT_MAX_ROWS = 1_000_000L;
+    /** System property capping the estimated memory of one point index, in bytes. */
+    public static final String PROP_MAX_BYTES = "lookup.point.max_bytes";
+    static final long DEFAULT_MAX_BYTES = 256L * 1024 * 1024;
 
     /** What one mapping of the join adds for a value: output column name to text, defaults applied. */
     public record MappingAnswer(String on, Map<String, String> columns) {}
@@ -92,16 +92,46 @@ public final class PointLookup {
         this.buildMillis = buildMillis;
     }
 
-    /** The row cap, from {@link #PROP_MAX_ROWS} (default one million). */
-    public static long maxRows() {
-        String v = System.getProperty(PROP_MAX_ROWS);
-        if (v == null || v.isBlank()) return DEFAULT_MAX_ROWS;
+    /** The memory cap of one index, from {@link #PROP_MAX_BYTES} (default 256 MiB). */
+    public static long maxBytes() {
+        String v = System.getProperty(PROP_MAX_BYTES);
+        if (v == null || v.isBlank()) return DEFAULT_MAX_BYTES;
         try {
             return Math.max(1, Long.parseLong(v.trim()));
         } catch (NumberFormatException e) {
-            return DEFAULT_MAX_ROWS;
+            return DEFAULT_MAX_BYTES;
         }
     }
+
+    /**
+     * The estimated heap an index holds while it is built: per row an array and a map entry, per held text a String
+     * object plus two bytes a character (the JVM's worst case, UTF-16). An estimate, deliberately on the high side:
+     * the cap refuses before the heap is at risk, not after.
+     */
+    private static final class Budget {
+        static final long ROW = 64, TEXT = 40;
+        final String id;
+        final long cap = maxBytes();
+        long used;
+
+        Budget(String id) { this.id = id; }
+
+        void row(String key, String[] vals, String... extra) {
+            long b = ROW + text(key);
+            for (String v : vals) b += 8 + text(v);
+            for (String v : extra) b += text(v);
+            used += b;
+            if (used > cap)
+                throw new IllegalArgumentException("transform.join node '" + id + "': the Reference needs more than "
+                        + cap + " bytes in memory, the point engine's cap (" + PROP_MAX_BYTES + ")");
+        }
+
+        private static long text(String v) { return v == null ? 0 : TEXT + 2L * v.length(); }
+    }
+
+    /** The estimated memory this index holds, in bytes. */
+    private long bytes;
+    public long bytes() { return bytes; }
 
     public long rows() { return rows; }
     public Instant loadedAt() { return loadedAt; }
@@ -141,7 +171,7 @@ public final class PointLookup {
      * scratch connection that is removed afterwards.
      *
      * @throws IllegalArgumentException the node is not a keyed exact / longest-prefix join, its config is refused as
-     *                                  the batch join would refuse it, or the Reference is over the row cap
+     *                                  the batch join would refuse it, or the Reference is over the memory cap
      */
     public static PointLookup load(PipelineNode node, RowShaper.ReferenceResolver references) throws Exception {
         long t0 = System.nanoTime();
@@ -220,7 +250,7 @@ public final class PointLookup {
                 for (RowShaper.JoinMapping m : mappings)
                     for (String c : m.columns().keySet())
                         if (returned.stream().noneMatch(r -> r.equalsIgnoreCase(c))) returned.add(c);
-                long cap = maxRows();
+                Budget budget = new Budget(id);
                 String vals = returned.stream().map(c -> ", CAST(t." + q(c) + " AS VARCHAR)")
                         .collect(java.util.stream.Collectors.joining());
                 String pick = "refuse".equals(dups) ? null
@@ -239,14 +269,17 @@ public final class PointLookup {
                     List<RangeRow> rows = new ArrayList<>();
                     try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
                         while (rs.next()) {
-                            capCheck(id, rows.size(), cap);
-                            rows.add(new RangeRow(rs.getString(1), rs.getString(2), rs.getLong(3), values(rs, 4, returned.size())));
+                            RangeRow r = new RangeRow(rs.getString(1), rs.getString(2), rs.getLong(3),
+                                    values(rs, 4, returned.size()));
+                            budget.row(r.from(), r.vals(), r.to());
+                            rows.add(r);
                         }
                     }
                     PointLookup p = new PointLookup(match, normalizers, mappings, returned, Map.of(), Map.of(),
                             (System.nanoTime() - t0) / 1_000_000);
                     p.ranges = rows;
                     p.rows = rows.size();
+                    p.bytes = budget.used;
                     p.bounds(conn, ref, fromCol, toCol);
                     return p;
                 }
@@ -263,20 +296,22 @@ public final class PointLookup {
                     long n = 0;
                     try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
                         while (rs.next()) {
-                            capCheck(id, n++, cap);
+                            n++;
                             String k = rs.getString(1), f = rs.getString(2);
                             if (!seen.add(k + "\u0000" + f))
                                 throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has "
                                         + "more than one row for " + keyCol + "=" + k + " effective " + f + " — clean the "
                                         + "Reference, or set duplicates: first|last with order_by:");
-                            byKeyAsof.computeIfAbsent(k, x -> new ArrayList<>())
-                                    .add(new AsofRow(f, values(rs, 3, returned.size())));
+                            String[] v = values(rs, 3, returned.size());
+                            budget.row(k, v, f);
+                            byKeyAsof.computeIfAbsent(k, x -> new ArrayList<>()).add(new AsofRow(f, v));
                         }
                     }
                     PointLookup p = new PointLookup(match, normalizers, mappings, returned, Map.of(), Map.of(),
                             (System.nanoTime() - t0) / 1_000_000);
                     p.asof = byKeyAsof;
                     p.rows = n;
+                    p.bytes = budget.used;
                     p.bounds(conn, ref, fromCol, null);
                     return p;
                 }
@@ -300,28 +335,23 @@ public final class PointLookup {
                 try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql.toString())) {
                     while (rs.next()) {
                         String k = rs.getString(1);
-                        if (byKey.size() >= cap)
-                            throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has more "
-                                    + "than " + cap + " rows, the point engine's cap (" + PROP_MAX_ROWS + ")");
-                        if (byKey.put(k, values(rs, 3, returned.size())) != null)
+                        String[] v = values(rs, 3, returned.size());
+                        budget.row(k, v);
+                        if (byKey.put(k, v) != null)
                             throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has more "
                                     + "than one row for " + keyCol + "=" + k + " — clean the Reference, or set "
                                     + "duplicates: first|last with order_by:");
                         if (rs.getBoolean(2)) exactOnly.put(k, true);
                     }
                 }
-                return new PointLookup(match, normalizers, mappings, returned, byKey, exactOnly,
+                PointLookup p = new PointLookup(match, normalizers, mappings, returned, byKey, exactOnly,
                         (System.nanoTime() - t0) / 1_000_000);
+                p.bytes = budget.used;
+                return p;
             }
         } finally {
             deleteScratch(scratch);   // PipelineDryRun.removeScratch only removes dryrun_* / flowjob_* dirs
         }
-    }
-
-    private static void capCheck(String id, long held, long cap) {
-        if (held >= cap)
-            throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has more than " + cap
-                    + " rows, the point engine's cap (" + PROP_MAX_ROWS + ")");
     }
 
     private static String[] values(ResultSet rs, int first, int n) throws SQLException {

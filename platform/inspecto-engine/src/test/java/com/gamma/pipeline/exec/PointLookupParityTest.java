@@ -177,13 +177,13 @@ class PointLookupParityTest {
                 () -> PointLookup.load(PipelineNode.of("j", "transform.join", refuse), resolver(csv)));
         assertTrue(dup.getMessage().contains("dial_digit_key=44"), dup.getMessage());
 
-        System.setProperty(PointLookup.PROP_MAX_ROWS, "2");
+        System.setProperty(PointLookup.PROP_MAX_BYTES, "300");   // two or three rows
         try {
             var cap = assertThrows(IllegalArgumentException.class,
                     () -> PointLookup.load(PipelineNode.of("j", "transform.join", cfg("match", "exact")), resolver(csv)));
-            assertTrue(cap.getMessage().contains(PointLookup.PROP_MAX_ROWS), cap.getMessage());
+            assertTrue(cap.getMessage().contains(PointLookup.PROP_MAX_BYTES), cap.getMessage());
         } finally {
-            System.clearProperty(PointLookup.PROP_MAX_ROWS);
+            System.clearProperty(PointLookup.PROP_MAX_BYTES);
         }
     }
 
