@@ -201,7 +201,8 @@ public final class PendingChanges {
                                 Map<String, String> publication, ApprovalPolicy.Rule mandatory, String attachFingerprint)
             throws IOException {
         Path root = api.writeRoot();
-        String reason = ex.getRequestHeaders().getFirst(HEADER_REASON);
+        String reason = ApiContext.attr(ex, com.gamma.spi.auth.RequestAttrs.ATTR_CHANGE_REASON) instanceof String carried
+                ? carried : ex.getRequestHeaders().getFirst(HEADER_REASON);
         if (reason != null && reason.length() > MAX_REASON)
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, HEADER_REASON + " is at most " + MAX_REASON + " chars");
         Instant now = Instant.now().truncatedTo(ChronoUnit.SECONDS);

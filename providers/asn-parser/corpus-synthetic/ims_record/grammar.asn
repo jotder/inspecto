@@ -1,0 +1,10 @@
+IMS-SYNTHETIC DEFINITIONS IMPLICIT TAGS ::= BEGIN
+IMSRecord ::= SET {
+  sCSCFRecord [0] SCSCFRecord
+}
+SCSCFRecord ::= SET {
+  recordType [0] INTEGER,
+  nodeAddress [1] IA5String,
+  causeForRecordClosing [2] INTEGER
+}
+END

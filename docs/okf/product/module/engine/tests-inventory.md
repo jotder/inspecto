@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-426 test class(es): 426 unit, 0 real-HTTP control-plane, 0 IT.
+427 test class(es): 427 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -169,6 +169,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `StreamingPluginIngestStrategyTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/StreamingPluginIngestStrategyTest.java` | Integration test for the streaming plugin-ingester path ({@link StreamingPluginIngestStrategy} + |
 | `TelcoFraudFeedGapTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/TelcoFraudFeedGapTest.java` | 2026-10-14 demo rehearsal: a missing CDR day (0702 between 0701 and 0703) raised no sequence gap on the polled inbox. |
 | `TextRegexPipelineTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/TextRegexPipelineTest.java` | End-to-end proof that the {@code frontend: text_regex} path flows through the unchanged backend: <!-- vocab-allow: quoted Javadoc --> |
+| `TypedDuckDbRecordSinkTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/TypedDuckDbRecordSinkTest.java` | Verifies typed {@link DuckDbRecordSink#defineTyped} staging table creation, safe {@code TRY_CAST} |
 | `TypedOutputThroughRecordTransformerTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/TypedOutputThroughRecordTransformerTest.java` | Found driving the UI 2026-09-25: a delimited Pipeline whose types live in a sibling Structure CSV |
 | `UnpackEndToEndTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/UnpackEndToEndTest.java` | The Collector-level unpack stage end-to-end (unpack-stage plan Phase 1): a {@code .bz2} inbox file |
 | `UnpackLedgerRunTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/UnpackLedgerRunTest.java` | The run-level unpack ledger END TO END (unpack-stage plan §2.2): a real archive through a real |

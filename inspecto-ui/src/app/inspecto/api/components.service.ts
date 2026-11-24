@@ -157,6 +157,8 @@ export interface ParserTreeNode {
     /** A type tag shown as a chip (e.g. `SEQUENCE`, `string`, element name). */
     type?: string;
     children?: ParserTreeNode[];
+    /** Optional node metadata (`fieldPath`, `tagPath`, `nodeRole`, `matched`, `decoderId`). */
+    meta?: Record<string, unknown>;
 }
 
 /** Flat parse preview (DSV / TXT / Parquet / XLSX / HTML / Other) — rows for the rich data grid. */
@@ -200,6 +202,8 @@ export interface ParserRowSet {
     rows: Record<string, string | null>[];
     /** Every row the previewed records produce for the segment, not just the sample. */
     rowCount: number;
+    /** Optional table metadata (`columnTypes`, `sourcePaths`, `decoders`, `nullable`). */
+    columnMeta?: Record<string, unknown>;
 }
 
 /** Derived columns and exploded child rows, built by the same code ingest runs. */

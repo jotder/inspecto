@@ -80,7 +80,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (175 open row
 
 * [Feature modules](layer/features/index.md) - `layer.features` · 2 doc(s) · 0 open row(s)
 * [Link Analysis modules](layer/la/index.md) - `layer.la` · 3 doc(s) · 1 open row(s)
-* [Platform](layer/platform/index.md) - `layer.platform` · 87 doc(s) · 34 open row(s)
+* [Platform](layer/platform/index.md) - `layer.platform` · 87 doc(s) · 35 open row(s)
 * [Product host](layer/product/index.md) - `layer.product` · 82 doc(s) · 31 open row(s)
 * [Providers](layer/providers/index.md) - `layer.providers` · 2 doc(s) · 0 open row(s)
 * [Service contracts (SPI)](layer/spi/index.md) - `layer.spi` · 2 doc(s) · 0 open row(s)
@@ -108,7 +108,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (175 open row
 
 # Modules
 
-* [Access policy (roles, grants, row scope, audit trail)](module/access/index.md) - `module.access` · 18 doc(s) · 6 open row(s)
+* [Access policy (roles, grants, row scope, audit trail)](module/access/index.md) - `module.access` · 18 doc(s) · 7 open row(s)
 * [Acquisition and collectors](module/acquire/index.md) - `module.acquire` · 3 doc(s) · 2 open row(s)
 * [Action Requests](module/action-requests/index.md) - `module.action-requests` · 10 doc(s) · 0 open row(s)
 * [Hosted model providers for the assistant](module/agent-hosted/index.md) - `module.agent-hosted` · 7 doc(s) · 0 open row(s)
@@ -121,7 +121,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (175 open row
 * [Authentication and capability contract](module/auth-spi/index.md) - `module.auth-spi` · 4 doc(s) · 0 open row(s)
 * [Backup and restore](module/backup/index.md) - `module.backup` · 8 doc(s) · 2 open row(s)
 * [Case Management](module/case-management/index.md) - `module.case-management` · 12 doc(s) · 4 open row(s)
-* [Config model and codecs](module/config/index.md) - `module.config` · 35 doc(s) · 22 open row(s)
+* [Config model and codecs](module/config/index.md) - `module.config` · 35 doc(s) · 21 open row(s)
 * [Kafka stream connector](module/connectors-kafka/index.md) - `module.connectors-kafka` · 6 doc(s) · 0 open row(s)
 * [Collector and export connectors](module/connectors/index.md) - `module.connectors` · 9 doc(s) · 2 open row(s)
 * [Demo authenticator](module/demo-auth/index.md) - `module.demo-auth` · 7 doc(s) · 0 open row(s)

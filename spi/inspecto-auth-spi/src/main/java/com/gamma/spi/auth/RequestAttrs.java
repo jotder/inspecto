@@ -77,6 +77,12 @@ public final class RequestAttrs {
     /** Extra {@code Map<String,Object>} attributes a handler adds to its request's AUDIT row (push ingest
      *  records the record count and byte size here — never the payload). */
     public static final String ATTR_AUDIT_ATTRS = "inspecto.auditAttrs";
+    /** The author's one-line reason for a held write, carried on an in-process replay (the MCP {@code propose_change}
+     *  tool) where it need not survive as an HTTP header: {@code PendingChanges.hold} reads it before the
+     *  {@code X-Change-Reason} header. A header cannot carry every character an author writes ("—", "→", "€"), and the
+     *  JDK refused such a header on the replay, so every such proposal failed (AGENT-PROPOSE-500-1). Absent on every
+     *  request a client sends. */
+    public static final String ATTR_CHANGE_REASON = "inspecto.changeReason";
     /** The {@link EmbedGrant} a public embedded-Investigation route resolved from its path token (LA-EMBED-VIEW-1). Stamped ONLY by
      *  that route after a successful lookup; a grant is NOT a {@code Subject}, so no capability gate ever accepts it. */
     public static final String ATTR_EMBED_GRANT = "inspecto.embedGrant";

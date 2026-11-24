@@ -202,7 +202,10 @@ export class GrammarEditorDialog {
      * through a `@ViewChild` in the template — a view query is unresolved on first render.
      */
     readonly plugin = signal<ParserDef | null>(null);
-    readonly pluginBlocked = computed(() => this.plugin() !== null);
+    readonly pluginBlocked = computed(() => {
+        const p = this.plugin();
+        return p !== null && p.id !== 'asn1';
+    });
 
     /** The last test-parse's table rows, mirrored from `(previewed)` — they arm the Schema
      *  editor's "Suggest from sample" when the user follows the Draft Schema link. */
@@ -336,8 +339,19 @@ export class GrammarEditorDialog {
         return PARSING_FRONTENDS.some((x) => x.id === f) ? (f as ParsingFrontend) : null;
     }
 
-    /** §4.5: export the whole property set — the portable template that replaced Save-as-template. */
+    /** §4.5: export the whole property set — or `.asn` grammar text when editing ASN.1. */
     exportCsv(): void {
+        if (this.plugin()?.id === 'asn1' && this.editor) {
+            const asn1 = (this.editor.value()['asn1'] ?? {}) as Record<string, unknown>;
+            const grammarText = String(asn1['grammar'] ?? '');
+            if (!grammarText.trim()) {
+                this.toastr.warning('No inline ASN.1 grammar text to export.');
+                return;
+            }
+            const stem = (this.data.node.name || this.data.node.id).replace(/[^A-Za-z0-9_-]/g, '_');
+            downloadCsv(`${stem}.asn`, grammarText);
+            return;
+        }
         const frontend = this.activeFrontend();
         if (!frontend || !this.editor) {
             this.toastr.warning('CSV export covers the built-in formats — plugin options are served.');
@@ -352,13 +366,23 @@ export class GrammarEditorDialog {
         downloadCsv(grammarCsvFilename(this.data.node.name || this.data.node.id), csv);
     }
 
-    /** §4.5: import a Grammar CSV — refuse a format mismatch, apply known options, list unknown keys. */
+    /** §4.5: import a Grammar CSV — or `.asn`/`.asn1` grammar text when editing ASN.1. */
     async importCsv(event: Event): Promise<void> {
         const input = event.target as HTMLInputElement;
         const file = input.files?.[0];
         input.value = '';
+        if (!file) return;
+        if (this.plugin()?.id === 'asn1' && /\.(asn|asn1)$/i.test(file.name)) {
+            const text = await file.text();
+            const current = this.editor ? this.editor.value() : nodeParsingBlock(this.data.node);
+            const asn1 = { ...((current['asn1'] as Record<string, unknown> | undefined) ?? {}), grammar: text };
+            this.seedFrom({ ...current, frontend: 'asn1', asn1 });
+            this.importedDirty = true;
+            this.importWarning.set(null);
+            return;
+        }
         const frontend = this.activeFrontend();
-        if (!file || !frontend) return;
+        if (!frontend) return;
         try {
             const parsed = parseGrammarCsv(await file.text(), parsingAttributesFor(frontend));
             if (parsed.meta.format !== frontend) {
@@ -412,6 +436,29 @@ export class GrammarEditorDialog {
         // Always inline — a bound node MIGRATES to an independent copy rather than writing back to the
         // shared component (D4). `closeInline` already drops the `use:`, so both cases are one path.
         const block = this.editor.value();
+        if (this.plugin()?.id === 'asn1') {
+            const prior = nodeParsingBlock(this.data.node)['asn1'];
+            if (prior && typeof prior === 'object') {
+                const asn1 = ((block['asn1'] as Record<string, unknown> | undefined) ?? {});
+                for (const key of [
+                    'event_roots',
+                    'header_fields',
+                    'field_decoders',
+                    'simplify_aliases',
+                    'segments',
+                    'derive',
+                    'children',
+                ]) {
+                    if (asn1[key] === undefined && (prior as Record<string, unknown>)[key] !== undefined) {
+                        asn1[key] = (prior as Record<string, unknown>)[key];
+                    }
+                }
+                if (typeof asn1['grammar'] === 'string' && !asn1['grammar'].trim()) {
+                    delete asn1['grammar'];
+                }
+                block['asn1'] = asn1;
+            }
+        }
         const schema = this.outputSchemaWrite(block);
         if (!schema) return this.closeInline(block);
         this.writing.set(true);

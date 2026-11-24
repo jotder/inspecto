@@ -127,6 +127,30 @@ class ControlApiMcpWriteToolsTest {
                 "content", Map.of("id", id, "tiles", List.of()), "reason", "a board for the on-call rota");
     }
 
+    /** AGENT-PROPOSE-500-1: the first live golden run's 500s - a reason with characters no HTTP header carries
+     *  ("—", "→", "€") made the replay throw before the route ran. It is held, and the approver reads it unchanged. */
+    @Test
+    void aReasonNoHeaderCanCarryIsHeldAndKeptExactly(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            String reason = "Shipments board — count tile → cost by carrier (€)";
+            JsonNode r = call(c.port, AGENT, "propose_change", Map.of("kind", "dashboard", "operation", "create",
+                    "content", Map.of("id", "ship_board", "tiles", List.of()), "reason", reason));
+            assertFalse(r.get("isError").asBoolean(), text(r));
+            assertEquals("pending", r.at("/structuredContent/data/status").asText(), text(r));
+            assertEquals(reason, r.at("/structuredContent/data/pendingChange/reason").asText());
+
+            // a direct request still says why with the header (PendingChanges.hold's fallback)
+            HttpResponse<String> direct = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port
+                            + "/api/v1/components/dashboard"))
+                    .header("Content-Type", "application/json").header("Authorization", AGENT)
+                    .header("X-Change-Reason", "the on-call board, sent directly")
+                    .POST(BodyPublishers.ofString("{\"id\":\"direct_board\",\"tiles\":[]}")).build(), BodyHandlers.ofString());
+            assertEquals(202, direct.statusCode(), direct.body());
+            assertEquals("the on-call board, sent directly",
+                    JSON.readTree(direct.body()).at("/data/pendingChange/reason").asText(), direct.body());
+        }
+    }
+
     @Test
     void toolsListOffersTheWriteToolsAnnotatedAsNotReadOnly(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {

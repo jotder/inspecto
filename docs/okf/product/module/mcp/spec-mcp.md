@@ -156,7 +156,7 @@ is passed on as the replayed route's JSON body, unchanged.
 |---|---|---|---|
 | `validate_config` | read | `type`, `config` | `POST /validate` (`{type, config}`); refusal findings come back as data |
 | `dry_run_pipeline` | read | `pipeline`, `body?` | `POST /pipelines/authored/{pipeline}/dry-run` |
-| `propose_change` | write | `kind`, `operation`, `id?`, `content?`, `reason?` | the kind's own write route, below; `reason` rides as `X-Change-Reason` |
+| `propose_change` | write | `kind`, `operation`, `id?`, `content?`, `reason?` | the kind's own write route, below; `reason` rides as the request attribute `RequestAttrs.ATTR_CHANGE_REASON`, which `PendingChanges.hold` reads before the `X-Change-Reason` header (an in-process replay need not be header-safe; a header holding "—" or "→" made the replay throw — `AGENT-PROPOSE-500-1`, fixed 2026-11-24) |
 | `list_pending_changes` | read | `status?` | `GET /pending-changes` |
 | `get_pending_change`, `diff_pending_change` | read | `change` | `GET /pending-changes/{change}`, `…/diff` |
 | `withdraw_change` | write | `change` | `POST /pending-changes/{change}/withdraw` (author only) |
@@ -187,6 +187,13 @@ console token refused every write tool but keeping the reads; validate, dry-run 
 withdraw; malformed proposals are `-32602`), `McpToolRoutesTest` (unit). Mutants that turned a test red: D-AK3 off,
 the refusal list off, the reason header dropped, the replay not answering a hold, the replay skipping the
 read-only check (on a read-only install `propose_change` is a 423 and no Pending Change is recorded; the reads answer).
+`aReasonNoHeaderCanCarryIsHeldAndKeptExactly` (2026-11-24): a reason with "—", "→" and "€" is held and kept exactly;
+putting the reason back on the header turns it red with the live run's "Illegal character found in header".
+
+**A replay that fails** with anything but an `ApiException` answers the tool `isError` with HTTP 500 and the exception's
+class name plus the correlation id, and is **logged at ERROR with its stack under that correlation id**
+(`McpRoutes.replay`), as a direct request's fault is (`ControlApi.fail500`). Until 2026-11-24 it was answered and
+dropped, which is why the first live golden run's 500s left no trace.
 
 ## Audit
 

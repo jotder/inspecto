@@ -23,13 +23,18 @@ public final class SchemaCompiler {
 
     private final Map<String, Def> defs = new HashMap<>();
     private final Map<String, CompiledType> memo = new LinkedHashMap<>();
-    private final List<String> warnings; // null = strict mode
+    private final List<String> warnings; // null unless compileLenient(warnings)
+    private final List<Diagnostic> diagnostics; // null unless compileLenient(diagnostics)
+    private final boolean simplifyAliases;
 
     private record Def(ModuleAst module, TypeAst ast) {
     }
 
-    private SchemaCompiler(List<ModuleAst> modules, List<String> warnings) {
+    private SchemaCompiler(List<ModuleAst> modules, List<String> warnings,
+                           List<Diagnostic> diagnostics, boolean simplifyAliases) {
         this.warnings = warnings;
+        this.diagnostics = diagnostics;
+        this.simplifyAliases = simplifyAliases;
         for (ModuleAst m : modules) {
             for (Map.Entry<String, TypeAst> e : m.types().entrySet()) {
                 defs.putIfAbsent(e.getKey(), new Def(m, e.getValue()));
@@ -38,7 +43,7 @@ public final class SchemaCompiler {
     }
 
     public static CompiledSchema compile(List<ModuleAst> modules, String rootTypeName) {
-        SchemaCompiler c = new SchemaCompiler(modules, null);
+        SchemaCompiler c = new SchemaCompiler(modules, null, null, false);
         CompiledType root = c.compileNamed(rootTypeName);
         return new CompiledSchema(root, c.memo);
     }
@@ -50,9 +55,32 @@ public final class SchemaCompiler {
      */
     public static CompiledSchema compileLenient(List<ModuleAst> modules, String rootTypeName,
                                                 List<String> warningsOut) {
-        SchemaCompiler c = new SchemaCompiler(modules, warningsOut);
+        SchemaCompiler c = new SchemaCompiler(modules, warningsOut, null, false);
         CompiledType root = c.compileNamed(rootTypeName);
         return new CompiledSchema(root, c.memo);
+    }
+
+    /**
+     * Lenient compile with optional alias-chain simplification and structured diagnostics.
+     */
+    public static CompiledSchema compileLenient(List<ModuleAst> modules, String rootTypeName,
+                                                boolean simplifyAliases, List<Diagnostic> out) {
+        SchemaCompiler c = new SchemaCompiler(modules, null, out, simplifyAliases);
+        CompiledType root = c.compileNamed(rootTypeName);
+        return new CompiledSchema(root, c.memo);
+    }
+
+    private boolean isLenient() {
+        return warnings != null || diagnostics != null;
+    }
+
+    private void warn(String message) {
+        if (warnings != null) {
+            warnings.add(message);
+        }
+        if (diagnostics != null) {
+            diagnostics.add(new Diagnostic(0, 0, "WARNING", message));
+        }
     }
 
     /** Root defaults to the first type assigned in the first module. */
@@ -73,23 +101,55 @@ public final class SchemaCompiler {
         }
         Def def = defs.get(name);
         if (def == null) {
-            if (warnings == null) {
+            if (!isLenient()) {
                 throw new Asn1ParseException("unresolved type reference '" + name + "'");
             }
-            warnings.add("unresolved type reference '" + name + "' — decoding as OCTET STRING");
-            CompiledType fallback = new CompiledType();
-            fallback.nameChain.add(name);
-            fallback.kind = CompiledType.Kind.PRIMITIVE;
-            fallback.primitive = BuiltinKind.OCTET_STRING;
-            fallback.tag = TagKey.universal(BuiltinKind.OCTET_STRING.universalTag());
-            memo.put(name, fallback);
-            return fallback;
+            return decayToOctetString(name, "unresolved type reference '" + name + "' — decoding as OCTET STRING");
+        }
+        List<String> aliasChain = new ArrayList<>();
+        aliasChain.add(name);
+        if (simplifyAliases && def.ast() instanceof TypeAst.Ref) {
+            Set<String> visited = new HashSet<>();
+            visited.add(name);
+            while (def.ast() instanceof TypeAst.Ref(String nextName)) {
+                if (!visited.add(nextName)) {
+                    if (!isLenient()) {
+                        throw new Asn1ParseException("cyclic alias reference involving '" + nextName + "'");
+                    }
+                    return decayToOctetString(name, "cyclic alias reference involving '" + nextName + "' — decoding as OCTET STRING");
+                }
+                Def nextDef = defs.get(nextName);
+                if (nextDef == null) {
+                    if (!isLenient()) {
+                        throw new Asn1ParseException("unresolved type reference '" + nextName + "'");
+                    }
+                    return decayToOctetString(name, "unresolved type reference '" + nextName + "' — decoding as OCTET STRING");
+                }
+                aliasChain.add(nextName);
+                def = nextDef;
+            }
         }
         CompiledType placeholder = new CompiledType();
-        placeholder.nameChain.add(name);
+        placeholder.nameChain.addAll(aliasChain);
         memo.put(name, placeholder);
         fill(placeholder, def.ast(), def.module());
         return placeholder;
+    }
+
+    private CompiledType decayToOctetString(String name, String warningMessage) {
+        if (warnings != null) {
+            warnings.add(warningMessage);
+        }
+        if (diagnostics != null) {
+            diagnostics.add(new Diagnostic(0, 0, "ERROR", warningMessage));
+        }
+        CompiledType fallback = new CompiledType();
+        fallback.nameChain.add(name);
+        fallback.kind = CompiledType.Kind.PRIMITIVE;
+        fallback.primitive = BuiltinKind.OCTET_STRING;
+        fallback.tag = TagKey.universal(BuiltinKind.OCTET_STRING.universalTag());
+        memo.put(name, fallback);
+        return fallback;
     }
 
     private CompiledType compileType(TypeAst ast, ModuleAst module) {

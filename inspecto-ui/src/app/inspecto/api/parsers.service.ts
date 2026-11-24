@@ -27,6 +27,24 @@ export interface ParserDef {
     grammarSchema: ServedFieldSpec[];
 }
 
+export interface Asn1DecoderDef {
+    id: string;
+    description: string;
+    sqlType: string;
+}
+
+export interface Asn1Diagnostic {
+    line: number;
+    column: number;
+    severity: string;
+    message: string;
+}
+
+export interface Asn1ValidationResult {
+    valid: boolean;
+    diagnostics: Asn1Diagnostic[];
+}
+
 /**
  * The parser-plugin catalog + stateless grammar preview (v5.3.0) — the served, self-describing
  * side of the parsing experience: any parser deployed as a plugin appears here with its options
@@ -79,5 +97,23 @@ export class ParsersService {
         let params = new HttpParams().set('profile_file', profileFile);
         if (subdir !== undefined) params = params.set('subdir', subdir);
         return this.http.get<{ asn1: Record<string, unknown> }>(apiUrl('/parsers/asn1/profile'), { params });
+    }
+
+    /** Catalog of registered ASN.1 value decoders (`GET /parsers/asn1/decoders`). */
+    decoders(): Observable<Asn1DecoderDef[]> {
+        return this.http.get<Asn1DecoderDef[]>(apiUrl('/parsers/asn1/decoders'));
+    }
+
+    /** Leniently parse and compile ASN.1 grammar text (`POST /parsers/asn1/validate`). */
+    validateGrammar(
+        grammarText: string,
+        rootType?: string,
+        simplifyAliases = false,
+    ): Observable<Asn1ValidationResult> {
+        return this.http.post<Asn1ValidationResult>(apiUrl('/parsers/asn1/validate'), {
+            grammar_text: grammarText,
+            ...(rootType ? { root_type: rootType } : {}),
+            simplify_aliases: simplifyAliases,
+        });
     }
 }

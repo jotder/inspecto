@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.elt`](../../../../../product-map/module/elt.toon).
 
-108 test class(es): 108 unit, 0 real-HTTP control-plane, 0 IT.
+109 test class(es): 109 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -116,6 +116,7 @@ mvn -o test -pl platform/inspecto-etl -Dtest=AcceptedConfigKeysDocContractTest,B
 | `SchemaSelectorEntriesTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/SchemaSelectorEntriesTest.java` | Tests for the read-only {@link SchemaSelector#entries()} catalog accessor (P2). |
 | `SchemaSelectorTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/SchemaSelectorTest.java` | Tests for {@link SchemaSelector} — the two-pass schema dispatch used by |
 | `SchemaTabularRowWidthTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/SchemaTabularRowWidthTest.java` | {@code TOON-UNQUOTED-DECIMAL-SKIPS-PIPELINE-1}: an unquoted {@code DECIMAL(18,2)} in a schema's tabular |
+| `SetOfGroupByFoldJoinTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/SetOfGroupByFoldJoinTest.java` | Task 4: {@code SET_OF}/{@code SEQUENCE_OF} shaping ({@code group_by} + per-member aggregations, |
 | `ShippedDatePartitionsAreDateTypedTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/ShippedDatePartitionsAreDateTypedTest.java` | No shipped Pipeline cuts a {@code DATE_*} partition from a field its schema declares non-date |
 | `ShippedPipelinesLoadFromAnyWorkingDirectoryTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/ShippedPipelinesLoadFromAnyWorkingDirectoryTest.java` | Every shipped Pipeline loads no matter which directory the process was launched from |
 | `SinkDuckLakeSharedTableTest` | `com.gamma.etl` | unit | `platform/inspecto-etl/src/test/java/com/gamma/etl/SinkDuckLakeSharedTableTest.java` | Two {@code sinks[]} destinations whose EFFECTIVE ducklake (entry → {@code output.ducklake}) is one |

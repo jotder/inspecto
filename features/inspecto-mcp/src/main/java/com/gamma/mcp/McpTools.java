@@ -296,7 +296,8 @@ final class McpTools {
         String path = template.substring(sp + 1).replace("{id}", id == null ? "" : seg(id));
         Map<String, String> headers = new LinkedHashMap<>();
         if (a.get("reason") instanceof String reason) {
-            // the route's own limit (PendingChanges.MAX_REASON), and one line: it travels as a header
+            // the route's own limit (PendingChanges.MAX_REASON), and one line, as the approver reads it. Carried under the
+            // header's name here; McpRoutes.replay moves it to RequestAttrs.ATTR_CHANGE_REASON (AGENT-PROPOSE-500-1)
             if (reason.length() > 500) throw new BadArgs("'reason' is at most 500 characters");
             if (reason.indexOf('\r') >= 0 || reason.indexOf('\n') >= 0) throw new BadArgs("'reason' is one line");
             headers.put("X-Change-Reason", reason);

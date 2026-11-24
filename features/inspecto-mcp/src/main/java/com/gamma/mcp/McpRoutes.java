@@ -40,6 +40,8 @@ import java.util.Set;
  */
 public final class McpRoutes implements RouteModule {
 
+    private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(McpRoutes.class);
+
     static final String MODERN = "2026-07-28";
     static final Set<String> LEGACY = Set.of("2025-11-25", "2025-06-18");
     static final List<String> SUPPORTED = List.of(MODERN, "2025-11-25", "2025-06-18");
@@ -381,13 +383,24 @@ public final class McpRoutes implements RouteModule {
         auditAttrs.put("via", "mcp");
         auditAttrs.put(kind, name);
         if (client != null) auditAttrs.put("mcpClient", clientLabel(client));
+        // AGENT-PROPOSE-500-1: the reason rides as a request attribute, not a header - an in-process replay need not be
+        // header-safe, and the JDK refuses a header holding "—" or "→", which agents write.
+        Map<String, Object> attrs = new LinkedHashMap<>();
+        attrs.put(RequestAttrs.ATTR_AUDIT_ATTRS, auditAttrs);
+        String reason = headers.remove("X-Change-Reason");
+        if (reason != null) attrs.put(RequestAttrs.ATTR_CHANGE_REASON, reason);
         try {
-            return api.replay(ex, call.method(), call.path(), call.body(), headers,
-                    Map.of(RequestAttrs.ATTR_AUDIT_ATTRS, auditAttrs));
+            return api.replay(ex, call.method(), call.path(), call.body(), headers, attrs);
         } catch (ApiException refused) {
             return new ApiContext.Replayed(refused.status, jsonText(Map.of("error", String.valueOf(refused.getMessage()))));
         } catch (Exception failed) {
-            return new ApiContext.Replayed(500, jsonText(Map.of("error", "the route failed: " + failed.getClass().getSimpleName())));
+            // AGENT-PROPOSE-500-1: a server fault inside a replay is logged like one on a direct request (ControlApi.fail500:
+            // ERROR, the correlation id, the stack) - before this it was answered and dropped, so the first live golden run's
+            // 53 HTTP 500s left no trace. The agent gets the correlation id an operator can search for, never the message.
+            Object cid = ApiContext.attr(ex, ApiContext.ATTR_CORRELATION_ID);
+            LOG.error("MCP {} '{}' replaying {} {} failed (Correlation-ID {})", kind, name, call.method(), call.path(), cid, failed);
+            return new ApiContext.Replayed(500, jsonText(Map.of("error", "the route failed: " + failed.getClass().getSimpleName()
+                    + " - correlation id " + cid)));
         }
     }
 

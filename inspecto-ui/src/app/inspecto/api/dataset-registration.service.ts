@@ -3,6 +3,19 @@ import { Observable, catchError, map, of, switchMap } from 'rxjs';
 
 import { ComponentsService } from './components.service';
 
+export interface DatasetColumnSpec {
+    name: string;
+    type: string;
+    role: string;
+}
+
+export interface DatasetEnsureOptions {
+    physicalRef?: string;
+    sourceName?: string;
+    columns?: DatasetColumnSpec[];
+    partitions?: unknown[];
+}
+
 /** What {@link DatasetRegistrationService.ensure} did. It never errors — see the service doc. */
 export type DatasetEnsure =
     | { status: 'exists'; store: string }
@@ -37,14 +50,16 @@ export class DatasetRegistrationService {
     private components = inject(ComponentsService);
 
     /**
-     * @param store the normalized pipeline id — the engine's `Identity.pipelineName`, which is also
-     *              the landed store's name and the Dataset's `physicalRef`.
+     * @param store the normalized pipeline/dataset id — also defaults {@code physicalRef} and {@code sourceName} when omitted.
      * @param display the human label for the Dataset (identity/display split).
+     * @param opts optional overrides for segmented stores ({@code physicalRef}, {@code sourceName}), {@code columns}, and {@code partitions}.
      */
-    ensure(store: string, display: string): Observable<DatasetEnsure> {
+    ensure(store: string, display: string, opts?: DatasetEnsureOptions): Observable<DatasetEnsure> {
+        const physicalRef = opts?.physicalRef ?? store;
+        const sourceName = opts?.sourceName ?? store;
         return this.components.list('dataset').pipe(
             switchMap((defs) => {
-                if (defs.some((d) => d.content['physicalRef'] === store))
+                if (defs.some((d) => d.content['physicalRef'] === physicalRef))
                     return of<DatasetEnsure>({ status: 'exists', store });
                 return this.components
                     .create('dataset', {
@@ -55,8 +70,10 @@ export class DatasetRegistrationService {
                         // sample-source default that names nothing, so the dataset silently read
                         // zero rows everywhere; naming the store is honest whether or not a preview
                         // for it exists yet (BACKLOG §4 split S2, slice B).
-                        sourceName: store,
-                        physicalRef: store,
+                        sourceName,
+                        physicalRef,
+                        ...(opts?.columns?.length ? { columns: opts.columns } : {}),
+                        ...(opts?.partitions?.length ? { partitions: opts.partitions } : {}),
                         description: `Landed data of stream "${display}" — registered at go-live.`,
                     })
                     .pipe(

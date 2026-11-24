@@ -102,6 +102,10 @@ run — not a per-row call.
    test-a-key / stats / refresh, parity suite against the batch engine.
 4. **P4 — fuzzy:** batch (blocking key, score, top-k), then point (candidate index); test console UI.
 
+**P1d built 2026-11-23 (operator: "normalized exact"):** `normalize:` on the keyed join (`match: exact | longest_prefix`) —
+an ordered list of `trim`, `lower`, `upper`, `strip_leading_zeros`, `strip_plus` applied to BOTH the Reference key and
+every looked-up value; two Reference rows that collapse to one key are refused by the duplicates rule; refused on
+`range`. `RowShaperTest`, `PipelineValidatorTest`. Still open in P1: as-of, the `lookup()` scalar, hit / miss counts.
 **P1d — the join output model (proposed 2026-11-22, operator; built 2026-11-23, see below):** each looked-up number fetches its OWN set of columns
 under its OWN names, and the user sees what a join adds before running it.
 - **Per-input mappings with rename** — one Step, one pass over the Reference, a mapping per `on` column, each with its

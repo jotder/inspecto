@@ -1554,6 +1554,15 @@ public final class RowShaper {
         } catch (IllegalArgumentException e) {
             throw new IllegalArgumentException("transform.join node '" + id + "': " + e.getMessage());
         }
+        List<String> normalizers;
+        try {
+            normalizers = joinNormalizers(node.cfg("normalize"));
+        } catch (IllegalArgumentException e) {
+            throw new IllegalArgumentException("transform.join node '" + id + "': " + e.getMessage());
+        }
+        if (range && !normalizers.isEmpty())
+            throw new IllegalArgumentException("transform.join node '" + id + "': normalize: applies to match: exact "
+                    + "and longest_prefix, not range (a range compares in the value's own type)");
         String exactWhen = strOrNull(node, "exact_when");
         if (exactWhen != null && !prefix)
             throw new IllegalArgumentException("transform.join node '" + id + "': exact_when only applies to "

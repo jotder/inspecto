@@ -15,6 +15,9 @@ export interface SegmentColumnDraft {
     /** Dotted path into the decoded record, e.g. `party.number`. */
     selector: string;
     type: SegmentColumnType;
+    rename?: string;
+    prefix?: string;
+    postfix?: string;
 }
 
 export interface SegmentDraft {
@@ -24,7 +27,15 @@ export interface SegmentDraft {
 }
 
 /** The honestly-castable set the Schema stage's type autodetection already speaks. */
-export const SEGMENT_COLUMN_TYPES = ['VARCHAR', 'DOUBLE', 'DATE', 'TIMESTAMP'] as const;
+export const SEGMENT_COLUMN_TYPES = [
+    'VARCHAR',
+    'BIGINT',
+    'INTEGER',
+    'DOUBLE',
+    'BOOLEAN',
+    'DATE',
+    'TIMESTAMP',
+] as const;
 export type SegmentColumnType = (typeof SEGMENT_COLUMN_TYPES)[number];
 
 /** The derived column every segment gets: the ingester emits the segment key here. */
@@ -194,15 +205,31 @@ export function segmentDraftFrom(key: string, config: Record<string, unknown> | 
         const selector = String(f['selector'] ?? '').trim();
         if (!name || !selector) continue; // a half-written row is not an editable column
         const declared = String(f['type'] ?? '').toUpperCase();
+        const rename = typeof f['rename'] === 'string' ? f['rename'].trim() : String(f['rename'] ?? '').trim();
+        const prefix = f['prefix'] != null ? String(f['prefix']) : '';
+        const postfix = f['postfix'] != null ? String(f['postfix']) : '';
         columns.push({
             name,
             selector,
             type: (SEGMENT_COLUMN_TYPES as readonly string[]).includes(declared)
                 ? (declared as SegmentColumnType)
                 : 'VARCHAR',
+            ...(rename ? { rename } : {}),
+            ...(prefix ? { prefix } : {}),
+            ...(postfix ? { postfix } : {}),
         });
     }
     return { key, columns };
+}
+
+/**
+ * Effective raw column name matching backend {@code DeriveSpec.applyNameAffixes}:
+ * {@code prefix + (non-blank rename || name) + postfix}.
+ */
+export function effectiveColumnName(c: Pick<SegmentColumnDraft, 'name' | 'rename' | 'prefix' | 'postfix'>): string {
+    const rename = (c.rename ?? '').trim();
+    const base = rename || c.name.trim();
+    return `${c.prefix ?? ''}${base}${c.postfix ?? ''}`;
 }
 
 export function schemaDraftFor(segment: SegmentDraft, schemaName: string): Record<string, unknown> {
@@ -211,12 +238,19 @@ export function schemaDraftFor(segment: SegmentDraft, schemaName: string): Recor
         raw: {
             name: schemaName,
             format: 'CSV',
-            fields: segment.columns.map((c) => ({ name: c.name, selector: c.selector, type: c.type })),
+            fields: segment.columns.map((c) => ({
+                name: c.name,
+                selector: c.selector,
+                type: c.type,
+                ...(c.rename ? { rename: c.rename } : {}),
+                ...(c.prefix ? { prefix: c.prefix } : {}),
+                ...(c.postfix ? { postfix: c.postfix } : {}),
+            })),
         },
         mapping: {
             canonicalName: schemaName,
             rawName: schemaName,
-            rules: segment.columns.map((c) => ({ targetColumn: c.name, sourceExpression: c.name })),
+            rules: segment.columns.map((c) => ({ targetColumn: c.name, sourceExpression: effectiveColumnName(c) })),
         },
     };
 }
