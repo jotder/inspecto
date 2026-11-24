@@ -43,7 +43,13 @@ const ANSWER: LookupTestAnswer = {
     matchedKey: '24991',
     matchKind: 'prefix',
     mappings: [{ on: 'SERVED_MSISDN', columns: { SERVED_MSISDN_provider_desc: 'Operator A' } }],
-    index: { rows: 2, loadedAt: '2026-11-24T10:00:00Z', buildMs: 5 },
+    index: {
+        rows: 2,
+        loadedAt: '2026-11-24T10:00:00Z',
+        buildMs: 5,
+        reloaded: 'reference changed',
+        watchesReference: true,
+    },
 };
 
 async function create(page: LookupsPage | Error, answer: LookupTestAnswer | Error = ANSWER) {
@@ -153,6 +159,8 @@ describe('LookupsComponent', () => {
         expect(text).toContain('Found: key 24991 (prefix)');
         expect(text).toContain('Operator A');
         expect(text).toContain('Index of 2 Reference rows');
+        expect(text).toContain('the Reference changed');
+        expect(text).not.toContain('not detected');
         await expectNoA11yViolations(fixture.nativeElement);
     });
 

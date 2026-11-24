@@ -189,7 +189,12 @@ export interface LookupTestAnswer {
     matchKind: 'exact' | 'prefix' | 'range' | 'asof' | 'none';
     /** What each looked-up column would add: output column → text, not-found defaults applied. */
     mappings: { on: string; columns: Record<string, string | null> }[];
-    index: { rows: number; loadedAt: string; buildMs: number };
+    /**
+     * The index that answered: `reloaded` says why this answer built it (`first use`, `reload asked`, `step changed`,
+     * `reference changed`), null when it was kept; `watchesReference` false means a Reference change is only seen on
+     * reload.
+     */
+    index: { rows: number; loadedAt: string; buildMs: number; reloaded: string | null; watchesReference: boolean };
 }
 
 export interface LookupsPage {

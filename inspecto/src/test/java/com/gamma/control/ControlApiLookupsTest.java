@@ -167,7 +167,7 @@ class ControlApiLookupsTest {
                 .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
     }
 
-    /** LOOKUP-1 P3 — test-a-key: the point engine's answer for one value, the index kept warm until refreshed. */
+    /** LOOKUP-1 P3 — test-a-key: the point engine's answer for one value, the index kept warm and rebuilt when its Reference changes. */
     @Test
     void aValueIsTestedThroughThePointEngineAndRefreshSeesANewReference(@TempDir Path dir) throws Exception {
         System.setProperty("assist.safety.roots", dir.toString());
@@ -203,13 +203,19 @@ class ControlApiLookupsTest {
             assertEquals("none", miss.get("matchKind").asText());
             assertEquals("UNKNOWN", miss.get("mappings").get(0).get("columns").get("SERVED_MSISDN_provider_desc").asText());
 
-            // the Reference changes: the warm index still answers from what it loaded until refresh asks
+            assertEquals("first use", a.get("index").get("reloaded").asText());
+            assertTrue(a.get("index").get("watchesReference").asBoolean());
+            assertTrue(miss.get("index").get("reloaded").isNull(), "kept: " + miss);
+
+            // the Reference changes: the next answer sees it, with no reload asked
             Files.writeString(ref, "dial_digit_key,provider_desc\n249,Sudan\n24991,Operator A\n999,Nine\n");
-            assertFalse(V1Body.of(test(c, "{\"pipeline\":\"" + name + "\",\"step\":\"join\",\"value\":\"999\"}").body())
-                    .get("hit").asBoolean(), "warm until refreshed");
-            JsonNode fresh = V1Body.of(test(c, "{\"pipeline\":\"" + name + "\",\"step\":\"join\",\"value\":\"999\",\"refresh\":true}").body());
+            JsonNode fresh = V1Body.of(test(c, "{\"pipeline\":\"" + name + "\",\"step\":\"join\",\"value\":\"999\"}").body());
             assertTrue(fresh.get("hit").asBoolean(), fresh.toString());
             assertEquals(3, fresh.get("index").get("rows").asLong());
+            assertEquals("reference changed", fresh.get("index").get("reloaded").asText());
+            JsonNode asked = V1Body.of(test(c, "{\"pipeline\":\"" + name + "\",\"step\":\"join\",\"value\":\"999\","
+                    + "\"refresh\":true}").body());
+            assertEquals("reload asked", asked.get("index").get("reloaded").asText());
 
             assertEquals(404, test(c, "{\"pipeline\":\"" + name + "\",\"step\":\"nope\",\"value\":\"1\"}").statusCode());
             assertEquals(400, test(c, "{\"value\":\"1\"}").statusCode());

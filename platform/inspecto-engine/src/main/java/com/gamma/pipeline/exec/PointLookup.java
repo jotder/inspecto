@@ -106,6 +106,34 @@ public final class PointLookup {
     public long rows() { return rows; }
     public Instant loadedAt() { return loadedAt; }
     public long buildMillis() { return buildMillis; }
+
+    /**
+     * A stamp of the files a Reference reads, as its resolver declares them ({@code readDirs} / {@code readFiles}):
+     * file count, total bytes and the newest modification time. A commit to a Reference Dataset or an edited file
+     * changes it, so a kept index can tell it is stale without reading a row. {@code null} when the resolver declares
+     * no files — the change cannot then be seen, and only an explicit reload refreshes the index.
+     */
+    public static String referenceStamp(String reference, RowShaper.ReferenceResolver references) {
+        List<Path> roots = new ArrayList<>(references.readDirs(reference));
+        roots.addAll(references.readFiles(reference));
+        if (roots.isEmpty()) return null;
+        long files = 0, bytes = 0, newest = 0;
+        for (Path root : roots) {
+            if (!Files.exists(root)) continue;
+            try (java.util.stream.Stream<Path> walk = Files.walk(root)) {
+                for (Path p : (Iterable<Path>) walk.filter(Files::isRegularFile)::iterator) {
+                    java.nio.file.attribute.BasicFileAttributes a =
+                            Files.readAttributes(p, java.nio.file.attribute.BasicFileAttributes.class);
+                    files++;
+                    bytes += a.size();
+                    newest = Math.max(newest, a.lastModifiedTime().toMillis());
+                }
+            } catch (java.io.IOException | java.io.UncheckedIOException e) {
+                return "unreadable:" + e.getMessage();   // a changed answer still differs from the last stamp
+            }
+        }
+        return files + ":" + bytes + ":" + newest;
+    }
     public String match() { return match; }
 
     /**
