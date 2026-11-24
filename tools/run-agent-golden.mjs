@@ -74,12 +74,16 @@ export function grade(task, state, vars = {}) {
             push(`pending-change ${c.kinds[0]}`, hits.length >= min,
                 `${hits.length} matching Pending Change(s) by agent client '${state.client}', need ${min}`);
         } else if (c.check === 'agent-action' || c.check === 'no-agent-action') {
-            // An action the agent RAN (AK-2d): its own audit row on an action route, answered 2xx other than 202 (a 202 is a
-            // Pending Action, not a run). `path` narrows it to one route (a regex tail, {vars} substituted).
+            // An action the agent RAN (AK-2d): its own audit row on an action route, answered 2xx. A 202 is NOT a hold by
+            // itself — a run trigger, a Job trigger and a Job Run replay answer 202 when they start — so a row counts as held
+            // only when the agent has a Pending Action for that very path. `path` narrows it to one route (a regex tail).
             const want = c.path ? new RegExp(substitute(c.path, vars) + '$') : ACTION_PATH;
+            const heldPaths = (state.pendingActions ?? []).filter((pa) => pa.agentClient === state.client)
+                .map((pa) => String(pa.action ?? '').replace(/^POST /, '').split('?')[0]);
+            const held = (r) => statusOf(r) === 202 && heldPaths.some((p) => p && (pathOf(r) ?? '').endsWith(p));
             const ran = (state.audit ?? []).filter((r) => agentOf(r) === state.client && methodOf(r) === 'POST'
                 && ACTION_PATH.test(pathOf(r) ?? '') && want.test(pathOf(r) ?? '')
-                && statusOf(r) !== null && statusOf(r) >= 200 && statusOf(r) < 300 && statusOf(r) !== 202);
+                && statusOf(r) !== null && statusOf(r) >= 200 && statusOf(r) < 300 && !held(r));
             if (c.check === 'agent-action')
                 push(`agent-action ${c.path ?? 'any'}`, ran.length >= (c.min ?? 1), `${ran.length} action(s) run by the agent`);
             else push('no-agent-action', ran.length === 0, ran.length ? `ran: ${ran.map(pathOf).join(', ')}` : 'none run');

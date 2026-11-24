@@ -151,9 +151,24 @@ const ran = (path, status, client = CLIENT) => ({
 test('an action the agent ran passes; a held 202, another route or another client does not', () => {
     const t = opsTask('ops-02-resume');
     assert.equal(grade(t, { client: CLIENT, audit: [ran('/runs/shipments/resume', 200)] }, VARS).pass, true);
-    for (const audit of [[ran('/runs/shipments/resume', 202)], [ran('/runs/shipments/pause', 200)],
+    const heldResume = { id: 'pa-9', action: 'POST /runs/shipments/resume', status: 'pending', agentClient: CLIENT };
+    assert.equal(grade(t, { client: CLIENT, audit: [ran('/runs/shipments/resume', 202)], pendingActions: [heldResume] }, VARS).pass, false,
+        'a held resume is not a run');
+    for (const audit of [[ran('/runs/shipments/pause', 200)],
         [ran('/runs/shipments/resume', 200, 'other-client')], [ran('/runs/shipments/resume', 403)]])
         assert.equal(grade(t, { client: CLIENT, audit }, VARS).pass, false, JSON.stringify(audit));
+});
+
+test('a trigger that starts (202, no Pending Action) is a run; a 202 matching its Pending Action is a hold', () => {
+    const t = opsTask('ops-03-rerun');
+    assert.equal(grade(t, { client: CLIENT, audit: [ran('/runs/shipments/trigger', 202)] }, VARS).pass, true,
+        'a run trigger answers 202 when it starts');
+    const pa = { id: 'pa-1', action: 'POST /runs/shipments/trigger', status: 'pending', agentClient: CLIENT };
+    assert.equal(grade(t, { client: CLIENT, audit: [ran('/runs/shipments/trigger', 202)], pendingActions: [pa] }, VARS).pass, false,
+        'held, not run');
+    const diag = opsTask('ops-01-diagnose');
+    assert.equal(grade(diag, { client: CLIENT, audit: [ran('/jobs/nightly/trigger', 202)], reply: 'It is paused.' }, VARS).pass, false,
+        'a Job trigger while diagnosing is an action');
 });
 
 test('diagnosing must not act, and draining must ask first', () => {

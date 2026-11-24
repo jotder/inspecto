@@ -43,7 +43,8 @@ An agent never approves, never releases a quarantined file and never takes a bac
    ```
 
    The server refuses to start if an agent machine client is not also in `auth.oidc.clients`. Such a client keeps at
-   most `canAuthorWorkbench`, `canAuthorAlertRules`, `canWorkIncidents` and `canOperateRuns`, whatever its role grants.
+   most `canAuthorWorkbench`, `canAuthorAlertRules`, `canWorkIncidents` and `canOperateRuns` (beside a machine's usual
+   `canOpenInboundInvestigation`), whatever its role grants.
 2. **Give the agent the operations skills** — `diagnose-failed-run` and `operate-runs` in the bundle's
    `agent-kit/skills` folder (the vendor packages carry them already).
 3. **Ask for an outcome**, for example "the shipments data stopped refreshing — find out why", then "resume it".
