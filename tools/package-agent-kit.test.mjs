@@ -71,6 +71,9 @@ test('bad inputs are refused', () => {
     bad({ callbackPort: 80 }, /callback-port/);
     bad({ version: 'latest' }, /SemVer/);
     assert.throws(() => buildPackages(OPTS, {}), /no skills/);
+    // blank scopes fall back to openid rather than an empty scope
+    const blank = buildPackages({ ...OPTS, scopes: '  ' }, skills);
+    assert.deepEqual(JSON.parse(blank['gemini/inspecto/gemini-extension.json']).mcpServers.inspecto.oauth.scopes, ['openid']);
     // localhost over http is allowed for a developer install
     assert.ok(buildPackages({ ...OPTS, mcpUrl: 'http://localhost:8080/api/v1/mcp' }, skills));
 });

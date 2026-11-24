@@ -74,7 +74,7 @@ this extension; \`build-an-app\` is the place to start for an outcome, \`safe-co
 export function buildPackages(opts, skills) {
     const { mcpUrl, clientId, authorizationUrl, tokenUrl, version } = opts;
     const geminiClientId = opts.geminiClientId ?? clientId;
-    const scopes = (opts.scopes ?? 'openid').trim();
+    const scopes = (opts.scopes ?? '').trim() || 'openid';
     const port = Number(opts.callbackPort ?? 8765);
     if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error(`--callback-port must be 1024-65535: ${opts.callbackPort}`);
     requireHttps('mcp-url', mcpUrl, { localOk: true });
@@ -156,7 +156,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
         }, readSkills());
         const out = a.out ?? join(ROOT, 'target/agent-kit');
         if (existsSync(join(out, 'claude')) || existsSync(join(out, 'gemini')))
-            throw new Error(`${out} already holds packages — give an empty --out`);
+            throw new Error(`${out} already holds packages — give a new --out (packages are never overwritten)`);
         for (const [p, text] of Object.entries(files)) {
             mkdirSync(dirname(join(out, p)), { recursive: true });
             writeFileSync(join(out, p), text);
