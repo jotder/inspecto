@@ -5,6 +5,7 @@ import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form
 import { RowLinkKind } from 'app/inspecto/viz/viz-types';
 import { HeatmapScale } from 'app/inspecto/viz/heatmap';
 import { NumberFormat } from 'app/inspecto/viz/number-format';
+import { COMPARE_KINDS, CompareKind } from 'app/inspecto/viz/compare';
 import { WidgetOptions } from './widget-types';
 import { WIDGET_OPTION_ATTRIBUTES, WIDGET_OPTION_VIZ_TYPES } from './widget-option-attributes';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -101,6 +102,7 @@ export class WidgetOptionsDialog {
         categoryOrderDir: this.data.categoryOrder?.dir ?? 'asc',
         categoryOrderAgg: this.data.categoryOrder?.agg ?? 'min',
         rowLinkLabelField: this.data.rowLink?.labelField ?? '', // UIE-6 link text column
+        compareKind: this.data.compare?.kind ?? '', // BI-INSIGHTS-1 I-1
     };
 
     save(): void {
@@ -234,6 +236,13 @@ export class WidgetOptionsDialog {
                       ...(v['categoryOrderAgg'] === 'max' ? { agg: 'max' as const } : {}),
                   }
                 : undefined;
+        }
+        if ('compareKind' in v) {
+            const kind = v['compareKind'];
+            o.compare =
+                typeof kind === 'string' && (COMPARE_KINDS as readonly string[]).includes(kind)
+                    ? { kind: kind as CompareKind }
+                    : undefined;
         }
     }
 }

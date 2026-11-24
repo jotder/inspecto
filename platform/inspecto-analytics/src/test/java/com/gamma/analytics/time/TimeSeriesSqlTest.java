@@ -140,6 +140,28 @@ class TimeSeriesSqlTest {
     }
 
     @Test
+    void aYearStepComparesEachBucketWithTheBucketHoldingItsStartAYearEarlier() throws Exception {
+        try (Statement st = conn.createStatement()) {
+            st.execute("CREATE OR REPLACE TABLE daily_y AS SELECT * FROM (VALUES"
+                    + " (TIMESTAMP '2027-02-28', 1.0), (TIMESTAMP '2028-02-28', 2.0), (TIMESTAMP '2028-02-29', 3.0),"
+                    + " (TIMESTAMP '2028-03-01', 4.0)) v(day, n)");
+        }
+        Shift ly = new Shift("daily_y", "day", TimeGrain.DAY, null, List.of(), 1, List.of(new Shifted("n", "n_ly")),
+                TimeGrain.YEAR);
+        assertEquals(List.of(
+                "2027-02-28 00:00:00|1.0|null",
+                "2028-02-28 00:00:00|2.0|1.0",
+                "2028-02-29 00:00:00|3.0|1.0",
+                "2028-03-01 00:00:00|4.0|null"), rows(TimeSeriesSql.shift(ly)),
+                "29 Feb looks at 28 Feb a year earlier; 1 Mar has no row a year earlier, so NULL - never a neighbour, never 0");
+        assertEquals(new Shift("r", "t", TimeGrain.MONTH, null, List.of(), 1, List.of(new Shifted("a", "b")),
+                TimeGrain.MONTH), new Shift("r", "t", TimeGrain.MONTH, null, List.of(), 1, List.of(new Shifted("a", "b"))),
+                "a step equal to the grain is the plain bucket shift");
+        assertThrows(IllegalArgumentException.class, () -> new Shift("r", "t", TimeGrain.MONTH, null, List.of(), 1,
+                List.of(new Shifted("a", "b")), TimeGrain.DAY));
+    }
+
+    @Test
     void aZonedShiftComparesBucketsOnTheZoneWallClock() throws Exception {
         try (Statement st = conn.createStatement()) {
             st.execute("CREATE OR REPLACE TABLE daily AS SELECT * FROM (VALUES"

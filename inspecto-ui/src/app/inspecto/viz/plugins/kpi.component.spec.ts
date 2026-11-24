@@ -110,7 +110,7 @@ describe('KpiComponent (UIE-1)', () => {
             format: { style: 'currency', currency: 'SAR' },
         };
 
-        function bound(response: KpiValue | 'error') {
+        function bound(response: KpiValue | 'error', compareKind?: 'previous' | 'target') {
             TestBed.configureTestingModule({
                 imports: [KpiComponent],
                 providers: [provideNoopAnimations(), provideHttpClient(withXhr()), provideHttpClientTesting()],
@@ -120,6 +120,7 @@ describe('KpiComponent (UIE-1)', () => {
             fixture.componentRef.setInput('value', 7);
             fixture.componentRef.setInput('target', 1);
             fixture.componentRef.setInput('kpiId', 'refunds');
+            if (compareKind) fixture.componentRef.setInput('compareKind', compareKind);
             fixture.detectChanges();
             const http = TestBed.inject(HttpTestingController);
             const req = http.expectOne((r) => r.url === environment.apiBaseUrl + '/v1/kpis/refunds/value');
@@ -137,6 +138,14 @@ describe('KpiComponent (UIE-1)', () => {
             expect(text('kpi-target')).toBe('Target SAR 35.00 — above target');
             expect(text('kpi-band')).toBe('RAG: Red');
             await expectNoA11yViolations(el);
+        });
+
+        it('BI-INSIGHTS-1 I-1: "Compare with: Target" measures the delta against the KPI\'s own target', () => {
+            const { text } = bound(served, 'target');
+            // 50 vs the definition's target 35 (not the hand-set 1, not the prior period's 40); lower is better here
+            expect(text('kpi-delta')).toContain('▲ Up 42.9 %');
+            expect(text('kpi-delta')).toContain('vs target');
+            expect(text('kpi-delta')).not.toContain('prior period');
         });
 
         it('says "No data" for a null value and never shows the hand-set one in its place', async () => {

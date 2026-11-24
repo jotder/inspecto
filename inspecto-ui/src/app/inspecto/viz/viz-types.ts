@@ -1,5 +1,6 @@
 import { NumberFormat } from './number-format';
 import type { HeatmapMatrix, HeatmapOptions } from './heatmap';
+import type { CompareKind } from './compare';
 import { ColumnType, ConditionGroup } from 'app/inspecto/query';
 import { TreemapRow } from './treemap-layout';
 
@@ -99,6 +100,9 @@ export interface QuerySpec {
     /** A saved Query (R3) the Widget is bound to — the server aggregates over that query's result, read and
      *  rendered at run time, instead of the whole Dataset (QUERY-BOUND-WIDGET-1). Absent = the Dataset. */
     queryId?: string;
+    /** BI-INSIGHTS-1 I-1: a comparison the server computes in the same statement (`compare.ts`). `field` defaults to the
+     *  one grained dimension; `target` only for `kind: 'target'`. */
+    compare?: { kind: CompareKind; field?: string; target?: number };
 }
 
 /** The channels a plugin can map fields onto (Tableau-style). `rows` / `columns` are the heatmap's two axes. */
@@ -214,6 +218,10 @@ export interface VizRenderOptions {
     kpi?: { target?: number; better?: 'higher' | 'lower'; kpiId?: string };
     /** KPI trend only: the delta compares the last point with the point `compareBack` steps earlier (default 1). */
     trend?: { compareBack?: number };
+    /** BI-INSIGHTS-1 I-1 (line, bar, area, KPI): compare each value with the previous period, the same period
+     *  last year, the target (`kpi.target`; a KPI-bound tile: its KPI's target) or the average — computed by the
+     *  server in the Widget's own query, drawn as a dashed series with the change and % in words. */
+    compare?: { kind: CompareKind };
     /** Progress list only: how many rows show before "+N more" (default: `limit`, else 10), and the value a full bar
      *  stands for (default: the largest value shown). */
     progress?: { limit?: number; max?: number };
@@ -272,7 +280,8 @@ export interface VizProps {
     columns?: string[];
     /** For KPI: the single headline value (+ optional comparison). */
     value?: number;
-    /** UIE-1, KPI: the prior-period value from the optional `compare` channel — the delta's baseline. */
+    /** UIE-1, KPI: the prior-period value from the optional `compare` channel — the delta's baseline. With a
+     *  server comparison (I-1, `options.compare`) and no `compare` channel, the server's compared value. */
     compare?: number;
     /** Treemap: one row per group (and subgroup) with its value — `treemap-layout.ts` builds the tree at render time. */
     treemap?: TreemapRow[];

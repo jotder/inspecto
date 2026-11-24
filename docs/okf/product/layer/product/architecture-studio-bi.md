@@ -83,7 +83,34 @@ the statement. It accepts:
 - three grains: `day`, `week`, `month`;
 - an optional trailing `window` (`{field, asOf, days?}`), which also enables the as-of aggregate
   `recency`;
-- `ratios` of two aggregations.
+- `ratios` of two aggregations;
+- an optional `compare` (`{kind, field?, target?}`, BI-INSIGHTS-1 I-1), below.
+
+**Compare (I-1).** A Widget's *Compare with* option (`options.compare.kind`: `previous`, `lastYear`, `target`,
+`average`; line, bar, area and KPI) travels as `compare` and is computed **in the Widget's own statement** (D-BI7:
+no storage, the same row cap, guard, sandbox and masking). `MeasureCompiler` wraps the aggregate as
+`WITH "__cmp_base" AS (…)`, grained columns kept as bucket starts, and adds three columns per Measure and ratio `m`:
+`m__cmp` (the compared value), `m__delta` and `m__pct` (the change in % of `|m__cmp|`), marked in
+`resultSet.columns[].overlay` (`{overlay: compare, kind, of, part}`, `ResultSetDescriptor.markCompare`).
+
+- `previous` / `lastYear` use the Analytics kernel's `TimeSeriesSql.shift` along `field` (the one grained
+  `groupBy` column by default), per the other grouped columns, matched by bucket: a missing bucket gives NULL.
+  `lastYear` is 12 months back for a month, 52 weeks for a week (the same weekdays) and, for a day, the same
+  date a year earlier (the kernel's `Shift.step`; 29 February looks at 28 February).
+- `target` is a constant (`options.kpi.target`); a KPI tile bound to a KPI compares its value with that KPI's
+  own target instead. `average` is the mean of the result's rows along `field`, per the other grouped columns.
+- A comparison with no value — no earlier bucket, a zero baseline for the % — is NULL, never 0. A Measure that
+  returns text or a date (`max` of a name) still shows its compared value; its change is NULL.
+- It is refused (422) with no Measure, with `previous`/`lastYear` and no grained column, and with a hidden-aggregate
+  `orderBy` (the SPA drops its category order then). A bound Query's `WITH` is merged with the comparison's
+  (`MeasureCompiler.withPrefix`).
+- Each comparison sees only the rows the filters, condition and window keep: the first bucket of a filtered range
+  has no previous value.
+
+The SPA draws the compared series dashed in its Measure's colour, named by its kind ("Amount · previous period"),
+adds the change to the tooltip and states the last category's change under the chart ("Latest (Mar 2026): ▼ Down
+25.0 % (−5) vs previous period"). The kinds and column suffixes are pinned on both sides by
+`contracts/measure-grammar.contract.json` (`compare`).
 
 The text then passes `SqlGuard.check` (422 on failure), the Dataset resolves through
 `DatasetRelation.relationSql`, and it runs in the same ephemeral DuckDB sandbox as
@@ -164,3 +191,6 @@ there; its relation is validated when it is read, by
 - Every row read is a page with `truncated`; a consumer that counts must say so.
 - A blank Dashboard header value is not written, so clearing a field removes the key.
 - Only three time grains (`day`, `week`, `month`) cross the wire.
+- *Compare with* is not offered on a table, and the public share viewer does not forward it (it forwards only
+  `tableSort`); a time bucket is the wall-clock `DATE_TRUNC` the grain already uses (DuckDB's session zone for a
+  `TIMESTAMPTZ`, the host's).

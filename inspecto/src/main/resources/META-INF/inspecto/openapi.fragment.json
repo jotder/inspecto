@@ -4294,6 +4294,16 @@
                         "cosmetic" : { "type" : "boolean", "description" : "Set by a chart for its category order only: honoured on a groupBy Dimension with no agg. For a caller who may not see raw entity keys the server drops a cosmetic term over a masked column and orders by the first Measure descending instead; any other order over a masked column is still refused (422)." }
                       }
                     }
+                  },
+                  "compare" : {
+                    "type" : "object",
+                    "description" : "A comparison computed in the same statement (BI-INSIGHTS-1 I-1): every Measure and ratio m gains m__cmp (the compared value), m__delta (m - m__cmp) and m__pct (the change in % of |m__cmp|), marked in resultSet.columns[].overlay {overlay: compare, kind, of, part}. previous = the bucket before along field (a grained groupBy column, the default when there is one), per the other grouped columns; lastYear = the same date a year earlier for a day, 52 weeks back for a week, 12 months back for a month; target = the constant target; average = the mean of the result's rows along field, per the other grouped columns. A comparison with no value is null, never 0. Refused with an orderBy over a column outside the result.",
+                    "required" : [ "kind" ],
+                    "properties" : {
+                      "kind" : { "type" : "string", "enum" : [ "previous", "lastYear", "target", "average" ] },
+                      "field" : { "type" : "string" },
+                      "target" : { "type" : "number" }
+                    }
                   }
                 }
               }

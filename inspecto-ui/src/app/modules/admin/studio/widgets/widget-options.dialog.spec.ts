@@ -172,6 +172,23 @@ describe('WidgetOptionsDialog', () => {
         expect((ref.close.mock.calls[2][0] as WidgetOptions).gauge).toBeUndefined();
     });
 
+    it('BI-INSIGHTS-1 I-1: offers "Compare with" for a line, round-trips it, and "Nothing" removes it', () => {
+        const { fixture, c, ref } = create({ compare: { kind: 'lastYear' } }, 'line');
+        expect((fixture.nativeElement as HTMLElement).textContent).toContain('Compare with');
+        c.save();
+        expect((ref.close.mock.calls[0][0] as WidgetOptions).compare).toEqual({ kind: 'lastYear' });
+        c.schemaForm.form.patchValue({ compareKind: '' });
+        c.save();
+        expect((ref.close.mock.calls[1][0] as WidgetOptions).compare).toBeUndefined();
+    });
+
+    it('hides "Compare with" for a pie and keeps a stored one as-is', () => {
+        const { fixture, c, ref } = create({ compare: { kind: 'average' } }, 'pie');
+        expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Compare with');
+        c.save();
+        expect((ref.close.mock.calls[0][0] as WidgetOptions).compare).toEqual({ kind: 'average' });
+    });
+
     it('hides the Gauge scale for other types and keeps a stored one as-is', () => {
         const { fixture, c, ref } = create({ gauge: { max: 10 } }, 'bar');
         expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Gauge: minimum');

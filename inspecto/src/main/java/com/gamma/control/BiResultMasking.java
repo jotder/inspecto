@@ -494,7 +494,7 @@ final class BiResultMasking {
                 // a repeated name: alias only if every copy may; a calculated column derived from a key never does
                 keepByName.merge(c.name(), (bareNames != null ? bareNames.contains(n) : keep.test(pos)) && !derivedCalc.contains(n), Boolean::logicalAnd);
             }
-            columns.add(mask ? new ResultSetDescriptor.Column(c.name(), "string", c.role(), c.cardinality()) : c);
+            columns.add(mask ? new ResultSetDescriptor.Column(c.name(), "string", c.role(), c.cardinality(), c.overlay()) : c);
         }
         lastMasked = List.copyOf(hit);
         if (hit.isEmpty()) return r;

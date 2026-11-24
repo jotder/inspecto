@@ -140,11 +140,17 @@ public final class TimeSeriesSql {
      * buckets earlier (a negative {@code periods} looks later). The match is by bucket, not by row position, so a
      * series with missing buckets is still shifted correctly: a bucket with no earlier row gets NULL.
      *
+     * <p>{@code step} is the unit {@code periods} counts in; {@code null} (or {@code grain}) = buckets. A coarser step
+     * compares each bucket with <b>the bucket that held its start {@code periods} steps earlier</b>: with {@code DAY}
+     * buckets and a {@code YEAR} step, 29 Feb 2028 looks at 28 Feb 2027; with {@code WEEK} buckets, a week looks at the
+     * week holding the same date a year earlier (BI-INSIGHTS-1 I-1 "same period last year"). Each bucket still matches at
+     * most one earlier bucket.
+     *
      * @param bucketColumn the time column; each value is truncated to {@code grain} before matching
      * @param zone         {@code null} = the column's own clock; else the zone a {@code TIMESTAMPTZ} is bucketed in
      */
     public record Shift(String relation, String bucketColumn, TimeGrain grain, ZoneId zone, List<String> keys,
-                        int periods, List<Shifted> columns) {
+                        int periods, List<Shifted> columns, TimeGrain step) {
         public Shift {
             Objects.requireNonNull(relation, "relation");
             Objects.requireNonNull(bucketColumn, "bucketColumn");
@@ -153,6 +159,21 @@ public final class TimeSeriesSql {
             columns = List.copyOf(columns);
             if (columns.isEmpty()) throw new IllegalArgumentException("shift needs at least one column");
             if (periods == 0) throw new IllegalArgumentException("shift periods must not be 0");
+            if (step == grain) step = null;
+            if (step != null && step.compareTo(grain) < 0)
+                throw new IllegalArgumentException("shift step '" + step.wire() + "' is finer than the grain '" + grain.wire() + "'");
+        }
+
+        /** A shift counted in buckets of {@code grain}. */
+        public Shift(String relation, String bucketColumn, TimeGrain grain, ZoneId zone, List<String> keys,
+                     int periods, List<Shifted> columns) {
+            this(relation, bucketColumn, grain, zone, keys, periods, columns, null);
+        }
+
+        /** The join term matching an earlier row {@code p} to the current row {@code c}. */
+        private String match() {
+            if (step == null) return label("p") + " + " + grain.intervalSql(periods) + " = " + label("c");
+            return label("p") + " = " + grain.truncateSql("(" + label("c") + " - " + step.intervalSql(periods) + ")");
         }
 
         private String label(String alias) {
@@ -167,9 +188,7 @@ public final class TimeSeriesSql {
         StringBuilder sql = new StringBuilder("SELECT c.*");
         for (Shifted x : s.columns())
             sql.append(", p.").append(SqlIdent.q(x.column())).append(" AS ").append(SqlIdent.q(x.as()));
-        sql.append(" FROM ").append(rel).append(" AS c LEFT JOIN ").append(rel).append(" AS p ON ")
-                .append(s.label("p")).append(" + ").append(s.grain().intervalSql(s.periods())).append(" = ")
-                .append(s.label("c"));
+        sql.append(" FROM ").append(rel).append(" AS c LEFT JOIN ").append(rel).append(" AS p ON ").append(s.match());
         for (String k : s.keys())
             sql.append(" AND p.").append(SqlIdent.q(k)).append(" IS NOT DISTINCT FROM c.").append(SqlIdent.q(k));
         sql.append(" ORDER BY ");

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-428 test class(es): 428 unit, 0 real-HTTP control-plane, 0 IT.
+429 test class(es): 429 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -432,6 +432,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `KpiHistoryTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/KpiHistoryTest.java` | KPI History (`BI-INSIGHTS-1` P0, I-3): period selection, partial periods, retention, the stored file. |
 | `KpiPeriodStartGoldenTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/KpiPeriodStartGoldenTest.java` | Golden figures for {@link KpiDefinition.Grain#start} (ANALYTICS-CORE-1 M5), written BEFORE the period start moved to |
 | `MeasureCompilerBindTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/MeasureCompilerBindTest.java` | {@code MEASURE-SQL-BIND-1}: {@link MeasureCompiler#compile} binds every {@code filters} and {@code when} |
+| `MeasureCompilerCompareTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/MeasureCompilerCompareTest.java` | BI-INSIGHTS-1 I-1 — {@code compare} on a Measure spec: previous period, same period last year, a target and the |
 | `MeasureCompilerGrainExecutionTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/MeasureCompilerGrainExecutionTest.java` | The half of the time-grain fix {@link MeasureCompilerTest} cannot prove: that DuckDB actually |
 | `MeasureCompilerTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/MeasureCompilerTest.java` | The BI-7 spec→SQL compiler: aggregation set, measure ids, filter ops, identifier safety. |
 | `MeasureCompilerWhenTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/MeasureCompilerWhenTest.java` | The additive {@code when} condition tree on a {@link MeasureCompiler.Spec} (MODULE-REORG-P7-KERNEL step 5). |

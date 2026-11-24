@@ -36,6 +36,14 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
   `event_date` at `month` grain + a KPI); `POST /bi/templates/{id}/apply` writes them as ordinary
   components bound to the caller's Dataset (409 on an id collision, `prefix` to disambiguate). Enrichment
   is the continuous BACKLOG §7 C7 item.
+* **Compare with** (BI-INSIGHTS-1 I-1, 2026-11-24) — the Widget options (cog) of a line, bar, area or KPI Widget
+  offer *Previous period*, *Same period last year*, *Target* or *Average*. The compared value is drawn as a dashed
+  series named by what it is ("Amount · same period last year"), the tooltip states the change at each point and a
+  line under the chart states the latest one: "Latest (Mar 2026): ▼ Down 25.0 % (−5) vs previous period". Previous
+  period and last year need a date on the x axis grouped by day, week or month; Target uses the Widget's target (a
+  KPI tile bound to a KPI: that KPI's own target). A period with nothing to compare with shows a gap and "No
+  previous period", never 0. Computed by the server in the Widget's own query, masked like it
+  ([Studio BI](architecture-studio-bi.md) §4).
 * **Widgets are library citizens** — identity + tags, the browsable Viz Library gallery, a standalone
   `WidgetHost` render path, and one shared `DatasetResultService` result layer: it runs
   `POST /bi/query` (DuckDB) and unmappable specs (named-Measure SQL, OR filters) fail honestly.
