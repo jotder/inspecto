@@ -163,7 +163,7 @@ describe('LookupsComponent', () => {
         c.testValue.setValue('249915555');
         c.test(true);
         fixture.detectChanges();
-        expect(api.testLookup).toHaveBeenCalledWith('cdr', 'join', '249915555', true, null);
+        expect(api.testLookup).toHaveBeenCalledWith('cdr', 'join', '249915555', true, null, null);
         const text = fixture.nativeElement.textContent as string;
         expect(text).toContain('Found: key 24991 (prefix)');
         expect(text).toContain('Operator A');
@@ -193,8 +193,45 @@ describe('LookupsComponent', () => {
         c.testAt.setValue('2026-02-15');
         c.test();
         fixture.detectChanges();
-        expect(api.testLookup).toHaveBeenCalledWith('cdr', 'join', 'A', false, '2026-02-15');
+        expect(api.testLookup).toHaveBeenCalledWith('cdr', 'join', 'A', false, '2026-02-15', null);
         expect(fixture.nativeElement.textContent).toContain('Found: key A@2026-01-01 (effective date)');
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('renders block inputs, score, and top-k candidates for a fuzzy lookup', async () => {
+        const fuzzyRow: LookupRow = {
+            ...ROW,
+            match: 'fuzzy',
+            block: ['country'],
+        };
+        const { fixture, api } = await create(
+            { lookups: [fuzzyRow], total: 1, known: { lastRun: true } },
+            {
+                ...ANSWER,
+                match: 'fuzzy',
+                compared: 'ACME COR',
+                matchedKey: 'ACME CORP',
+                matchKind: 'fuzzy',
+                matchScore: 0.967,
+                candidates: [
+                    { matchedKey: 'ACME CORP', matchKind: 'fuzzy', matchScore: 0.967, mappings: ANSWER.mappings },
+                    { matchedKey: 'ACME CO', matchKind: 'fuzzy', matchScore: 0.912, mappings: ANSWER.mappings },
+                ],
+            },
+        );
+        const c = fixture.componentInstance;
+        c.select(c.rows()[0]);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(fixture.nativeElement.textContent).toContain('Block: country');
+        c.testValue.setValue('ACME COR');
+        c.setBlockValue('country', 'US');
+        c.test();
+        fixture.detectChanges();
+        expect(api.testLookup).toHaveBeenCalledWith('cdr', 'join', 'ACME COR', false, null, { country: 'US' });
+        expect(fixture.nativeElement.textContent).toContain('Found: key ACME CORP (fuzzy match, score 0.967)');
+        expect(fixture.nativeElement.textContent).toContain('Candidate key');
+        expect(fixture.nativeElement.textContent).toContain('ACME CO');
         await expectNoA11yViolations(fixture.nativeElement);
     });
 

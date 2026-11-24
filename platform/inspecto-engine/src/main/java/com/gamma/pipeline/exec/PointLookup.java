@@ -50,7 +50,12 @@ public final class PointLookup {
      * The answer for one value: the value as compared (after {@code normalize:}), whether a Reference row matched, the
      * key that matched and how ({@code exact} | {@code prefix} | {@code none}), and what each mapping adds.
      */
-    public record Answer(String compared, boolean hit, String matchedKey, String matchKind, List<MappingAnswer> mappings) {}
+    public record Answer(String compared, boolean hit, String matchedKey, String matchKind,
+                         List<MappingAnswer> mappings, Double matchScore) {
+        public Answer(String compared, boolean hit, String matchedKey, String matchKind, List<MappingAnswer> mappings) {
+            this(compared, hit, matchedKey, matchKind, mappings, null);
+        }
+    }
 
     private final String match;
     private final List<String> normalizers;
@@ -769,7 +774,7 @@ public final class PointLookup {
             if (m.matchScoreAs() != null) cols.put(m.matchScoreAs(), score == null ? null : Double.toString(score));
             out.add(new MappingAnswer(m.on(), cols));
         }
-        return new Answer(v, row != null, matched, kind, out);
+        return new Answer(v, row != null, matched, kind, out, score);
     }
 
     private int indexOf(String col) {

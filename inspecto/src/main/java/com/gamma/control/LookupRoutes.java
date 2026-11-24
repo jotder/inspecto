@@ -180,6 +180,14 @@ final class LookupRoutes implements RouteModule {
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "pipeline and step are required");
         Object value = body.get("value");
         Object at = body.get("at");
+        Map<String, String> blockValues = new LinkedHashMap<>();
+        if (body.get("blockValues") instanceof Map<?, ?> bm) {
+            for (Map.Entry<?, ?> e : bm.entrySet()) {
+                if (e.getKey() != null && e.getValue() != null && !e.getValue().toString().isBlank()) {
+                    blockValues.put(e.getKey().toString(), e.getValue().toString());
+                }
+            }
+        }
         PipelineNode node = null;
         for (PipelineConfig cfg : HostContext.of(api).service().loadedPipelines()) {
             if (!cfg.identity().pipelineName().equals(pipeline)) continue;
@@ -195,8 +203,13 @@ final class LookupRoutes implements RouteModule {
         Warmed w = warmUp(api, pipeline, node, Boolean.TRUE.equals(body.get("refresh")));
         Warm warm = w.warm();
         String reason = w.reason(), stamp = w.stamp();
-        PointLookup.Answer a = warm.index().test(value == null ? null : value.toString(),
-                at == null || at.toString().isBlank() ? null : at.toString());
+        String valStr = value == null ? null : value.toString();
+        String atStr = at == null || at.toString().isBlank() ? null : at.toString();
+        boolean isFuzzy = RowShaper.JOIN_MATCH_FUZZY.equals(warm.index().match());
+        List<PointLookup.Answer> answers = isFuzzy
+                ? warm.index().testTopK(valStr, blockValues)
+                : List.of(warm.index().test(valStr, atStr));
+        PointLookup.Answer a = answers.getFirst();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("pipeline", pipeline);
         out.put("step", step);
@@ -205,14 +218,21 @@ final class LookupRoutes implements RouteModule {
         out.put("hit", a.hit());
         out.put("matchedKey", a.matchedKey());
         out.put("matchKind", a.matchKind());
-        List<Map<String, Object>> mappings = new ArrayList<>();
-        for (PointLookup.MappingAnswer m : a.mappings()) {
-            Map<String, Object> r = new LinkedHashMap<>();
-            r.put("on", m.on());
-            r.put("columns", m.columns());
-            mappings.add(r);
+        if (a.matchScore() != null) out.put("matchScore", a.matchScore());
+        out.put("mappings", toMappingList(a.mappings()));
+        if (isFuzzy) {
+            List<Map<String, Object>> candidates = new ArrayList<>();
+            for (PointLookup.Answer cand : answers) {
+                if (!cand.hit()) continue;
+                Map<String, Object> c = new LinkedHashMap<>();
+                c.put("matchedKey", cand.matchedKey());
+                c.put("matchKind", cand.matchKind());
+                c.put("matchScore", cand.matchScore());
+                c.put("mappings", toMappingList(cand.mappings()));
+                candidates.add(c);
+            }
+            out.put("candidates", candidates);
         }
-        out.put("mappings", mappings);
         Map<String, Object> index = new LinkedHashMap<>();
         index.put("rows", warm.index().rows());
         index.put("bytes", warm.index().bytes());
@@ -221,6 +241,28 @@ final class LookupRoutes implements RouteModule {
         index.put("reloaded", reason);                 // why this answer built the index, or null when it was kept
         index.put("watchesReference", stamp != null);  // false: a Reference change is only seen on reload
         out.put("index", index);
+        return out;
+    }
+
+    private static List<Map<String, Object>> toMappingList(List<PointLookup.MappingAnswer> answers) {
+        List<Map<String, Object>> mappings = new ArrayList<>(answers.size());
+        for (PointLookup.MappingAnswer m : answers) {
+            Map<String, Object> r = new LinkedHashMap<>();
+            r.put("on", m.on());
+            r.put("columns", m.columns());
+            mappings.add(r);
+        }
+        return mappings;
+    }
+
+    private static List<String> blockCols(PipelineNode n) {
+        Object raw = n.cfg("block");
+        List<String> out = new ArrayList<>();
+        if (raw instanceof List<?> list) {
+            for (Object o : list) if (o != null && !o.toString().isBlank()) out.add(o.toString());
+        } else if (raw != null && !raw.toString().isBlank()) {
+            out.add(raw.toString());
+        }
         return out;
     }
 
@@ -266,6 +308,8 @@ final class LookupRoutes implements RouteModule {
         r.put("step", n.id());
         r.put("reference", n.cfg("reference"));
         r.put("match", n.cfg("match") == null ? "exact" : n.cfg("match").toString());
+        List<String> block = blockCols(n);
+        if (!block.isEmpty()) r.put("block", block);
         r.put("lookedUpBy", lookedUpBy(n));
         r.put("index", indexState(pipeline, n.id()));
         if (store != null) {

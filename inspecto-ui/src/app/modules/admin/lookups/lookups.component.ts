@@ -63,6 +63,7 @@ export class LookupsComponent implements OnInit {
         this.selected.set(row);
         this.answer.set(null);
         this.testError.set(null);
+        this.blockValues.set({});
     }
 
     /** Test a value (LOOKUP-1 P3): the value to look up in the selected lookup's in-memory index. */
@@ -70,10 +71,25 @@ export class LookupsComponent implements OnInit {
     /** The row's time for an `asof` lookup (optional: without it only undated Reference rows match). */
     readonly testAt = new FormControl('', { nonNullable: true });
     readonly testForm = new FormGroup({ value: this.testValue, at: this.testAt });
+    readonly blockValues = signal<Record<string, string>>({});
+
+    setBlockValue(col: string, val: string): void {
+        const next = { ...this.blockValues() };
+        if (val.trim()) next[col] = val;
+        else delete next[col];
+        this.blockValues.set(next);
+    }
 
     /** How the answer matched, in words. */
     matchedHow(kind: LookupTestAnswer['matchKind']): string {
-        return { exact: 'whole value', prefix: 'prefix', range: 'range', asof: 'effective date', none: '' }[kind];
+        return {
+            exact: 'whole value',
+            prefix: 'prefix',
+            range: 'range',
+            asof: 'effective date',
+            fuzzy: 'fuzzy match',
+            none: '',
+        }[kind];
     }
     readonly testing = signal(false);
     readonly fmtDateTime = fmtDateTime;
@@ -96,7 +112,17 @@ export class LookupsComponent implements OnInit {
         }
         this.testing.set(true);
         this.testError.set(null);
-        this.api.testLookup(s.pipeline, s.step, this.testValue.value, refresh, this.testAt.value || null).subscribe({
+        const bv = this.blockValues();
+        this.api
+            .testLookup(
+                s.pipeline,
+                s.step,
+                this.testValue.value,
+                refresh,
+                this.testAt.value || null,
+                Object.keys(bv).length > 0 ? bv : null,
+            )
+            .subscribe({
             next: (a) => {
                 this.answer.set(a);
                 this.testing.set(false);
