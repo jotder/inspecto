@@ -73,8 +73,15 @@ public final class SchemaMappingDrift {
         Set<String> names = new LinkedHashSet<>();
         if (schema == null || !(schema.get("raw") instanceof Map<?, ?> raw)) return names;
         if (!(raw.get("fields") instanceof List<?> fields)) return names;
-        for (Object f : fields)
-            if (f instanceof Map<?, ?> fm && fm.get("name") != null) names.add(String.valueOf(fm.get("name")));
+        for (Object f : fields) {
+            if (f instanceof Map<?, ?> fm && fm.get("name") != null) {
+                names.add(DeriveSpec.applyNameAffixes(
+                        String.valueOf(fm.get("name")),
+                        fm.get("rename"),
+                        fm.get("prefix"),
+                        fm.get("postfix")));
+            }
+        }
         return names;
     }
 
