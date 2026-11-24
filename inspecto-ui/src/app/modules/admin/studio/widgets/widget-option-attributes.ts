@@ -1,5 +1,6 @@
 import { AttributeSpec } from 'app/inspecto/component-model';
 import { CHART_PALETTES } from 'app/inspecto/theme/chart-tokens';
+import { MARKER_VIZ_TYPES } from 'app/inspecto/viz/chart-markers';
 
 /**
  * The widget **advanced-options** attribute set (the cog dialog) — every knob is always visible but
@@ -337,6 +338,16 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
             { value: 'max', label: 'Largest value per category' },
         ],
     },
+    // BI-INSIGHTS-1 I-2: the KPI definition a Chart Marker reads (a target line with no value of its own, the RAG bands).
+    {
+        key: 'kpiId',
+        label: 'KPI for chart markers',
+        type: 'autocomplete',
+        tier: 'required',
+        required: false,
+        placeholder: 'A saved KPI — its target and bands',
+        help: "A Target line with no value of its own draws at this KPI's target; a KPI status bands marker draws its red, amber and green bands.",
+    },
     // UIE-6: optional readable column carrying the link instead of the id; the id column is then hidden (still queried).
     {
         key: 'rowLinkLabelField',
@@ -370,5 +381,6 @@ export const WIDGET_OPTION_VIZ_TYPES: Record<string, string | readonly string[]>
     categoryOrderField: CATEGORY_ORDER_VIZ_TYPES,
     categoryOrderDir: CATEGORY_ORDER_VIZ_TYPES,
     categoryOrderAgg: CATEGORY_ORDER_VIZ_TYPES,
+    kpiId: MARKER_VIZ_TYPES,
 };
 // ── end per-Visualization-Type options ──────────────────────────────────────────────────────────────────────

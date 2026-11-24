@@ -1,6 +1,8 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { describe, expect, it, vi } from 'vitest';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { WidgetOptions } from './widget-types';
@@ -13,6 +15,9 @@ function create(options: WidgetOptions = {}, vizType?: string) {
         imports: [WidgetOptionsDialog],
         providers: [
             provideNoopAnimations(),
+            // The KPI picker's suggestions (kpiOptionLoader) inject ComponentsService.
+            provideHttpClient(),
+            provideHttpClientTesting(),
             { provide: MAT_DIALOG_DATA, useValue: data },
             { provide: MatDialogRef, useValue: ref },
         ],
@@ -400,6 +405,64 @@ describe('WidgetOptionsDialog', () => {
 
         it('renders the combo fields with no a11y violations', async () => {
             const { fixture } = create({ format2: { style: 'currency', currency: 'SAR' } }, 'combo');
+            await expectNoA11yViolations(fixture.nativeElement);
+        });
+    });
+
+    // BI-INSIGHTS-1 I-2: Chart Markers and the KPI they read.
+    describe('chart markers', () => {
+        const markersShown = (el: HTMLElement) => !!el.querySelector('[data-testid="chart-markers"]');
+        const last = (ref: { close: ReturnType<typeof vi.fn> }) => ref.close.mock.lastCall![0] as WidgetOptions;
+
+        it('offers the markers list on line / bar / area / combo only', () => {
+            const line = create({}, 'line');
+            expect(markersShown(line.fixture.nativeElement)).toBe(true);
+        });
+
+        it('hides the markers list and the KPI picker on a pie', () => {
+            const { fixture, c } = create({}, 'pie');
+            expect(markersShown(fixture.nativeElement)).toBe(false);
+            expect(c.attributes.some((s) => s.key === 'kpiId')).toBe(false);
+        });
+
+        it('saves the markers and the chosen KPI with the Widget', () => {
+            const markers = [{ kind: 'target' as const }, { kind: 'rag' as const }];
+            const { c, ref } = create({ markers, kpi: { kpiId: 'sla' } }, 'bar');
+            c.save();
+            expect(last(ref).markers).toEqual(markers);
+            expect(last(ref).kpi).toEqual({ target: undefined, better: 'higher', kpiId: 'sla' });
+        });
+
+        it('keeps a KPI tile binding (kpiId) through a save where the picker is not shown', () => {
+            const { c, ref } = create({ kpi: { kpiId: 'sla' } }, 'kpi');
+            c.save();
+            expect(last(ref).kpi?.kpiId).toBe('sla');
+        });
+
+        it('keeps stored markers when the type does not offer them', () => {
+            const { c, ref } = create({ markers: [{ kind: 'average' }] }, 'pie');
+            c.save();
+            expect(last(ref).markers).toEqual([{ kind: 'average' }]);
+        });
+
+        it('writes no markers key once the last one is removed', () => {
+            const { fixture, c, ref } = create({ markers: [{ kind: 'average' }] }, 'line');
+            (fixture.nativeElement as HTMLElement)
+                .querySelector<HTMLButtonElement>('[data-testid="remove-marker"]')!
+                .click();
+            fixture.detectChanges();
+            c.save();
+            expect(last(ref).markers).toBeUndefined();
+        });
+
+        it('stays open while a marker row needs a fix', () => {
+            const { c, ref } = create({ markers: [{ kind: 'percentile', p: 0 }] }, 'line');
+            c.save();
+            expect(ref.close).not.toHaveBeenCalled();
+        });
+
+        it('renders the markers list with no a11y violations', async () => {
+            const { fixture } = create({ markers: [{ kind: 'band', from: 1, tone: 'success' }] }, 'area');
             await expectNoA11yViolations(fixture.nativeElement);
         });
     });
