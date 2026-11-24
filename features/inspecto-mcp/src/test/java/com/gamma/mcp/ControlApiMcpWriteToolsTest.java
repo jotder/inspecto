@@ -138,6 +138,16 @@ class ControlApiMcpWriteToolsTest {
             assertFalse(r.get("isError").asBoolean(), text(r));
             assertEquals("pending", r.at("/structuredContent/data/status").asText(), text(r));
             assertEquals(reason, r.at("/structuredContent/data/pendingChange/reason").asText());
+
+            // a direct request still says why with the header (PendingChanges.hold's fallback)
+            HttpResponse<String> direct = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port
+                            + "/api/v1/components/dashboard"))
+                    .header("Content-Type", "application/json").header("Authorization", AGENT)
+                    .header("X-Change-Reason", "the on-call board, sent directly")
+                    .POST(BodyPublishers.ofString("{\"id\":\"direct_board\",\"tiles\":[]}")).build(), BodyHandlers.ofString());
+            assertEquals(202, direct.statusCode(), direct.body());
+            assertEquals("the on-call board, sent directly",
+                    JSON.readTree(direct.body()).at("/data/pendingChange/reason").asText(), direct.body());
         }
     }
 
