@@ -46,6 +46,7 @@ Two rules the server cannot check for you:
 | Key | Default | What it does |
 |---|---|---|
 | `auth.oidc.agentClients` | unset (no agent clients) | Comma list of client ids whose **person** tokens are an agent acting for that person. Needs `auth.oidc.audience`. Boot refuses a client that is also in `auth.oidc.clients` (machines) or is `auth.oidc.clientId` (the console). |
+| `auth.oidc.agentMachineClients` | unset (no machine agents) | Comma list of **machine** clients (client credentials, each also in `auth.oidc.clients`) that are unattended agents. Such a client keeps, where its roles grant them, `canAuthorWorkbench`, `canAuthorAlertRules`, `canWorkIncidents` and `canOperateRuns` beside a machine's usual `canOpenInboundInvestigation`; every config write it makes is held for a person, and it never approves. The Space must still name it in `roles.toon` `identity.machineClients`. |
 | `mcp.publicOrigin` | the request's scheme and `Host` | The origin agents reach the install at, for example `https://inspecto.example.com`. Set it behind a TLS-terminating reverse proxy, or the metadata names `http://…`. |
 | `auth.oidc.scopes` | `openid` | The scopes the metadata lists as `scopes_supported` (space-separated; the console's sign-in uses the same key). |
 
@@ -72,6 +73,10 @@ location = /.well-known/oauth-protected-resource { proxy_pass http://inspecto:80
   the person's own rights).
 - **Nothing else:** every other write is refused (`403`, "an agent client may not call …"), and an agent never
   approves, declines, reveals, promotes, or changes Apps or access.
+
+A **machine agent** (`auth.oidc.agentMachineClients`) follows the same rules with its client as the actor
+(`client:<id>`): it proposes and is held, and it never runs a Pipeline, approves or administers. Give it a role in
+the Space that grants only what it should author or operate; it never keeps more than the four capabilities above.
 
 Every audit row of an agent's request names the person as the actor and the agent client as `agent_client`;
 search the audit log for it to see everything an agent did. The Pending Changes screen shows "via agent client"

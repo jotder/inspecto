@@ -192,6 +192,10 @@ public final class OidcAuthenticator implements Authenticator {
             if (proc == processor && agent == null && machineTrust != null
                     && !machineTrust.admits(claims, java.time.Instant.now()))
                 return Optional.empty();
+            // OIDC-CC-MACHINE-ACTOR-1: a machine is named by its client, not a service-account UUID. Bearer path only.
+            String machine = proc == processor ? MachineTrust.machineClient(claims, machineTrust) : null;
+            // AGENT-KIT-1 AK-2c: a machine client listed in -Dauth.oidc.agentMachineClients is an agent too.
+            if (agent == null) agent = MachineTrust.agentMachineClient(machine, machineTrust);
             // RBAC R1: the role → grant table is per-request — the bound space's authored roles.toon
             // overlaid on the seed (ControlApi stamps the config root on the exchange pre-auth).
             var defs = Roles.effective(ex);
@@ -206,8 +210,6 @@ public final class OidcAuthenticator implements Authenticator {
             // match `subjectType: role` shares — the Subject itself stays capabilities-only.
             ComponentAccess.heldRoles(ex, Set.copyOf(held));
             Subject.stampIssuer(ex, claims.getIssuer());   // bearer vs gateway issuer: separate idempotency namespaces
-            // OIDC-CC-MACHINE-ACTOR-1: a machine is named by its client, not a service-account UUID. Bearer path only.
-            String machine = proc == processor ? MachineTrust.machineClient(claims, machineTrust) : null;
             return Optional.of(new Subject(machine == null ? subjectId : "client:" + machine, Set.copyOf(capabilities),
                     RoleMapper.dataScopesFor(claims, rolesClaim, defs, keycloak),
                     attributes(claims, Roles.attributeClaims(ex)), verifiedEmail(claims), displayName(claims),

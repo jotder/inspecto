@@ -19,7 +19,7 @@ AK-1 is **read-only**: no MCP Tool changes anything. **AK-2a** (identity first, 
 agent-client allowlist, the agent marker on every audit row, protected-resource metadata and the host's agent gate
 ([Identity](#identity), [The agent gate](#the-agent-gate-ak-2a)); still no write tool. Write tools (validate →
 dry-run → Pending Change) and `propose_action` are **AK-2b** (2026-11-20, [Write tools](#write-tools-ak-2b)); the
-machine agent capability set is phase 2.
+machine agent capability set is **AK-2c** (phase 2, 2026-11-25, [Identity](#identity)).
 
 **On this page**
 
@@ -250,14 +250,21 @@ Per §7.3 and D-UE5 (signed: both modes, delegated first).
   3. Client registration: the agent client is registered in the customer's IdP by its administrator (the
      specification's Client ID Metadata Documents and the deprecated dynamic registration are the IdP's
      business, not Inspecto's).
-- **Machine — unattended agents.** Client credentials, admitted per Space exactly as today
-  (`MachineTrust`, `Roles.admitMachine`, the Space's `machineClients`). Reads need no capability
-  (operator 2026-09-15), so an admitted machine can use the AK-1 tools today. The **agent capability set**
-  (read plus Draft authoring, never approve, never reveal) widens `Roles.MACHINE_CAPABILITIES` and lands
-  with AK-2's write tools.
+- **Machine — unattended agents** (**built in AK-2c**, 2026-11-25). Client credentials, admitted per Space
+  exactly as any machine (`MachineTrust`, `Roles.admitMachine`, the Space's `identity.machineClients`). A machine
+  client also listed in `-Dauth.oidc.agentMachineClients` (a subset of `auth.oidc.clients`; boot refuses an entry
+  that is not a listed machine client, is the SPA client, or is set without `auth.oidc.clients`) is a Subject that is
+  **both** `machine()` and `agent()`: id `client:<client>`, `agentClient` = the client id. At admission it keeps
+  `Roles.MACHINE_CAPABILITIES` plus `Roles.AGENT_MACHINE_CAPABILITIES` (`canAuthorWorkbench`, `canAuthorAlertRules`,
+  `canWorkIncidents`, `canOperateRuns`) where its roles grant them, never an `AGENT_NEVER_CAPABILITIES` one; an
+  unlisted machine keeps `canOpenInboundInvestigation` only, as before. Being an agent, every config write it makes
+  is held as a Pending Change, the agent gate applies, and it never approves; it may not run a Pipeline
+  (`AgentGate.PERSON_ONLY`, D-AK2). The Pending Change records `authorMachine` (the token's `sub`), and
+  `PendingChanges.authorNow` replays an approved machine change as that machine: re-admitted by the Space (403 when
+  the Space no longer names the client) and filtered to what a machine agent keeps, so approval never widens it.
 - **What is built:** the endpoint accepts any Subject the host's `Authenticator` resolves — a person's own
-  token (the SPA client), a person through an allowlisted agent client (AK-2a), or an admitted machine. The
-  machine agent capability set is phase 2 (AK-2c).
+  token (the SPA client), a person through an allowlisted agent client (AK-2a), an admitted machine, or an admitted
+  machine agent (AK-2c).
 
 ## The agent gate (AK-2a)
 
