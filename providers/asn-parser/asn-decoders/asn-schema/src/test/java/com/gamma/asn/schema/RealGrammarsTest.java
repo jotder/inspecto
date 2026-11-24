@@ -62,4 +62,56 @@ class RealGrammarsTest {
         SchemaCompiler.compileLenient(List.of(module), "Nrtrde", warnings);
         assertTrue(warnings.size() < 30, warnings.size() + " warnings: " + warnings);
     }
+
+    @Test
+    void allConfigGrammarsLoadLeniently() throws IOException {
+        assumeTrue(Boolean.getBoolean("asn.corpus.tests"),
+                "corpus-backed tests are opt-in; enable with -Dasn.corpus.tests=true");
+        assumeTrue(Files.isDirectory(CONFIG), "config dir not present: " + CONFIG);
+        List<Path> files;
+        try (var walk = Files.walk(CONFIG)) {
+            files = walk.filter(p -> Files.isRegularFile(p) && p.getFileName().toString().toLowerCase().endsWith(".asn"))
+                    .sorted()
+                    .toList();
+        }
+        assertTrue(files.size() >= 25, "expected operator grammars in config/, found " + files.size());
+        List<String> failures = new ArrayList<>();
+        for (Path p : files) {
+            String rel = CONFIG.relativize(p).toString();
+            try {
+                String text = Files.readString(p, StandardCharsets.ISO_8859_1);
+                if (text.isBlank()) {
+                    continue;
+                }
+                List<Diagnostic> diags = new ArrayList<>();
+                List<ModuleAst> modules = Asn1Parser.parseLenientDiagnostics(text, diags);
+                if (modules.isEmpty() || modules.stream().allMatch(m -> m.types().isEmpty())) {
+                    failures.add(rel + ": 0 types parsed (diags=" + diags.size() + ")");
+                    continue;
+                }
+                CompiledSchema bestSchema = null;
+                String bestRoot = null;
+                for (ModuleAst m : modules) {
+                    for (String candidate : m.types().keySet()) {
+                        CompiledSchema s = SchemaCompiler.compileLenient(modules, candidate, true, new ArrayList<>());
+                        if (bestSchema == null || s.types().size() > bestSchema.types().size()) {
+                            bestSchema = s;
+                            bestRoot = candidate;
+                        }
+                    }
+                }
+                CompiledSchema schema = SchemaCompiler.compileLenient(modules, bestRoot, true, diags);
+                long errs = diags.stream().filter(d -> "ERROR".equalsIgnoreCase(d.severity())).count();
+                System.out.println("[GRAMMAR] " + rel + " -> root=" + bestRoot + ", types=" + schema.types().size()
+                        + ", errors=" + errs + ", totalDiags=" + diags.size());
+                diags.stream()
+                        .filter(d -> "ERROR".equalsIgnoreCase(d.severity()))
+                        .limit(3)
+                        .forEach(d -> System.out.println("  ERR " + d));
+            } catch (Exception e) {
+                failures.add(rel + ": " + e.getClass().getSimpleName() + ": " + e.getMessage());
+            }
+        }
+        assertTrue(failures.isEmpty(), "Failed grammars:\n" + String.join("\n", failures));
+    }
 }

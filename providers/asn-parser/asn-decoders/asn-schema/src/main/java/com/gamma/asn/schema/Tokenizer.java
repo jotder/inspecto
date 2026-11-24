@@ -12,16 +12,35 @@ import java.util.List;
 final class Tokenizer {
 
     private final String text;
+    private final boolean lenient;
+    private final List<String> warnings;
+    private final List<Diagnostic> diagnostics;
     private int pos;
     private int line = 1;
     private int col = 1;
 
-    private Tokenizer(String text) {
+    private Tokenizer(String text, boolean lenient, List<String> warnings, List<Diagnostic> diagnostics) {
         this.text = text;
+        this.lenient = lenient;
+        this.warnings = warnings;
+        this.diagnostics = diagnostics;
     }
 
     static List<Token> tokenize(String text) {
-        return new Tokenizer(text).run();
+        return new Tokenizer(text, false, null, null).run();
+    }
+
+    static List<Token> tokenizeLenient(String text, List<String> warnings, List<Diagnostic> diagnostics) {
+        return new Tokenizer(text, true, warnings, diagnostics).run();
+    }
+
+    private void warn(int warnLine, int warnCol, String message) {
+        if (warnings != null) {
+            warnings.add(message);
+        }
+        if (diagnostics != null) {
+            diagnostics.add(new Diagnostic(warnLine, warnCol, "WARNING", message));
+        }
     }
 
     private List<Token> run() {
@@ -62,11 +81,20 @@ final class Tokenizer {
                     case ';' -> Token.Kind.SEMICOLON;
                     case '.' -> Token.Kind.DOT;
                     case '-', '|', '<', '>', '!', '^', '*', '@', '&', '=', ':' -> Token.Kind.SYMBOL;
-                    default -> throw new Asn1ParseException(startLine, startCol,
-                            "unexpected character '" + c + "'");
+                    default -> {
+                        if (lenient) {
+                            warn(startLine, startCol, "unexpected character '" + c + "' skipped");
+                            advance(1);
+                            yield null;
+                        }
+                        throw new Asn1ParseException(startLine, startCol,
+                                "unexpected character '" + c + "'");
+                    }
                 };
-                advance(1);
-                out.add(new Token(kind, String.valueOf(c), startLine, startCol));
+                if (kind != null) {
+                    advance(1);
+                    out.add(new Token(kind, String.valueOf(c), startLine, startCol));
+                }
             }
         }
     }
@@ -103,6 +131,10 @@ final class Tokenizer {
             advance(1);
         }
         if (pos >= text.length()) {
+            if (lenient) {
+                warn(startLine, startCol, "unterminated string literal");
+                return text.substring(start, pos);
+            }
             throw new Asn1ParseException(startLine, startCol, "unterminated string literal");
         }
         advance(1);
@@ -113,18 +145,40 @@ final class Tokenizer {
         return text.substring(start, pos);
     }
 
+    private boolean isAtLineStart(int p) {
+        int cur = p - 1;
+        while (cur >= 0) {
+            char ch = text.charAt(cur);
+            if (ch == '\n' || ch == '\r') {
+                return true;
+            }
+            if (ch != ' ' && ch != '\t') {
+                return false;
+            }
+            cur--;
+        }
+        return true;
+    }
+
     private void skipWhitespaceAndComments() {
         while (pos < text.length()) {
             char c = text.charAt(pos);
             if (Character.isWhitespace(c)) {
                 advance(1);
             } else if (text.startsWith("--", pos)) {
+                boolean lineCommentOnly = lenient && isAtLineStart(pos);
                 advance(2);
-                while (pos < text.length() && text.charAt(pos) != '\n' && !text.startsWith("--", pos)) {
+                while (pos < text.length() && text.charAt(pos) != '\n'
+                        && (lineCommentOnly || !text.startsWith("--", pos))) {
                     advance(1);
                 }
-                if (text.startsWith("--", pos)) {
+                if (!lineCommentOnly && text.startsWith("--", pos)) {
                     advance(2);
+                }
+            } else if (lenient && text.startsWith("//", pos)) {
+                advance(2);
+                while (pos < text.length() && text.charAt(pos) != '\n') {
+                    advance(1);
                 }
             } else if (text.startsWith("/*", pos)) {
                 int depth = 1;

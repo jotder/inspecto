@@ -31,7 +31,10 @@ public final class Asn1Parser {
     private int i;
 
     private Asn1Parser(String text, List<String> warnings, List<Diagnostic> diagnostics) {
-        this.tokens = Tokenizer.tokenize(text);
+        boolean lenient = warnings != null || diagnostics != null;
+        this.tokens = lenient
+                ? Tokenizer.tokenizeLenient(text, warnings, diagnostics)
+                : Tokenizer.tokenize(text);
         this.warnings = warnings;
         this.diagnostics = diagnostics;
     }
@@ -76,6 +79,11 @@ public final class Asn1Parser {
     private List<ModuleAst> modules() {
         List<ModuleAst> modules = new ArrayList<>();
         while (!peek().is(Token.Kind.EOF)) {
+            if (isLenient() && !peek().is(Token.Kind.IDENT)) {
+                Token stray = next();
+                warn(stray.line(), stray.col(), "skipped stray token before module: " + stray.text());
+                continue;
+            }
             modules.add(module());
         }
         if (modules.isEmpty()) {
@@ -87,6 +95,11 @@ public final class Asn1Parser {
     // ---------------- module ----------------
 
     private ModuleAst module() {
+        if (isLenient() && peek().is(Token.Kind.IDENT) && peek(1).is(Token.Kind.ASSIGN)) {
+            warn(peek().line(), peek().col(),
+                    "missing DEFINITIONS ... BEGIN header; assuming ANONYMOUS module");
+            return parseModuleBody("ANONYMOUS", ModuleAst.TagDefault.EXPLICIT_TAGS, true);
+        }
         // vendor exports (e.g. Huawei GSN grammars) start straight at DEFINITIONS —
         // tolerate the missing module name
         String name;
@@ -102,7 +115,12 @@ public final class Asn1Parser {
         ModuleAst.TagDefault tagDefault = ModuleAst.TagDefault.EXPLICIT_TAGS;
         if (peek().isWord("IMPLICIT") || peek().isWord("EXPLICIT") || peek().isWord("AUTOMATIC")) {
             String word = next().text();
-            expectWord("TAGS");
+            if (isLenient() && peek().isWord("TAG")) {
+                warn(peek().line(), peek().col(), "expected 'TAGS', got 'TAG'");
+                next();
+            } else {
+                expectWord("TAGS");
+            }
             tagDefault = switch (word) {
                 case "IMPLICIT" -> ModuleAst.TagDefault.IMPLICIT_TAGS;
                 case "AUTOMATIC" -> ModuleAst.TagDefault.AUTOMATIC_TAGS;
@@ -115,13 +133,19 @@ public final class Asn1Parser {
         }
         expect(Token.Kind.ASSIGN);
         expectWord("BEGIN");
+        return parseModuleBody(name, tagDefault, false);
+    }
 
+    private ModuleAst parseModuleBody(String name, ModuleAst.TagDefault tagDefault, boolean headerless) {
         Map<String, TypeAst> types = new LinkedHashMap<>();
         Map<String, String> imports = new LinkedHashMap<>();
         List<String> exports = new ArrayList<>();
 
         while (!peek().isWord("END")) {
             if (peek().is(Token.Kind.EOF)) {
+                if (headerless) {
+                    return new ModuleAst(name, tagDefault, types, imports, exports);
+                }
                 if (isLenient()) { // hand-doctored files may just stop
                     error(peek().line(), peek().col(), "missing END for module " + name);
                     return new ModuleAst(name, tagDefault, types, imports, exports);
@@ -434,7 +458,15 @@ public final class Asn1Parser {
                 return out;
             }
             if (peek().is(Token.Kind.EOF)) {
+                if (isLenient()) {
+                    warn(peek().line(), peek().col(), "unterminated component list at EOF");
+                    return out;
+                }
                 throw err("unterminated component list");
+            }
+            if (isLenient() && peek().is(Token.Kind.IDENT) && peek(1).is(Token.Kind.ASSIGN)) {
+                warn(peek().line(), peek().col(), "missing '}' before assignment " + peek().text());
+                return out;
             }
             if (peek().is(Token.Kind.COMMA)) { // stray/trailing comma tolerance
                 next();
