@@ -360,4 +360,53 @@ class PipelineLiftTest {
         m.put("processing", proc);
         return PipelineConfig.fromMap(m);
     }
+
+    // ── JG1 (OUTPUT-STORE-SINK-NOT-DRAWN-1): steps: + output_store: two-branch lift ──
+
+    @Test
+    void liftsStepsWithOutputStoreIntoTwoBranches(@TempDir Path dir) throws Exception {
+        Files.createDirectories(dir);
+        Path schema = dir.resolve("s.toon");
+        Files.writeString(schema, PipelineConfigBatchTest.miniSchema());
+        String d = dir.toString().replace("\\", "/");
+        Path pipe = dir.resolve("cdr_enrich_pipeline.toon");
+        Files.writeString(pipe, """
+                name: cdr_enrich
+                active: true
+                dirs:
+                  poll: %s/in
+                  database: %s/db
+                output:
+                  format: PARQUET
+                output_store: cdr_dial_digit
+                steps[2]:
+                  - join:
+                      reference: reference/dim_dial_digit
+                      on: [dial_prefix]
+                  - join:
+                      reference: reference/dim_service_range
+                      on: [service_code]
+                processing:
+                  threads: 1
+                  schema_file: "%s"
+                """.formatted(d, d, schema.toString().replace("\\", "/")));
+
+        PipelineConfig cfg = PipelineConfig.load(pipe.toString());
+        PipelineGraph g = PipelineLift.lift(cfg);
+
+        // Landed ingest sink sits directly off map, never downstream of the join chain
+        assertTrue(hasEdge(g, "map", PipelineRel.DATA, "sink"), "map feeds landed sink directly");
+        assertEquals("mini", g.node("sink").orElseThrow().cfg("store"));
+
+        // Stage-2 chain branches off map and ends at the output_store sink
+        assertTrue(hasEdge(g, "map", PipelineRel.DATA, "join"), "map also feeds the Stage-2 chain");
+        assertTrue(hasEdge(g, "join", PipelineRel.DATA, "join__s1"), "first join feeds second join");
+        assertTrue(hasEdge(g, "join__s1", PipelineRel.DATA, "output_store"), "chain ends at output_store sink");
+
+        PipelineNode outSink = g.node("output_store").orElseThrow();
+        assertEquals("sink.persistent", outSink.type());
+        assertEquals("cdr_dial_digit", outSink.name());
+        assertEquals("cdr_dial_digit", outSink.cfg("store"));
+        assertEquals(Set.of("mini", "cdr_dial_digit"), PipelineStores.produced(g));
+    }
 }

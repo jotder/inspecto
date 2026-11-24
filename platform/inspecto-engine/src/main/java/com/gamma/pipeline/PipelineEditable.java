@@ -665,6 +665,8 @@ public final class PipelineEditable {
         } else if (BuiltinNodeType.SINK_PERSISTENT.type().equals(t)) {
             if (isQuarantine(n)) {
                 putIfPresent(c, "dir", dirs.get("quarantine"));
+            } else if (isOutputStoreSink(n)) {
+                putIfPresent(c, PipelineStores.CONFIG_STORE, n.cfg(PipelineStores.CONFIG_STORE));
             } else {
                 putIfPresent(c, PipelineStores.CONFIG_STORE, n.cfg(PipelineStores.CONFIG_STORE));
                 putIfPresent(c, "table", n.cfg("table"));
@@ -756,7 +758,7 @@ public final class PipelineEditable {
         List<PipelineCompileException.Refusal> refusals = new ArrayList<>();
 
         PipelineNode acq = null, parser = null, gap = null, marker = null;
-        PipelineNode primarySink = null, quarantineSink = null, webhook = null, excel = null;
+        PipelineNode primarySink = null, quarantineSink = null, outputStoreSink = null, webhook = null, excel = null;
         // The transform chain in authored order — the five kinds the flat file can hold. Order is node
         // order, which is what the editor sends and what PipelineLift emits; the flat file has no edges,
         // so there is no topology to sort by at this point.
@@ -869,6 +871,8 @@ public final class PipelineEditable {
             else if (BuiltinNodeType.SINK_PERSISTENT.type().equals(t)) {
                 if (isQuarantine(n)) {
                     quarantineSink = n;
+                } else if (isOutputStoreSink(n)) {
+                    outputStoreSink = n;
                 } else {
                     if (n.cfg("database") != null) destByDatabase.putIfAbsent(String.valueOf(n.cfg("database")), n);
                     if (primarySink == null || (primarySink.cfg("database") == null && n.cfg("database") != null))
@@ -1227,6 +1231,8 @@ public final class PipelineEditable {
         // mode — the lift only models a quarantine node for selector/segments pipelines, so a
         // single-schema pipeline's quarantine dir has no owning node and must not be dropped.
         if (quarantineSink != null) replaceOrRemove(dirs, "quarantine", quarantineSink.cfg("dir"));
+        if (outputStoreSink != null && outputStoreSink.cfg(PipelineStores.CONFIG_STORE) != null)
+            out.put("output_store", outputStoreSink.cfg(PipelineStores.CONFIG_STORE));
 
         if (collector.isEmpty()) out.remove(colKey);
         // A file with no output: block must not gain an empty one — getOrNew created the section
@@ -1531,6 +1537,11 @@ public final class PipelineEditable {
     /** A quarantine sink is a persistent sink writing unmatched FILES to a dir, not batches to a database. */
     private static boolean isQuarantine(PipelineNode n) {
         return n.cfg("dir") != null && n.cfg("database") == null;
+    }
+
+    /** An at-rest job output sink (the {@code output_store:} branch's terminal, never an ingest destination). */
+    private static boolean isOutputStoreSink(PipelineNode n) {
+        return PipelineLift.OUTPUT_STORE_SINK.equals(n.id());
     }
 
     /**

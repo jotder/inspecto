@@ -2139,4 +2139,40 @@ class PipelineEditableTest {
         assertFalse(((Map<?, ?>) cleared.get("processing")).containsKey("disabled_steps"),
                 "a re-enable clears the list even on a draft (lenient) save");
     }
+
+    @Test
+    void outputStoreLiftAndLowerRoundTripsUntouchedByteForByte(@TempDir Path dir) throws Exception {
+        Path toon = writeRichPipeline(dir);
+        Map<String, Object> raw = decode(toon);
+        raw.put("output_store", "cdr_dial_digit");
+        raw.put("steps", List.of(
+                Map.of("join", Map.of("reference", "reference/dim_dial_digit", "on", List.of("a"))),
+                Map.of("dedup", Map.of("keys", List.of("a")))));
+        Path authored = dir.resolve("enriched_pipeline.toon");
+        String originalToon = com.gamma.config.io.ConfigCodec.toToon(raw);
+        Files.writeString(authored, originalToon);
+
+        PipelineConfig cfg = PipelineConfig.load(authored.toString());
+        Map<String, Object> editableMap = PipelineEditable.toMap(cfg, raw);
+        PipelineGraph g = PipelineCodec.fromMap(editableMap);
+
+        PipelineNode outSink = g.byId().get("output_store");
+        assertNotNull(outSink, "lifted graph carries the output_store sink");
+        assertEquals("cdr_dial_digit", outSink.cfg("store"));
+        assertNull(outSink.cfg("database"), "output_store sink must not borrow the landed sink's database");
+
+        Map<String, Object> lowered = PipelineEditable.lower(g, raw, true);
+        assertEquals("cdr_dial_digit", lowered.get("output_store"));
+        assertEquals(raw.get("dirs"), lowered.get("dirs"), "dirs.database stays the landed sink's dir");
+        assertFalse(lowered.containsKey("sinks"), "output_store sink does not trigger plural sinks:");
+        assertEquals(raw, lowered, "untouched open -> save round-trips with identical config");
+
+        // Second untouched open -> save is byte-for-byte identical in TOON serialization too
+        String canonicalToon = com.gamma.config.io.ConfigCodec.toToon(lowered);
+        Files.writeString(authored, canonicalToon);
+        PipelineConfig cfg2 = PipelineConfig.load(authored.toString());
+        PipelineGraph g2 = PipelineCodec.fromMap(PipelineEditable.toMap(cfg2, lowered));
+        assertEquals(canonicalToon, com.gamma.config.io.ConfigCodec.toToon(PipelineEditable.lower(g2, lowered, true)),
+                "untouched open -> save round-trips byte-for-byte");
+    }
 }

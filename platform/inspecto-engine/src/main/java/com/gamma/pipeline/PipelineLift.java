@@ -52,6 +52,8 @@ public final class PipelineLift {
     static final String WEBHOOK           = "webhook";
     /** The {@code sink.excel} node ({@code excel:}) — one per flat file, on both lifts. */
     static final String EXCEL             = "excel";
+    /** The {@code sink.persistent} node for {@code output_store:} — second branch off {@code map} (JG1). */
+    static final String OUTPUT_STORE_SINK = "output_store";
 
     /** Lift a loaded {@link PipelineConfig} into a {@link PipelineGraph}. */
     public static PipelineGraph lift(PipelineConfig cfg) {
@@ -104,14 +106,7 @@ public final class PipelineLift {
         //    prepare() refuses arming it): a lift that skipped it would make the next strict lower delete
         //    the block — a silent edit loss.
         if (cfg.webhookConfig() != null) {
-            String feed = null;
-            for (PipelineEdge e : edges) {
-                if (!PipelineRel.DATA.equals(e.rel())) continue;
-                for (PipelineNode n : nodes)
-                    if (n.id().equals(e.to()) && BuiltinNodeType.SINK_PERSISTENT.type().equals(n.type())
-                            && !QUARANTINE.equals(n.id())) { feed = e.from(); break; }
-                if (feed != null) break;
-            }
+            String feed = sinkFeed(nodes, edges);
             nodes.add(new PipelineNode(WEBHOOK, BuiltinNodeType.SINK_WEBHOOK.type(), "Webhook",
                     "POSTs rows to Connection '" + cfg.webhook().connection() + "'",
                     new LinkedHashMap<>(cfg.webhookConfig()), null));
@@ -120,14 +115,7 @@ public final class PipelineLift {
         // 5. the Excel workbook (excel:) — the same second-branch placement and the same "emit for EVERY file
         //    carrying the block" rule as the webhook above, for the same silent-edit-loss reason.
         if (cfg.excelConfig() != null) {
-            String feed = null;
-            for (PipelineEdge e : edges) {
-                if (!PipelineRel.DATA.equals(e.rel())) continue;
-                for (PipelineNode n : nodes)
-                    if (n.id().equals(e.to()) && BuiltinNodeType.SINK_PERSISTENT.type().equals(n.type())
-                            && !QUARANTINE.equals(n.id())) { feed = e.from(); break; }
-                if (feed != null) break;
-            }
+            String feed = sinkFeed(nodes, edges);
             nodes.add(new PipelineNode(EXCEL, BuiltinNodeType.SINK_EXCEL.type(), "Excel workbook",
                     "Writes " + cfg.excel().path(), new LinkedHashMap<>(cfg.excelConfig()), null));
             if (feed != null) edges.add(PipelineEdge.data(feed, EXCEL));
@@ -417,6 +405,13 @@ public final class PipelineLift {
         String sinkUpstream = mapId;
         String routeId = null;
         Map<String, Object> routeCfg = cfg.routeConfig();
+        // JG1 (OUTPUT-STORE-SINK-NOT-DRAWN-1): when output_store: is authored on a single-schema pipeline
+        // without a route, the ingest path ends at map -> landed sink, and the Stage-2 chain branches off
+        // map -> steps[] -> output_store sink — matching actual execution (ingest vs at-rest Job).
+        boolean splitOutputStore = cfg.outputStore() != null && key == null && routeCfg == null && !hasRouteStep(cfg);
+        if (splitOutputStore) {
+            emitSinks(nodes, edges, suffix, schema, table, cfg, mapId, null, null);
+        }
 
         // ⚠ An explicit steps: chain is walked; a legacy file keeps the proven emission below.
         //
@@ -443,7 +438,8 @@ public final class PipelineLift {
                 sinkUpstream = id;
                 if (PipelineConfig.Step.ROUTE.equals(kind)) { routeId = id; routeCfg = sc; }
             }
-            emitSinks(nodes, edges, suffix, schema, table, cfg, sinkUpstream, routeId, routeCfg);
+            if (splitOutputStore) emitOutputStoreSink(nodes, edges, sinkUpstream, cfg.outputStore());
+            else emitSinks(nodes, edges, suffix, schema, table, cfg, sinkUpstream, routeId, routeCfg);
             return;
         }
 
@@ -512,7 +508,41 @@ public final class PipelineLift {
             sinkUpstream = routeId;
         }
 
-        emitSinks(nodes, edges, suffix, schema, table, cfg, sinkUpstream, routeId, routeCfg);
+        if (splitOutputStore) emitOutputStoreSink(nodes, edges, sinkUpstream, cfg.outputStore());
+        else emitSinks(nodes, edges, suffix, schema, table, cfg, sinkUpstream, routeId, routeCfg);
+    }
+
+    /** Whether an explicit {@code steps:} chain includes a {@code route} step. */
+    private static boolean hasRouteStep(PipelineConfig cfg) {
+        if (!cfg.hasExplicitSteps()) return false;
+        for (PipelineConfig.Step step : cfg.steps())
+            if (PipelineConfig.Step.ROUTE.equals(step.kind())) return true;
+        return false;
+    }
+
+    /** Emit the {@code output_store:} sink node at the end of the Stage-2 branch off {@code map}. */
+    private static void emitOutputStoreSink(List<PipelineNode> nodes, List<PipelineEdge> edges,
+                                            String upstream, String outputStore) {
+        Map<String, Object> c = new LinkedHashMap<>();
+        c.put(PipelineStores.CONFIG_STORE, outputStore);
+        nodes.add(new PipelineNode(OUTPUT_STORE_SINK, BuiltinNodeType.SINK_PERSISTENT.type(),
+                outputStore, "Job output store", c, null));
+        edges.add(PipelineEdge.data(upstream, OUTPUT_STORE_SINK));
+    }
+
+    /** Feeder for outbound {@code webhook:} / {@code excel:} branches: {@code output_store} sink's feeder when
+     *  present (matching {@link #stageTwo}), otherwise the first non-quarantine persistent sink's feeder. */
+    private static String sinkFeed(List<PipelineNode> nodes, List<PipelineEdge> edges) {
+        for (PipelineEdge e : edges) {
+            if (PipelineRel.DATA.equals(e.rel()) && OUTPUT_STORE_SINK.equals(e.to())) return e.from();
+        }
+        for (PipelineEdge e : edges) {
+            if (!PipelineRel.DATA.equals(e.rel())) continue;
+            for (PipelineNode n : nodes)
+                if (n.id().equals(e.to()) && BuiltinNodeType.SINK_PERSISTENT.type().equals(n.type())
+                        && !QUARANTINE.equals(n.id())) return e.from();
+        }
+        return null;
     }
 
     /** The chain's tail: one {@code sink.persistent} per destination, fed by {@code sinkUpstream} (or by
