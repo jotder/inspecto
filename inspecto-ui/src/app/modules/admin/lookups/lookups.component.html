@@ -88,6 +88,20 @@
                             formControlName="at"
                         ></inspecto-pen-field>
                     }
+                    @if (s.match === 'fuzzy' && s.block.length > 0) {
+                        @for (col of s.block; track col) {
+                            <label class="flex flex-col text-xs">
+                                <span class="text-secondary mb-1">Block: {{ col }}</span>
+                                <input
+                                    type="text"
+                                    class="min-w-36 rounded border px-2 py-1 font-mono text-sm"
+                                    [value]="blockValues()[col] ?? ''"
+                                    (input)="setBlockValue(col, $any($event.target).value)"
+                                    [attr.aria-label]="'Block ' + col"
+                                />
+                            </label>
+                        }
+                    }
                     <button mat-flat-button color="primary" type="submit" [disabled]="testing()">Test</button>
                     <button mat-stroked-button type="button" [disabled]="testing()" (click)="test(true)">
                         Reload Reference and test
@@ -99,12 +113,32 @@
                 @if (answer(); as a) {
                     <inspecto-alert [variant]="a.hit ? 'success' : 'warning'">
                         @if (a.hit) {
-                            Found: key {{ a.matchedKey }} ({{ matchedHow(a.matchKind) }}).
+                            Found: key {{ a.matchedKey }} ({{ matchedHow(a.matchKind) }}@if (a.matchScore != null) {, score {{ a.matchScore.toFixed(3) }}}).
                         } @else {
                             Not found: no Reference row matches.
                         }
                         Compared as “{{ a.compared }}”.
                     </inspecto-alert>
+                    @if ((a.candidates?.length ?? 0) > 1) {
+                        <table class="text-sm" aria-label="Top fuzzy candidates">
+                            <thead>
+                                <tr>
+                                    <th scope="col" class="pr-6 text-left">Candidate key</th>
+                                    <th scope="col" class="pr-6 text-left">Match</th>
+                                    <th scope="col" class="text-left">Score</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @for (c of a.candidates ?? []; track c.matchedKey) {
+                                    <tr>
+                                        <td class="pr-6 font-mono">{{ c.matchedKey }}</td>
+                                        <td class="pr-6">{{ c.matchKind }}</td>
+                                        <td>{{ c.matchScore != null ? c.matchScore.toFixed(3) : '—' }}</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    }
                     <table class="text-sm" aria-label="Columns this value would get">
                         <thead>
                             <tr>
