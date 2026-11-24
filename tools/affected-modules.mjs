@@ -18,6 +18,9 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { posix } from 'node:path';
+import { aiProfileDirs } from './bundle-modules.mjs';
+
+export { aiProfileDirs };
 
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8', maxBuffer: 1 << 28 }).trim();
 export const FULL_THRESHOLD = 0.7;
@@ -93,7 +96,7 @@ export function discoverConsumers(mods, testFiles, read, isTracked) {
 }
 
 /** Pure decision. changed: repo-relative paths. Returns the plan. */
-export function decide({ mods, changed, consumers, forceFull = false, pomChanged = () => true }) {
+export function decide({ mods, changed, consumers, forceFull = false, pomChanged = () => true, ai = new Set() }) {
     // start: modules whose CODE changed (their dependents are tested too); readers: modules whose tests READ a changed
     // file (only their own tests run — a reader's dependents do not consume that file)
     const reasons = [], start = new Set(), readers = new Set(), notes = new Set();
@@ -126,16 +129,24 @@ export function decide({ mods, changed, consumers, forceFull = false, pomChanged
     for (const r of readers) closure.add(r);
     if (!full && closure.size > FULL_THRESHOLD * real.length) { full = true; reasons.push(`closure ${closure.size}/${real.length} modules > ${FULL_THRESHOLD * 100}%`); }
     const mode = full ? 'full' : closure.size ? 'affected' : 'none';
-    const pl = [...closure].sort().map((a) => `:${a}`).join(',');
-    const commands = mode === 'full'
-        ? ['mvn -B install -Pedition-advanced']
-        : mode === 'affected'
-            // ONE chained command: if the upstream install fails, the test step must NOT run — it would resolve
-            // stale sibling jars from ~/.m2 and report false failures (or false passes). Observed 2026-10-19.
-            ? [`mvn -B install -DskipTests -Pedition-advanced -pl ${pl} -am && mvn -B test -Pedition-advanced -pl ${pl}`]
-            : [];
-    return { mode, reasons, changedModules: [...start].sort(), testModules: mode === 'full' ? real.map((m) => m.artifactId).sort() : [...closure].sort(),
-        reactorSize: real.length, ui, package: pkg, notes: [...notes].sort(), commands };
+    const testModules = mode === 'full' ? real.map((m) => m.artifactId).sort() : [...closure].sort();
+    // AI-OPTIN-1: the AI modules exist in the reactor only with -Pai, so a test set that holds one gets -Pai (never dropped
+    // silently); noAiCommands is the same plan without them, for a machine with no eoiagent in ~/.m2 - its AI modules are then NOT tested.
+    const aiModules = testModules.filter((a) => ai.has(a));
+    const plan = (P, set) => {
+        const pl = set.map((a) => `:${a}`).join(',');
+        return mode === 'full'
+            ? [`mvn -B install -P${P}`]
+            : mode === 'affected' && set.length
+                // ONE chained command: if the upstream install fails, the test step must NOT run — it would resolve
+                // stale sibling jars from ~/.m2 and report false failures (or false passes). Observed 2026-10-19.
+                ? [`mvn -B install -DskipTests -P${P} -pl ${pl} -am && mvn -B test -P${P} -pl ${pl}`]
+                : [];
+    };
+    const commands = plan(aiModules.length ? 'edition-advanced,ai' : 'edition-advanced', mode === 'full' ? [] : [...closure].sort());
+    const noAiCommands = aiModules.length ? plan('edition-advanced', [...closure].filter((a) => !ai.has(a)).sort()) : commands;
+    return { mode, reasons, changedModules: [...start].sort(), testModules, aiModules,
+        reactorSize: real.length, ui, package: pkg, notes: [...notes].sort(), commands, noAiCommands };
 }
 
 function main() {
@@ -177,7 +188,8 @@ function main() {
             consumers.get(p).add(dir);
         }
     }
-    const plan = decide({ mods, changed: [...changed], consumers, forceFull, pomChanged });
+    const ai = new Set(aiProfileDirs(read('pom.xml')).map((d) => mods[d]?.artifactId).filter(Boolean));
+    const plan = decide({ mods, changed: [...changed], consumers, forceFull, pomChanged, ai });
     plan.base = base; plan.head = head ?? 'WORKTREE'; plan.changedFiles = changed.size;
     if (json) { console.log(JSON.stringify(plan, null, 2)); return; }
     console.log(`affected-modules: ${plan.changedFiles} changed file(s) ${base.slice(0, 9)}..${plan.head} → mode ${plan.mode.toUpperCase()}`);
@@ -191,6 +203,12 @@ function main() {
     if (plan.package) console.log('  packaging inputs changed → pwsh inspecto/package.ps1 smoke for one edition');
     if (plan.mode === 'none') console.log('  no Java module affected → node guards only');
     for (const c of plan.commands) console.log(`  $ ${c}`);
+    if (plan.aiModules.length) {
+        console.log(`  AI modules in the set (${plan.aiModules.join(', ')}) → -Pai, which needs com.eoiagent in ~/.m2 (node tools/dev-doctor.mjs).`);
+        console.log('  Without eoiagent, run this instead and report those AI modules as NOT built or tested:');
+        for (const c of plan.noAiCommands) console.log(`  $ ${c}`);
+        if (!plan.noAiCommands.length) console.log('  (nothing left to build: every module in the set is an AI module)');
+    }
 }
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].replace(/\\/g, '/').split('/').pop())) main();

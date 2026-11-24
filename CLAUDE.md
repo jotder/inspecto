@@ -188,6 +188,8 @@ shift gets the identical environment.
   `-Dtest=A,B` (commas, never `+`). The FULL reactor gate (`mvn -o clean test -Pedition-advanced`, ~10 min) runs
   only when the tool says `full`, the operator asks (GAUNTLET), or at release — never once per edit. ⛔ Never
   `-pl X -am` alone as proof: it skips every dependent. Protocol: `docs/okf/product/layer/platform/spec-build-test.md`.
+  **AI is opt-in (`-Pai`, operator 2026-11-24):** the AI modules build only with `,ai` (e.g. `-Pedition-advanced,ai`,
+  needs eoiagent in `~/.m2`); a run without it reports them as NOT built — never folded into a green verdict.
 
 ## Deterministic checks run themselves — don't spend turns on them
 

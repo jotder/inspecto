@@ -42,7 +42,7 @@ Assembly mechanisms:
 
 * **Maven profiles** — `-Pedition-standard` / `-Pedition-advanced` / `-Pedition-preview` are **`<modules>` lists
   and nothing else**: no `<build>`, no `<properties>`, no `<dependencies>`. The edition profiles exist only in the
-  root pom; the only other profiles in the tree are `coverage` (root pom, `la/inspecto-geo-link/pom.xml` and the
+  root pom; the only other profiles in the tree are `ai` (root pom, below) and `coverage` (root pom, `la/inspecto-geo-link/pom.xml` and the
   nested `providers/asn-parser/asn-decoders/pom.xml`). `edition-standard` lists 17 modules; `edition-advanced`
   and `edition-preview` list the same 19 (the 17 plus `inspecto-policy` and `inspecto-la-store-pg`). ⚠ The
   profile lists are static XML: a module added to one profile must be added to the others that should have it.
@@ -52,6 +52,12 @@ Assembly mechanisms:
   default build**, no profile at all. ⚠ Maven only *warns* on a profile that does not exist and then builds the
   default, so `-Pedition-basic` produces a correct Basic build for an incorrect reason — the kind of instruction
   that survives because it appears to work.
+* **The opt-in `ai` profile** (`AI-OPTIN-1`, operator 2026-11-24) — `inspecto-agent`, `inspecto-agent-hosted` and
+  `inspecto-intelligence`, the only modules that need `com.eoiagent`, build only with `-Pai`, combined with an
+  edition when wanted (`-Pedition-advanced,ai`). No edition profile pulls them in, so the default and edition
+  reactors build with no eoiagent present; the callers that build what an edition ships pass `ai` themselves
+  (`package.ps1` for every non-Basic edition, `tools/sbom.mjs`, `tools/check-dependencies.mjs`, `ci.yml`,
+  `release.yml`), and `tools/affected-modules.mjs` adds `-Pai` when an AI module is in its test set.
 * **An optional Maven module** — the primary mechanism: a feature an edition lacks is a module that edition
   does not bundle. The 19 profile-scoped modules are `inspecto-oidc` (OIDC/Nimbus, role mapping, token relay — see
   [auth & security](../../module/access/admin-guide-auth-security.md)), `inspecto-secrets`,
@@ -61,9 +67,10 @@ Assembly mechanisms:
   `inspecto-screening`, `inspecto-anomaly`, `inspecto-predictive`, and for Advanced and Preview `inspecto-policy`
   (ABAC) and `inspecto-la-store-pg` (the PostgreSQL Investigation store). Basic never compiles them.
   ⚠ **Reactor membership is not bundle membership.** Some optional modules are in the default reactor, so their
-  tests run in every build, but ship only from a higher edition: `inspecto-agent` and `inspecto-telecom-asn1`
-  ship from Standard, `inspecto-intelligence` from Advanced; `inspecto-agent-hosted` and `inspecto-demo-auth` are
-  in no edition's Offering. What an edition ships is decided by its Offering (`offerings/<edition>.toon`), which
+  tests run in every build, but ship only from a higher edition: `inspecto-telecom-asn1` ships from Standard;
+  `inspecto-demo-auth` is in no edition's Offering. The AI modules are the reverse case: Standard ships
+  `inspecto-agent` and Advanced `inspecto-intelligence`, but they are in the reactor only with `-Pai` (above);
+  `inspecto-agent-hosted` is in no Offering. What an edition ships is decided by its Offering (`offerings/<edition>.toon`), which
   `tools/check-offerings.mjs` holds equal to the pom profile and the manifests.
 * **`ServiceLoader`** — an absent module means the no-op impl is the only one discovered (same pattern as the
   optional [assist agent](../../module/agent/spec-assist-agent.md) and [connectors](../../module/connectors/architecture-connectors.md)).

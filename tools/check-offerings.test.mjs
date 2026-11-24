@@ -48,6 +48,14 @@ test('a built add-on whose module is not in the Offering is RED', () => {
 test('the pom profile drifting from the bundle is RED', () => {
     assert.match(run((g) => { g.pom.profiles['edition-standard'] = ['ops', 'la']; }).join('\n'), /bundle ships core but pom profile edition-standard does not build it/);
 });
+test('AI-OPTIN-1: a shipped module built by the opt-in ai profile is GREEN; built by no profile is RED', () => {
+    const shipAgent = (g) => { g.manifests.agent = mf('optional'); g.offerings.standard.modules.push('agent'); BUNDLE.Standard.push('inspecto-agent'); };
+    try {
+        assert.deepEqual(run((g) => { shipAgent(g); g.pom.profiles.ai = ['agent']; }), []);
+        BUNDLE.Standard.pop();
+        assert.match(run(shipAgent).join('\n'), /bundle ships agent but pom profile edition-standard does not build it/);
+    } finally { if (BUNDLE.Standard.at(-1) === 'inspecto-agent') BUNDLE.Standard.pop(); }
+});
 test('a missing content pack, an unknown include and a cycle are RED', () => {
     assert.match(run((g) => g.offerings.basic.contentPacks.push('zz')).join('\n'), /content pack 'zz'/);
     assert.match(run((g) => { g.offerings.standard.includes = ['nobody']; }).join('\n'), /includes unknown Offering 'nobody'/);

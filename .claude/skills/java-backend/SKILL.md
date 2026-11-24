@@ -59,10 +59,10 @@ Dir == artifactId for every module **except** `inspecto/` → `inspecto-processo
 | `inspecto-acquire` | File/remote acquisition SPI. |
 | `inspecto-engine` | The engine cluster — the strongly-connected component **below** the control plane. |
 | `inspecto/` → **`inspecto-processor`** | Lean control plane + the shaded fat JAR. No network/AI deps. |
-| `inspecto-agent` | Assist skills on `agent-kernel` (7-skill catalog). |
-| `inspecto-agent-hosted` | Hosted model providers (langchain4j). |
+| `inspecto-agent` | **Optional, `-Pai` only** (AI-OPTIN-1): Assist skills on eoiagent (7-skill catalog). |
+| `inspecto-agent-hosted` | **Optional, `-Pai` only**: hosted model providers (langchain4j). |
 | `inspecto-connectors` | **Optional** SFTP/FTP connectors, ServiceLoader-discovered. |
-| `inspecto-intelligence` | **Optional** embedded intelligence. |
+| `inspecto-intelligence` | **Optional, `-Pai` only**: embedded intelligence. |
 | `inspecto-oidc` | **Optional, `-Pedition-standard` / `-Pedition-advanced` only**: `Authenticator` SPI impl (OIDC/Nimbus JWKS). |
 | `inspecto-policy` | **Optional, `-Pedition-advanced` only**: ABAC policy engine. |
 
@@ -120,6 +120,7 @@ Entry points: `com.gamma.inspector.CollectorProcessor` (one-shot ETL) · `com.ga
 ```bash
 mvn -o clean test          # default reactor, offline — misses the profile-gated modules
 mvn -o clean test -Pedition-advanced   # + inspecto-oidc AND inspecto-policy
+mvn -o clean test -Pedition-advanced,ai   # + the AI modules (agent, agent-hosted, intelligence) - needs eoiagent in ~/.m2
 mvn -o clean package -q    # → inspecto/target/inspecto-processor-*.jar
 ```
 ⚠ A **profile-scoped module is invisible** to a bare `mvn -o clean test`. Anything touching the parent

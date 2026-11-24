@@ -172,12 +172,17 @@ example). A bundle without the agent is a **valid deployment, not a broken one**
 "stays dependency-lean" (`inspecto/pom.xml`, `AssistAgent`'s class javadoc) and the agent modules pull
 the vendored kernel + eoiagent model transport.
 
-⚠ **They are NOT edition-gated modules.** `inspecto-agent`, `inspecto-agent-hosted` and
-`inspecto-intelligence` are plain default `<modules>` in the root POM. The profile-gated modules are the
-**nine** edition modules: `inspecto-oidc`, `inspecto-policy`, and the seven EDG-01 ones
-(`inspecto-notify-channels`, `inspecto-backup`, `inspecto-geo-link`, `inspecto-exchange`,
-`inspecto-observability`, `inspecto-observability`, `inspecto-ops`) — see [editions model](architecture-editions.md). The agent modules build in an
-ordinary `mvn test` run; they are simply never *bundled*.
+⚠ **They are opt-in: the `ai` profile (`AI-OPTIN-1`, operator 2026-11-24).** `inspecto-agent`,
+`inspecto-agent-hosted` and `inspecto-intelligence` — the only modules that need `com.eoiagent` (built from source,
+jotder/inspect-agent) — sit in the root POM's `ai` profile, not in the default `<modules>` and not in any edition
+profile. A plain `mvn test` or `-Pedition-advanced` run builds **no AI** and needs no eoiagent; `-Pai` adds them
+(`-Pedition-advanced,ai`). Not `activeByDefault`: that activation switches off whenever another `-P` is given. Since
+Standard and up *ship* the assistant (and Advanced/Preview the Intelligence agent), every caller that builds a
+shipped edition passes `ai` itself: `package.ps1` (`-P<edition>,ai` for every non-Basic edition — without it
+`-pl :inspecto-agent` fails loudly), `tools/sbom.mjs` (`mavenProfiles()` in `tools/bundle-modules.mjs`),
+`tools/check-dependencies.mjs` (the lock covers the eoiagent tree), and `ci.yml` / `release.yml`, which install
+eoiagent first. `tools/check-offerings.mjs` accepts a shipped module that the `ai` profile builds. See
+[editions model](architecture-editions.md).
 
 ⚠ **THREE reactor sizes, three baselines** (2026-09-08, EDG-01 complete): the default (Basic) build is
 **23 modules / 3777 tests**; `-Pedition-standard` is **31 modules / 4106**; `-Pedition-advanced` is

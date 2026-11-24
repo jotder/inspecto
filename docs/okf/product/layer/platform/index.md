@@ -53,6 +53,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `TOOL-TESTS-UNWIRED-BASELINE-1` | P3 | chore | 46 of 112 tools/*.test.mjs are named by no workflow, so no gate runs them. | demand |
 | `TEST-ENV-PG-ASN-UNRUN-1` | P3 | chore | Two test groups (Postgres and asn-*) cannot run on the shared User profile, so a green reactor does not cover them. | operator |
 | `IMPORT-LOADER-INVENTORY-RED-1` | P3 | defect | ImportLoaderInventoryTest.everyFixedNameALoaderReadsIsReservedOrAllowedWithAReason fails on master (seen 2026-11-19 by every BASIC-ELT-PR… | — |
+| `AI-OPTIN-VERIFY-1` | P3 | chore | Run the -Pai builds once on a machine with com.eoiagent in ~/.m2. | — |
 | `REALTIME-DECISIONING-1` | P3 | feature | PA-9e (the CEP App) and PA-9f (its docs) are open; the Add-on (PA-9a…PA-9d) is built. | demand |
 | `REALTIME-INLINE-DECISION-1` | P3 | feature | inline allow / block decision on each record of a stream | demand |
 | `SCALEOUT-HELM-NPOD-1` | P2 | feature | The only Helm chart is a replicas-1 StatefulSet: no N-pod topology, ingress template or per-pod Space assignment. | operator |

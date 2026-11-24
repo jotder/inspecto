@@ -31,7 +31,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { m2Repo } from './maven-repo.mjs';
-import { bundleModules, coreModules, editionProfile, EDITIONS, LIB_DIR, PG_SIDECAR } from './bundle-modules.mjs';
+import { bundleModules, coreModules, mavenProfiles, EDITIONS, LIB_DIR, PG_SIDECAR } from './bundle-modules.mjs';
 import { cdxComponent, generatePerModule } from './sbom-modules.mjs';
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -66,7 +66,8 @@ if (!EDITIONS.includes(edition)) {
 const modules = [...bundleModules(edition), ...coreModules()];
 const SHIPPED = Object.fromEntries(modules.map((m) => [m.artifactId, m.bundleFile]));
 const plModules = modules.map((m) => m.dir);
-const profile = editionProfile(edition);
+// AI-OPTIN-1: the edition profile plus -Pai when the edition ships an AI module (only -Pai puts those in the reactor).
+const profile = mavenProfiles(edition);
 
 // The local repository Maven itself uses (M2_REPO, else <localRepository> in ~/.m2/settings.xml - a moved repo, e.g.
 // C:/.m2/repository, left every artifact unresolved and failed the SBOM with "no hash" - else ~/.m2/repository):

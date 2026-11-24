@@ -57,10 +57,11 @@ test('unset JAVA_HOME and mvn on Java 26 are RED', () => {
     assert.deepEqual(st(checkJava(p)), ['ok', 'fail', 'fail']);
 });
 
-test('old Maven and missing ~/.m2 artifacts are RED with install fixes', () => {
+test('old Maven and a missing inspecto install are RED; missing eoiagent only WARNs (AI-OPTIN-1: -Pai only)', () => {
     const p = probe({ cmds: { 'mvn -v': ok('Apache Maven 3.8.6') }, missing: ['eoiagent', 'inspector'] });
     const r = checkMaven(p);
-    assert.deepEqual(st(r), ['fail', 'fail', 'fail']);
+    assert.deepEqual(st(r), ['fail', 'warn', 'fail']);
+    assert.match(r[1].detail, /only for -Pai/);
     assert.match(r[1].fix, /jotder\/inspect-agent.*mvn -DskipTests install/);
 });
 

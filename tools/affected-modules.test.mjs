@@ -1,7 +1,8 @@
 // Fixture test for tools/affected-modules.mjs. Run: node --test tools/affected-modules.test.mjs
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readReactor, dependentsClosure, discoverConsumers, decide, FULL_THRESHOLD, parsePorcelain } from './affected-modules.mjs';
+import { readFileSync } from 'node:fs';
+import { readReactor, dependentsClosure, discoverConsumers, decide, FULL_THRESHOLD, parsePorcelain, aiProfileDirs } from './affected-modules.mjs';
 
 const pom = (id, deps = [], packaging = '') => `<project><parent><artifactId>parent</artifactId></parent>${packaging}
 <artifactId>${id}</artifactId><dependencies>${deps.map((d) => `<dependency><artifactId>${d}</artifactId></dependency>`).join('')}
@@ -109,4 +110,32 @@ test('porcelain parser keeps every path whole, including a leading-space first l
     ]);
     // AFFECTED-MODULES-PORCELAIN-TRIM-1: the old code trimmed the whole output first, cutting `.gitattributes` to `gitattributes`
     assert.equal(parsePorcelain(out.trim())[0].path, 'gitattributes');
+});
+
+test('AI-OPTIN-1: an AI module in the test set adds -Pai, and a no-AI fallback drops it', () => {
+    const ai = new Set(['leaf']);
+    const p = run(['platform/util/src/main/java/U.java'], { ai });
+    assert.equal(p.mode, 'full');
+    assert.deepEqual(p.aiModules, ['leaf']);
+    assert.deepEqual(p.commands, ['mvn -B install -Pedition-advanced,ai']);
+    assert.deepEqual(p.noAiCommands, ['mvn -B install -Pedition-advanced']);
+    const q = run(['providers/leaf/src/main/java/L.java'], { ai });
+    assert.match(q.commands[0], /-Pedition-advanced,ai -pl :leaf -am && mvn -B test -Pedition-advanced,ai -pl :leaf$/);
+    assert.deepEqual(q.noAiCommands, []);
+    const r = run(['features/ops/src/main/java/A.java'], { ai });
+    assert.deepEqual(r.aiModules, []);
+    assert.doesNotMatch(r.commands[0], /ai/);
+});
+
+test('AI-OPTIN-1: aiProfileDirs reads the ai profile modules only', () => {
+    const root = '<project><modules><module>a</module></modules><profiles><profile><id>edition-x</id><modules><module>b</module></modules></profile>'
+        + '<!-- <profile><id>ai</id><modules><module>ghost</module></modules></profile> -->'
+        + '<profile><id>ai</id><modules><module>features/x-agent</module><module>features/x-intel</module></modules></profile></profiles></project>';
+    assert.deepEqual(aiProfileDirs(root), ['features/x-agent', 'features/x-intel']);
+    assert.deepEqual(aiProfileDirs('<project/>'), []);
+});
+
+test('AI-OPTIN-1: the real root pom puts exactly the three AI modules in the ai profile', () => {
+    assert.deepEqual(aiProfileDirs(readFileSync(new URL('../pom.xml', import.meta.url), 'utf8')).sort(),
+        ['features/inspecto-agent', 'features/inspecto-intelligence', 'providers/inspecto-agent-hosted']);
 });

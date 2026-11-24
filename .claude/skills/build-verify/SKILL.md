@@ -55,6 +55,14 @@ mvn -o clean test -Pedition-advanced -B > build.log 2>&1     # -B, NEVER -q
 node tools/check-reactor-verdict.mjs build.log --expect-modules 42   # the advanced reactor has 42 modules (inspecto-la-storage added 2026-10-02); the count moves with every new module
 ```
 
+⚠ **AI is opt-in (`-Pai`, AI-OPTIN-1, 2026-11-24).** `inspecto-agent`, `inspecto-agent-hosted` and
+`inspecto-intelligence` are in the root pom's `ai` profile, not the default reactor and not any edition profile, so
+the command above builds **no AI** and needs no `com.eoiagent` in `~/.m2`. To verify AI too (any change those
+modules reach — `node tools/affected-modules.mjs` adds `-Pai` when one is in its set):
+`mvn -o clean test -Pedition-advanced,ai -B` (needs eoiagent: `node tools/dev-doctor.mjs`). Without eoiagent, say in
+the report that the AI modules were **NOT built or tested** — never fold them into a green verdict. The module count
+for `--expect-modules` is 3 higher with `,ai`.
+
 `tools/check-reactor-verdict.mjs` is the only thing in this file that can actually *refuse* a verdict.
 It cross-checks the exit code, Maven's Reactor Summary, and the surefire reports' mtimes against the
 build window, and exits non-zero unless **every** reactor module is `SUCCESS` and **every** surefire
@@ -164,7 +172,7 @@ those modules are not in the reactor at all — yet it reports BUILD SUCCESS. So
 default-profile run is a claim about the **Basic** flavor only. Prove Standard/Advanced separately:
 
 ```powershell
-mvn -o clean package -DskipTests -Pedition-advanced -B
+mvn -o clean package -DskipTests -Pedition-advanced,ai -B   # ,ai: Standard and up ship the assistant (AI-OPTIN-1)
 ```
 
 🔴 **And do NOT infer reactor membership from `<module>/target/` existence or mtimes.** `mvn clean` only

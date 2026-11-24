@@ -109,8 +109,11 @@ jobs:
       # Advanced is the superset (9 modules vs Standard's 8), so one pass covers every edition packaged
       # below. ⛔ Do NOT "fix" this by narrowing the scope filter: the failure is in RESOLUTION, which
       # precedes filtering.
+      #
+      # `ai` (AI-OPTIN-1, operator 2026-11-24): the AI modules (inspecto-agent, -agent-hosted, -intelligence) are opt-in
+      # in the root pom; Standard and up ship them, so the SBOM generator (tools/sbom.mjs, -P<edition>,ai) resolves them too.
       - name: Install the reactor into .m2 so the SBOM generator can resolve it (SBOM-RESOLVE-1)
-        run: mvn --batch-mode --no-transfer-progress -DskipTests -Pedition-advanced install
+        run: mvn --batch-mode --no-transfer-progress -DskipTests -Pedition-advanced,ai install
 
       - name: Install UI dependencies
         run: npm ci

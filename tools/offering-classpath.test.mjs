@@ -207,8 +207,9 @@ test('Preview carries every module every other edition ships, on the plain and t
     for (const j of trio) assert.ok(!demo.has(j), `the demo build swaps out ${j}`);
     assert.equal(renderEdition('preview', true), 'edition=Preview' + String.fromCharCode(10) + 'variant=demo' + String.fromCharCode(10));
     const pom = parsePom(readFileSync(join(ROOT, 'pom.xml'), 'utf8'));
-    const built = new Set([...pom.defaults, ...pom.profiles['edition-preview']]);
-    for (const m of bundleModules('Preview')) assert.ok(built.has(m.dir.split('/').pop().replace(/^inspecto-/, '')), `pom edition-preview + default reactor lack ${m.dir}`);
+    // AI-OPTIN-1: the AI modules come from the opt-in `ai` profile, which package.ps1 adds for Preview (-Pedition-preview,ai)
+    const built = new Set([...pom.defaults, ...pom.profiles['edition-preview'], ...(pom.profiles.ai ?? [])]);
+    for (const m of bundleModules('Preview')) assert.ok(built.has(m.dir.split('/').pop().replace(/^inspecto-/, '')), `pom edition-preview + ai + default reactor lack ${m.dir}`);
 });
 
 // ── PACKAGE-DEMOAUTH-ADVANCED-1: the PostgreSQL driver is needed only by a bundle that carries a Postgres module ───────────────

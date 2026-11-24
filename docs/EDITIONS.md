@@ -11,7 +11,9 @@ an organisation), **how much data** it handles, and **how much governance** surr
 | **Advanced** | An organisation | Everything in Standard, plus Access Policies and shared PostgreSQL state for several servers. |
 
 The three editions come from the same build, packaged differently. Your bundle names its edition in
-`lib/edition.properties`.
+`lib/edition.properties`. The AI features (the Assistant from Standard, and Intelligence in Advanced) are an
+optional add-on: every Standard and Advanced bundle carries them, but a build from source includes them only when
+asked for with the Maven `ai` profile — see [build & test](okf/product/layer/platform/spec-build-test-verify-loop.md).
 
 ## Inspecto LA (Link Analysis) by edition
 

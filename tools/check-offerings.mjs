@@ -117,7 +117,8 @@ export function check({ offerings, manifests, bundle, pom, templates, templateMi
             if (onlyOffering.length) say(`lists ${onlyOffering.join(',')} but bundle-modules.mjs does not ship it for ${edition}`);
             if (onlyBundle.length) say(`bundle-modules.mjs ships ${onlyBundle.join(',')} for ${edition} but the Offering does not list it`);
             const profile = PROFILE_OF[o.tier];
-            const defaults = new Set(pom.defaults);
+            // AI-OPTIN-1: a shipped AI module is built by the opt-in `ai` profile (package.ps1 passes -P<edition>,ai), not the edition's
+            const defaults = new Set([...pom.defaults, ...(pom.profiles.ai ?? [])]);
             const gated = new Set([...shipped].filter((m) => !defaults.has(m)));
             if (profile && !pom.profiles[profile]) say(`pom.xml has no profile ${profile}`);
             else {
