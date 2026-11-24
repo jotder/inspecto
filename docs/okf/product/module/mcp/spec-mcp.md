@@ -354,6 +354,22 @@ config only.
   `PendingActions.ATTR_APPROVED_ACTION`, which lets that one request through the hold. Outcome: `approved` (2xx),
   `stale` (409 — the run moved on) or `failed` (any other status, recorded as `appliedStatus`). Every transition is
   an `AUDIT` row `pending-action.proposed|approved|stale|failed|declined|withdrawn|expired` (category `operation`).
+- **Operations MCP Tools** (lane C, `McpTools.OPERATIONS_TOOLS`): reads `list_runs` (`GET /runs`), `get_run_status`
+  (`GET /runs/runs/{runId}`), `get_run_batches` (`GET /runs/{run}/batches`), `list_pending_actions`,
+  `get_pending_action`; writes (`write: true`, so a console token is refused, D-AK3) `operate_run` (`action` one of
+  `trigger`, `pause`, `resume`, `reprocess`, `replay-rejects`, `retry-now`, `cancel-retries`, `drain` → the matching
+  `POST /runs/{run}/…`, optional `body` and one-line `reason` as `X-Change-Reason`), `trigger_job`, `replay_job_run` and
+  `withdraw_action`. Each replays its route as the caller, so the gate above decides: at once for a person's agent, a
+  Pending Action for a machine. `McpToolRoutesTest` expands `operate_run` over every action and pins each to a
+  `canOperateRuns` manifest route.
+- **The screen:** the Pending Changes screen has two tabs, *Pending Changes* and *Pending Actions*
+  (`PendingActionsPanelComponent`): a list (Waiting / All), the action, the machine that asked, its reason and outcome;
+  Approve and Decline for a holder of `canApproveChanges`.
+- **Agent Skills and golden tasks:** `diagnose-failed-run` (read only) and `operate-runs` (act after diagnosis; ask
+  before a drain or reprocess; report a `pa-…` id when held); the operations suite `agent-kit/golden/operations.json`
+  (six tasks: diagnose without acting, resume, re-run, drain asks first, a machine's resume held, a machine never
+  self-approves), graded by `tools/run-agent-golden.mjs`'s `agent-action`, `no-agent-action` and `pending-action`
+  checks. Its live run is open, as for the developer suite's other clients.
 - **Tests:** `ControlApiPendingActionsTest` (real HTTP: a person's agent pauses and resumes at once and its row
   names the agent client, a business user's agent is 403; a machine's pause is 202 and nothing ran, a second one
   409, the machine's approve 403, the list, another person's approval runs it, a second approve 409; withdraw by the

@@ -140,7 +140,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (174 open row
 * [Link Analysis core and ports](module/la-core/index.md) - `module.la-core` · 83 doc(s) · 24 open row(s)
 * [Link Analysis storage](module/la-storage/index.md) - `module.la-storage` · 8 doc(s) · 2 open row(s)
 * [Link Analysis PostgreSQL store](module/la-store-pg/index.md) - `module.la-store-pg` · 6 doc(s) · 2 open row(s)
-* [MCP endpoint](module/mcp/index.md) - `module.mcp` · 8 doc(s) · 4 open row(s)
+* [MCP endpoint](module/mcp/index.md) - `module.mcp` · 9 doc(s) · 4 open row(s)
 * [Notification channels](module/notify-channels/index.md) - `module.notify-channels` · 8 doc(s) · 0 open row(s)
 * [Observability (metrics endpoint + events feed API)](module/observability/index.md) - `module.observability` · 15 doc(s) · 2 open row(s)
 * [OIDC authenticator and token relay](module/oidc/index.md) - `module.oidc` · 9 doc(s) · 4 open row(s)

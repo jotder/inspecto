@@ -39,6 +39,11 @@ class McpToolRoutesTest {
     private static List<McpTools.Call> everyCall() {
         List<McpTools.Call> calls = new ArrayList<>();
         for (McpTools.Tool t : McpTools.ALL_TOOLS) {
+            if (t.name().equals("operate_run")) {   // AK-2d: every run action, not only the first enum value
+                for (String action : McpTools.RUN_ACTIONS.keySet())
+                    calls.add(t.router().route(t.validate(new LinkedHashMap<>(Map.of("run", "orders", "action", action)))));
+                continue;
+            }
             if (!t.name().equals("propose_change")) {
                 calls.add(t.router().route(t.validate(sample(t))));
                 continue;
@@ -86,6 +91,20 @@ class McpToolRoutesTest {
             assertTrue(McpTools.refused(new McpTools.Call(line.substring(0, sp), line.substring(sp + 1), null)), line);
         }
         assertFalse(McpTools.refused(new McpTools.Call("GET", "/apps", null)), "reading Apps is a read");
+    }
+
+    @Test
+    void everyOperationsToolActionReplaysAnOperationalAction() {
+        for (McpTools.Call c : everyCall()) {
+            boolean action = c.path().startsWith("/runs/orders/") || c.path().matches("/jobs/[^/]+/trigger")
+                    || c.path().matches("/jobs/runs/[^/]+/replay");
+            if (!"POST".equals(c.method()) || !action) continue;
+            String route = c.path();
+            assertTrue(CapabilityManifest.ENTRIES.stream().anyMatch(e -> e.method().equals("POST")
+                    && Pattern.matches(e.pattern(), route) && "canOperateRuns".equals(e.capability())),
+                    "an operations tool replays a canOperateRuns route: " + route);
+        }
+        assertEquals(8, McpTools.RUN_ACTIONS.size(), "the eight run actions of plan §4.6");
     }
 
     @Test
