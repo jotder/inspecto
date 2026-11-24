@@ -42,14 +42,21 @@ person** approves it. The agent never approves, never reveals a masked value, an
 
    The server refuses to start if the client is also the console's client or a machine client.
 3. **In the agent**, add the MCP server `https://inspecto.example.com/api/v1/spaces/<space>/mcp` and the Agent Kit
-   skills. For **Claude Code** and **Gemini CLI**, Inspecto's team builds a package for your install that carries both
-   (the server address, the agent client and the skills); also register its redirect addresses on the agent client —
-   `http://localhost:8765/callback` (Claude Code) and `http://localhost:8765/oauth/callback` (Gemini CLI):
+   skills. The bundle's `agent-kit/` folder holds the skills and a packager that builds, for your install, a **Claude
+   Code** plugin and a **Gemini CLI** extension carrying both (the server address, the agent client and the skills) —
+   with Node.js, in `agent-kit/`:
 
    ```text
-   claude plugin marketplace add <package>/claude
+   node package-agent-kit.mjs --mcp-url https://inspecto.example.com/api/v1/spaces/<space>/mcp --client-id claude-code --discovery-url <the server's AUTH_OIDC_DISCOVERY_URL>
+   ```
+
+   Register its redirect addresses on the agent client — `http://localhost:8765/callback` (Claude Code) and
+   `http://localhost:8765/oauth/callback` (Gemini CLI) — and install the packages from `agent-kit/packages/`:
+
+   ```text
+   claude plugin marketplace add agent-kit/packages/claude
    claude plugin install inspecto@inspecto-agent-kit
-   gemini extensions install <package>/gemini/inspecto
+   gemini extensions install agent-kit/packages/gemini/inspecto
    ```
 
    Then sign in: `/mcp` in Claude Code, `/mcp auth inspecto` in Gemini CLI. The person signs in at the identity

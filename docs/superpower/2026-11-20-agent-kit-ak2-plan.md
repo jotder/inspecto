@@ -374,7 +374,14 @@ notifications and the tasks extension stay deferred to AK-3 / AK-4.
   unpaid and Google One users — confirm the target before a customer release.
 - **Still open for phase 1:** the first live golden run on Standard with Keycloak (which is also AK-2b's end-to-end
   proof) and its compatibility-matrix row (model, client, versions, pass rate, safety failures, date) — run it through
-  these packages; the OpenAI (Codex) and local packages; shipping `agent-kit/` inside the bundle.
+  these packages; the OpenAI (Codex) and local packages.
+- **The Kit in the bundle (2026-11-24)** — `inspecto/package.ps1` step 7 stages `<bundle>/agent-kit/` (README, `skills/`,
+  `package-agent-kit.mjs`, `VERSION`) **only when `lib/modules.list` carries the `inspecto-mcp` jar**, so Standard and up
+  ship it and Basic, or an offering without the module, never does; staging it without the module fails the package, as
+  does a stray file under it (an allow-list). The bundle root's layout list (BUNDLE-LAYOUT-1) gains `agent-kit`, as this
+  plan's §7.5 named it. `tools/check-agent-kit.mjs` runs before the copy. The packager finds `skills/` beside itself and
+  reads `VERSION` in place of `pom.xml`, so an operator builds the vendor packages on site with Node.js (writes
+  `agent-kit/packages/`). The golden tasks stay in the repo (grading needs `tools/run-agent-golden.mjs`).
 
 ## 7. Risks
 

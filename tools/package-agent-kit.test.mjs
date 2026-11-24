@@ -1,6 +1,11 @@
 // Tests for tools/package-agent-kit.mjs — the per-vendor packages built from the Kit, no network, no disk.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { copyFileSync, cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { buildPackages, productVersion, readSkills } from './package-agent-kit.mjs';
 
 const OPTS = {
@@ -80,4 +85,23 @@ test('bad inputs are refused', () => {
 
 test('the version defaults to the product version without -SNAPSHOT', () => {
     assert.match(productVersion(), /^\d+\.\d+\.\d+$/);
+});
+
+test('in a bundle (agent-kit/ with skills, VERSION, no pom) the packager builds from beside itself', () => {
+    // the layout package.ps1 stages: <bundle>/agent-kit/{README.md, skills/, package-agent-kit.mjs, VERSION}
+    const bundle = mkdtempSync(join(tmpdir(), 'ak-bundle-'));
+    try {
+        const kit = join(bundle, 'agent-kit');
+        cpSync(fileURLToPath(new URL('../agent-kit/skills', import.meta.url)), join(kit, 'skills'), { recursive: true });
+        copyFileSync(fileURLToPath(new URL('./package-agent-kit.mjs', import.meta.url)), join(kit, 'package-agent-kit.mjs'));
+        writeFileSync(join(kit, 'VERSION'), '4.1.0-SNAPSHOT\n');
+        const r = spawnSync(process.execPath, [join(kit, 'package-agent-kit.mjs'), '--mcp-url', 'https://x.example/api/v1/mcp',
+            '--client-id', 'c', '--authorization-url', 'https://id.example/a', '--token-url', 'https://id.example/t'], { encoding: 'utf8' });
+        assert.equal(r.status, 0, r.stderr);
+        const plugin = JSON.parse(readFileSync(join(kit, 'packages/claude/plugins/inspecto/.claude-plugin/plugin.json'), 'utf8'));
+        assert.equal(plugin.version, '4.1.0');
+        for (const n of Object.keys(skills)) assert.ok(existsSync(join(kit, 'packages/gemini/inspecto/skills', n, 'SKILL.md')), n);
+    } finally {
+        rmSync(bundle, { recursive: true, force: true });
+    }
 });

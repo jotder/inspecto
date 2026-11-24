@@ -21,7 +21,9 @@ This README is for the person who installs and runs Inspecto. To use it, read th
 | `spaces/` | your Spaces, plus `_templates/` (the Space templates offered in the console) |
 | `ui/` | the web console |
 
-An Advanced bundle also carries `licenses/`, the licence texts of its bundled native libraries.
+An Advanced bundle also carries `licenses/`, the licence texts of its bundled native libraries. A bundle with the MCP
+endpoint (Standard and up) also carries `agent-kit/`: Agent Skills and a packager for Claude Code and Gemini CLI, so an
+AI agent can build in a Space as proposals a person approves (see `agent-kit/README.md`).
 
 Every launcher changes to the bundle folder before it starts, so you can run it from any directory.
 

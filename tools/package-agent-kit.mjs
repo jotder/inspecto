@@ -26,21 +26,29 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const ROOT = fileURLToPath(new URL('..', import.meta.url));
+const HERE = dirname(fileURLToPath(import.meta.url));
+// Two homes: the repo (tools/package-agent-kit.mjs, the Kit in agent-kit/) and an installed bundle, where package.ps1 copies
+// this file to agent-kit/package-agent-kit.mjs beside skills/ and a VERSION file (no pom.xml, no source tree).
+const IN_BUNDLE = existsSync(join(HERE, 'skills'));
+const KIT = IN_BUNDLE ? HERE : join(HERE, '..', 'agent-kit');
+const ROOT = join(HERE, '..');
 export const NAME = 'inspecto';
 const DESCRIPTION = 'Build Pipelines, Expectations, Alert Rules and Dashboards on a running Inspecto through its MCP '
     + 'endpoint. Every change is a proposal another person approves.';
 
 /** The Kit's skills: { name → SKILL.md text }. */
-export function readSkills(root = ROOT) {
-    const dir = join(root, 'agent-kit/skills');
+export function readSkills(kit = KIT) {
+    const dir = join(kit, 'skills');
     return Object.fromEntries(readdirSync(dir, { withFileTypes: true }).filter((d) => d.isDirectory())
         .map((d) => [d.name, readFileSync(join(dir, d.name, 'SKILL.md'), 'utf8')]));
 }
 
-export function productVersion(root = ROOT) {
-    const m = readFileSync(join(root, 'pom.xml'), 'utf8').match(/<version>([^<]+)<\/version>/);
-    return m ? m[1].replace(/-SNAPSHOT$/, '') : '0.0.0';
+/** The product version: the bundle's agent-kit/VERSION, else the repo's pom.xml; without -SNAPSHOT. */
+export function productVersion(kit = KIT) {
+    const file = join(kit, 'VERSION');
+    const raw = existsSync(file) ? readFileSync(file, 'utf8').trim()
+        : (readFileSync(join(kit, '..', 'pom.xml'), 'utf8').match(/<version>([^<]+)<\/version>/) || [])[1];
+    return raw ? raw.replace(/-SNAPSHOT$/, '') : '0.0.0';
 }
 
 function requireHttps(name, url, { localOk = false } = {}) {
@@ -154,7 +162,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
             mcpUrl: a['mcp-url'], clientId: a['client-id'], geminiClientId: a['gemini-client-id'], ...ep,
             scopes: a.scopes, callbackPort: a['callback-port'], version: a.version ?? productVersion(),
         }, readSkills());
-        const out = a.out ?? join(ROOT, 'target/agent-kit');
+        const out = a.out ?? (IN_BUNDLE ? join(KIT, 'packages') : join(ROOT, 'target/agent-kit'));
         if (existsSync(join(out, 'claude')) || existsSync(join(out, 'gemini')))
             throw new Error(`${out} already holds packages — give a new --out (packages are never overwritten)`);
         for (const [p, text] of Object.entries(files)) {
