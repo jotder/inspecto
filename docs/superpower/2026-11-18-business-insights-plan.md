@@ -1,7 +1,7 @@
 # Business insights in Widgets and Dashboards — research and design
 
 > **Status: DESIGN APPROVED 2026-11-18 — D-BI1, D-BI2, D-BI3 signed (operator, recommended options); D-BI4…D-BI10
-> signed 2026-11-24 (operator, recommended options); nothing built.** Every decision in §11 is closed. Board row: `BI-INSIGHTS-1`
+> signed 2026-11-24 (operator, recommended options); P0 I-3 KPI History built 2026-11-24 (§11.1, D-BI11, D-BI12).** Every decision in §11 is closed. Board row: `BI-INSIGHTS-1`
 > (§12). The new terms are in `GLOSSARY.md` §7.
 > Scope: insights on **business data** — the Measures over Datasets (revenue, usage, subscribers, transactions,
 > margin, leakage, partners, churn). Not observability: pipeline health stays with Metrics and Alert Rules.
@@ -280,6 +280,27 @@ already exists there, and Q2/Q4 answer the questions an RA or finance lead asks 
 | D-BI8 | Insights stored as an auto-registered Dataset | ✅ **SIGNED 2026-11-24: (a)** yes · (b) object store only |
 | D-BI9 | Chart Markers implementation | ✅ **SIGNED 2026-11-24: (a)** a Chart.js overlay plugin behind the viz contract · (b) custom drawing |
 | D-BI10 | KPI History grain and retention | ✅ **SIGNED 2026-11-24: (a)** the KPI's own grain, 3 years · (b) day only, retention per Space |
+| D-BI11 | KPI History registration under a Dataset approval policy | ✅ **SIGNED 2026-11-24 (operator):** the `kpi.snapshot` Job registers its Dataset as a **system Dataset regardless of the policy** (`origin: system`); the gate is lifted for this Job only |
+| D-BI12 | The period still in progress | ✅ **SIGNED 2026-11-24: (a)** stored with `complete = false`, rewritten each run until it closes · (b) closed periods only |
+
+### 11.1 P0 I-3 KPI History — as designed (2026-11-24)
+
+- **Job `kpi.snapshot`**, parameter `kpi` (the KPI id); built into the control plane (`inspecto/`, ServiceLoader) because
+  it needs the BI masking check. One Job per KPI, cron'd like any Job.
+- **One Dataset per KPI**, `kpi_history_<kpi>` (id = `physicalRef`), never a shared table: a shared one would show
+  every viewer the values of KPIs over Datasets they cannot read. Its `owner` / `shares` admit only who may read both
+  the KPI and its Dataset (a KPI and Dataset shared differently refuse the run). The `kpi_history_` store prefix is
+  reserved (a check in `ComponentRoutes.validateKind`) except for that Dataset over a saved KPI.
+- **Columns**: `kpi_id`, `grain`, `period_start` (DATE), `period_end` (DATE, exclusive), `value` (DOUBLE, NULL when
+  the period holds no value — never 0), `rag`, `complete` (BOOLEAN), `snapshot_at` (TIMESTAMP), `definition` (a
+  changed KPI definition rebuilds the whole history).
+- **Runs as its author** (as `publish.postgres`): a KPI or source Dataset the Job's author cannot view refuses the run,
+  and the KPI is the saved Job's (a run may not override it). A Measure that returns raw values of a masked column
+  refuses the run (a Job never reveals; BI-QUERY-MASKING-1).
+- **Backfill and restatement**: the first run evaluates every period from the later of the data's first day and
+  3 years back; later runs evaluate the missing periods plus the current and the previous period (late data
+  restates one closed period); rows older than 3 years are dropped. Each run rewrites the KPI's one file
+  atomically (`ScoreOutputDirs.swapIn`, the snapshot-swap lock).
 
 ## 12. Board row
 
