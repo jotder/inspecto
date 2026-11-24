@@ -17,7 +17,7 @@ folder: this README, `skills/`, `package-agent-kit.mjs` and `VERSION`.
 
 Any client that reads `SKILL.md` folders can use `skills/` as it stands.
 
-## Packages for Claude Code and Gemini CLI
+## Packages for Claude Code, Gemini CLI, Codex CLI and a local model
 
 A package is built **for one install**: it names that install's MCP endpoint and agent client (a Gemini CLI extension
 cannot take its server address from a variable). It needs Node.js 20 or later. In the bundle's `agent-kit/` folder:
@@ -36,15 +36,22 @@ script is `tools/package-agent-kit.mjs` and writes to `target/agent-kit/`).
 |---|---|---|
 | Claude Code | `claude/` — a plugin marketplace with the plugin `inspecto`: the skills and an HTTP MCP server with OAuth | `claude plugin marketplace add <out>/claude`, then `claude plugin install inspecto@inspecto-agent-kit`; sign in with `/mcp` |
 | Gemini CLI | `gemini/inspecto/` — an extension: the skills, `GEMINI.md`, an `httpUrl` MCP server with OAuth | `gemini extensions install <out>/gemini/inspecto`; sign in with `/mcp auth inspecto` |
+| OpenAI Codex CLI | `codex/` — a project folder: `.codex/config.toml` (`[mcp_servers.inspecto]` with OAuth), `.agents/skills/`, `AGENTS.md` | open the folder in Codex as a trusted project (or merge the config into `~/.codex/config.toml` and copy `.agents/skills/` to `~/.agents/skills/`); sign in with `codex mcp login inspecto` |
+| Local model (OpenCode with Ollama or LM Studio) | `opencode/` — a project folder: `opencode.json` (a remote MCP server with OAuth), `.opencode/skills/`, `AGENTS.md` | open the folder in OpenCode with a local provider; sign in with `opencode mcp auth inspecto` |
+
+Each client may have its own agent client at the identity provider: `--gemini-client-id`, `--codex-client-id`,
+`--local-client-id` (each defaults to `--client-id`).
 
 Register these redirect addresses on the agent clients at the identity provider (default port 8765,
 `--callback-port` to change it): `http://localhost:8765/callback` for Claude Code, `http://localhost:8765/oauth/callback`
-for Gemini CLI.
+for Gemini CLI, `http://127.0.0.1:8765/callback` for OpenCode, and for Codex the exact address `codex mcp login`
+prints (Codex may append a server id to it).
+
+A local model needs a network route to the install and its identity provider only, not to any cloud service.
 
 ## Any other MCP client, by hand
 
-The packages only save a manual step; the skills are the same for every client. For OpenAI Codex, a client running a
-local model, or any MCP-capable client:
+The packages only save a manual step; the skills are the same for every client. For any other MCP-capable client:
 
 1. Copy the folders in `skills/` to where the client reads `SKILL.md` skills.
 2. Add one MCP server in the client's settings: Streamable HTTP to `https://<host>/api/v1/spaces/<space>/mcp`; OAuth

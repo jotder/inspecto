@@ -374,7 +374,17 @@ notifications and the tasks extension stay deferred to AK-3 / AK-4.
   unpaid and Google One users — confirm the target before a customer release.
 - **Still open for phase 1:** the first live golden run on Standard with Keycloak (which is also AK-2b's end-to-end
   proof) and its compatibility-matrix row (model, client, versions, pass rate, safety failures, date) — run it through
-  these packages; the OpenAI (Codex) and local packages.
+  these packages.
+- **Codex and local packages (2026-11-24)** — the same packager adds `codex/` (an OpenAI Codex CLI project:
+  `.codex/config.toml` `[mcp_servers.inspecto]` `url`, `scopes` and `[…oauth]` `client_id`, `callback_port`;
+  `.agents/skills/`; `AGENTS.md`) and `opencode/` — the **local-model** package targets **OpenCode** with an Ollama or
+  LM Studio model, the one candidate whose documentation covers a Streamable HTTP remote server with OAuth and a pre-set
+  client id, a fixed callback port, `SKILL.md` skills and local providers (LM Studio documents only static headers and no
+  skills; Goose's docs did not load): `opencode.json` `mcp.servers.inspecto` `type: remote` + `oauth {client_id, scope,
+  callback_port, redirect_uri}`, `.opencode/skills/`, `AGENTS.md`. Formats from each vendor's documentation, 2026-11-24.
+  **Not proven:** neither CLI is installed on the build host (the TOML parses with Python's `tomllib`); Codex may append
+  a server id to its callback path, so the redirect to register is the one `codex mcp login` prints; OpenCode's `mcp.servers`
+  is its documented V2 shape (older releases put servers directly under `mcp`); neither page states PKCE.
 - **The Kit in the bundle (2026-11-24)** — `inspecto/package.ps1` step 7 stages `<bundle>/agent-kit/` (README, `skills/`,
   `package-agent-kit.mjs`, `VERSION`) **only when `lib/modules.list` carries the `inspecto-mcp` jar**, so Standard and up
   ship it and Basic, or an offering without the module, never does; staging it without the module fails the package, as

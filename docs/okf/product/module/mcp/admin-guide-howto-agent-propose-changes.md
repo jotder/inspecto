@@ -43,15 +43,17 @@ person** approves it. The agent never approves, never reveals a masked value, an
    The server refuses to start if the client is also the console's client or a machine client.
 3. **In the agent**, add the MCP server `https://inspecto.example.com/api/v1/spaces/<space>/mcp` and the Agent Kit
    skills. The bundle's `agent-kit/` folder holds the skills and a packager that builds, for your install, a **Claude
-   Code** plugin and a **Gemini CLI** extension carrying both (the server address, the agent client and the skills) —
+   Code** plugin, a **Gemini CLI** extension, an **OpenAI Codex CLI** project folder and a **local-model** project folder
+   for OpenCode (with Ollama or LM Studio), each carrying both (the server address, the agent client and the skills) —
    with Node.js, from the bundle folder:
 
    ```text
    node agent-kit/package-agent-kit.mjs --mcp-url https://inspecto.example.com/api/v1/spaces/<space>/mcp --client-id claude-code --discovery-url <the server's AUTH_OIDC_DISCOVERY_URL>
    ```
 
-   Register its redirect addresses on the agent client — `http://localhost:8765/callback` (Claude Code) and
-   `http://localhost:8765/oauth/callback` (Gemini CLI) — and install the packages from `agent-kit/packages/`:
+   Register its redirect addresses on the agent client — `http://localhost:8765/callback` (Claude Code),
+   `http://localhost:8765/oauth/callback` (Gemini CLI), `http://127.0.0.1:8765/callback` (OpenCode) and, for Codex, the
+   address `codex mcp login` prints — and install the packages from `agent-kit/packages/`:
 
    ```text
    claude plugin marketplace add agent-kit/packages/claude
@@ -59,11 +61,12 @@ person** approves it. The agent never approves, never reveals a masked value, an
    gemini extensions install agent-kit/packages/gemini/inspecto
    ```
 
-   Then sign in: `/mcp` in Claude Code, `/mcp auth inspecto` in Gemini CLI. The person signs in at the identity
-   provider as themselves.
+   For Codex, open `agent-kit/packages/codex` as a trusted project; for a local model, open
+   `agent-kit/packages/opencode` in OpenCode with a local provider. Then sign in: `/mcp` in Claude Code,
+   `/mcp auth inspecto` in Gemini CLI, `codex mcp login inspecto`, `opencode mcp auth inspecto`. The person signs in at
+   the identity provider as themselves.
 
-   **Any other MCP client, by hand** — OpenAI Codex, a client running a local model, or Claude Code and Gemini CLI
-   without the packages. The skills are the same `SKILL.md` folders for every client; only the client's own settings
+   **Any other MCP client, by hand** — a client the packages do not cover, or any of the four without its package. The skills are the same `SKILL.md` folders for every client; only the client's own settings
    differ:
 
    - **Skills:** copy the folders in `agent-kit/skills/` to where the client reads skills (its skills directory, or the

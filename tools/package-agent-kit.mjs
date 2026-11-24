@@ -4,7 +4,7 @@
 //
 //   node tools/package-agent-kit.mjs --mcp-url https://inspecto.example.com/api/v1/spaces/sales/mcp \
 //        --client-id claude-code --discovery-url https://id.example.com/realms/inspecto/.well-known/openid-configuration \
-//        [--gemini-client-id gemini-cli] [--scopes "openid"] [--callback-port 8765] [--version 4.0.0] [--out target/agent-kit]
+//        [--gemini-client-id gemini-cli] [--codex-client-id codex] [--local-client-id opencode] [--scopes "openid"] [--callback-port 8765] [--version 4.0.0] [--out target/agent-kit]
 //
 // In an installed bundle the same file is agent-kit/package-agent-kit.mjs (package.ps1 step 7): run it as
 // `node agent-kit/package-agent-kit.mjs …`; it reads skills/ and VERSION beside itself and writes agent-kit/packages/.
@@ -13,15 +13,20 @@
 //   <out>/claude/                 a Claude Code plugin marketplace (.claude-plugin/marketplace.json) holding the plugin
 //     plugins/inspecto/           .claude-plugin/plugin.json, .mcp.json (type http + oauth), skills/<name>/SKILL.md
 //   <out>/gemini/inspecto/        a Gemini CLI extension: gemini-extension.json (httpUrl + oauth), GEMINI.md, skills/
+//   <out>/codex/                  an OpenAI Codex CLI project: .codex/config.toml ([mcp_servers.inspecto] url + oauth
+//                                 client_id/callback_port), .agents/skills/, AGENTS.md   (--codex-client-id)
+//   <out>/opencode/               a local-model project for OpenCode (Ollama / LM Studio): opencode.json (mcp.servers,
+//                                 type remote + oauth), .opencode/skills/, AGENTS.md     (--local-client-id)
 //
 // WHY PER INSTALL (verified against the vendors' docs 2026-11-24): a Gemini CLI extension cannot take its MCP `httpUrl`
 // from a variable (only ${extensionPath}, ${workspacePath}, ${/} are substituted in gemini-extension.json), and a plugin's
 // `.mcp.json` env expansion in `url` is not documented for Claude Code plugins. The install's identity provider needs a
 // PRE-REGISTERED agent client (Inspecto lists it in -Dauth.oidc.agentClients; no dynamic registration), so the client id
 // and a fixed localhost callback are baked in too: Claude Code calls back on http://localhost:<port>/callback, Gemini CLI
-// on the `redirectUri` given here (http://localhost:<port>/oauth/callback) — register both on the agent client(s).
+// on the `redirectUri` given here (http://localhost:<port>/oauth/callback) , OpenCode on http://127.0.0.1:<port>/callback, Codex on the address `codex mcp login` prints — register each on the
+// agent client(s).
 // The authorization and token endpoints Gemini needs are read from the OIDC discovery document (or --authorization-url /
-// --token-url). No secret is written: both are public clients.
+// --token-url). No secret is written: every client is public.
 //
 // Tests: tools/package-agent-kit.test.mjs. Nothing here needs the server.
 
@@ -68,7 +73,7 @@ export function geminiContext() {
     return `# Inspecto
 
 You are connected to a running Inspecto through the MCP server \`${NAME}\`, signed in as a person. Use the skills in
-this extension; \`build-an-app\` is the place to start for an outcome, \`safe-config-change\` for any change.
+this package; \`build-an-app\` is the place to start for an outcome, \`safe-config-change\` for any change.
 
 - Validate (\`validate_config\`) — and for a Pipeline graph dry-run (\`dry_run_pipeline\`) — before \`propose_change\`.
 - You propose; another person approves. Never try to approve, decline, reveal a masked value, promote, or change Apps,
@@ -86,11 +91,16 @@ export function buildPackages(opts, skills) {
     const { mcpUrl, clientId, authorizationUrl, tokenUrl, version } = opts;
     const geminiClientId = opts.geminiClientId ?? clientId;
     const scopes = (opts.scopes ?? '').trim() || 'openid';
+    // RFC 6749 §3.3 scope-token characters only (keeps quotes, backslashes and control characters out of every format)
+    if (!scopes.split(/\s+/).every((t) => /^[\x21\x23-\x5B\x5D-\x7E]+$/.test(t))) throw new Error(`--scopes holds a character a scope may not: ${opts.scopes}`);
+    // printable ASCII only: no control character, DEL or lone surrogate reaches a TOML or JSON string
+    if (!/^[\x21-\x7E]+$/.test(opts.mcpUrl ?? '')) throw new Error('--mcp-url holds a control character, a space or a non-ASCII character');
     const port = Number(opts.callbackPort ?? 8765);
     if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error(`--callback-port must be 1024-65535: ${opts.callbackPort}`);
     requireHttps('mcp-url', mcpUrl, { localOk: true });
     if (!/\/mcp$/.test(new URL(mcpUrl).pathname)) throw new Error(`--mcp-url must end in /mcp (…/api/v1[/spaces/<id>]/mcp): ${mcpUrl}`);
-    for (const [k, v] of [['client-id', clientId], ['gemini-client-id', geminiClientId]])
+    for (const [k, v] of [['client-id', clientId], ['gemini-client-id', geminiClientId],
+        ['codex-client-id', opts.codexClientId ?? clientId], ['local-client-id', opts.localClientId ?? clientId]])
         if (!/^[A-Za-z0-9._:-]{1,200}$/.test(v ?? '')) throw new Error(`--${k} is missing or not a client id: ${v}`);
     requireHttps('authorization-url', authorizationUrl, { localOk: true });
     requireHttps('token-url', tokenUrl, { localOk: true });
@@ -133,7 +143,40 @@ export function buildPackages(opts, skills) {
         },
     });
     files[`${ext}/GEMINI.md`] = geminiContext();
+    // OpenAI Codex CLI: a project folder (learn.chatgpt.com/docs/extend/mcp, build-skills, agent-configuration/agents-md):
+    // .codex/config.toml (read in a TRUSTED project), .agents/skills/, AGENTS.md. Strings are JSON-quoted, which is a valid
+    // TOML basic string for the validated inputs (no control character or DEL in the URL, RFC 6749 scope tokens only).
+    const codexClientId = opts.codexClientId ?? clientId;
+    const q = (v) => JSON.stringify(v);
+    files['codex/.codex/config.toml'] = `# Inspecto Agent Kit - the MCP server for this install (Codex CLI).
+# Sign in: codex mcp login ${NAME}
+[mcp_servers.${NAME}]
+url = ${q(mcpUrl)}
+scopes = [${scopes.split(/\s+/).map(q).join(', ')}]
+
+[mcp_servers.${NAME}.oauth]
+client_id = ${q(codexClientId)}
+callback_port = ${port}
+`;
+    files['codex/AGENTS.md'] = geminiContext();
+    // Local models: OpenCode (opencode.ai/docs/mcp-servers, skills, rules, providers) with an Ollama or LM Studio model.
+    const localClientId = opts.localClientId ?? clientId;
+    files['opencode/opencode.json'] = json({
+        $schema: 'https://opencode.ai/config.json',
+        mcp: {
+            servers: {
+                [NAME]: {
+                    type: 'remote',
+                    url: mcpUrl,
+                    oauth: { client_id: localClientId, scope: scopes, callback_port: port, redirect_uri: `http://127.0.0.1:${port}/callback` },
+                },
+            },
+        },
+    });
+    files['opencode/AGENTS.md'] = geminiContext();
     for (const [n, text] of Object.entries(skills)) {
+        files[`codex/.agents/skills/${n}/SKILL.md`] = text;
+        files[`opencode/.opencode/skills/${n}/SKILL.md`] = text;
         files[`${plugin}/skills/${n}/SKILL.md`] = text;
         files[`${ext}/skills/${n}/SKILL.md`] = text;
     }
@@ -162,11 +205,12 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     try {
         const ep = await endpoints(a);
         const files = buildPackages({
-            mcpUrl: a['mcp-url'], clientId: a['client-id'], geminiClientId: a['gemini-client-id'], ...ep,
+            mcpUrl: a['mcp-url'], clientId: a['client-id'], geminiClientId: a['gemini-client-id'],
+            codexClientId: a['codex-client-id'], localClientId: a['local-client-id'], ...ep,
             scopes: a.scopes, callbackPort: a['callback-port'], version: a.version ?? productVersion(),
         }, readSkills());
         const out = a.out ?? (IN_BUNDLE ? join(KIT, 'packages') : join(ROOT, 'target/agent-kit'));
-        if (existsSync(join(out, 'claude')) || existsSync(join(out, 'gemini')))
+        if (['claude', 'gemini', 'codex', 'opencode'].some((d) => existsSync(join(out, d))))
             throw new Error(`${out} already holds packages — give a new --out (packages are never overwritten)`);
         for (const [p, text] of Object.entries(files)) {
             mkdirSync(dirname(join(out, p)), { recursive: true });
@@ -176,7 +220,10 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
         console.log(`  Claude Code: claude plugin marketplace add ${join(out, 'claude')}  then  claude plugin install ${NAME}@inspecto-agent-kit`);
         console.log(`  Gemini CLI:  gemini extensions install ${join(out, 'gemini', NAME)}  then  /mcp auth ${NAME}`);
         const port = a['callback-port'] ?? 8765;
-        console.log(`  Register on the agent client(s): http://localhost:${port}/callback (Claude Code) and http://localhost:${port}/oauth/callback (Gemini CLI)`);
+        console.log(`  Codex CLI:   open ${join(out, 'codex')} as a trusted project (or merge its .codex/config.toml into ~/.codex/config.toml and copy .agents/skills to ~/.agents/skills), then  codex mcp login ${NAME}`);
+        console.log(`  Local model: OpenCode with Ollama or LM Studio - open ${join(out, 'opencode')} as the project, then  opencode mcp auth ${NAME}`);
+        console.log(`  Register on the agent client(s): http://localhost:${port}/callback (Claude Code), http://localhost:${port}/oauth/callback (Gemini CLI),`);
+        console.log(`    http://127.0.0.1:${port}/callback (OpenCode), and the redirect 'codex mcp login' prints (Codex may append a server id)`);
     } catch (e) {
         console.error(`package-agent-kit: ${e.message}`);
         process.exit(2);

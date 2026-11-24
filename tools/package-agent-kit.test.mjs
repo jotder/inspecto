@@ -46,11 +46,40 @@ test('the Gemini CLI extension is well-formed', () => {
     assert.ok(files['gemini/inspecto/GEMINI.md'].includes('propose_change'));
 });
 
-test('every skill ships unchanged in both packages', () => {
+test('the Codex CLI project is well-formed', () => {
+    const t = files['codex/.codex/config.toml'];
+    assert.match(t, /^\[mcp_servers\.inspecto\]$/m);
+    assert.match(t, /^url = "https:\/\/inspecto\.example\.com\/api\/v1\/spaces\/sales\/mcp"$/m);
+    assert.match(t, /^scopes = \["openid"\]$/m);
+    assert.match(t, /^\[mcp_servers\.inspecto\.oauth\]$/m);
+    assert.match(t, /^client_id = "claude-code"$/m);
+    assert.match(t, /^callback_port = 8765$/m);
+    assert.doesNotMatch(t, /client_secret|bearer_token/);
+    assert.ok(files['codex/AGENTS.md'].includes('propose_change'));
+});
+
+test('the OpenCode (local model) project is well-formed', () => {
+    const s = j('opencode/opencode.json').mcp.servers.inspecto;
+    assert.equal(s.type, 'remote');
+    assert.equal(s.url, OPTS.mcpUrl);
+    assert.deepEqual(s.oauth, { client_id: 'claude-code', scope: 'openid', callback_port: 8765, redirect_uri: 'http://127.0.0.1:8765/callback' });
+    assert.ok(files['opencode/AGENTS.md'].includes('propose_change'));
+});
+
+test('per-client ids are used where given', () => {
+    const f = buildPackages({ ...OPTS, codexClientId: 'codex', localClientId: 'opencode' }, skills);
+    assert.match(f['codex/.codex/config.toml'], /^client_id = "codex"$/m);
+    assert.equal(JSON.parse(f['opencode/opencode.json']).mcp.servers.inspecto.oauth.client_id, 'opencode');
+    assert.throws(() => buildPackages({ ...OPTS, codexClientId: 'a"b' }, skills), /codex-client-id/);
+});
+
+test('every skill ships unchanged in every package', () => {
     assert.ok(Object.keys(skills).length >= 7);
     for (const [n, text] of Object.entries(skills)) {
         assert.equal(files[`claude/plugins/inspecto/skills/${n}/SKILL.md`], text);
         assert.equal(files[`gemini/inspecto/skills/${n}/SKILL.md`], text);
+        assert.equal(files[`codex/.agents/skills/${n}/SKILL.md`], text);
+        assert.equal(files[`opencode/.opencode/skills/${n}/SKILL.md`], text);
     }
 });
 
@@ -74,6 +103,10 @@ test('bad inputs are refused', () => {
     bad({ clientId: undefined }, /client id/);
     bad({ tokenUrl: 'ftp://x' }, /must be https/);
     bad({ callbackPort: 80 }, /callback-port/);
+    bad({ scopes: 'openid a\x7fb' }, /--scopes/);
+    bad({ scopes: 'openid "x"' }, /--scopes/);
+    bad({ mcpUrl: 'https://inspecto.example.com/api/\x7f/mcp' }, /control character/);
+    bad({ mcpUrl: 'https://inspecto.example.com/a\uD800/mcp' }, /non-ASCII/);
     bad({ version: 'latest' }, /SemVer/);
     assert.throws(() => buildPackages(OPTS, {}), /no skills/);
     // blank scopes fall back to openid rather than an empty scope
