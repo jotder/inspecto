@@ -61,6 +61,28 @@ person** approves it. The agent never approves, never reveals a masked value, an
 
    Then sign in: `/mcp` in Claude Code, `/mcp auth inspecto` in Gemini CLI. The person signs in at the identity
    provider as themselves.
+
+   **Any other MCP client, by hand** — OpenAI Codex, a client running a local model, or Claude Code and Gemini CLI
+   without the packages. The skills are the same `SKILL.md` folders for every client; only the client's own settings
+   differ:
+
+   - **Skills:** copy the folders in `agent-kit/skills/` to where the client reads skills (its skills directory, or the
+     project it works in). A client that reads no `SKILL.md` can be given `agent-kit/skills/build-an-app/SKILL.md` and
+     `agent-kit/skills/safe-config-change/SKILL.md` as instructions.
+   - **The MCP server:** add one server in the client's MCP settings, with these values in the client's own format:
+
+     | Setting | Value |
+     |---|---|
+     | Transport | Streamable HTTP (not SSE, not stdio) |
+     | Address | `https://inspecto.example.com/api/v1/spaces/<space>/mcp` |
+     | Sign-in | OAuth, authorization code with PKCE, as a public client (no secret) |
+     | Client id | the agent client you registered in step 1, listed in `auth.oidc.agentClients` |
+     | Authorization and token endpoints | from the discovery document (`AUTH_OIDC_DISCOVERY_URL`); a client that follows the server's 401 challenge finds them itself |
+     | Scopes | `openid` (or what `auth.oidc.scopes` lists) |
+     | Redirect address | whatever the client uses — register it on the agent client |
+
+   - A client that cannot run an OAuth sign-in cannot be used: a token copied from the console belongs to the
+     console's client, and the write tools refuse it.
 4. **Ask the agent for an outcome**, for example "add a check that amount is never negative on orders, and tell me how
    many rows break it today". It validates, dry-runs where it builds a Pipeline, and proposes. It reports a Pending
    Change id (`pc-…`).

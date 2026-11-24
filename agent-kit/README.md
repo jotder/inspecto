@@ -41,6 +41,21 @@ Register these redirect addresses on the agent clients at the identity provider 
 `--callback-port` to change it): `http://localhost:8765/callback` for Claude Code, `http://localhost:8765/oauth/callback`
 for Gemini CLI.
 
+## Any other MCP client, by hand
+
+The packages only save a manual step; the skills are the same for every client. For OpenAI Codex, a client running a
+local model, or any MCP-capable client:
+
+1. Copy the folders in `skills/` to where the client reads `SKILL.md` skills.
+2. Add one MCP server in the client's settings: Streamable HTTP to `https://<host>/api/v1/spaces/<space>/mcp`; OAuth
+   authorization code with PKCE as a public client, with the agent client id the administrator listed in
+   `auth.oidc.agentClients`; scope `openid`; the authorization and token endpoints from the identity provider's
+   discovery document (a client that follows the server's 401 challenge finds them itself); register the client's
+   redirect address on the agent client.
+
+A client that cannot run an OAuth sign-in cannot write: a token copied from the console is refused by the write tools.
+Details: the Handbook how-to *Let an AI agent propose changes*, step 3.
+
 ## Rules every skill follows
 
 - Validate (and dry-run a Pipeline) before proposing; never propose a draft with errors.
