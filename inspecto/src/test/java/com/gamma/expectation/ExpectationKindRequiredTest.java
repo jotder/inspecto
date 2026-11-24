@@ -22,6 +22,15 @@ class ExpectationKindRequiredTest {
     }
 
     @Test
+    void aNullBaselineMeasureIsRefusedNotAFault() {
+        java.util.List<Object> measures = new java.util.ArrayList<>();
+        measures.add(null);
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> Expectation.fromMap(Map.of(
+                "name", "x", "kind", "baseline", "target", "shipments", "measures", measures, "maxIncrease", 50)));
+        assertTrue(e.getMessage().startsWith("expectation.measures entries must be one of"), e.getMessage());
+    }
+
+    @Test
     void anUnknownKindIsRefusedTheSameWay() {
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> Expectation.fromMap(Map.of(
                 "name", "x", "kind", "not_empty", "target", "shipments", "column", "shipment_id")));

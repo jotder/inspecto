@@ -26,9 +26,10 @@ same realm or tenant as the console's own client. Its access tokens must carry t
 
 **Allow `offline_access`.** Claude Code signs in with `scope=openid offline_access` (it keeps a refresh token), whatever
 scopes the plugin names. Give the agent client `offline_access` as an allowed (optional) scope, and make sure the
-people who will use the agent hold the `offline_access` role — Keycloak grants it through the realm's default roles; a
-realm that has none answers `invalid_scope` at sign-in or `Offline tokens not allowed for the user or client` at the
-token exchange (found in the Claude Code plugin's live sign-in, 2026-11-24).
+people who will use the agent hold the `offline_access` role — Keycloak grants it through the realm's default roles. A
+client that does not allow the scope answers `invalid_scope` at sign-in; a person without the role gets `Offline tokens
+not allowed for the user or client` at the token exchange, after the browser has shown "Authentication Successful"
+(both found in the Claude Code plugin's live sign-in, 2026-11-24).
 
 Two rules the server cannot check for you:
 

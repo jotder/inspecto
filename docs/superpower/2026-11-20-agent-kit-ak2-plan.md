@@ -141,7 +141,8 @@ File access therefore closes the "no config-key reference" gap (the agent learns
 widening what an agent may change. Recommended: files for learning and drafting in both postures, the API for applying
 on a governed install. The phase-1 gate governs an agent's **API** calls; it cannot see a file an agent writes on the
 host. So the posture is set by who may write into the install root, not by the server — a governed install gives the
-agent read access to the install root and no write access to its Space folders (decision D-AK7, open).
+agent read access to the install root and no write access to its Space folders (decision D-AK7, signed 2026-11-24 as
+recommended, §8).
 
 ### 1.3 Agent-friendly documentation — a docs track under the analytics builder *(operator, 2026-11-21)*
 
@@ -324,8 +325,8 @@ and a security review of what it added.
 | **AK-2a** identity first — **built 2026-11-20** ([spec-mcp.md § The agent gate](../okf/product/module/mcp/spec-mcp.md#the-agent-gate-ak-2a)) | 1 | `auth.oidc.agentClients`, the Subject's agent marker on every audit row, RFC 9728 metadata and the 401 header, the identity-keyed hold in `PendingChanges.hold`/`holdSet`, the three-bucket default deny and never-list at the host gate, `authorNow` keeping the marker, `agentClient` on the Pending Change and its screen | real-HTTP tests: an agent-client token's direct `PUT` is held (202); the SPA client's is not; a `holdRefusing`-only write (bundle import) is 403 for the agent; the agent token's approve is 403; approval per D-AK1; falsified (remove the marker check → the direct `PUT` writes) |
 | **AK-2b** write tools — **built 2026-11-20** ([spec-mcp.md § Write tools](../okf/product/module/mcp/spec-mcp.md#write-tools-ak-2b); the Keycloak end-to-end run is left to AK-4) | 1 | the §4.4 tools, the endpoint refusal list, the manifest category, tool definitions and the `openapi.fragment.json` | end to end on a Standard install with Keycloak: validate → dry-run → propose → a second person approves → the change is live; `propose_action` → approve → sent |
 | **AK-2c** machines | 2 | `auth.oidc.agentMachineClients` and the agent capability set | a machine in the set proposes and is held; one outside it keeps one capability; an approval attempt is 403 |
-| **AK-2d** operational actions | 2 | the operations rows of §4.6, the held-action record per D-AK6, the operations MCP Tools and Skills | an agent re-runs a failed run (low); its reprocess is held until a person approves; a machine's resume is held |
-| **AK-2e** case actions | 3 | the analyst rows of §4.6, the analyst MCP Tools and Skills | an agent comments and assigns (low); its resolve is held; an agent never approves an Action Request |
+| **AK-2d** operational actions | 2 | the operations rows of §4.6, the held-action record per D-AK6, the operations MCP Tools and Skills | a person's agent re-runs a failed run and reprocesses at once, within the person's rights, audited with `agentClient` (D-AK5 as signed); a machine's resume is held as a Pending Action |
+| **AK-2e** case actions | 3 | the analyst rows of §4.6, the analyst MCP Tools and Skills | a person's agent comments, assigns and resolves at once, within the person's rights (D-AK5 as signed); a machine's resolve is held as a Pending Action; an agent never approves an Action Request |
 | close, per phase | 1–3 | security review of what the phase added, hub `module/mcp` spec and guides, the role's Handbook how-to | review at confidence ≥ 8 finds nothing |
 
 AK-2a ships before any write tool (spec-mcp.md "Deferred to AK-2": a verified agent client must be on the row before an

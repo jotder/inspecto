@@ -187,9 +187,11 @@ public record Expectation(String name, String description, String targetType, St
         public Baseline {
             require(window >= 1 && window <= MAX_WINDOW,
                     "expectation.baselineWindow must be between 1 and " + MAX_WINDOW);
+            // a null entry is refused here, before List.copyOf, which throws NullPointerException on one (a 500 otherwise)
+            if (measures != null)
+                for (String ms : measures)
+                    require(ms != null && MEASURES.contains(ms), "expectation.measures entries must be one of " + MEASURES);
             measures = measures == null || measures.isEmpty() ? List.of("row_count") : List.copyOf(measures);
-            for (String ms : measures)
-                require(MEASURES.contains(ms), "expectation.measures entries must be one of " + MEASURES);
             columns = idents(columns, "columns");
             groupBy = idents(groupBy, "groupBy");
             boolean perColumn = measures.stream().anyMatch(ms -> !"row_count".equals(ms));
