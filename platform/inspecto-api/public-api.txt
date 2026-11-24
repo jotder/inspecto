@@ -2775,6 +2775,7 @@ com.gamma.spi.auth.RequestAttrs | public static final ConcurrentHashMap<HttpExch
 com.gamma.spi.auth.RequestAttrs | public static final String ATTR_APPROVED_CHANGE
 com.gamma.spi.auth.RequestAttrs | public static final String ATTR_AUDIT_ATTRS
 com.gamma.spi.auth.RequestAttrs | public static final String ATTR_CAPABILITY
+com.gamma.spi.auth.RequestAttrs | public static final String ATTR_CHANGE_REASON
 com.gamma.spi.auth.RequestAttrs | public static final String ATTR_CLIENT_IP
 com.gamma.spi.auth.RequestAttrs | public static final String ATTR_CORRELATION_ID
 com.gamma.spi.auth.RequestAttrs | public static final String ATTR_EMBED_GRANT

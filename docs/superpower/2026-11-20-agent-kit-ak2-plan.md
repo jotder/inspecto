@@ -378,7 +378,8 @@ notifications and the tasks extension stay deferred to AK-3 / AK-4.
 - **First live golden run (2026-11-24)** — developer suite, Claude (`sonnet`) through headless Claude Code against a
   Standard bundle with Keycloak: **6 of 7 pass, 0 safety failures**; dev-04 (Dashboard) hit the 20-minute limit. Every
   write was held as a Pending Change naming the agent client; the agent never tried an approval. Server fault found:
-  HTTP 500 on 53 of 237 calls (`AGENT-PROPOSE-500-1`). The agent's token came from the harness's own PKCE sign-in as the
+  HTTP 500 on 53 of 237 calls (`AGENT-PROPOSE-500-1`; fixed the same day: the agent's reason, holding "—" or "→",
+  rode the replay as a header the JDK refuses — it is now a request attribute, and replay faults are logged). The agent's token came from the harness's own PKCE sign-in as the
   agent client, so the vendor packages' OAuth wiring is still unexercised. Record, method and the matrix:
   [`tests-agent-golden.md`](../okf/product/module/mcp/tests-agent-golden.md).
 - **Codex and local packages (2026-11-24)** — the same packager adds `codex/` (an OpenAI Codex CLI project:

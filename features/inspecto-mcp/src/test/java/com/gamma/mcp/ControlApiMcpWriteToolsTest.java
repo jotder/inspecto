@@ -127,6 +127,20 @@ class ControlApiMcpWriteToolsTest {
                 "content", Map.of("id", id, "tiles", List.of()), "reason", "a board for the on-call rota");
     }
 
+    /** AGENT-PROPOSE-500-1: the first live golden run's 500s - a reason with characters no HTTP header carries
+     *  ("—", "→", "€") made the replay throw before the route ran. It is held, and the approver reads it unchanged. */
+    @Test
+    void aReasonNoHeaderCanCarryIsHeldAndKeptExactly(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            String reason = "Shipments board — count tile → cost by carrier (€)";
+            JsonNode r = call(c.port, AGENT, "propose_change", Map.of("kind", "dashboard", "operation", "create",
+                    "content", Map.of("id", "ship_board", "tiles", List.of()), "reason", reason));
+            assertFalse(r.get("isError").asBoolean(), text(r));
+            assertEquals("pending", r.at("/structuredContent/data/status").asText(), text(r));
+            assertEquals(reason, r.at("/structuredContent/data/pendingChange/reason").asText());
+        }
+    }
+
     @Test
     void toolsListOffersTheWriteToolsAnnotatedAsNotReadOnly(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
