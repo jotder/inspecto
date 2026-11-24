@@ -135,6 +135,18 @@ class PointLookupParityTest {
     }
 
     @Test
+    void theReferenceStampChangesWithItsFilesAndIsNullWhenNoneAreDeclared() throws Exception {
+        Path csv = dir.resolve("stamp.csv");
+        Files.writeString(csv, DIAL);
+        String before = PointLookup.referenceStamp("r", resolver(csv));
+        assertNotNull(before);
+        assertEquals(before, PointLookup.referenceStamp("r", resolver(csv)), "unchanged files, same stamp");
+        Files.writeString(csv, DIAL + "33,FR,France,0,10\n");
+        assertNotEquals(before, PointLookup.referenceStamp("r", resolver(csv)), "a changed file changes the stamp");
+        assertNull(PointLookup.referenceStamp("r", (c, r) -> "x"), "no declared files: nothing to watch");
+    }
+
+    @Test
     void aBuildLeavesNoScratchBehind() throws Exception {
         Path csv = dir.resolve("s.csv");
         Files.writeString(csv, DIAL);

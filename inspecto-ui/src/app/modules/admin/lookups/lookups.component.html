@@ -65,7 +65,7 @@
                 <h2 id="lookup-test-title" class="text-lg font-semibold">Test a value</h2>
                 <p class="text-secondary text-sm">
                     Look one value up the way this Step looks up each row. The Reference is loaded into memory on the
-                    first test and kept; reload it to see changes made since.
+                    first test and kept, and loaded again when the Reference's files change.
                 </p>
                 <form class="flex flex-wrap items-start gap-2" [formGroup]="testForm" (ngSubmit)="test()">
                     <inspecto-pen-field
@@ -125,6 +125,12 @@
                     </table>
                     <p class="text-secondary text-xs">
                         Index of {{ a.index.rows }} Reference rows, loaded {{ fmtDateTime(a.index.loadedAt) }}.
+                        @if (a.index.reloaded === 'reference changed') {
+                            Loaded again for this test: the Reference changed.
+                        }
+                        @if (!a.index.watchesReference) {
+                            Changes to this Reference are not detected; use Reload Reference and test.
+                        }
                     </p>
                 }
             </section>

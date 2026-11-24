@@ -8,6 +8,7 @@ import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineLift;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.pipeline.exec.PointLookup;
+import com.gamma.pipeline.exec.RowShaper;
 import com.gamma.pipeline.exec.StepReceipt;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
@@ -49,7 +50,7 @@ final class LookupRoutes implements RouteModule {
     /** Built point indexes kept warm, at most this many (least recently used dropped first). */
     static final int MAX_WARM = 8;
 
-    private record Warm(Map<String, Object> config, PointLookup index) {}
+    private record Warm(Map<String, Object> config, PointLookup index, String stamp) {}
 
     private static final Map<String, Warm> WARM = new LinkedHashMap<>(16, 0.75f, true) {
         @Override protected boolean removeEldestEntry(Map.Entry<String, Warm> eldest) { return size() > MAX_WARM; }
@@ -62,8 +63,9 @@ final class LookupRoutes implements RouteModule {
      * {@code POST /lookups/test} {@code {pipeline, step, value, at?, refresh?}} — LOOKUP-1 P3 test-a-key: the keyed join's
      * answer for one value from the point engine ({@link PointLookup}), which the parity suite holds equal to the
      * batch join. The value travels in the body, never the URL, and is not logged. The index is built on first use and
-     * kept warm; it is rebuilt when the Step's config changed or {@code refresh: true} asks (a Reference that changed
-     * since {@code index.loadedAt} is not seen until then). 404 for an unknown keyed Step, 422 for a join the point
+     * kept warm; it is rebuilt when the Step's config changed, its Reference's files changed (the stamp of
+     * {@link PointLookup#referenceStamp}; the new index replaces the old in one write), or {@code refresh: true} asks; a
+     * Reference whose files the resolver does not declare is not watched ({@code index.watchesReference=false}). 404 for an unknown keyed Step, 422 for a join the point
      * engine refuses (a duplicate key or overlapping ranges, over the row cap); {@code at} is the row time for {@code match: asof}. An open read, like the dry run.
      */
     private static Object test(ApiContext api, Map<String, Object> body) throws Exception {
@@ -89,12 +91,23 @@ final class LookupRoutes implements RouteModule {
         Map<String, Object> config = new LinkedHashMap<>(node.config());
         Warm warm;
         synchronized (WARM) { warm = WARM.get(key); }
-        if (warm == null || !warm.config().equals(config) || Boolean.TRUE.equals(body.get("refresh"))) {
+        RowShaper.ReferenceResolver refs = PipelineGraphRoutes.dryRunReferences(api);
+        // stamped BEFORE the build: a Reference committed while it builds differs from this stamp next time
+        Object reference = node.cfg("reference");   // none: the build refuses it (422), so there is nothing to stamp
+        String stamp = reference == null || reference.toString().isBlank() ? null
+                : PointLookup.referenceStamp(reference.toString().trim(), refs);
+        String reason = warm == null ? "first use"
+                : Boolean.TRUE.equals(body.get("refresh")) ? "reload asked"
+                : !warm.config().equals(config) ? "step changed"
+                : stamp != null && !stamp.equals(warm.stamp()) ? "reference changed"
+                : null;
+        if (reason != null) {
             try {
-                warm = new Warm(config, PointLookup.load(node, PipelineGraphRoutes.dryRunReferences(api)));
+                warm = new Warm(config, PointLookup.load(node, refs), stamp);
             } catch (IllegalArgumentException refused) {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, refused.getMessage());
             }
+            // the old index answers until this put: the swap is one map write, never a half-built index
             synchronized (WARM) { WARM.put(key, warm); }
         }
         PointLookup.Answer a = warm.index().test(value == null ? null : value.toString(),
@@ -115,8 +128,13 @@ final class LookupRoutes implements RouteModule {
             mappings.add(r);
         }
         out.put("mappings", mappings);
-        out.put("index", Map.of("rows", warm.index().rows(), "loadedAt", warm.index().loadedAt().toString(),
-                "buildMs", warm.index().buildMillis()));
+        Map<String, Object> index = new LinkedHashMap<>();
+        index.put("rows", warm.index().rows());
+        index.put("loadedAt", warm.index().loadedAt().toString());
+        index.put("buildMs", warm.index().buildMillis());
+        index.put("reloaded", reason);                 // why this answer built the index, or null when it was kept
+        index.put("watchesReference", stamp != null);  // false: a Reference change is only seen on reload
+        out.put("index", index);
         return out;
     }
 

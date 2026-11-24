@@ -235,6 +235,18 @@ commit with atomic swap, a size-aware cap, readiness / warm-up. `PointLookupPari
 pick and refusal, date ranges; asof with an undated row, a NULL time, normalize, repeated key-and-date refused and
 picked), `ControlApiLookupsTest`, `lookups.component.spec.ts`. Not driven in the preview.
 
+**P3c — the kept index follows its Reference, built 2026-11-24 (operator: "Auto-refresh"):** `PointLookup.referenceStamp`
+stamps the files a Reference reads as its resolver declares them (`readDirs` / `readFiles`: the producing Pipeline's
+database dir for `reference/<name>`, the one file for a path) — file count, bytes, newest modification time, no row
+read. `POST /lookups/test` stamps before each answer and rebuilds when the stamp moved (stamped BEFORE the build, so a
+commit landing mid-build is seen next time); the new index replaces the old in one map write, so a reader never sees a
+half-built one. The answer's `index.reloaded` says why it built (`first use | reload asked | step changed | reference
+changed`, null when kept) and `index.watchesReference=false` when no files are declared — then only a reload sees a
+change. Decisions (assistant): a filesystem stamp, not a version id — it works for both reference kinds and needs no
+registry read; a walk per test is cheap at a Reference's file count. Known limits (verification): a file replaced by one of the same size AND the same modification time (a copy that keeps the source time) is not seen — engine commits write new files, so a Reference Dataset commit is; an append-only store grows the walk until compaction. Still open in P3: a size-aware cap, readiness /
+warm-up at start. `PointLookupParityTest.theReferenceStampChangesWithItsFilesAndIsNullWhenNoneAreDeclared`,
+`ControlApiLookupsTest`, `lookups.component.spec.ts`. Not driven in the preview.
+
 **P1h built 2026-11-23 (operator: "Yes, exact only"):** the `lookup()` scalar as the Record Transformer function
 `lookup.reference` (category Lookup; params `reference`, `key`, `returns`, `normalize`), exact match only. It renders
 the marker call `inspecto_lookup(...)`; `RowShaper.project` expands it into a scalar subquery over the resolved
