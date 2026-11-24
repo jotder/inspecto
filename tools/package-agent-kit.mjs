@@ -93,7 +93,8 @@ export function buildPackages(opts, skills) {
     const scopes = (opts.scopes ?? '').trim() || 'openid';
     // RFC 6749 §3.3 scope-token characters only (keeps quotes, backslashes and control characters out of every format)
     if (!scopes.split(/\s+/).every((t) => /^[\x21\x23-\x5B\x5D-\x7E]+$/.test(t))) throw new Error(`--scopes holds a character a scope may not: ${opts.scopes}`);
-    if (/[\x00-\x1F\x7F]/.test(opts.mcpUrl ?? '')) throw new Error('--mcp-url holds a control character');
+    // printable ASCII only: no control character, DEL or lone surrogate reaches a TOML or JSON string
+    if (!/^[\x21-\x7E]+$/.test(opts.mcpUrl ?? '')) throw new Error('--mcp-url holds a control character, a space or a non-ASCII character');
     const port = Number(opts.callbackPort ?? 8765);
     if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error(`--callback-port must be 1024-65535: ${opts.callbackPort}`);
     requireHttps('mcp-url', mcpUrl, { localOk: true });
