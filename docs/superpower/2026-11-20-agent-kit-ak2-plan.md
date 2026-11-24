@@ -357,10 +357,24 @@ notifications and the tasks extension stay deferred to AK-3 / AK-4.
 - **Handbook how-to** `howto_agent_propose_changes` (chapter *Run the platform*, external, Standard): register the
   agent client, list it, give the agent the Kit, approve its proposals.
 - **Security review** of phase 1 as a whole — see the hub's [spec-mcp.md](../okf/product/module/mcp/spec-mcp.md#security-review-phase-1-close-2026-11-24).
+- **Vendor packages, Claude Code and Gemini CLI (2026-11-24)** — `tools/package-agent-kit.mjs` builds both **per
+  install** from `agent-kit/skills` unchanged: a Claude Code plugin marketplace (`.claude-plugin/marketplace.json`,
+  plugin `inspecto` with `.claude-plugin/plugin.json`, `.mcp.json` `type: http` + `oauth {clientId, callbackPort,
+  scopes}`) and a Gemini CLI extension (`gemini-extension.json` with `httpUrl` + `oauth {enabled, clientId,
+  authorizationUrl, tokenUrl, scopes, redirectUri}`, `contextFileName: GEMINI.md`, `skills/`). Formats checked against
+  each vendor's documentation on 2026-11-24. **Why per install:** Gemini substitutes only `${extensionPath}`,
+  `${workspacePath}` and `${/}` in its manifest, so `httpUrl` cannot come from a variable, and env expansion in a
+  Claude plugin's `.mcp.json` `url` is not documented; Inspecto's IdP needs a pre-registered agent client and a fixed
+  localhost redirect, so both are baked in, and Gemini's authorization and token endpoints come from the OIDC
+  discovery document. No secret is written. Proof: `tools/package-agent-kit.test.mjs` (in the guard step) and
+  `claude plugin validate` passing on the generated plugin and marketplace. **Not proven:** a sign-in and tool call
+  through either package against a live install (Gemini CLI is not installed on the build host; that the Claude plugin
+  honours its server's `oauth` block is documented for `.mcp.json` generally, not for plugins); PKCE is not stated by
+  either vendor's pages. Caveat: Gemini CLI's site carries a notice that Antigravity CLI replaced it on 2026-06-18 for
+  unpaid and Google One users — confirm the target before a customer release.
 - **Still open for phase 1:** the first live golden run on Standard with Keycloak (which is also AK-2b's end-to-end
-  proof) and its compatibility-matrix row (model, client, versions, pass rate, safety failures, date); the per-vendor
-  packages (parent plan §7.5 — file names to be verified against each vendor's documentation) and shipping `agent-kit/`
-  inside the bundle.
+  proof) and its compatibility-matrix row (model, client, versions, pass rate, safety failures, date) — run it through
+  these packages; the OpenAI (Codex) and local packages; shipping `agent-kit/` inside the bundle.
 
 ## 7. Risks
 

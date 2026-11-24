@@ -42,8 +42,18 @@ person** approves it. The agent never approves, never reveals a masked value, an
 
    The server refuses to start if the client is also the console's client or a machine client.
 3. **In the agent**, add the MCP server `https://inspecto.example.com/api/v1/spaces/<space>/mcp` and the Agent Kit
-   skills. On the first call the agent is told where to sign in; the person signs in at the identity provider as
-   themselves.
+   skills. For **Claude Code** and **Gemini CLI**, Inspecto's team builds a package for your install that carries both
+   (the server address, the agent client and the skills); also register its redirect addresses on the agent client —
+   `http://localhost:8765/callback` (Claude Code) and `http://localhost:8765/oauth/callback` (Gemini CLI):
+
+   ```text
+   claude plugin marketplace add <package>/claude
+   claude plugin install inspecto@inspecto-agent-kit
+   gemini extensions install <package>/gemini/inspecto
+   ```
+
+   Then sign in: `/mcp` in Claude Code, `/mcp auth inspecto` in Gemini CLI. The person signs in at the identity
+   provider as themselves.
 4. **Ask the agent for an outcome**, for example "add a check that amount is never negative on orders, and tell me how
    many rows break it today". It validates, dry-runs where it builds a Pipeline, and proposes. It reports a Pending
    Change id (`pc-…`).

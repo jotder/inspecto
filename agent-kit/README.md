@@ -12,13 +12,32 @@ on your install).
 | `skills/` | Agent Skills in the open `SKILL.md` format, one folder per job. Phase 1 covers the **developer** role. |
 | `golden/` | The golden task suite: tasks, their data, and the ground truth a grader checks against. |
 
+Per-vendor packages are generated, not kept here (below).
+
 ### Agent Skills — developer role (phase 1)
 
 `build-an-app` (start here for an outcome) · `author-pipeline` · `add-expectations` · `author-alert-rules` ·
 `build-dashboard` · `safe-config-change` (every change goes through it) · `explain-inspecto` (read-only).
 
-Point your agent at the `skills/` folder: Claude Code reads `SKILL.md` folders from a plugin or a project's skills
-directory; Gemini CLI and Codex read the same format. Per-vendor packages are not shipped yet.
+## Packages for Claude Code and Gemini CLI
+
+A package is built **for one install**: it names that install's MCP endpoint and agent client (a Gemini CLI extension
+cannot take its server address from a variable). From a source checkout:
+
+```text
+node tools/package-agent-kit.mjs --mcp-url https://inspecto.example.com/api/v1/spaces/<space>/mcp \
+     --client-id claude-code --gemini-client-id gemini-cli \
+     --discovery-url https://id.example.com/realms/inspecto/.well-known/openid-configuration --out target/agent-kit
+```
+
+| Vendor | What you get | Install |
+|---|---|---|
+| Claude Code | `claude/` — a plugin marketplace with the plugin `inspecto`: the skills and an HTTP MCP server with OAuth | `claude plugin marketplace add <out>/claude`, then `claude plugin install inspecto@inspecto-agent-kit`; sign in with `/mcp` |
+| Gemini CLI | `gemini/inspecto/` — an extension: the skills, `GEMINI.md`, an `httpUrl` MCP server with OAuth | `gemini extensions install <out>/gemini/inspecto`; sign in with `/mcp auth inspecto` |
+
+Register these redirect addresses on the agent clients at the identity provider (default port 8765,
+`--callback-port` to change it): `http://localhost:8765/callback` for Claude Code, `http://localhost:8765/oauth/callback`
+for Gemini CLI. The skills also work loose: any client that reads `SKILL.md` folders can use `skills/` directly.
 
 ## Rules every skill follows
 

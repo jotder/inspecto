@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-127 test file(s). Run one, or all:
+128 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -100,6 +100,7 @@ node --test tools/
 | `tools/la_gen_io.test.mjs` | Unit test of tools/la_gen_io.py, the safe output helper of the gen-la-*-data.py generators (LA-GENERATOR-DELETE-FIRST-1). |
 | `tools/maven-repo.test.mjs` | Run: node --test tools/maven-repo.test.mjs |
 | `tools/offering-classpath.test.mjs` | Fixture test for tools/offering-classpath.mjs. Run: node --test tools/offering-classpath.test.mjs |
+| `tools/package-agent-kit.test.mjs` | Tests for tools/package-agent-kit.mjs — the per-vendor packages built from the Kit, no network, no disk. |
 | `tools/package-la-showcase.test.mjs` | Unit tests for tools/package-la-showcase.mjs (LA-SHOWCASE-DIST-1): the Space / data split and the space.toon it writes. |
 | `tools/pick-addons.test.mjs` | tools/pick-addons.mjs - the Add-on picker (PRODUCT-ASSEMBLY-1 PA-6c). |
 | `tools/precommit.test.mjs` | Fixture test for tools/precommit.mjs. Run: node --test tools/precommit.test.mjs |
