@@ -93,7 +93,9 @@ final class LookupRoutes implements RouteModule {
         synchronized (WARM) { warm = WARM.get(key); }
         RowShaper.ReferenceResolver refs = PipelineGraphRoutes.dryRunReferences(api);
         // stamped BEFORE the build: a Reference committed while it builds differs from this stamp next time
-        String stamp = PointLookup.referenceStamp(String.valueOf(node.cfg("reference")).trim(), refs);
+        Object reference = node.cfg("reference");   // none: the build refuses it (422), so there is nothing to stamp
+        String stamp = reference == null || reference.toString().isBlank() ? null
+                : PointLookup.referenceStamp(reference.toString().trim(), refs);
         String reason = warm == null ? "first use"
                 : Boolean.TRUE.equals(body.get("refresh")) ? "reload asked"
                 : !warm.config().equals(config) ? "step changed"
