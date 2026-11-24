@@ -28,7 +28,8 @@ node package-agent-kit.mjs --mcp-url https://inspecto.example.com/api/v1/spaces/
      --discovery-url https://id.example.com/realms/inspecto/.well-known/openid-configuration
 ```
 
-The packages are written to `agent-kit/packages/` (`--out` to choose another empty folder; from a source checkout the
+The packages are written to `agent-kit/packages/` (`--out` to choose another folder; existing packages there are never
+overwritten; from a source checkout the
 script is `tools/package-agent-kit.mjs` and writes to `target/agent-kit/`).
 
 | Vendor | What you get | Install |

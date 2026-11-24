@@ -6,6 +6,9 @@
 //        --client-id claude-code --discovery-url https://id.example.com/realms/inspecto/.well-known/openid-configuration \
 //        [--gemini-client-id gemini-cli] [--scopes "openid"] [--callback-port 8765] [--version 4.0.0] [--out target/agent-kit]
 //
+// In an installed bundle the same file is agent-kit/package-agent-kit.mjs (package.ps1 step 7): run it as
+// `node agent-kit/package-agent-kit.mjs …`; it reads skills/ and VERSION beside itself and writes agent-kit/packages/.
+//
 // Writes, from agent-kit/skills unchanged:
 //   <out>/claude/                 a Claude Code plugin marketplace (.claude-plugin/marketplace.json) holding the plugin
 //     plugins/inspecto/           .claude-plugin/plugin.json, .mcp.json (type http + oauth), skills/<name>/SKILL.md

@@ -44,10 +44,10 @@ person** approves it. The agent never approves, never reveals a masked value, an
 3. **In the agent**, add the MCP server `https://inspecto.example.com/api/v1/spaces/<space>/mcp` and the Agent Kit
    skills. The bundle's `agent-kit/` folder holds the skills and a packager that builds, for your install, a **Claude
    Code** plugin and a **Gemini CLI** extension carrying both (the server address, the agent client and the skills) —
-   with Node.js, in `agent-kit/`:
+   with Node.js, from the bundle folder:
 
    ```text
-   node package-agent-kit.mjs --mcp-url https://inspecto.example.com/api/v1/spaces/<space>/mcp --client-id claude-code --discovery-url <the server's AUTH_OIDC_DISCOVERY_URL>
+   node agent-kit/package-agent-kit.mjs --mcp-url https://inspecto.example.com/api/v1/spaces/<space>/mcp --client-id claude-code --discovery-url <the server's AUTH_OIDC_DISCOVERY_URL>
    ```
 
    Register its redirect addresses on the agent client — `http://localhost:8765/callback` (Claude Code) and
