@@ -374,7 +374,7 @@ git commit -m "feat(engine): align DuckDbRecordSink with typed columns and expos
 
 ---
 
-### Task 6: Interactive Pipeline Step UI & Parse-to-Dataset Flow (`inspecto-ui`)
+### Task 6: Interactive Pipeline Step UI & Parse-to-Dataset Workflow (`inspecto-ui`)
 
 **Files:**
 - Modify: `inspecto-ui/src/app/inspecto/api/parsers.service.ts`

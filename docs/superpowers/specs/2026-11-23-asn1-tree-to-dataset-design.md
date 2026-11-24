@@ -6,7 +6,7 @@
 
 ---
 
-## 1. Goal & User Flow
+## 1. Goal & User Workflow
 
 Enable an Inspecto user to go from raw ASN.1 telecom records (for example, TAP 3.12 `TransferBatch` with `batchControlInfo` header + `mobileOriginatedCall`/`mobileTerminatedCall`/`gprsCall` events, MSC `mocCall`, or GGSN `listOfServiceData`) to populated, queryable Inspecto datasets/tables in four connected stages:
 
@@ -19,7 +19,7 @@ Enable an Inspecto user to go from raw ASN.1 telecom records (for example, TAP 3
 
 ## 2. Architecture Overview
 
-We use a **Hybrid Two-Stage Flattening** architecture paired with a **Unified Parse-to-Dataset UI Flow**:
+We use a **Hybrid Two-Stage Flattening** architecture paired with a **Unified Parse-to-Dataset UI Workflow**:
 
 - **Stage A (Pre-SQL, Java in `inspecto-telecom-asn1` / `DecodeProfile`):** High-throughput streaming decode (`ByteSource.map` -> `BerReader` -> `SchemaBinder`), **event-root routing**, and **intra-record** tree shaping (`map`, `reduce` + `group_by`, `fold`, intra-record `join`) over `NamedNode` trees.
 - **Stage B (Post-ingest, DuckDB SQL in `inspecto-etl` / `DataTransformer`):** Typed sink materialization (`DuckDbRecordSink`), safe `TRY_CAST` projection (`DataTransformer.materialize`), and partitioned Parquet/CSV output (`PartitionWriter`). (External cross-table `transform.join` is intentionally excluded from this parse-to-dataset flow to keep it focused; it remains available as a downstream ETL step.)
@@ -87,7 +87,7 @@ Real-world operator ASN.1 data often arrives without a matching grammar, or with
   - `DatasetRegistrationService.ensure` registers one `dataset` component per routed event root in `ComponentStore` (`<writeRoot>/registry`) with the confirmed **Table Metadata** schema, `PartitionDef`, and pipeline reference.
   - `POST /datasets/{id}/materialize` (`JobService.triggerMaterializeRun`) runs `StreamingPluginIngestStrategy` -> `DuckDbRecordSink` -> `DataTransformer.materialize` (`transformed_<KEY>`) -> `PartitionWriter.write` (Parquet/CSV), and `GET /datasets/{id}/rows` serves populated rows.
 
-### 3.5 Interactive UI Flow & Pipeline Step UI Alignment (`inspecto-ui`, `providers/inspecto-telecom-asn1`)
+### 3.5 Interactive UI Workflow & Pipeline Step UI Alignment (`inspecto-ui`, `providers/inspecto-telecom-asn1`)
 
 Align `parser.asn1` with built-in parsers (`delimited`, `fixedwidth`, `json`, `text_regex`, `xlsx`) inside `PipelineParseDefinitionComponent` (and `AddDataComponent` where applicable):
 
