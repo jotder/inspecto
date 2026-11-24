@@ -491,6 +491,14 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
     length, how many rows carried it, and its fingerprint — the Space-salted one rejected rows carry, so the same value
     has the same fingerprint in both. The value itself is never stored. Kept for the last run only; a dry run does not
     replace it; a canvas-store Pipeline keeps none.
+  - **Test a value (since 2026-11-24, `LOOKUP-1` P3)** — under the selected row, type a value and **Test**: the answer
+    says Found (the key that matched, whole value or prefix) or Not found, the value as compared after `normalize:`,
+    and every column the Step would add for it, not-found defaults applied. Answered by the point engine, an in-memory
+    index of the Reference that the parity suite holds equal to the batch join. The Reference is loaded on the first
+    test and kept (up to 8 lookups); **Reload Reference and test** reloads it, which you need after the Reference
+    changed. `exact` and `longest_prefix` only (`range` and `asof` are refused by name); a Reference over
+    `-Dlookup.point.max_rows` rows (default 1,000,000) is refused rather than loaded. Served by `POST /lookups/test`;
+    the value travels in the request body and is not logged.
 - **`normalize:` (since 2026-11-23, `LOOKUP-1` P1e)** — for `exact` and `longest_prefix`, an ordered list of `trim`,
   `lower`, `upper`, `strip_leading_zeros`, `strip_plus`, applied to the Reference key and to every looked-up value
   alike. Two Reference rows that collapse to one key are refused by the `duplicates` rule; `range` refuses it. The

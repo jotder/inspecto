@@ -883,7 +883,7 @@ final class PipelineGraphRoutes implements RouteModule {
      * both {@code POST …/dry-run} and {@code POST …/run?to=}; {@code POST /enrichment/preview} applies the same
      * jail through {@link WriteGates#jailToAllowedRoots}.
      */
-    private static RowShaper.ReferenceResolver dryRunReferences(ApiContext api) {
+    static RowShaper.ReferenceResolver dryRunReferences(ApiContext api) {
         return new RowShaper.ReferenceResolver() {
           /**
            * What the sealed dry-run connection may read for {@code reference} (SEC-DRYRUN-EXPR-UNSEALED-1):

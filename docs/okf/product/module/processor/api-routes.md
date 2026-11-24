@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-393 route(s) registered; 393 in the OpenAPI contract, 0 not.
+394 route(s) registered; 394 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -230,6 +230,7 @@ tags: [api, routes, generated]
 | GET | `/kpis/{kpiId}/value` | Evaluate a KPI definition for the period to date | kpis | — | `inspecto/src/main/java/com/gamma/control/KpiRoutes.java` |
 | GET | `/lineage` | Lineage around one output table | lineage | — | `inspecto/src/main/java/com/gamma/control/LineageRoutes.java` |
 | GET | `/lookups` | Every keyed Reference lookup with its last run | Execution & Scheduling | — | `inspecto/src/main/java/com/gamma/control/LookupRoutes.java` |
+| POST | `/lookups/test` | Test one value against a keyed lookup | Execution & Scheduling | — | `inspecto/src/main/java/com/gamma/control/LookupRoutes.java` |
 | GET | `/metrics/acquisition` | Acquisition metrics snapshot | metrics | — | `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java` |
 | GET | `/modules` | List modules and their state | modules | — | `inspecto/src/main/java/com/gamma/control/ModulesRoutes.java` |
 | GET | `/nav/menus` | The Space's Menu tree | nav | — | `inspecto/src/main/java/com/gamma/control/NavRoutes.java` |

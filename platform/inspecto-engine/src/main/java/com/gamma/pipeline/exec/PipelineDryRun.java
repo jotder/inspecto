@@ -224,7 +224,7 @@ public final class PipelineDryRun {
      * {@link com.gamma.config.safety.PathJail#readAllowlistRefusal} and the run refuses, fail closed, if one is
      * refused; everything else (host files, {@code config.secrets}, URLs) DuckDB itself then refuses.
      */
-    private static void seal(Connection conn, PipelineGraph g, RowShaper.ReferenceResolver references,
+    static void seal(Connection conn, PipelineGraph g, RowShaper.ReferenceResolver references,
                              java.nio.file.Path scratch) throws Exception {
         LinkedHashSet<java.nio.file.Path> allowed = new LinkedHashSet<>();
         LinkedHashSet<java.nio.file.Path> allowedHomes = new LinkedHashSet<>();

@@ -61,6 +61,62 @@
                     noRowsHint="The last run had no values without a Reference row, or it has not run yet."
                 />
             </section>
+            <section class="flex flex-col gap-2" aria-labelledby="lookup-test-title">
+                <h2 id="lookup-test-title" class="text-lg font-semibold">Test a value</h2>
+                <p class="text-secondary text-sm">
+                    Look one value up the way this Step looks up each row. The Reference is loaded into memory on the
+                    first test and kept; reload it to see changes made since.
+                </p>
+                <form class="flex flex-wrap items-start gap-2" [formGroup]="testForm" (ngSubmit)="test()">
+                    <inspecto-pen-field
+                        class="min-w-64 flex-auto"
+                        label="Value"
+                        [required]="true"
+                        [open]="true"
+                        [mono]="true"
+                        formControlName="value"
+                        [error]="testValue.touched && testValue.hasError('required') ? 'Enter a value to look up.' : ''"
+                    ></inspecto-pen-field>
+                    <button mat-flat-button color="primary" type="submit" [disabled]="testing()">Test</button>
+                    <button mat-stroked-button type="button" [disabled]="testing()" (click)="test(true)">
+                        Reload Reference and test
+                    </button>
+                </form>
+                @if (testError(); as err) {
+                    <inspecto-alert variant="error">{{ err }}</inspecto-alert>
+                }
+                @if (answer(); as a) {
+                    <inspecto-alert [variant]="a.hit ? 'success' : 'warning'">
+                        @if (a.hit) {
+                            Found: key {{ a.matchedKey }} ({{ a.matchKind === 'exact' ? 'whole value' : 'prefix' }}).
+                        } @else {
+                            Not found: no Reference row matches.
+                        }
+                        Compared as “{{ a.compared }}”.
+                    </inspecto-alert>
+                    <table class="text-sm" aria-label="Columns this value would get">
+                        <thead>
+                            <tr>
+                                <th scope="col" class="pr-6 text-left">Looked up by</th>
+                                <th scope="col" class="pr-6 text-left">Column</th>
+                                <th scope="col" class="text-left">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @for (r of answerRows(a); track r.on + r.column) {
+                                <tr>
+                                    <td class="pr-6">{{ r.on }}</td>
+                                    <td class="pr-6">{{ r.column }}</td>
+                                    <td>{{ r.value }}</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                    <p class="text-secondary text-xs">
+                        Index of {{ a.index.rows }} Reference rows, loaded {{ fmtDateTime(a.index.loadedAt) }}.
+                    </p>
+                }
+            </section>
         }
     </div>
 </div>

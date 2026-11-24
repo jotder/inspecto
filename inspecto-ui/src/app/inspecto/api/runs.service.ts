@@ -177,6 +177,21 @@ export interface LookupMiss {
     n: number;
 }
 
+/** `POST /lookups/test` (LOOKUP-1 P3): one value's answer from the lookup's in-memory index. */
+export interface LookupTestAnswer {
+    pipeline: string;
+    step: string;
+    match: string;
+    /** The value as compared, after the lookup's `normalize:`. */
+    compared: string | null;
+    hit: boolean;
+    matchedKey: string | null;
+    matchKind: 'exact' | 'prefix' | 'none';
+    /** What each looked-up column would add: output column → text, not-found defaults applied. */
+    mappings: { on: string; columns: Record<string, string | null> }[];
+    index: { rows: number; loadedAt: string; buildMs: number };
+}
+
 export interface LookupsPage {
     lookups: LookupRow[];
     total: number;
@@ -316,6 +331,10 @@ export class RunsService {
     /** Every keyed Reference lookup in the Space's Pipelines, each with its last run's counts (LOOKUP-1). */
     lookups(): Observable<LookupsPage> {
         return this.http.get<LookupsPage>(apiUrl('/lookups'));
+    }
+    /** Look one value up through a lookup's in-memory index; `refresh` reloads the Reference first (LOOKUP-1 P3). */
+    testLookup(pipeline: string, step: string, value: string, refresh = false): Observable<LookupTestAnswer> {
+        return this.http.post<LookupTestAnswer>(apiUrl('/lookups/test'), { pipeline, step, value, refresh });
     }
     quarantine(name: string): Observable<AuditRow[]> {
         return this.http.get<AuditRow[]>(apiUrl(`/runs/${encodeURIComponent(name)}/quarantine`));

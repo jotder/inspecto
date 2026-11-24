@@ -14585,6 +14585,26 @@
         }
       }
     },
+    "/lookups/test" : {
+      "post" : {
+        "tags" : [ "Execution & Scheduling" ],
+        "summary" : "Test one value against a keyed lookup",
+        "description" : "LOOKUP-1 P3 test-a-key. Body {pipeline, step, value, refresh?}: the keyed transform.join Step's answer for one value from the point engine (an in-memory index of the Reference, held equal to the batch join by a parity suite): compared (the value after normalize:), hit, matchedKey, matchKind (exact|prefix|none), mappings[] {on, columns} (each output column as text, not-found defaults applied) and index {rows, loadedAt, buildMs}. match: exact and longest_prefix only. The index is built on first use and kept warm (at most 8); it is rebuilt when the Step config changed or refresh is true. The value rides the body, never the URL, and is not logged. 400 without pipeline and step; 404 for an unknown keyed Step; 422 for a join the point engine refuses (range or asof, a duplicate key, a Reference over -Dlookup.point.max_rows, default 1000000). No capability gate: read-shaped, persists nothing.",
+        "operationId" : "testLookup",
+        "responses" : {
+          "200" : {
+            "description" : "The value's answer.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/Envelope"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/mcp" : {
       "post" : {
         "tags" : [ "mcp" ],

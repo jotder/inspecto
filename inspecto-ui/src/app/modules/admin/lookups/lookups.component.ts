@@ -1,12 +1,14 @@
 import { ChangeDetectionStrategy, Component, inject, OnInit, signal } from '@angular/core';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
-import { apiErrorMessage, LookupMiss, RunsService } from 'app/inspecto/api';
+import { apiErrorMessage, LookupMiss, LookupTestAnswer, RunsService } from 'app/inspecto/api';
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime } from 'app/inspecto/grid';
@@ -30,6 +32,8 @@ const count = (v: number | null | undefined): string => (v == null ? '—' : for
         MatButtonModule,
         MatIconModule,
         MatTooltipModule,
+        PenFieldComponent,
+        ReactiveFormsModule,
     ],
     templateUrl: './lookups.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -57,6 +61,45 @@ export class LookupsComponent implements OnInit {
 
     select(row: LookupGridRow | null): void {
         this.selected.set(row);
+        this.answer.set(null);
+        this.testError.set(null);
+    }
+
+    /** Test a value (LOOKUP-1 P3): the value to look up in the selected lookup's in-memory index. */
+    readonly testValue = new FormControl('', { nonNullable: true, validators: Validators.required });
+    readonly testForm = new FormGroup({ value: this.testValue });
+    readonly testing = signal(false);
+    readonly fmtDateTime = fmtDateTime;
+    readonly answer = signal<LookupTestAnswer | null>(null);
+    readonly testError = signal<string | null>(null);
+
+    /** The answer's added columns, one row per output column. */
+    answerRows(a: LookupTestAnswer): { on: string; column: string; value: string }[] {
+        return a.mappings.flatMap((m) =>
+            Object.entries(m.columns).map(([column, value]) => ({ on: m.on, column, value: value ?? '—' })),
+        );
+    }
+
+    test(refresh = false): void {
+        const s = this.selected();
+        if (!s) return;
+        if (this.testForm.invalid) {
+            this.testForm.markAllAsTouched();
+            return;
+        }
+        this.testing.set(true);
+        this.testError.set(null);
+        this.api.testLookup(s.pipeline, s.step, this.testValue.value, refresh).subscribe({
+            next: (a) => {
+                this.answer.set(a);
+                this.testing.set(false);
+            },
+            error: (err) => {
+                this.answer.set(null);
+                this.testing.set(false);
+                this.testError.set(apiErrorMessage(err, 'Could not test the value'));
+            },
+        });
     }
 
     readonly columnDefs: ColDef<LookupGridRow>[] = [

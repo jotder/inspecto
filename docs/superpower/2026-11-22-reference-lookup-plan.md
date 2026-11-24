@@ -200,6 +200,24 @@ Refresh stays with P3's shared cache (D-LK8: batch keeps no cache to refresh). `
 `PipelineJobRunnerLookupMissesTest`, `PipelineJobRunnerTest.aKeyedJoinRunStoresItsUnmatchedSampleFingerprinted`,
 `ControlApiLookupsTest`, `lookups.component.spec.ts`. Not driven in the preview.
 
+**P3a — point engine and test-a-key built 2026-11-24 (operator: "P3", caller "Test-a-key API"):** P3 had no
+row-at-a-time caller (D-LK8; the ingest lane refuses lookups), so its first caller is the test box. `PointLookup`
+(`com.gamma.pipeline.exec`) builds from the keyed join's node config, reusing `RowShaper`'s own parsing
+(`joinMappings`, `joinNormalizers`, `normalized`, widened to package scope) and the batch join's Reference SQL verbatim
+(key normalized in SQL, `filter`, `duplicates` + `order_by`, `exact_when`), read once over a connection sealed by
+`PipelineDryRun.seal`; values are probed in Java (hash map; for `longest_prefix` the key lengths present, longest
+first, code points as DuckDB's `length`). Every returned value is held as text. `POST /lookups/test`
+`{pipeline, step, value, refresh?}` (read-shaped exemption, value in the body) answers through it; `LookupRoutes`
+keeps at most 8 indexes warm (LRU), rebuilt when the Step config changes or `refresh: true`. Decisions (assistant):
+`exact` and `longest_prefix` first — `range` and `asof` refused by name; a memory cap by rows
+(`-Dlookup.point.max_rows`, default 1,000,000) that refuses the build, no spill; no invalidation on Reference commit
+— the answer carries `index.loadedAt` and the screen offers *Reload Reference and test*. Parity: `PointLookupParityTest`
+(longest prefix + `exact_when` + default + details, exact, normalized exact and prefix with `filter`, duplicate pick)
+asserts every added column equal to the batch join's for each value. Still open in P3: `range` / `asof` indexes, the
+invalidation on Reference commit and atomic swap, a size-aware cap, readiness / warm-up at start, stats beyond the
+answer's `index`. `PointLookupParityTest`, `ControlApiLookupsTest`, `lookups.component.spec.ts`. Not driven in the
+preview.
+
 **P1h built 2026-11-23 (operator: "Yes, exact only"):** the `lookup()` scalar as the Record Transformer function
 `lookup.reference` (category Lookup; params `reference`, `key`, `returns`, `normalize`), exact match only. It renders
 the marker call `inspecto_lookup(...)`; `RowShaper.project` expands it into a scalar subquery over the resolved

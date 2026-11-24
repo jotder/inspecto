@@ -1103,7 +1103,7 @@ public final class RowShaper {
     }
 
     /** The inbound relation's column names, in declaration order — a zero-row read, no scan. */
-    private static List<String> columnsOf(Connection conn, String table) throws SQLException {
+    static List<String> columnsOf(Connection conn, String table) throws SQLException {
         List<String> out = new java.util.ArrayList<>();
         try (Statement st = conn.createStatement();
              java.sql.ResultSet rs = st.executeQuery("SELECT * FROM " + q(table) + " LIMIT 0")) {
@@ -1202,7 +1202,7 @@ public final class RowShaper {
      * The input columns looked up: {@code on} (a scalar or a list), or — with {@code lookups:} (LOOKUP-1 P1d) — each
      * mapping's {@code on}, in order, without repeats. Setting both is refused: the two would disagree.
      */
-    private static List<String> joinOn(PipelineNode node) {
+    static List<String> joinOn(PipelineNode node) {
         List<String> on = new ArrayList<>();
         Object lookups = node.cfg("lookups");
         if (lookups != null) {
@@ -1238,7 +1238,7 @@ public final class RowShaper {
      * returns under their output names, the not-found values keyed by output name, and the optional match-detail
      * column names ({@code null} = not added).
      */
-    private record JoinMapping(String on, LinkedHashMap<String, String> columns, Map<String, String> defaults,
+    record JoinMapping(String on, LinkedHashMap<String, String> columns, Map<String, String> defaults,
                                String matchedKeyAs, String matchKindAs) {}
 
     /**
@@ -1290,7 +1290,7 @@ public final class RowShaper {
      * Checks every name against the Reference ({@code refCols}) and the rows ({@code inputCols}, skipped when empty),
      * and refuses an output name clashing with an input column or another output name.
      */
-    private static List<JoinMapping> joinMappings(PipelineNode node, List<String> on, List<String> refCols,
+    static List<JoinMapping> joinMappings(PipelineNode node, List<String> on, List<String> refCols,
                                                   List<String> inputCols) {
         String id = node.id();
         List<JoinMapping> mappings = new ArrayList<>();
@@ -1459,7 +1459,7 @@ public final class RowShaper {
     }
 
     /** {@code expr} (a text expression) with each normalizer applied in order; NULL stays NULL. */
-    private static String normalized(String expr, List<String> normalizers) {
+    static String normalized(String expr, List<String> normalizers) {
         String e = expr;
         for (String n : normalizers) {
             e = switch (n) {
@@ -2422,7 +2422,7 @@ public final class RowShaper {
         return v == null ? null : v.toString();
     }
 
-    private static String strOrNull(PipelineNode n, String key) {
+    static String strOrNull(PipelineNode n, String key) {
         String v = str(n, key);
         return (v == null || v.isBlank()) ? null : v;
     }

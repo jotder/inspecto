@@ -4,7 +4,7 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
-import { LookupRow, LookupsPage, RunsService } from 'app/inspecto/api';
+import { LookupRow, LookupsPage, LookupTestAnswer, RunsService } from 'app/inspecto/api';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { ToastrService } from 'ngx-toastr';
@@ -34,10 +34,23 @@ const ROW: LookupRow = {
     },
 };
 
-async function create(page: LookupsPage | Error) {
+const ANSWER: LookupTestAnswer = {
+    pipeline: 'cdr',
+    step: 'join',
+    match: 'longest_prefix',
+    compared: '249915555',
+    hit: true,
+    matchedKey: '24991',
+    matchKind: 'prefix',
+    mappings: [{ on: 'SERVED_MSISDN', columns: { SERVED_MSISDN_provider_desc: 'Operator A' } }],
+    index: { rows: 2, loadedAt: '2026-11-24T10:00:00Z', buildMs: 5 },
+};
+
+async function create(page: LookupsPage | Error, answer: LookupTestAnswer | Error = ANSWER) {
     const toastr = { error: vi.fn() };
     const api = {
         lookups: vi.fn(() => (page instanceof Error ? throwError(() => page) : of(page))),
+        testLookup: vi.fn(() => (answer instanceof Error ? throwError(() => answer) : of(answer))),
     } as unknown as RunsService;
     TestBed.configureTestingModule({
         imports: [LookupsComponent],
@@ -53,7 +66,7 @@ async function create(page: LookupsPage | Error) {
     await TestBed.compileComponents(); // data-table @defer block
     const fixture = TestBed.createComponent(LookupsComponent);
     fixture.detectChanges();
-    return { fixture, toastr };
+    return { fixture, toastr, api };
 }
 
 describe('toGridRow', () => {
@@ -116,6 +129,46 @@ describe('LookupsComponent', () => {
         expect(fixture.nativeElement.querySelector('#lookup-unmatched-title').textContent).toContain('cdr ▸ join');
         expect(fixture.componentInstance.selected()!.unmatched[0].shape).toBe('4479••••••••');
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('refuses an empty value inline and tests a value through the selected lookup', async () => {
+        const { fixture, api } = await create({ lookups: [ROW], total: 1, known: { lastRun: true } });
+        const c = fixture.componentInstance;
+        c.select(c.rows()[0]);
+        fixture.detectChanges();
+        await fixture.whenStable();
+        expect(fixture.nativeElement.textContent).not.toContain('Enter a value');
+        (fixture.nativeElement.querySelector('#lookup-test-title + p + form') as HTMLFormElement).dispatchEvent(
+            new Event('submit'),
+        );
+        fixture.detectChanges();
+        expect(api.testLookup).not.toHaveBeenCalled();
+        expect(fixture.nativeElement.querySelector('inspecto-pen-field').textContent).toContain('Enter a value');
+
+        c.testValue.setValue('249915555');
+        c.test(true);
+        fixture.detectChanges();
+        expect(api.testLookup).toHaveBeenCalledWith('cdr', 'join', '249915555', true);
+        const text = fixture.nativeElement.textContent as string;
+        expect(text).toContain('Found: key 24991 (prefix)');
+        expect(text).toContain('Operator A');
+        expect(text).toContain('Index of 2 Reference rows');
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('shows a refusal from the point engine inline', async () => {
+        const { fixture } = await create(
+            { lookups: [ROW], total: 1, known: { lastRun: true } },
+            new Error('testing a value covers match: exact and longest_prefix so far, not range'),
+        );
+        const c = fixture.componentInstance;
+        c.select(c.rows()[0]);
+        c.testValue.setValue('3');
+        c.test();
+        fixture.detectChanges();
+        expect(c.answer()).toBeNull();
+        expect(fixture.nativeElement.querySelector('inspecto-alert').textContent).toBeTruthy();
+        expect(c.testError()).toBeTruthy();
     });
 
     it('degrades to an empty list and a toast when the load fails', async () => {

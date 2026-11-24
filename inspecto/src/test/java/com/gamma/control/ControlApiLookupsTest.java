@@ -54,6 +54,8 @@ class ControlApiLookupsTest {
                   on: id
             """;
 
+    private static final String PRIOR_ROOTS = System.getProperty("assist.safety.roots");
+
     @BeforeEach
     void setUp() { Authenticators.forTest(FAKE); }
 
@@ -62,6 +64,10 @@ class ControlApiLookupsTest {
         Authenticators.forTest(null);
         ConsignmentOutputStores.use(null);
         System.clearProperty("consignment.steps");
+        // surefire sets the roots for every test: restore them, never clear
+        if (PRIOR_ROOTS != null) System.setProperty("assist.safety.roots", PRIOR_ROOTS);
+        else System.clearProperty("assist.safety.roots");
+        LookupRoutes.clearWarm();
     }
 
     private record Ctx(CollectorService svc, ControlApi api, DbConsignmentOutputStore store) implements AutoCloseable {
@@ -72,9 +78,11 @@ class ControlApiLookupsTest {
         }
     }
 
-    private Ctx open(Path dir) throws Exception {
+    private Ctx open(Path dir) throws Exception { return open(dir, STEPS); }
+
+    private Ctx open(Path dir, String steps) throws Exception {
         Path toon = TestConfigs.csv(dir, PipelineConfigBatchTest.miniSchema()).write();
-        Files.writeString(toon, Files.readString(toon).replace("active: true", "active: false") + STEPS);
+        Files.writeString(toon, Files.readString(toon).replace("active: true", "active: false") + steps);
         CollectorService svc = new CollectorService(List.of(toon), 3600, 1);
         DbConsignmentOutputStore store = DbConsignmentOutputStore.open("jdbc:duckdb:");
         ConsignmentOutputStores.use(store);
@@ -150,6 +158,85 @@ class ControlApiLookupsTest {
                     "the last run is c-new; c-old's sample is not shown beside it");
             c.store.recordLookupMisses(pipeline, "join", "c-new", List.of());   // a run where every value matched
             assertEquals(0, lookups(c).get("lookups").get(0).get("unmatched").size(), "a clean run clears the sample");
+        }
+    }
+
+    private HttpResponse<String> test(Ctx c, String body) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.api.port() + "/api/v1/lookups/test"))
+                .header("Authorization", "Bearer plain").header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(body)).build(), HttpResponse.BodyHandlers.ofString());
+    }
+
+    /** LOOKUP-1 P3 — test-a-key: the point engine's answer for one value, the index kept warm until refreshed. */
+    @Test
+    void aValueIsTestedThroughThePointEngineAndRefreshSeesANewReference(@TempDir Path dir) throws Exception {
+        System.setProperty("assist.safety.roots", dir.toString());
+        Path ref = dir.resolve("refdata").resolve("dial.csv");
+        Files.createDirectories(ref.getParent());
+        Files.writeString(ref, "dial_digit_key,provider_desc\n249,Sudan\n24991,Operator A\n");
+        String steps = """
+                output_store: enriched_calls
+                steps[1]:
+                  - join:
+                      reference: %s
+                      key: dial_digit_key
+                      match: longest_prefix
+                      on: SERVED_MSISDN
+                      columns: provider_desc
+                      default[1]: provider_desc=UNKNOWN
+                      details: true
+                """.formatted(ref.toString().replace('\\', '/'));
+        try (Ctx c = open(dir, steps)) {
+            String name = c.svc.loadedPipelines().get(0).identity().pipelineName();
+            HttpResponse<String> r = test(c, "{\"pipeline\":\"" + name + "\",\"step\":\"join\",\"value\":\"249915555\"}");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode a = V1Body.of(r.body());
+            assertTrue(a.get("hit").asBoolean(), a.toString());
+            assertEquals("24991", a.get("matchedKey").asText());
+            assertEquals("prefix", a.get("matchKind").asText());
+            JsonNode cols = a.get("mappings").get(0).get("columns");
+            assertEquals("Operator A", cols.get("SERVED_MSISDN_provider_desc").asText(), a.toString());
+            assertEquals(2, a.get("index").get("rows").asLong());
+
+            JsonNode miss = V1Body.of(test(c, "{\"pipeline\":\"" + name + "\",\"step\":\"join\",\"value\":\"999\"}").body());
+            assertFalse(miss.get("hit").asBoolean());
+            assertEquals("none", miss.get("matchKind").asText());
+            assertEquals("UNKNOWN", miss.get("mappings").get(0).get("columns").get("SERVED_MSISDN_provider_desc").asText());
+
+            // the Reference changes: the warm index still answers from what it loaded until refresh asks
+            Files.writeString(ref, "dial_digit_key,provider_desc\n249,Sudan\n24991,Operator A\n999,Nine\n");
+            assertFalse(V1Body.of(test(c, "{\"pipeline\":\"" + name + "\",\"step\":\"join\",\"value\":\"999\"}").body())
+                    .get("hit").asBoolean(), "warm until refreshed");
+            JsonNode fresh = V1Body.of(test(c, "{\"pipeline\":\"" + name + "\",\"step\":\"join\",\"value\":\"999\",\"refresh\":true}").body());
+            assertTrue(fresh.get("hit").asBoolean(), fresh.toString());
+            assertEquals(3, fresh.get("index").get("rows").asLong());
+
+            assertEquals(404, test(c, "{\"pipeline\":\"" + name + "\",\"step\":\"nope\",\"value\":\"1\"}").statusCode());
+            assertEquals(400, test(c, "{\"value\":\"1\"}").statusCode());
+        }
+    }
+
+    @Test
+    void aRangeLookupIsRefusedByThePointEngine(@TempDir Path dir) throws Exception {
+        System.setProperty("assist.safety.roots", dir.toString());
+        Path ref = dir.resolve("refdata").resolve("band.csv");
+        Files.createDirectories(ref.getParent());
+        Files.writeString(ref, "lo,hi,band\n1,9,small\n");
+        String steps = """
+                output_store: enriched_calls
+                steps[1]:
+                  - join:
+                      reference: %s
+                      from: lo
+                      to: hi
+                      match: range
+                      on: id
+                """.formatted(ref.toString().replace('\\', '/'));
+        try (Ctx c = open(dir, steps)) {
+            String name = c.svc.loadedPipelines().get(0).identity().pipelineName();
+            HttpResponse<String> r = test(c, "{\"pipeline\":\"" + name + "\",\"step\":\"join\",\"value\":\"3\"}");
+            assertEquals(422, r.statusCode(), r.body());
+            assertTrue(r.body().contains("range"), r.body());
         }
     }
 

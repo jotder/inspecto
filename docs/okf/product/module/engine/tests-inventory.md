@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-425 test class(es): 425 unit, 0 real-HTTP control-plane, 0 IT.
+426 test class(es): 426 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -387,6 +387,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `PipelineExecutorTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/PipelineExecutorTest.java` | T12 — {@link PipelineExecutor} end-to-end over embedded DuckDB: a {@code parse → filter → route → 2 sinks} |
 | `PipelineNodeExecutorTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/PipelineNodeExecutorTest.java` | The node-type plugin seam's EXECUTION half: a contributed type must actually run. |
 | `PipelineWatermarkStoreTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/PipelineWatermarkStoreTest.java` | WATERMARK-ATOMIC-1 (2026-09-17): the watermark was the ONE store still written in place, so a crash mid-write |
+| `PointLookupParityTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/PointLookupParityTest.java` | LOOKUP-1 P3 — the parity suite: the same golden cases through the batch keyed join ({@link RowShaper}) and the point |
 | `RowShaperChangeCohortTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/RowShaperChangeCohortTest.java` | {@code transform.timeseries.changepoint}, {@code transform.cohort.retention} and {@code transform.cohort.funnel} |
 | `RowShaperDistributionTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/RowShaperDistributionTest.java` | The distribution Steps (ANALYTICS-CORE-1 S3) — {@code transform.stats.outlier}, {@code transform.data.binning}, |
 | `RowShaperEntityLinkTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/RowShaperEntityLinkTest.java` | {@code transform.entity.link} (ANALYTICS-CORE-1 S2) — {@link RowShaper} over an embedded DuckDB input. Every row is |
