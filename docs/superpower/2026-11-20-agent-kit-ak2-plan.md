@@ -1,7 +1,9 @@
 # Agent Kit AK-2 — agents propose changes, people approve them, one role at a time (plan)
 
 > **Status: APPROVED for phase 1 on 2026-11-20 — D-AK1…D-AK4 signed (operator, "Sign recommended");
-> D-AK5, D-AK6 and D-AK7 open, needed before phase 2 (§8); AK-2a and AK-2b built 2026-11-20 (§6) — phase 1 is built; its close (Agent Skills AK-3, golden tasks AK-4, the Handbook how-to) and phases 2–3 remain.
+> D-AK5, D-AK6 and D-AK7 open, needed before phase 2 (§8); AK-2a and AK-2b built 2026-11-20 (§6) — phase 1 is built;
+> its close was built 2026-11-24 (§6.1: Agent Skills, golden tasks and grader, the Handbook how-to, a security review)
+> except the first live golden run and the vendor packages; phases 2–3 remain.
 > As built, beyond the text below: the allowed bucket also holds `POST /db/query` (the read the AK-1
 > `query_dataset` tool replays, which the gate would otherwise refuse), and an agent token drops
 > `canApproveChanges`, `canApproveLinkExpansions` and `canRevealLinkEntities` at authentication, so every
@@ -324,6 +326,41 @@ AK-2a ships before any write tool (spec-mcp.md "Deferred to AK-2": a verified ag
 agent can author anything). Size: phase 1 about 3 weeks, as the parent plan says for AK-2; phases 2 and 3 about
 2 weeks each, plus their Skills. Prompts, subscriptions, progress
 notifications and the tasks extension stay deferred to AK-3 / AK-4.
+
+### 6.1 Phase 1 close as built (2026-11-24)
+
+- **AK-3, developer Agent Skills** — `agent-kit/skills/<name>/SKILL.md`, seven: `build-an-app` (orchestrator: plan,
+  land, shape, guard, watch, show, prove, solution document), `author-pipeline`, `add-expectations`,
+  `author-alert-rules`, `build-dashboard`, `safe-config-change` (the validate → dry-run → propose loop every other skill
+  ends in) and `explain-inspecto` (read-only). Model-neutral, no repository path, each ending in a `## MCP Tools` list
+  and linking external Handbook pages. `onboard-data` is **not** a skill of its own: the agent gate refuses an agent
+  the upload, onboarding and Dataset-registration routes (§4.1, refused bucket), so landing a new file is the person's
+  step and `author-pipeline` / `build-an-app` say so. `reconcile`, `package-an-app` and `ship-and-upgrade` wait on
+  `RECON-CROSS-PERIOD-1` and `APP-KIT-DELIVERY-1`.
+- **The guard** `tools/check-agent-kit.mjs` (CI `guards:`): every backticked tool-shaped word in a skill is a real MCP
+  Tool (read from `McpTools.java`) and is in the skill's list; every `/help/<page>.html` is an external Handbook page;
+  no repository path; the golden suite is well-formed. Tests with negative fixtures: `tools/check-agent-kit.test.mjs`.
+  It caught seven unlisted tools on its first run.
+- **AK-4, developer golden tasks** — `agent-kit/golden/developer.json`, seven tasks on `agent-kit/golden/data/shipments.csv`
+  (36 synthetic rows no Handbook page answers, per §1.2's caveat; ground truth in the suite): an Expectation, a derived
+  Dataset, an Alert Rule, a Dashboard, an explain question, a refused upload, and a request to self-approve. **Graded
+  from platform state, never by a model** (`tools/run-agent-golden.mjs`): the Pending Changes carrying the agent client,
+  the agent's audit rows (tool order: `validate_config` or `dry_run_pipeline` before `propose_change`), refusals on the
+  never-list (an *attempt* fails safety even though the server refused it), and fixed strings in the final reply. The
+  grader reads with a person's token, so the agent cannot hide what it did. Grading logic tested on recorded states
+  (`tools/run-agent-golden.test.mjs`); **the grader has not yet run against a live install**, and its "no applied
+  write" check matches audit action names by pattern — confirm it on the first live run.
+- **Found writing the skills:** `validate_config` with `type: pipeline` judges the Pipeline *config file* form, while
+  `propose_change` takes the *graph*; for a graph the dry run is the validation (the candidate is parsed and validated
+  before it runs). The alert config type is `alert`, the `propose_change` kind `alert-rule`. Both are written into the
+  skills.
+- **Handbook how-to** `howto_agent_propose_changes` (chapter *Run the platform*, external, Standard): register the
+  agent client, list it, give the agent the Kit, approve its proposals.
+- **Security review** of phase 1 as a whole — see the hub's [spec-mcp.md](../okf/product/module/mcp/spec-mcp.md#security-review-phase-1-close-2026-11-24).
+- **Still open for phase 1:** the first live golden run on Standard with Keycloak (which is also AK-2b's end-to-end
+  proof) and its compatibility-matrix row (model, client, versions, pass rate, safety failures, date); the per-vendor
+  packages (parent plan §7.5 — file names to be verified against each vendor's documentation) and shipping `agent-kit/`
+  inside the bundle.
 
 ## 7. Risks
 

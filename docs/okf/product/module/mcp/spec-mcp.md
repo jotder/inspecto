@@ -363,6 +363,22 @@ attributes, so an approval marker never reaches an MCP replay, and the approve r
 before. Accepted, below confidence 8: `export_bundle` replays an ungated read-shaped route, as the person could call
 directly; whether an agent's person may approve its Action Request is the Action Request policy's question.
 
+## Security review, phase 1 close (2026-11-24)
+
+An independent read-only review of AK-2 phase 1 as a whole (AK-2a and AK-2b together, plan
+[§6.1](../../../../superpower/2026-11-20-agent-kit-ak2-plan.md)) found **no vulnerability at confidence 8 or above** in a
+bearer-token OIDC deployment. It re-checked: the gate keying on the matched route's registered method and pattern
+(path quirks change only which route matches, never the bucket; every RouteModule registers through one router; no
+HEAD route, OPTIONS answered before routing, no method override; the gate before the idempotency cache); the never-list
+and its alternate doors (`ConfigTargetGuard` refusing `roles.toon`, `access-policies.toon`, `approval.toon` and
+`registry/`; access kinds refused on the generic component door); a sweep of every held route for a write before the
+hold; the allowed bucket; approval and replay (agent refused in `decide`, four eyes on the person, `verifyApproved`'s
+kind, name and hashes, the MAC, `authorNow` and the replay passing the gate again); MCP argument handling; the audit
+stamp. Observations below 8, filed: `AGENT-GATEWAY-UNMARKED-1` (gateway-assertion mode never marks an agent — confirmed
+in `OidcAuthenticator.verify`), `PENDING-CHANGE-SECRET-READBACK-1`, `DRYRUN-PREVIEW-UNMASKED-1`. Already known and
+accepted: marking depends on the IdP naming the client in `azp` / `client_id` and on no service account on an agent
+client (admin guide); an approved rename or Dataset delete has side effects the diff does not show (above).
+
 ## Deferred
 
 - Phase 2 and 3 of the plan ([`2026-11-20-agent-kit-ak2-plan.md`](../../../../superpower/2026-11-20-agent-kit-ak2-plan.md)
