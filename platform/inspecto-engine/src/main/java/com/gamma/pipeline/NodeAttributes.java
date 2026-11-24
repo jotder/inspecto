@@ -917,7 +917,7 @@ public final class NodeAttributes {
                             + "carries lookups: (one mapping per looked-up column, written in the pipeline file)."),
             NodeAttribute.of("match", "Match", "select", "optional").defaultValue("exact")
                     .options("exact", "Exact", "longest_prefix", "Longest prefix (last key)", "range", "Range (from – to)",
-                            "asof", "As of (latest effective at the row's time)")
+                            "asof", "As of (latest effective at the row's time)", "fuzzy", "Fuzzy (similarity threshold)")
                     .help("Exact: every key equal. Longest prefix: the last key matches the Reference row "
                             + "whose key is its longest prefix (e.g. phone number to operator). Range: the row whose "
                             + "From – To contains the value (e.g. the rate valid on the call date)."),
@@ -960,7 +960,21 @@ public final class NodeAttributes {
             NodeAttribute.of("max_miss_rate", "Stop above this miss rate", "number", "optional").min(0).max(1)
                     .placeholder("0.1")
                     .help("Stop the run when more than this share (0 to 1) of a column's values find no Reference "
-                            + "row — a stale or wrong Reference. The failed Step raises the Incident. Empty = never stop."));
+                            + "row — a stale or wrong Reference. The failed Step raises the Incident. Empty = never stop."),
+            NodeAttribute.of("method", "Similarity method", "select", "optional").defaultValue("jaro_winkler")
+                    .options("jaro_winkler", "Jaro-Winkler (names, short text)", "jaro", "Jaro",
+                            "levenshtein", "Levenshtein (edit distance)", "token_jaccard", "Token Jaccard (shared words)")
+                    .help("Fuzzy: the string similarity metric used to score each Reference key."),
+            NodeAttribute.of("threshold", "Similarity threshold", "number", "optional").min(0).max(1)
+                    .defaultValue("0.85").placeholder("0.85")
+                    .help("Fuzzy: minimum similarity score (0 to 1) required to accept a match."),
+            NodeAttribute.of("block_prefix", "Blocking prefix length", "number", "optional").min(1)
+                    .placeholder("1")
+                    .help("Fuzzy: require the first N characters (after normalize) to match exactly before scoring."),
+            NodeAttribute.of("block", "Blocking column(s)", "list", "optional").placeholder("country")
+                    .help("Fuzzy: column(s) present on both the rows and the Reference that must match exactly before scoring."),
+            NodeAttribute.of("top_k", "Top matches", "number", "optional").min(1).defaultValue("1")
+                    .help("Fuzzy: maximum number of matching Reference rows returned per input value, highest score first."));
 
     /**
      * {@code transform.sql} (sql-transform-v1-plan.md, B1) — one author {@code SELECT} over the typed

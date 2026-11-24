@@ -365,4 +365,117 @@ class PointLookupParityTest {
         assertTrue(e.getMessage().contains("code=A"), e.getMessage());
         assertTypedParity(asofCfg("duplicates", "last", "order_by", "rate"), dup, RATE_INPUT);
     }
+
+    // ── fuzzy (LOOKUP-1 P4) ──────────────────────────────────────────────────────────────────────────────────
+
+    private static final String ENTITIES = """
+            entity_name,country,sector,rank
+            Acme Corporation,US,Tech,1
+            Acme Corp,US,Tech,2
+            Beta Holdings,GB,Finance,3
+            Café du Nord,FR,Food,4
+            Globex Industries,US,Manufacturing,5
+            """;
+
+    private static Map<String, Object> fuzzyCfg(Object... kv) {
+        Map<String, Object> m = new LinkedHashMap<>(Map.of("reference", "r", "match", "fuzzy", "on", "v",
+                "key", "entity_name", "details", true, "columns", List.of("sector"), "default", List.of("sector=NONE")));
+        for (int i = 0; i < kv.length; i += 2) {
+            if (kv[i + 1] == null) m.remove((String) kv[i]);
+            else m.put((String) kv[i], kv[i + 1]);
+        }
+        return m;
+    }
+
+    private void assertFuzzyParity(Map<String, Object> cfg, List<String> inputs) throws Exception {
+        Path csv = dir.resolve("fz" + System.nanoTime() + ".csv");
+        Files.writeString(csv, ENTITIES);
+        RowShaper.ReferenceResolver refs = resolver(csv);
+        PointLookup point = PointLookup.load(PipelineNode.of("j", "transform.join", cfg), refs);
+        List<String> added = new ArrayList<>(point.test("x").mappings().get(0).columns().keySet());
+        if (conn == null) conn = DuckDbUtil.openConnection(DuckDbUtil.tempDbFile("parity_", dir));
+        try (Statement st = conn.createStatement()) {
+            st.execute("CREATE OR REPLACE TABLE fzin (id INTEGER, v VARCHAR)");
+            for (int i = 0; i < inputs.size(); i++) {
+                String val = inputs.get(i);
+                st.execute("INSERT INTO fzin VALUES (" + i + ", " + (val == null ? "NULL" : "'" + val.replace("'", "''") + "'") + ")");
+            }
+        }
+        String id = "pfz" + System.nanoTime();
+        var rel = RowShaper.shape(conn, PipelineNode.of(id, "transform.join", cfg), "fzin", id, refs);
+        String table = rel.stream().filter(r -> r.rel().equals(PipelineRel.DATA)).findFirst().orElseThrow().table();
+        Map<Integer, List<Map<String, String>>> want = new LinkedHashMap<>();
+        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(
+                "SELECT id, " + added.stream().map(c -> "CAST(\"" + c + "\" AS VARCHAR) AS \"" + c + "\"")
+                        .collect(java.util.stream.Collectors.joining(", "))
+                        + " FROM \"" + table + "\" ORDER BY id, "
+                        + (cfg.containsKey("details") && cfg.get("details") instanceof Map<?, ?> dm && dm.containsKey("match_score")
+                                ? "CAST(\"" + dm.get("match_score") + "\" AS DOUBLE) DESC NULLS LAST, " : "")
+                        + "\"" + (added.stream().filter(c -> c.endsWith("matched_key")).findFirst().orElse(added.get(0))) + "\" ASC")) {
+            while (rs.next()) {
+                Map<String, String> r = new LinkedHashMap<>();
+                for (String c : added) r.put(c, rs.getString(c));
+                want.computeIfAbsent(rs.getInt("id"), k -> new ArrayList<>()).add(r);
+            }
+        }
+        for (int i = 0; i < inputs.size(); i++) {
+            String v = inputs.get(i);
+            List<Map<String, String>> got = point.testTopK(v).stream()
+                    .map(a -> a.mappings().get(0).columns()).toList();
+            assertEquals(want.get(i), got, "fuzzy value '" + v + "' under " + cfg);
+        }
+    }
+
+    @Test
+    void fuzzyJaroWinklerLevenshteinJaroAndTokenJaccardAgree() throws Exception {
+        List<String> inputs = new ArrayList<>(java.util.Arrays.asList(
+                "Acme Corp", "acme corporaton", "Beta Holding", "Cafe du Nord", "Globex", "Totally Unknown", "", null));
+        assertFuzzyParity(fuzzyCfg("method", "jaro_winkler", "threshold", 0.80,
+                "normalize", List.of("trim", "lower")), inputs);
+        assertFuzzyParity(fuzzyCfg("method", "jaro", "threshold", 0.78,
+                "normalize", List.of("trim", "lower")), inputs);
+        assertFuzzyParity(fuzzyCfg("method", "levenshtein", "threshold", 0.75,
+                "normalize", List.of("trim", "lower"),
+                "details", Map.of("matched_key", "v_matched_key", "match_kind", "v_match_kind", "match_score", "v_score")), inputs);
+        assertFuzzyParity(fuzzyCfg("method", "token_jaccard", "threshold", 0.5,
+                "normalize", List.of("trim", "lower")), inputs);
+    }
+
+    @Test
+    void fuzzyWithBlockPrefixAndTopKAgree() throws Exception {
+        List<String> inputs = List.of("Acme", "Bcme Corp", "Globex Ind", "Zeta");
+        assertFuzzyParity(fuzzyCfg("method", "jaro_winkler", "threshold", 0.70, "block_prefix", 1,
+                "normalize", List.of("trim", "lower")), inputs);
+        assertFuzzyParity(fuzzyCfg("method", "jaro_winkler", "threshold", 0.75, "top_k", 2,
+                "normalize", List.of("trim", "lower")), inputs);
+    }
+
+    @Test
+    void fuzzyWithBlockColumnAgrees() throws Exception {
+        Path csv = dir.resolve("fzb" + System.nanoTime() + ".csv");
+        Files.writeString(csv, ENTITIES);
+        RowShaper.ReferenceResolver refs = resolver(csv);
+        Map<String, Object> cfg = fuzzyCfg("method", "jaro_winkler", "threshold", 0.75, "block", "country",
+                "normalize", List.of("trim", "lower"));
+        PointLookup point = PointLookup.load(PipelineNode.of("j", "transform.join", cfg), refs);
+        assertThrows(IllegalArgumentException.class, () -> point.test("Acme Corp"));
+        if (conn == null) conn = DuckDbUtil.openConnection(DuckDbUtil.tempDbFile("parity_", dir));
+        try (Statement st = conn.createStatement()) {
+            st.execute("CREATE OR REPLACE TABLE fzb (id INTEGER, v VARCHAR, country VARCHAR)");
+            st.execute("INSERT INTO fzb VALUES (1, 'Acme Corp', 'US'), (2, 'Acme Corp', 'GB'), (3, 'Beta Holding', 'GB')");
+        }
+        var rel = RowShaper.shape(conn, PipelineNode.of("pfzb", "transform.join", cfg), "fzb", "pfzb", refs);
+        String table = rel.stream().filter(r -> r.rel().equals(PipelineRel.DATA)).findFirst().orElseThrow().table();
+        try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery("SELECT * FROM \"" + table + "\" ORDER BY id")) {
+            while (rs.next()) {
+                Map<String, String> expected = new LinkedHashMap<>();
+                expected.put("v_sector", rs.getString("v_sector"));
+                expected.put("v_matched_key", rs.getString("v_matched_key"));
+                expected.put("v_match_kind", rs.getString("v_match_kind"));
+                Map<String, String> got = point.test(rs.getString("v"), Map.of("country", rs.getString("country")))
+                        .mappings().get(0).columns();
+                assertEquals(expected, got, "row " + rs.getInt("id"));
+            }
+        }
+    }
 }

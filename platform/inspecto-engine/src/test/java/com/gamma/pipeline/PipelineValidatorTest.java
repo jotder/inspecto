@@ -463,7 +463,7 @@ class PipelineValidatorTest {
     /** LOOKUP-1: a join's match must be one RowShaper.join runs; exact and longest_prefix are clean. */
     @Test
     void aJoinWithAnUnknownMatchIsRefusedAtValidation() {
-        for (String ok : List.of("exact", "longest_prefix")) {
+        for (String ok : List.of("exact", "longest_prefix", "fuzzy")) {
             PipelineGraph g = new PipelineGraph("join-" + ok, true,
                     List.of(new PipelineNode("j", "transform.join",
                             Map.of("reference", "reference/prefixes", "on", "msisdn", "match", ok), null)),
@@ -477,6 +477,24 @@ class PipelineValidatorTest {
         PipelineValidator.Result r = PipelineValidator.validate(bad);
         assertTrue(codes(r).contains(PipelineValidator.JOIN_MATCH_UNKNOWN), () -> r.issues().toString());
         assertFalse(r.ok());
+    }
+
+    @Test
+    void aFuzzyJoinConfigIsCheckedAtValidation() {
+        Map<String, Object> ok = Map.of("reference", "reference/entities", "key", "name", "on", "v",
+                "match", "fuzzy", "method", "jaro_winkler", "threshold", 0.85, "block_prefix", 1, "top_k", 2);
+        assertFalse(codes(PipelineValidator.validate(joinGraph(ok))).contains(PipelineValidator.JOIN_KEYED_INVALID));
+        for (Map<String, Object> bad : List.of(
+                with(ok, "method", "soundex"),
+                with(ok, "threshold", 1.5),
+                with(ok, "threshold", -0.1),
+                with(ok, "threshold", "high"),
+                with(ok, "block_prefix", 0),
+                with(ok, "top_k", 0),
+                with(without(ok, "match"), "match", "exact"))) {
+            PipelineValidator.Result r = PipelineValidator.validate(joinGraph(bad));
+            assertTrue(codes(r).contains(PipelineValidator.JOIN_KEYED_INVALID), () -> bad + " → " + r.issues());
+        }
     }
 
     /** …and the correctly-spelled one against the same registry is clean. */

@@ -1,5 +1,6 @@
 package com.gamma.pipeline.exec;
 
+import com.gamma.analytics.similarity.SimilaritySql;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.util.DuckDbUtil;
@@ -67,9 +68,22 @@ public final class PointLookup {
     /** An {@code asof} Reference row of one key: its effective-from as DuckDB text ({@code null} = since forever). */
     private record AsofRow(String from, String[] vals) {}
 
-    /** {@code range}: every row; {@code asof}: the rows of each key. Empty for the other modes. */
+    /** A {@code fuzzy} Reference row: its normalized key, its returned values, and any {@code block:} column values. */
+    private record FuzzyRow(String key, String[] vals, String[] blockVals) {}
+
+    /** {@code range}: every row; {@code asof}: the rows of each key; {@code fuzzy}: rows + candidate index. */
     private List<RangeRow> ranges = List.of();
     private Map<String, List<AsofRow>> asof = Map.of();
+    private List<FuzzyRow> fuzzyRows = List.of();
+    private SimilaritySql.Method fuzzyMethod;
+    private double fuzzyThreshold;
+    private Integer fuzzyBlockPrefix;
+    private List<String> fuzzyBlockCols = List.of();
+    private int fuzzyTopK = 1;
+    private Map<List<String>, List<Integer>> fuzzyByBlockCols = Map.of();
+    private Map<String, List<Integer>> fuzzyByPrefix = Map.of();
+    private Map<Integer, List<Integer>> fuzzyByChar = Map.of();
+    private Map<String, List<Integer>> fuzzyByToken = Map.of();
     /** The bound columns' DuckDB types (the tested value is cast to each), and whether each compares as a number. */
     private String fromType, toType;
     private boolean fromNumeric, toNumeric;
@@ -181,6 +195,7 @@ public final class PointLookup {
         boolean prefix = RowShaper.JOIN_MATCH_LONGEST_PREFIX.equals(match);
         boolean range = RowShaper.JOIN_MATCH_RANGE.equals(match);
         boolean asof = RowShaper.JOIN_MATCH_ASOF.equals(match);
+        boolean fuzzy = RowShaper.JOIN_MATCH_FUZZY.equals(match);
         if (!RowShaper.JOIN_MATCHES.contains(match))
             throw new IllegalArgumentException("transform.join node '" + id + "' has match '" + match
                     + "' — use one of " + RowShaper.JOIN_MATCHES);
@@ -221,6 +236,28 @@ public final class PointLookup {
         if (exactWhen != null && !prefix)
             throw new IllegalArgumentException("transform.join node '" + id + "': exact_when only applies to "
                     + "match: longest_prefix");
+        if (!fuzzy) {
+            for (String fk : List.of("method", "threshold", "block", "block_prefix", "top_k"))
+                if (node.cfg(fk) != null)
+                    throw new IllegalArgumentException("transform.join node '" + id + "': " + fk
+                            + ": only applies to match: fuzzy");
+        }
+        SimilaritySql.Method fuzzyMethod = null;
+        double fuzzyThreshold = RowShaper.DEFAULT_FUZZY_THRESHOLD;
+        Integer fuzzyBlockPrefix = null;
+        List<String> fuzzyBlockCols = List.of();
+        int fuzzyTopK = 1;
+        if (fuzzy) {
+            try {
+                fuzzyMethod = RowShaper.joinFuzzyMethod(node.cfg("method"));
+                fuzzyThreshold = RowShaper.joinFuzzyThreshold(node.cfg("threshold"));
+                fuzzyBlockPrefix = RowShaper.joinFuzzyBlockPrefix(node.cfg("block_prefix"));
+                fuzzyBlockCols = RowShaper.joinFuzzyBlockColumns(node.cfg("block"));
+                fuzzyTopK = RowShaper.joinFuzzyTopK(node.cfg("top_k"));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("transform.join node '" + id + "': " + e.getMessage());
+            }
+        }
         String filter = RowShaper.strOrNull(node, "filter");
         String dups = RowShaper.strOrNull(node, "duplicates");
         if (dups == null) dups = "refuse";
@@ -244,6 +281,10 @@ public final class PointLookup {
                     if (c != null && refCols.stream().noneMatch(r -> r.equalsIgnoreCase(c)))
                         throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has no column '"
                                 + c + "' (it has " + refCols + ")");
+                for (String bc : fuzzyBlockCols)
+                    if (refCols.stream().noneMatch(r -> r.equalsIgnoreCase(bc)))
+                        throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has no block column '"
+                                + bc + "' (it has " + refCols + ")");
                 // no input rows here: the rows' own column names are not checked, only the Reference's
                 List<RowShaper.JoinMapping> mappings = RowShaper.joinMappings(node, RowShaper.joinOn(node), refCols, List.of());
                 List<String> returned = new ArrayList<>();
@@ -313,6 +354,71 @@ public final class PointLookup {
                     p.rows = n;
                     p.bytes = budget.used;
                     p.bounds(conn, ref, fromCol, null);
+                    return p;
+                }
+
+                if (fuzzy) {
+                    String refKey = RowShaper.normalized("CAST(t." + q(keyCol) + " AS VARCHAR)", normalizers);
+                    StringBuilder sql = new StringBuilder("SELECT ").append(refKey).append(" AS __lk_key");
+                    sql.append(vals);
+                    for (String bc : fuzzyBlockCols) sql.append(", CAST(t.").append(q(bc)).append(" AS VARCHAR)");
+                    sql.append(" FROM ").append(q(ref)).append(" t WHERE t.").append(q(keyCol)).append(" IS NOT NULL")
+                            .append(filter == null ? "" : " AND (" + filter + ")");
+                    if (pick != null)
+                        sql.append(" QUALIFY row_number() OVER (PARTITION BY ").append(refKey).append(" ").append(pick).append(") = 1");
+                    List<FuzzyRow> rows = new ArrayList<>();
+                    java.util.Set<String> seen = new java.util.HashSet<>();
+                    Map<List<String>, List<Integer>> byBlockCols = new HashMap<>();
+                    Map<String, List<Integer>> byPrefix = new HashMap<>();
+                    Map<Integer, List<Integer>> byChar = new HashMap<>();
+                    Map<String, List<Integer>> byToken = new HashMap<>();
+                    try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql.toString())) {
+                        while (rs.next()) {
+                            String k = rs.getString(1);
+                            if (!seen.add(k))
+                                throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has more "
+                                        + "than one row for " + keyCol + "=" + k + " — clean the Reference, or set "
+                                        + "duplicates: first|last with order_by:");
+                            String[] v = values(rs, 2, returned.size());
+                            String[] bv = values(rs, 2 + returned.size(), fuzzyBlockCols.size());
+                            budget.row(k, v, bv);
+                            int idx = rows.size();
+                            rows.add(new FuzzyRow(k, v, bv));
+                            if (!fuzzyBlockCols.isEmpty()) {
+                                boolean anyNull = false;
+                                for (String b : bv) if (b == null) { anyNull = true; break; }
+                                if (!anyNull) byBlockCols.computeIfAbsent(java.util.Arrays.asList(bv), x -> new ArrayList<>()).add(idx);
+                            } else if (fuzzyBlockPrefix != null) {
+                                byPrefix.computeIfAbsent(codePointPrefix(k, fuzzyBlockPrefix), x -> new ArrayList<>()).add(idx);
+                            } else if (fuzzyThreshold > 0.0) {
+                                if (fuzzyMethod == SimilaritySql.Method.TOKEN_JACCARD) {
+                                    for (String tok : tokensOf(k))
+                                        byToken.computeIfAbsent(tok, x -> new ArrayList<>()).add(idx);
+                                } else {
+                                    java.util.Set<Integer> cps = new java.util.HashSet<>();
+                                    for (int i = 0; i < k.length(); ) {
+                                        int cp = k.codePointAt(i);
+                                        if (cps.add(cp)) byChar.computeIfAbsent(cp, x -> new ArrayList<>()).add(idx);
+                                        i += Character.charCount(cp);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    PointLookup p = new PointLookup(match, normalizers, mappings, returned, Map.of(), Map.of(),
+                            (System.nanoTime() - t0) / 1_000_000);
+                    p.fuzzyRows = rows;
+                    p.fuzzyMethod = fuzzyMethod;
+                    p.fuzzyThreshold = fuzzyThreshold;
+                    p.fuzzyBlockPrefix = fuzzyBlockPrefix;
+                    p.fuzzyBlockCols = fuzzyBlockCols;
+                    p.fuzzyTopK = fuzzyTopK;
+                    p.fuzzyByBlockCols = byBlockCols;
+                    p.fuzzyByPrefix = byPrefix;
+                    p.fuzzyByChar = byChar;
+                    p.fuzzyByToken = byToken;
+                    p.rows = rows.size();
+                    p.bytes = budget.used;
                     return p;
                 }
 
@@ -462,7 +568,12 @@ public final class PointLookup {
     }
 
     /** As {@link #test(String, String)} with no time (an {@code asof} lookup then matches only rows with no from-date). */
-    public Answer test(String value) { return test(value, null); }
+    public Answer test(String value) { return test(value, (String) null); }
+
+    /** Look up one value in {@code match: fuzzy} with explicit {@code block:} column values. */
+    public Answer test(String value, Map<String, String> blockValues) {
+        return testTopK(value, blockValues).get(0);
+    }
 
     /**
      * Look up one value; {@code null} (no value) matches nothing, as a NULL key does in the batch join. {@code at} is
@@ -471,6 +582,7 @@ public final class PointLookup {
     public Answer test(String value, String at) {
         if (RowShaper.JOIN_MATCH_RANGE.equals(match)) return rangeTest(value);
         if (RowShaper.JOIN_MATCH_ASOF.equals(match)) return asofTest(value, at);
+        if (RowShaper.JOIN_MATCH_FUZZY.equals(match)) return fuzzyTest(value, null).get(0);
         String v = value == null ? null : normalize(value, normalizers);
         String[] row = null;
         String matched = null;
@@ -538,7 +650,110 @@ public final class PointLookup {
         return answer(k, best == null ? null : best.vals(), mk, best == null ? "none" : "asof");
     }
 
+    /** Up to {@code top_k} matches for one value (for {@code match: fuzzy}; a single-element list otherwise). */
+    public List<Answer> testTopK(String value) { return testTopK(value, null); }
+
+    /** Up to {@code top_k} matches for one value with {@code block:} column values. */
+    public List<Answer> testTopK(String value, Map<String, String> blockValues) {
+        if (RowShaper.JOIN_MATCH_FUZZY.equals(match)) return fuzzyTest(value, blockValues);
+        return List.of(test(value, (String) null));
+    }
+
+    private record FuzzyMatch(FuzzyRow row, double score) {}
+
+    /** {@code match: fuzzy}: candidate lookup + exact {@link SimilaritySql.Method#score} + deterministic tie-break. */
+    private List<Answer> fuzzyTest(String value, Map<String, String> blockValues) {
+        if (!fuzzyBlockCols.isEmpty() && blockValues == null)
+            throw new IllegalArgumentException("match: fuzzy with block: column requires block values");
+        String v = value == null ? null : normalize(value, normalizers);
+        if (v == null) return List.of(answer(null, null, null, "none", null));
+
+        List<Integer> candidates;
+        if (!fuzzyBlockCols.isEmpty()) {
+            List<String> bv = new ArrayList<>(fuzzyBlockCols.size());
+            for (String bc : fuzzyBlockCols) {
+                String val = blockValues.get(bc);
+                if (val == null) return List.of(answer(v, null, null, "none", null));
+                bv.add(val);
+            }
+            candidates = fuzzyByBlockCols.getOrDefault(bv, List.of());
+        } else if (fuzzyBlockPrefix != null) {
+            candidates = fuzzyByPrefix.getOrDefault(codePointPrefix(v, fuzzyBlockPrefix), List.of());
+        } else if (fuzzyThreshold > 0.0) {
+            java.util.BitSet seen = new java.util.BitSet(fuzzyRows.size());
+            candidates = new ArrayList<>();
+            if (fuzzyMethod == SimilaritySql.Method.TOKEN_JACCARD) {
+                for (String tok : tokensOf(v)) {
+                    for (int idx : fuzzyByToken.getOrDefault(tok, List.of()))
+                        if (!seen.get(idx)) { seen.set(idx); candidates.add(idx); }
+                }
+            } else {
+                for (int i = 0; i < v.length(); ) {
+                    int cp = v.codePointAt(i);
+                    for (int idx : fuzzyByChar.getOrDefault(cp, List.of()))
+                        if (!seen.get(idx)) { seen.set(idx); candidates.add(idx); }
+                    i += Character.charCount(cp);
+                }
+            }
+        } else {
+            candidates = null; // threshold == 0.0: 0-score pairs are allowed, so scan all rows
+        }
+
+        String vPrefix = fuzzyBlockPrefix != null ? codePointPrefix(v, fuzzyBlockPrefix) : null;
+        int vLen = fuzzyMethod == SimilaritySql.Method.LEVENSHTEIN ? v.codePointCount(0, v.length()) : 0;
+        List<FuzzyMatch> hits = new ArrayList<>();
+        int count = candidates != null ? candidates.size() : fuzzyRows.size();
+        for (int i = 0; i < count; i++) {
+            FuzzyRow r = fuzzyRows.get(candidates != null ? candidates.get(i) : i);
+            if (vPrefix != null && !vPrefix.equals(codePointPrefix(r.key(), fuzzyBlockPrefix))) continue;
+            if (fuzzyMethod == SimilaritySql.Method.LEVENSHTEIN && fuzzyThreshold > 0.0) {
+                int kLen = r.key().codePointCount(0, r.key().length());
+                if (kLen < fuzzyThreshold * vLen || vLen < fuzzyThreshold * kLen) continue;
+            }
+            double score = fuzzyMethod.score(v, r.key());
+            if (score >= fuzzyThreshold) hits.add(new FuzzyMatch(r, score));
+        }
+        if (hits.isEmpty()) return List.of(answer(v, null, null, "none", null));
+        hits.sort((a, b) -> {
+            int cmp = Double.compare(b.score(), a.score());
+            return cmp != 0 ? cmp : compare(a.row().key(), b.row().key(), false);
+        });
+        int limit = Math.min(fuzzyTopK, hits.size());
+        List<Answer> out = new ArrayList<>(limit);
+        for (int i = 0; i < limit; i++) {
+            FuzzyMatch m = hits.get(i);
+            String kind = m.row().key().equals(v) ? "exact" : "fuzzy";
+            out.add(answer(v, m.row().vals(), m.row().key(), kind, m.score()));
+        }
+        return out;
+    }
+
+    private static String codePointPrefix(String s, int n) {
+        if (s.codePointCount(0, s.length()) <= n) return s;
+        return s.substring(0, s.offsetByCodePoints(0, n));
+    }
+
+    private static java.util.Set<String> tokensOf(String s) {
+        java.util.Set<String> out = new java.util.HashSet<>();
+        int start = -1;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            boolean ws = c == ' ' || c == '\t' || c == '\n' || c == 0x0B || c == '\f' || c == '\r';
+            if (ws) {
+                if (start >= 0) { out.add(s.substring(start, i)); start = -1; }
+            } else if (start < 0) {
+                start = i;
+            }
+        }
+        if (start >= 0) out.add(s.substring(start));
+        return out;
+    }
+
     private Answer answer(String v, String[] row, String matched, String kind) {
+        return answer(v, row, matched, kind, null);
+    }
+
+    private Answer answer(String v, String[] row, String matched, String kind, Double score) {
         List<MappingAnswer> out = new ArrayList<>();
         for (RowShaper.JoinMapping m : mappings) {
             Map<String, String> cols = new LinkedHashMap<>();
@@ -551,6 +766,7 @@ public final class PointLookup {
             }
             if (m.matchedKeyAs() != null) cols.put(m.matchedKeyAs(), matched);
             if (m.matchKindAs() != null) cols.put(m.matchKindAs(), kind);
+            if (m.matchScoreAs() != null) cols.put(m.matchScoreAs(), score == null ? null : Double.toString(score));
             out.add(new MappingAnswer(m.on(), cols));
         }
         return new Answer(v, row != null, matched, kind, out);

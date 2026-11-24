@@ -2,6 +2,7 @@ package com.gamma.pipeline.exec;
 
 import com.gamma.util.SqlIdent;
 import com.gamma.analytics.ColumnProfiler;
+import com.gamma.analytics.similarity.SimilaritySql;
 import com.gamma.api.PublicApi;
 import com.gamma.etl.DataTransformer;
 import com.gamma.etl.PipelineConfig;
@@ -1168,6 +1169,9 @@ public final class RowShaper {
         if (JOIN_MATCH_ASOF.equals(match))
             throw new IllegalArgumentException("transform.join node '" + node.id() + "': match: asof needs key:, "
                     + "from: and at: — the Reference's key and effective-from columns, and the rows' time column");
+        if (JOIN_MATCH_FUZZY.equals(match))
+            throw new IllegalArgumentException("transform.join node '" + node.id() + "': match: fuzzy needs key: "
+                    + "— the Reference's key column");
         for (String k : JOIN_KEYED_KEYS)
             if (node.cfg(k) != null)
                 throw new IllegalArgumentException("transform.join node '" + node.id() + "' sets '" + k
@@ -1239,7 +1243,7 @@ public final class RowShaper {
      * column names ({@code null} = not added).
      */
     record JoinMapping(String on, LinkedHashMap<String, String> columns, Map<String, String> defaults,
-                               String matchedKeyAs, String matchKindAs) {}
+                               String matchedKeyAs, String matchKindAs, String matchScoreAs) {}
 
     /**
      * A column a keyed {@code transform.join} adds (LOOKUP-1 P1d — "Columns this Step adds"): its output name, its
@@ -1280,6 +1284,8 @@ public final class RowShaper {
                 out.add(new AddedColumn(m.matchedKeyAs(), "VARCHAR", null, m.on(), match, "matched_key"));
             if (m.matchKindAs() != null)
                 out.add(new AddedColumn(m.matchKindAs(), "VARCHAR", null, m.on(), match, "match_kind"));
+            if (m.matchScoreAs() != null)
+                out.add(new AddedColumn(m.matchScoreAs(), "DOUBLE", null, m.on(), match, "match_score"));
         }
         return out;
     }
@@ -1318,7 +1324,7 @@ public final class RowShaper {
                             .ifPresent(e -> dflt.put(prefix + c, e.getValue()));
                 }
                 String[] details = joinDetails(id, node.cfg("details"), prefix);
-                mappings.add(new JoinMapping(o, cols, dflt, details[0], details[1]));
+                mappings.add(new JoinMapping(o, cols, dflt, details[0], details[1], details[2]));
             }
         } else {
             for (Object raw : (List<?>) node.cfg("lookups")) {
@@ -1348,7 +1354,7 @@ public final class RowShaper {
                                 + " has a default for '" + n + "', which is not one of its output columns "
                                 + cols.values());
                 String[] details = joinDetails(id, e.get("details"), prefix);
-                mappings.add(new JoinMapping(o, cols, dflt, details[0], details[1]));
+                mappings.add(new JoinMapping(o, cols, dflt, details[0], details[1], details[2]));
             }
         }
         // output names: refuse a clash with the input or between themselves rather than let DuckDB suffix one
@@ -1362,6 +1368,7 @@ public final class RowShaper {
             List<String> names = new ArrayList<>(m.columns().values());
             if (m.matchedKeyAs() != null) names.add(m.matchedKeyAs());
             if (m.matchKindAs() != null) names.add(m.matchKindAs());
+            if (m.matchScoreAs() != null) names.add(m.matchScoreAs());
             for (String name : names)
                 if (!taken.add(name))
                     throw new IllegalArgumentException("transform.join node '" + id + "': the returned column '"
@@ -1386,24 +1393,27 @@ public final class RowShaper {
     }
 
     /**
-     * {@code details:} → the {@code [matched_key, match_kind]} output names, {@code null} each when not added:
-     * {@code true} derives {@code <prefix>matched_key} / {@code <prefix>match_kind}; a map
-     * {@code {matched_key: NAME, match_kind: NAME}} names (and picks) them.
+     * {@code details:} → the {@code [matched_key, match_kind, match_score]} output names, {@code null} each when not
+     * added: {@code true} derives {@code <prefix>matched_key} / {@code <prefix>match_kind}; a map
+     * {@code {matched_key: NAME, match_kind: NAME, match_score: NAME}} names (and picks) them.
      */
     private static String[] joinDetails(String id, Object d, String prefix) {
-        if (d == null || Boolean.FALSE.equals(d) || "false".equalsIgnoreCase(d.toString())) return new String[2];
+        if (d == null || Boolean.FALSE.equals(d) || "false".equalsIgnoreCase(d.toString())) return new String[3];
         if (Boolean.TRUE.equals(d) || "true".equalsIgnoreCase(d.toString()))
-            return new String[] {prefix + "matched_key", prefix + "match_kind"};
+            return new String[] {prefix + "matched_key", prefix + "match_kind", null};
         if (d instanceof Map<?, ?> m) {
             for (Object k : m.keySet())
-                if (!List.of("matched_key", "match_kind").contains(String.valueOf(k)))
+                if (!List.of("matched_key", "match_kind", "match_score").contains(String.valueOf(k)))
                     throw new IllegalArgumentException("transform.join node '" + id + "': details: names '" + k
-                            + "' — use matched_key and/or match_kind");
-            Object mk = m.get("matched_key"), kind = m.get("match_kind");
-            return new String[] {mk == null ? null : mk.toString().trim(), kind == null ? null : kind.toString().trim()};
+                            + "' — use matched_key, match_kind and/or match_score");
+            Object mk = m.get("matched_key"), kind = m.get("match_kind"), score = m.get("match_score");
+            return new String[] {
+                    mk == null ? null : mk.toString().trim(),
+                    kind == null ? null : kind.toString().trim(),
+                    score == null ? null : score.toString().trim()};
         }
         throw new IllegalArgumentException("transform.join node '" + id + "': details: must be true, false or a map "
-                + "{matched_key: name, match_kind: name}");
+                + "{matched_key: name, match_kind: name, match_score: name}");
     }
 
     /** {@code transform.join} {@code match:} values; absent means {@link #JOIN_MATCH_EXACT}. */
@@ -1411,13 +1421,78 @@ public final class RowShaper {
     public static final String JOIN_MATCH_LONGEST_PREFIX = "longest_prefix";
     public static final String JOIN_MATCH_RANGE = "range";
     public static final String JOIN_MATCH_ASOF = "asof";
+    public static final String JOIN_MATCH_FUZZY = "fuzzy";
     public static final List<String> JOIN_MATCHES =
-            List.of(JOIN_MATCH_EXACT, JOIN_MATCH_LONGEST_PREFIX, JOIN_MATCH_RANGE, JOIN_MATCH_ASOF);
+            List.of(JOIN_MATCH_EXACT, JOIN_MATCH_LONGEST_PREFIX, JOIN_MATCH_RANGE, JOIN_MATCH_ASOF, JOIN_MATCH_FUZZY);
 
-    /** The keyed form's settings (LOOKUP-1 P1b/P1c); each needs {@code key:}, or {@code from:}/{@code to:} for a range. */
+    /** The keyed form's settings (LOOKUP-1 P1b–P4); each needs {@code key:}, or {@code from:}/{@code to:} for a range. */
     public static final List<String> JOIN_KEYED_KEYS =
             List.of("columns", "as", "default", "exact_when", "duplicates", "order_by", "from", "to", "filter",
-                    "lookups", "details", "normalize", "at", "max_miss_rate");
+                    "lookups", "details", "normalize", "at", "max_miss_rate",
+                    "method", "threshold", "block", "block_prefix", "top_k");
+
+    /** Default similarity threshold for {@code match: fuzzy} (0..1). */
+    public static final double DEFAULT_FUZZY_THRESHOLD = 0.85;
+
+    /** The similarity {@link SimilaritySql.Method} for {@code match: fuzzy}; defaults to {@code jaro_winkler}. */
+    public static SimilaritySql.Method joinFuzzyMethod(Object raw) {
+        if (raw == null || raw.toString().isBlank()) return SimilaritySql.Method.JARO_WINKLER;
+        SimilaritySql.Method m = SimilaritySql.Method.parse(raw.toString());
+        if (m == null)
+            throw new IllegalArgumentException("method '" + raw + "' — use one of [jaro_winkler, jaro, levenshtein, token_jaccard]");
+        return m;
+    }
+
+    /** The similarity threshold (0..1) for {@code match: fuzzy}; defaults to {@value #DEFAULT_FUZZY_THRESHOLD}. */
+    public static double joinFuzzyThreshold(Object raw) {
+        if (raw == null || raw.toString().isBlank()) return DEFAULT_FUZZY_THRESHOLD;
+        double t;
+        try {
+            t = raw instanceof Number n ? n.doubleValue() : Double.parseDouble(raw.toString().trim());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("threshold: must be a number from 0 to 1, not " + raw);
+        }
+        if (!(t >= 0 && t <= 1))
+            throw new IllegalArgumentException("threshold: must be a number from 0 to 1, not " + raw);
+        return t;
+    }
+
+    /** Optional blocking prefix length (>= 1 code points) for {@code match: fuzzy}; {@code null} when unset. */
+    public static Integer joinFuzzyBlockPrefix(Object raw) {
+        if (raw == null || raw.toString().isBlank()) return null;
+        int n;
+        try {
+            n = raw instanceof Number num ? num.intValue() : Integer.parseInt(raw.toString().trim());
+            if (raw instanceof Number num && num.doubleValue() != n)
+                throw new NumberFormatException("not an integer");
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("block_prefix: must be a positive integer, not " + raw);
+        }
+        if (n < 1)
+            throw new IllegalArgumentException("block_prefix: must be >= 1, not " + raw);
+        return n;
+    }
+
+    /** Optional blocking column(s) for {@code match: fuzzy} (present in both input and Reference). */
+    public static List<String> joinFuzzyBlockColumns(Object raw) {
+        return joinColumnList(raw);
+    }
+
+    /** Number of best matches per input value for {@code match: fuzzy}; defaults to 1. */
+    public static int joinFuzzyTopK(Object raw) {
+        if (raw == null || raw.toString().isBlank()) return 1;
+        int k;
+        try {
+            k = raw instanceof Number num ? num.intValue() : Integer.parseInt(raw.toString().trim());
+            if (raw instanceof Number num && num.doubleValue() != k)
+                throw new NumberFormatException("not an integer");
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("top_k: must be a positive integer, not " + raw);
+        }
+        if (k < 1)
+            throw new IllegalArgumentException("top_k: must be >= 1, not " + raw);
+        return k;
+    }
 
     /**
      * {@code max_miss_rate:} (LOOKUP-1 P2): the share of a mapping's looked-up values, from 0 to 1, that may find no
@@ -1516,6 +1591,7 @@ public final class RowShaper {
         String filter = strOrNull(node, "filter");
         boolean asof = JOIN_MATCH_ASOF.equals(match);
         String atCol = strOrNull(node, "at");
+        boolean fuzzy = JOIN_MATCH_FUZZY.equals(match);
         if (range) {
             if (keyCol != null)
                 throw new IllegalArgumentException("transform.join node '" + id + "': match: range reads from:/to:, "
@@ -1558,6 +1634,28 @@ public final class RowShaper {
         if (exactWhen != null && !prefix)
             throw new IllegalArgumentException("transform.join node '" + id + "': exact_when only applies to "
                     + "match: longest_prefix");
+        if (!fuzzy) {
+            for (String fk : List.of("method", "threshold", "block", "block_prefix", "top_k"))
+                if (node.cfg(fk) != null)
+                    throw new IllegalArgumentException("transform.join node '" + id + "': " + fk
+                            + ": only applies to match: fuzzy");
+        }
+        SimilaritySql.Method fuzzyMethod = null;
+        double fuzzyThreshold = DEFAULT_FUZZY_THRESHOLD;
+        Integer fuzzyBlockPrefix = null;
+        List<String> fuzzyBlockCols = List.of();
+        int fuzzyTopK = 1;
+        if (fuzzy) {
+            try {
+                fuzzyMethod = joinFuzzyMethod(node.cfg("method"));
+                fuzzyThreshold = joinFuzzyThreshold(node.cfg("threshold"));
+                fuzzyBlockPrefix = joinFuzzyBlockPrefix(node.cfg("block_prefix"));
+                fuzzyBlockCols = joinFuzzyBlockColumns(node.cfg("block"));
+                fuzzyTopK = joinFuzzyTopK(node.cfg("top_k"));
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException("transform.join node '" + id + "': " + e.getMessage());
+            }
+        }
         String dups = strOrNull(node, "duplicates");
         if (dups == null) dups = "refuse";
         if (!JOIN_DUPLICATES.contains(dups))
@@ -1573,10 +1671,18 @@ public final class RowShaper {
             if (c != null && refCols.stream().noneMatch(r -> r.equalsIgnoreCase(c)))
                 throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has no column '"
                         + c + "' (it has " + refCols + ")");
+        for (String bc : fuzzyBlockCols)
+            if (refCols.stream().noneMatch(r -> r.equalsIgnoreCase(bc)))
+                throw new IllegalArgumentException("transform.join node '" + id + "': the Reference has no block column '"
+                        + bc + "' (it has " + refCols + ")");
         List<String> inputCols = columnsOf(conn, input);
         if (atCol != null && inputCols.stream().noneMatch(c -> c.equalsIgnoreCase(atCol)))
             throw new IllegalArgumentException("transform.join node '" + id + "': the rows have no column '" + atCol
                     + "' to read the time from (at:)");
+        for (String bc : fuzzyBlockCols)
+            if (inputCols.stream().noneMatch(c -> c.equalsIgnoreCase(bc)))
+                throw new IllegalArgumentException("transform.join node '" + id + "': the rows have no block column '"
+                        + bc + "' (they have " + inputCols + ")");
         List<JoinMapping> mappings = joinMappings(node, on, refCols, inputCols);
         // every Reference column any mapping returns, fetched once in the one pass over the Reference
         List<String> returned = new ArrayList<>();
@@ -1600,11 +1706,16 @@ public final class RowShaper {
             if (m.matchedKeyAs() != null) select.append(", ").append(h).append(".__lk_mk AS ").append(q(m.matchedKeyAs()));
             if (m.matchKindAs() != null)
                 select.append(", coalesce(").append(h).append(".__lk_kind, 'none') AS ").append(q(m.matchKindAs()));
+            if (m.matchScoreAs() != null)
+                select.append(", ").append(h).append(".__lk_score AS ").append(q(m.matchScoreAs()));
             // a range compares in the value's own type (dates as dates); prefix and exact compare as text
             joins.append(" LEFT JOIN __lk_hit ").append(h).append(" ON ").append(h).append(".__lk_v = ")
                     .append(range ? "i." + q(o) : normalized("CAST(i." + q(o) + " AS VARCHAR)", normalizers));
             // an as-of hit belongs to a (key, time) pair; the time compares as the same value, a NULL time to a NULL
             if (asof) joins.append(" AND ").append(h).append(".__lk_t IS NOT DISTINCT FROM i.").append(q(atCol));
+            for (int b = 0; b < fuzzyBlockCols.size(); b++)
+                joins.append(" AND ").append(h).append(".").append(q("__lk_b" + b))
+                        .append(" = i.").append(q(fuzzyBlockCols.get(b)));
             // whether this mapping found a Reference row for the row: counted into the Step's receipt, then dropped
             select.append(", (").append(h).append(".__lk_v IS NOT NULL) AS ").append(q("__lk_hit" + n));
         }
@@ -1640,33 +1751,57 @@ public final class RowShaper {
         // __lk_mk / __lk_kind: the match details (P1d) — the key that matched, and whether it was the whole value
         String kept = returned.stream().map(c -> ", r." + q(c)).collect(java.util.stream.Collectors.joining());
         StringBuilder values = new StringBuilder();
+        StringBuilder blockValSelect = new StringBuilder();
+        StringBuilder blockValCols = new StringBuilder();
+        for (int b = 0; b < fuzzyBlockCols.size(); b++) {
+            blockValSelect.append(", ").append(q(fuzzyBlockCols.get(b))).append(" AS ").append(q("__lk_b" + b));
+            blockValCols.append(", ").append(q("__lk_b" + b));
+        }
         for (String o : on) {
             if (values.length() > 0) values.append(" UNION ");
             values.append("SELECT ").append(normalized("CAST(" + q(o) + " AS VARCHAR)", normalizers))
                     .append(" AS __lk_v").append(asof ? ", " + q(atCol) + " AS __lk_t" : "")
+                    .append(blockValSelect)
                     .append(" FROM ").append(q(input));
         }
         // as of: the latest Reference row of the key effective at or before the time (an empty from: = since forever)
-        String hit = asof
+        String hit;
+        if (fuzzy) {
+            String scoreSql = fuzzyMethod.sql("v.__lk_v", "r.__lk_key");
+            List<String> joinConds = new ArrayList<>();
+            for (int b = 0; b < fuzzyBlockCols.size(); b++)
+                joinConds.add("r." + q(fuzzyBlockCols.get(b)) + " = v." + q("__lk_b" + b));
+            if (fuzzyBlockPrefix != null)
+                joinConds.add("left(r.__lk_key, " + fuzzyBlockPrefix + ") = left(v.__lk_v, " + fuzzyBlockPrefix + ")");
+            joinConds.add(scoreSql + " >= CAST(" + fuzzyThreshold + " AS DOUBLE)");
+            hit = "SELECT v.__lk_v" + blockValCols + kept + ", r.__lk_key AS __lk_mk"
+                    + ", CASE WHEN r.__lk_key = v.__lk_v THEN 'exact' ELSE 'fuzzy' END AS __lk_kind"
+                    + ", " + scoreSql + " AS __lk_score"
+                    + " FROM __lk_val v JOIN __lk_ref r ON " + String.join(" AND ", joinConds)
+                    + " QUALIFY row_number() OVER (PARTITION BY v.__lk_v" + blockValCols
+                    + " ORDER BY __lk_score DESC, r.__lk_key ASC) " + (fuzzyTopK == 1 ? "= 1" : "<= " + fuzzyTopK);
+        } else {
+            hit = asof
                 ? "SELECT v.__lk_v, v.__lk_t" + kept + ", r.__lk_key || '@' || coalesce(CAST(r." + fromQ
-                  + " AS VARCHAR), '') AS __lk_mk, 'asof' AS __lk_kind"
+                  + " AS VARCHAR), '') AS __lk_mk, 'asof' AS __lk_kind, CAST(NULL AS DOUBLE) AS __lk_score"
                   + " FROM __lk_val v JOIN __lk_ref r ON r.__lk_key = v.__lk_v AND (r." + fromQ + " IS NULL OR r."
                   + fromQ + " <= " + asofValue(conn, ref, fromCol) + ")"
                   + " QUALIFY row_number() OVER (PARTITION BY v.__lk_v, v.__lk_t ORDER BY r." + fromQ
                   + " DESC NULLS LAST) = 1"
                 : prefix
                 ? "SELECT v.__lk_v" + kept + ", r.__lk_key AS __lk_mk, CASE WHEN l.__lk_n = length(v.__lk_v) THEN "
-                  + "'exact' ELSE 'prefix' END AS __lk_kind"
+                  + "'exact' ELSE 'prefix' END AS __lk_kind, CAST(NULL AS DOUBLE) AS __lk_score"
                   + " FROM __lk_val v JOIN __lk_len l ON l.__lk_n <= length(v.__lk_v)"
                   + " JOIN __lk_ref r ON r.__lk_key = left(v.__lk_v, l.__lk_n)"
                   + (exactWhen == null ? "" : " AND (NOT coalesce(r.__lk_exact, false) OR l.__lk_n = length(v.__lk_v))")
                   + " QUALIFY row_number() OVER (PARTITION BY v.__lk_v ORDER BY l.__lk_n DESC) = 1"
-                : "SELECT v.__lk_v" + kept + ", r.__lk_key AS __lk_mk, 'exact' AS __lk_kind"
+                : "SELECT v.__lk_v" + kept + ", r.__lk_key AS __lk_mk, 'exact' AS __lk_kind, CAST(NULL AS DOUBLE) AS __lk_score"
                   + " FROM __lk_val v JOIN __lk_ref r ON r.__lk_key = v.__lk_v";
+        }
         exec(conn, "CREATE TABLE " + q(data) + " AS"
                 + " WITH __lk_ref AS MATERIALIZED (SELECT *" + (exactWhen == null ? "" : ", (" + exactWhen + ") AS __lk_exact")
                 + " FROM (" + refRows + ")),"
-                + " __lk_val AS MATERIALIZED (SELECT DISTINCT __lk_v" + (asof ? ", __lk_t" : "") + " FROM (" + values
+                + " __lk_val AS MATERIALIZED (SELECT DISTINCT __lk_v" + (asof ? ", __lk_t" : "") + blockValCols + " FROM (" + values
                 + ") WHERE __lk_v IS NOT NULL),"
                 + " __lk_len AS (SELECT DISTINCT length(__lk_key) AS __lk_n FROM __lk_ref),"
                 + " __lk_hit AS MATERIALIZED (" + hit + ")"

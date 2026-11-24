@@ -144,6 +144,20 @@ public final class PipelineValidator {
         }
         if (n.cfg("exact_when") != null && !"longest_prefix".equals(String.valueOf(match)))
             return "exact_when only applies to match: longest_prefix";
+        boolean fuzzy = "fuzzy".equals(String.valueOf(match));
+        if (!fuzzy) {
+            for (String fk : List.of("method", "threshold", "block", "block_prefix", "top_k"))
+                if (n.cfg(fk) != null) return fk + ": only applies to match: fuzzy";
+        } else {
+            try {
+                com.gamma.pipeline.exec.RowShaper.joinFuzzyMethod(n.cfg("method"));
+                com.gamma.pipeline.exec.RowShaper.joinFuzzyThreshold(n.cfg("threshold"));
+                com.gamma.pipeline.exec.RowShaper.joinFuzzyBlockPrefix(n.cfg("block_prefix"));
+                com.gamma.pipeline.exec.RowShaper.joinFuzzyTopK(n.cfg("top_k"));
+            } catch (IllegalArgumentException e) {
+                return e.getMessage();
+            }
+        }
         try {
             if (!com.gamma.pipeline.exec.RowShaper.joinNormalizers(n.cfg("normalize")).isEmpty() && range)
                 return "normalize: applies to match: exact and longest_prefix, not range";
@@ -167,7 +181,11 @@ public final class PipelineValidator {
         Object details = n.cfg("details");
         if (details != null && !(details instanceof Boolean) && !(details instanceof Map<?, ?>)
                 && !List.of("true", "false").contains(details.toString()))
-            return "details: must be true, false or a map {matched_key: name, match_kind: name}";
+            return "details: must be true, false or a map {matched_key: name, match_kind: name, match_score: name}";
+        if (details instanceof Map<?, ?> dm)
+            for (Object k : dm.keySet())
+                if (!List.of("matched_key", "match_kind", "match_score").contains(String.valueOf(k)))
+                    return "details: names '" + k + "' — use matched_key, match_kind and/or match_score";
         return null;
     }
 
