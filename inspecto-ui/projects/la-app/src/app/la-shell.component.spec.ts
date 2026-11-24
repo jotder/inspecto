@@ -42,6 +42,7 @@ describe('la-app shell and landing page', () => {
         features: Record<string, boolean> = { geoMap: true, investigations: true, entityPages: true },
         product: BootstrapProduct | null = null,
         authMode: 'none' | 'oidc' = 'none',
+        canApproveLinkExpansions = false,
     ) {
         TestBed.configureTestingModule({
             providers: [
@@ -54,6 +55,7 @@ describe('la-app shell and landing page', () => {
                         canAuthorWorkbench: signal(false),
                         canManageIncidents: signal(false),
                         canAdminister: signal(false),
+                        canApproveLinkExpansions: signal(canApproveLinkExpansions),
                     },
                 },
                 {
@@ -338,5 +340,13 @@ describe('la-app shell and landing page', () => {
         harness.detectChanges();
         expect(el.querySelector('nav[aria-label="Areas"]')).toBeTruthy();
         expect(el.querySelector('[data-testid="la-no-access"]')).toBeNull();
+    });
+
+    it('shows the Approvals inbox link in the rail only when investigations is on and canApproveLinkExpansions holds', async () => {
+        const elNo = await render({ geoMap: true, investigations: true, entityPages: true }, null, 'none', false);
+        expect(elNo.querySelector('nav[aria-label="Areas"] a[href="/approvals"]')).toBeNull();
+        TestBed.resetTestingModule();
+        const elYes = await render({ geoMap: true, investigations: true, entityPages: true }, null, 'none', true);
+        expect(elYes.querySelector('nav[aria-label="Areas"] a[href="/approvals"]')).toBeTruthy();
     });
 });

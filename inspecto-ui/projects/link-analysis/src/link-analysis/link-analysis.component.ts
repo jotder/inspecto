@@ -2181,7 +2181,7 @@ export class LinkAnalysisComponent implements OnInit, OnDestroy {
         // What the canvas draws: over an Investigation that is its Working Set, whose ids the server run maps (serverIds).
         const g = this.canvasData();
         return (g?.nodes ?? [])
-            .map((n) => ({ id: n.id, label: n.data.label }))
+            .map((n) => ({ id: n.id, label: n.data.hoverLabel ?? n.data.label }))
             .sort((a, b) => a.label.localeCompare(b.label))
             .slice(0, 500);
     });
@@ -5180,10 +5180,12 @@ Its prior copies stay in its version history.`,
         return maskedOnScreen(this.canvasData()?.nodes ?? []).filter((a) => !Object.hasOwn(revealed, a));
     }
 
-    /** Why Reveal cannot run on what is drawn ('' = it can): only inside a saved Investigation, by a holder of the right. */
+    /** Why Reveal cannot run on what is drawn ('' = it can): only inside a saved Investigation, by a lead holding the right. */
     private revealWhyNot(): string {
         if (!this.investigation.canvas())
             return 'Reveal works in a saved Investigation: each reveal is recorded against it and its purpose.';
+        if (this.investigation.readsOnly())
+            return 'Only a lead of this Investigation may reveal its masked entities.';
         return this.lens.canRevealLinkEntities() ? '' : 'Needs See unmasked ids.';
     }
 

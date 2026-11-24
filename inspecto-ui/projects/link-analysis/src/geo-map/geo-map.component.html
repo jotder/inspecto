@@ -504,6 +504,11 @@
                         ) {
                             <p class="text-warn m-0 text-xs" role="alert">Pick a dataset.</p>
                         }
+                        @if (coordDatasetNames().length) {
+                            <p class="text-secondary m-0 text-xs" data-testid="geo-coord-hint">
+                                With coordinates: {{ coordDatasetNames().join(', ') }}.
+                            </p>
+                        }
                     </div>
                     @if (sourceId() === 'dataset') {
                         <inspecto-option-picker

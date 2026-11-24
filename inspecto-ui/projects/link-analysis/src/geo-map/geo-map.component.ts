@@ -213,6 +213,15 @@ export class GeoMapComponent implements OnInit, OnDestroy {
     readonly datasetOptions = computed<PickerOption[]>(() =>
         this.datasets().map((d) => ({ value: d.id, label: d.name })),
     );
+    /** Datasets whose declared columns include latitude and longitude (hint under the Dataset picker). */
+    readonly coordDatasetNames = computed<string[]>(() =>
+        this.datasets()
+            .filter((d) => {
+                const cols = (d.columns ?? []).map((c) => c.name);
+                return cols.some((c) => /lat/i.test(c)) && cols.some((c) => /lon|lng/i.test(c));
+            })
+            .map((d) => d.name),
+    );
     readonly columnOptions = computed<PickerOption[]>(() => this.datasetColumns().map((c) => ({ value: c, label: c })));
     /** A blank-valued option is the real "none" choice — the picker shows its label, not the placeholder. */
     readonly optionalColumnOptions = computed<PickerOption[]>(() => [

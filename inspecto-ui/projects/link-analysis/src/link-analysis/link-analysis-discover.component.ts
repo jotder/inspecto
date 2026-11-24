@@ -155,6 +155,22 @@ export interface FoundAction {
                                 </li>
                             }
                         </ul>
+                        @if (r.hint; as h) {
+                            <div class="mt-1 flex flex-wrap items-center gap-1" data-testid="la-discover-hint">
+                                <p class="text-secondary m-0 text-xs">{{ h.text }}</p>
+                                @if (!listWhyNot()) {
+                                    <button
+                                        mat-stroked-button
+                                        type="button"
+                                        (click)="
+                                            addToList.emit({ row: h.row, what: h.what, purpose: 'exclusion' })
+                                        "
+                                    >
+                                        Add to exclusion list
+                                    </button>
+                                }
+                            </div>
+                        }
                     </div>
                 }
                 @if (startWhyNot() || listWhyNot()) {
