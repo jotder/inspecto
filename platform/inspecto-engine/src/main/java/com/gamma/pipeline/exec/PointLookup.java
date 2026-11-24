@@ -123,7 +123,7 @@ public final class PointLookup {
             used += b;
             if (used > cap)
                 throw new IllegalArgumentException("transform.join node '" + id + "': the Reference needs more than "
-                        + (cap / (1024 * 1024)) + " MiB in memory, the point engine's cap (" + PROP_MAX_BYTES + ")");
+                        + cap + " bytes in memory, the point engine's cap (" + PROP_MAX_BYTES + ")");
         }
 
         private static long text(String v) { return v == null ? 0 : TEXT + 2L * v.length(); }
@@ -171,7 +171,7 @@ public final class PointLookup {
      * scratch connection that is removed afterwards.
      *
      * @throws IllegalArgumentException the node is not a keyed exact / longest-prefix join, its config is refused as
-     *                                  the batch join would refuse it, or the Reference is over the row cap
+     *                                  the batch join would refuse it, or the Reference is over the memory cap
      */
     public static PointLookup load(PipelineNode node, RowShaper.ReferenceResolver references) throws Exception {
         long t0 = System.nanoTime();
