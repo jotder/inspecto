@@ -41,7 +41,7 @@ class ControlApiPendingActionsTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     /** AGENT = op-1 (power) through agent client claude-code; BOT = machine agent ops-bot (power); VIEWER_AGENT = a business user's agent. */
     private static final String AGENT = "Bearer agent", BOT = "Bearer bot", CHECKER = "Bearer checker",
-            ADMIN = "Bearer admin", VIEWER_AGENT = "Bearer viewer-agent";
+            ADMIN = "Bearer admin", VIEWER_AGENT = "Bearer viewer-agent", WEAK_BOT = "Bearer weak-bot";
     private final HttpClient client = HttpClient.newHttpClient();
 
     @TempDir
@@ -59,7 +59,8 @@ class ControlApiPendingActionsTest {
         System.setProperty("jobs.audit.dir", auditDir.resolve("jobs_audit").toString());
         Authenticators.forTest(ex -> {
             String h = String.valueOf(ex.getRequestHeaders().getFirst("Authorization"));
-            String role = VIEWER_AGENT.equals(h) ? "business" : AGENT.equals(h) || BOT.equals(h) ? "power" : "super";
+            String role = VIEWER_AGENT.equals(h) || WEAK_BOT.equals(h) ? "business"
+                    : AGENT.equals(h) || BOT.equals(h) ? "power" : "super";
             Roles.Def def = Roles.effective(ex).get(role);
             if (def == null) return Optional.empty();
             ComponentAccess.heldRoles(ex, Set.of(role));
@@ -70,7 +71,7 @@ class ControlApiPendingActionsTest {
                     yield Optional.of(new Subject("op-1", caps, null, Map.of(), null, null, null, "claude-code"));
                 }
                 case VIEWER_AGENT -> Optional.of(new Subject("viewer-1", caps, null, Map.of(), null, null, null, "claude-code"));
-                case BOT -> Optional.of(new Subject("client:ops-bot", caps, null, Map.of(), null, null, "svc-ops", "ops-bot"));
+                case BOT, WEAK_BOT -> Optional.of(new Subject("client:ops-bot", caps, null, Map.of(), null, null, "svc-ops", "ops-bot"));
                 case CHECKER -> Optional.of(new Subject("checker-1", caps));
                 case ADMIN -> Optional.of(new Subject("admin-1", caps));
                 default -> Optional.empty();
@@ -193,6 +194,32 @@ class ControlApiPendingActionsTest {
             assertEquals("declined", d.at("/pendingAction/status").asText());
             assertFalse(paused(c, run), "declined: nothing ran");
         }
+    }
+
+    @Test
+    void aMachineWithoutTheRunCapabilityIsRefusedAndLeavesNoRecord(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            String run = pipeline(c);
+            HttpResponse<String> r = send(c, "POST", "/runs/" + run + "/pause", "{}", WEAK_BOT);
+            assert403(r);
+            assertEquals(0, data(send(c, "GET", "/pending-actions", null, CHECKER), 200).get("total").asInt(),
+                    "no record for a machine that may not operate runs");
+        }
+    }
+
+    @Test
+    void actionsOnTheSameRunWithDifferentBodiesAreDifferentActions(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            String run = pipeline(c);
+            data(send(c, "POST", "/runs/" + run + "/drain", "{\"batchId\":\"a\"}", BOT), 202);
+            data(send(c, "POST", "/runs/" + run + "/drain", "{\"batchId\":\"b\"}", BOT), 202);
+            assertEquals(409, send(c, "POST", "/runs/" + run + "/drain", "{\"batchId\":\"a\"}", BOT).statusCode(),
+                    "the same drain of the same batch is already waiting");
+        }
+    }
+
+    private static void assert403(HttpResponse<String> r) {
+        assertEquals(403, r.statusCode(), r.body());
     }
 
     @Test

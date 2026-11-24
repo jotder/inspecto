@@ -82,6 +82,11 @@ final class PendingActions {
             throw new ApiException(409, ErrorCodes.CONFLICT, "the approved action is " + approved.get("action")
                     + ", but its replay calls " + method + " " + path + " — not run");
         }
+        // The route's own capability, checked HERE: the hold runs before the handler, where withCapability would check it,
+        // so a machine that may not operate runs gets the same 403 it would get without the hold, and no record
+        // (verification, lane B: a capability-less machine filled the approvers' queue).
+        String capability = com.gamma.access.CapabilityManifest.capabilityFor(method, path);
+        if (capability != null) ApiContext.requireCapability(ex, capability);
         propose(api, ex, s, method, pattern, path);
     }
 
@@ -122,10 +127,15 @@ final class PendingActions {
 
         Files.createDirectories(SpaceStateDirs.writeDir(root, PendingChanges.DIR));   // the shared store lock lives there
         PendingChanges.underStoreLock(root, () -> {
-            for (Map<String, Object> other : list(root))
-                if ("pending".equals(other.get("status")) && rec.get("action").equals(other.get("action")))
+            for (Map<String, Object> other : list(root)) {
+                expireIfDue(ex, root, other);   // an expired, unswept record never blocks a new request
+                // the same action = the same route, path AND body: a drain or retry names its batch or file in the body
+                if ("pending".equals(other.get("status")) && rec.get("action").equals(other.get("action"))
+                        && other.get("request") instanceof Map<?, ?> otherReq
+                        && request.get("body").equals(otherReq.get("body")))
                     throw new ApiException(409, ErrorCodes.CONFLICT, "the same action (" + rec.get("action")
                             + ") is already pending approval (" + other.get("id") + ")");
+            }
             save(root, rec);
             return null;
         });
