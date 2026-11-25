@@ -392,21 +392,38 @@ public final class PipelineJobRunner implements Job {
             // scratch connection isn't uncapped (defaults ≈ 80% RAM) while the batch path is capped.
             DuckDbUtil.applyGlobalDuckDbSettings(conn);
             Map<String, String> seedViews = new LinkedHashMap<>();
+            String byDay = ctx == null ? null : ctx.params().get(DayReconciler.PARAM_DAY);
+            String byDayPathsRaw = ctx == null ? null : ctx.params().get(DayReconciler.PARAM_INPUT_PATHS);
+            List<String> byDayPaths = (byDayPathsRaw == null || byDayPathsRaw.isBlank()) ? List.of()
+                    : java.util.Arrays.stream(byDayPathsRaw.split("\n")).filter(s -> !s.isBlank()).toList();
+            String byDayIfMissing = ctx == null ? null : ctx.params().get(DayReconciler.PARAM_IF_VERSION_MISSING);
+            boolean byDayStale = ctx != null && "true".equalsIgnoreCase(ctx.params().get(DayReconciler.PARAM_STALE));
+            String byDayStaleReason = ctx == null ? null : ctx.params().get(DayReconciler.PARAM_STALE_REASON);
+            Map<String, String> versionsUsed = new LinkedHashMap<>();
+
             // Each seed view pins its store's files, which DuckDB opens when the run scans them: the source stores stay
             // held against a snapshot swap until the last scan of a seed view (SNAPSHOT-SWAP-UNLOCKED-READERS-1).
             seedsPinned = SnapshotSwapLock.hold();
             for (Seed seed : seeds) {                              // one view per source_store (multi-source, Phase C)
                 String view = SEED_VIEW_PREFIX + "_" + safe(seed.node());
-                String predicate = incremental
-                        ? watermarks.get(pipelineId, seed.store())
-                            .map(wm -> q(incCol) + " > " + SqlIdent.sqlStr(wm)).orElse(null)
-                        : null;
-                List<String> read = SourceStoreReader.registerView(conn, view, dir, seed.store(), seed.format(), predicate);
-                reportSources(ctx, seed.store(), read);
+                if (!byDayPaths.isEmpty()) {
+                    try (Statement st = conn.createStatement()) {
+                        st.execute("CREATE OR REPLACE VIEW " + q(view) + " AS SELECT * FROM "
+                                + SqlViews.reader(seed.format(), byDayPaths, true));
+                    }
+                    reportSources(ctx, seed.store(), byDayPaths);
+                } else {
+                    String predicate = incremental
+                            ? watermarks.get(pipelineId, seed.store())
+                                .map(wm -> q(incCol) + " > " + SqlIdent.sqlStr(wm)).orElse(null)
+                            : null;
+                    List<String> read = SourceStoreReader.registerView(conn, view, dir, seed.store(), seed.format(), predicate);
+                    reportSources(ctx, seed.store(), read);
+                }
                 seedViews.put(seed.node(), view);
             }
             afterPin.run();
-            RowShaper.ReferenceResolver refs = references();
+            RowShaper.ReferenceResolver refs = references(byDayIfMissing, versionsUsed);
             seal(conn, g, storeDirs, refs, scratch);
 
             // Every run gets a batch-unique base name (addressing step 6). Incremental runs always did — each
@@ -467,6 +484,16 @@ public final class PipelineJobRunner implements Job {
             PipelineExecutor.execute(conn, g, seedViews, batchId, coordinator, writer, () -> {}, receipts,
                     refs, null, RowShaper.ExecutionContext.forRun(pipelineId, batchId));
             annotateReceipts(receipts, g, realWriter);
+            if (!dryRun && byDay != null && !byDayPaths.isEmpty()) {
+                com.gamma.consignment.DbConsignmentOutputStore outStore =
+                        com.gamma.consignment.ConsignmentOutputStores.shared();
+                if (outStore != null) {
+                    outStore.recordJobDayProgress(cfg.name(), byDay, byDayPaths, batchId,
+                            versionsUsed.isEmpty() ? null : versionsUsed.toString(),
+                            "ENRICHED", byDayStale, byDayStaleReason,
+                            ctx == null ? null : ctx.runId());
+                }
+            }
 
             if (provenance != null) {
                 provenance.record(provRows);
@@ -601,16 +628,45 @@ public final class PipelineJobRunner implements Job {
      * changed between them.
      */
     private RowShaper.ReferenceResolver references() {
+        return references(null, null);
+    }
+
+    private RowShaper.ReferenceResolver references(String ifVersionMissingOverride, Map<String, String> versionsUsed) {
         return new RowShaper.ReferenceResolver() {
             @Override
             public String resolve(Connection conn, String reference) throws SQLException {
-                String view = REF_VIEW_PREFIX + "_" + safe(reference);
+                return resolveForDay(conn, reference, null, ifVersionMissingOverride);
+            }
+
+            @Override
+            public String resolveForDay(Connection conn, String reference, String day, String ifVersionMissing)
+                    throws SQLException {
+                String effectivePolicy = (ifVersionMissingOverride != null && !ifVersionMissingOverride.isBlank())
+                        ? ifVersionMissingOverride : ifVersionMissing;
+                String suffix = (day == null || day.isBlank()) ? "" : "_" + safe(day);
+                String view = REF_VIEW_PREFIX + "_" + safe(reference) + suffix;
                 EnrichmentConfig.Reference parsed = parsedReference(reference);
-                String sql = ReferenceReader.sqlFor(parsed, pipelines == null ? null : pipelines.get());
+                List<com.gamma.etl.PipelineConfig> loaded = pipelines == null ? null : pipelines.get();
+                String sql = ReferenceReader.sqlForDay(parsed, loaded, day, effectivePolicy);
+                if (versionsUsed != null && parsed.byName() && loaded != null) {
+                    loaded.stream()
+                            .filter(p -> p.identity().pipelineName().equals(parsed.ref()) && p.producesReference())
+                            .findFirst()
+                            .ifPresent(p -> {
+                                if (p.reference().isDaily()) {
+                                    String fmt = (p.output() == null || p.output().format() == null)
+                                            ? "PARQUET" : p.output().format();
+                                    String resolved = com.gamma.enrich.DatedReferences.resolveDay(
+                                            parsed.ref(), Path.of(p.dirs().database()),
+                                            SqlViews.ext(fmt), day, effectivePolicy);
+                                    versionsUsed.put(parsed.ref(), resolved);
+                                }
+                            });
+                }
                 try (Statement st = conn.createStatement()) {
                     st.execute("CREATE OR REPLACE VIEW " + q(view) + " AS SELECT * FROM " + sql);
                 }
-                log.info("[PIPELINEJOB] {} resolved reference '{}' for join", cfg.name(), reference);
+                log.info("[PIPELINEJOB] {} resolved reference '{}' (day={}) for join", cfg.name(), reference, day);
                 return view;
             }
 

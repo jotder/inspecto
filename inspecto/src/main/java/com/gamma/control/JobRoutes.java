@@ -110,6 +110,37 @@ final class JobRoutes implements RouteModule {
         // never collides with the single-segment poll route above. Operating verb → canOperateRuns.
         api.post("/jobs/runs/([^/]+)/replay", ApiContext.withCapability("canOperateRuns",
                 (e, m) -> replayRun(api, e, ApiContext.name(m))));
+        // DATED-REFERENCE-RUNS-1 P4: Runs ▸ Backlog API (per-Job work ledger + operator controls).
+        api.get("/jobs/backlog", (e, m) -> jobs(api).dayReconciler().backlogSnapshot());
+        api.post("/jobs/([^/]+)/backlog/drain", ApiContext.withCapability("canOperateRuns", (e, m) -> {
+            String job = ApiContext.name(m);
+            boolean force = "true".equalsIgnoreCase(ApiContext.query(e, "force"));
+            int submitted = jobs(api).dayReconciler().drainJob(job, force);
+            return Map.of("job", job, "submitted", submitted);
+        }));
+        api.post("/jobs/([^/]+)/backlog/pause", ApiContext.withCapability("canOperateRuns", (e, m) -> {
+            String job = ApiContext.name(m);
+            jobs(api).dayReconciler().pauseJob(job);
+            return Map.of("job", job, "paused", true);
+        }));
+        api.post("/jobs/([^/]+)/backlog/resume", ApiContext.withCapability("canOperateRuns", (e, m) -> {
+            String job = ApiContext.name(m);
+            jobs(api).dayReconciler().resumeJob(job);
+            return Map.of("job", job, "paused", false);
+        }));
+        api.post("/jobs/([^/]+)/backlog/days/([^/]+)/run", ApiContext.withCapability("canOperateRuns", (e, m) -> {
+            String job = ApiContext.param(m, 1);
+            String day = ApiContext.param(m, 2);
+            boolean allowPrev = "true".equalsIgnoreCase(ApiContext.query(e, "allowPrevious"));
+            boolean ok = jobs(api).dayReconciler().runDayNow(job, day, allowPrev);
+            return Map.of("job", job, "day", day, "submitted", ok);
+        }));
+        api.post("/jobs/([^/]+)/backlog/days/([^/]+)/give-up", ApiContext.withCapability("canOperateRuns", (e, m) -> {
+            String job = ApiContext.param(m, 1);
+            String day = ApiContext.param(m, 2);
+            boolean ok = jobs(api).dayReconciler().giveUpWaiting(job, day);
+            return Map.of("job", job, "day", day, "skipped", ok);
+        }));
         // Single-job detail (the Scheduler's detail page). Registered AFTER every fixed /jobs/<sub-path>
         // above, so "types"/"packs"/"metrics"/"runs"/"failures" resolve to their own routes first.
         api.get("/jobs/([^/]+)", (e, m) -> jobDetail(api, e, ApiContext.name(m)));

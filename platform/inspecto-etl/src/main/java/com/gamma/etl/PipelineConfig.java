@@ -1233,15 +1233,64 @@ public final class PipelineConfig {
      * @param orderBy        D6-ref: the within-batch tie-break column ({@code reference.order_by}), or
      *                       {@code null} (arbitrary) — the greatest value wins per key, deletes included.
      */
+    /** Version granularity for a {@code produces: reference} pipeline ({@code DATED-REFERENCE-RUNS-1} P1, D-DR1). */
     @PublicApi(since = "4.0.0")
-    public record Reference(List<String> key, Load load, int refreshSeconds, Delete delete, String orderBy) {
+    public enum Versions {
+        /** Single current version (default, existing behaviour). */
+        NONE,
+        /** One version per business day ({@code reference.versions: daily}). */
+        DAILY;
+
+        public static Versions from(String s) {
+            if (s == null || s.isBlank()) return NONE;
+            return switch (s.trim().toUpperCase(Locale.ROOT)) {
+                case "NONE"  -> NONE;
+                case "DAILY" -> DAILY;
+                default -> throw new IllegalArgumentException(
+                        "reference.versions must be 'none' or 'daily', got: '" + s + "'");
+            };
+        }
+    }
+
+    /** Where a dated Reference file's business day comes from ({@code reference.day_from}). */
+    @PublicApi(since = "4.0.0")
+    public enum DayFrom {
+        /** Extracted from the source file name (e.g. {@code DIM_DIAL_DIGIT_20261122.csv}). */
+        FILE_NAME,
+        /** Taken from a declared column in the file. */
+        COLUMN;
+
+        public static DayFrom from(String s) {
+            if (s == null || s.isBlank()) return FILE_NAME;
+            return switch (s.trim().toUpperCase(Locale.ROOT)) {
+                case "FILE_NAME" -> FILE_NAME;
+                case "COLUMN"    -> COLUMN;
+                default -> COLUMN;
+            };
+        }
+    }
+
+    @PublicApi(since = "4.0.0")
+    public record Reference(List<String> key, Load load, int refreshSeconds, Delete delete, String orderBy,
+                            Versions versions, DayFrom dayFrom, String dayColumn, int keepDays) {
         /** Full-replace, no key, no refresh timer — exactly the pre-Phase-2 behaviour. */
-        public static final Reference DEFAULT = new Reference(List.of(), Load.REPLACE, 0, null, null);
+        public static final Reference DEFAULT = new Reference(
+                List.of(), Load.REPLACE, 0, null, null, Versions.NONE, DayFrom.FILE_NAME, null, 0);
+
+        /** Back-compat 5-arg constructor (pre-DATED-REFERENCE-RUNS-1). */
+        public Reference(List<String> key, Load load, int refreshSeconds, Delete delete, String orderBy) {
+            this(key, load, refreshSeconds, delete, orderBy, Versions.NONE, DayFrom.FILE_NAME, null, 0);
+        }
+
         public Reference {
             key = (key == null) ? List.of() : List.copyOf(key);
             if (load == null) load = Load.REPLACE;
             if (refreshSeconds < 0) refreshSeconds = 0;
             if (orderBy != null && orderBy.isBlank()) orderBy = null;
+            if (versions == null) versions = Versions.NONE;
+            if (dayFrom == null) dayFrom = DayFrom.FILE_NAME;
+            if (dayColumn != null && dayColumn.isBlank()) dayColumn = null;
+            if (keepDays < 0) keepDays = 0;
         }
 
         /**
@@ -1255,6 +1304,8 @@ public final class PipelineConfig {
         }
         /** Whether a periodic refresh/compaction timer should be armed (Phase-3). */
         public boolean refreshEnabled() { return refreshSeconds > 0; }
+        /** Whether this Reference keeps one version per business day ({@code reference.versions: daily}). */
+        public boolean isDaily() { return versions == Versions.DAILY; }
     }
 
     /**

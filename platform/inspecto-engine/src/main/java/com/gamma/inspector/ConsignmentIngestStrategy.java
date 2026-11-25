@@ -371,6 +371,37 @@ interface ConsignmentIngestStrategy {
         // processing.dedup, exactly as it already did for route/summarize/join. The three cross-record
         // kinds are finally uniform — parsed, lifted and round-tripped, executed by Stage-2 only.
 
+        List<String> writePartCols = partCols;
+        if (cfg.producesReference() && cfg.reference().isDaily()) {
+            String datedTable = "__ref_dated";
+            String dayExpr;
+            if (cfg.reference().dayFrom() == PipelineConfig.DayFrom.COLUMN && cfg.reference().dayColumn() != null) {
+                String col = com.gamma.util.SqlIdent.q(cfg.reference().dayColumn());
+                dayExpr = "COALESCE(strftime(TRY_CAST(" + col + " AS DATE), '%Y-%m-%d'), LEFT(CAST(" + col + " AS VARCHAR), 10))";
+            } else {
+                StringBuilder cases = new StringBuilder("CASE __src_id");
+                for (Map.Entry<Integer, String> entry : srcIdToFile.entrySet()) {
+                    var day = com.gamma.enrich.DatedReferences.extractDayFromFileName(entry.getValue());
+                    if (day.isPresent()) {
+                        cases.append(" WHEN ").append(entry.getKey()).append(" THEN '").append(day.get()).append("'");
+                    }
+                }
+                cases.append(" ELSE NULL END");
+                dayExpr = cases.toString();
+            }
+            try (java.sql.Statement st = conn.createStatement()) {
+                st.execute("CREATE OR REPLACE TABLE " + com.gamma.util.SqlIdent.q(datedTable) + " AS SELECT *, " + dayExpr
+                        + " AS " + com.gamma.util.SqlIdent.q(com.gamma.enrich.DatedReferences.REF_DAY_COL)
+                        + " FROM " + com.gamma.util.SqlIdent.q(writeTable));
+            }
+            writeTable = datedTable;
+            if (partCols == null || !partCols.contains(com.gamma.enrich.DatedReferences.REF_DAY_COL)) {
+                List<String> extended = new java.util.ArrayList<>(partCols == null ? List.of() : partCols);
+                extended.add(com.gamma.enrich.DatedReferences.REF_DAY_COL);
+                writePartCols = List.copyOf(extended);
+            }
+        }
+
         if (cfg.producesReference() && cfg.reference().load().versionedStore()) {
             String versioned = "__ref_versioned";
             stampReferenceVersions(conn, writeTable, versioned, cfg.reference(), batchId,
@@ -390,7 +421,7 @@ interface ConsignmentIngestStrategy {
         // §3.1: one GROUP BY over the relation being written, before the fan-out — the same event-time range
         // applies to every destination, since each writes the identical rows. Empty for a relation with no
         // __event_time (nothing downstream requires bounds).
-        Map<String, EventTimeBounds> byPartition = ConsignmentOutputs.boundsByPartition(conn, writeTable, partCols);
+        Map<String, EventTimeBounds> byPartition = ConsignmentOutputs.boundsByPartition(conn, writeTable, writePartCols);
         Map<String, EventTimeBounds> bounds = new java.util.HashMap<>();
 
         for (int d = 0; d < sinks.size(); d++) {
@@ -402,10 +433,16 @@ interface ConsignmentIngestStrategy {
             // B4: dest.filenameColumn() (null = byte-identical) translates __src_id into a source-file
             // column via the same map the lineage ledger uses.
             List<PartitionOutput> outs = PartitionWriter.write(conn, writeTable, destDir,
-                    dest.format(), dest.compression(), writeBase, partCols,
+                    dest.format(), dest.compression(), writeBase, writePartCols,
                     dest.filenameColumn(), srcIdToFile);
+            if (cfg.producesReference() && cfg.reference().isDaily()) {
+                com.gamma.enrich.DatedReferences.replaceDayAndPrune(
+                        Paths.get(destDir),
+                        outs.stream().map(o -> Paths.get(o.outputFile())).toList(),
+                        cfg.reference().keepDays());
+            }
             outputs.addAll(outs);
-            List<LineageRow> destLineage = LineageCollector.collect(conn, writeTable, batchId, srcIdToFile, outs, partCols);
+            List<LineageRow> destLineage = LineageCollector.collect(conn, writeTable, batchId, srcIdToFile, outs, writePartCols);
             lineage.addAll(destLineage);
             IngestTrail.sinkWritten(d, destLineage.stream().mapToLong(LineageRow::rowCount).sum(), outs.size());
             // Re-key onto files, and only these files: applied.outputs() came from a different relation.

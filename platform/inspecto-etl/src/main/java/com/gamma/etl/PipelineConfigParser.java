@@ -408,7 +408,28 @@ final class PipelineConfigParser {
                     throw new IllegalArgumentException("Config error in " + sourceLabel
                             + ": reference column '" + c + "' is not declared in the pipeline schema "
                             + declaredColumns);
-            b.reference = new Reference(key, load, refreshSeconds, delete, orderBy);
+            PipelineConfig.Versions versions = PipelineConfig.Versions.from(opt(refBlock, "versions", null));
+            String rawDayFrom = trimToNull(refBlock.get("day_from"));
+            PipelineConfig.DayFrom dayFrom = PipelineConfig.DayFrom.from(rawDayFrom);
+            String dayColumn = trimToNull(refBlock.get("day_column"));
+            if (dayFrom == PipelineConfig.DayFrom.COLUMN && dayColumn == null) {
+                if (rawDayFrom != null && !"column".equalsIgnoreCase(rawDayFrom)) {
+                    dayColumn = rawDayFrom;
+                } else {
+                    throw new IllegalArgumentException("Config error in " + sourceLabel
+                            + ": reference.day_from 'column' requires reference.day_column");
+                }
+            }
+            if (dayColumn != null && !declaredColumns.isEmpty() && !declaredColumns.contains(dayColumn))
+                throw new IllegalArgumentException("Config error in " + sourceLabel
+                        + ": reference.day_column '" + dayColumn + "' is not declared in the pipeline schema "
+                        + declaredColumns);
+            int keepDays = toInt(refBlock.getOrDefault("keep_days", 0));
+            if (keepDays < 0)
+                throw new IllegalArgumentException("Config error in " + sourceLabel
+                        + ": reference.keep_days must be >= 0, got: " + keepDays);
+            b.reference = new Reference(key, load, refreshSeconds, delete, orderBy,
+                    versions, dayFrom, dayColumn, keepDays);
         }
 
         // O6: the column a period replaces by is a stored (mapped) column, checked like reference.key
