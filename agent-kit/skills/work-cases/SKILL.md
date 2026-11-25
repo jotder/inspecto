@@ -30,7 +30,9 @@ Always pass a one-line `reason` (at most 500 characters): it is what an approver
 
 ## Steps
 
-1. Read it now: `get_incident`. A Workflow move is judged against its status at the moment it runs.
+1. Read it now: `get_incident`. A Workflow move is judged against its status at the moment it runs. Before resolving
+   one a score raised, read the score as it stands now (`get_risk_score`, `get_anomaly_score` or `get_prediction`):
+   a disposition should match the latest run, not the one that raised it.
 2. Say what you will do and why, in one sentence, and wait for the person's yes — every time for `resolve`, `close`
    and opening a Case.
 3. Call the tool once, and read the answer:
@@ -57,6 +59,7 @@ Always pass a one-line `reason` (at most 500 characters): it is what an approver
 ## MCP Tools
 
 - `get_incident`, `list_incidents`, `list_alerts` — the state before and after
+- `get_risk_score`, `get_anomaly_score`, `get_prediction` — the entity's score now (key masked)
 - `work_incident_or_case` — transition or resolve an Incident or Case
 - `work_alert` — acknowledge or resolve an Alert
 - `open_case_from_entities` — open a Case (a person's agent only)

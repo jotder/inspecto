@@ -56,6 +56,26 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- W3: the score read routes the score tools replay (GET /risk-scores, /anomaly-scores, /predictions, all
+             canWorkIncidents), so the denied-capability test meets each route's own gate, not the absent-module stub. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-scoring</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-anomaly</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-predictive</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-etl</artifactId>

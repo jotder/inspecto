@@ -16,9 +16,12 @@ import java.util.Set;
  *
  * @param measureIds the result columns holding the measures, in channel order ({@link MeasureCompiler.Measure#id})
  * @param body       the {@code POST /bi/query}-shaped body {@link MeasureCompiler#parse} reads
+ * @param options    the Widget's stored {@code options} — its Chart Markers, bound KPI and overlay
+ *                   (REPORT-CHART-MARKERS-1, drawn by {@link WidgetChartRenderer})
  */
 record ReportWidget(String id, String title, String vizType, String datasetId, String x, String series,
-                    List<String> measureIds, List<String> measureLabels, Map<String, Object> body) {
+                    List<String> measureIds, List<String> measureLabels, Map<String, Object> body,
+                    Map<?, ?> options) {
 
     static final Set<String> DRAWN = Set.of("bar", "line", "kpi");
     /** Rows a chart query may return; a cut result says so on the page. */
@@ -95,7 +98,29 @@ record ReportWidget(String id, String title, String vizType, String datasetId, S
         if (!grains.isEmpty()) body.put("grains", grains);
         if (!orderBy.isEmpty()) body.put("orderBy", orderBy);
         body.put("limit", MAX_ROWS);
-        return new ReportWidget(id, title, vizType, datasetId, x, series, ids, labels, body);
+        // REPORT-CHART-MARKERS-1: the forecast band and anomaly scores (BI-INSIGHTS-1 I-11 / I-7) are asked for exactly as
+        // the SPA's buildXyQuery asks — a line or bar Widget whose x channel picked a real grain — and computed by the same
+        // ChartOverlays over this query's own masked rows (ReportJob). The sensitivity stays in the options: it is the renderer's.
+        Map<?, ?> xc = first(controls, "x");
+        Map<String, Object> overlay = overlayWire(options.get("overlay"));
+        if (overlay != null && ChartMarkers.OVERLAY_VIZ_TYPES.contains(vizType) && xc != null
+                && str(xc.get("grain")) != null && !"auto".equals(str(xc.get("grain"))))
+            body.put("overlay", overlay);
+        return new ReportWidget(id, title, vizType, datasetId, x, series, ids, labels, body, options);
+    }
+
+    /** The wire fragment {@code {forecast?: {horizon?, level?}, anomaly?: {}}} of {@code options.overlay} (the SPA's overlayFragment). */
+    private static Map<String, Object> overlayWire(Object raw) {
+        if (!(raw instanceof Map<?, ?> o) || (o.get("forecast") == null && o.get("anomaly") == null)) return null;
+        Map<String, Object> out = new LinkedHashMap<>();
+        if (o.get("forecast") instanceof Map<?, ?> f) {
+            Map<String, Object> fc = new LinkedHashMap<>();
+            if (f.get("horizon") != null) fc.put("horizon", f.get("horizon"));
+            if (f.get("level") != null) fc.put("level", f.get("level"));
+            out.put("forecast", fc);
+        }
+        if (o.get("anomaly") != null) out.put("anomaly", Map.of());
+        return out.isEmpty() ? null : out;
     }
 
     private static Map<?, ?> first(Map<?, ?> controls, String channel) {
