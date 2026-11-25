@@ -3,6 +3,8 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { KpisService } from 'app/inspecto/api';
+import { LensService } from 'app/inspecto/api/lens.service';
+import { Router } from '@angular/router';
 import { GammaConfigService } from '@gamma/services/config';
 import { registerBuiltinViz } from 'app/inspecto/viz/plugins';
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
@@ -307,7 +309,8 @@ describe('WidgetHostComponent', () => {
         expect(fixture.componentInstance.kpiBound()).toBe(true);
         expect(fixture.componentInstance.tileState()).toBe('ready');
         expect(datasetFetched).toBe(false);
-        expect(value).toHaveBeenCalledWith('leakage_found', '2026-10-09', undefined);
+        // I-12: a KPI with no picked range also asks for its projection (the 4th argument).
+        expect(value).toHaveBeenCalledWith('leakage_found', '2026-10-09', undefined, true);
     });
 
     it("evaluates a kpiId-bound KPI at the host Dashboard's asOf day", async () => {
@@ -327,7 +330,7 @@ describe('WidgetHostComponent', () => {
         fixture.detectChanges();
         await fixture.whenStable();
         fixture.detectChanges();
-        expect(value).toHaveBeenCalledWith('refunds', '2026-08-13', undefined);
+        expect(value).toHaveBeenCalledWith('refunds', '2026-08-13', undefined, true);
     });
 
     it('the KPI size cycle lives in the tile action set and drives the KPI (which drops its own button)', async () => {
@@ -546,5 +549,47 @@ describe('WidgetHostComponent', () => {
         const alert = fixture.nativeElement.querySelector('[data-testid="tile-query-error"]');
         expect(alert?.textContent).toContain('Bound query unavailable');
         expect(fixture.nativeElement.querySelector('[data-testid="tile-run-error"]')).toBeNull();
+    });
+
+    // ── BI-INSIGHTS-1 I-17: "Alert me…" drafts a KPI Alert Rule on the Alerts pane — a link, never a write ──
+    function kpiTile(canAuthor: boolean) {
+        const navigate = vi.fn(() => Promise.resolve(true));
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+            { provide: KpisService, useValue: { value: () => of(null as never) } },
+            { provide: LensService, useValue: { canAuthorAlertRules: () => canAuthor } },
+            { provide: Router, useValue: { navigate } },
+        ]);
+        fixture.componentRef.setInput('widget', {
+            ...WIDGET,
+            datasetId: '',
+            controls: {},
+            options: { kpi: { kpiId: 'leakage_found' } },
+        });
+        fixture.detectChanges();
+        return { fixture, navigate };
+    }
+
+    it('a KPI-bound tile offers "Alert me…", which opens the prefilled create on its value or its projection', async () => {
+        const { fixture, navigate } = kpiTile(true);
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('[data-testid="kpi-alert-me"]')).not.toBeNull();
+        fixture.componentInstance.alertMe('value');
+        expect(navigate).toHaveBeenCalledWith(['/alerts'], { queryParams: { newRule: '1', kpi: 'leakage_found' } });
+        fixture.componentInstance.alertMe('projection');
+        expect(navigate).toHaveBeenLastCalledWith(['/alerts'], {
+            queryParams: { newRule: '1', kpi: 'leakage_found', projection: 'value' },
+        });
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('offers no "Alert me…" to a user who may not author Alert Rules, nor on a tile with no KPI', async () => {
+        const { fixture } = kpiTile(false);
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(fixture.nativeElement.querySelector('[data-testid="kpi-alert-me"]')).toBeNull();
+        expect(fixture.componentInstance.alertKpi()).toBe('');
     });
 });

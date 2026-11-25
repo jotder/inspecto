@@ -78,6 +78,12 @@ export interface AlertRule {
     valueMeasure?: ({ name: string } & Record<string, unknown>) | null;
     /** Freshness rule over the Link Analysis index (files waiting to be indexed) rather than over publishing. */
     indexLag?: boolean;
+    /** KPI rule (BI-INSIGHTS-1 I-17): the saved KPI whose own Measure, for its period to date, the rule watches. */
+    kpi?: string | null;
+    /** KPI rule: watch where the period is projected to land (`value`) or the chance of meeting the target (`probability`). */
+    projection?: 'value' | 'probability' | null;
+    /** KPI rule: fire at this RAG status or worse (of the value, or of the projected landing). */
+    rag?: 'amber' | 'red' | null;
 }
 
 /**

@@ -558,4 +558,99 @@ describe('AlertRuleFormDialog', () => {
         expect(c.schemaForm.form.get('by')?.value).toEqual(['model', 'entity_key']);
         expect(c.schemaForm.form.get('threshold')?.value).toBe(70);
     });
+
+    // ── BI-INSIGHTS-1 I-17: a KPI rule (value, RAG, projection, probability) ──
+
+    it('a KPI value rule saves kpi + comparator + threshold, and no other kind keys', () => {
+        const { c, save } = create({});
+        c.schemaForm.form.patchValue({ kind: 'kpi' });
+        c.schemaForm.form.patchValue({ kpi: 'monthly_revenue', comparator: 'lt', threshold: 1000 });
+        c.save();
+        expect(c.step()).toBe('save');
+        expect(c.saveForm.get('name')?.value).toBe('monthly_revenue_lt');
+        c.saveForm.patchValue({ name: 'revenue_low' });
+        c.save();
+        const body = (save.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
+        expect(body).toMatchObject({ name: 'revenue_low', kpi: 'monthly_revenue', comparator: 'lt', threshold: 1000 });
+        for (const k of ['kind', 'kpiWatch', 'projection', 'rag', 'metric', 'window', 'dataset', 'measure'])
+            expect(body).not.toHaveProperty(k);
+    });
+
+    it('a projected-status rule hides comparator and threshold and writes projection: value + rag, gte its rank', () => {
+        const { c, fixture, save } = create({});
+        c.schemaForm.form.patchValue({ kind: 'kpi' });
+        c.schemaForm.form.patchValue({ kpi: 'monthly_revenue', kpiWatch: 'projectedStatus', rag: 'amber' });
+        fixture.detectChanges();
+        const el: HTMLElement = fixture.nativeElement;
+        expect(fieldByLabel(el, 'Threshold')).toBeNull();
+        expect(fieldByLabel(el, 'Fire at')).not.toBeNull();
+        c.save();
+        c.saveForm.patchValue({ name: 'revenue_landing_amber' });
+        c.save();
+        expect(save).toHaveBeenCalledWith(
+            expect.objectContaining({
+                kpi: 'monthly_revenue',
+                projection: 'value',
+                rag: 'amber',
+                comparator: 'gte',
+                threshold: 1,
+            }),
+        );
+    });
+
+    it('a probability rule writes projection: probability with the chance as its threshold', () => {
+        const { c, save } = create({});
+        c.schemaForm.form.patchValue({ kind: 'kpi' });
+        c.schemaForm.form.patchValue({ kpi: 'k', kpiWatch: 'probability', comparator: 'lt', threshold: 0.5 });
+        c.save();
+        c.saveForm.patchValue({ name: 'k_unlikely' });
+        c.save();
+        const body = (save.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
+        expect(body).toMatchObject({ kpi: 'k', projection: 'probability', comparator: 'lt', threshold: 0.5 });
+        expect(body).not.toHaveProperty('rag');
+    });
+
+    it('leaving the KPI kind on a RAG watch brings comparator and threshold back for a metric rule', () => {
+        const { c, fixture } = create({});
+        c.schemaForm.form.patchValue({ kind: 'kpi' });
+        c.schemaForm.form.patchValue({ kpiWatch: 'status' });
+        c.schemaForm.form.patchValue({ kind: 'metric' });
+        fixture.detectChanges();
+        expect(fieldByLabel(fixture.nativeElement, 'Threshold')).not.toBeNull();
+    });
+
+    it('a seeded KPI draft (a Widget\'s "Alert me…") opens as a KPI projection rule and stays a create', async () => {
+        const { c, fixture, save } = create({ seed: { kpi: 'monthly_revenue', projection: 'value' } });
+        expect(c.isEdit).toBe(false);
+        expect(c.kind()).toBe('kpi');
+        expect(c.schemaForm.form.get('kpi')?.value).toBe('monthly_revenue');
+        expect(c.schemaForm.form.get('kpiWatch')?.value).toBe('projection');
+        expect(save).not.toHaveBeenCalled();
+        await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    it('edits a stored KPI RAG rule as one and re-saves its keys', () => {
+        const rule = {
+            name: 'rev_red',
+            kpi: 'monthly_revenue',
+            rag: 'red',
+            comparator: 'gte',
+            threshold: 2,
+            severity: 'CRITICAL',
+        } as AlertRule;
+        const { c, save } = create({ rule });
+        expect(c.kind()).toBe('kpi');
+        expect(c.schemaForm.form.get('kpiWatch')?.value).toBe('status');
+        c.save();
+        expect(save).toHaveBeenCalledWith(
+            'rev_red',
+            expect.objectContaining({
+                name: 'rev_red',
+                kpi: 'monthly_revenue',
+                rag: 'red',
+                comparator: 'gte',
+                threshold: 2,
+            }),
+        );
+    });
 });

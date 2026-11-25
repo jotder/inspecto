@@ -9,6 +9,7 @@ import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';
 // Side-effect import: registers the built-in VizPlugins. Essential here — /share/:token is a guest,
 // shell-less route, so nothing else has loaded the registry when a share link is opened directly.
 import 'app/inspecto/viz/plugins';
+import type { OverlaySummary } from 'app/inspecto/viz/chart-overlays';
 import { getViz } from 'app/inspecto/viz/viz-registry';
 import { channelMeasureId } from 'app/inspecto/viz/query-spec';
 import { ChannelValue, ControlValues, VizPlugin, VizProps, VizRenderOptions } from 'app/inspecto/viz/viz-types';
@@ -24,9 +25,10 @@ interface EmbedWidget {
     viewId?: string;
     /** A bound saved Query — the public query surface cannot run one, so such a widget is not embeddable. */
     queryId?: string;
-    /** The widget's options. Only the query-shaping `tableSort` is read (it becomes the public query's `orderBy`),
-     *  so a shared table opens in the same row order, and keeps the same top rows, as in the app. */
-    options?: Pick<VizRenderOptions, 'tableSort'>;
+    /** The widget's options. Only the query-shaping `tableSort` (the public query's `orderBy`, so a shared table opens
+     *  in the same row order and keeps the same top rows) and `overlay` (BI-INSIGHTS-1 I-11 / I-7: the forecast band and
+     *  anomaly markers, computed server-side from the masked result) are read; the rest never enters the public query. */
+    options?: Pick<VizRenderOptions, 'tableSort' | 'overlay'>;
 }
 
 /** One rendered tile's view-model; `state` drives the per-tile skeleton/alert/viz switch. */
@@ -39,6 +41,9 @@ interface TileVm {
     props?: VizProps;
     /** Rows the query returned; 0 ⇒ the tile card's compact empty state. */
     rowCount?: number;
+    /** The widget's `overlay` option, for the renderer (band, markers, sensitivity slider), or nothing. */
+    renderOptions?: Pick<VizRenderOptions, 'overlay'>;
+    overlaySummary?: OverlaySummary[] | null;
 }
 
 /**
@@ -56,7 +61,7 @@ export function embedQueryBody(widget: EmbedWidget): PublicQueryBody | null {
         datasetId: widget.datasetId,
         sourceName: widget.datasetId,
         filters: null,
-        options: widget.options?.tableSort ? { tableSort: widget.options.tableSort } : undefined,
+        options: embedOptions(widget),
     });
     const byId = new Map<string, ChannelValue>();
     for (const values of Object.values(widget.controls ?? {})) {
@@ -71,9 +76,19 @@ export function embedQueryBody(widget: EmbedWidget): PublicQueryBody | null {
     const body: PublicQueryBody = { dataset: widget.datasetId };
     if (measures.length) body.measures = measures;
     if (spec.groupBy.length) body.groupBy = spec.groupBy;
+    const grains = Object.entries(spec.grains ?? {}).filter(([f]) => spec.groupBy.includes(f));
+    if (grains.length) body.grains = Object.fromEntries(grains);
     if (spec.orderBy?.length) body.orderBy = spec.orderBy;
     body.limit = spec.limit ?? 500;
+    if (spec.overlay) body.overlay = spec.overlay;
     return body;
+}
+
+/** The query-shaping options a public query may carry: `tableSort` and `overlay`, nothing else. */
+function embedOptions(widget: EmbedWidget): Pick<VizRenderOptions, 'tableSort' | 'overlay'> | undefined {
+    const o = widget.options;
+    if (!o?.tableSort && !o?.overlay) return undefined;
+    return { ...(o.tableSort ? { tableSort: o.tableSort } : {}), ...(o.overlay ? { overlay: o.overlay } : {}) };
 }
 
 /**
@@ -179,6 +194,8 @@ export class ShareViewerComponent implements OnInit {
                         state: 'ready',
                         props: vm.plugin!.transformProps(r.rows, widget.controls ?? {}),
                         rowCount: r.rows.length,
+                        renderOptions: widget.options?.overlay ? { overlay: widget.options.overlay } : undefined,
+                        overlaySummary: r.overlays ?? null,
                     }),
                 error: (err) =>
                     this.patchTile(i, {

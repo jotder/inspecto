@@ -4461,7 +4461,7 @@
         "tags" : [ "public" ],
         "summary" : "Query the data behind a shared Dashboard",
         "operationId" : "postPublicDashboardsByDashboardIdQuery",
-        "description" : "Anonymous BI query (body as /bi/query, path segment = share token) fenced to the Datasets the Dashboard's Widgets reference; the Dashboard's stored filter and default date range replace the body's filters, and classified keys are always masked. No capability gate. 404 for a bad token or unknown Dataset; 403 for a Dataset the link does not cover; 422 for a bad spec or a guard failure.",
+        "description" : "Anonymous BI query (body as /bi/query, path segment = share token) fenced to the Datasets the Dashboard's Widgets reference; the Dashboard's stored filter and default date range replace the body's filters, and classified keys are always masked; an `overlay` (forecast band, anomaly scores) is computed from the masked rows and summarised in `overlays`. No capability gate. 404 for a bad token or unknown Dataset; 403 for a Dataset the link does not cover; 422 for a bad spec or a guard failure.",
         "parameters" : [ {
           "name" : "dashboardId",
           "in" : "path",

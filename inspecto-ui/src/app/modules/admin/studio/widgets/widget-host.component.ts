@@ -12,6 +12,10 @@ import {
 } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
+import { Router } from '@angular/router';
+import { LensService } from 'app/inspecto/api/lens.service';
+import { KpiAlertWatch, kpiAlertRuleParams } from 'app/inspecto/viz/kpi-alert-link';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { isSharedRef } from 'app/inspecto/api';
 import { apiErrorMessage } from 'app/inspecto/api/api-base';
@@ -66,6 +70,7 @@ export interface DrillEvent extends DrillPair {
     imports: [
         MatButtonModule,
         MatIconModule,
+        MatMenuModule,
         MatTooltipModule,
         VizRenderComponent,
         InspectoEmptyStateComponent,
@@ -112,6 +117,25 @@ export interface DrillEvent extends DrillPair {
                     >
                         <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
                     </button>
+                }
+                @if (alertKpi() && tileState() === 'ready') {
+                    <!-- BI-INSIGHTS-1 I-17: a draft on the Alerts pane — nothing is armed until the user saves it there. -->
+                    <button
+                        mat-icon-button
+                        type="button"
+                        [matMenuTriggerFor]="alertMenu"
+                        matTooltip="Alert me…"
+                        aria-label="Alert me…"
+                        data-testid="kpi-alert-me"
+                    >
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:bell-alert"></mat-icon>
+                    </button>
+                    <mat-menu #alertMenu="matMenu">
+                        <button mat-menu-item type="button" (click)="alertMe('value')">On this KPI…</button>
+                        <button mat-menu-item type="button" (click)="alertMe('projection')">
+                            On where the period is projected to land…
+                        </button>
+                    </mat-menu>
                 }
                 <ng-content select="[tileActions]" />
             </ng-container>
@@ -218,6 +242,8 @@ export class WidgetHostComponent {
     private datasetResult = inject(DatasetResultService);
     private datasetRows = inject(DatasetRowsService);
     private elementRef = inject(ElementRef<HTMLElement>);
+    private router = inject(Router);
+    private lens = inject(LensService);
 
     /** Self-fetch mode: only an id (the standalone route). */
     readonly widgetId = input<string | undefined>(undefined);
@@ -260,6 +286,11 @@ export class WidgetHostComponent {
         const w = this.resolvedWidget();
         return !!w && isKpiBound(w);
     });
+    /** BI-INSIGHTS-1 I-17: the KPI an "Alert me…" draft watches — the Widget's bound KPI (`options.kpi.kpiId`), for a
+     *  user who may author Alert Rules; '' hides the action. */
+    readonly alertKpi = computed(() =>
+        this.lens.canAuthorAlertRules() ? (this.resolvedWidget()?.options?.kpi?.kpiId ?? '') : '',
+    );
     readonly props = signal<VizProps>({ labels: [], series: [] });
     readonly canExport = computed(() => this.plugin()?.render.kind === 'chartjs');
     /** False once a data run fails — a shared-bound dataset that no longer resolves (revoked/expired grant). */
@@ -390,6 +421,12 @@ export class WidgetHostComponent {
 
     /** Resolve the clicked category to the field it came from (the widget's `x` channel, or `series` for
      *  plugins that use it as the point label, e.g. bubble) and emit the drill event. */
+    /** Open the Alerts pane's prefilled create on this Widget's KPI (its value, or its projection): a draft to review. */
+    alertMe(watch: KpiAlertWatch): void {
+        const kpi = this.alertKpi();
+        if (kpi) void this.router.navigate(['/alerts'], { queryParams: kpiAlertRuleParams(kpi, watch) });
+    }
+
     onCategoryClick(value: string): void {
         const controls = this.resolvedWidget()?.controls;
         const field = controls?.x?.[0]?.field ?? controls?.series?.[0]?.field;

@@ -18,6 +18,7 @@ import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import {
     datasetOptionLoader,
+    kpiOptionLoader,
     pipelineOptionLoader,
     runbookOptionLoader,
 } from 'app/inspecto/components/entity-option-loaders';
@@ -27,7 +28,7 @@ import { firstValueFrom } from 'rxjs';
 import { QueryConditionGroupComponent } from 'app/inspecto/query/query-condition-group.component';
 import { Condition, ColumnMeta, ConditionGroup, emptyGroup } from 'app/inspecto/query/query-types';
 import { groupByValidator, measureError } from 'app/inspecto/query/measure-grammar';
-import { ALERT_RULE_ATTRIBUTES } from './alert-rule-attributes';
+import { ALERT_RULE_ATTRIBUTES, KPI_WATCH_KEYS, kpiWatchOf } from './alert-rule-attributes';
 import { ledgerMetricWords, ruleName, ruleWatchText } from './alert-words';
 
 /** The ledger-row fields a `when` clause can scope on (the columns `AlertService`'s metric math
@@ -61,15 +62,32 @@ function referencedFields(group: ConditionGroup): string[] {
  * tells them apart by `dataset`. A freshness (`maximumAge`) or Investigation rule is neither: it is
  * edit-only here (threshold, severity, …) and keeps its target as stored — `null`.
  */
-type AuthoredKind = 'metric' | 'measure';
+type AuthoredKind = 'metric' | 'measure' | 'kpi';
 function authoredKind(r: AlertRule | undefined): AuthoredKind | null {
     if (!r) return 'metric';
     if (r.maximumAge || r.investigation) return null;
+    if (r.kpi) return 'kpi';
     return r.dataset ? 'measure' : 'metric';
 }
 
 /** The keys only one kind writes. All of them count as "edited", so switching kind drops the other's. */
-const KIND_KEYS = ['metric', 'window', 'when', 'dataset', 'measure', 'by', 'stormCap', 'healAfterSweeps'];
+const KIND_KEYS = [
+    'metric',
+    'window',
+    'when',
+    'dataset',
+    'measure',
+    'by',
+    'stormCap',
+    'healAfterSweeps',
+    'kpi',
+    'kpiWatch',
+    'projection',
+    'rag',
+];
+
+/** A RAG rule reads the status rank (green 0, amber 1, red 2): `AlertRule` fixes comparator `gte` and this threshold. */
+const RAG_RANK: Record<string, number> = { amber: 1, red: 2 };
 
 /** `measure` as `AlertRule` accepts it (`count | agg(column)`), via the shared, contract-pinned grammar. */
 const measureValidator: ValidatorFn = (c: AbstractControl) => {
@@ -95,7 +113,8 @@ export interface AlertRuleFormData {
     rule?: AlertRule;
     /** Names already armed — on create the name control rejects a duplicate inline (product-wide rule). */
     existingNames?: string[];
-    /** Create only: values to start from (a prefilled link, e.g. the Risk Scores pane's per-entity rule, D-RP9). */
+    /** Create only: values to start from (a prefilled link, e.g. the Risk Scores pane's per-entity rule, D-RP9, or
+     *  a KPI-bound Widget's "Alert me…", BI-INSIGHTS-1 I-17). Nothing is armed until the user saves. */
     seed?: Partial<AlertRule>;
 }
 export interface AlertRuleFormResult {
@@ -275,6 +294,7 @@ export class AlertRuleFormDialog implements AfterViewInit {
         onPipeline: pipelineOptionLoader(),
         dataset: datasetOptionLoader(),
         runbook: runbookOptionLoader(),
+        kpi: kpiOptionLoader(),
         by: datasetColumnOptionLoader('dataset'),
     };
 
@@ -294,7 +314,7 @@ export class AlertRuleFormDialog implements AfterViewInit {
     readonly saveError = signal('');
     /** The kind this form authors for the loaded rule — `null` for a freshness / Investigation rule. */
     readonly authored = authoredKind(
-        this.data.rule ?? (this.data.seed?.dataset ? (this.data.seed as AlertRule) : undefined),
+        this.data.rule ?? (this.data.seed?.dataset || this.data.seed?.kpi ? (this.data.seed as AlertRule) : undefined),
     );
     /** The live kind choice — drives the host-rendered `when` editor, which is not a spec. */
     readonly kind = signal<AuthoredKind | null>(this.authored);
@@ -339,9 +359,14 @@ export class AlertRuleFormDialog implements AfterViewInit {
               ...this.data.rule,
               onPipeline: this.data.rule.onPipeline ?? '',
               ...(this.authored ? { kind: this.authored } : {}),
+              ...(this.authored === 'kpi' ? { kpiWatch: kpiWatchOf(this.data.rule) } : {}),
           }
         : this.data.seed
-          ? { ...this.data.seed, ...(this.authored ? { kind: this.authored } : {}) }
+          ? {
+                ...this.data.seed,
+                ...(this.authored ? { kind: this.authored } : {}),
+                ...(this.authored === 'kpi' ? { kpiWatch: kpiWatchOf(this.data.seed) } : {}),
+            }
           : undefined;
 
     /** Deep-cloned on edit — the condition editor mutates the bound group in place. */
@@ -358,7 +383,12 @@ export class AlertRuleFormDialog implements AfterViewInit {
         this.schemaForm.form
             .get('kind')
             ?.valueChanges.pipe(takeUntilDestroyed(this.destroyRef))
-            .subscribe((k) => this.kind.set(k === 'measure' ? 'measure' : 'metric'));
+            .subscribe((k) => {
+                this.kind.set(k === 'measure' || k === 'kpi' ? k : 'metric');
+                // `kpiWatch` stays in the raw value while hidden, and comparator / threshold hang off it: leaving the
+                // KPI kind on a RAG watch would hide them for a metric or measure rule.
+                if (k !== 'kpi') this.schemaForm.form.get('kpiWatch')?.setValue('value');
+            });
     }
 
     whenEmpty(): boolean {
@@ -369,9 +399,11 @@ export class AlertRuleFormDialog implements AfterViewInit {
     suggestedName(): string {
         const v = this.schemaForm.value() as Record<string, string | undefined>;
         const parts =
-            this.kind() === 'measure'
-                ? [v['dataset'], v['measure'], v['comparator']]
-                : [v['metric'], v['comparator'], v['window']];
+            this.kind() === 'kpi'
+                ? [v['kpi'], v['kpiWatch'] === 'value' ? v['comparator'] : v['kpiWatch']]
+                : this.kind() === 'measure'
+                  ? [v['dataset'], v['measure'], v['comparator']]
+                  : [v['metric'], v['comparator'], v['window']];
         const base = parts.filter(Boolean).join('_') || 'alert_rule';
         return base
             .replace(/[^A-Za-z0-9._-]+/g, '_')
@@ -412,6 +444,8 @@ export class AlertRuleFormDialog implements AfterViewInit {
         const stormCap = v.stormCap === null || v.stormCap === undefined ? null : Number(v.stormCap);
         const healAfterSweeps =
             v.healAfterSweeps === null || v.healAfterSweeps === undefined ? null : Number(v.healAfterSweeps);
+        const watch = KPI_WATCH_KEYS[String((v as Record<string, unknown>)['kpiWatch'] ?? 'value')] ?? {};
+        const rag = kind === 'kpi' && watch.rag ? String(v.rag ?? 'red') : null;
         const body: AlertRuleUpsert = {
             ...kept,
             name: this.isEdit ? this.data.rule!.name : String(this.saveForm.getRawValue().name ?? '').trim(),
@@ -425,9 +459,17 @@ export class AlertRuleFormDialog implements AfterViewInit {
                       ...(healAfterSweeps !== null ? { healAfterSweeps } : {}),
                   }
                 : {}),
+            ...(kind === 'kpi'
+                ? {
+                      kpi: String(v.kpi ?? '').trim(),
+                      ...(watch.projection ? { projection: watch.projection } : {}),
+                      ...(rag ? { rag: rag as 'amber' | 'red' } : {}),
+                  }
+                : {}),
             // A freshness rule's comparator/threshold are not form fields (hidden ⇒ absent from `v`): stored values.
-            comparator: String(v.comparator ?? this.data.rule?.comparator ?? 'gt'),
-            threshold: Number(v.threshold ?? this.data.rule?.threshold),
+            // A RAG rule's are fixed by the engine to `gte` its status rank: sent as such, never an author's.
+            comparator: rag ? 'gte' : String(v.comparator ?? this.data.rule?.comparator ?? 'gt'),
+            threshold: rag ? RAG_RANK[rag] : Number(v.threshold ?? this.data.rule?.threshold),
             severity: String(v.severity ?? 'WARNING'),
             ...(onPipeline ? { onPipeline } : {}),
             ...(description ? { description } : {}),

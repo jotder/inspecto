@@ -54,6 +54,30 @@ describe('embedQueryBody', () => {
     });
 });
 
+describe('embedQueryBody — BI-INSIGHTS-1 I-11 / I-7 overlays', () => {
+    const LINE = {
+        name: 'Daily sales',
+        datasetId: 'sales_ds',
+        vizType: 'line',
+        controls: {
+            x: [{ field: 'sold_at', grain: 'day' as const }],
+            y: [{ field: 'amount', agg: 'sum' as const }],
+        },
+    };
+
+    it('asks the public query for the overlays and the date bucket, as the app does', () => {
+        const body = embedQueryBody({ ...LINE, options: { overlay: { forecast: {}, anomaly: { sensitivity: 4 } } } })!;
+        expect(body.grains).toEqual({ sold_at: 'day' });
+        expect(body.overlay).toEqual({ forecast: {}, anomaly: {} });
+    });
+
+    it('sends no overlay without the option, nor on a chart without a grained date', () => {
+        expect(embedQueryBody(LINE)!.overlay).toBeUndefined();
+        const raw = { ...LINE, controls: { ...LINE.controls, x: [{ field: 'region' }] } };
+        expect(embedQueryBody({ ...raw, options: { overlay: { anomaly: {} } } })!.overlay).toBeUndefined();
+    });
+});
+
 describe('ShareViewerComponent', () => {
     async function create(share: Partial<ShareService>) {
         TestBed.configureTestingModule({

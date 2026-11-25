@@ -11,6 +11,25 @@ import { MEASURE_AGGS } from 'app/inspecto/query/measure-grammar';
  */
 // 'name' (the rule id) is asked at save time (ui-design-review R9 — name-at-save), not declared
 // here; see AlertRuleFormDialog's `saveForm`.
+/** What each KPI watch writes: `projection` and `rag` as `AlertRule` reads them (a RAG rule fixes its own comparator). */
+export const KPI_WATCH_KEYS: Record<string, { projection?: 'value' | 'probability'; rag?: boolean }> = {
+    value: {},
+    status: { rag: true },
+    projection: { projection: 'value' },
+    projectedStatus: { projection: 'value', rag: true },
+    probability: { projection: 'probability' },
+};
+
+/** The KPI watch a stored rule's keys spell (the inverse of {@link KPI_WATCH_KEYS}). */
+export function kpiWatchOf(r: { projection?: string | null; rag?: string | null }): string {
+    if (r.projection === 'probability') return 'probability';
+    if (r.projection === 'value') return r.rag ? 'projectedStatus' : 'projection';
+    return r.rag ? 'status' : 'value';
+}
+
+/** Comparator and threshold show unless the rule reads a RAG status (the engine fixes both there). */
+const NUMERIC_WATCH = { key: 'kpiWatch', in: ['value', 'projection', 'probability'] };
+
 export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
     {
         key: 'kind',
@@ -21,6 +40,7 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
         options: [
             { value: 'metric', label: "A Pipeline's processing Metric (over its recent Consignments)" },
             { value: 'measure', label: 'A Dataset Measure (over its current data)' },
+            { value: 'kpi', label: 'A KPI (its value, status or projection for the period so far)' },
         ],
     },
     {
@@ -42,6 +62,44 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
         help: `count, or agg(column) with agg one of ${MEASURE_AGGS.join(', ')}.`,
     },
     {
+        key: 'kpi',
+        label: 'KPI',
+        type: 'autocomplete',
+        tier: 'required',
+        dependsOn: { key: 'kind', equals: 'kpi' },
+        placeholder: 'e.g. monthly_revenue',
+        help: 'The saved KPI. The rule reads it as you, so it never sees more than you may.',
+    },
+    // Form-only, like `kind`: picks the KPI rule's `projection` / `rag` keys (KPI_WATCH_KEYS). Its default keeps
+    // comparator and threshold visible for the other kinds, where it is hidden.
+    {
+        key: 'kpiWatch',
+        label: 'Alert on',
+        type: 'select',
+        tier: 'required',
+        default: 'value',
+        dependsOn: { key: 'kind', equals: 'kpi' },
+        options: [
+            { value: 'value', label: 'Its value so far this period' },
+            { value: 'status', label: 'Its RAG status' },
+            { value: 'projection', label: 'Where the period is projected to land' },
+            { value: 'projectedStatus', label: 'The RAG status of the projected landing' },
+            { value: 'probability', label: 'The chance of meeting its target' },
+        ],
+    },
+    {
+        key: 'rag',
+        label: 'Fire at',
+        type: 'select',
+        tier: 'required',
+        default: 'red',
+        dependsOn: { key: 'kpiWatch', in: ['status', 'projectedStatus'] },
+        options: [
+            { value: 'amber', label: 'Amber or worse' },
+            { value: 'red', label: 'Red' },
+        ],
+    },
+    {
         key: 'metric',
         label: 'Metric',
         type: 'autocomplete',
@@ -56,6 +114,7 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
         type: 'select',
         tier: 'required',
         default: 'gt',
+        dependsOn: NUMERIC_WATCH,
         options: [
             { value: 'gt', label: '> greater than' },
             { value: 'gte', label: '≥ at least' },
@@ -69,7 +128,8 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
         label: 'Threshold',
         type: 'number',
         tier: 'required',
-        help: 'A positive number (an error rate is a fraction, e.g. 0.05).',
+        dependsOn: NUMERIC_WATCH,
+        help: 'A positive number (an error rate or a chance is a fraction, e.g. 0.05).',
     },
     {
         key: 'window',

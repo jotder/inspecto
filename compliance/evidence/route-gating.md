@@ -177,7 +177,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/connections/([^/]+)/probe` | gated | `canOnboardConnections` | `inspecto/src/main/java/com/gamma/control/ConnectionRoutes.java:55` |
 | POST | `/connections/([^/]+)/test` | gated | `canOnboardConnections` | `inspecto/src/main/java/com/gamma/control/ConnectionRoutes.java:50` |
 | POST | `/connections/test` | gated | `canOnboardConnections` | `inspecto/src/main/java/com/gamma/control/ConnectionRoutes.java:63` |
-| POST | `/dashboards/([^/]+)/share` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ShareRoutes.java:55` |
+| POST | `/dashboards/([^/]+)/share` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/ShareRoutes.java:56` |
 | PUT | `/datasets/([^/]+)/columns/([^/]+)` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/OnboardRoutes.java:88` |
 | POST | `/datasets/([^/]+)/compact` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/DatasetCompaction.java:49` |
 | DELETE | `/datasets/([^/]+)/feed` | gated | `canUploadData` | `inspecto/src/main/java/com/gamma/control/DatasetFeed.java:72` |
@@ -370,7 +370,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/pipelines/rename/resume` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineRenameRoutes.java:57` |
 | POST | `/promotion/apply` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpacePromotionRoutes.java:58` |
 | POST | `/promotion/preview` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpacePromotionRoutes.java:57` |
-| POST | `/public/dashboards/([^/]+)/query` | exempt | self-verifying-public | `inspecto/src/main/java/com/gamma/control/ShareRoutes.java:58` |
+| POST | `/public/dashboards/([^/]+)/query` | exempt | self-verifying-public | `inspecto/src/main/java/com/gamma/control/ShareRoutes.java:59` |
 | POST | `/public/delivery-status/([^/]+)` | exempt | self-verifying-public | `inspecto/src/main/java/com/gamma/control/DeliveryStatusRoutes.java:70` |
 | POST | `/queries/([^/]+)/run` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/QueryRoutes.java:49` |
 | POST | `/recon/([^/]+)/breaks/status` | gated | `canOperateRuns` | `features/inspecto-reconciliation/src/main/java/com/gamma/recon/ReconRoutes.java:89` |
