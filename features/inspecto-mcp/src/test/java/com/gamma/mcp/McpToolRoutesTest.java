@@ -45,6 +45,11 @@ class McpToolRoutesTest {
                     calls.add(t.router().route(t.validate(new LinkedHashMap<>(Map.of("run", "orders", "action", action)))));
                 continue;
             }
+            if (t.name().equals("preview_config")) {   // W6 group A: every preview kind
+                for (String kind : McpTools.PREVIEWS.keySet())
+                    calls.add(t.router().route(t.validate(new LinkedHashMap<>(Map.of("kind", kind, "body", Map.of())))));
+                continue;
+            }
             if (t.name().equals("run_link_query") || t.name().equals("work_draft")) {   // AK-2f: every kind and action
                 java.util.Collection<String> values = t.name().equals("run_link_query") ? McpTools.LINK_QUERIES.keySet()
                         : McpTools.DRAFT_ACTIONS;

@@ -98,6 +98,18 @@ class AgentGateParityTest {
         assertEquals(Set.of("POST /pipelines/authored/([^/]+)/run"), AgentGate.PERSON_ONLY);
     }
 
+    /** W6 group A (D-AK10): the five authoring previews are allowed to every agent — read-shaped exemptions, none person-only. */
+    @Test
+    void theAuthoringPreviewsAreAllowedToEveryAgent() {
+        Map<String, String> m = manifest();
+        assertEquals(5, AgentGate.AUTHORING_PREVIEWS.size());
+        for (String key : AgentGate.AUTHORING_PREVIEWS) {
+            assertEquals("exempt:read-shaped", m.get(key), key);
+            assertEquals(AgentGate.Bucket.ALLOWED, bucket(key), key);
+            assertFalse(AgentGate.PERSON_ONLY.contains(key), key);
+        }
+    }
+
     @Test
     void theActionBucketIsExactlyTheNamedOperationalRoutes() {
         Map<String, String> m = manifest();

@@ -160,6 +160,7 @@ is passed on as the replayed route's JSON body, unchanged.
 |---|---|---|---|
 | `validate_config` | read | `type`, `config` | `POST /validate` (`{type, config}`); refusal findings come back as data |
 | `dry_run_pipeline` | read | `pipeline`, `body?` | `POST /pipelines/authored/{pipeline}/dry-run` |
+| `preview_config` | read | `kind`, `body` | one of the five authoring previews (W6 group A, [spec-agent-previews.md](spec-agent-previews.md)) |
 | `propose_change` | write | `kind`, `operation`, `id?`, `version?`, `content?`, `reason?` | the kind's own write route, below; `reason` rides as the request attribute `RequestAttrs.ATTR_CHANGE_REASON`, which `PendingChanges.hold` reads before the `X-Change-Reason` header (an in-process replay need not be header-safe; a header holding "—" or "→" made the replay throw — `AGENT-PROPOSE-500-1`, fixed 2026-11-24) |
 | `list_requirements` | read | — | `GET /requirements` (W2 step 2: what a `requirement-kpi` proposal starts from) |
 | `list_pipeline_versions` | read | `pipeline` | `GET /pipelines/{pipeline}/history` (W2 step 2: what a `pipeline-restore` restores) |
@@ -355,7 +356,10 @@ agent token calling a route directly is treated the same.
   2. **allowed** — reads (GET), and `POST /mcp`, `/validate`, `/pipelines/authored/{id}/dry-run`,
      `/bundle/export`, `/promotion/preview`, `/pending-changes/{id}/withdraw`, `/action-requests` (held by its
      own design), `/db/query` (the read the AK-1 `query_dataset` tool replays) and `/pipelines/authored/{id}/run`
-     (D-AK2: a delegated person only, never a machine), and `/pending-actions/{id}/withdraw`;
+     (D-AK2: a delegated person only, never a machine), and `/pending-actions/{id}/withdraw`; since **W6 group A**
+     (2026-11-26) the five authoring previews (`AgentGate.AUTHORING_PREVIEWS`: `/config/preview/parsing|schema`,
+     `/config/suggest/schema`, `/components/mapping/validate`, `/lookups/test`), for every agent, body-capped at
+     256 KiB and naming no config file ([Agent authoring previews](spec-agent-previews.md));
   3. **actions** (**AK-2d**, 2026-11-25) — `AgentGate.ACTIONS`, the operational routes of plan §4.6: `POST
      /runs/{id}/trigger|pause|resume|reprocess|replay-rejects|drain`, `…/retries/retry-now|cancel`,
      `…/quarantine/release` (since 2026-11-25, widening plan W1),

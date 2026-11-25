@@ -356,6 +356,17 @@ final class McpTools {
         return McpRoutes.jsonBytes(b == null ? Map.of() : (Map<String, Object>) b);
     }
 
+    /**
+     * {@code preview_config}'s kinds → the authoring preview each replays (AK-2 widening plan W6 group A; every one in
+     * {@code AgentGate.AUTHORING_PREVIEWS}, so an agent's call runs body-capped and may name no config file).
+     */
+    static final Map<String, String> PREVIEWS = Map.of(
+            "parsing", "/config/preview/parsing",
+            "suggest-schema", "/config/suggest/schema",
+            "schema", "/config/preview/schema",
+            "mapping", "/components/mapping/validate",
+            "lookup", "/lookups/test");
+
     static final List<Tool> WRITE_TOOLS = List.of(
             new Tool("validate_config", "Validate a config",
                     "Check a config draft against the server's own save gate WITHOUT writing it: the findings a save would "
@@ -370,6 +381,18 @@ final class McpTools {
                             body("The dry-run request: optional sample rows and an optional draft graph, as POST "
                                     + "/pipelines/authored/{id}/dry-run takes them.", false)),
                     a -> new Call("POST", "/pipelines/authored/" + seg(a.get("pipeline")) + "/dry-run", bodyOf(a))),
+            new Tool("preview_config", "Preview a config draft",
+                    "Try a draft against the server's own parser, casts and lookups on sample data; writes nothing. kind "
+                            + "parsing: a Pipeline draft's parsing: settings over raw text, body {config, sample_text}. "
+                            + "suggest-schema: the typed fields the server infers from parsed rows, body {sampleRows, "
+                            + "frontend?, decimalSeparator?, config?}. schema: a schema draft's casts and mapping over parsed "
+                            + "rows, body {config, sampleRows}. mapping: a mapping's rules checked, body {rules}. lookup: one "
+                            + "value through a loaded Pipeline's keyed join, body {pipeline, step, value, at?}. At most 256 KiB; "
+                            + "the draft must be inline - one naming a file (schema_file, grammar, mapping_file) is refused. "
+                            + "Preview until clean, then propose.",
+                    List.of(new Arg("kind", Kind.ENUM, true, "Which preview.", List.copyOf(new java.util.TreeSet<>(PREVIEWS.keySet()))),
+                            body("The preview's own request body (see the description).", true)),
+                    a -> new Call("POST", PREVIEWS.get((String) a.get("kind")), bodyOf(a))),
             new Tool("propose_change", "Propose a config change",
                     "Propose creating, updating or deleting a Pipeline, Expectation, Alert Rule, Job, Widget, Dashboard, "
                             + "Decision Rule, Notification Rule or Notification Channel; creating the KPI of a delivered kpi Requirement "

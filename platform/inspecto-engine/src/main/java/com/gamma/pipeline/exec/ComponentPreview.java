@@ -622,9 +622,13 @@ public final class ComponentPreview {
         }
         String allOk = conds.isEmpty() ? "TRUE" : String.join(" AND ", conds);
 
-        File db = DuckDbUtil.tempDbFile("preview_");
-        try (Connection conn = DuckDbUtil.openConnection(db)) {
+        // Sealed like transform(): the draft's own SQL runs here — an EXPR mapping rule is author SQL emitted verbatim, and
+        // a field's cast format is the author's text — so after seeding it can reach the scratch tables and no file
+        // (AGENT-KIT-1 W6 group A: an unsealed connection let read_text('<any path>') in an EXPR rule read the disk).
+        try (SqlSandbox sandbox = SqlSandbox.open(SqlSandboxPolicy.defaultPolicy())) {
+            Connection conn = sandbox.connection();
             ScratchTables.seed(conn, INPUT, columns, sampleRows);
+            sandbox.seal();
             String data = "preview_schema__data";
             String rejected = "preview_schema__rejected";
             try (java.sql.Statement st = conn.createStatement()) {
@@ -656,8 +660,6 @@ public final class ComponentPreview {
                         ScratchTables.readRows(conn, mapped, MAX_ROWS)));
             }
             return new Result(columns, List.copyOf(out));
-        } finally {
-            DuckDbUtil.deleteTempDb(db);
         }
     }
 

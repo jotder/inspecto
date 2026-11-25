@@ -8,6 +8,7 @@ import com.gamma.spi.auth.Authenticators;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.auth.PublicPaths;
 import com.gamma.spi.auth.AuthChallenges;
+import com.gamma.config.safety.PathJail;
 import com.gamma.spi.auth.Subject;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.http.Envelope;
@@ -1181,7 +1182,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
             if (idempotency(ex, method, path)) return;   // after every gate, before the handler's side effects
             try {
                 PendingActions.holdIfMachineAction(this, ex, method, bare(r));   // AK-2d: a machine agent's action → 202
-                Object result = r.handler.handle(ex, m);
+                Object result = handle(ex, method, r, m);
                 if (result != HANDLED) respond(ex, 200, result);
             } catch (ApiException ae) {
                 if (ae.status == 401 || ae.status == 403) AuditTrail.accessDenied(ex, method, path, ae.status);
@@ -1257,7 +1258,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 Object result;
                 try {
                     PendingActions.holdIfMachineAction(this, rx, method, bare(r));   // every door, as the gate
-                    result = r.handler.handle(rx, m);
+                    result = handle(rx, method, r, m);
                 } catch (PendingChanges.Held held) {
                     // AK-2b: a replayed write that became a Pending Change answers 202, exactly as routeDispatch does
                     respond(rx, 202, held.body());
@@ -1367,6 +1368,18 @@ public final class ControlApi implements AutoCloseable, HostContext {
     private static String agentRefusal(HttpExchange ex, String method, Route r) {
         return ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s
                 ? AgentGate.refusal(s, method, r.pattern.pattern()) : null;
+    }
+
+    /**
+     * Run the route's handler — for an agent's authoring preview (AK-2 widening plan W6 group A) bounded on every door: a
+     * body over {@link AgentGate#PREVIEW_MAX_BODY_BYTES} is 413 before the handler parses it (the bytes are cached, so its
+     * own {@code body()} reads them), and the draft may not name a config file ({@link PathJail#withoutConfigRefs}).
+     */
+    private Object handle(HttpExchange ex, String method, Route r, Matcher m) throws Exception {
+        if (!(ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s) || !AgentGate.agentPreview(s, method, bare(r)))
+            return r.handler.handle(ex, m);
+        rawBody(ex, AgentGate.PREVIEW_MAX_BODY_BYTES);
+        return PathJail.withoutConfigRefs(AgentGate.NO_FILE_REFS, () -> r.handler.handle(ex, m));
     }
 
     /** Route-level PEP (ABAC A3): consult the edition's {@link AccessDecider} — a no-op when none is

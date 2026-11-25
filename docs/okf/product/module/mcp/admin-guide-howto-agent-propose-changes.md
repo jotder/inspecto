@@ -88,8 +88,10 @@ person** approves it. The agent never approves, never reveals a masked value, an
    - A client that cannot run an OAuth sign-in cannot be used: a token copied from the console belongs to the
      console's client, and the write tools refuse it.
 4. **Ask the agent for an outcome**, for example "add a check that amount is never negative on orders, and tell me how
-   many rows break it today". It validates, dry-runs where it builds a Pipeline, and proposes. It reports a Pending
-   Change id (`pc-…`).
+   many rows break it today". It validates, previews (parses a sample, suggests and checks a schema, checks a
+   mapping or a lookup), dry-runs where it builds a Pipeline, and proposes once the draft is clean. It reports a
+   Pending Change id (`pc-…`). The previews write nothing; an agent's preview body is at most 256 KiB and its draft
+   may not name a file — it puts the schema, grammar or mapping inline.
 5. **A second person approves** on the Pending Changes screen. Each agent proposal reads "Proposed by *person* via
    agent client *claude-code*", with the agent's one-line reason and the diff. Approve, or decline with a note the
    agent can read on its next turn.
@@ -117,6 +119,8 @@ naming the person as the actor.
   the client is not in `auth.oidc.agentClients`.
 - 403 "an agent client may not call …" — the agent tried a step that is closed to agents: uploading a file,
   registering a Dataset, settings, access or Apps. A person does it in the console (Add data for a file).
+- A preview answers 413 — the agent sent more than 256 KiB of sample; or 422 "names a file" — its draft pointed at a
+  schema, grammar or mapping file instead of carrying it inline. Both are the agent's to fix; tell it so.
 - The proposal never becomes live — no second person has approved it. The person the agent acts for cannot approve
   it either (four eyes, always).
 - 401 on every call — the token's audience is not the install's, or the agent's client sets no `azp`/`client_id`.

@@ -113,10 +113,35 @@ final class AgentGate {
             "POST /inv/investigations/([^/]+)/dossier/verify", "POST /inv/investigations/([^/]+)/dossier/bundle/verify");
 
     /**
+     * The authoring previews (widening plan W6 group A, D-AK10 signed 2026-11-25: for every agent): a draft's parsing over
+     * raw sample text, its schema casts and mapping over parsed rows, the schema the server infers from rows, a mapping's
+     * rule check, and one value looked up in a loaded Pipeline's keyed join. Each persists nothing (scratch DuckDB or an
+     * in-memory index). For an agent the host runs them with two more bounds ({@code ControlApi.handle}): the body is at
+     * most {@link #PREVIEW_MAX_BODY_BYTES} (413), and the draft may not name a config file — a {@code schema_file},
+     * {@code grammar}, {@code mapping_file} or profile ref is refused before anything is read
+     * ({@code PathJail.withoutConfigRefs}). The schema preview's draft SQL (an EXPR rule) runs sealed, with no file access.
+     */
+    static final Set<String> AUTHORING_PREVIEWS = Set.of(
+            "POST /config/suggest/schema", "POST /config/preview/parsing", "POST /config/preview/schema",
+            "POST /components/mapping/validate", "POST /lookups/test");
+
+    /** An agent's authoring-preview body cap: the MCP endpoint's own 256 KiB, so a direct call gets no more than a tool call. */
+    static final int PREVIEW_MAX_BODY_BYTES = 256 * 1024;
+
+    /** Why an agent's authoring preview may not name a config file (W6 group A). */
+    static final String NO_FILE_REFS = "an agent's preview draft names no file — put the schema, grammar or mapping inline";
+
+    /** Whether {@code subject} is an agent calling one of the {@link #AUTHORING_PREVIEWS} (route pattern without anchors). */
+    static boolean agentPreview(Subject subject, String method, String pattern) {
+        return subject != null && subject.agent() && AUTHORING_PREVIEWS.contains(method + " " + pattern);
+    }
+
+    /**
      * Writes an agent may make that change nothing governed: the MCP endpoint itself, validation and dry runs, the Ship
      * reads, taking back its own proposal, an Action Request (held for approval by its own design), {@code POST /db/query}
      * (the read the AK-1 {@code query_dataset} tool replays; SqlGuard and masking run as for the person) and a Pipeline
-     * run (D-AK2: a delegated person only — {@link #PERSON_ONLY}); and the Link Analysis queries ({@link #LA_READS}, AK-2f).
+     * run (D-AK2: a delegated person only — {@link #PERSON_ONLY}); the Link Analysis queries ({@link #LA_READS}, AK-2f);
+     * and the authoring previews ({@link #AUTHORING_PREVIEWS}, W6 group A).
      */
     static final Set<String> ALLOWED;
     static {
@@ -133,6 +158,7 @@ final class AgentGate {
                 "POST /db/query",
                 "POST /pipelines/authored/([^/]+)/run"));
         all.addAll(LA_READS);
+        all.addAll(AUTHORING_PREVIEWS);
         ALLOWED = Set.copyOf(all);
     }
 
@@ -203,8 +229,8 @@ final class AgentGate {
         return never(method, pattern)
                 ? "an agent client never approves, reveals, promotes, or changes Apps or access — a person must"
                 : "an agent client may not call " + method + " " + pattern + " — an agent proposes config changes (held "
-                        + "for approval), takes run, Case and Link Analysis Draft actions within its rights, validates, dry-runs and "
-                        + "reads; sign in "
+                        + "for approval), takes run, Case and Link Analysis Draft actions within its rights, validates, previews, "
+                        + "dry-runs and reads; sign in "
                         + "without the agent client for anything else";
     }
 }

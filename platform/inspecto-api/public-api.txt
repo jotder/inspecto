@@ -431,6 +431,7 @@ com.gamma.config.safety.PathJail | public static void refuseDataHome(Path, Path,
 com.gamma.config.safety.PathJail | public static void refuseSecrets(Path, String, String)
 com.gamma.config.safety.PathJail | public static void registerDataRoot(Path)
 com.gamma.config.safety.PathJail | public static void registerRestrictedStore(Path)
+com.gamma.config.safety.PathJail | public static<T, X extends Throwable> T withoutConfigRefs(String, ScopedValue.CallableOp<T, X>) throws X
 com.gamma.config.safety.PathJail.Escape | public String field()
 com.gamma.config.safety.PathJail.Escape | public String value()
 com.gamma.config.safety.PathJail.Escape | public static final class Escape extends RuntimeException
