@@ -62,6 +62,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `TEST-WRITES-TRACKED-DIR-1` | P3 | chore | a test run deletes a tracked file: | — |
 | `DRYRUN-PREVIEW-UNMASKED-1` | P3 | defect | Pipeline dry-run and test-run previews are not masked: | — |
 | `SAVE-AS-TEMPLATE-LEFTOVER-1` | P3 | defect | POST /pipelines/{id}/save-as-template copies the source's schema and segment schemas into the write root before its hold and removes them… | — |
+| `ENGINE-ETL-TESTS-RED-1` | P2 | defect | Nine inspecto-etl / inspecto-engine tests fail on master since the 2026-11-25 pushes of OUTPUT-NAME-OVERWRITE-1 (e37f96b1a) and DATED-REF… | — |
 | `NUM-ROUND-TYPE-AWARE-1` | P3 | feature | The Record Transformer's num.round rounds a DOUBLE column the DuckDB 2.0.1 way (52.05 → 52.0; 2.0.0 gave 52.1). | — |
 | `RECORD-TRANSFORM-NUM-VARCHAR-1` | P3 | defect | On the ingest side the Record Transformer's num.* functions (num.round seen; num.multiply probably) do not bind: | — |
 | `DUCKLAKE-REAL-DRIVER-FAILURE-PROOF-1` | P3 | chore | no test proves that a real DuckLake driver's registration failure is non-fatal (filed 2026-11-16; untracked since SPEC-NOPROOF-1 closed o… | external |
