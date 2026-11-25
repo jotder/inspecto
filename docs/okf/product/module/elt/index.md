@@ -36,8 +36,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | `AUTHORING-REDESIGN-1` | P3 | feature | Only letter (d) of the authoring redesign is left; no CREATE MACRO exists in any main source. | demand |
 | — | P3 | feature | Step Processor catalog | — |
-| `QUARANTINE-RELEASE-1` | P3 | feature | a quarantined file has no console action: the Quarantine tab lists files per Pipeline (no run, Consignment or time) and offers only *View… | — |
-| `OUTPUT-NAME-OVERWRITE-1` | P3 | defect | A second file with the same file name silently replaces the first file's rows, on any Pipeline (filed 2026-11-20, BASIC-ELT-PROFILE-1 B3… | — |
 | `REPROCESS-ARCHIVE-MEMBER-1` | P3 | defect | Reprocessing ONE Consignment of a zip restores the whole archive under the member's composite name and reads every entry again, so rows d… | — |
 | `PARSER-SPI-KIT-1` | P3 | chore | the Parser extension point (com.gamma.parse.ParserPlugin, a public API since 4.0.0) has no starter and is missing from the developer docs. | — |
 | `PARSING-DERIVE-EDITOR-1` | P3 | feature | slice 4 of Parsing D9: an optional profile editor for ASN.1 derive / children. | operator |

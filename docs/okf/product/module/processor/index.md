@@ -35,7 +35,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | — | P3 | feature | Platform Services Stage 2 / 3 | demand |
-| `QUARANTINE-RELEASE-1` | P3 | feature | a quarantined file has no console action: the Quarantine tab lists files per Pipeline (no run, Consignment or time) and offers only *View… | — |
 | `IMPORT-RUN-REFUSAL-GAPS-1` | P3 | defect | Two kinds of run can still commit while Add data's run-scoped choice is open, and a held claim refuses every manual run (filed 2026-11-20… | — |
 | `SNAPSHOT-OUTSIDE-RUN-NOW-1` | P3 | defect | A run of a switched Postgres snapshot outside Run now has no column check, no import.max_rows cap and only the engine's own fetch wording… | — |
 | `BASIC-PROFILE-TIDY-1` | P3 | chore | Three small leftovers of the Basic profile lanes (filed 2026-11-20, BASIC-ELT-PROFILE-1 close). | — |

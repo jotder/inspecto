@@ -28,7 +28,8 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **163<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 147<!--count:backlog-p3--> × P3** —
+> **161<!--count:backlog-rows--> rows: 1<!--count:backlog-p1--> × P1 · 15<!--count:backlog-p2--> × P2 · 145<!--count:backlog-p3--> × P3** —
+> ⬇ **163 → 161 (P3 147 → 145) on 2026-11-25**: closed P3 `OUTPUT-NAME-OVERWRITE-1` [items: module.elt, module.engine · kind: defect] (`e37f96b1a`; `ConsignmentIngestStrategy.nonCollidingBaseName` disambiguates committed cross-batch / `on_change: reprocess` stem collisions to `<baseName>__<8hex>` while keeping `output_per_member` off by default) and P3 `QUARANTINE-RELEASE-1` [items: module.elt, module.processor · kind: feature] (`b53d07ef9`; `consignment_id`/`quarantined_at` metadata + `POST /runs/{name}/quarantine/release` + Quarantine tab `Release & reprocess` action).
 > ⬇ **173 → 163 (P2 17 → 15, P3 155 → 147) on 2026-11-25**: closed 2 P2 + 8 P3 rows and narrowed 2 P3 rows via swarm:
 >   - Closed P2 `DATED-REFERENCE-RUNS-1` [items: module.elt, module.engine, layer.product · kind: feature] (`dbb720aae`, `9663e7297`; `DatedReferences`, `DayReconciler`, `job_day_progress`, `JobRoutes` backlog API + `RunsBacklogComponent`; plan archived as `archived-documents/plans-archive/2026-11-22-dated-reference-runs-plan.md`).
 >   - Closed P2 `JOB-GRAPH-1` [items: module.elt, layer.product · kind: feature] (`ca6bf0256`, `fea9792af`; `connector: dataset` Job Pipelines, Reference edges, `split-job-pipeline`, Topology By Dataset / create-in-place; plan archived as `archived-documents/plans-archive/2026-11-22-job-graph-plan.md`) and P3 `OUTPUT-STORE-SINK-NOT-DRAWN-1` [items: module.elt, layer.product · kind: defect] (`ca6bf0256`).
@@ -129,10 +130,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > ↔ **89 (no count change, P2 13, P3 76) on 2026-11-17**: narrowed P3 `LEGAL-HOLD-SCOPE-1` [items: module.ops, addon.incidents, module.engine · kind: feature] (MoSCoW S12) — a legal hold now protects an Incident's evidence (its notes and attachments, Alerts, links, the Case it is in and that Case's Investigations, its audit days): the three retention tasks skip it and seven delete paths answer 409, audited, until release. Left open: `partition_prune` (no Incident-to-partition lineage) and a screen to set a hold.
 > ⬇ **90 → 89 (P3 77 → 76) on 2026-11-17**: closed P3 chore `OPENAPI-SKELETON-SUMMARIES-1` [items: module.api · kind: chore] (MoSCoW C3) — all 439 public operations that were generated skeletons in `docs/api/openapi-v1.json` now carry a summary and a one- or two-sentence description read from their handlers (what it does, the capability, the main refusals), written in the module fragments. "Public" = every `/api/v1` operation registered by shipped code; the one skeleton left, `GET /test-discovered/ping`, is registered only by a test RouteModule. New CI guard `tools/check-openapi-summaries.mjs` fails on a skeleton summary or stock description outside its allow-list, which may only shrink. `x-generated` stays: those operations still have no request/response schemas.
 > ⚠ **Report the 1<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 147<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 145<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 1<!--count:backlog-p1--> P1 + 15<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 147<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 163<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 145<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 161<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -274,12 +275,7 @@ the git-tree API: `gh api 'repos/jotder/inspect-agent/git/trees/main?recursive=1
 
 #### Runs, replay & dry runs
 
-
-- **P3** · `QUARANTINE-RELEASE-1` — **a quarantined file has no console action: the Quarantine tab lists files per Pipeline (no run, Consignment or time) and offers only *View the rejected rows*;** the remedy is to repair the file and move it back into the inbox by hand, and *Reprocess this batch* exists for batches only. Found writing `howto_handle_quarantined_rows` (plan `2026-11-19-user-enablement-and-agent-kit-plan.md` §4.5). [items: module.elt, module.processor · kind: feature]
-
 #### Consignments
-
-- **P3** · `OUTPUT-NAME-OVERWRITE-1` — **A second file with the same file name silently replaces the first file's rows, on any Pipeline (filed 2026-11-20, `BASIC-ELT-PROFILE-1` B3 part 2).** With `processing.output_per_member` off (the default) an output is named by the file's stem without its folder, so `later/feed.csv` taken after `feed.csv` (or `feed.csv` again under `on_change: reprocess`) writes over the first one's output: reproduced 112 rows → 106 on an import. Across batches the stage-1 stem guard does not apply. Add data imports guard it by refusing the name (`ImportFingerprints`); every other Pipeline still loses the rows. Fix: name outputs by origin by default (`output_per_member`'s `<stem>__<hash>`), or refuse the collision across batches. → `okf/product/module/elt/spec-ingest-coordination-failover.md` [items: module.elt, module.engine · kind: defect]
 
 ### 3.3 Acquisition, Collectors & Parsing
 
