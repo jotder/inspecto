@@ -354,6 +354,44 @@ class ControlApiLookupsTest {
     }
 
     @Test
+    void aFuzzyLookupAnswersWithScoreBlockAndTopKCandidates(@TempDir Path dir) throws Exception {
+        System.setProperty("assist.safety.roots", dir.toString());
+        Path ref = dir.resolve("refdata").resolve("merchants.csv");
+        Files.createDirectories(ref.getParent());
+        Files.writeString(ref, "country,name,tier\nUS,ACME CORP,gold\nUS,ACME CO,silver\nUK,BETA CORP,bronze\n");
+        String steps = """
+                output_store: enriched_calls
+                steps[1]:
+                  - join:
+                      reference: %s
+                      key: name
+                      match: fuzzy
+                      method: jaro_winkler
+                      threshold: 0.8
+                      block: country
+                      top_k: 2
+                      on: merchant_name
+                      columns: tier
+                """.formatted(ref.toString().replace('\\', '/'));
+        try (Ctx c = open(dir, steps)) {
+            JsonNode row = lookups(c).get("lookups").get(0);
+            assertEquals("fuzzy", row.get("match").asText());
+            assertEquals("country", row.get("block").get(0).asText());
+            String name = c.svc.loadedPipelines().get(0).identity().pipelineName();
+            String body = "{\"pipeline\":\"" + name + "\",\"step\":\"join\",\"value\":\"ACME COR\",\"blockValues\":{\"country\":\"US\"}}";
+            HttpResponse<String> r = test(c, body);
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode a = V1Body.of(r.body());
+            assertTrue(a.get("hit").asBoolean(), a.toString());
+            assertEquals("fuzzy", a.get("matchKind").asText());
+            assertEquals("ACME CORP", a.get("matchedKey").asText());
+            assertTrue(a.get("matchScore").asDouble() > 0.9, a.toString());
+            assertEquals("gold", a.get("mappings").get(0).get("columns").get("merchant_name_tier").asText());
+            assertEquals(2, a.get("candidates").size(), a.toString());
+        }
+    }
+
+    @Test
     void withReceiptsOffTheLastRunIsUnknown(@TempDir Path dir) throws Exception {
         System.setProperty("consignment.steps", "false");
         try (Ctx c = open(dir)) {

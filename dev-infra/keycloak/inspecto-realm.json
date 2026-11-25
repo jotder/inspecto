@@ -100,6 +100,49 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "claude-code",
+      "name": "AI agent client (Agent Kit, dev)",
+      "description": "DEV FIXTURE. The Agent Kit's agent client: list it in -Dauth.oidc.agentClients. Public, PKCE; redirects of the generated Claude Code, Gemini CLI and OpenCode packages (Codex prints its own).",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "http://localhost:8765/callback",
+        "http://localhost:8765/oauth/callback",
+        "http://127.0.0.1:8765/callback"
+      ],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "web-origins",
+        "acr",
+        "profile",
+        "roles",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "offline_access"
+      ],
+      "protocolMappers": [
+        {
+          "name": "inspecto-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "inspecto_spa",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
     }
   ],
   "users": [
@@ -136,7 +179,8 @@
         }
       ],
       "realmRoles": [
-        "pipeline-developer"
+        "pipeline-developer",
+        "offline_access"
       ]
     },
     {

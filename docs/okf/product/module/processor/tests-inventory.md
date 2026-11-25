@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-480 test class(es): 194 unit, 286 real-HTTP control-plane, 0 IT.
+481 test class(es): 195 unit, 286 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -416,6 +416,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `BaselineProfileStoreTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/BaselineProfileStoreTest.java` | DUCKLE-C8 — the durable profile history + accepted-profile store behind the {@code baseline} kind. |
 | `ExpectationEvaluatorParityTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/ExpectationEvaluatorParityTest.java` | Golden corpus for the {@code non_null} / {@code range} / {@code regex} shorthand kinds: the failing-row |
 | `ExpectationEvaluatorSwapLockTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/ExpectationEvaluatorSwapLockTest.java` | SNAPSHOT-SWAP-UNLOCKED-READERS-1: an Expectation's count pins the target's files and scans them afterwards; a snapshot |
+| `ExpectationKindRequiredTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/ExpectationKindRequiredTest.java` | An Expectation draft with no {@code kind} is refused with the kind message (the route answers 422), not a |
 | `LaDailyFeedTemplateRulesTest` | `com.gamma.expectation` | unit | `inspecto/src/test/java/com/gamma/expectation/LaDailyFeedTemplateRulesTest.java` | LA-DATA-TRUST-1 S3, S4, S7 / S8: the rules the shipped {@code spaces/_templates/la-daily-feed} template carries load through |
 | `DryRunCoverageTest` | `com.gamma.job` | unit | `inspecto/src/test/java/com/gamma/job/DryRunCoverageTest.java` | Recurrence guard for {@code PLATFORM-SERVICES-DRYRUN-GAP-1}: every built-in Platform Service the host binds |
 | `JobTypesForTest` | `com.gamma.job` | unit | `inspecto/src/test/java/com/gamma/job/JobTypesForTest.java` | Test access, for host-module tests, to {@link JobService}'s package-private Job Type registration seam. |
