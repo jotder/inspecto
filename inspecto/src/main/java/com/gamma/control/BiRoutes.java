@@ -8,6 +8,7 @@ import com.gamma.config.spec.Finding;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
+import com.gamma.query.ChartOverlays;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.MeasureCompiler;
 import com.gamma.query.Parameters;
@@ -67,10 +68,12 @@ final class BiRoutes implements RouteModule {
         // 1. Parse + compile the spec (validated identifiers / typed literals only).
         MeasureCompiler.Spec spec;
         MeasureCompiler.Spec probe;
+        ChartOverlays.Request overlay;   // BI-INSIGHTS-1 I-7 / I-11: computed over this statement's own (masked) result
         MeasureCompiler.Compiled sql;   // the probe statement that is EXECUTED (cap + 1), its values bound
         String echoSql;   // the statement for the ORIGINAL spec (LIMIT = cap) that the response echoes, values rendered
         try {
             spec = MeasureCompiler.parse(body, ListLimitSettings.effectiveRows(writeRoot), MAX_LIMIT);
+            overlay = ChartOverlays.parse(body.get("overlay"), spec);
             // One row PAST the cap: the compiled statement carries its own LIMIT, so asking for exactly the cap
             // could never come back truncated (statistics.truncated was always false). QueryExecutor trims it.
             probe = spec.withLimit(spec.limit() + 1);
@@ -150,7 +153,17 @@ final class BiRoutes implements RouteModule {
             // BI-INSIGHTS-1 I-1: the comparison columns are marked, after masking (which keeps a marked column's mark).
             shown = new QueryExecutor.Result(ResultSetDescriptor.markCompare(shown.columns(), MeasureCompiler.compareColumns(spec)),
                     shown.rows(), shown.rowCount(), shown.truncated(), shown.elapsedMs());
-            return response(shown, echoSql, masking.describe());
+            // BI-INSIGHTS-1 I-7 / I-11 (D-BI7): forecast band and anomaly scores from the rows above — after masking, under the
+            // same cap, no second query — so a masked Measure or series key reaches the overlay only as the caller sees it.
+            List<Map<String, Object>> overlays = null;
+            if (overlay != null) {
+                ChartOverlays.Outcome o = ChartOverlays.apply(overlay, spec, shown);
+                shown = o.result();
+                overlays = o.summary();
+            }
+            Map<String, Object> out = response(shown, echoSql, masking.describe());
+            if (overlays != null) out.put("overlays", overlays);
+            return out;
         } catch (SQLException e) {
             throw masking.scrub(ServerFaults.datasetRead("BI query failed", spec.dataset(), dataset, e, api));
         }
@@ -225,7 +238,7 @@ final class BiRoutes implements RouteModule {
     }
 
     /** The Result Set contract (same shape as {@code /queries/{id}/run}) + the compiled SQL for transparency. */
-    private static Object response(QueryExecutor.Result r, String sql, Map<String, Object> masking) {
+    private static Map<String, Object> response(QueryExecutor.Result r, String sql, Map<String, Object> masking) {
         List<Map<String, Object>> columns = new ArrayList<>();
         for (ResultSetDescriptor.Column c : r.columns()) {
             Map<String, Object> col = new LinkedHashMap<>();
