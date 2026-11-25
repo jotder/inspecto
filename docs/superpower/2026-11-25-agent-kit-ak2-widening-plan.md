@@ -389,8 +389,9 @@ under it are the decision.
   (operator, 2026-11-25): `canManageIncidents` and `canManageExclusionCategories` are granted to the machine agent set
   globally, not per route**, knowing that a machine agent then also asks (held) for a new Case from entities and an
   Investigation attach, and **reads** what the two rights read — the Entity Identity reads and a `restricted` Entity
-  List's members in Screening hits, the Dossier and the Grow preview. That read is an **explicit, operator-accepted
-  exception to "an agent never reveals"**; `AGENT_NEVER_CAPABILITIES` is unchanged, and the set still applies only to
+  List's members: `GET /entity-lists/{id}` itself (raw unless masked by Entity Type), Screening hits, the Dossier, the
+  Grow preview's exact counts, and an Investigation's or Draft's replay and log (list in `spec-mcp.md` § Entity List
+  edits). That read is an **explicit, operator-accepted exception to "an agent never reveals"**; `AGENT_NEVER_CAPABILITIES` is unchanged, and the set still applies only to
   clients in `-Dauth.oidc.agentMachineClients`.
 - **D-AK10 — as recommended:** group A for every agent; B, D and E once masking is proven per route; C for a
   person's agent only.

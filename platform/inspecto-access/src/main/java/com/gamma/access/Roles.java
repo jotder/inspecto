@@ -266,8 +266,10 @@ public final class Roles {
      * (AK-2 widening W2 step 3, D-AK9 "Entity List edits", granted GLOBALLY, not per route), so a machine agent may propose
      * Entity List member, retire and attribute changes. Granted globally they also let it ask for a new Case from entities
      * and an Investigation attach (both held as Pending Actions) and READ what the two rights read: the Entity Identity
-     * reads, and a {@code restricted} Entity List's members in Screening hits, the Dossier and the Grow preview — an
-     * operator-accepted exception to "an agent never reveals" (spec-mcp.md, plan D-AK9). Its every write stays held.
+     * reads, and a {@code restricted} Entity List's members wherever {@code EntityListFacts.seesRestricted} decides —
+     * {@code GET /entity-lists/{id}}, Screening hits, the Dossier, the Grow preview, an Investigation's or Draft's replay
+     * and log — an operator-accepted exception to "an agent never reveals" (spec-mcp.md § Entity List edits, plan D-AK9).
+     * Its every write stays held.
      */
     public static final Set<String> AGENT_MACHINE_CAPABILITIES =
             Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_WORK_INCIDENTS, CAN_OPERATE_RUNS,

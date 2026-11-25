@@ -1,7 +1,7 @@
 ---
 type: How-to
 title: "Let an AI agent work Incidents and Cases"
-description: "Let an AI agent triage Incidents and work Cases on a Standard install: signed in as a person it comments, writes Briefs, accepts, assigns, resolves and opens Cases within that person's rights at once; as an unattended machine agent every such action waits as a Pending Action for a person to approve, and it never opens a Case."
+description: "Let an AI agent triage Incidents and work Cases on a Standard install: signed in as a person it comments, writes Briefs, accepts, assigns, resolves and opens Cases within that person's rights at once; as an unattended machine agent every such action waits as a Pending Action for a person to approve, opening a Case included."
 item: module.mcp
 audience: external
 status: current
@@ -20,7 +20,7 @@ Alert, and opens a Case over the entities an investigation found. Who the agent 
 - **Signed in as a person** (through an agent client): the action runs **at once**, within that person's own rights,
   exactly as if the person had pressed the button. The audit row names the person and the agent client.
 - **An unattended machine agent**: every action is **held** as a **Pending Action** and runs only once a person
-  approves it. A machine agent never opens a Case.
+  approves it — opening a Case too.
 
 An agent never approves anything — a Pending Action, a Pending Change or the Action Request a Brief proposes — and never
 merges, splits or edits an Incident's priority or severity.
@@ -32,7 +32,10 @@ merges, splits or edits an Incident's priority or severity.
 - **A person's agent:** set up as in *Let an AI agent propose changes*. The person needs `canWorkIncidents` to work
   Incidents and Cases, and `canManageIncidents` to open a Case. Commenting needs only that they can see the Incident.
 - **A machine agent:** set up as in *Let an AI agent operate runs* (listed in `auth.oidc.agentMachineClients`), holding
-  a role that grants `canWorkIncidents`. It never keeps `canManageIncidents`, whatever its role grants.
+  a role that grants `canWorkIncidents` (and `canManageIncidents` to ask for a new Case). Since 2026-11-25 a machine
+  agent keeps `canManageIncidents` and `canManageExclusionCategories` when its role grants them; every write stays
+  held, but **`canManageExclusionCategories` also lets it read a restricted Entity List's members** (the Entity List
+  itself, Screening hits, Investigation replays). Grant it to a machine role only if that is acceptable.
 - **An approver:** a person who holds `canApproveChanges` and is on the Space's approver roster.
 
 ## Steps

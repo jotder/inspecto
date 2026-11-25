@@ -50,7 +50,7 @@ class ControlApiAgentLinkAnalysisTest {
     private static final String LEAD = "Bearer lead", AGENT = "Bearer agent", BOT = "Bearer bot", CHECKER = "Bearer checker",
             ANALYST = "Bearer analyst";
     private final HttpClient client = HttpClient.newHttpClient();
-    /** The machine's authored Space role: the Draft right, and two rights a machine agent never keeps. */
+    /** The machine's authored Space role: the Draft right, canManageIncidents (kept since W2 step 3) and a graph-run right it never keeps. */
     private static final String MACHINE_ROLE = "la-drafter";
 
     private record Ctx(CollectorService svc, ControlApi api, int port, Path root) implements AutoCloseable {

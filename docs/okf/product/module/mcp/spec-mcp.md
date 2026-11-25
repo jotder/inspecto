@@ -210,9 +210,14 @@ analyst skills `work-cases` (§ Entity Lists) and `triage-incident` describe the
   either right gates stays refused to agents (`AgentGateParityTest` pins the set and asserts no route either right
   gates sits in `ALLOWED`, which runs at once).
 - **Reads — an operator-accepted exception to "an agent never reveals".** `canManageExclusionCategories` is also the
-  right that shows a holder a `restricted` Entity List's members (`EntityListFacts.MANAGE_CATEGORIES`: Screening hits,
-  the Dossier's `excludeBy`, the Grow preview's counts), and `canManageIncidents` opens `GET /inv/entity-identities`.
-  A machine agent whose roles grant them now sees those. This is a deliberate exception, recorded in the plan's D-AK9
+  right that shows a holder a `restricted` Entity List (`EntityListFacts.seesRestricted`, every check below keys on
+  it), and `canManageIncidents` opens `GET /inv/entity-identities` (and `/group`). A machine agent whose roles grant
+  them now reads, at once: **`GET /entity-lists/{id}`** (also `?at=`) — the restricted list's full members, ranges and
+  expiring entries, raw unless the Space's masking mode masks that Entity Type; **Screening hits** naming a restricted
+  list's member; the **Dossier**'s `excludeBy`; the **Grow preview**'s exact (not rounded) counts;
+  **`POST /inv/investigations/{id}/replay`**, **`GET /inv/investigations/{id}/log`** and
+  **`GET …/drafts/{d}/replay`** — which keys a restricted exclusion step left out, with exact counts. (Found by the
+  W2 verification's security review; the first record named only Screening, the Dossier and the Grow preview.) This is a deliberate exception, recorded in the plan's D-AK9
   **Signed** line; `AGENT_NEVER_CAPABILITIES` (approve, approve an expand, `canRevealLinkEntities`) is unchanged, and
   a masked Link Analysis key stays masked.
 

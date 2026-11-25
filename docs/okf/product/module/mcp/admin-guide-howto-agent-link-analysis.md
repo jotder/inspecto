@@ -20,8 +20,8 @@ an Investigation. A person reads the Draft and promotes it — or not. Who the a
 - **Signed in as a person** (through an agent client): queries, Draft work, attaching an Investigation to a Case and
   graph runs run **at once**, within that person's own rights. The audit row names the person and the agent client.
 - **An unattended machine agent**: queries run at once; every Draft write is **held** as a **Pending Action** for a
-  person to approve, and only on an Investigation a lead added the machine to. It never attaches an Investigation to a
-  Case or starts a graph run.
+  person to approve, and only on an Investigation a lead added the machine to; so is attaching an Investigation to a
+  Case (when its role grants `canManageIncidents`). It never starts a graph run.
 
 No agent promotes a Draft, edits an Investigation directly, reveals a masked key or approves an expand. Every key an
 agent sees is masked when the Space masks.
