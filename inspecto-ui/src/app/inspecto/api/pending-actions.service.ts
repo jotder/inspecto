@@ -38,6 +38,8 @@ export interface PendingAction {
     decisionReason?: string | null;
     /** The route's status when an approved action ran. */
     appliedStatus?: number;
+    /** What an approval replays — only on `GET /pending-actions/{id}`, never in the list. */
+    request?: { method: string; path: string; body: string };
 }
 
 /** The outcome of a decision: the closed action, and for an approval the route's own answer. */
@@ -60,6 +62,10 @@ export class PendingActionsService {
             apiUrl('/pending-actions'),
             { params: toParams({ status }) },
         );
+    }
+
+    get(id: string): Observable<PendingAction> {
+        return this.http.get<PendingAction>(apiUrl(`/pending-actions/${encodeURIComponent(id)}`));
     }
 
     approve(id: string, reason?: string): Observable<PendingActionDecision> {

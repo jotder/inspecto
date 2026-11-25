@@ -78,13 +78,10 @@ final class PendingActionRoutes implements RouteModule {
             PendingActions.expireIfDue(ex, root, r);
             return r;
         });
+        // The whole request — query and body included — is what an approval replays, so the approver sees all of it: a
+        // drain or reprocess names its batch in the body, a trigger its params, and the query can carry ?dryRun= or
+        // ?actor= (phase-2 security review: the approver decided on the action line alone).
         Map<String, Object> out = new LinkedHashMap<>(rec);
-        if (out.get("request") instanceof Map<?, ?> req) {
-            Map<String, Object> r = new LinkedHashMap<>();
-            r.put("method", req.get("method"));
-            r.put("path", req.get("path"));
-            out.put("request", r);   // the raw body is the machine's request, not the reviewer's business
-        }
         return PendingChangeRoutes.withApproverCheck(root, rec, out, new java.util.HashMap<>());
     }
 

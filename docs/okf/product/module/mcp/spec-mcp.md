@@ -345,7 +345,7 @@ config only.
   with the Space's Pending Change key under its own MAC domain (`PendingChanges.domainMac`, domain `pending-action`),
   so neither record type verifies as the other; written under the Pending Change store's lock.
 - **Routes** (`PendingActionRoutes`): `GET /pending-actions` (`?status=`, capped at 500 with `total` and
-  `truncated`, no raw request), `GET /pending-actions/{id}` (request method and path only),
+  `truncated`, no raw request), `GET /pending-actions/{id}` (the whole request an approval replays: method, path with its query, and body — the phase-2 security review, plan §6.3),
   `POST …/{id}/approve` and `…/decline` (`canApproveChanges`; four-eyes; the approver roster; an agent refused by
   the gate and by the route), `POST …/{id}/withdraw` (the asking machine only, `self-service` exemption).
 - **Approve** — under the store lock: MAC verified, expiry applied, still pending; the record must still name an

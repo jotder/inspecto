@@ -52,6 +52,16 @@
         @if (a.reason) {
             <p class="mt-3 text-sm"><span class="font-semibold">Reason:</span> {{ a.reason }}</p>
         }
+        @if (a.request; as req) {
+            <div class="mt-3 text-sm">
+                <p><span class="font-semibold">Runs on approval:</span> <code>{{ req.method }} {{ req.path }}</code></p>
+                @if (req.body && req.body !== '{}') {
+                    <pre class="mt-1 max-h-48 overflow-auto rounded bg-gray-100 p-2 text-xs dark:bg-gray-800" aria-label="Request body">{{
+                        req.body
+                    }}</pre>
+                }
+            </div>
+        }
         @if (a.decidedBy) {
             <p class="text-secondary mt-1 text-sm">
                 {{ a.status }} by {{ a.decidedBy }} on {{ a.decidedAt | date: 'medium' }}

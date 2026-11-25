@@ -108,7 +108,15 @@ export class PendingActionsPanelComponent implements OnInit {
     open(row: Record<string, unknown>): void {
         this.decideError.set(null);
         this.reason.reset('');
-        this.selected.set(row as unknown as PendingAction);
+        const a = row as unknown as PendingAction;
+        this.selected.set(a);
+        // the list row carries no request: read the whole one, so the approver sees what an approval replays
+        this.api.get(a.id).subscribe({
+            next: (full) => {
+                if (this.selected()?.id === full.id) this.selected.set(full);
+            },
+            error: (err) => this.decideError.set(apiErrorMessage(err, 'The request of this action could not be read')),
+        });
     }
 
     close(): void {

@@ -35,3 +35,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LEGAL-HOLD-SCOPE-1` | P3 | feature | A legal hold does not yet protect a Pipeline's data partitions, and holds have no screen. | — |
+| `RUN-TRIGGER-ACTOR-SPOOF-1` | P3 | defect | ?actor= on POST /jobs/{name}/trigger and POST /jobs/runs/{id}/replay is free text written into the run ledger's trigger field (manual:<ac… | — |

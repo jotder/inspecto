@@ -427,6 +427,51 @@ pushed on its own:
 Not in phase 2: the role's product gaps `QUARANTINE-RELEASE-1` and `BACKUP-DATA-1` (§1.1) stay board rows; an agent
 cannot release a quarantined file or take a backup until they ship.
 
+### 6.3 Phase 2 security review (2026-11-25)
+
+Reviewed on `c2e2e7dc3`: `AgentGate`, `PendingActions`, `PendingActionRoutes`, the two `ControlApi` doors,
+`PendingChanges.authorNow`, `Roles.admitMachine`, `MachineTrust` and `OidcAuthenticator.verify`. The question: can a
+machine agent act beyond its four rights, past the hold, or past four eyes, and can an approval run anything with more
+than the machine has?
+
+**Holds.**
+- A machine agent never decides: the never-list refuses every `…/approve` and `…/decline`, the decide handler refuses
+  any agent Subject, and `AGENT_NEVER_CAPABILITIES` are stripped at sign-in and again at `admitMachine`.
+- It keeps at most `canAuthorWorkbench`, `canAuthorAlertRules`, `canWorkIncidents` and `canOperateRuns`, never
+  `canAdminister` or access configuration. A Pipeline run stays refused to it (`PERSON_ONLY`).
+- The token lifetime and replay checks still apply to it: `admits` runs before the machine is marked an agent.
+- `auth.oidc.agentMachineClients` must be a subset of `auth.oidc.clients`, without the SPA client, or the server
+  refuses to boot.
+- A held action needs the route's own capability first, so a machine without `canOperateRuns` gets 403 and leaves no
+  record.
+- A record is MAC'd under its own domain (`pending-action`), so a Pending Change record cannot pass as an action.
+- Approval checks MAC, expiry, status, four eyes and the roster under the store lock, so an action never runs twice.
+- Approval dispatches only a record whose route is still an action route.
+- The replay passes the hold only when the marker's method and path match the request; a mismatch is 409.
+- The replay runs as the machine, re-admitted by the Space and re-filtered, so approval never widens its rights.
+
+**Fixed in this review.** The approver decided on the action line alone (`POST /runs/x/drain`). The request body
+(which batch a drain or reprocess names, a trigger's `params`) and the query (`?dryRun=`, `?skipPostAction=`,
+`?actor=`) were hidden: `GET /pending-actions/{id}` dropped the body, and the tab showed neither. Both are replayed on
+approval. `GET /pending-actions/{id}` now returns the whole request, and the tab shows "Runs on approval" with the
+path, query and body. Pinned by `ControlApiPendingActionsTest` and the panel spec.
+
+**Filed.** `RUN-TRIGGER-ACTOR-SPOOF-1` (P3 defect): `?actor=` on `POST /jobs/{name}/trigger` and
+`POST /jobs/runs/{id}/replay` is free text written into the run ledger's `trigger` field (`manual:<actor>`). Any
+caller holding `canOperateRuns` can name someone else there; the audit log still names the real caller. This was
+already true before phase 2; agents only widen who can do it.
+
+**Accepted.**
+- An approval still runs after the operator removes the client from `auth.oidc.agentMachineClients` or
+  `auth.oidc.clients`. The replay cannot read the OIDC provider's lists; the Space's `identity.machineClients` and the
+  capability filter are re-checked. To revoke a machine, also decline its waiting actions.
+- The replay re-uses the role names recorded when the action was held, exactly as a Pending Change does (AK-2b).
+  Capabilities are re-filtered, but a component share granted by a role removed since would still match.
+- The duplicate check ignores the query, so two requests that differ only in their query give a false 409. Nothing
+  runs.
+- `POST /bundle/export` (read-shaped) and `POST /action-requests` (held for approval by its own design) stay open to a
+  machine agent, as to a person's agent in phase 1.
+
 ## 7. Risks
 
 - **A write route that skips the hold.** Mitigated by §4.1's default deny and the bucket parity test over every

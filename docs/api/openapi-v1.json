@@ -14876,7 +14876,7 @@
         "tags" : [ "pending-actions" ],
         "summary" : "Get a Pending Action",
         "operationId" : "getPendingActionsByPendingactionId",
-        "description" : "One Pending Action: the action (`METHOD path`), the machine that asked (`author` `client:<id>`, `agentClient`), reason, status and outcome (`appliedStatus`). The request shows its method and path only, never its body. Unsafe id 422, unknown 404.",
+        "description" : "One Pending Action: the action (`METHOD path`), the machine that asked (`author` `client:<id>`, `agentClient`), reason, status and outcome (`appliedStatus`). `request` is the whole request an approval replays: method, path with its query, and body. Unsafe id 422, unknown 404.",
         "parameters" : [ {
           "name" : "pendingactionId",
           "in" : "path",

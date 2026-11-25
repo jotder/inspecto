@@ -27,6 +27,12 @@ async function create(overrides: Partial<Record<keyof PendingActionsService, unk
     const toastr = { info: vi.fn(), error: vi.fn(), warning: vi.fn(), success: vi.fn() };
     const api = {
         list: vi.fn(() => of({ items: [ACTION], total: 1, truncated: false })),
+        get: vi.fn(() =>
+            of({
+                ...ACTION,
+                request: { method: 'POST', path: '/runs/orders/resume?dryRun=false', body: '{"batchId":"b-42"}' },
+            }),
+        ),
         approve: vi.fn(() =>
             of({
                 pendingAction: { ...ACTION, status: 'approved', decidedBy: 'checker-1', appliedStatus: 200 },
@@ -73,6 +79,10 @@ describe('PendingActionsPanelComponent', () => {
         expect(el.textContent).toContain('POST /runs/orders/resume');
         expect(el.textContent).toContain('client:ops-bot');
         expect(el.textContent).toContain('the source is back');
+        // the whole request an approval replays — query and body — is on screen before anyone approves
+        expect(api.get).toHaveBeenCalledWith(ACTION.id);
+        expect(el.textContent).toContain('/runs/orders/resume?dryRun=false');
+        expect(el.querySelector('pre[aria-label="Request body"]')?.textContent).toContain('"batchId":"b-42"');
         expect(buttons(el)).toEqual(expect.arrayContaining(['Approve', 'Decline']));
         await fixture.componentInstance.approve();
         expect(api.approve).toHaveBeenCalledWith(ACTION.id, undefined);
