@@ -328,4 +328,46 @@ class ControlApiShareTest {
             assertEquals(404, post(c.port, "/dashboards/ghost/share", null).statusCode());
         }
     }
+
+    /** BI-INSIGHTS-1 I-11 / I-7: a shared line Widget gets the forecast band and anomaly scores the app gets — from the
+     *  fenced, masked result of the same statement, summarised in `overlays`; an overlay over no grained date is a 422. */
+    @Test
+    void aSharedQueryComputesTheOverlaysFromItsOwnResult(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        System.setProperty("bi.share.secret", "test-secret-0123456789");
+        try (Ctx c = open(cfg, root)) {
+            seed(c);
+            // 42 days with a weekly cycle: six seasons, enough for the band and its backtest.
+            new ViewStore(c.root.resolve("views")).write(new ViewDefinition("daily_view", "flow-x", List.of(),
+                    "SELECT DATE '2026-08-01' + CAST(i AS INTEGER) AS sold_at, CAST(10 + i % 7 AS DOUBLE) AS amount"
+                            + " FROM range(42) t(i)", "2026-09-24T00:00:00Z"));
+            ComponentStore reg = new ComponentStore(c.root.resolve("registry"));
+            reg.write("dataset", "daily_ds", Map.of("view", "daily_view",
+                    "columns", List.of(Map.of("name", "sold_at", "type", "date"), Map.of("name", "amount", "type", "number"))));
+            reg.write("widget", "daily_w", Map.of("vizType", "line", "datasetId", "daily_ds"));
+            reg.write("dashboard", "daily_board", Map.of("widgets", List.of("daily_w")));
+            String token = shareToken(c, "daily_board");
+
+            HttpResponse<String> r = post(c.port, "/public/dashboards/" + token + "/query",
+                    "{\"dataset\":\"daily_ds\",\"measures\":[{\"agg\":\"sum\",\"field\":\"amount\"}],\"groupBy\":[\"sold_at\"],"
+                            + "\"grains\":{\"sold_at\":\"day\"},\"orderBy\":[{\"field\":\"sold_at\",\"dir\":\"asc\"}],"
+                            + "\"overlay\":{\"forecast\":{\"horizon\":7},\"anomaly\":{}}}");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode body = V1Body.of(r.body());
+            JsonNode rows = body.get("rows");
+            assertEquals(49, rows.size(), "42 actual days + 7 forecast rows: " + r.body());
+            assertTrue(rows.get(48).has("sum_amount__fc"), r.body());
+            assertTrue(rows.get(0).has("sum_amount__z"), r.body());
+            assertTrue(body.get("overlays").isArray() && body.get("overlays").size() > 0, r.body());
+            for (JsonNode o : body.get("overlays"))
+                if ("forecast".equals(o.path("overlay").asText()))
+                    assertFalse(o.has("reason"), "six weekly seasons give a band: " + o);
+
+            HttpResponse<String> noDate = post(c.port, "/public/dashboards/" + token + "/query",
+                    "{\"dataset\":\"daily_ds\",\"measures\":[{\"agg\":\"sum\",\"field\":\"amount\"}],\"overlay\":{\"anomaly\":{}}}");
+            assertEquals(422, noDate.statusCode(), noDate.body());
+            HttpResponse<String> plain = post(c.port, "/public/dashboards/" + token + "/query",
+                    "{\"dataset\":\"daily_ds\",\"measures\":[{\"agg\":\"sum\",\"field\":\"amount\"}]}");
+            assertFalse(V1Body.of(plain.body()).has("overlays"), "no overlay asked, none answered");
+        }
+    }
 }

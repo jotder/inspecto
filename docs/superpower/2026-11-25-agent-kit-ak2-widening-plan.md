@@ -1,6 +1,6 @@
 # Agent Kit AK-2 — widening what an agent can reach, task by task (plan and task specs)
 
-> **Status: PROPOSED 2026-11-25 — D-AK8…D-AK12 open (§5); nothing built.** The follow-on to phases 1–3b of
+> **Status: PROPOSED 2026-11-25 — D-AK8…D-AK12 open (§5); W1 built 2026-11-25 (§3 W1), the rest not started.** The follow-on to phases 1–3b of
 > [`2026-11-20-agent-kit-ak2-plan.md`](2026-11-20-agent-kit-ak2-plan.md) (all built 2026-11-25). It takes the gaps a
 > peer's product review of that plan listed
 ([`2026-11-25-agent-kit-ak2-product-review.md`](2026-11-25-agent-kit-ak2-product-review.md)), keeps the ones
@@ -62,6 +62,10 @@ These are the phase 1–3 rules, restated so a task spec does not repeat them:
 Recommended order: **W1, W10, W3, W2, W4, W5, W6, W7, W9, W8**. W1, W3 and W10 need no decision and can start now.
 
 ### W1 — Release a quarantined file
+
+> **Built 2026-11-25.** As specified, with the read the spec asked to check: `get_run_batches` does not list
+> quarantined files, so a read tool `list_quarantined_files` (`GET /runs/{run}/quarantine`) was added. Golden tasks
+> `ops-07` and `ops-08`; their live run is part of W4.
 
 - **Goal.** The operations agent can put one quarantined file back into its run, the last step of *diagnose a failed
   run* that today ends in "ask a person".

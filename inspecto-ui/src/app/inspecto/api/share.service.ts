@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl } from './api-base';
+import type { OverlaySummary, OverlayWire } from 'app/inspecto/viz/chart-overlays';
 
 /** One shared component as the public endpoint returns it: id + raw content (typed by the feature side). */
 export interface SharedComponent {
@@ -29,14 +30,20 @@ export interface PublicQueryBody {
     dataset: string;
     measures?: PublicMeasure[];
     groupBy?: string[];
+    /** Time buckets on grouped date columns, as /bi/query. */
+    grains?: Record<string, string>;
     orderBy?: { field: string; dir: 'asc' | 'desc' }[];
     limit?: number;
+    /** BI-INSIGHTS-1 I-11 / I-7: the forecast band and anomaly scores, computed from this query's own masked result. */
+    overlay?: OverlayWire;
 }
 
 export interface PublicQueryResult {
     rows: Record<string, unknown>[];
     rowCount: number;
     truncated: boolean;
+    /** Set when the body asked for an `overlay`: the method and backtest, or the reason there is none. */
+    overlays?: OverlaySummary[];
 }
 
 /**

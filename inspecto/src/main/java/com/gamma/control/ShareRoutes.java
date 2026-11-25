@@ -8,6 +8,7 @@ import com.gamma.config.spec.Finding;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
+import com.gamma.query.ChartOverlays;
 import com.gamma.query.DatasetRelation;
 import com.gamma.query.MeasureCompiler;
 import com.gamma.query.QueryExecutor;
@@ -124,6 +125,7 @@ final class ShareRoutes implements RouteModule {
         Map<String, Object> fenced = new LinkedHashMap<>(body);
         MeasureCompiler.Spec spec;
         MeasureCompiler.Compiled sql;
+        ChartOverlays.Request overlay;   // BI-INSIGHTS-1 I-7 / I-11: from this statement's own masked result, as /bi/query
         try {
             // UIE-5 (d): and the Dashboard's DEFAULT date range, for a Dataset that has its date column — same fence.
             List<Map<String, Object>> filters = new ArrayList<>(SharedDashboardFilter.terms(dashboard.get("filter"), dataset));
@@ -133,6 +135,7 @@ final class ShareRoutes implements RouteModule {
             // The chart's cosmetic category order over a masked key is dropped, as /bi/query drops it (review R6).
             spec = masking.stripCosmeticOrder(MeasureCompiler.parse(fenced, ListLimitSettings.effectiveRows(api.writeRoot()), ListLimitSettings.MAX_ROWS), null);
             sql = MeasureCompiler.compile(spec.withLimit(spec.limit() + 1));   // one past the cap, so truncated is exact
+            overlay = ChartOverlays.parse(fenced.get("overlay"), spec);
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
@@ -153,12 +156,21 @@ final class ShareRoutes implements RouteModule {
             QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(
                     spec.dataset(), relationSql, sql.sql(), spec.limit(), 0, List.of(), List.of(), sql.params()));
             QueryExecutor.Result shown = masking.apply(r, spec.groupBy(), null);
+            // After masking, under the same cap, no second statement: a masked Measure gets no band, a masked series
+            // key reaches the summary only as its alias — the share still never reveals.
+            List<Map<String, Object>> overlays = null;
+            if (overlay != null) {
+                ChartOverlays.Outcome o = ChartOverlays.apply(overlay, spec, shown);
+                shown = o.result();
+                overlays = o.summary();
+            }
             Map<String, Object> out = new LinkedHashMap<>();
             out.put("rows", shown.rows());
             out.put("rowCount", shown.rowCount());
             out.put("truncated", shown.truncated());
             Map<String, Object> maskingBlock = masking.describe();
             if (maskingBlock != null) out.put("masking", maskingBlock);
+            if (overlays != null) out.put("overlays", overlays);
             return out;
         } catch (SQLException e) {
             throw masking.scrub(ServerFaults.datasetRead("query failed", datasetId, dataset, e, api));

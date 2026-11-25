@@ -35,13 +35,15 @@ final class AgentGate {
 
     /**
      * The operational actions (plan §4.6, operations rows, AK-2d): a run's trigger, pause, resume, reprocess, rejects
-     * replay, retry now, retry cancel and drain; a Job's trigger and a Job Run's replay. Each is still gated by its own
+     * replay, retry now, retry cancel and drain, and the release of one quarantined file (widening plan W1, the route
+     * of {@code QUARANTINE-RELEASE-1}); a Job's trigger and a Job Run's replay. Each is still gated by its own
      * capability ({@code canOperateRuns}).
      */
     static final Set<String> RUN_ACTIONS = Set.of(
             "POST /runs/([^/]+)/trigger", "POST /runs/([^/]+)/pause", "POST /runs/([^/]+)/resume",
             "POST /runs/([^/]+)/reprocess", "POST /runs/([^/]+)/replay-rejects",
             "POST /runs/([^/]+)/retries/retry-now", "POST /runs/([^/]+)/retries/cancel", "POST /runs/([^/]+)/drain",
+            "POST /runs/([^/]+)/quarantine/release",
             "POST /jobs/([^/]+)/trigger", "POST /jobs/runs/([^/]+)/replay");
 
     /**
