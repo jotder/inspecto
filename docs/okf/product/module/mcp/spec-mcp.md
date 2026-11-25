@@ -428,15 +428,19 @@ only when a lead adds it as a member. Promote, reveal and expand decisions stay 
 - **Queries** (`AgentGate.LA_READS`, in the allowed bucket): the 19 read-shaped `/inv` POSTs — projection, neighbours
   and their preview, multi-Dataset projection, unsaved expand, overlap profile, reference rows, case history, entity
   resolve and suggest, deep-link resolve, recursive paths, presets, the query builder, branching and temporal
-  patterns, Investigation replay, dossier verify. They persist nothing, run under the caller's masking (no agent holds
-  `canRevealLinkEntities`) and the Link Analysis rate classes. No hold, for a machine either.
+  patterns, Investigation replay, dossier verify. They save no analysis (they may add to the Space's alias book and the
+  audit log, as for any caller), run under the Space's masking — only `reference-rows` and `deep-links` with `reveal`
+  depend on the caller, and they need `canRevealLinkEntities`, which no agent holds — and the Link Analysis rate
+  classes. No hold, for a machine either.
 - **The Draft right `canDraftInvestigations`** (`Roles.CAN_DRAFT_INVESTIGATIONS`): gates the five Draft writes
   (`POST /inv/investigations/{id}/drafts`, `…/drafts/{d}/ops|undo|discard|rebase`); promote stays
   `canManageIncidents`. `Roles.holds` makes `canManageIncidents` imply it, and every capability check
   (`ApiContext.requireCapability`, `requireCapabilityIn`) goes through `holds`, so no person lost a right and no role
   table changed. `AGENT_MACHINE_CAPABILITIES` keeps it; because admission strips `canManageIncidents` first, a
-  machine's role must grant `canDraftInvestigations` by name. In the Link Analysis product set, the Access catalogue
-  (`linkgraph.draft`) and the LA app's Access page.
+  machine's role must grant `canDraftInvestigations` by name. An implied grant yields to an Access profile that
+  denies `canDraftInvestigations` by name (`ApiContext.impliedButDenied`, phase-3b review): the authenticator strips
+  only granted capabilities, so the deny is asked for at the check. In the Link Analysis product set, the Access
+  catalogue (`linkgraph.draft`) and the LA app's Access page.
 - **Actions** (`AgentGate.LA_ACTIONS`): the five Draft writes, `PUT /inv/investigations/{id}/case` and
   `POST /inv/graph/runs` with its cancel. A person's agent acts at once within the person's rights; a machine agent's
   Draft writes are Pending Actions replayed as the machine — the Draft route re-checks membership by Subject id, so a
@@ -458,8 +462,9 @@ only when a lead adds it as a member. Promote, reveal and expand decisions stay 
   person's agent, a machine's Draft held, never promote, a graph run's top result, a machine never starts a graph run).
   The grader's `ACTION_PATH` covers the Draft writes and graph runs; promote and deny count as never-list attempts. Its
   live run is open.
-- **Tests:** `ControlApiAgentLinkAnalysisTest` (`inspecto-geo-link`, real HTTP: an agent's projection never carries a
-  raw key; a person's agent opens a Draft and adds an op at once, its promote and direct edit 403; a member machine's
+- **Tests:** `ControlApiAgentLinkAnalysisTest` (`inspecto-geo-link`, real HTTP: an agent's projection answers 200
+  and, in a masking Space, carries no raw key; a person who holds `canManageIncidents` but whose Access profile denies
+  `linkgraph.draft` cannot open a Draft, and can once the profile is gone; a person's agent opens a Draft and adds an op at once, its promote and direct edit 403; a member machine's
   Draft open is 202, nothing opened, its approve 403, another person's approval opens it with the machine as actor; a
   machine that is no member gets 404 on approval; a machine's attach, graph run and promote are 403 with no record),
   `RolesImpliedCapabilityTest`, `AgentGateParityTest`, `McpToolRoutesTest`; `ControlApiDraftsTest` (23 tests, every

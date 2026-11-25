@@ -46,7 +46,8 @@ class ControlApiAgentLinkAnalysisTest {
             + "\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"linkKindCol\":\"channel\"}";
     private static final String BASE = "\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"";
     /** LEAD = a person; AGENT = analyst-2 through agent client claude-code; BOT = machine agent la-bot (drafts only). */
-    private static final String LEAD = "Bearer lead", AGENT = "Bearer agent", BOT = "Bearer bot", CHECKER = "Bearer checker";
+    private static final String LEAD = "Bearer lead", AGENT = "Bearer agent", BOT = "Bearer bot", CHECKER = "Bearer checker",
+            ANALYST = "Bearer analyst";
     private final HttpClient client = HttpClient.newHttpClient();
     /** The machine's authored Space role: the Draft right, and two rights a machine agent never keeps. */
     private static final String MACHINE_ROLE = "la-drafter";
@@ -69,6 +70,10 @@ class ControlApiAgentLinkAnalysisTest {
             return switch (h) {
                 case LEAD -> Optional.of(new Subject("lead-1", person));
                 case CHECKER -> Optional.of(new Subject("checker-1", person));
+                case ANALYST -> {   // a person whose role "analysts" may carry an Access profile
+                    com.gamma.access.ComponentAccess.heldRoles(ex, Set.of("analysts"));
+                    yield Optional.of(new Subject("analyst-9", person));
+                }
                 case AGENT -> Optional.of(new Subject("analyst-2", agentCaps, null, Map.of(), null, null, null, "claude-code"));
                 // its Space role grants more; Roles.admitMachine leaves it only canDraftInvestigations of these. The role is
                 // recorded as OidcAuthenticator does, so an approved replay re-derives the machine's rights from it.
@@ -186,6 +191,27 @@ class ControlApiAgentLinkAnalysisTest {
             assertFalse(approved.get("ran").asBoolean(), approved.toString());
             assertEquals(404, approved.at("/result/status").asInt(), "membership is checked again as the machine");
             assertEquals(0, data(send(c, "GET", "/inv/investigations/inv-b/drafts", null, LEAD), 200).get("items").size());
+        }
+    }
+
+    @Test
+    void anAccessProfileDenyingDraftWorkHoldsForAPersonWhoManagesIncidents(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root, "none")) {
+            investigation(c, "inv-a", false);
+            data(send(c, "POST", "/inv/investigations/inv-a/members", "{\"subject\":\"analyst-9\",\"role\":\"analyst\"}", LEAD), 200);
+            // the catalogue binds node linkgraph.draft to canDraftInvestigations; role "analysts" denies it by name
+            Path catalog = Files.createDirectories(root.resolve("registry").resolve("access-catalog"));
+            Files.writeString(catalog.resolve("catalog.toon"), dev.toonformat.jtoon.JToon.encode(Map.of("version", 1, "nodes",
+                    List.of(Map.of("id", "linkgraph.draft", "label", "Drafts", "kind", "action",
+                            "capability", Roles.CAN_DRAFT_INVESTIGATIONS)))));
+            Path profiles = Files.createDirectories(root.resolve("registry").resolve("access-profiles"));
+            Path profile = profiles.resolve("role-analysts.toon");
+            Files.writeString(profile, dev.toonformat.jtoon.JToon.encode(Map.of("subjectType", "role", "subjectId", "analysts",
+                    "label", "analysts", "grants", Map.of("linkgraph.draft", "deny"))));
+            HttpResponse<String> denied = send(c, "POST", "/inv/investigations/inv-a/drafts", "{}", ANALYST);
+            assertEquals(403, denied.statusCode(), "an implied right yields to a deny by name: " + denied.body());
+            Files.delete(profile);
+            data(send(c, "POST", "/inv/investigations/inv-a/drafts", "{}", ANALYST), 201);   // canManageIncidents implies it
         }
     }
 

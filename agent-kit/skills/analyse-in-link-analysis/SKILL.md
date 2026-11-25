@@ -27,7 +27,7 @@ act, audited per entity.
 
 1. **Start from the Case.** `get_incident` (or the Case) names the entities; `list_investigations` and
    `get_investigation` `view: case` show whether an Investigation already serves it. Read its `working-set` first.
-2. **Explore an entity**: `explore_entity` `view: summary`, then `profile`; `run_link_query` `kind: case-history` for
+2. **Explore an entity**: `explore_entity` `view: profile`, then `view: summary` with the `dataset` it sits in; `run_link_query` `kind: case-history` for
    the Incidents and Cases that name it.
 3. **Expand a step at a time**: `run_link_query` `kind: neighbors-preview` (how much one step adds), then
    `kind: neighbors`. Stop and say so when a step would add more than the person can read.

@@ -532,8 +532,14 @@ final class McpTools {
             new Tool("explore_entity", "Explore an entity",
                     "An Entity's profile or summary: its links, activity and the Incidents and Cases that name it (masked).",
                     List.of(id("type", "The Entity Type."), id("key", "The entity key, as a Link Analysis read returned it."),
-                            new Arg("view", Kind.ENUM, true, "What to read.", List.of("profile", "summary"))),
-                    a -> new Call("GET", "/inv/entities/" + seg(a.get("type")) + "/" + seg(a.get("key")) + "/" + a.get("view"), null)),
+                            new Arg("view", Kind.ENUM, true, "What to read.", List.of("profile", "summary")),
+                            text("dataset", "The Dataset to summarise the entity in — required for the summary.")),
+                    a -> {
+                        if ("summary".equals(a.get("view")) && a.get("dataset") == null)
+                            throw new BadArgs("'dataset' is required for the summary view");
+                        return new Call("GET", "/inv/entities/" + seg(a.get("type")) + "/" + seg(a.get("key")) + "/"
+                                + a.get("view") + query(a, "dataset", "dataset"), null);
+                    }),
             new Tool("run_link_query", "Run a Link Analysis query",
                     "Run one Link Analysis query over a Dataset: a projection, the neighbours of a set of entities (or a "
                             + "count of what one step would add), a multi-Dataset projection, an unsaved expand, paths between "
@@ -580,7 +586,7 @@ final class McpTools {
                             + "canRunLinkGraphAnalysis, so only a person's agent can; read it with get_graph_run.",
                     List.of(body("The run request: {investigationId, algorithm, params}.", true), text("reason", "Why — on the audit row.")),
                     a -> withReason(new Call("POST", "/inv/graph/runs", bodyOf(a)), a), true),
-            new Tool("cancel_graph_run", "Cancel a graph run", "Stop a graph run you started.",
+            new Tool("cancel_graph_run", "Cancel a graph run", "Stop a graph run you started (an administrator's agent: any run).",
                     List.of(id("run", "The graph run id.")),
                     a -> new Call("POST", "/inv/graph/runs/" + seg(a.get("run")) + "/cancel", McpRoutes.jsonBytes(Map.of())), true));
 

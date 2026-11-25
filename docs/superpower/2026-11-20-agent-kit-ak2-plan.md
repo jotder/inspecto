@@ -584,7 +584,7 @@ for agents; graph-run cost.
 
 | Step | Delivers | Proof |
 |---|---|---|
-| 3b-1 reads | the read-shaped LA routes in `ALLOWED`; the read MCP Tools | `AgentGateParityTest` pins them; a real-HTTP test: an agent's projection answers masked keys where its person's own request would reveal |
+| 3b-1 reads | the read-shaped LA routes in `ALLOWED`; the read MCP Tools | `AgentGateParityTest` pins them; a real-HTTP test: an agent's projection is answered, masked in a masking Space (as built: masking is the Space's, not the caller's, except `reference-rows` / `deep-links` with `reveal`, which need a right no agent holds) |
 | 3b-2 the right | `canDraftInvestigations`, the implication, the machine set, the manifest and vocabulary | a person with only `canManageIncidents` (seed or authored) still drafts; a role with only `canDraftInvestigations` drafts but cannot promote |
 | 3b-3 actions | Draft writes, attach to a Case and graph runs as actions; the write MCP Tools | a person's agent drafts and starts a graph run at once; a machine's Draft op is 202 and, approved, runs as the machine; a machine's promote, attach and graph run are refused with no record |
 | 3b-4 close | Skill, golden suite, how-to, docs, security review | `check-agent-kit`, grader tests, the review |
@@ -615,7 +615,16 @@ Reviewed on the phase 3b lane: `Roles.holds` and its two callers, `CAN_DRAFT_INV
   the MCP endpoint refuses `…/promote` and `…/deny` too. A person's agent's expand that crosses a sensitive threshold is
   held at promote by the existing four-eyes, which the agent never reaches.
 
+**Fixed in this review** (independent verification of `4fa8d5fa7`): an Access profile denying
+`canDraftInvestigations` by name was ignored for a holder of `canManageIncidents`, because the implication added the
+right back after the authenticator stripped it; the check now asks the profile when a right is held only by
+implication (`ControlApiAgentLinkAnalysisTest` proves 403, then 201 without the profile). And `explore_entity`'s
+summary sent no `dataset`, which the route requires (422 always); the tool now takes it.
+
 **Accepted.**
+- A machine holding `canDraftInvestigations` can queue Draft writes on any Investigation id; membership is checked
+  when an approved write replays (404, `failed`). As with comments, the approvers' queue may hold writes that can only
+  fail.
 - A person's agent may start graph runs within the person's rights; the server's run budgets and the rate classes bound
   the cost (operator, D-AK3b-4).
 - `case-history` answers the Incidents and Cases that name a masked key, as it does for any caller without the reveal
