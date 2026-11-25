@@ -39,6 +39,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `REPROCESS-ARCHIVE-MEMBER-1` | P3 | defect | Reprocessing ONE Consignment of a zip restores the whole archive under the member's composite name and reads every entry again, so rows d… | — |
 | `PARSER-SPI-KIT-1` | P3 | chore | the Parser extension point (com.gamma.parse.ParserPlugin, a public API since 4.0.0) has no starter and is missing from the developer docs. | — |
 | `PARSING-DERIVE-EDITOR-1` | P3 | feature | slice 4 of Parsing D9: an optional profile editor for ASN.1 derive / children. | operator |
+| `ENGINE-TESTS-RED-1` | P3 | defect | Two inspecto-engine tests fail on master: NodeAttributesContractTest.theServedVocabularyMatchesTheCommittedContract (the served Pipeline… | — |
 | `IMPORT-RUN-REFUSAL-GAPS-1` | P3 | defect | Two kinds of run can still commit while Add data's run-scoped choice is open, and a held claim refuses every manual run (filed 2026-11-20… | — |
 | `SNAPSHOT-OUTSIDE-RUN-NOW-1` | P3 | defect | A run of a switched Postgres snapshot outside Run now has no column check, no import.max_rows cap and only the engine's own fetch wording… | — |
 | `ARRIVAL-HEAL-AT-START-1` | P3 | defect | A crash during a replace leaves readers a mix of old and new files until the Dataset's next run, replace or compaction (filed 2026-11-20,… | — |

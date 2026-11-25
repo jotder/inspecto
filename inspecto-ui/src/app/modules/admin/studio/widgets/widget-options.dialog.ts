@@ -1,10 +1,23 @@
-import { ChangeDetectionStrategy, Component, ViewChild, inject } from '@angular/core';
+import {
+    AfterViewInit,
+    ChangeDetectionStrategy,
+    Component,
+    DestroyRef,
+    ViewChild,
+    inject,
+    signal,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { kpiOptionLoader } from 'app/inspecto/components/entity-option-loaders';
+import { MARKER_VIZ_TYPES } from 'app/inspecto/viz/chart-markers';
+import { ChartMarkersEditorComponent } from './chart-markers-editor.component';
 import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { InspectoSchemaFormComponent } from 'app/inspecto/components/schema-form.component';
 import { RowLinkKind } from 'app/inspecto/viz/viz-types';
 import { HeatmapScale } from 'app/inspecto/viz/heatmap';
 import { NumberFormat } from 'app/inspecto/viz/number-format';
+import { COMPARE_KINDS, CompareKind } from 'app/inspecto/viz/compare';
 import { WidgetOptions } from './widget-types';
 import { WIDGET_OPTION_ATTRIBUTES, WIDGET_OPTION_VIZ_TYPES } from './widget-option-attributes';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
@@ -26,12 +39,20 @@ export interface WidgetOptionsData {
 @Component({
     selector: 'app-widget-options-dialog',
     standalone: true,
-    imports: [MatDialogModule, MatButtonModule, InspectoSchemaFormComponent],
+    imports: [MatDialogModule, MatButtonModule, InspectoSchemaFormComponent, ChartMarkersEditorComponent],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Advanced options</h2>
         <mat-dialog-content>
-            <inspecto-schema-form #sf [specs]="attributes" [initial]="initialValue"></inspecto-schema-form>
+            <inspecto-schema-form
+                #sf
+                [specs]="attributes"
+                [initial]="initialValue"
+                [optionLoaders]="optionLoaders"
+            ></inspecto-schema-form>
+            @if (marksSupported) {
+                <app-chart-markers-editor #markers [initial]="data.markers ?? []" [kpiBound]="kpiChosen()" />
+            }
         </mat-dialog-content>
         <mat-dialog-actions align="end">
             <button type="button" mat-button (click)="requestClose()">Cancel</button>
@@ -39,16 +60,38 @@ export interface WidgetOptionsData {
         </mat-dialog-actions>
     `,
 })
-export class WidgetOptionsDialog {
+export class WidgetOptionsDialog implements AfterViewInit {
     private ref = inject(MatDialogRef<WidgetOptionsDialog, WidgetOptions>);
     private confirm = inject(InspectoConfirmService);
+    private destroyRef = inject(DestroyRef);
 
     /** Cancel/Esc/backdrop ask before discarding typed input (ui-design-review R2). */
-    readonly requestClose = guardDirtyClose(this.ref, () => this.schemaForm?.isDirty() ?? false, this.confirm);
+    readonly requestClose = guardDirtyClose(
+        this.ref,
+        () => (this.schemaForm?.isDirty() ?? false) || (this.markersEditor?.isDirty() ?? false),
+        this.confirm,
+    );
     private readonly input = inject<WidgetOptionsData>(MAT_DIALOG_DATA);
     readonly data: WidgetOptions = this.input.options;
 
+    /** BI-INSIGHTS-1 I-2: Chart Markers are offered on the types that draw them. */
+    readonly marksSupported = this.input.vizType !== undefined && MARKER_VIZ_TYPES.includes(this.input.vizType);
+    /** The KPI picker suggests saved KPI definitions. */
+    readonly optionLoaders = { kpiId: kpiOptionLoader() };
+    /** Whether a KPI is chosen right now — a KPI status bands marker says so when it is not. */
+    readonly kpiChosen = signal(!!this.data.kpi?.kpiId);
+
     @ViewChild('sf') schemaForm!: InspectoSchemaFormComponent;
+    @ViewChild('markers') markersEditor?: ChartMarkersEditorComponent;
+
+    ngAfterViewInit(): void {
+        if (!this.marksSupported) return;
+        this.schemaForm.form.valueChanges
+            .pipe(takeUntilDestroyed(this.destroyRef))
+            .subscribe((v: Record<string, unknown>) =>
+                this.kpiChosen.set(typeof v['kpiId'] === 'string' && v['kpiId'].trim() !== ''),
+            );
+    }
     /** Every option, minus the per-type ones belonging to another vizType. */
     readonly attributes = WIDGET_OPTION_ATTRIBUTES.filter(
         (s) =>
@@ -76,6 +119,7 @@ export class WidgetOptionsDialog {
         decimals: this.data.format?.decimals ?? null,
         kpiTarget: this.data.kpi?.target ?? null,
         kpiBetter: this.data.kpi?.better ?? 'higher',
+        kpiId: this.data.kpi?.kpiId ?? '',
         waterfallStart: this.data.waterfall?.start ?? '',
         waterfallShowTotal: this.data.waterfall?.totalLabel !== '',
         waterfallTotalLabel: this.data.waterfall?.totalLabel ?? '',
@@ -101,11 +145,17 @@ export class WidgetOptionsDialog {
         categoryOrderDir: this.data.categoryOrder?.dir ?? 'asc',
         categoryOrderAgg: this.data.categoryOrder?.agg ?? 'min',
         rowLinkLabelField: this.data.rowLink?.labelField ?? '', // UIE-6 link text column
+        compareKind: this.data.compare?.kind ?? '', // BI-INSIGHTS-1 I-1
     };
 
     save(): void {
+        // A Chart Marker row that needs a fix keeps the dialog open, its error line on screen.
+        const markers = this.marksSupported ? this.markersEditor?.markers() : undefined;
+        if (markers === null) return;
         const v = this.schemaForm.value();
         const str = (x: unknown) => (typeof x === 'string' ? x.trim() : '');
+        // The KPI the Widget is bound to: the picker where it is shown, else kept as stored (a KPI tile's binding).
+        const kpiId = 'kpiId' in v ? str(v['kpiId']) || undefined : this.data.kpi?.kpiId;
         const xTitle = str(v['xTitle']);
         const yTitle = str(v['yTitle']);
         const y2Title = str(v['y2Title']);
@@ -165,7 +215,10 @@ export class WidgetOptionsDialog {
             stacked: (v['stacked'] as boolean) ?? false,
             hideBlank: (v['hideBlank'] as boolean) || undefined,
             format,
-            kpi: target != null || better === 'lower' ? { target, better } : undefined,
+            kpi:
+                target != null || better === 'lower' || kpiId
+                    ? { target, better, ...(kpiId ? { kpiId } : {}) }
+                    : undefined,
             waterfall,
             combo: secondaryAxis ? undefined : { secondaryAxis: false },
             heatmap:
@@ -178,6 +231,7 @@ export class WidgetOptionsDialog {
                     : undefined,
         };
         this.applyPerTypeOptions(v, options);
+        if (markers !== undefined) options.markers = markers.length ? markers : undefined;
         this.ref.close(options);
     }
 
@@ -234,6 +288,13 @@ export class WidgetOptionsDialog {
                       ...(v['categoryOrderAgg'] === 'max' ? { agg: 'max' as const } : {}),
                   }
                 : undefined;
+        }
+        if ('compareKind' in v) {
+            const kind = v['compareKind'];
+            o.compare =
+                typeof kind === 'string' && (COMPARE_KINDS as readonly string[]).includes(kind)
+                    ? { kind: kind as CompareKind }
+                    : undefined;
         }
     }
 }

@@ -175,7 +175,16 @@ the repeated hour gets a day start after itself; its label is still the right da
   evaluated only by `MeasureCompiler`.
 * `shift(Shift)` — every row gains each listed column from `periods` buckets earlier (negative = later), by a self-join
   on `label(p) + N·interval = label(c)`: a missing bucket gives NULL, never the wrong period. `duplicateBucketsSql`
-  counts (key, bucket) pairs with more than one row, which a caller must refuse first.
+  counts (key, bucket) pairs with more than one row, which a caller must refuse first. An optional `step` (a grain
+  coarser than the buckets, BI-INSIGHTS-1 I-1, 2026-11-24) counts `periods` in that unit instead: each bucket is
+  matched with **the bucket that held its start `periods` steps earlier**
+  (`label(p) = trunc(label(c) − N·step)`), so a `DAY` bucket with a `YEAR` step looks at the same date a year back
+  and 29 February at 28 February; each bucket still matches at most one earlier bucket. A step finer than the grain
+  is refused.
+
+Also the comparison of a Studio Widget (`POST /bi/query` `compare`): `MeasureCompiler` shifts its grouped result
+through `shift` — `previous` = 1 bucket, `lastYear` = 12 months / 52 weeks / a `YEAR` step on days
+([Studio BI](../../layer/product/architecture-studio-bi.md) §4).
 
 Exposed as the Steps `transform.timeseries.resample` and `transform.timeseries.shift`
 ([step-catalog](../elt/spec-step-catalog.md)), through the engine's `TimeSeriesStep` (grammar, clock/type checks).

@@ -43,6 +43,6 @@ agent ──POST /mcp──▶ host: authenticate · rate limit · access policy
   Expectation, Alert Rule, Job, Widget, Dashboard → a Pending Change another person approves), the Pending Change
   reads, `withdraw_change`, `propose_action`, `export_bundle`, `preview_promotion`, `run_pipeline_now`; write tools
   need a verified agent client; the endpoint is `replay-gated`. [spec-mcp.md § Write tools](spec-mcp.md#write-tools-ak-2b).
-- **Next (phase 2):** the machine agent capability set and operational actions (D-AK5, D-AK6 open).
+- **Next (phase 2):** the machine agent capability set and operational actions (D-AK5, D-AK6, D-AK7 signed 2026-11-24: a person's agent acts within the person's rights; a machine's actions are held as Pending Actions).
   Design (approved for phase 1 on 2026-11-20, D-AK1…D-AK4 signed): [`2026-11-20-agent-kit-ak2-plan.md`](../../../../superpower/2026-11-20-agent-kit-ak2-plan.md).
 - **Plan:** [`2026-11-19-user-enablement-and-agent-kit-plan.md`](../../../../superpower/2026-11-19-user-enablement-and-agent-kit-plan.md) §7.

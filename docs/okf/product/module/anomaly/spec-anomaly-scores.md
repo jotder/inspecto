@@ -207,7 +207,7 @@ DuckDB statement per Feature (day grain); the pure maths is `AnomalyScorer` plus
 
 ## Incidents — the `afterScore` pending Alert Rule
 
-No new alerting path: declare `anomaly_scores_<id>_latest` as a Dataset and point a per-entity Alert Rule at
+No new alerting path: the run registers `anomaly_scores_<id>_latest` as a system Dataset ([model output Datasets](../engine/spec-model-output-datasets.md)); point a per-entity Alert Rule at
 it (`max(score)`, `by: [model, entity_key]`, `gte highThreshold`); it heals when a later run's `_latest` scores
 the entity normal (`AnomalyScoreAlertTest`). Templates cannot seed it at apply (no Schema before the first
 run), so they use the deferred seed `config/pending/alert-rules/<name>.toon` with the generalised trigger

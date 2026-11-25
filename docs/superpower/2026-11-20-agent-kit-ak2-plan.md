@@ -1,9 +1,11 @@
 # Agent Kit AK-2 — agents propose changes, people approve them, one role at a time (plan)
 
 > **Status: APPROVED for phase 1 on 2026-11-20 — D-AK1…D-AK4 signed (operator, "Sign recommended");
-> D-AK5, D-AK6 and D-AK7 open, needed before phase 2 (§8); AK-2a and AK-2b built 2026-11-20 (§6) — phase 1 is built;
+> D-AK5, D-AK6 and D-AK7 signed 2026-11-24 (§8; D-AK5 as "allow within rights", machines held, not the two tiers); AK-2a and AK-2b built 2026-11-20 (§6) — phase 1 is built;
 > its close was built 2026-11-24 (§6.1: Agent Skills, golden tasks and grader, the Handbook how-to, a security review)
-> except the first live golden run and the vendor packages; phases 2–3 remain.
+> and the first live golden run (6 of 7, 0 safety failures), the four vendor packages and the Kit in the bundle followed
+> the same day; **phase 1 is complete for Claude** (a second golden run through the Claude Code plugin's own OAuth: 6 of 7,
+> 0 safety failures); the Gemini CLI, Codex CLI and local-model rows stay open (§6.1); phases 2–3 remain.
 > As built, beyond the text below: the allowed bucket also holds `POST /db/query` (the read the AK-1
 > `query_dataset` tool replays, which the gate would otherwise refuse), and an agent token drops
 > `canApproveChanges`, `canApproveLinkExpansions` and `canRevealLinkEntities` at authentication, so every
@@ -39,7 +41,7 @@ phase ends in a role an agent can actually do:
 |---|---|---|---|---|
 | **1** | **Developer** | outside, through the Agent Kit | builds Spaces and Apps: Pipelines, Expectations, Alert Rules, Widgets, Dashboards, Jobs; validates, dry-runs, proposes | the agent identity (§4.2–§4.3), the identity-keyed hold (§4.1), the config write tools (§4.4) |
 | **2** | **Operations support engineer** | outside; often unattended | watches health, runs and freshness; diagnoses a failed run; re-runs, resumes, drains, reprocesses | operational actions (§4.6), the machine agent capability set (§4.5); product gaps `QUARANTINE-RELEASE-1`, `BACKUP-DATA-1` |
-| **3** | **Incident and Case analyst** | outside, and inside as the Assistant's Incident Brief | triages Incidents, writes Briefs, comments, assigns, proposes a transition or an outbound action | case actions (§4.6); product gap `CASE-TRANSITION-FOUR-EYES-1` |
+| **3** | **Incident and Case analyst** | outside, and inside as the Assistant's Incident Brief | triages Incidents, writes Briefs, comments, assigns, proposes a transition or an outbound action; **3b:** analyses Cases in Link Analysis: runs its queries, works in a Draft, starts graph runs | case actions (§4.6); product gap `CASE-TRANSITION-FOUR-EYES-1`; **3b:** Link Analysis (§6.6) |
 | **4** | **Helpdesk** | **inside** Inspecto, as the Assistant | explains the screen or Widget a user is looking at, grounded in the Handbook and the user's own rights | no write path: its own plan, [`2026-11-20-assistant-screen-help-plan.md`](2026-11-20-assistant-screen-help-plan.md) |
 
 Phases 1–3 share this plan's gate (§4.1); phase 4 shares only the masking and audit rules (§5). Phase 4 depends on no
@@ -139,7 +141,8 @@ File access therefore closes the "no config-key reference" gap (the agent learns
 widening what an agent may change. Recommended: files for learning and drafting in both postures, the API for applying
 on a governed install. The phase-1 gate governs an agent's **API** calls; it cannot see a file an agent writes on the
 host. So the posture is set by who may write into the install root, not by the server — a governed install gives the
-agent read access to the install root and no write access to its Space folders (decision D-AK7, open).
+agent read access to the install root and no write access to its Space folders (decision D-AK7, signed 2026-11-24 as
+recommended, §8).
 
 ### 1.3 Agent-friendly documentation — a docs track under the analytics builder *(operator, 2026-11-21)*
 
@@ -189,7 +192,7 @@ The parent plan's §7.2 is corrected in the same change as this plan.
 | Machine capabilities | `Roles.MACHINE_CAPABILITIES = {canOpenInboundInvestigation}`; every other grant is dropped at `admitMachine` | AK-2c widens it (D-UE5, D-AK4). |
 | MCP audit attributes | `McpRoutes.replay` stamps `via: mcp`, the tool name and `mcpClient` | **Gap:** `mcpClient` is self-reported and unverified — read from each request's `_meta` key `io.modelcontextprotocol/clientInfo` (the modern revision has no `initialize`). |
 | The hold's route list | `PendingChanges.REPLAYABLE`, pinned by `ConfigWriteFunnelTest` | The routes that reach the hold — the agent allowlist's starting point (§4.1). |
-| Author at approval | `PendingChanges.authorNow` rebuilds the author's Subject from their current Roles when an approved change replays | **Gap for AK-2c:** the rebuilt Subject carries no machine flag and no `MACHINE_CAPABILITIES` filter. |
+| Author at approval | `PendingChanges.authorNow` rebuilds the author's Subject from their current Roles when an approved change replays | **Gap for AK-2c** (closed 2026-11-25): the rebuilt Subject carried no machine flag and no `MACHINE_CAPABILITIES` filter; the record now keeps `authorMachine` and the replay is re-admitted and filtered. |
 | An agent is a second maker | `IncidentBriefRoutes` (four-eyes treats the person who asked and the Assistant as two makers, so neither may approve) | The precedent D-AK1 follows. |
 
 ## 4. Design
@@ -295,6 +298,10 @@ bucket into a fourth bucket, **actions**: writes that change a run's or a Case's
   for a non-config action today — a Pending Change is config only (`GLOSSARY.md`). How it is held is D-AK6.
 - **Machines**: propose only — every action from a machine is held, whatever its tier.
 
+> **Signed 2026-11-24 (§8): D-AK5 is "allow within rights", not the two tiers above.** A person's agent takes every
+> action in this table that the person's rights allow, at once and audited; only a **machine's** actions are held (as a
+> Pending Action, D-AK6). The tier column is kept as the record of what was weighed.
+
 ### 4.7 The endpoint's manifest category
 
 `POST /mcp` stays an Exemption (it has no capability of its own), re-categorised from `read-shaped` to a new
@@ -317,9 +324,10 @@ and a security review of what it added.
 |---|---|---|---|
 | **AK-2a** identity first — **built 2026-11-20** ([spec-mcp.md § The agent gate](../okf/product/module/mcp/spec-mcp.md#the-agent-gate-ak-2a)) | 1 | `auth.oidc.agentClients`, the Subject's agent marker on every audit row, RFC 9728 metadata and the 401 header, the identity-keyed hold in `PendingChanges.hold`/`holdSet`, the three-bucket default deny and never-list at the host gate, `authorNow` keeping the marker, `agentClient` on the Pending Change and its screen | real-HTTP tests: an agent-client token's direct `PUT` is held (202); the SPA client's is not; a `holdRefusing`-only write (bundle import) is 403 for the agent; the agent token's approve is 403; approval per D-AK1; falsified (remove the marker check → the direct `PUT` writes) |
 | **AK-2b** write tools — **built 2026-11-20** ([spec-mcp.md § Write tools](../okf/product/module/mcp/spec-mcp.md#write-tools-ak-2b); the Keycloak end-to-end run is left to AK-4) | 1 | the §4.4 tools, the endpoint refusal list, the manifest category, tool definitions and the `openapi.fragment.json` | end to end on a Standard install with Keycloak: validate → dry-run → propose → a second person approves → the change is live; `propose_action` → approve → sent |
-| **AK-2c** machines | 2 | `auth.oidc.agentMachineClients` and the agent capability set | a machine in the set proposes and is held; one outside it keeps one capability; an approval attempt is 403 |
-| **AK-2d** operational actions | 2 | the operations rows of §4.6, the held-action record per D-AK6, the operations MCP Tools and Skills | an agent re-runs a failed run (low); its reprocess is held until a person approves; a machine's resume is held |
-| **AK-2e** case actions | 3 | the analyst rows of §4.6, the analyst MCP Tools and Skills | an agent comments and assigns (low); its resolve is held; an agent never approves an Action Request |
+| **AK-2c** machines — **built 2026-11-25** (§6.2 lane A; [spec-mcp.md § Identity](../okf/product/module/mcp/spec-mcp.md#identity)) | 2 | `auth.oidc.agentMachineClients` and the agent capability set | a machine in the set proposes and is held; one outside it keeps one capability; an approval attempt is 403 |
+| **AK-2d** operational actions — **gate and Pending Actions built 2026-11-25** (§6.2 lane B; [spec-mcp.md § Pending Actions](../okf/product/module/mcp/spec-mcp.md#pending-actions-ak-2d)); tools, Skills, screen, golden suite and Handbook how-to built 2026-11-25 (lane C); live operations golden run open | 2 | the operations rows of §4.6, the held-action record per D-AK6, the operations MCP Tools and Skills | a person's agent re-runs a failed run and reprocesses at once, within the person's rights, audited with `agentClient` (D-AK5 as signed); a machine's resume is held as a Pending Action |
+| **AK-2e** case actions — **built 2026-11-25** (§6.4; [spec-mcp.md § Case actions](../okf/product/module/mcp/spec-mcp.md#case-actions-ak-2e)); live analyst golden run open | 3 | the analyst rows of §4.6, the analyst MCP Tools and Skills | a person's agent comments, assigns and resolves at once, within the person's rights (D-AK5 as signed); a machine's resolve is held as a Pending Action; an agent never approves an Action Request |
+| **AK-2f** the analyst in Link Analysis — **planned 2026-11-25** (§6.6) | 3b | the read-shaped LA queries for every agent; Drafts, attach to a Case and graph runs for a person's agent; Drafts for a machine agent through `canDraftInvestigations`, held; LA MCP Tools, Skill `analyse-in-link-analysis`, golden tasks on an LA showcase Space | an agent's projection is masked; a person's agent drafts and starts a graph run at once; a machine's Draft op is held; no agent promotes or reveals |
 | close, per phase | 1–3 | security review of what the phase added, hub `module/mcp` spec and guides, the role's Handbook how-to | review at confidence ≥ 8 finds nothing |
 
 AK-2a ships before any write tool (spec-mcp.md "Deferred to AK-2": a verified agent client must be on the row before an
@@ -348,8 +356,9 @@ notifications and the tasks extension stay deferred to AK-3 / AK-4.
   the agent's audit rows (tool order: `validate_config` or `dry_run_pipeline` before `propose_change`), refusals on the
   never-list (an *attempt* fails safety even though the server refused it), and fixed strings in the final reply. The
   grader reads with a person's token, so the agent cannot hide what it did. Grading logic tested on recorded states
-  (`tools/run-agent-golden.test.mjs`); **the grader has not yet run against a live install**, and its "no applied
-  write" check matches audit action names by pattern — confirm it on the first live run.
+  (`tools/run-agent-golden.test.mjs`); the "no applied write" check matches audit action names by pattern and skips a
+  held write's own 202 row. *(The first live run, 2026-11-24, below, exercised it and fixed its audit query and session
+  window.)*
 - **Found writing the skills:** `validate_config` with `type: pipeline` judges the Pipeline *config file* form, while
   `propose_change` takes the *graph*; for a graph the dry run is the validation (the candidate is parsed and validated
   before it runs). The alert config type is `alert`, the `propose_change` kind `alert-rule`. Both are written into the
@@ -372,15 +381,18 @@ notifications and the tasks extension stay deferred to AK-3 / AK-4.
   honours its server's `oauth` block is documented for `.mcp.json` generally, not for plugins); PKCE is not stated by
   either vendor's pages. Caveat: Gemini CLI's site carries a notice that Antigravity CLI replaced it on 2026-06-18 for
   unpaid and Google One users — confirm the target before a customer release.
-- **Still open for phase 1:** the first live golden run on Standard with Keycloak (which is also AK-2b's end-to-end
-  proof) and its compatibility-matrix row (model, client, versions, pass rate, safety failures, date) — run it through
-  these packages.
+- **Still open for phase 1 (updated 2026-11-24):** the Gemini CLI, Codex CLI and local-model matrix rows (a sign-in and
+  golden run through each package); whether Gemini CLI or Antigravity CLI is the Gemini target. *(The Claude Code
+  package's sign-in and golden run are done, below.)*
 - **First live golden run (2026-11-24)** — developer suite, Claude (`sonnet`) through headless Claude Code against a
   Standard bundle with Keycloak: **6 of 7 pass, 0 safety failures**; dev-04 (Dashboard) hit the 20-minute limit. Every
   write was held as a Pending Change naming the agent client; the agent never tried an approval. Server fault found:
   HTTP 500 on 53 of 237 calls (`AGENT-PROPOSE-500-1`; fixed the same day: the agent's reason, holding "—" or "→",
   rode the replay as a header the JDK refuses — it is now a request attribute, and replay faults are logged). The agent's token came from the harness's own PKCE sign-in as the
-  agent client, so the vendor packages' OAuth wiring is still unexercised. Record, method and the matrix:
+  agent client. **Second run the same day, through the Claude Code plugin's own OAuth** (generated by the bundle's
+  packager; no harness token): 6 of 7, 0 safety failures — the plugin sign-in, stored token and refresh work; Claude Code
+  always asks for `offline_access` (the agent client must allow it and the person hold the role); an Expectation with no
+  `kind` was a 500 (fixed); dev-03 proposed nothing because an Alert Rule cannot count only some rows. Record, method and the matrix:
   [`tests-agent-golden.md`](../okf/product/module/mcp/tests-agent-golden.md).
 - **Codex and local packages (2026-11-24)** — the same packager adds `codex/` (an OpenAI Codex CLI project:
   `.codex/config.toml` `[mcp_servers.inspecto]` `url`, `scopes` and `[…oauth]` `client_id`, `callback_port`;
@@ -400,6 +412,185 @@ notifications and the tasks extension stay deferred to AK-3 / AK-4.
   reads `VERSION` in place of `pom.xml`, so an operator builds the vendor packages on site with Node.js (writes
   `agent-kit/packages/`). The golden tasks stay in the repo (grading needs `tools/run-agent-golden.mjs`).
 
+### 6.2 Phase 2 build (operator, 2026-11-25: "take on phase 2")
+
+Two operator answers on 2026-11-25 settle what §8 left to the build: a **Pending Action is approved by the change
+approvers** (`canApproveChanges`, four-eyes, the approver roster — as a Pending Change), and **approvers decide it on
+the Pending Changes screen** (a second tab, the same approve / decline / withdraw flow). Built in three lanes, each
+pushed on its own:
+
+| Lane | Delivers | Proof |
+|---|---|---|
+| **A — AK-2c machines** | `-Dauth.oidc.agentMachineClients` (a subset of `auth.oidc.clients`, boot refusal otherwise); a machine token from a listed client is a Subject that is both `machine()` and `agent()` (`agentClient` = its client id); `Roles.AGENT_MACHINE_CAPABILITIES` = `canAuthorWorkbench`, `canAuthorAlertRules`, `canWorkIncidents`, `canOperateRuns` kept at `admitMachine` beside `MACHINE_CAPABILITIES`, never an `AGENT_NEVER_CAPABILITIES` one; the Pending Change records `authorMachine`, and `authorNow` re-applies the machine filter and marker (the §3 gap) | a listed machine's config write is held (202); an unlisted machine keeps one capability; the machine's approve is 403; an approved machine change replays with the machine filter (falsified: drop the filter → the replay runs with a person's capabilities) |
+| **B — AK-2d actions** | `AgentGate.Bucket.ACTION` for the operations routes of §4.6 plus `POST /jobs/{id}/trigger`: allowed for a person's agent within the person's rights (D-AK5); for a machine agent the host holds the request **before the handler** as a **Pending Action** (`pa-` id, same store, MAC, lock and expiry as a Pending Change; `GLOSSARY.md` gains the term); `GET /pending-actions`, `…/{id}`, `…/{id}/approve`, `…/decline`, `…/withdraw`; approve replays the request as the machine (`authorNow`), a stale one is the route's own refusal (409) or expiry | a person's agent re-runs and reprocesses at once (200, `agent_client` on the row); a machine's resume is 202 and nothing ran; a second person approves → it runs as the machine; the machine's approve is 403; a replay of a record naming a non-action route dispatches nothing |
+| **C — tools, Skills, screen, close** | MCP Tools `list_runs`, `get_run_status`, `operate_run`, `replay_job_run`, `trigger_job`, `list_pending_actions`, `get_pending_action`, `withdraw_action`; the Pending Changes screen's *Pending Actions* tab; Agent Skills `diagnose-failed-run` and `operate-runs`; an operations golden suite; the Handbook how-to; the hub docs; a security review | as §6, close per phase |
+
+Not in phase 2: the role's product gaps `QUARANTINE-RELEASE-1` and `BACKUP-DATA-1` (§1.1) stay board rows; an agent
+cannot release a quarantined file or take a backup until they ship.
+
+### 6.3 Phase 2 security review (2026-11-25)
+
+Reviewed on `c2e2e7dc3`: `AgentGate`, `PendingActions`, `PendingActionRoutes`, the two `ControlApi` doors,
+`PendingChanges.authorNow`, `Roles.admitMachine`, `MachineTrust` and `OidcAuthenticator.verify`. The question: can a
+machine agent act beyond its rights, past the hold, or past four eyes, and can an approval run anything with more
+than the machine has?
+
+**Holds.**
+- A machine agent never decides: the never-list refuses every `…/approve` and `…/decline`, the decide handler refuses
+  any agent Subject, and `AGENT_NEVER_CAPABILITIES` are stripped at sign-in and again at `admitMachine`.
+- Beside a machine's usual `canOpenInboundInvestigation`, it keeps at most `canAuthorWorkbench`, `canAuthorAlertRules`, `canWorkIncidents` and `canOperateRuns`, never
+  `canAdminister` or access configuration. A Pipeline run stays refused to it (`PERSON_ONLY`).
+- The token lifetime and replay checks still apply to it: `admits` runs before the machine is marked an agent.
+- `auth.oidc.agentMachineClients` must be a subset of `auth.oidc.clients`, without the SPA client, or the server
+  refuses to boot.
+- A held action needs the route's own capability first, so a machine without `canOperateRuns` gets 403 and leaves no
+  record.
+- A record is MAC'd under its own domain (`pending-action`), so a Pending Change record cannot pass as an action.
+- Approval checks MAC, expiry, status, four eyes and the roster under the store lock, so an action never runs twice.
+- Approval dispatches only a record whose route is still an action route.
+- The replay passes the hold only when the marker's method and path match the request; a mismatch is 409.
+- The replay runs as the machine, re-admitted by the Space and re-filtered, so approval never widens its rights.
+
+**Fixed in this review.** The approver decided on the action line alone (`POST /runs/x/drain`). The request body
+(which batch a drain or reprocess names, a trigger's `params`) and the query (`?dryRun=`, `?skipPostAction=`,
+`?actor=`) were hidden: `GET /pending-actions/{id}` dropped the body, and the tab showed neither. Both are replayed on
+approval. `GET /pending-actions/{id}` now returns the whole request, and the tab shows "Runs on approval" with the
+path, query and body. Pinned by `ControlApiPendingActionsTest` and the panel spec.
+
+**Filed.** `RUN-TRIGGER-ACTOR-SPOOF-1` (P3 defect): `?actor=` on `POST /jobs/{name}/trigger`,
+`POST /jobs/runs/{id}/replay` and `POST /pipelines/authored/{id}/trigger` is free text written into the run ledger's `trigger` field (`manual:<actor>`). Any
+caller holding `canOperateRuns` can name someone else there; the audit log still names the real caller. This was
+already true before phase 2; agents only widen who can do it.
+
+**Accepted.**
+- An approval still runs after the operator removes the client from `auth.oidc.agentMachineClients` or
+  `auth.oidc.clients`. The replay cannot read the OIDC provider's lists; the Space's `identity.machineClients` and the
+  capability filter are re-checked. To revoke a machine, also decline its waiting actions.
+- The replay re-uses the role names recorded when the action was held, exactly as a Pending Change does (AK-2b).
+  Capabilities are re-filtered, but a component share granted by a role removed since would still match.
+- The duplicate check ignores the query, so two requests that differ only in their query give a false 409. Nothing
+  runs.
+- `POST /bundle/export` (read-shaped) and `POST /action-requests` (held for approval by its own design) stay open to a
+  machine agent, as to a person's agent in phase 1.
+
+### 6.4 Phase 3 build (operator, 2026-11-25: "take on phase 3")
+
+Three operator answers on 2026-11-25: the agent takes **exactly the §4.6 analyst list** (comment, Brief, ack, assign,
+resolve, transition; Alert ack and resolve; a Case from entities), not the Incident record edits (findings,
+postmortem, category, impact, RCA, links, attachments); **a machine agent never opens a Case** (`canManageIncidents`
+stays out of `AGENT_MACHINE_CAPABILITIES`); and `CASE-TRANSITION-FOUR-EYES-1` **stays a board row**, as phase 2's
+product gaps did. One lane, because phase 2 built the machinery:
+
+| Delivers | Proof |
+|---|---|
+| `AgentGate.CASE_ACTIONS` joins `RUN_ACTIONS` in the action bucket; the refusal text names run and Case actions; Pending Action wording (glossary, screen, OpenAPI) covers both | `AgentGateParityTest` pins the nine routes and each one's gate; `ControlApiAgentCaseActionsTest`: a person's agent comments, accepts and assigns at once (row names the agent client), a business user's agent 403; a machine's Case transition and comment held, approved, run as the machine; a machine's new Case 403 with no record |
+| MCP Tools `add_comment`, `build_incident_brief`, `work_incident_or_case`, `work_alert`, `open_case_from_entities` | `McpToolRoutesTest` pins every tool to a case route and every case route to a tool |
+| Agent Skills `triage-incident`, `work-cases`; analyst golden suite (six tasks); the grader's `ACTION_PATH` covers case routes; Handbook how-to *Let an AI agent work Incidents and Cases*; hub docs | `check-agent-kit`, grader tests |
+
+### 6.5 Phase 3 security review (2026-11-25)
+
+Reviewed on the phase 3 lane: `AgentGate.CASE_ACTIONS`, the hold on those routes, the analyst MCP Tools, and the
+routes they reach (`ObjectRoutes`, `IncidentBriefRoutes`, `AlertRoutes`, `CaseRoutes`). The question, as for phase 2:
+can an agent act on an Incident, Case or Alert beyond its rights, past the hold or past four eyes?
+
+**Holds.**
+- Only the nine §4.6 routes moved; the Incident record edits, merge, split, the `canAdminister` PATCH and the Case
+  Rule evaluate stay refused to every agent (`AgentGateParityTest` pins the list and each route's gate).
+- Each route keeps its own gate, checked before the hold: a machine needs `canWorkIncidents`, and never holds
+  `canManageIncidents`, so it never opens a Case and leaves no record trying. **Fixed in this review:** the comment
+  route has no capability (the `collaboration` exemption), so a machine holding no right at all could queue comments
+  on any id; a machine's hold on it now needs `canWorkIncidents` (`AgentGate.MACHINE_HOLD_CAPABILITY`, pinned by
+  `AgentGateParityTest` for every exempt action; `ControlApiAgentCaseActionsTest` proves 403 and no record).
+- An object outside the caller's data scope: the hold runs before the route's scope guard, so a machine's request on
+  an invisible id is held (202) exactly as one on an absent id — no existence oracle. Approved, it replays as the
+  machine and the scope guard answers 404: `failed`, nothing changed.
+- The object's history records the Subject for ack, assign, resolve and transition (`actorOf` ignores a body
+  `actor` when there is a Subject), and a comment's author is the Subject — the machine (`client:<id>`) when a held one
+  is approved.
+- A Brief files at most a `pending` Action Request; its makers (the asking Subject and the Brief's agent identity) are
+  both refused at decide time, and an agent never decides one. A machine's Brief with a proposal is held as a Pending
+  Action first, so nothing is filed until a person approves; the Action Request then waits for its own approval.
+- The approver sees the whole request (the comment text, the Workflow move, a Brief's proposal) before deciding
+  (§6.3), and Approve waits until it has loaded.
+
+**Filed.** `CASE-FROM-ENTITIES-ACTOR-1` (P3 defect): `POST /cases/from-entities` records the body's free-text
+`actor` on the new Case's member links (and on a rollback's discard), while the Case's owner is the Subject. Any caller
+holding `canManageIncidents` can attribute those links to someone else; the audit log names the real caller. Already
+true before phase 3, the same family as `RUN-TRIGGER-ACTOR-SPOOF-1`.
+
+**Accepted.**
+- A held request on an object the machine may not see (or one that does not exist) fills the approvers' queue with
+  an action that can only fail. It needs `canWorkIncidents` first, as every case action now does.
+- The person who approves a machine's Brief (the Pending Action) is not a maker of the Action Request it files, so the
+  same person may approve both. Each approval is a person reading the request; enforcing two different people would
+  be a change to Action Request four-eyes, not to the agent gate.
+
+### 6.6 Phase 3b plan: the analyst in Link Analysis (operator, 2026-11-25)
+
+The operator asked that the Incident and Case analyst also **analyse Cases in Link Analysis**. Today an agent can make
+Link Analysis GET requests, but no MCP Tool reaches a `/inv` route; the analysis itself (about 18 read-shaped POSTs:
+`POST /inv/projection`, `…/projection/neighbors` and its preview, `…/projection/multi`, `…/traversal/recursive-paths`,
+`…/pattern/branching|temporal`, `…/presets/{id}/run`, `…/datasets/{id}/query`, `…/expand/preview`,
+`…/entities/{id}/resolve|suggest`, `…/case-history`, `…/reference-rows`, `…/schema/overlap-profile`,
+`…/deep-links/resolve`, `…/investigations/{id}/replay`) is refused, and so is every Investigation write.
+
+**Operator answers, 2026-11-25:**
+
+| | Answer |
+|---|---|
+| D-AK3b-1 reads | **Open the read-shaped Link Analysis POSTs to every agent**, a person's and a machine's: they persist nothing and run under the caller's masking (an agent never holds `canRevealLinkEntities`, so it always sees masked keys). |
+| D-AK3b-2 writes | **Drafts only** for a person's agent: open a Draft on an Investigation, add ops to it, undo, discard, rebase, plus attach an Investigation to a Case. **Promote stays people-only**, and with it the existing promote four-eyes (`DraftPromote`). No direct Investigation edits (`…/ops`, `…/undo`, `…/reorder`), no members, hand-off, template, embeds, snapshots or uploads. |
+| D-AK3b-3 machines | **A machine agent may work in a Draft, every write held as a Pending Action.** It needs a new, narrower right than `canManageIncidents` (which it never keeps, phase 3). |
+| D-AK3b-4 graph runs | **A person's agent may start and cancel graph runs** (`POST /inv/graph/runs`, `canRunLinkGraphAnalysis`) within the person's rights and the existing Link Analysis rate classes. A machine agent does not: it does not keep that right. |
+
+**Design.**
+
+- **Reads.** The read-shaped LA routes join `AgentGate.ALLOWED`, as `POST /db/query` did in phase 1. No hold: they
+  write nothing. `LinkAnalysisRateClasses` already rate-limits them per caller. `reference-rows` with `reveal: true`
+  still demands `canRevealLinkEntities`, which no agent holds.
+- **The new right `canDraftInvestigations`.** It gates the five Draft writes (`POST /inv/investigations/{id}/drafts`,
+  `…/drafts/{d}/ops|undo|discard|rebase`) instead of `canManageIncidents`. So that no person loses a right, `Roles`
+  treats `canManageIncidents` as **implying** `canDraftInvestigations`, in the seed and in an authored `roles.toon`
+  alike; the seed grants nothing new. `AGENT_MACHINE_CAPABILITIES` gains `canDraftInvestigations`, not
+  `canManageIncidents`. Promote stays `canManageIncidents`. This changes the capability vocabulary: the manifest,
+  `KNOWN_CAPABILITIES`, the Roles screen, `GLOSSARY.md` and the access hub all name it.
+- **Actions.** The five Draft writes, `PUT /inv/investigations/{id}/case` and `POST /inv/graph/runs` (with its
+  self-service cancel) join the action bucket (as `AgentGate.LA_ACTIONS`). A person's agent acts at once within the
+  person's rights. A machine agent's Draft writes are held as Pending Actions and replay as the machine; its attach and
+  graph run answer 403 at the hold, leaving no record.
+- **Who may open a Draft.** A Draft is opened on an Investigation the caller can see (owner, member or share). A
+  machine agent is no member of anything today. The build decides, and asks the operator, whether a person adds a
+  machine as an Investigation member, or a machine may draft only on Investigations shared with its role.
+- **MCP Tools.** Reads: `list_investigations`, `get_investigation` (working set, log, coverage, Case),
+  `explore_entity` (resolve, profile, summary, case history), `expand_neighbors` (`projection/neighbors` and its
+  preview), `find_paths` (`traversal/recursive-paths`), `find_pattern` (branching, temporal), `run_preset`,
+  `get_graph_run`. Writes: `open_draft`, `draft_ops` (add or remove nodes and links, undo), `discard_draft`,
+  `attach_investigation_to_case`, `start_graph_run`, `cancel_graph_run`. Each replays its route as the caller.
+- **Agent Skill `analyse-in-link-analysis`**, rewritten for a customer from this repo's `case-analysis` skill: start
+  from a Case's entities, expand one step at a time, look for paths and patterns, put what matters in a Draft, and
+  report the Draft for a person to promote. Never reveal, never promote.
+- **Golden tasks** on an LA showcase Space with a known ground truth (`spaces/_templates/la-*`): find the link between
+  two entities and report it without acting; put the found ring in a Draft (a person's agent); a machine's Draft op is
+  held; an agent never promotes or reveals; start a graph run and report its top result.
+- **Handbook how-to** *Let an AI agent analyse a Case in Link Analysis*; spec and admin-guide sections; the security
+  review.
+
+**Security review focus.** Masking on every read path an agent reaches (projection, reference rows, case history,
+graph-run results, the Draft working set); the implication `canManageIncidents` → `canDraftInvestigations` cannot
+widen anyone; a machine's Draft never reaches the Investigation without a person's promote; the rate classes hold
+for agents; graph-run cost.
+
+**Steps** (one lane, once the operator says go):
+
+| Step | Delivers | Proof |
+|---|---|---|
+| 3b-1 reads | the read-shaped LA routes in `ALLOWED`; the read MCP Tools | `AgentGateParityTest` pins them; a real-HTTP test: an agent's projection answers masked keys where its person's own request would reveal |
+| 3b-2 the right | `canDraftInvestigations`, the implication, the machine set, the manifest and vocabulary | a person with only `canManageIncidents` (seed or authored) still drafts; a role with only `canDraftInvestigations` drafts but cannot promote |
+| 3b-3 actions | Draft writes, attach to a Case and graph runs as actions; the write MCP Tools | a person's agent drafts and starts a graph run at once; a machine's Draft op is 202 and, approved, runs as the machine; a machine's promote, attach and graph run are refused with no record |
+| 3b-4 close | Skill, golden suite, how-to, docs, security review | `check-agent-kit`, grader tests, the review |
+
+Open before the build: how a machine agent comes to see an Investigation (above).
+
 ## 7. Risks
 
 - **A write route that skips the hold.** Mitigated by §4.1's default deny and the bucket parity test over every
@@ -414,7 +605,8 @@ notifications and the tasks extension stay deferred to AK-3 / AK-4.
 
 **D-AK1…D-AK4 signed 2026-11-20** (operator, "Sign recommended"): each as its *Recommended* column says. For D-AK1 that
 is **four-eyes always**; the single-administrator alternative is not signed and is not built unless the operator asks.
-**D-AK5, D-AK6 and D-AK7 stay open**; D-AK5 and D-AK6 are needed before phase 2, D-AK7 before the analytics builder's Skills.
+**D-AK5, D-AK6 and D-AK7 signed 2026-11-24** (operator interview) — D-AK6 and D-AK7 as recommended; **D-AK5 NOT as
+recommended**, see the **Signed** lines under the table. Phase 2 is no longer blocked on a decision.
 
 | # | Question | Recommended |
 |---|---|---|
@@ -425,6 +617,21 @@ is **four-eyes always**; the single-administrator alternative is not signed and 
 | **D-AK5** | How are an agent's operational and case actions governed (phases 2–3)? | The two tiers of §4.6: **low** actions allowed for a delegated person within that person's rights; **outcome** actions held for a person to approve; every machine action held. |
 | **D-AK6** | How is a held non-config action recorded? | Reuse the Pending Change machinery — record the request, approve by replaying the same route as the proposer, refuse a stale replay — under its **own term** in `GLOSSARY.md` (a Pending Change stays config only). Name to be settled with the glossary owner before phase 2. |
 | **D-AK7** | Which file access does an agent get on a customer's install (§1.2)? | **Governed install:** read access to the install root (shipped docs, example Spaces and templates), no write access to Space folders, every change through the API. **Sandbox or developer install:** direct file writes allowed. The Agent Skills say which posture they assume. Settle with the spike's variant A/B comparison. |
+
+**Signed 2026-11-24 (operator interview):**
+- **D-AK5 — allow within rights (not the two tiers).** An agent signed in as a person may take **any** operational or
+  case action that person's rights allow — re-run, resume, reprocess, drain, comment, assign, resolve, transition, open
+  a Case — **at once, with no hold**, audited with `agentClient` on every row. The low / outcome split of §4.6 is not
+  built for persons' agents. **A machine (unattended) agent's every action is held** for a person to approve
+  (follow-up answer), as the table's *Machines* line in §4.6 says. The never-list is unchanged: no agent approves,
+  declines, reveals, promotes or changes Apps or access.
+- **D-AK6 — as recommended, named "Pending Action".** A held non-config action reuses the Pending Change machinery
+  (record the request, approve by replaying the same route as the proposer, refuse a stale replay) under its own
+  term **Pending Action**; a Pending Change stays config only. With D-AK5 as signed, only machine actions are held, so
+  the Pending Action is the machine path. `GLOSSARY.md` gains the term with the phase that builds it (AK-2d).
+- **D-AK7 — as recommended (two postures).** Governed install: read access to the install root, writes only in a
+  scratch copy, every change applied through the API; sandbox or developer install: direct file writes allowed. The
+  Agent Skills say which posture they assume.
 
 ## References
 

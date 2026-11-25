@@ -70,6 +70,18 @@ class MeasureGrammarContractTest {
                         + "then be refused by /bi/query, or vice versa");
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
+    void theCompareKindsAndColumnSuffixesMatchTheCommittedContract() throws IOException {
+        Map<String, Object> contract = JSON.readValue(contractPath().toFile(), Map.class);
+        Map<String, Object> compare = (Map<String, Object>) contract.get("compare");
+        assertNotNull(compare, "contract file has no `compare` key");
+        // The Widget editor offers these kinds and reads its overlay columns back by these suffixes (BI-INSIGHTS-1 I-1).
+        assertEquals(MeasureCompiler.COMPARE_KINDS, compare.get("kinds"));
+        assertEquals(Map.of("cmp", MeasureCompiler.CMP, "delta", MeasureCompiler.DELTA, "pct", MeasureCompiler.PCT),
+                compare.get("suffixes"));
+    }
+
     @Test
     void theIdentifierPatternTheEngineEnforcesMatchesTheCommittedContract() throws IOException {
         Map<?, ?> contract = JSON.readValue(contractPath().toFile(), Map.class);

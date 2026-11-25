@@ -96,6 +96,9 @@ public final class ForecastJobType implements JobTypeProvider {
             List<Forecaster.Forecast> forecasts = ForecastEvaluator.evaluate(model, asOf, relation);
             String version = ForecastEvaluator.version(content);
             ForecastEvaluator.write(data, model, version, ctx.runId(), now, asOf, forecasts);
+            String note = ChurnJobType.registered(ctx, modelId, com.gamma.alert.ScoreDatasets.register(store, data,
+                    ForecastModel.SCORE_KIND, model.id(), model.entityType(), ForecastEvaluator.COLUMNS, content,
+                    List.of(new com.gamma.alert.ScoreDatasets.Input(model.dataset(), model.key()))));
             long insufficient = forecasts.stream().filter(Forecaster.Forecast::isInsufficient).count();
             long rows = forecasts.stream().mapToLong(f -> f.isInsufficient() ? 1 : f.points().size()).sum();
             ctx.artifacts().dataset("forecasts", model.forecastsDataset(), META, rows, now);
@@ -104,7 +107,7 @@ public final class ForecastJobType implements JobTypeProvider {
                     "modelVersion", version);
             return JobResult.ok("predict.forecast: " + forecasts.size() + " series forecast " + model.horizon() + " "
                     + model.grain().id + "(s) ahead as of " + asOf + ", " + insufficient + " insufficient -> dataset '"
-                    + model.forecastsDataset() + "'", (System.nanoTime() - t0) / 1_000_000L);
+                    + model.forecastsDataset() + "'" + note, (System.nanoTime() - t0) / 1_000_000L);
         }
     }
 

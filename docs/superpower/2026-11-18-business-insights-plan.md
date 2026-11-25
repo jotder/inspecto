@@ -1,7 +1,7 @@
 # Business insights in Widgets and Dashboards — research and design
 
 > **Status: DESIGN APPROVED 2026-11-18 — D-BI1, D-BI2, D-BI3 signed (operator, recommended options); D-BI4…D-BI10
-> signed 2026-11-24 (operator, recommended options); P0 I-3 KPI History built 2026-11-24 (§11.1, D-BI11, D-BI12).** Every decision in §11 is closed. Board row: `BI-INSIGHTS-1`
+> signed 2026-11-24 (operator, recommended options); P0 I-3 KPI History built 2026-11-24 (§11.1, D-BI11, D-BI12); P0 I-14 model output Datasets built 2026-11-24 (§11.3).** Every decision in §11 is closed. Board row: `BI-INSIGHTS-1`
 > (§12). The new terms are in `GLOSSARY.md` §7.
 > Scope: insights on **business data** — the Measures over Datasets (revenue, usage, subscribers, transactions,
 > margin, leakage, partners, churn). Not observability: pipeline health stays with Metrics and Alert Rules.
@@ -301,6 +301,39 @@ already exists there, and Q2/Q4 answer the questions an RA or finance lead asks 
   3 years back; later runs evaluate the missing periods plus the current and the previous period (late data
   restates one closed period); rows older than 3 years are dropped. Each run rewrites the KPI's one file
   atomically (`ScoreOutputDirs.swapIn`, the snapshot-swap lock).
+
+### 11.2 P0 I-2 Chart Markers — as built (2026-11-24)
+
+- **Stored shape**: `options.markers` on a `line`, `bar`, `area` or `combo` Widget (`MARKER_VIZ_TYPES`; any other
+  type ignores them): `constant` (`value`), `target` (`value` optional), `average`, `percentile` (`p` 1–99),
+  `band` (`from` / `to`, either open, `tone` = a status tone) and `rag`; each may carry a `label`.
+- **Resolved at render, in the browser** (D-BI7: query-time, no new storage): `inspecto-ui/src/app/inspecto/viz/chart-markers.ts`.
+  Statistics read the values on the value axis `y` as drawn (a Combo's bars while its lines sit on the right axis;
+  category totals per stack when stacked, a Combo's bars and lines being two stacks as in Chart.js); a percentile is a
+  whole number, by `quantile_cont`'s rule. A target line takes its own value, else the
+  bound KPI's target, else `options.kpi.target`. A marker that cannot be placed is dropped, never guessed.
+- **KPI binding**: `options.kpi.kpiId` (the KPI tile's existing key), chosen in the cog dialog on the four types; the
+  definition is read from `/components/kpi/{id}` only when a marker needs it, and `rag` follows `KpiDefinition.rag`
+  (up / down thresholds, band intervals). A failed read leaves `rag` undrawn and the target line on the Widget's own target.
+  The cog dialog now keeps a KPI tile's `kpiId` through a save (it was dropped before).
+- **Drawing (D-BI9)**: one inline Chart.js plugin per chart (`chart-markers.plugin.ts`), built from resolved markers so
+  nothing passes Chart.js's option resolver: `afterDataLimits` widens `y` to every marker, bands are shaded behind the
+  data, lines drawn over it with their words. Colours from `CHART_TONE` / `CHART_MARKER_LINE` only; the canvas text
+  alternative lists every marker (WCAG 1.1.1, 1.4.1).
+- **Deliberately deferred**: the Report PDF (`WidgetChartRenderer`, Java2D) does not draw markers — it already prints a
+  plain snapshot without palette or sort — filed as `REPORT-CHART-MARKERS-1`. Decimation of many markers on long series
+  (§10) was not needed: markers are a handful of lines, not series.
+
+### 11.3 P0 I-14 model output Datasets — as built (2026-11-24)
+
+- Each model Job registers its `<prefix><model>` and `_latest` stores as system Datasets right after writing them
+  (`ScoreDatasets.register`), every column declared with its role and `entity_key` classified with the model's Entity
+  Type so BI masking aliases it. Operator rulings (2026-11-24): readable only by who may read the model AND every
+  Dataset it reads (`SharingEnvelope`, shared with KPI History; sources shared differently register nothing); system
+  Datasets regardless of a Dataset approval policy; a registration problem never fails the run — it is named in the
+  run message, and any refusal narrows earlier output Datasets to the model's owner. `entity_key` takes the strictest
+  class of the Entity Type and every input's key column (fail closed when untraceable). A hand-declared Dataset is
+  never touched, except a bare `_latest` from a template, which is adopted. Spec: `okf/product/module/engine/spec-model-output-datasets.md`.
 
 ## 12. Board row
 

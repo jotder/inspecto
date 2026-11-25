@@ -17,6 +17,9 @@ import java.util.Set;
  *   <li>{@link Bucket#HELD} — the route reaches {@code PendingChanges.hold} / {@code holdSet} ({@link PendingChanges#REPLAYABLE}),
  *       where an agent's write always becomes a Pending Change;</li>
  *   <li>{@link Bucket#ALLOWED} — reads, and the few writes that change nothing governed ({@link #ALLOWED});</li>
+ *   <li>{@link Bucket#ACTION} — the actions of plan §4.6 ({@link #ACTIONS}): a run's (AK-2d) and an Incident's or Case's (AK-2e): a person's agent takes
+ *       them at once, within the person's rights (D-AK5); a machine agent's are held as Pending Actions
+ *       ({@code PendingActions.holdIfMachineAction});</li>
  *   <li>{@link Bucket#REFUSED} — everything else (403), including every route that only calls {@code holdRefusing*}
  *       (those do not hold when no policy covers the kind) and the never-list ({@link #never}), which overrides the
  *       other two: an agent never approves, reveals, promotes, administers Apps or changes access.</li>
@@ -28,7 +31,46 @@ final class AgentGate {
 
     private AgentGate() {}
 
-    enum Bucket { HELD, ALLOWED, REFUSED }
+    enum Bucket { HELD, ALLOWED, ACTION, REFUSED }
+
+    /**
+     * The operational actions (plan §4.6, operations rows, AK-2d): a run's trigger, pause, resume, reprocess, rejects
+     * replay, retry now, retry cancel and drain; a Job's trigger and a Job Run's replay. Each is still gated by its own
+     * capability ({@code canOperateRuns}).
+     */
+    static final Set<String> RUN_ACTIONS = Set.of(
+            "POST /runs/([^/]+)/trigger", "POST /runs/([^/]+)/pause", "POST /runs/([^/]+)/resume",
+            "POST /runs/([^/]+)/reprocess", "POST /runs/([^/]+)/replay-rejects",
+            "POST /runs/([^/]+)/retries/retry-now", "POST /runs/([^/]+)/retries/cancel", "POST /runs/([^/]+)/drain",
+            "POST /jobs/([^/]+)/trigger", "POST /jobs/runs/([^/]+)/replay");
+
+    /**
+     * The case actions (plan §4.6, analyst rows, AK-2e, operator 2026-11-25: the §4.6 list, no record edits): comment on
+     * an Incident or Case, build an Incident Brief, ack, assign, resolve or transition one, ack or resolve an Alert, open
+     * a Case from entities. Each is still gated by its own route — {@code canWorkIncidents}, {@code canManageIncidents}
+     * for a new Case (which a machine agent never keeps), the comment route's collaboration exemption.
+     */
+    static final Set<String> CASE_ACTIONS = Set.of(
+            "POST /objects/([^/]+)/comments", "POST /incidents/([^/]+)/briefs",
+            "POST /objects/([^/]+)/ack", "POST /objects/([^/]+)/assign", "POST /objects/([^/]+)/resolve",
+            "POST /objects/([^/]+)/transition", "POST /alerts/([^/]+)/ack", "POST /alerts/([^/]+)/resolve",
+            "POST /cases/from-entities");
+
+    /**
+     * The capability a machine agent's hold needs on an action route the manifest exempts (phase-3 security review): a
+     * comment is open to anyone who can see the object, but the hold runs before the route's scope guard, so without
+     * this a machine holding no right at all could fill the approvers' queue with comments on any id.
+     */
+    static final Map<String, String> MACHINE_HOLD_CAPABILITY = Map.of(
+            "POST /objects/([^/]+)/comments", Roles.CAN_WORK_INCIDENTS);
+
+    /** Every action route: {@link #RUN_ACTIONS} and {@link #CASE_ACTIONS}. */
+    static final Set<String> ACTIONS;
+    static {
+        Set<String> all = new java.util.HashSet<>(RUN_ACTIONS);
+        all.addAll(CASE_ACTIONS);
+        ACTIONS = Set.copyOf(all);
+    }
 
     /**
      * Writes an agent may make that change nothing governed: the MCP endpoint itself, validation and dry runs, the Ship
@@ -44,6 +86,7 @@ final class AgentGate {
             "POST /bundle/export",
             "POST /promotion/preview",
             "POST /pending-changes/([^/]+)/withdraw",
+            "POST /pending-actions/([^/]+)/withdraw",
             "POST /action-requests",
             "POST /db/query",
             "POST /pipelines/authored/([^/]+)/run");
@@ -96,6 +139,7 @@ final class AgentGate {
         String key = method + " " + pattern;
         if (PendingChanges.REPLAYABLE.contains(key) && !NOT_HELD.contains(key)) return Bucket.HELD;
         if (ALLOWED.contains(key)) return Bucket.ALLOWED;
+        if (ACTIONS.contains(key)) return Bucket.ACTION;
         return Bucket.REFUSED;
     }
 
@@ -114,6 +158,7 @@ final class AgentGate {
         return never(method, pattern)
                 ? "an agent client never approves, reveals, promotes, or changes Apps or access — a person must"
                 : "an agent client may not call " + method + " " + pattern + " — an agent proposes config changes (held "
-                        + "for approval), validates, dry-runs and reads; sign in without the agent client for anything else";
+                        + "for approval), takes run and Case actions within its rights, validates, dry-runs and reads; sign in "
+                        + "without the agent client for anything else";
     }
 }

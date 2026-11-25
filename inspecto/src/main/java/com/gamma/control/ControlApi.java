@@ -668,7 +668,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 new QueryRoutes(), new DatasetRoutes(), new OnboardRoutes(), new SpaceComparisonRoutes(), new BiRoutes(), new KpiRoutes(), new DbBrowserRoutes(), new ShareRoutes(),   // InvRoutes + GeoRoutes moved to inspecto-geo-link (EDG-01 cell 3b); ReconRoutes to inspecto-reconciliation (P7)
                 new ExpectationRoutes(), new RequirementRoutes(),
                 new JobRoutes(), new SignalRoutes(), new LineageRoutes(), new EnrichmentRoutes(), new AlertRoutes(), new DecisionRoutes(), new RuleRoutes(), new AcquisitionRoutes(), new StreamPushRoutes(),
-                new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new LinkAnalysisLimitsRoutes(), new DomainProfileRoutes(), new PendingChangeRoutes(), new EgressRoutes(), new ApproverRosterRoutes(), new SafetyPolicyRoutes(), new PublicationDestinationRoutes(), new MailAttachmentRoutes(), new NavRoutes(), new AccessRoutes(),
+                new NotificationRoutes(), new DeliveryStatusRoutes(), new SettingsRoutes(), new LinkAnalysisLimitsRoutes(), new DomainProfileRoutes(), new PendingChangeRoutes(), new PendingActionRoutes(), new EgressRoutes(), new ApproverRosterRoutes(), new SafetyPolicyRoutes(), new PublicationDestinationRoutes(), new MailAttachmentRoutes(), new NavRoutes(), new AccessRoutes(),
                 new AuditLogRoutes(),   // the audit projection stays CORE though the /events feed is gated (EDG-01 cell 6)
                 new AssistRoutes(), new AgentRoutes(), new SystemRoutes(), new AppInstallRoutes(), new SchedulerRoutes(), new OnboardingRoutes(), new AnalyticsCatalogueRoutes(),
                 new ModulesRoutes(), new ModuleSettingsRoutes()))   // MODULE-REORG-1 P2a/P2b: GET /modules, /settings/modules — appended LAST (order is load-bearing)
@@ -1180,6 +1180,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
             requireWritable(method, r);   // PA-7b: an expired entitlement past its grace leaves reads only
             if (idempotency(ex, method, path)) return;   // after every gate, before the handler's side effects
             try {
+                PendingActions.holdIfMachineAction(this, ex, method, bare(r));   // AK-2d: a machine agent's action → 202
                 Object result = r.handler.handle(ex, m);
                 if (result != HANDLED) respond(ex, 200, result);
             } catch (ApiException ae) {
@@ -1255,6 +1256,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 requireWritable(method, r);   // AK-2b: a replayed write on a read-only install is refused as a direct one is
                 Object result;
                 try {
+                    PendingActions.holdIfMachineAction(this, rx, method, bare(r));   // every door, as the gate
                     result = r.handler.handle(rx, m);
                 } catch (PendingChanges.Held held) {
                     // AK-2b: a replayed write that became a Pending Change answers 202, exactly as routeDispatch does
@@ -1353,6 +1355,12 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 throw new ApiException(401, ErrorCodes.UNAUTHENTICATED, "authentication required");
             }
         });
+    }
+
+    /** The route's registered pattern without its {@code ^…$} anchors — the key {@link AgentGate} and the manifest use. */
+    private static String bare(Route r) {
+        String p = r.pattern.pattern();
+        return p.startsWith("^") && p.endsWith("$") ? p.substring(1, p.length() - 1) : p;
     }
 
     /** {@link AgentGate#refusal} for the route {@code r} this request matched, as the request's Subject (AK-2a). */

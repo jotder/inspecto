@@ -21,7 +21,7 @@ tags: [product-item, module]
 | features | missing | |
 | feature-db | current | [MCP endpoint — feature database](feature-db.md) |
 | user-guide | missing | |
-| admin-guide | current | [Let an AI agent propose changes](admin-guide-howto-agent-propose-changes.md) · [MCP endpoint — administrator guide](admin-guide-mcp.md) |
+| admin-guide | current | [Let an AI agent operate runs](admin-guide-howto-agent-operate-runs.md) · [Let an AI agent propose changes](admin-guide-howto-agent-propose-changes.md) · [Let an AI agent work Incidents and Cases](admin-guide-howto-agent-work-incidents.md) · [MCP endpoint — administrator guide](admin-guide-mcp.md) |
 | api | current | [HTTP routes — module.mcp](api-routes.md) |
 | tests | current | [Agent Kit golden runs — the compatibility matrix](tests-agent-golden.md) · [MCP endpoint — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
@@ -38,4 +38,3 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `AGENT-GATEWAY-UNMARKED-1` | P3 | defect | behind an API gateway (-Dauth.oidc.gateway.*) an agent client's token is never marked: | — |
 | `PENDING-CHANGE-SECRET-READBACK-1` | P3 | defect | a Job's secret parameter can be read back through its Pending Change: | — |
 | `DRYRUN-PREVIEW-UNMASKED-1` | P3 | defect | Pipeline dry-run and test-run previews are not masked: | — |
-| `AGENT-KIT-FULL-GATE-1` | P1 | chore | Run the full reactor gate once over the Agent Kit and agent-fix changes before the next release: none of them ran it. | — |

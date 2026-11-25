@@ -161,6 +161,25 @@ class ForecastJobTest {
         }
     }
 
+    /** BI-INSIGHTS-1 I-14: a run registers its history and _latest as system Datasets, the entity key classified. */
+    @Test
+    void aRunRegistersItsOutputsAsSystemDatasets(@TempDir Path dir) throws Exception {
+        Path data = plant(dir);
+        JobRun run = runOnce(dir, data, params("demand"));
+        assertEquals("SUCCESS", run.status(), run.message());
+        assertFalse(run.message().contains("not registered"), run.message());
+
+        com.gamma.pipeline.ComponentStore store = new com.gamma.pipeline.ComponentStore(dir.resolve("config").resolve("registry"));
+        String entityType = String.valueOf(store.get(ForecastModel.KIND, "demand").orElseThrow().content().get("entityType"));
+        for (String id : List.of("forecasts_demand", "forecasts_demand_latest")) {
+            Map<String, Object> ds = store.get("dataset", id).orElseThrow(() -> new AssertionError(id + " not registered")).content();
+            assertEquals(id, ds.get("physicalRef"));
+            assertEquals("system", ds.get("origin"));
+            assertTrue(((List<?>) ds.get("columns")).contains(Map.of("name", "entity_key", "role", "entity",
+                    "classification", entityType)), String.valueOf(ds.get("columns")));
+        }
+    }
+
     @Test
     void seasonalNaivePersistsTheHandComputedBacktestError(@TempDir Path dir) throws Exception {
         Path data = plant(dir);

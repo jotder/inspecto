@@ -84,7 +84,37 @@ class OidcAgentClientTest {
         Subject s = authenticate(null, Set.of("claude-code"),
                 token("svc-uuid", "claude-code").claim("gty", "client_credentials").build());
         assertTrue(s.machine());
-        assertNull(s.agentClient(), "phase 1 marks a delegated person only");
+        assertNull(s.agentClient(), "a person's agent client never marks a client-credentials token");
+    }
+
+    @Test
+    void aMachineClientListedAsAnAgentMachineIsBothMachineAndAgent() throws Exception {
+        MachineTrust pin = new MachineTrust(Set.of("la-integration", "ops-bot"), "inspecto-spa", null, false, Set.of("ops-bot"));
+        Subject bot = authenticate(pin, Set.of(), token("svc-ops", "ops-bot").claim("gty", "client_credentials").build());
+        assertEquals("client:ops-bot", bot.id());
+        assertTrue(bot.machine());
+        assertEquals("ops-bot", bot.agentClient(), "AK-2c: a listed machine client is an agent");
+        for (String never : Roles.AGENT_NEVER_CAPABILITIES)
+            assertFalse(bot.capabilities().contains(never), "a machine agent never holds " + never);
+        Subject plain = authenticate(pin, Set.of(), token("svc-la", "la-integration").claim("gty", "client_credentials").build());
+        assertTrue(plain.machine());
+        assertNull(plain.agentClient(), "a machine client not listed stays an ordinary machine");
+    }
+
+    @Test
+    void agentMachineClientsMustBeListedMachineClients() {
+        assertThrows(IllegalStateException.class,
+                () -> new MachineTrust(Set.of("la-integration"), "inspecto-spa", null, false, Set.of("ops-bot")));
+        assertThrows(IllegalStateException.class,
+                () -> new MachineTrust(Set.of("inspecto-spa"), "inspecto-spa", null, false, Set.of("inspecto-spa")));
+        System.setProperty("auth.oidc.agentMachineClients", "ops-bot");
+        try {
+            IllegalStateException e = assertThrows(IllegalStateException.class, MachineTrust::fromSystemProperties,
+                    "no -Dauth.oidc.clients");
+            assertTrue(e.getMessage().contains("agentMachineClients"), e.getMessage());
+        } finally {
+            System.clearProperty("auth.oidc.agentMachineClients");
+        }
     }
 
     @Test

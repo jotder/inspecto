@@ -14,6 +14,7 @@ com.gamma.access.Roles | public static Map<String, Def> effective(Path)
 com.gamma.access.Roles | public static Map<String, Def> validate(Object)
 com.gamma.access.Roles | public static Subject admitMachine(Path, Subject)
 com.gamma.access.Roles | public static final Map<String, Def> SEED
+com.gamma.access.Roles | public static final Set<String> AGENT_MACHINE_CAPABILITIES
 com.gamma.access.Roles | public static final Set<String> AGENT_NEVER_CAPABILITIES
 com.gamma.access.Roles | public static final Set<String> KNOWN_CAPABILITIES
 com.gamma.access.Roles | public static final Set<String> MACHINE_CAPABILITIES

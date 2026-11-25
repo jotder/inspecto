@@ -41,6 +41,8 @@ class DecisionRuleWritersTest {
             Map.entry("AlertRoutes#write", FIXED_KIND + " (alert-rule)"),
             Map.entry("ExpectationRoutes#write", FIXED_KIND + " (expectation)"),
             Map.entry("ExpectationRunner#runAndPersist", FIXED_KIND + " (an expectation's lastResult stamp)"),
+            Map.entry("ScoreDatasets#narrow", FIXED_KIND + " (a model's output datasets)"),
+            Map.entry("ScoreDatasets#registerOne", FIXED_KIND + " (a model's output datasets)"),
             Map.entry("KpiSnapshotJobType#register", FIXED_KIND + " (the kpi_history_<kpi> dataset)"),
             Map.entry("DecisionRoutes#simulate", "re-writes the STORED rule with a lastSimulation stamp only "
                     + "(archive=false) — no body content, the stamps and invoke-api consequences are the stored ones"),

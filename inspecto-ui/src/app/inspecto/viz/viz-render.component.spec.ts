@@ -62,6 +62,35 @@ describe('VizRenderComponent', () => {
         expect(c.chartData()?.datasets[0].data).toEqual([1, 2]);
     });
 
+    it('BI-INSIGHTS-1 I-1: draws the compared series dashed under its own name and states the latest change in words', async () => {
+        const props: VizProps = {
+            labels: ['2026-02', '2026-03'],
+            series: [
+                {
+                    label: 'Amount (total)',
+                    data: [20, 15],
+                    compare: [
+                        { cmp: 10, delta: 10, pct: 100 },
+                        { cmp: 20, delta: -5, pct: -25 },
+                    ],
+                },
+                { label: 'Amount (total)', compareOf: 'Amount (total)', data: [10, 20] },
+            ],
+        };
+        const fixture = create(BAR_PLUGIN, props);
+        fixture.componentRef.setInput('renderOptions', { compare: { kind: 'previous' } });
+        fixture.detectChanges();
+        const sets = fixture.componentInstance.chartData()!.datasets as unknown as Record<string, unknown>[];
+        expect(sets[1]['label']).toBe('Amount (total) · previous period');
+        expect(sets[1]['borderDash']).toEqual([6, 4]);
+        expect(sets[0]['borderDash']).toBeUndefined();
+        const el = fixture.nativeElement as HTMLElement;
+        expect(el.querySelector('[data-testid="compare-note"]')?.textContent?.trim()).toBe(
+            'Latest (Mar 2026): ▼ Down 25.0 % (−5) vs previous period',
+        );
+        await expectNoA11yViolations(el);
+    });
+
     it('labels an empty category "(blank)" but a click still emits the raw value for drill-down', () => {
         const props: VizProps = { labels: ['PBKS', ''], series: [{ label: 'm', data: [12, 1] }] };
         const c = create(BAR_PLUGIN, props).componentInstance;

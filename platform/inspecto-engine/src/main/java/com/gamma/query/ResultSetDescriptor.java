@@ -19,8 +19,36 @@ public final class ResultSetDescriptor {
 
     private ResultSetDescriptor() {}
 
-    /** One described column: name, coarse type ({@code number|string|date|boolean}), role, and (dimensions) cardinality. */
-    public record Column(String name, String type, String role, Integer cardinality) {}
+    /**
+     * One described column: name, coarse type ({@code number|string|date|boolean}), role, (dimensions) cardinality, and —
+     * for a column a query adds on top of a Measure rather than a Measure of its own — its {@link Overlay}; {@code null}
+     * for every ordinary column.
+     */
+    public record Column(String name, String type, String role, Integer cardinality, Overlay overlay) {
+        public Column(String name, String type, String role, Integer cardinality) {
+            this(name, type, role, cardinality, null);
+        }
+    }
+
+    /**
+     * What an overlay column is (BI-INSIGHTS-1 I-1): {@code overlay} = {@code compare}; {@code kind} = how
+     * ({@code previous | lastYear | target | average}); {@code of} = the Measure / ratio column it is drawn against;
+     * {@code part} = {@code cmp} (the compared value), {@code delta} or {@code pct}. A renderer draws it with its Measure
+     * instead of as a Measure of its own.
+     */
+    public record Overlay(String overlay, String kind, String of, String part) {}
+
+    /** {@code cols} with the comparison columns of {@code compare} (by name, as {@link MeasureCompiler#compareColumns}) marked. */
+    public static List<Column> markCompare(List<Column> cols, Map<String, MeasureCompiler.CompareColumn> compare) {
+        if (compare.isEmpty()) return cols;
+        List<Column> out = new ArrayList<>(cols.size());
+        for (Column c : cols) {
+            MeasureCompiler.CompareColumn m = compare.get(c.name());
+            out.add(m == null ? c : new Column(c.name(), c.type(), c.role(), c.cardinality(),
+                    new Overlay("compare", m.kind(), m.of(), m.part())));
+        }
+        return out;
+    }
 
     private static final Pattern ID_COLUMN = Pattern.compile("(^|_)id$", Pattern.CASE_INSENSITIVE);
 

@@ -1122,6 +1122,17 @@ built: [`okf/product/module/config/spec-config-safety.md`](okf/product/module/co
 Request" — that word means a commercial CR. ⛔ Not an agent approval: the `/agent/approvals` inbox governs
 what the assistant may do, not whether a human's config change lands.
 
+**Pending Action** — An action on a run — a run's trigger, pause, resume, reprocess, rejects replay, retry, drain;
+a Job's trigger or a Job Run's replay — or on an **Incident**, **Case** or **Alert** — a comment, an Incident
+Brief, ack, assign, resolve, a Workflow transition — that an unattended **machine agent** asked for, held for a person to
+approve before it runs: the recorded request, the machine that asked, a reason, created / expires-at. It is
+**approved** by the change approvers (`canApproveChanges`, four-eyes) and then runs as that machine, or it is
+**declined**, **withdrawn** by the machine, or **expires**; one the run or Case moved past (the route answers 409) is
+closed as **stale**, and one its route refuses otherwise (an illegal Workflow move) as **failed**. A person's own AI agent takes these actions at once, within that person's rights, so only a
+machine's are ever held. *(Added 2026-11-25, `AGENT-KIT-1` AK-2d, operator decision D-AK6; case actions AK-2e the same day; as built:
+[`okf/product/module/mcp/spec-mcp.md`](okf/product/module/mcp/spec-mcp.md).)* ⛔ Not a **Pending Change**: that holds
+a config change; this holds an action on a run or a Case. ⛔ Not an **Action Request**: that holds an outbound call.
+
 **Action Request** — An outbound API call raised from an **Incident** or **Case** (by a person, or by a Decision
 Rule's `invoke-api` consequence) and held for a second person's approval before it is sent: the target
 **Connection**, the method, the payload rendered at creation, an idempotency key, and its delivery — attempts and

@@ -224,6 +224,8 @@ public final class PendingChanges {
         // AK-2a: the verified agent client that proposed it for its person (null for a person's own write), and the MCP
         // Tool when it came through the MCP endpoint — what the approver sees, and what an approved replay runs as.
         rec.put("agentClient", author == null ? null : author.agentClient());
+        // AK-2c: a machine author's token subject, so an approved replay runs as that machine again (authorNow).
+        rec.put("authorMachine", author != null && author.machine() ? author.machineSub() : null);
         rec.put("mcpTool", author != null && author.agent()
                 && ApiContext.attr(ex, ApiContext.ATTR_AUDIT_ATTRS) instanceof Map<?, ?> via && via.get("mcpTool") instanceof String t
                 ? t : null);
@@ -340,7 +342,12 @@ public final class PendingChanges {
         // removed — so approval never widens what the change runs with.
         String agent = rec.get("agentClient") instanceof String a && !a.isBlank() ? a : null;
         if (agent != null) caps.removeAll(Roles.AGENT_NEVER_CAPABILITIES);
-        return new Subject(String.valueOf(rec.get("author")), caps, unscoped ? null : scopes, Map.of(), null, null, null, agent);
+        // AK-2c (plan §3 gap): a machine author replays as that machine — still admitted by the Space (identity.machineClients,
+        // else 403) and holding only what a machine keeps — so approval never widens what a machine's change runs with.
+        String machine = rec.get("authorMachine") instanceof String m && !m.isBlank() ? m : null;
+        Subject author = new Subject(String.valueOf(rec.get("author")), caps, unscoped ? null : scopes, Map.of(), null,
+                null, machine, agent);
+        return machine == null ? author : Roles.admitMachine(configRoot, author);
     }
 
     /**

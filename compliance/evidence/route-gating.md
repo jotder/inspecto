@@ -342,6 +342,9 @@ system: the evidence cannot say something the code does not.
 | POST | `/origin/upgrade` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceOriginRoutes.java:62` |
 | POST | `/parsers/([^/]+)/preview` | exempt | provenance-gated | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java:43` |
 | POST | `/parsers/asn1/validate` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java:46` |
+| POST | `/pending-actions/([^/]+)/approve` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingActionRoutes.java:39` |
+| POST | `/pending-actions/([^/]+)/decline` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingActionRoutes.java:41` |
+| POST | `/pending-actions/([^/]+)/withdraw` | exempt | self-service | `inspecto/src/main/java/com/gamma/control/PendingActionRoutes.java:44` |
 | POST | `/pending-changes/([^/]+)/approve` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:74` |
 | POST | `/pending-changes/([^/]+)/decline` | gated | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:76` |
 | POST | `/pending-changes/([^/]+)/withdraw` | exempt | self-service | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:79` |

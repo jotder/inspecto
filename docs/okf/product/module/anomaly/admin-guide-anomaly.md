@@ -54,7 +54,7 @@ stored as `masked:` tokens.
 
 ## Raising Incidents
 
-Declare `anomaly_scores_<id>_latest` as a Dataset and point a per-entity Alert Rule at it; templates use the
+Each run registers `anomaly_scores_<id>_latest` (and the history) as a system Dataset ([model output Datasets](../engine/spec-model-output-datasets.md)); point a per-entity Alert Rule at it; templates use the
 pending seed `config/pending/alert-rules/<name>.toon` with `afterScore: {kind: anomaly-model, model}` — see
 [Incidents](spec-anomaly-scores.md).
 
