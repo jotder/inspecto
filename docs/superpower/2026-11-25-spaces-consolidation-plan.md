@@ -345,3 +345,39 @@ folder, `data/` included, into a temp Space (`Files.walk(TEMPLATE)`), so the Jav
 `platform/inspecto-engine`, `platform/inspecto-graph`, `la/inspecto-geo-link`); (b) moving the hand-written golden
 samples into module test resources and repointing the corpus classes (`AmlCorpus`, `PaymentFraudCorpus`,
 `MobileMoneyCorpus`, `TelcoRaCorpus`, …); (c) the Template spec text — written in P3, when it becomes true.
+
+## 14. P2.4 built; P2.3 premise corrected (2026-11-25)
+
+**P2.4 — the LA golden tests generate their corpus (built, verified, committed in its own lane).**
+- One helper, `com.gamma.etl.LaCorpus` in the `inspecto-etl` test tree (every consumer module already depends on that
+  test-jar): `data(template)` runs `node tools/seed-space-data.mjs` once per JVM into `<module>/target/la-corpora/<t>/data`;
+  `install(template, space)` copies the Template without its `data/` and adds the generated corpus. A missing Node or
+  Python is a named `IllegalStateException`, never a skip. `inspecto-graph` keeps its own 40-line copy of `data(...)`
+  (`com.gamma.graph.LaCorpus`): the module is dependency-free (`check-module-deps.mjs`) and the etl module reaches it
+  through `inspecto-analytics`, so it cannot be its test dependency.
+- Converted: 13 `*LinksJobGoldenTest` in `platform/inspecto-engine` plus `MmLinksJobGoldenTest`,
+  `LaClaimsLinksJobTest`, `TelecomLinksGoldenTest`; the four `La*GoldenTest` and `ClaimsCorpus` in `inspecto-graph`;
+  `LaShowcaseRiskScoreGoldenTest` (scoring); `LaClaimsTemplateTest` (`inspecto`); and in `inspecto-geo-link`
+  `ControlApiLaShowcaseFiguresTest`, `ControlApiTelecomPatternPacksTest`, `ControlApiLaShowcaseGeoSceneTest`,
+  `ControlApiLaClaimsGeoSceneTest`, `ControlApiFullCycleIndexStatusTest`. **The first survey (22 classes) missed every
+  class that spells the path as separate `Path.of("..", "_templates", "la-x")` arguments**; the second found the rest.
+  `La*TemplateTest` classes read only `config/` and are untouched.
+- Proof: 247 targeted tests green (graph 33, engine 165, `inspecto` 35, geo-link 13, scoring 1) **with all 17 Templates'
+  `data/` folders deleted and every `target/la-corpora` cleared**; the unconverted `LaAuditGoldenTest` fails 9 of 9 on
+  `NoSuchFileException …/la-audit/data/inbox/ap_invoice` in the same state. Full reactor gate NOT run.
+- Committed Template data the generators do **not** produce (found while checking): `la-mobile-money/data/staged/README.txt`,
+  `la-showcase/data/staged/README.txt`, `order-to-cash/data/o2c_open_items/`. P3 must move the READMEs (into the
+  generator or the Template config) or drop them on purpose.
+
+**P2.3 — the premise of D-SC3 was wrong for five of the six Templates.** `AmlCorpus`, `PaymentFraudCorpus`,
+`MobileMoneyCorpus`, `TelcoRaCorpus` and `TelcoFraudCorpus` are **Java generators** with a fixed seed (each has a
+`main` or `writeTo` and an `-D…regenerate` switch), and their golden tests already assert "the committed samples are
+exactly the generator's output" — so `aml`, `mobile-money`, `payment-fraud`, `telco-ra` and `telco-fraud` are not
+hand-written fixtures but generated corpora like the LA ones. Copying them into test resources would duplicate
+generated data; the right shape is the P2.4 one (the tests build the corpus from the generator into the temp Space and
+the pin tests shrink to a determinism check), which is a different change from the one D-SC3 signed. **Not built;
+awaiting a decision.** The `demo`, `default` and `ucc` Spaces' `data/samples` are a different case again: they are
+product demo data consumed by `tools/seed-samples.mjs --all` (the `launch.json` entries and the CI seed-path guard),
+`tools/check-split-identity-fixture.mjs` (a `guards:` step reading `spaces/demo/data/samples/roaming_tap`), the
+customer and App tools, `SpaceSamples.load` and about thirteen Java tests (`DemoCorpusIngestTest`,
+`ControlApiConnectionsTest`, …). `demo` also carries its own Python generator inside `data/samples`.
