@@ -410,3 +410,25 @@ golden tests now **build the samples from those classes** instead of reading `da
    with `tools/seed-telco.test.mjs` (`telco-fraud`). With the samples untracked they have no source; the corpora are Java,
    not Node, so P3 either keeps these five `data/samples` tracked (about 0.7 MB) or gives the tools a generated source.
 3. The `demo`, `default` and `ucc` Spaces' samples are a separate question (§14).
+
+## 16. P3a built: the spaces-config-only guard, as a ratchet (2026-11-25)
+
+Nothing is untracked yet; this change stops data entering `spaces/` and fixes today's debt so it can only go down.
+- `tools/check-spaces-config-only.mjs` (+ `.test.mjs`, 8 cases, each defect planted and its finding required) in the
+  `guards:` job, so the pre-commit hook runs it (it reads `git ls-files` and sizes, ~0.1 s). It fails on **NEW** (tracked
+  data outside the baseline, or a data-extension file outside `config/` and `tests/`), **GROWN**, **SHRUNK** (lower the
+  baseline in the same change), **STALE** (delete the entry), **BIG** (a tracked file over 256 KB) and **IGNORE**.
+- `tools/spaces-config-only.baseline.json`: 33 `data/` folders, 811 files, 92.4 MB, each with its reason — 17 generated
+  `la-*` corpora (P3b), 5 Templates whose samples a Java test generator builds (aml, payment-fraud, mobile-money, telco-ra,
+  telco-fraud) and 8 hand-written ones, and the `demo`/`default`/`ucc` Spaces' samples (P3c).
+- Scope rules: `audit/` is state only at the Space root (la-audit authors a `config/audit/` of its own); a Space's `tests/`
+  folder holds authored Pipeline test fixtures; `config/la-index/` is data, and `.gitignore` now ignores it (D-SC9).
+
+**P3b — untrack the 17 generated `la-*` corpora (about 90 MB): not started.** The tests no longer need them (P2.4); the
+consumers outside tests do: the 18 `tools/seed-la-*.mjs --scaffold` copies (each hand-copies `<template>/data` into the new
+Space), `tools/package-la-showcase.mjs` (stages the Template's data for the data zip), the `package.ps1` Template gallery
+(bundles `spaces/_templates/<t>` with its data), and the two staged `README.txt` files (la-mobile-money, la-showcase) no
+generator writes. Each must call `tools/seed-space-data.mjs`, which needs Python on the packaging machine.
+**P3c — the rest (about 2 MB): decisions open.** The five Java-generated Templates' samples (read by
+`tools/seed-screening-demo.mjs`, `tools/seed-telco-fraud-demo.mjs`), the hand-written Templates' samples and sink seeds, and
+the `demo`/`default`/`ucc` samples.

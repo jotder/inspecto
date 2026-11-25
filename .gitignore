@@ -91,6 +91,8 @@
 # Link Analysis evidence (snapshots, Investigations, the Identity Fact log) is written under the Space's CONFIG root
 # (SnapshotStore / EntityFactLog resolve <write root>/audit/) — runtime state, never committed.
 /spaces/*/config/audit/
+# The Link Analysis index (parquet, written by the engine) sits in a Space's config folder but is data (SPACES-CONSOLIDATION-1, D-SC9).
+/spaces/*/config/la-index/
 # Maker-checker (ASSURE-MAKER-CHECKER-1): Pending Changes are runtime proposals, and a Space's Pending Change key
 # lives OUTSIDE its config tree in the sibling <space>/config.secrets/ — neither is ever committed.
 /spaces/*/config/pending-changes/

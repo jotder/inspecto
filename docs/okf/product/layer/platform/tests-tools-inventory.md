@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-129 test file(s). Run one, or all:
+130 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -52,6 +52,7 @@ node --test tools/
 | `tools/check-reactor-verdict.test.mjs` | tools/check-reactor-verdict.mjs, driven end to end over a synthetic log and surefire reports. |
 | `tools/check-release-signing.test.mjs` |  |
 | `tools/check-sbom-modules.test.mjs` | Negative fixtures for tools/check-sbom-modules.mjs. Run: node --test tools/check-sbom-modules.test.mjs |
+| `tools/check-spaces-config-only.test.mjs` | The spaces-config-only guard (SPACES-CONSOLIDATION-1 P3): data may not enter the repository, and what is tracked today |
 | `tools/check-tool-tests-wired.test.mjs` | Negative fixtures for tools/check-tool-tests-wired.mjs. Run: node --test tools/check-tool-tests-wired.test.mjs |
 | `tools/compile-clean.test.mjs` | Fixture test for tools/compile-clean.mjs — the verdict must come from the LOG, never from an exit code, and each way |
 | `tools/compose-space.test.mjs` | Tests for tools/compose-space.mjs - PRODUCT-ASSEMBLY-1 PA-5 (D-PA14). Run: node --test tools/compose-space.test.mjs |
