@@ -45,8 +45,13 @@ function distinct(rows: Record<string, unknown>[], key: string): string[] {
     return out;
 }
 
-/** Group-by = the x + series (dimension/temporal) channels; measures = the y channels' aggregations. */
-export function buildXyQuery(values: ControlValues, ctx: QueryCtx): QuerySpec {
+/**
+ * Group-by = the x + series (dimension/temporal) channels; measures = the y channels' aggregations. `overlays` is true
+ * only for the Visualization Types that draw the forecast band and anomaly markers (line, bar, area — `xyPlugin`): every
+ * other caller (kpi-trend, waterfall, funnel, progress list, pie) never sends a stored `overlay`, which a type change keeps.
+ */
+export function buildXyQuery(values: ControlValues, ctx: QueryCtx, overlays = false): QuerySpec {
+    const overlay = overlays && values.x?.[0]?.grain && values.x[0].grain !== 'auto' ? withOverlay(ctx) : {};
     const dims = [values.x?.[0], values.series?.[0]].filter((cv): cv is ChannelValue => !!cv?.field);
     const groupBy = dims.map((cv) => cv.field);
     const measures = (values.y ?? []).map(channelMeasure);
@@ -64,15 +69,13 @@ export function buildXyQuery(values: ControlValues, ctx: QueryCtx): QuerySpec {
             ? {
                   orderBy: categoryOrderBy(
                       groupBy,
-                      compareFragment(ctx.options) || overlayFragment(ctx.options)
-                          ? undefined
-                          : ctx.options?.categoryOrder,
+                      compareFragment(ctx.options) || overlay.overlay ? undefined : ctx.options?.categoryOrder,
                   ),
               }
             : {}),
         ...withCompare(ctx),
         // I-11 / I-7 read along a date grouped by day, week or month on x; any other x would only be refused (422).
-        ...(values.x?.[0]?.grain && values.x[0].grain !== 'auto' ? withOverlay(ctx) : {}),
+        ...overlay,
     };
 }
 
@@ -123,9 +126,10 @@ export function transformXy(rows: Record<string, unknown>[], values: ControlValu
 
     const compared = hasCompare(rows, mId);
     const overlaid = hasOverlay(rows, mId);
-    // I-11: a forecast row carries no actual — the line stops there (NaN), never drops to 0.
+    // I-11: a forecast row carries no actual, and a series with no row at a forecast label (its own forecast refused or
+    // shorter) has none either — the line stops there (NaN), never drops to 0.
     const value = (r: Record<string, unknown> | undefined): number =>
-        overlaid && r && r[mId] == null ? NaN : num(r?.[mId]);
+        overlaid && r?.[mId] == null ? NaN : num(r?.[mId]);
     if (seriesField) {
         const seriesVals = distinct(rows, seriesField);
         const series: VizSeries[] = [];

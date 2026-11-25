@@ -246,4 +246,6 @@ there; its relation is validated when it is read, by
   (`REPORT-CHART-MARKERS-1`), and the public share viewer does not forward `overlay` (it forwards only
   `tableSort`). The anomaly baseline is the result's own buckets, so a narrower date range changes the scores; a
   week or month grain has no seasonal slot in `SeasonalBaseline` (weekday / hour only) and is scored against every
-  other bucket.
+  other bucket. A stacked or value-sorted chart draws neither (a band follows each series' own values in time order)
+  and says so under the chart; only `line`, `bar` and `area` send `overlay`, so a Widget switched to another type keeps
+  the stored option without asking for it.

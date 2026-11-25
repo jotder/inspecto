@@ -180,8 +180,10 @@ public final class ChartOverlays {
         String refusal = shown.truncated() ? "the result was cut at the row limit; an overlay over part of a series would mislead"
                 : series.size() > MAX_SERIES ? series.size() + " series exceed the limit of " + MAX_SERIES + " for overlays"
                 : series.isEmpty() ? "the result has no time buckets" : null;
+        // Too many series: one entry per Measure and overlay, never one per series (the summary stays bounded).
+        boolean perSeries = series.size() <= MAX_SERIES;
         for (String id : valueIds(spec)) {
-            for (Map.Entry<List<Object>, List<Point>> e : series.entrySet()) {
+            if (perSeries) for (Map.Entry<List<Object>, List<Point>> e : series.entrySet()) {
                 Map<String, Object> seriesKey = new LinkedHashMap<>();
                 for (int k = 0; k < others.size(); k++) seriesKey.put(others.get(k), e.getKey().get(k));
                 String why = refusal != null ? refusal
@@ -192,7 +194,7 @@ public final class ChartOverlays {
                 if (req.anomaly())
                     summary.add(anomaly(grain, id, seriesKey, e.getValue(), rows, why));
             }
-            if (refusal != null && series.isEmpty()) {
+            if (refusal != null && (series.isEmpty() || !perSeries)) {
                 if (req.forecast() != null) summary.add(entry("forecast", id, Map.of(), refusal));
                 if (req.anomaly()) summary.add(entry("anomaly", id, Map.of(), refusal));
             }

@@ -12,6 +12,9 @@ import {
 } from './chart-overlays';
 import { biQueryBody } from './dataset-result.service';
 import { buildXyQuery, transformXy } from './plugins/plugin-helpers';
+import { AREA_PLUGIN, BAR_PLUGIN, LINE_PLUGIN, PIE_PLUGIN } from './plugins/standard.plugins';
+import { KPI_TREND_PLUGIN } from './plugins/kpi-trend.plugin';
+import { WATERFALL_PLUGIN } from './plugins/waterfall.plugin';
 import { ControlValues } from './viz-types';
 
 /** BI-INSIGHTS-1 I-11 / I-7 — the option → the `/bi/query` fragment → the server's columns → Chart Markers and words. */
@@ -44,12 +47,35 @@ describe('chart overlays (I-11, I-7)', () => {
     const ctx = { datasetId: 'd', sourceName: 's', options: { overlay: { forecast: {} } } };
 
     it('asks the server only along a grained date, so a stale option never refuses a Widget', () => {
-        const spec = buildXyQuery(day, ctx);
+        const spec = LINE_PLUGIN.buildQuery(day, ctx);
         expect(spec.overlay).toEqual({ forecast: {} });
         expect(biQueryBody(spec)?.overlay).toEqual({ forecast: {} });
-        const plain = buildXyQuery({ ...day, x: [{ field: 'region' }] }, ctx);
+        const plain = LINE_PLUGIN.buildQuery({ ...day, x: [{ field: 'region' }] }, ctx);
         expect('overlay' in plain).toBe(false);
         expect(biQueryBody(plain)).not.toHaveProperty('overlay');
+    });
+
+    it('asks only for line, bar and area — a type changed away keeps the stored option but never sends it', () => {
+        for (const p of [LINE_PLUGIN, BAR_PLUGIN, AREA_PLUGIN])
+            expect(p.buildQuery(day, ctx).overlay).toEqual({ forecast: {} });
+        for (const p of [KPI_TREND_PLUGIN, WATERFALL_PLUGIN, PIE_PLUGIN])
+            expect('overlay' in p.buildQuery(day, ctx)).toBe(false);
+        expect('overlay' in buildXyQuery(day, ctx)).toBe(false);
+    });
+
+    it('leaves a series with no row at a forecast label as a gap, never 0', () => {
+        const byRegion: ControlValues = { ...day, series: [{ field: 'region' }] };
+        const p = transformXy(
+            [
+                { ts: '2026-01-01', region: 'north', sum_amount: 10 },
+                { ts: '2026-01-01', region: 'south', sum_amount: 20 },
+                // south's forecast was refused (or shorter): no south row on the 2nd
+                { ts: '2026-01-02', region: 'north', sum_amount: null, sum_amount__fc: 11 },
+            ],
+            byRegion,
+        );
+        expect(p.series.map((s) => s.label)).toEqual(['north', 'south']);
+        expect(p.series[1].data[1]).toBeNaN();
     });
 
     const rows = [

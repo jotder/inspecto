@@ -222,6 +222,8 @@ export class VizRenderComponent {
     private readonly overlayMarkers = computed<ResolvedMarker[]>(() => {
         const o = this.renderOptions();
         if (!this.overlaysSupported() || (!o?.overlay?.forecast && !o?.overlay?.anomaly)) return [];
+        // A band follows each series' own values in time order: a stacked or value-sorted chart has neither.
+        if (this.overlaysHidden()) return [];
         const p = this.sortedProps();
         const series = p.series.map((s) => ({
             label: s.label,
@@ -237,11 +239,18 @@ export class VizRenderComponent {
         );
     });
     readonly showSensitivity = computed(
-        () => this.overlaysSupported() && !!this.renderOptions()?.overlay?.anomaly && !!this.overlaySummary()?.length,
+        () =>
+            this.overlaysSupported() &&
+            !this.overlaysHidden() &&
+            !!this.renderOptions()?.overlay?.anomaly &&
+            !!this.overlaySummary()?.length,
     );
     /** The caption lines: the forecast, its tested accuracy, the flagged count — or why there is none. */
+    private readonly overlaysHidden = computed(() => !!this.renderOptions()?.stacked || !!this.renderOptions()?.sort);
     readonly overlayLines = computed<string[]>(() => {
         if (!this.overlaysSupported()) return [];
+        if (this.overlaysHidden() && this.overlaySummary()?.length)
+            return ['The forecast band and anomaly markers are not drawn on a stacked or sorted chart.'];
         const flagged = this.overlayMarkers().reduce((n, m) => n + (m.type === 'points' ? m.points.length : 0), 0);
         const grain = grainUnit(this.props().labels);
         return overlayNote(this.overlaySummary(), flagged, this.sensitivity(), grain);

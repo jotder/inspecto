@@ -199,6 +199,29 @@ class ChartOverlaysTest {
     }
 
     @Test
+    void pastTwentySeriesTheSummaryStaysOneEntryPerOverlay() {
+        MeasureCompiler.Spec bySeries = spec(List.of("day", "region"));
+        List<Map<String, Object>> rows = new ArrayList<>();
+        for (int i = 0; i < 28; i++)
+            for (int k = 0; k < ChartOverlays.MAX_SERIES + 1; k++) {
+                Map<String, Object> r = new LinkedHashMap<>();
+                r.put("day", START.plusDays(i).toString());
+                r.put("region", "r" + k);
+                r.put("sum_amount", weekly(i));
+                rows.add(r);
+            }
+        ChartOverlays.Outcome o = ChartOverlays.apply(req(Map.of("forecast", Map.of(), "anomaly", Map.of()), bySeries),
+                bySeries, result(rows, "number", false));
+        assertEquals(2, o.summary().size(), o.summary().toString());
+        o.summary().forEach(s -> assertTrue(String.valueOf(s.get("reason")).contains("exceed"), s.toString()));
+        assertEquals(rows.size(), o.result().rows().size(), "no forecast rows");
+        // falsified: twenty series are forecast one by one
+        List<Map<String, Object>> twenty = rows.stream().filter(r -> !"r20".equals(r.get("region"))).toList();
+        assertEquals(ChartOverlays.MAX_SERIES,
+                ChartOverlays.apply(req(FORECAST, bySeries), bySeries, result(new ArrayList<>(twenty), "number", false)).summary().size());
+    }
+
+    @Test
     void aMonthGrainFallsBackToTheCalendarYear() {
         MeasureCompiler.Spec monthly = new MeasureCompiler.Spec("ds", List.of(new MeasureCompiler.Measure("sum", "amount")),
                 List.of("day"), Map.of("day", "month"), List.of(), List.of(), 1000);

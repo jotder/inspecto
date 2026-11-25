@@ -357,7 +357,9 @@ already exists there, and Q2/Q4 answer the questions an RA or finance lead asks 
   non-number → no forecast and the reason; a missing value is never 0 (the SPA leaves a forecast row's actual as a
   gap). The anomaly sensitivity (1–5 → |z| 5, 4, 3.5, 3, 2.5) is the renderer's: the server's scores do not depend on
   it, so the slider under the chart re-draws without a query.
-- **UI**: `options.overlay` (`chart-overlays.ts`) on line, bar, area; sent only when x is a grained date. Drawn
+- **UI**: `options.overlay` (`chart-overlays.ts`) on line, bar, area — only those plugins pass `buildXyQuery(…, true)` — and
+  sent only when x is a grained date; a stacked or value-sorted chart draws neither and says why; a series with no row at
+  a forecast label is a gap, never 0. Past 20 series the summary is one refusal per Measure and overlay. Drawn
   through the Chart Markers plugin (D-BI9) as two new resolved kinds — `interval` (filled band + dashed point
   forecast) and `points` (rings) — not as extra Chart.js datasets, so the band is one drawing path with I-2.
 - **Deliberately deferred**: the Report PDF (added to `REPORT-CHART-MARKERS-1`) and the public share viewer (it
