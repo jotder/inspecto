@@ -5,7 +5,7 @@
   "about": "Golden tasks for the Incident and Case analyst role. Graded from the platform's own state through the API (audit rows of the actions the agent ran, its Pending Actions, its Pending Changes) and from the agent's final reply - never by a model. Same Space as the developer and operations suites.",
   "setup": [
     "The developer suite's setup: a Standard install with an OpenID Connect provider, Space 'golden-dev'.",
-    "A PERSON opens an Incident titled 'Late shipments feed' (POST /objects, type incident, severity MAJOR); its id is variable incident. Before an-03 it is still IDENTIFIED.",
+    "A PERSON opens an Incident titled 'Late shipments feed' (POST /objects, type incident, severity MAJOR); its id is variable incident. Before an-03 it is still IDENTIFIED. POST /objects needs links naming at least one existing object, and a fresh Space has none: first open one, e.g. POST /cases/from-entities {title, entities:[{id: 'entity:SETUP-ANCHOR', dataset: 'shipments'}]}, and link the Incident and both Cases to the Incident it mints (first live run, 2026-11-25).",
     "A PERSON opens a Case titled 'Duplicate carrier invoices' (POST /objects, type case) and moves it to INVESTIGATING (POST /objects/{case}/transition {\"action\":\"investigate\"}); its id is variable case. Before an-05 a second Case is opened and moved the same way; its id is variable case2.",
     "User 'dana' exists in the Space.",
     "Person tasks (identity: person): the agent signs in through an agent client as a person who holds canWorkIncidents and canManageIncidents (and nothing that approves).",

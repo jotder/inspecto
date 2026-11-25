@@ -13,7 +13,10 @@ action on live data.
 - **Signed in as a person** (an agent client acting for them): the action runs **at once**, within that person's own
   rights (it needs `canOperateRuns`). The audit row names the person and your agent client.
 - **An unattended machine agent**: the action is **held** as a **Pending Action** (`pa-…`) for a person to approve —
-  the answer is `202` with `ran: false`. Nothing ran yet.
+  the answer is `202` with `ran: false`. Nothing ran yet. Put what you found in its `reason` (for a quarantined file,
+  its quarantine reason and whether it will be set aside again): the approver decides with it.
+- **Nothing tells you in advance which you are.** Until an answer shows you are a machine agent (a 202 with a `pa-…`
+  id), act as a person's agent: your action runs at once, so every rule below that says "ask first" applies.
 
 ## The actions
 

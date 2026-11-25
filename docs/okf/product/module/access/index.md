@@ -39,3 +39,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `APPROVAL-POLICY-PRESET-1` | P3 | feature | a Standard install is not gated by default: | — |
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
 | `MACHINE-CLIENT-CONSOLE-1` | P3 | feature | a Space's admitted machine clients (identity.machineClients) and attribute claims are set only through PUT /access/roles; the Roles scree… | — |
+| `AUDIT-ACTION-VERBS-1` | P3 | defect | A run's quarantine release, drain, retry-now and retry cancel, and a Job Run replay, are audited as pipeline.created / job.created (categ… | — |
