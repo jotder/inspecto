@@ -69,6 +69,11 @@ class TelcoRaGoldenTest {
     }
 
     @Test
+    void theCommittedSamplesMatchTheGeneratorWhenPresent() throws Exception {
+        SampleCorpora.assertCommittedMatches(TEMPLATE, TelcoRaCorpus.samples());
+    }
+
+    @Test
     void everyControlFlagsExactlyItsPlantedLeakages(@TempDir Path dir) throws Exception {
         Path writeRoot = dir.resolve("config");
         Path dataDir = dir.resolve("data");

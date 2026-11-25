@@ -432,3 +432,30 @@ generator writes. Each must call `tools/seed-space-data.mjs`, which needs Python
 **P3c — the rest (about 2 MB): decisions open.** The five Java-generated Templates' samples (read by
 `tools/seed-screening-demo.mjs`, `tools/seed-telco-fraud-demo.mjs`), the hand-written Templates' samples and sink seeds, and
 the `demo`/`default`/`ucc` samples.
+
+## 17. P3c settled (operator, 2026-11-25)
+
+Outside the 17 LA corpora the repository tracks about 1.6 MB under `spaces/`: samples (demo 759 KB, telco-fraud 325,
+payment-fraud 119, telco-ra 103, aml 79, mobile-money 79, la-sample 33, ucc 29, default 14, order-to-cash 11, starter 1)
+and 79 zero-row sink seeds (26 KB). Seed tools, the product's first-run samples, a CI guard and about 13 Java tests read
+them.
+- **D-SC12 ✅ — one kind of Space data is permitted: a named, capped exception.** Pristine samples under `data/samples/`
+  (up to 1 MiB per Space or Template) and sink seeds the seed gate needs (`seed.parquet`, `schema-seed.parquet`,
+  `entries.parquet` or a dot-marker under `data/<sink>/`, up to 16 KiB each). This is the design `.gitignore` always had
+  ("data/samples is the one committed exception"), now enforced by `tools/check-spaces-config-only.mjs` (new finding
+  `CAP`; 12 test cases). The independent review found the first seed rule too loose (any dot-file, any depth, no total);
+  it is now exact names (`seed.parquet`, `schema-seed.parquet`, `entries.parquet`, `.<name>-output` markers), never in
+  inbox, staged, samples, duckdb or audit, 16 KiB each and 256 KiB per Space or Template, and `_industries` is not a Space. Only the generated LA corpora are debt.
+- **D-SC13 ✅ — a drift check, "pin if present".** `SampleCorpora.assertCommittedMatches` (etl test-jar) compares the
+  samples a Template still commits with its generator's output and is **skipped when the folder is absent**, so the golden
+  tests stay independent of the committed copy while a stale copy still fails; `-Dsamples.regenerate=true` rewrites the
+  folder from the generator. One test in each of `AmlPackGoldenTest`, `PaymentFraudTemplateGoldenTest`,
+  `MobileMoneyPackGoldenTest`, `TelcoRaGoldenTest`, `TelcoFraudTemplateGoldenTest`.
+- Proof: with `aml` and `telco-ra` samples tampered by one byte, both checks failed naming the file; with `payment-fraud`'s
+  samples deleted its check was skipped; `mobile-money` and `telco-fraud` passed; `-Dsamples.regenerate=true` restored the
+  tampered `aml` sample byte for byte (`git status` clean). Nothing under `spaces/` changed.
+
+**Effect on P3b:** the baseline is now the 17 generated `la-*` corpora only (589 files, 90.9 MB). Everything else tracked
+under `spaces/` is either configuration or inside the permitted exception, so the guard no longer carries any other debt,
+and the open items of §14–§16 shrink to the P3b consumers (the 18 `seed-la-*` scaffolds, `package-la-showcase.mjs`, the
+`package.ps1` Template gallery) and the two `staged/README.txt` files no generator writes.

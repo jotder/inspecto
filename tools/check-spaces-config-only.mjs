@@ -6,13 +6,19 @@
  * script. A file under a `data/` (or `audit/`, `duckdb/`, `state/`, `la-index/`, `config.secrets/`, `.inspecto/`) folder
  * is data, and a data-extension file (`.csv`, `.parquet`, `.duckdb`, …) or any file over 256 KB is too.
  *
- * The data tracked today is a RATCHET, not an exemption: `tools/spaces-config-only.baseline.json` lists each folder that
- * still holds some, with its file and byte count and why. The guard fails when
+ * ONE kind of Space data is permitted (D-SC12, 2026-11-25): pristine SAMPLES under `data/samples/` (up to 1 MiB per Space or
+ * Template) and zero-row SINK SEEDS the seed gate needs (`seed.parquet`, `schema-seed.parquet`, `entries.parquet` or a dot-marker under
+ * `data/<sink>/` (never in inbox, staged, samples, duckdb or audit; a marker is a `.<name>-output` file), up to 16 KiB each
+ * and 256 KiB per Space or Template). That is the design `.gitignore` always had ("data/samples is the one committed exception"), now enforced.
+ *
+ * Everything else tracked today is a RATCHET, not an exemption: `tools/spaces-config-only.baseline.json` lists each folder
+ * that still holds some (the generated Link Analysis corpora), with its file and byte count and why. The guard fails when
  *   - NEW      a tracked data file lies outside every baseline folder (data is entering the repository);
  *   - GROWN    a baseline folder holds more files or bytes than recorded;
  *   - SHRUNK   it holds fewer — lower the baseline in the same change, so the debt can only go down;
  *   - STALE    a baseline folder holds nothing tracked any more — delete its entry;
  *   - BIG      a file over 256 KB is tracked outside a baseline folder;
+ *   - CAP      a Space's or Template's samples exceed 1 MiB, or a sink seed exceeds 16 KiB;
  *   - IGNORE   `.gitignore` lacks the rule for the Link Analysis index (`/spaces/<id>/config/la-index/`, D-SC9).
  *
  *   node tools/check-spaces-config-only.mjs                  the guard
@@ -31,6 +37,30 @@ export const MAX_BYTES = 256 * 1024;
 const STATE_AT_SPACE_ROOT = new Set(['data', 'audit', 'duckdb', 'state', 'config.secrets', '.inspecto']);
 const DATA_EXT = /\.(csv|tsv|psv|parquet|duckdb|db|sqlite|dat)$/i;
 export const LA_INDEX_RULE = '/spaces/*/config/la-index/';
+export const SAMPLES_CAP = 1024 * 1024;
+export const SEED_CAP = 16 * 1024;
+export const SEEDS_CAP = 256 * 1024;   // all the seeds of one Space or Template together
+/** A zero-row snapshot, an Entity List's entries, or an engine marker (`.entity-list-output`): exact names, not any dot-file. */
+const SEED_NAME = /^((seed|schema-seed|entries)\.parquet|\.[a-z]+(-[a-z]+)*-output)$/;
+const NOT_A_SINK = new Set(['inbox', 'staged', 'samples', 'duckdb', 'audit']);   // folders that hold landed or runtime data, never a seed
+
+/** The Space or Template folder a tracked path belongs to (`spaces/<id>` or `spaces/_templates/<t>`), else null. */
+export function ownerFolder(path) {
+  const parts = path.split('/');
+  if (parts[1] === '_templates') return parts.length > 3 ? parts.slice(0, 3).join('/') : null;
+  return parts.length > 2 ? parts.slice(0, 2).join('/') : null;
+}
+
+/** 'samples' for `<owner>/data/samples/**`, 'seed' for `<owner>/data/<sink>/<seed file>`, else null: the permitted data. */
+export function permittedKind(path) {
+  const parts = path.split('/');
+  if (parts[1].startsWith('_') && parts[1] !== '_templates') return null;   // _industries holds only definitions
+  const at = parts[1] === '_templates' ? 3 : 2;
+  if (parts[at] !== 'data') return null;
+  if (parts[at + 1] === 'samples' && parts.length > at + 2) return 'samples';
+  if (parts.length >= at + 3 && !NOT_A_SINK.has(parts[at + 1]) && SEED_NAME.test(parts[parts.length - 1])) return 'seed';   // data/<sink>/[database/]<seed file>
+  return null;
+}
 
 /** The state folder a tracked path lies in (`spaces/<x>/data/` or `spaces/_templates/<t>/data/`), else null. */
 export function stateFolder(path) {
@@ -47,8 +77,22 @@ export function check(files, baseline, ignoreText) {
   const findings = [];
   const folders = baseline.folders ?? {};
   const seen = new Map(); // baseline folder -> {files, bytes}
+  const samples = new Map(); // owner folder -> bytes of permitted samples
+  const seeds = new Map(); // owner folder -> bytes of permitted seeds
   const covering = (p) => Object.keys(folders).find((f) => p.startsWith(f));
   for (const { path, size } of files) {
+    const kind = permittedKind(path);
+    if (kind === 'samples') {
+      const owner = ownerFolder(path);
+      samples.set(owner, (samples.get(owner) ?? 0) + size);
+      continue;
+    }
+    if (kind === 'seed') {
+      if (size > SEED_CAP) findings.push({ kind: 'CAP', path, why: `a sink seed of ${size} bytes, over the ${SEED_CAP}-byte cap` });
+      const owner = ownerFolder(path);
+      seeds.set(owner, (seeds.get(owner) ?? 0) + size);
+      continue;
+    }
     const own = covering(path);
     if (own) {
       const cur = seen.get(own) ?? { files: 0, bytes: 0 };
@@ -56,11 +100,15 @@ export function check(files, baseline, ignoreText) {
       continue;
     }
     const state = stateFolder(path);
-    if (state) findings.push({ kind: 'NEW', path, why: `tracked data under ${state}: Space data is generated or supplied, never committed` });
+    if (state) findings.push({ kind: 'NEW', path, why: `tracked data under ${state}: only data/samples/ and sink seeds may be committed` });
     else if (DATA_EXT.test(path) && !path.includes('/config/') && !path.includes('/tests/'))   // tests/ holds authored Pipeline test fixtures
       findings.push({ kind: 'NEW', path, why: 'a data file outside config/ and tests/' });
     else if (size > MAX_BYTES) findings.push({ kind: 'BIG', path, why: `${size} bytes, over the ${MAX_BYTES}-byte cap for a tracked Space file` });
   }
+  for (const [owner, bytes] of samples)
+    if (bytes > SAMPLES_CAP) findings.push({ kind: 'CAP', path: `${owner}/data/samples/`, why: `${bytes} bytes of samples, over the ${SAMPLES_CAP}-byte cap` });
+  for (const [owner, bytes] of seeds)
+    if (bytes > SEEDS_CAP) findings.push({ kind: 'CAP', path: `${owner}/data/`, why: `${bytes} bytes of sink seeds, over the ${SEEDS_CAP}-byte cap` });
   for (const [folder, want] of Object.entries(folders)) {
     const cur = seen.get(folder);
     if (!cur) { findings.push({ kind: 'STALE', path: folder, why: 'nothing is tracked there any more: delete its baseline entry' }); continue; }
@@ -85,7 +133,7 @@ function run() {
     const folders = {};
     for (const { path, size } of files) {
       const f = stateFolder(path);
-      if (!f) continue;
+      if (!f || permittedKind(path)) continue;
       folders[f] ??= { files: 0, bytes: 0, reason: 'TODO' };
       folders[f].files++; folders[f].bytes += size;
     }

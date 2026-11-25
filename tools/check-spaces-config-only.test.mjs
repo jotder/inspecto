@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { BASELINE_FILE, LA_INDEX_RULE, MAX_BYTES, check, stateFolder, trackedSpaceFiles } from './check-spaces-config-only.mjs';
+import { BASELINE_FILE, LA_INDEX_RULE, MAX_BYTES, SAMPLES_CAP, SEED_CAP, SEEDS_CAP, check, permittedKind, stateFolder, trackedSpaceFiles } from './check-spaces-config-only.mjs';
 
 const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
 const IGNORE = `/spaces/*/audit/\n${LA_INDEX_RULE}\n`;
@@ -41,6 +41,45 @@ test('RED: a large file outside a baseline folder is BIG; the same file in confi
 
 test('RED: a .gitignore without the la-index rule is IGNORE', () => {
   assert.deepEqual(kinds([...config, ...inBaseline], baseline(), '/spaces/*/audit/\n'), ['IGNORE']);
+});
+
+test('pristine samples and sink seeds are permitted: they need no baseline and are not NEW', () => {
+  const permitted = [
+    { path: 'spaces/demo/data/samples/orders/O1.csv', size: 5000 },
+    { path: 'spaces/_templates/aml/data/samples/aml_txn/T.csv', size: 5000 },
+    { path: 'spaces/_templates/aml/data/aml_threshold/seed.parquet', size: 400 },
+    { path: 'spaces/_templates/aml/data/aml_txn/database/schema-seed.parquet', size: 400 },
+    { path: 'spaces/_templates/telco-bypass/data/entity_list_tb_allow/entries.parquet', size: 400 },
+    { path: 'spaces/_templates/telco-bypass/data/entity_list_tb_allow/.entity-list-output', size: 16 },
+  ];
+  assert.deepEqual(kinds([...config, ...inBaseline, ...permitted]), []);
+  assert.equal(permittedKind('spaces/demo/data/samples/a/b.csv'), 'samples');
+  assert.equal(permittedKind('spaces/demo/data/inbox/a.csv'), null);
+  assert.equal(permittedKind('spaces/_templates/t/data/inbox/seed.parquet'), null);   // a landing folder never holds a seed
+});
+
+test('RED: samples over 1 MiB in one Space or Template, or a seed over 16 KiB, is CAP', () => {
+  const big = [{ path: 'spaces/demo/data/samples/a/1.csv', size: SAMPLES_CAP }, { path: 'spaces/demo/data/samples/a/2.csv', size: 1 }];
+  assert.deepEqual(kinds([...config, ...inBaseline, ...big]), ['CAP']);
+  assert.deepEqual(kinds([...config, ...inBaseline, { path: 'spaces/demo/data/samples/a/1.csv', size: SAMPLES_CAP }]), []);   // exactly the cap is allowed
+  assert.deepEqual(kinds([...config, ...inBaseline, { path: 'spaces/_templates/aml/data/x/seed.parquet', size: SEED_CAP + 1 }]), ['CAP']);
+});
+
+test('RED: other data under data/ (inbox, staged, a loose csv) is still NEW even next to permitted samples', () => {
+  const near = [{ path: 'spaces/demo/data/samples/a/1.csv', size: 10 }, { path: 'spaces/demo/data/inbox/a/2.csv', size: 10 }, { path: 'spaces/demo/data/staged/b.csv', size: 10 }];
+  assert.deepEqual(kinds([...config, ...inBaseline, ...near]), ['NEW', 'NEW']);
+});
+
+test('RED: the seed rule is exact - a data file wearing a seed name in a landing folder, an arbitrary dot-file, or a pile of seeds is not permitted', () => {
+  assert.equal(permittedKind('spaces/demo/data/inbox/seed.parquet'), null);
+  assert.equal(permittedKind('spaces/demo/data/staged/seed.parquet'), null);
+  assert.equal(permittedKind('spaces/demo/data/duckdb/.space.duckdb'), null);
+  assert.equal(permittedKind('spaces/demo/data/x/.orders.csv'), null);
+  assert.equal(permittedKind('spaces/_templates/telco-ra/data/kpi_completeness/.kpi-completeness-output'), 'seed');
+  assert.equal(permittedKind('spaces/_industries/data/samples/x.csv'), null);
+  const pile = Array.from({ length: 17 }, (_, i) => ({ path: `spaces/_templates/aml/data/s${i}/seed.parquet`, size: SEED_CAP }));
+  assert.ok(17 * SEED_CAP > SEEDS_CAP);
+  assert.deepEqual(kinds([...config, ...inBaseline, ...pile]), ['CAP']);
 });
 
 test('a Template that authors its own config/audit/ is not state; the Space-level audit/ is', () => {

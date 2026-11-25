@@ -67,6 +67,11 @@ class AmlPackGoldenTest {
         assertEquals(AmlCorpus.files(), AmlCorpus.files(), "the generator is deterministic");
     }
 
+    @Test
+    void theCommittedSamplesMatchTheGeneratorWhenPresent() throws Exception {
+        SampleCorpora.assertCommittedMatches(TEMPLATE, AmlCorpus.files());
+    }
+
     /** A zero-row seed of every sink, so the seed gate can check Alert Rule and KPI fields and each Job has a sink to read first. */
     @Test
     void everyJobShipsAnEmptySeedOfItsSinkMatchingItsSql() throws Exception {

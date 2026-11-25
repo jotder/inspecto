@@ -125,6 +125,11 @@ class MobileMoneyPackGoldenTest {
     }
 
     @Test
+    void theCommittedSamplesMatchTheGeneratorWhenPresent() throws Exception {
+        SampleCorpora.assertCommittedMatches(template(), MobileMoneyCorpus.samples());
+    }
+
+    @Test
     void everyDetectionJobRollsItsWindowOnADailySchedule() throws Exception {
         List<JobConfig> jobs = sqlJobs(template().resolve("config"));
         assertEquals(EXPECTED.keySet(), new TreeSet<>(jobs.stream().map(JobConfig::name).toList()));

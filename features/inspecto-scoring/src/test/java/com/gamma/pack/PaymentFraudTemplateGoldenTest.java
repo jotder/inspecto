@@ -63,6 +63,11 @@ class PaymentFraudTemplateGoldenTest {
     }
 
     @Test
+    void theCommittedSamplesMatchTheGeneratorWhenPresent() throws Exception {
+        SampleCorpora.assertCommittedMatches(TEMPLATE, PaymentFraudCorpus.files());
+    }
+
+    @Test
     void theGoldenCorpusRaisesExactlyThePlantedCasesPerTypology(@TempDir Path tmp) throws Exception {
         Path space = copyTemplate(tmp);
         Path cfg = space.resolve("config");

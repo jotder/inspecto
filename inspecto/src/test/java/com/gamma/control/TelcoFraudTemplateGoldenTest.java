@@ -299,6 +299,11 @@ class TelcoFraudTemplateGoldenTest {
         assertEquals(TelcoFraudCorpus.samples(), TelcoFraudCorpus.samples(), "the generator is deterministic");
     }
 
+    @Test
+    void theCommittedSamplesMatchTheGeneratorWhenPresent() throws Exception {
+        SampleCorpora.assertCommittedMatches(template(), TelcoFraudCorpus.samples());
+    }
+
     /**
      * The template ships a ZERO-row seed snapshot of every detection Job's sink, so each per-entity Alert Rule's
      * {@code by} columns (and each KPI's fields) can be checked against a real Schema when {@code POST /spaces}
