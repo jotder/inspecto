@@ -820,6 +820,17 @@ jobs:
       - name: Guard — the jar-signature guard's negative fixtures still go red (~45 s)
         run: node --test tools/check-jar-signatures.test.mjs
 
+      # SPACES-CONSOLIDATION-1 P2 (2026-11-25): a Space Template's corpus is generated into the Space's data folder, not
+      # committed under spaces/. Every `tools/gen-*-data.*` generator, run with `--out`, must reproduce what the Template
+      # commits today, byte for byte, so untracking it loses nothing. Here and not in `guards:` because it runs all 18
+      # generators (~70 s) and the pre-commit hook pays every `guards:` step on every commit. Python is declared, not
+      # assumed: the generators are Python and the test skips without it.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Guard — every Template generator reproduces its corpus into any folder (~70 s)
+        run: node --test tools/seed-space-data.test.mjs
+
   # serve.bat, EXECUTED (LAUNCHER-GUARD-1, 2026-09-14).
   # ⛔ This job exists because the `test` job cannot do it. SERVEBAT-OPTS-1 was a cmd.exe parsing rule —
   # a parenthesised block expands its variables once, at parse time — and no amount of reading, and no

@@ -39,7 +39,9 @@ import random
 from datetime import datetime, timedelta
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent / "spaces" / "_templates" / "la-mobile-money" / "data"
+from la_gen_io import data_dir
+
+ROOT = data_dir(Path(__file__).resolve().parent.parent / "spaces" / "_templates" / "la-mobile-money" / "data")
 rng = random.Random(20261016)
 
 FIRST = datetime(2026, 10, 1)

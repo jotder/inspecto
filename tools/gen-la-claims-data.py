@@ -27,7 +27,9 @@ import random
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent / "spaces" / "_templates" / "la-claims" / "data" / "inbox"
+from la_gen_io import data_dir
+
+ROOT = data_dir(Path(__file__).resolve().parent.parent / "spaces" / "_templates" / "la-claims" / "data") / "inbox"
 rng = random.Random(20261016)
 DAY = "20260930"
 START, END = date(2025, 4, 1), date(2026, 9, 30)

@@ -393,6 +393,34 @@ Spec: [`okf/product/module/engine/spec-kpi-projection.md`](../okf/product/module
 - **Deliberately deferred**: the Studio Alert Rule editor's KPI fields; "arm from a Widget" (I-17's UI half); a role-aware
   owner for rule evaluation (would need roles stamped on the rule, as Jobs stamp `updatedByRoles`).
 
+### 11.6 P1 I-20 insight-aware Show-Me — as built (2026-11-25)
+
+- **Where**: the Widget builder (`studio/widgets/explore.component`) shows a *Suggested for this chart* strip above the
+  preview; the logic is the pure `suggestOverlays()` beside `recommend()` in `inspecto/viz/show-me.ts`.
+  `recommend()` itself is unchanged: it ranks Visualization Types from fields, before any query has run, so the
+  signal could not live inside it.
+- **Seasonality signal = the I-11 / I-7 route, no new backend.** When the Widget is a line, bar or area with a Measure over a grained
+  date, neither stacked nor value-sorted, and a forecast or anomaly overlay is not on yet, the builder runs the
+  Widget's own statement once more with `overlay: {forecast, anomaly}` through `POST /bi/query` (D-BI7: query
+  time, nothing stored; an identical probe is served from `DatasetResultService`'s cache). `ChartOverlays` already
+  calls `SeasonalityDetector`, so its `overlays[]` summary is the signal.
+- **Honesty (§10)**: a forecast band is offered only when the summary has no `reason` (two seasons, no gap, no empty
+  bucket) AND `periodSource: detected` — a calendar fallback is not called a season. The cycle is worded only when it
+  names one (7 days → weekly; 52 weeks, 12 months, 4 quarters → yearly), else "A 7-week cycle". Anomaly markers are
+  offered only when at least one point reaches the default sensitivity's |z| (3.5), with the count. A target line
+  when the Widget or its bound KPI (`options.kpi.kpiId`, read from `/components/kpi/{id}`) has a target; the
+  KPI's bands (`rag` marker) when the KPI has them. An overlay or marker already on is never offered again.
+- **Never applied without a click**: each suggestion carries the Widget's options with that one overlay added;
+  *Add …* sets them and re-runs the preview, *Not now* hides it for this builder session. A probe answering after a later preview run (another
+  chart, field or bound Query; a run counter) is dropped. A bound KPI's target wins over the Widget's own, as the
+  marker draws it. The preview now also passes the result's overlay summary, so an applied band shows its
+  caption in the builder as on a Dashboard.
+- **Preview** (2026-11-25, a 112-day series with a weekly cycle and one spike): "Weekly seasonal pattern found over
+  112 days of history" and "1 unusual point", both applied by click and drawn. The KPI target / bands suggestion is
+  covered by unit tests only (no KPI in the scratch Space).
+- **Deliberately deferred**: no suggestion on the Dashboard tile or cog dialog (the builder only); no suggestion of
+  a compare (I-1) or a different Visualization Type from the signal.
+
 ## 12. Board row
 
 Filed 2026-11-18 as **one** row, `BI-INSIGHTS-1` (P2, `BACKLOG.md` §3.6) — the board allows a lane at most one

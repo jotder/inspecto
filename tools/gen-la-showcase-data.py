@@ -22,7 +22,9 @@ import random
 from datetime import datetime, timedelta
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent / "spaces" / "_templates" / "la-showcase" / "data"
+from la_gen_io import data_dir
+
+ROOT = data_dir(Path(__file__).resolve().parent.parent / "spaces" / "_templates" / "la-showcase" / "data")
 rng = random.Random(20261010)
 LANDED = [datetime(2026, 9, 1), datetime(2026, 9, 2), datetime(2026, 9, 3)]
 NEXT_DAY = datetime(2026, 9, 4)

@@ -41,7 +41,9 @@ const CDR_PAGE: DatasetRows = {
 };
 
 /** Every spec the builder previewed, in order. */
-const runs: { queryId?: string }[] = [];
+const runs: { queryId?: string; overlay?: unknown }[] = [];
+/** I-20: what a probe (a spec carrying `overlay`) answers; null = the offline runSpec. */
+let probeAnswer: unknown = null;
 const QUERIES = [
     { id: 'long_calls', name: 'Long calls', type: 'sql', datasetId: 'cdr_sample', parameters: [] },
     { id: 'other_ds', name: 'Other', type: 'sql', datasetId: 'elsewhere', parameters: [] },
@@ -53,6 +55,7 @@ const STANDARD = { laWidgets: true, geoMap: true };
 
 function create(ds: Dataset = DS, page: DatasetRows = CDR_PAGE, features: Record<string, boolean> = STANDARD) {
     runs.length = 0;
+    probeAnswer = null;
     TestBed.configureTestingModule({
         imports: [ExploreComponent],
         providers: [
@@ -87,6 +90,7 @@ function create(ds: Dataset = DS, page: DatasetRows = CDR_PAGE, features: Record
                 useValue: {
                     run: (...a: Parameters<typeof runSpec>) => {
                         runs.push(a[0]);
+                        if (a[0].overlay && probeAnswer) return Promise.resolve(probeAnswer);
                         return runSpec(...a);
                     },
                     clear: () => undefined,
@@ -266,5 +270,104 @@ describe('ExploreComponent', () => {
         c.onBindQuery('long_calls');
         c.onSelectDataset('cdr_sample');
         expect(c.boundQueryId()).toBeUndefined();
+    });
+
+    describe('insight-aware Show-Me (BI-INSIGHTS-1 I-20)', () => {
+        const LINE = {
+            x: [{ field: 'day', grain: 'day' as const }],
+            y: [{ field: 'duration_s', agg: 'sum' as const }],
+        };
+        const SEASONAL = {
+            ok: true,
+            rows: [{ day: '2026-01-01', sum_duration_s: 10, sum_duration_s__z: 4.2 }],
+            columns: [],
+            overlays: [
+                {
+                    overlay: 'forecast',
+                    of: 'sum_duration_s',
+                    series: {},
+                    period: 7,
+                    periodSource: 'detected',
+                    points: 56,
+                },
+                { overlay: 'anomaly', of: 'sum_duration_s', series: {}, scored: 49 },
+            ],
+        };
+
+        async function lineWidget(answer: unknown) {
+            const fixture = create();
+            probeAnswer = answer;
+            const c = fixture.componentInstance;
+            c.dataset.set(DS);
+            c.vizType.set('line');
+            c.onControls(LINE);
+            await fixture.whenStable();
+            fixture.detectChanges();
+            return fixture;
+        }
+
+        it('offers a forecast band and anomaly markers, and applies one only on its click', async () => {
+            const fixture = await lineWidget(SEASONAL);
+            const c = fixture.componentInstance;
+            expect(runs.some((r) => !!r.overlay)).toBe(true); // the probe went through the same route
+            expect(c.suggestions().map((s) => s.id)).toEqual(['forecast', 'anomaly']);
+            expect(c.options().overlay).toBeUndefined(); // nothing applied before the click
+            const el: HTMLElement = fixture.nativeElement;
+            expect(el.textContent).toContain('Weekly seasonal pattern found over 56 days of history.');
+            const add = el.querySelector<HTMLButtonElement>('[data-suggestion="forecast"] button')!;
+            add.click();
+            await fixture.whenStable();
+            fixture.detectChanges();
+            expect(c.options().overlay?.forecast).toEqual({});
+            expect(c.suggestions().map((s) => s.id)).not.toContain('forecast');
+            await expectNoA11yViolations(el);
+        });
+
+        it('offers nothing when the server found no season or too little history', async () => {
+            const fixture = await lineWidget({
+                ...SEASONAL,
+                rows: [],
+                overlays: [
+                    {
+                        overlay: 'forecast',
+                        of: 'sum_duration_s',
+                        series: {},
+                        period: 7,
+                        periodSource: 'detected',
+                        points: 9,
+                        reason: 'a forecast needs two seasons',
+                    },
+                    {
+                        overlay: 'anomaly',
+                        of: 'sum_duration_s',
+                        series: {},
+                        scored: 0,
+                        reason: 'no bucket could be scored',
+                    },
+                ],
+            });
+            expect(fixture.componentInstance.suggestions()).toEqual([]);
+            expect(fixture.nativeElement.querySelector('[data-testid="overlay-suggestions"]')).toBeNull();
+        });
+
+        it('drops a probe that answers after a later run (another bound Query)', async () => {
+            let answer!: (v: unknown) => void;
+            const fixture = await lineWidget(new Promise((r) => (answer = r)));
+            const c = fixture.componentInstance;
+            probeAnswer = null; // the re-run over the bound Query probes offline: no overlays
+            c.onBindQuery('long_calls');
+            await fixture.whenStable();
+            answer(SEASONAL); // the first statement's probe lands late
+            await fixture.whenStable();
+            expect(c.suggestions()).toEqual([]);
+        });
+
+        it('"Not now" hides a suggestion without changing the Widget', async () => {
+            const fixture = await lineWidget(SEASONAL);
+            const c = fixture.componentInstance;
+            c.dismissSuggestion(c.suggestions()[0]);
+            expect(c.suggestions().map((s) => s.id)).toEqual(['anomaly']);
+            expect(c.options().overlay).toBeUndefined();
+        });
     });
 });

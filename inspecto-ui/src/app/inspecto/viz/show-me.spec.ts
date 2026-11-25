@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { isolateViz, registerViz } from './viz-registry';
-import { recommend, autoAssignChannels } from './show-me';
+import { recommend, autoAssignChannels, suggestOverlays } from './show-me';
 import { BAR_PLUGIN, BUBBLE_PLUGIN, KPI_PLUGIN, BUILTIN_VIZ_PLUGINS, PIE_PLUGIN, TABLE_PLUGIN } from './plugins';
 import { channelMeasureId } from './query-spec';
-import { ControlSpec, VizField, VizPlugin } from './viz-types';
+import { ControlSpec, VizField, VizPlugin, VizRenderOptions } from './viz-types';
 
 function plugin(type: string, fit: VizPlugin['meta']['fit'], controls: ControlSpec[]): VizPlugin {
     return {
@@ -180,5 +180,98 @@ describe('Show-Me over a cricket-shaped Dataset (identifier + near-unique column
     it('the Table plugin still seeds a dimension (multi-field, optional) — just not the identifier', () => {
         const values = autoAssignChannels(TABLE_PLUGIN, CRICKET_FIELDS, CRICKET_ROWS);
         expect(values.x?.[0].field).toBe('VENUE');
+    });
+});
+
+describe('suggestOverlays (BI-INSIGHTS-1 I-20)', () => {
+    const LINE = { x: [{ field: 'day', grain: 'day' as const }], y: [{ field: 'amount', agg: 'sum' as const }] };
+    const FORECAST = {
+        overlay: 'forecast' as const,
+        of: 'sum_amount',
+        series: {},
+        period: 7,
+        periodSource: 'detected' as const,
+        points: 56,
+    };
+    const ANOMALY = { overlay: 'anomaly' as const, of: 'sum_amount', series: {}, scored: 49 };
+    const ROWS = [{ sum_amount__z: 3.2 }, { sum_amount__z: -4 }, { sum_amount__z: 1 }];
+
+    it('words a detected weekly cycle and counts points past the default sensitivity (|z| ≥ 3.5)', () => {
+        const out = suggestOverlays({
+            vizType: 'line',
+            controls: LINE,
+            options: {},
+            probe: [FORECAST, ANOMALY],
+            probeRows: ROWS,
+        });
+        expect(out.map((s) => s.text)).toEqual([
+            'Weekly seasonal pattern found over 56 days of history.',
+            '1 unusual point against the usual level.',
+        ]);
+        expect(out[0].options).toEqual({ overlay: { forecast: {} } });
+        expect(out[1].options).toEqual({ overlay: { anomaly: {} } });
+    });
+
+    it('is honest: no detected cycle, a refused forecast or no flagged point → no suggestion', () => {
+        const probe = [
+            { ...FORECAST, periodSource: 'calendar' as const },
+            { ...FORECAST, of: 'x', reason: 'two seasons' },
+            ANOMALY,
+        ];
+        expect(
+            suggestOverlays({ vizType: 'line', controls: LINE, options: {}, probe, probeRows: [{ sum_amount__z: 1 }] }),
+        ).toEqual([]);
+        expect(suggestOverlays({ vizType: 'line', controls: LINE, options: {} })).toEqual([]);
+    });
+
+    it('never offers an overlay already on, nor on a chart the overlays cannot draw', () => {
+        const probe = [FORECAST, ANOMALY];
+        const on = { overlay: { forecast: {}, anomaly: {} } };
+        expect(suggestOverlays({ vizType: 'line', controls: LINE, options: on, probe, probeRows: ROWS })).toEqual([]);
+        expect(
+            suggestOverlays({ vizType: 'line', controls: LINE, options: { stacked: true }, probe, probeRows: ROWS }),
+        ).toEqual([]);
+        expect(suggestOverlays({ vizType: 'pie', controls: LINE, options: {}, probe, probeRows: ROWS })).toEqual([]);
+        const ungrained = { ...LINE, x: [{ field: 'day', grain: 'auto' as const }] };
+        expect(suggestOverlays({ vizType: 'line', controls: ungrained, options: {}, probe, probeRows: ROWS })).toEqual(
+            [],
+        );
+    });
+
+    it('names the target the marker will draw: the bound KPI first, else the Widget own', () => {
+        const both: VizRenderOptions = { kpi: { kpiId: 'revenue', target: 500 } };
+        expect(suggestOverlays({ vizType: 'line', controls: {}, options: both, kpi: { target: 1200 } })[0].text).toBe(
+            'This KPI has a target of 1,200.',
+        );
+        expect(suggestOverlays({ vizType: 'line', controls: {}, options: both, kpi: null })[0].text).toBe(
+            'This Widget has a target of 500.',
+        );
+    });
+
+    it('sends no overlay suggestion for a chart with no Measure (the server would refuse the probe)', () => {
+        const noMeasure = { x: LINE.x };
+        expect(
+            suggestOverlays({
+                vizType: 'line',
+                controls: noMeasure,
+                options: {},
+                probe: [FORECAST, ANOMALY],
+                probeRows: ROWS,
+            }),
+        ).toEqual([]);
+    });
+
+    it('offers the bound KPI target line and its bands, once each', () => {
+        const options: VizRenderOptions = { kpi: { kpiId: 'revenue' } };
+        const kpi = { target: 1200, bands: { green: 1000, amber: 800 } };
+        const out = suggestOverlays({ vizType: 'bar', controls: {}, options, kpi });
+        expect(out.map((s) => [s.id, s.text])).toEqual([
+            ['target', 'This KPI has a target of 1,200.'],
+            ['rag', 'This KPI has green, amber and red bands.'],
+        ]);
+        expect(out[1].options.markers).toEqual([{ kind: 'rag' }]);
+        const done = { ...options, markers: [{ kind: 'target' as const }, { kind: 'rag' as const }] };
+        expect(suggestOverlays({ vizType: 'bar', controls: {}, options: done, kpi })).toEqual([]);
+        expect(suggestOverlays({ vizType: 'bar', controls: {}, options: {} })).toEqual([]); // no target, no KPI
     });
 });

@@ -39,10 +39,10 @@ import random
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from la_gen_io import Outputs
+from la_gen_io import Outputs, data_dir
 
 TOOLS = Path(__file__).resolve().parent
-DATA = TOOLS.parent / "spaces" / "_templates" / "la-telco-ra" / "data"
+DATA = data_dir(TOOLS.parent / "spaces" / "_templates" / "la-telco-ra" / "data")
 TRUTH = TOOLS / "gen-la-telco-ra-data.ground-truth.json"
 SEED = 20261110
 rng = random.Random(SEED)
