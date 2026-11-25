@@ -1,6 +1,7 @@
 package com.gamma.job;
 
 import com.gamma.etl.ConsignmentEventBus;
+import com.gamma.etl.LaCorpus;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.inspector.CollectorProcessor;
 import com.gamma.util.DuckDbUtil;
@@ -45,13 +46,7 @@ class MmLinksJobGoldenTest {
     @BeforeAll
     static void runThePipelinesAndTheJob() throws Exception {
         Path space = tmp.resolve("spaces").resolve("la-mobile-money");
-        try (Stream<Path> w = Files.walk(TEMPLATE)) {
-            for (Path p : w.toList()) {
-                Path to = space.resolve(TEMPLATE.relativize(p).toString());
-                if (Files.isDirectory(p)) Files.createDirectories(to);
-                else Files.copy(p, to);
-            }
-        }
+        LaCorpus.install(TEMPLATE, space);
         for (String feed : FEEDS) {
             PipelineConfig pc = PipelineConfig.load(space.resolve("config/" + feed + "/" + feed + "_pipeline.toon").toString());
             CollectorProcessor.run(pc);

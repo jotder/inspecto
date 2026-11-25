@@ -6,6 +6,7 @@ import com.gamma.catalog.ConfigSource;
 import com.gamma.catalog.SemanticModel;
 import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.etl.ConsignmentEventBus;
+import com.gamma.etl.LaCorpus;
 import com.gamma.etl.StatusStore;
 import com.gamma.objects.FakeObjectAccess;
 import com.gamma.pipeline.ComponentStore;
@@ -71,13 +72,7 @@ class TelecomLinksGoldenTest {
     @BeforeAll
     static void runThePipelinesAndJobs() throws Exception {
         space = tmp.resolve("spaces").resolve("la-showcase");
-        try (Stream<Path> w = Files.walk(TEMPLATE)) {
-            for (Path p : w.toList()) {
-                Path to = space.resolve(TEMPLATE.relativize(p).toString());
-                if (Files.isDirectory(p)) Files.createDirectories(to);
-                else Files.copy(p, to);
-            }
-        }
+        LaCorpus.install(TEMPLATE, space);
         for (String feed : FEEDS) {
             PipelineConfig pc = PipelineConfig.load(space.resolve("config/telecom/" + feed + "_pipeline.toon").toString());
             CollectorProcessor.run(pc);

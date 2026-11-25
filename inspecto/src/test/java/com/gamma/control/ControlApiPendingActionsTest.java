@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.access.ComponentAccess;
 import com.gamma.access.Roles;
+import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
+import com.gamma.inspector.CollectorProcessor;
 import com.gamma.service.CollectorService;
 import com.gamma.spi.auth.Authenticators;
 import com.gamma.spi.auth.Subject;
@@ -85,7 +87,18 @@ class ControlApiPendingActionsTest {
     }
 
     private Ctx open(Path dir) throws Exception {
+        return open(dir, false);
+    }
+
+    /** {@code quarantined}: one header-only file is ingested first, so the run holds one quarantined file (reason "empty"). */
+    private Ctx open(Path dir, boolean quarantined) throws Exception {
         Path pipe = PipelineConfigBatchTest.writePipeline(Files.createDirectories(dir.resolve("cfg")), "");
+        if (quarantined) {
+            PipelineConfig cfg = PipelineConfig.load(pipe.toString());
+            Path inbox = Files.createDirectories(Path.of(cfg.dirs().poll()).resolve("sub"));
+            Files.writeString(inbox.resolve("bad.csv"), "ID,AMT,EVENT_DATE\n");
+            CollectorProcessor.run(cfg);
+        }
         Path root = Files.createDirectories(dir.resolve("root"));
         System.setProperty("assist.write.root", root.toString());
         try {
@@ -219,6 +232,55 @@ class ControlApiPendingActionsTest {
             data(send(c, "POST", "/runs/" + run + "/drain", "{\"batchId\":\"b\"}", BOT), 202);
             assertEquals(409, send(c, "POST", "/runs/" + run + "/drain", "{\"batchId\":\"a\"}", BOT).statusCode(),
                     "the same drain of the same batch is already waiting");
+        }
+    }
+
+    private JsonNode quarantine(Ctx c, String run) throws Exception {
+        return data(send(c, "GET", "/runs/" + run + "/quarantine", null, ADMIN), 200);
+    }
+
+    /** Widening plan W1: the release of a quarantined file is a run action — at once for a person's agent, within its rights. */
+    @Test
+    void aPersonsAgentReleasesAQuarantinedFileAtOnce(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, true)) {
+            String run = pipeline(c);
+            JsonNode before = quarantine(c, run);
+            assertEquals(1, before.size(), before.toString());
+            String body = "{\"path\":\"" + before.get(0).get("path").asText() + "\",\"reprocess\":false}";
+
+            HttpResponse<String> viewer = send(c, "POST", "/runs/" + run + "/quarantine/release", body, VIEWER_AGENT);
+            assertEquals(403, viewer.statusCode(), "never beyond the person's own rights: " + viewer.body());
+            assertEquals(403, send(c, "POST", "/runs/" + run + "/quarantine/release",
+                    "{\"path\":\"../inbox/bad.csv\"}", AGENT).statusCode(), "the route's own path jail still answers");
+            assertEquals(1, quarantine(c, run).size(), "neither refusal moved the file");
+
+            JsonNode released = data(send(c, "POST", "/runs/" + run + "/quarantine/release", body, AGENT), 200);
+            assertEquals("released", released.get("status").asText(), released.toString());
+            assertEquals(0, quarantine(c, run).size(), "the file left quarantine");
+            assertTrue(audit(c, "/quarantine/release").stream().anyMatch(r -> r.contains("\"agent_client\":\"claude-code\"")),
+                    "the release's row names the agent client");
+        }
+    }
+
+    @Test
+    void aMachineAgentsReleaseIsHeldAndTheFileStaysQuarantinedUntilAPersonApproves(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, true)) {
+            String run = pipeline(c);
+            String body = "{\"path\":\"" + quarantine(c, run).get(0).get("path").asText() + "\",\"reprocess\":false}";
+
+            assert403(send(c, "POST", "/runs/" + run + "/quarantine/release", body, WEAK_BOT));
+            JsonNode held = data(send(c, "POST", "/runs/" + run + "/quarantine/release", body, BOT), 202);
+            assertFalse(held.get("ran").asBoolean(), held.toString());
+            assertEquals("POST /runs/" + run + "/quarantine/release", held.at("/pendingAction/action").asText());
+            assertEquals(1, quarantine(c, run).size(), "held: the file is still quarantined");
+            String id = held.at("/pendingAction/id").asText();
+            // the approver sees which file an approval releases
+            JsonNode one = data(send(c, "GET", "/pending-actions/" + id, null, CHECKER), 200);
+            assertEquals(body, one.at("/request/body").asText(), one.toString());
+
+            JsonNode approved = data(send(c, "POST", "/pending-actions/" + id + "/approve", "{\"reason\":\"ok\"}", CHECKER), 200);
+            assertTrue(approved.get("ran").asBoolean(), approved.toString());
+            assertEquals(0, quarantine(c, run).size(), "approved: the file left quarantine");
         }
     }
 

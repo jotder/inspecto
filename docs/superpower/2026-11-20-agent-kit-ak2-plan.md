@@ -40,7 +40,7 @@ phase ends in a role an agent can actually do:
 | Phase | Role | Where the agent runs | What it does | What it needs beyond the phase before |
 |---|---|---|---|---|
 | **1** | **Developer** | outside, through the Agent Kit | builds Spaces and Apps: Pipelines, Expectations, Alert Rules, Widgets, Dashboards, Jobs; validates, dry-runs, proposes | the agent identity (§4.2–§4.3), the identity-keyed hold (§4.1), the config write tools (§4.4) |
-| **2** | **Operations support engineer** | outside; often unattended | watches health, runs and freshness; diagnoses a failed run; re-runs, resumes, drains, reprocesses | operational actions (§4.6), the machine agent capability set (§4.5); product gaps `QUARANTINE-RELEASE-1`, `BACKUP-DATA-1` |
+| **2** | **Operations support engineer** | outside; often unattended | watches health, runs and freshness; diagnoses a failed run; re-runs, resumes, drains, reprocesses | operational actions (§4.6), the machine agent capability set (§4.5); product gaps `QUARANTINE-RELEASE-1` (an agent reaches it since 2026-11-25, widening plan W1), `BACKUP-DATA-1` |
 | **3** | **Incident and Case analyst** | outside, and inside as the Assistant's Incident Brief | triages Incidents, writes Briefs, comments, assigns, proposes a transition or an outbound action; **3b:** analyses Cases in Link Analysis: runs its queries, works in a Draft, starts graph runs | case actions (§4.6); product gap `CASE-TRANSITION-FOUR-EYES-1`; **3b:** Link Analysis (§6.6) |
 | **4** | **Helpdesk** | **inside** Inspecto, as the Assistant | explains the screen or Widget a user is looking at, grounded in the Handbook and the user's own rights | no write path: its own plan, [`2026-11-20-assistant-screen-help-plan.md`](2026-11-20-assistant-screen-help-plan.md) |
 
@@ -338,7 +338,7 @@ notifications and the tasks extension stay deferred to AK-3 / AK-4.
 **What follows phases 1–3b** (proposed 2026-11-25, D-AK8…D-AK12 open): ten task specs, W1–W10, in
 [`2026-11-25-agent-kit-ak2-widening-plan.md`](2026-11-25-agent-kit-ak2-widening-plan.md) — the routes and kinds an
 agent still cannot reach, and the live golden runs still owed. `QUARANTINE-RELEASE-1` (§1.1, §6.2) shipped as a
-route on 2026-11-25; an agent reaches it with W1.
+route on 2026-11-25; an agent reaches it since W1 (built 2026-11-25).
 
 ### 6.1 Phase 1 close as built (2026-11-24)
 

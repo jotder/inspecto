@@ -2,6 +2,7 @@ package com.gamma.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gamma.etl.LaCorpus;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.service.SpaceId;
 import com.gamma.service.SpaceManager;
@@ -267,7 +268,7 @@ class ControlApiFullCycleIndexStatusTest {
     /** {@code tools/seed-la-showcase.mjs --scaffold}: config and data copied, the index Job's owner stamped as its last editor. */
     private static void scaffoldShowcase(Path space) throws Exception {
         for (String sub : List.of("config", "data")) {
-            Path from = SHOWCASE.resolve(sub);
+            Path from = sub.equals("data") ? LaCorpus.data(SHOWCASE) : SHOWCASE.resolve(sub);
             try (Stream<Path> w = Files.walk(from)) {
                 for (Path p : w.toList()) {
                     Path to = space.resolve(sub).resolve(from.relativize(p).toString());

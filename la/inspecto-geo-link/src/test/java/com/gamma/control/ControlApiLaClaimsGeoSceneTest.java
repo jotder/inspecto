@@ -2,6 +2,7 @@ package com.gamma.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gamma.etl.LaCorpus;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
@@ -51,7 +52,7 @@ class ControlApiLaClaimsGeoSceneTest {
     @SuppressWarnings("unchecked")
     private static String datasetSql(String dataset) throws Exception {
         Path csv;
-        try (var f = Files.list(TPL.resolve("data/inbox/accident_location"))) {
+        try (var f = Files.list(LaCorpus.data(TPL).resolve("inbox/accident_location"))) {
             csv = f.filter(p -> p.toString().endsWith(".csv")).findFirst().orElseThrow();
         }
         String values = ControlApiLaShowcaseGeoSceneTest.valuesSql(csv, Set.of("lat", "lon"), m -> true);
@@ -93,14 +94,14 @@ class ControlApiLaClaimsGeoSceneTest {
                     store.write("dataset", ds, Map.of("view", ds + "_view"));
                 }
                 Path directory;
-                try (var f = Files.list(TPL.resolve("data/inbox/provider_directory"))) {
+                try (var f = Files.list(LaCorpus.data(TPL).resolve("inbox/provider_directory"))) {
                     directory = f.filter(p -> p.toString().endsWith(".csv")).findFirst().orElseThrow();
                 }
                 views.write(new ViewDefinition("provider_directory_view", "flow-x", List.of(),
                         ControlApiLaShowcaseGeoSceneTest.valuesSql(directory, Set.of("lat", "lon"), m -> true), "2026-10-16T00:00:00Z"));
                 store.write("dataset", "provider_directory_dataset", Map.of("view", "provider_directory_view"));
                 long accidents;
-                try (var lines = Files.lines(Files.list(TPL.resolve("data/inbox/accident_location")).findFirst().orElseThrow())) {
+                try (var lines = Files.lines(Files.list(LaCorpus.data(TPL).resolve("inbox/accident_location")).findFirst().orElseThrow())) {
                     accidents = lines.count() - 1;
                 }
 
