@@ -79,6 +79,11 @@ export const GAUGE_TRACK = '#9ca3af';
 /** A thin neutral guide line drawn over data (the Waterfall's step-to-step connectors) — the same scheme-neutral gray. */
 export const CHART_CONNECTOR = GAUGE_TRACK;
 
+/** Chart Markers (BI-INSIGHTS-1 I-2): a reference line with no tone (constant, average, percentile) is slate-500, which
+ *  reads on both schemes; a toned line or band takes {@link CHART_TONE}, a band at {@link CHART_MARKER_BAND_ALPHA}. */
+export const CHART_MARKER_LINE = SLATE[500];
+export const CHART_MARKER_BAND_ALPHA = 0.12;
+
 /**
  * Colours for the Link Analysis SVG export (Phase F): a standalone downloaded file has no host page
  * defining `--gamma-*`, so — like every other canvas/file token here — these are hardcoded, not CSS

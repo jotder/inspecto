@@ -37,11 +37,23 @@ export interface BiQueryBody {
     /** A saved Query id: aggregate over its result instead of the whole Dataset. The query must read `dataset`;
      *  a missing or hidden one is a 404, never an empty result. */
     query?: string;
+    /** BI-INSIGHTS-1 I-1: every Measure `m` also returns `m__cmp`, `m__delta` and `m__pct` against the previous
+     *  period, the same period last year, a target or the average; an absent comparison is null, never 0. */
+    compare?: { kind: 'previous' | 'lastYear' | 'target' | 'average'; field?: string; target?: number };
 }
 
 /** The Result Set contract `/bi/query` shares with `/queries/{id}/run`. */
 export interface BiQueryResult {
-    resultSet: { columns: { name: string; type: string; role?: string }[]; rowCount: number };
+    resultSet: {
+        columns: {
+            name: string;
+            type: string;
+            role?: string;
+            /** Set on a comparison column only: which Measure it is drawn against, and which part it is. */
+            overlay?: { overlay: 'compare'; kind: string; of: string; part: 'cmp' | 'delta' | 'pct' };
+        }[];
+        rowCount: number;
+    };
     rows: Record<string, unknown>[];
     statistics: { rowCount: number; elapsedMs: number; truncated: boolean };
     sql: string;

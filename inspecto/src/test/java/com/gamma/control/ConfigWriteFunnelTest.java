@@ -245,6 +245,12 @@ class ConfigWriteFunnelTest {
             Map.entry("DecisionRoutes#write", HELPER), Map.entry("ExpectationRoutes#write", HELPER),
             Map.entry("DecisionRoutes#simulate", "a lastSimulation RESULT stamp (archive=false) — operating, not authoring"),
             Map.entry("ExpectationRunner#runAndPersist", "a lastResult RESULT stamp (archive=false) — operating, not authoring"),
+            Map.entry("ScoreDatasets#narrow", MACHINE + "; only NARROWS a model's own system output Datasets to the model's "
+                    + "owner (shares: []) when they can no longer be registered as they are (BI-INSIGHTS-1 I-14)"),
+            Map.entry("ScoreDatasets#registerOne", MACHINE + "; a model's <prefix><model>(_latest) output Datasets are "
+                    + "registered as system Datasets regardless of a Dataset approval policy by operator ruling (2026-11-24, "
+                    + "BI-INSIGHTS-1 I-14, as D-BI11); readable only by who may read the model and its inputs, and a "
+                    + "hand-declared Dataset is never touched"),
             Map.entry("KpiSnapshotJobType#register", MACHINE + "; the kpi_history_<kpi> system Dataset is registered "
                     + "regardless of a Dataset approval policy by operator ruling D-BI11 (2026-11-24, BI-INSIGHTS-1 I-3); it "
                     + "only copies the source Dataset's owner/shares and never overwrites a Dataset that reads another store"),

@@ -98,7 +98,7 @@ Entity Lists have no TOON file: they are created through the API. Four-eyes is t
 `approval: {entity-list: {required: true}}` (see [maker-checker](../workflow/architecture-workflow.md)).
 
 Schedule `risk.score` with parameter `model` on a `cron` or `on_pipeline:` trigger ([jobs-scheduler](../processor/architecture-processor.md)).
-For Incidents, declare the `_latest` Dataset and a per-entity Alert Rule with `by: [model, entity_key]`.
+For Incidents, the run registers the `_latest` Dataset itself ([model output Datasets](../engine/spec-model-output-datasets.md)); add a per-entity Alert Rule with `by: [model, entity_key]`.
 
 ### 6. Screens
 

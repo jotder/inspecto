@@ -135,7 +135,7 @@ is hit.
 
 ## Incident priority — through the existing Alert Rule machinery
 
-No new alerting path exists. To raise Incidents, declare the `_latest` relation as a Dataset and point one
+No new alerting path exists. Each run registers the `_latest` relation as a system Dataset ([model output Datasets](../engine/spec-model-output-datasets.md)); to raise Incidents, point one
 per-entity Alert Rule at it. Use `by: [model, entity_key]` and set the threshold to the model's
 `highThreshold`:
 

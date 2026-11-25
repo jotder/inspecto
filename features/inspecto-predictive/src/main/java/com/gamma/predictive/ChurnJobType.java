@@ -102,6 +102,8 @@ public final class ChurnJobType implements JobTypeProvider {
             List<ChurnScorer.Scored> scored = ChurnEvaluator.evaluate(model, asOf, relation);
             String version = ChurnEvaluator.version(content);
             ChurnEvaluator.write(data, model, version, ctx.runId(), now, asOf, scored);
+            String note = registered(ctx, modelId, com.gamma.alert.ScoreDatasets.register(store, data, ChurnModel.SCORE_KIND,
+                    model.id(), model.entityType(), ChurnEvaluator.COLUMNS, content, List.of(new com.gamma.alert.ScoreDatasets.Input(model.dataset(), model.key()))));
             Map<String, Long> bands = ChurnEvaluator.bands(scored);
             ctx.artifacts().dataset("scores", model.scoresDataset(), META, scored.size(), now);
             ctx.signals().emit(SignalType.CHURN_SCORE_PRODUCED, Severity.INFO, Map.of("model", modelId,
@@ -112,10 +114,20 @@ public final class ChurnJobType implements JobTypeProvider {
                     "insufficient", bands.get(ChurnModel.INSUFFICIENT), "modelVersion", version);
             return JobResult.ok("predict.churn: " + scored.size() + " entit(ies) scored as of " + asOf + ", "
                     + bands.get("high") + " high, " + bands.get(ChurnModel.INSUFFICIENT) + " insufficient -> dataset '"
-                    + model.scoresDataset() + "'", (System.nanoTime() - t0) / 1_000_000L);
+                    + model.scoresDataset() + "'" + note, (System.nanoTime() - t0) / 1_000_000L);
         }
     }
 
     /** The scores Dataset's fixed shape. */
     static final ResultSetMeta META = ScoreOutputWriter.meta(ChurnEvaluator.COLUMNS);
+
+    /**
+     * BI-INSIGHTS-1 I-14: what the run message says about the output Datasets ({@code ""} when registered). A problem
+     * is logged as a warning and reported, never fails the run — the scores are written.
+     */
+    static String registered(JobContext ctx, String modelId, String unregistered) {
+        if (unregistered == null) return "";
+        ctx.log().warn("output Datasets not registered: " + unregistered, "model", modelId);
+        return "; output Datasets not registered: " + unregistered;
+    }
 }

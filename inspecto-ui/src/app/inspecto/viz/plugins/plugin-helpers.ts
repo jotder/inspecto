@@ -1,7 +1,8 @@
 import { ConditionGroup } from 'app/inspecto/query';
 import { humanizeColumn } from '../column-label';
 import { channelMeasure, channelMeasureId } from '../query-spec';
-import { ChannelValue, ControlValues, QuerySpec, TimeGrain, VizProps, VizRenderOptions } from '../viz-types';
+import { compareCell, compareFragment, hasCompare } from '../compare';
+import { ChannelValue, ControlValues, QuerySpec, TimeGrain, VizProps, VizRenderOptions, VizSeries } from '../viz-types';
 
 /**
  * Shared pure helpers for the standard chart plugins: turn the field mapping into a {@link QuerySpec}, and
@@ -57,8 +58,23 @@ export function buildXyQuery(values: ControlValues, ctx: QueryCtx): QuerySpec {
         filters: ctx.filters ?? null,
         // Categories follow ROW order, and an unordered GROUP BY comes back in hash order — months read
         // "Oct, Jan, Mar, … Nov, Dec". Order by the dimensions; a widget's `sort` option still re-sorts by value.
-        ...(groupBy.length ? { orderBy: categoryOrderBy(groupBy, ctx.options?.categoryOrder) } : {}),
+        // A comparison refuses a hidden-aggregate order (the server compares over the result's own columns).
+        ...(groupBy.length
+            ? {
+                  orderBy: categoryOrderBy(
+                      groupBy,
+                      compareFragment(ctx.options) ? undefined : ctx.options?.categoryOrder,
+                  ),
+              }
+            : {}),
+        ...withCompare(ctx),
     };
+}
+
+/** The `{compare}` fragment of a query (BI-INSIGHTS-1 I-1), or nothing — so a spec without one keeps its exact shape. */
+export function withCompare(ctx: QueryCtx): Pick<QuerySpec, 'compare'> {
+    const compare = compareFragment(ctx.options);
+    return compare ? { compare } : {};
 }
 
 /** The ORDER BY of an XY query (terms over a grouped dimension carry `cosmetic`: the server drops them rather than 422s when
@@ -94,25 +110,34 @@ export function transformXy(rows: Record<string, unknown>[], values: ControlValu
     const mId = channelMeasureId(ycv);
     const labels = distinct(rows, xField);
 
+    const compared = hasCompare(rows, mId);
     if (seriesField) {
         const seriesVals = distinct(rows, seriesField);
-        const series = seriesVals.map((sv) => ({
-            label: sv,
-            data: labels.map((l) => {
-                const r = rows.find((row) => str(row[xField]) === l && str(row[seriesField]) === sv);
-                return num(r?.[mId]);
-            }),
-        }));
+        const series: VizSeries[] = [];
+        for (const sv of seriesVals) {
+            const at = labels.map((l) => rows.find((row) => str(row[xField]) === l && str(row[seriesField]) === sv));
+            series.push({ label: sv, data: at.map((r) => num(r?.[mId])) });
+            if (compared) series.push(...compareSeries(series[series.length - 1], at, mId));
+        }
         return { labels, series };
     }
 
-    const data = labels.map((l) => {
-        const r = rows.find((row) => str(row[xField]) === l);
-        return num(r?.[mId]);
-    });
+    const at = labels.map((l) => rows.find((row) => str(row[xField]) === l));
     // The legend/tooltip text: a reader's wording ("First ings score (total)", "Count"), not the SQL-ish
     // `sum(FIRST_INGS_SCORE)` — the same default the table plugin gives the column's header.
-    return { labels, series: [{ label: humanizeColumn(mId), data }] };
+    const main: VizSeries = { label: humanizeColumn(mId), data: at.map((r) => num(r?.[mId])) };
+    return { labels, series: compared ? [main, ...compareSeries(main, at, mId)] : [main] };
+}
+
+/**
+ * BI-INSIGHTS-1 I-1: the compared series drawn beside `main` (marked `compareOf`, the host names it by the kind) and
+ * the server's change at each point on `main` itself (`compare`, read by the tooltip and the latest-change line). A
+ * point with no compared value is `NaN` — a gap in the line, never a 0.
+ */
+function compareSeries(main: VizSeries, at: (Record<string, unknown> | undefined)[], mId: string): VizSeries[] {
+    const cells = at.map((r) => compareCell(r, mId));
+    main['compare'] = cells;
+    return [{ label: main.label, compareOf: main.label, data: cells.map((c) => (c.cmp == null ? NaN : c.cmp)) }];
 }
 
 /** Single headline measure over the (single-row, ungrouped) result — the KPI value. */
@@ -122,12 +147,16 @@ export function buildValueQuery(values: ControlValues, ctx: QueryCtx): QuerySpec
     // UIE-1: a KPI's optional prior-period measure rides the same one-row query.
     const cmp = values.compare?.[0];
     if (cmp && !measures.some((m) => m.id === channelMeasure(cmp).id)) measures.push(channelMeasure(cmp));
+    // I-1: with no `compare` channel, a target comparison rides the same one-row query (a KPI has no time axis or
+    // groups, so the previous period, last year and the average have nothing to look along).
+    const server = !cmp && ctx.options?.compare?.kind === 'target' ? withCompare(ctx) : {};
     return {
         datasetId: ctx.datasetId,
         sourceName: ctx.sourceName,
         groupBy: [],
         measures,
         filters: ctx.filters ?? null,
+        ...server,
     };
 }
 
@@ -136,6 +165,10 @@ export function transformValue(rows: Record<string, unknown>[], values: ControlV
     if (!cv) return { labels: [], series: [], value: 0 };
     const mId = channelMeasureId(cv);
     const cmp = values.compare?.[0];
-    const compare = cmp && rows[0]?.[channelMeasureId(cmp)] != null ? num(rows[0][channelMeasureId(cmp)]) : undefined;
+    const compare = cmp
+        ? rows[0]?.[channelMeasureId(cmp)] != null
+            ? num(rows[0][channelMeasureId(cmp)])
+            : undefined
+        : (compareCell(rows[0], mId).cmp ?? undefined); // I-1: the server's compared value, absent stays absent
     return { labels: [], series: [], value: num(rows[0]?.[mId]), ...(compare === undefined ? {} : { compare }) };
 }

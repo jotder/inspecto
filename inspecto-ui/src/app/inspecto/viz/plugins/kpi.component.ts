@@ -5,6 +5,7 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
 import { formatNumber, NumberFormat } from '../number-format';
 import { targetStatus } from '../target-status';
 import { kpiDelta, toneBadge } from '../kpi-delta';
+import { COMPARE_LABEL, CompareKind } from '../compare';
 import { KpiRange, KpisService, KpiValue } from 'app/inspecto/api/kpis.service';
 
 export type KpiMode = 'mini' | 'standard' | 'max';
@@ -107,6 +108,9 @@ export class KpiComponent {
     readonly label = input<string | undefined>(undefined);
     /** The prior-period value (`compare` channel); absent ⇒ no delta line. */
     readonly compare = input<number | undefined>(undefined);
+    /** I-1: what `compare` is (`options.compare.kind`); absent ⇒ the prior period. Bound to a definition, `target`
+     *  measures the delta against the KPI's own target and `previous` keeps the definition's comparison. */
+    readonly compareKind = input<CompareKind | undefined>(undefined);
     readonly format = input<NumberFormat | undefined>(undefined);
     readonly target = input<number | undefined>(undefined);
     readonly better = input<'higher' | 'lower'>('higher');
@@ -145,9 +149,17 @@ export class KpiComponent {
     private readonly eValue = computed<number | null>(() =>
         this.bound() ? (this.definition()?.value ?? null) : this.value(),
     );
-    private readonly eCompare = computed(() =>
-        this.bound() ? (this.definition()?.comparisonValue ?? undefined) : this.compare(),
-    );
+    private readonly eCompare = computed(() => {
+        if (!this.bound()) return this.compare();
+        const d = this.definition();
+        return (this.compareKind() === 'target' ? d?.target : d?.comparisonValue) ?? undefined;
+    });
+    /** What the delta is measured against, after "vs". */
+    private readonly vs = computed(() => {
+        const k = this.compareKind();
+        if (this.bound()) return k === 'target' ? COMPARE_LABEL.target : 'prior period';
+        return k ? COMPARE_LABEL[k] : 'prior period';
+    });
     private readonly eFormat = computed(() =>
         this.bound() ? ((this.definition()?.format as NumberFormat | undefined) ?? undefined) : this.format(),
     );
@@ -192,7 +204,7 @@ export class KpiComponent {
             const amount = formatNumber(Math.abs(d.delta), { ...this.eFormat(), compact: true });
             return { text: `Change ${sign}${amount}${pct} vs prior period`, badge: d.band ?? '' };
         }
-        const k = kpiDelta(v, this.eCompare(), this.eBetter(), this.eFormat());
+        const k = kpiDelta(v, this.eCompare(), this.eBetter(), this.eFormat(), this.vs());
         return k ? { text: k.text, badge: toneBadge(k.tone) } : null;
     });
 

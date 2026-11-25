@@ -101,12 +101,15 @@ public final class SegmentJobType implements JobTypeProvider {
             List<RfmSegmenter.Assignment> assigned = SegmentEvaluator.evaluate(model, asOf, relation);
             String version = SegmentEvaluator.version(content);
             SegmentEvaluator.write(data, model, version, ctx.runId(), now, asOf, assigned);
+            String note = ChurnJobType.registered(ctx, modelId, com.gamma.alert.ScoreDatasets.register(store, data,
+                    SegmentationModel.SCORE_KIND, model.id(), model.entityType(), SegmentEvaluator.COLUMNS, content,
+                    List.of(new com.gamma.alert.ScoreDatasets.Input(model.dataset(), model.key()))));
             Map<String, Long> counts = SegmentEvaluator.counts(assigned);
             ctx.artifacts().dataset("segments", model.segmentsDataset(), META, assigned.size(), now);
             ctx.log().info("segmented entities", "model", modelId, "asOf", asOf.toString(), "entities", assigned.size(),
                     "segments", counts.toString(), "modelVersion", version);
             return JobResult.ok("predict.segment: " + assigned.size() + " entit(ies) segmented as of " + asOf
-                    + " -> dataset '" + model.segmentsDataset() + "'", (System.nanoTime() - t0) / 1_000_000L);
+                    + " -> dataset '" + model.segmentsDataset() + "'" + note, (System.nanoTime() - t0) / 1_000_000L);
         }
     }
 

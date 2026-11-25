@@ -114,6 +114,11 @@ public final class AnomalyScoreJobType implements JobTypeProvider {
             int excluded = run.excluded();
             String version = AnomalyScoreEvaluator.version(content);
             AnomalyScoreEvaluator.write(data, model, version, ctx.runId(), now, run);
+            // BI-INSIGHTS-1 I-14: the outputs as system Datasets; a problem is reported, never fails the run.
+            String unregistered = com.gamma.alert.ScoreDatasets.register(store, data, com.gamma.alert.AnomalyScoreOutputs.SCORE_KIND,
+                    model.id(), model.entityType(), AnomalyScoreEvaluator.COLUMNS, content, inputs(model));
+            if (unregistered != null) ctx.log().warn("output Datasets not registered: " + unregistered, "model", modelId);
+            String note = unregistered == null ? "" : "; output Datasets not registered: " + unregistered;
             int fed = feedWatchList(WatchListFeed.installed(), writeRoot, data, model, lists, ctx.runId(), now, run.scored());
             if (lists.exclusionList() != null)
                 ctx.log().info("excluded entities", "model", modelId, "list", lists.exclusionList(), "excluded", excluded);
@@ -134,9 +139,18 @@ public final class AnomalyScoreJobType implements JobTypeProvider {
                 ctx.log().warn("evidence read hit its cap - entities past it carry no evidence (their scores are unaffected)",
                         "model", modelId, "cap", AnomalyScoreEvaluator.MAX_EVIDENCE_ROWS);
             return JobResult.ok("anomaly.score: " + run.scored().size() + " entit(ies) scored for " + run.period()
-                    + ", " + bands.get("high") + " high -> dataset '" + model.scoresDataset() + "'",
+                    + ", " + bands.get("high") + " high -> dataset '" + model.scoresDataset() + "'" + note,
                     (System.nanoTime() - t0) / 1_000_000L);
         }
+    }
+
+    /** BI-INSIGHTS-1 I-14: every Dataset the model reads with its key column — each feature, and the peers. */
+    static List<com.gamma.alert.ScoreDatasets.Input> inputs(AnomalyModel model) {
+        List<com.gamma.alert.ScoreDatasets.Input> out = new java.util.ArrayList<>();
+        for (AnomalyModel.Feature f : model.features()) out.add(new com.gamma.alert.ScoreDatasets.Input(f.dataset(), f.key()));
+        if (model.peers() != null)
+            out.add(new com.gamma.alert.ScoreDatasets.Input(model.peers().dataset(), model.peers().key()));
+        return out;
     }
 
     /**
