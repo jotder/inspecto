@@ -1,7 +1,7 @@
 # Business insights in Widgets and Dashboards — research and design
 
 > **Status: DESIGN APPROVED 2026-11-18 — D-BI1, D-BI2, D-BI3 signed (operator, recommended options); D-BI4…D-BI10
-> signed 2026-11-24 (operator, recommended options); P0 I-3 KPI History built 2026-11-24 (§11.1, D-BI11, D-BI12).** Every decision in §11 is closed. Board row: `BI-INSIGHTS-1`
+> signed 2026-11-24 (operator, recommended options); P0 I-3 KPI History built 2026-11-24 (§11.1, D-BI11, D-BI12); P0 I-14 model output Datasets built 2026-11-24 (§11.2).** Every decision in §11 is closed. Board row: `BI-INSIGHTS-1`
 > (§12). The new terms are in `GLOSSARY.md` §7.
 > Scope: insights on **business data** — the Measures over Datasets (revenue, usage, subscribers, transactions,
 > margin, leakage, partners, churn). Not observability: pipeline health stays with Metrics and Alert Rules.
@@ -301,6 +301,17 @@ already exists there, and Q2/Q4 answer the questions an RA or finance lead asks 
   3 years back; later runs evaluate the missing periods plus the current and the previous period (late data
   restates one closed period); rows older than 3 years are dropped. Each run rewrites the KPI's one file
   atomically (`ScoreOutputDirs.swapIn`, the snapshot-swap lock).
+
+### 11.2 P0 I-14 model output Datasets — as built (2026-11-24)
+
+- Each model Job registers its `<prefix><model>` and `_latest` stores as system Datasets right after writing them
+  (`ScoreDatasets.register`), every column declared with its role and `entity_key` classified with the model's Entity
+  Type so BI masking aliases it. Operator rulings (2026-11-24): readable only by who may read the model AND every
+  Dataset it reads (`SharingEnvelope`, shared with KPI History; sources shared differently register nothing); system
+  Datasets regardless of a Dataset approval policy; a registration problem never fails the run — it is named in the
+  run message, and any refusal narrows earlier output Datasets to the model's owner. `entity_key` takes the strictest
+  class of the Entity Type and every input's key column (fail closed when untraceable). A hand-declared Dataset is
+  never touched, except a bare `_latest` from a template, which is adopted. Spec: `okf/product/module/engine/spec-model-output-datasets.md`.
 
 ## 12. Board row
 

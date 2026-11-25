@@ -25,7 +25,6 @@ import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * The {@code kpi.snapshot} Job Type (`BI-INSIGHTS-1` P0, I-3): stores one KPI's value per period at its own grain as
@@ -130,15 +129,12 @@ public final class KpiSnapshotJobType implements JobTypeProvider {
      * the run is refused rather than showing one component's readers the other's values.
      */
     static Map<String, Object> envelope(Map<String, Object> kpi, Map<String, Object> dataset) {
-        boolean kpiShared = kpi.containsKey("shares"), datasetShared = dataset.containsKey("shares");
-        Map<String, Object> from = kpiShared && !datasetShared ? kpi : dataset;
-        if (kpiShared && datasetShared && !(Objects.equals(kpi.get("owner"), dataset.get("owner"))
-                && Objects.equals(kpi.get("shares"), dataset.get("shares"))))
+        try {
+            return com.gamma.pipeline.SharingEnvelope.of(List.of(kpi, dataset));
+        } catch (SecurityException e) {
             throw new SecurityException("the KPI and its Dataset are shared differently; the history would show one's "
                     + "values to the other's readers — share them alike, or leave one unshared — refused");
-        Map<String, Object> out = new LinkedHashMap<>();
-        for (String k : List.of("owner", "shares")) if (from.containsKey(k)) out.put(k, from.get(k));
-        return out;
+        }
     }
 
     /**

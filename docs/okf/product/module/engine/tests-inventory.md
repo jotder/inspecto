@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-428 test class(es): 428 unit, 0 real-HTTP control-plane, 0 IT.
+429 test class(es): 429 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -47,6 +47,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `PerEntityAlertTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/PerEntityAlertTest.java` | ASSURE-PER-ENTITY-ALERTS-1 — a Dataset measure Alert Rule with {@code by} evaluates the Measure per key over |
 | `PollRelativeFreshnessTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/PollRelativeFreshnessTest.java` | LA-DATA-TRUST-1 S3: a freshness Alert Rule whose {@code maximumAge} is a MULTIPLE of the feeding Collector's poll interval |
 | `RunbookTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/RunbookTest.java` | The {@code runbook} kind's structural validator, and the Alert Rule's {@code runbook:} link. |
+| `ScoreDatasetsTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/ScoreDatasetsTest.java` | A model's outputs as system Datasets (`BI-INSIGHTS-1` P0, I-14). |
 | `ScoreOutputWriterSwapTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/ScoreOutputWriterSwapTest.java` | SNAPSHOT-SWAP-UNLOCKED-READERS-1, the score output writer: its retention prune deletes history runs a reader may have |
 | `WindowedPatternEvaluatorTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/WindowedPatternEvaluatorTest.java` | PA-9c: {@link WindowedRuleEvaluator} running the {@code sequence} and {@code absence} Patterns over committed |
 | `WindowedRuleEvaluatorTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/WindowedRuleEvaluatorTest.java` | PA-9b: {@link WindowedRuleEvaluator} over committed Parquet files — the window buffer, effectively-once Alerts |

@@ -53,7 +53,7 @@ A model's `dataScope` is stricter than for objects: an unscoped model is readabl
 
 ## Raising Incidents
 
-Declare `risk_scores_<id>_latest` as a Dataset and add a per-entity Alert Rule at the model's `highThreshold`
+Each run registers `risk_scores_<id>_latest` (and the history) as a system Dataset ([model output Datasets](../engine/spec-model-output-datasets.md)); add a per-entity Alert Rule at the model's `highThreshold`
 (Incident priority section of the [spec](spec-risk-scores.md)).
 
 ## Common failures

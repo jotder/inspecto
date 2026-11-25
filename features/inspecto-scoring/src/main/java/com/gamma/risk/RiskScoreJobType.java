@@ -91,6 +91,12 @@ public final class RiskScoreJobType implements JobTypeProvider {
             Instant now = Instant.now();
             String version = RiskScoreEvaluator.version(content);
             RiskScoreEvaluator.write(data, model, version, ctx.runId(), now, run.scored());
+            // BI-INSIGHTS-1 I-14: the outputs as system Datasets; a problem is reported, never fails the run.
+            String unregistered = com.gamma.alert.ScoreDatasets.register(store, data, com.gamma.alert.RiskScoreOutputs.SCORE_KIND,
+                    model.id(), model.entityType(), RiskScoreEvaluator.COLUMNS, content, model.factors().stream()
+                            .map(f -> new com.gamma.alert.ScoreDatasets.Input(f.dataset(), f.key())).toList());
+            if (unregistered != null) ctx.log().warn("output Datasets not registered: " + unregistered, "model", modelId);
+            String note = unregistered == null ? "" : "; output Datasets not registered: " + unregistered;
 
             long high = run.scored().stream().filter(RiskScorer.Scored::high).count();
             int fed = feedWatchList(writeRoot, data, model, ctx.runId(), now, run.scored());
@@ -105,7 +111,7 @@ public final class RiskScoreJobType implements JobTypeProvider {
                 ctx.log().warn("evidence read hit its cap - entities past it carry no evidence (their scores are unaffected)",
                         "model", modelId, "cap", RiskScoreEvaluator.MAX_EVIDENCE_ROWS);
             return JobResult.ok("risk.score: " + run.scored().size() + " entit(ies) scored, " + high
-                    + " high → dataset '" + model.scoresDataset() + "'", (System.nanoTime() - t0) / 1_000_000L);
+                    + " high → dataset '" + model.scoresDataset() + "'" + note, (System.nanoTime() - t0) / 1_000_000L);
         }
     }
 
