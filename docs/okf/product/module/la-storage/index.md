@@ -34,5 +34,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-ENTITY-KEY-NEW-CASE-PAIRS-1` | P3 | defect | The SQL entity key and the Java key still differ for about 55 newer Unicode case pairs. | — |
 | `LA-INDEX-SCALE-MEASURE-1` | P3 | chore | Measure the link index at 10^9 rows (clause 3) on a bigger machine. | operator |

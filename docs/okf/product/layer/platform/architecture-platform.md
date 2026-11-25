@@ -488,7 +488,7 @@ naming rule is held by `node tools/check-product-docs.mjs`.
 | Link Analysis audit showcase (`solution-pack.la-audit`) | [architecture](../../solution-pack/la-audit/architecture-la-audit.md) |  |
 | Link Analysis claims showcase (`solution-pack.la-claims`) | [architecture](../../solution-pack/la-claims/architecture-la-claims.md) |  |
 | Link Analysis daily feed (`solution-pack.la-daily-feed`) | [architecture](../../solution-pack/la-daily-feed/architecture-la-daily-feed.md) |  |
-| Mobile Money (`solution-pack.la-mobile-money`) | [architecture](../../solution-pack/la-mobile-money/architecture-la-mobile-money.md) |  |
+| Mobile money network (`solution-pack.la-mobile-money`) | [architecture](../../solution-pack/la-mobile-money/architecture-la-mobile-money.md) |  |
 | Link Analysis ownership showcase (`solution-pack.la-ownership`) | [architecture](../../solution-pack/la-ownership/architecture-la-ownership.md) |  |
 | Other Examples (feature off) (`solution-pack.la-showcase-off`) | [architecture](../../solution-pack/la-showcase-off/architecture-la-showcase-off.md) |  |
 | Other Examples (`solution-pack.la-showcase`) | [architecture](../../solution-pack/la-showcase/architecture-la-showcase.md) |  |

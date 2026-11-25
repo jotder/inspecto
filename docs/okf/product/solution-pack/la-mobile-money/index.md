@@ -1,12 +1,12 @@
 ---
 type: ProductItem
-title: Mobile Money
+title: Mobile money network
 item: solution-pack.la-mobile-money
 description: Documentation hub for solution-pack.la-mobile-money — every document about it, by slot.
 tags: [product-item, solution-pack]
 ---
 
-# Mobile Money (`solution-pack.la-mobile-money`)
+# Mobile money network (`solution-pack.la-mobile-money`)
 
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`solution-pack.la-mobile-money`](../../../../../product-map/solution-pack/la-mobile-money.toon). Editions, add-ons, order codes and dependencies are read
@@ -34,5 +34,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `s
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-INDUSTRY-FOLD-1` | P3 | chore | Fold la-showcase into *Banking and finance* and la-mobile-money into *Telecom*, so only industry Spaces ship. | — |
+| `LA-INDUSTRY-FOLD-1` | P3 | chore | Fold la-showcase into *Banking and finance* and la-mobile-money into *Telecom*, so only industry Spaces ship. | operator |
 | `LA-SHOWCASE-REHEARSAL-1` | P3 | chore | A spoken showcase run with an audience, the portal on :8140 and the B Alert beat. | — |

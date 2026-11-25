@@ -34,8 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LOOKUP-1` | P2 | feature | Lookup: exact and best-match key resolution over a Reference Dataset (longest prefix, range, as-of, fuzzy), a batch engine and a row-at-a… | — |
-| `DATED-REFERENCE-RUNS-1` | P2 | feature | Each record joins the Reference version of its own day, and a Job's backlog drains itself: daily Reference versions, version_by on the jo… | — |
 | `OUTPUT-NAME-OVERWRITE-1` | P3 | defect | A second file with the same file name silently replaces the first file's rows, on any Pipeline (filed 2026-11-20, BASIC-ELT-PROFILE-1 B3… | — |
 | `REPROCESS-ARCHIVE-MEMBER-1` | P3 | defect | Reprocessing ONE Consignment of a zip restores the whole archive under the member's composite name and reads every entry again, so rows d… | — |
 | `ARRIVAL-HEAL-AT-START-1` | P3 | defect | A crash during a replace leaves readers a mix of old and new files until the Dataset's next run, replace or compaction (filed 2026-11-20,… | — |

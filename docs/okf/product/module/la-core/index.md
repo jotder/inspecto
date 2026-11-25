@@ -39,12 +39,9 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `ADD-DATA-DUPLICATE-CHECK-UI-1` | P3 | feature | Add data cannot set a Basic import's duplicate check (duplicate.mode, on_change); only the Pipelines editor's Collector stage can (filed… | operator |
 | `BASIC-ELT-DUPLICATES-1` | P3 | chore | Basic and ELT duplications Phase 0 found and the build left (filed 2026-11-20, BASIC-ELT-PROFILE-1 close). | — |
 | `WATCH-KEEP-TWO-CONTROLS-1` | P3 | defect | On Standard a watched folder offers two controls for one schedule (filed 2026-11-19, BASIC-ELT-PROFILE-1 U4-Watch review). | — |
-| `LA-FULL-CYCLE-RESIDUALS-1` | P3 | chore | Eight items the LA full-cycle plan left on purpose, plus two environment gaps its drive found. | — |
+| `LA-FULL-CYCLE-RESIDUALS-1` | P3 | chore | Items 6 (shared Preview Spaces re-bake & admin roster conflict) and 8a (la-guide-02-create-space.png live browser screenshot) remain afte… | — |
 | `LA-TRAINING-SERIES-1` | P3 | feature | An Inspecto LA user training video series of 41 episodes. | operator |
 | `LA-CASE-VIDEOS-2` | P3 | feature | Re-specify and re-record the twenty industry case films to the training-series standard. | operator |
-| `LA-EXEC-DEMO-POLISH-1` | P3 | chore | Polish left by the third executive review of Inspecto LA, plus transfer amounts drawn on the links. | — |
-| `SPACE-ADMISSION-FOLLOWUPS-1` | P3 | chore | Seven follow-ups the closed-Space change (D5) left on purpose. | — |
-| `LA-SPACE-SWITCHER-NAMES-1` | P3 | defect | the Space switcher still shows near-twin names, no name on a phone, and squeezes a two-line name. | — |
 | `LA-UI-TEXT-PASS-2` | P3 | defect | La-app wording items that each wait on an operator call, plus wording leftovers that need no decision. | operator |
 | `LA-ONBOARD-RESIDUALS-1` | P3 | feature | Two items wave 1 of LA-ONBOARD-1 left: how far no-code row filtering goes in Basic, and a real drag-and-drop of a file onto Add data. | operator |
 | `LA-GROW-EXCLUDE-THINK-ALOUD-1` | P3 | chore | run a think-aloud test of "Grow and clean a graph" with two analysts new to Link Analysis | external |
