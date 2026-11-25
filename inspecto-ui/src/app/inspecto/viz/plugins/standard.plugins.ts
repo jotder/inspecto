@@ -17,7 +17,8 @@ function xyPlugin(type: string, chartType: string, label: string, icon: string, 
     return {
         meta: { type, label, icon, fit },
         controls: XY_CONTROLS,
-        buildQuery: buildXyQuery,
+        // BI-INSIGHTS-1 I-11 / I-7: line, bar and area draw the overlays, so only they ask for them.
+        buildQuery: (values, ctx) => buildXyQuery(values, ctx, true),
         transformProps: (rows, values) => {
             const props = transformXy(rows, values);
             if (fill) props.series.forEach((s) => (s['fill'] = true));

@@ -3820,6 +3820,21 @@
                       "field" : { "type" : "string" },
                       "target" : { "type" : "number" }
                     }
+                  },
+                  "overlay" : {
+                    "type" : "object",
+                    "description" : "Time-series overlays computed from this statement's own masked result, under the same row cap (BI-INSIGHTS-1 I-11, I-7; D-BI7). field = the time dimension (a grained groupBy column; the default when there is one). forecast: Holt-Winters additive with its prediction interval; every Measure and ratio m gains m__fc, m__fc_lo, m__fc_hi on horizon new rows after the last bucket (m null there), per value of the other grouped columns; the period is the detected one, else the grain's calendar cycle. anomaly: m__expected (the seasonal baseline's median) and m__z (the robust z) on every row with a value. The columns are marked in resultSet.columns[].overlay {overlay: forecast|anomaly, kind, of, part}. The response's overlays[] states per overlay, Measure and series the method, period, backtest {origins, horizon, pairs, mape, smape, mae, coverage}, or the reason there is none: fewer than two seasons, a gap, an empty bucket, a cut result or a masked value give no forecast, never a guessed band.",
+                    "properties" : {
+                      "field" : { "type" : "string" },
+                      "forecast" : {
+                        "type" : "object",
+                        "properties" : {
+                          "horizon" : { "type" : "integer", "minimum" : 1, "maximum" : 60 },
+                          "level" : { "type" : "number", "minimum" : 0.5, "maximum" : 0.99 }
+                        }
+                      },
+                      "anomaly" : { "type" : "object", "description" : "Empty: the sensitivity (the |z| that counts) is the chart's." }
+                    }
                   }
                 }
               }

@@ -34,10 +34,16 @@ export type ChartMarker =
 
 export type ChartMarkerKind = ChartMarker['kind'];
 
-/** A marker ready to draw: a line at a value, or a band between two values (an open end = the chart's edge). */
+/**
+ * A marker ready to draw: a line at a value, or a band between two values (an open end = the chart's edge). The two
+ * per-category kinds come from the server's overlays (BI-INSIGHTS-1 I-11 / I-7, `chart-overlays.ts`): an `interval`
+ * (a forecast band and its dashed point forecast, by category index) and `points` (rings on the flagged values).
+ */
 export type ResolvedMarker =
     | { type: 'line'; value: number; text: string; tone?: MarkerTone; dashed: boolean }
-    | { type: 'band'; from: number | null; to: number | null; text: string; tone: MarkerTone };
+    | { type: 'band'; from: number | null; to: number | null; text: string; tone: MarkerTone }
+    | { type: 'interval'; points: { index: number; value: number; lower: number; upper: number }[]; text: string }
+    | { type: 'points'; points: { index: number; value: number }[]; text: string; tone: MarkerTone };
 
 /** The parts of a KPI definition a marker reads (`KpiDefinition` in `api/kpis.service.ts`). */
 export interface MarkerKpi {

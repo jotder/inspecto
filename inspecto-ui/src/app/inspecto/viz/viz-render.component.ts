@@ -45,6 +45,15 @@ import { COMPARE_LABEL, CompareCell, CompareKind, compareText } from './compare'
 import { KpiDefinition, KpiRange } from 'app/inspecto/api/kpis.service';
 import { ComponentsService } from 'app/inspecto/api/components.service';
 import { MARKER_VIZ_TYPES, needsKpi, ResolvedMarker, resolveMarkers } from './chart-markers';
+import {
+    DEFAULT_SENSITIVITY,
+    OVERLAY_VIZ_TYPES,
+    OverlayCell,
+    OverlaySummary,
+    grainUnit,
+    overlayNote,
+    resolveOverlays,
+} from './chart-overlays';
 import { ChannelId, VizPlugin, VizProps, VizRenderOptions, VizSeries } from './viz-types';
 
 /** componentKey → Angular component, for plugins that render via the escape hatch (`render.kind:'component'`).
@@ -116,6 +125,28 @@ const COMPONENT_BY_KEY: Record<string, Type<unknown>> = {
                     @if (compareNote(); as n) {
                         <p class="text-secondary mt-1 text-xs" data-testid="compare-note">{{ n }}</p>
                     }
+                    @if (showSensitivity()) {
+                        <label
+                            class="text-secondary mt-1 flex items-center gap-2 text-xs"
+                            data-testid="anomaly-sensitivity"
+                        >
+                            <span>Anomaly sensitivity</span>
+                            <input
+                                type="range"
+                                min="1"
+                                max="5"
+                                step="1"
+                                class="w-28"
+                                [value]="sensitivity()"
+                                [attr.aria-valuetext]="sensitivity() + ' of 5'"
+                                (input)="sensitivityOverride.set(+$any($event.target).value)"
+                            />
+                            <span aria-hidden="true">{{ sensitivity() }} of 5</span>
+                        </label>
+                    }
+                    @for (line of overlayLines(); track $index) {
+                        <p class="text-secondary mt-1 text-xs" data-testid="overlay-note">{{ line }}</p>
+                    }
                 }
             }
             @case ('aggrid') {
@@ -176,6 +207,55 @@ export class VizRenderComponent {
     readonly kpiAsOf = input<string | undefined>(undefined);
     /** KPI only: the host Dashboard's picked dates; a `kpiId`-bound KPI is evaluated over them instead of at `asOf`. */
     readonly kpiRange = input<KpiRange | null | undefined>(undefined);
+    /** BI-INSIGHTS-1 I-11 / I-7: the server's overlay summary for this result (method, backtest, or why there is none). */
+    readonly overlaySummary = input<OverlaySummary[] | null | undefined>(undefined);
+    /** The viewer's own sensitivity from the slider under the chart; `null` = the Widget's stored one. A presentation
+     *  choice: the server's scores are the same at every setting, so moving it re-draws without a new query. */
+    readonly sensitivityOverride = signal<number | null>(null);
+    readonly sensitivity = computed(
+        () => this.sensitivityOverride() ?? this.renderOptions()?.overlay?.anomaly?.sensitivity ?? DEFAULT_SENSITIVITY,
+    );
+    private readonly overlaysSupported = computed(() =>
+        (OVERLAY_VIZ_TYPES as readonly string[]).includes(this.plugin().meta.type),
+    );
+    /** I-11 / I-7: the forecast band and flagged points as Chart Markers, drawn by the one markers plugin (D-BI9). */
+    private readonly overlayMarkers = computed<ResolvedMarker[]>(() => {
+        const o = this.renderOptions();
+        if (!this.overlaysSupported() || (!o?.overlay?.forecast && !o?.overlay?.anomaly)) return [];
+        // A band follows each series' own values in time order: a stacked or value-sorted chart has neither.
+        if (this.overlaysHidden()) return [];
+        const p = this.sortedProps();
+        const series = p.series.map((s) => ({
+            label: s.label,
+            data: s.data,
+            overlay: s['overlay'] as OverlayCell[] | undefined,
+        }));
+        return resolveOverlays(
+            series,
+            p.labels.map((l) => fullDateLabel(l) ?? categoryLabel(l)),
+            o,
+            this.sensitivity(),
+            (l) => categoryLabel(seriesLabel(l)),
+        );
+    });
+    readonly showSensitivity = computed(
+        () =>
+            this.overlaysSupported() &&
+            !this.overlaysHidden() &&
+            !!this.renderOptions()?.overlay?.anomaly &&
+            !!this.overlaySummary()?.length,
+    );
+    /** A band follows each series' own values in time order: a stacked or value-sorted chart has neither. */
+    private readonly overlaysHidden = computed(() => !!this.renderOptions()?.stacked || !!this.renderOptions()?.sort);
+    /** The caption lines: the forecast, its tested accuracy, the flagged count — or why there is none. */
+    readonly overlayLines = computed<string[]>(() => {
+        if (!this.overlaysSupported()) return [];
+        if (this.overlaysHidden() && this.overlaySummary()?.length)
+            return ['The forecast band and anomaly markers are not drawn on a stacked or sorted chart.'];
+        const flagged = this.overlayMarkers().reduce((n, m) => n + (m.type === 'points' ? m.points.length : 0), 0);
+        const grain = grainUnit(this.props().labels);
+        return overlayNote(this.overlaySummary(), flagged, this.sensitivity(), grain);
+    });
     /** Emits the clicked category's label (bar/line/area/pie/bubble) — the drill-down seam. Gauge has no filterable
      *  categories, so it never emits. */
     readonly categoryClick = output<string>();
@@ -278,7 +358,9 @@ export class VizRenderComponent {
      * category totals when the series are stacked — per stack, as Chart.js stacks them: a Combo's bars and lines
      * on the same axis are two stacks (its stack key falls back to the dataset type), never one sum.
      */
-    readonly markers = computed<ResolvedMarker[]>(() => {
+    readonly markers = computed<ResolvedMarker[]>(() => [...this.staticMarkers(), ...this.overlayMarkers()]);
+
+    private readonly staticMarkers = computed<ResolvedMarker[]>(() => {
         const o = this.renderOptions();
         if (!this.marksSupported() || !o?.markers?.length) return [];
         const p = this.sortedProps();
@@ -357,6 +439,10 @@ export class VizRenderComponent {
                     // I-1: the change at each point moves with its point
                     ...(Array.isArray(s['compare'])
                         ? { compare: order.map((i) => (s['compare'] as CompareCell[])[i]) }
+                        : {}),
+                    // I-11 / I-7: the forecast and score at each point move with it
+                    ...(Array.isArray(s['overlay'])
+                        ? { overlay: order.map((i) => (s['overlay'] as OverlayCell[])[i]) }
                         : {}),
                 }),
             ),

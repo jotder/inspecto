@@ -82,6 +82,17 @@ class MeasureGrammarContractTest {
                 compare.get("suffixes"));
     }
 
+    @SuppressWarnings("unchecked")
+    @Test
+    void theOverlayColumnSuffixesMatchTheCommittedContract() throws IOException {
+        Map<String, Object> contract = JSON.readValue(contractPath().toFile(), Map.class);
+        Map<String, Object> overlay = (Map<String, Object>) contract.get("overlay");
+        assertNotNull(overlay, "contract file has no `overlay` key");
+        // The chart reads the forecast band and anomaly scores back by these suffixes (BI-INSIGHTS-1 I-11, I-7).
+        assertEquals(Map.of("fc", ChartOverlays.FC, "fcLo", ChartOverlays.FC_LO, "fcHi", ChartOverlays.FC_HI,
+                "expected", ChartOverlays.EXPECTED, "z", ChartOverlays.Z), overlay.get("suffixes"));
+    }
+
     @Test
     void theIdentifierPatternTheEngineEnforcesMatchesTheCommittedContract() throws IOException {
         Map<?, ?> contract = JSON.readValue(contractPath().toFile(), Map.class);

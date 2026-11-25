@@ -1,3 +1,4 @@
+import type { OverlaySummary } from 'app/inspecto/viz/chart-overlays';
 import {
     ChangeDetectionStrategy,
     Component,
@@ -174,6 +175,7 @@ export interface DrillEvent extends DrillPair {
                                     [kpiSize]="kpiSize()"
                                     [kpiAsOf]="asOf()"
                                     [kpiRange]="range()"
+                                    [overlaySummary]="overlaySummary()"
                                     (categoryClick)="onCategoryClick($event)"
                                     (channelClick)="onChannelClick($event)"
                                     (cellClick)="onCellClick($event)"
@@ -279,6 +281,8 @@ export class WidgetHostComponent {
     private readonly rowCount = signal(0);
     /** The last successful result was cut at the server's row limit (`statistics.truncated`). */
     private readonly truncated = signal(false);
+    /** BI-INSIGHTS-1 I-11 / I-7: the server's overlay summary of the last result (`null` without an overlay). */
+    readonly overlaySummary = signal<OverlaySummary[] | null>(null);
     /** The caption under a truncated render — names the number of rows actually drawn. */
     readonly truncatedNote = computed(() =>
         this.truncated() ? `Showing the first ${formatNumber(this.rowCount())} rows — the result was cut` : null,
@@ -357,6 +361,7 @@ export class WidgetHostComponent {
                     this.throttled.set(!!res.throttled);
                     this.rowCount.set(res.ok ? res.rows.length : 0);
                     this.truncated.set(res.ok && !!res.truncated);
+                    this.overlaySummary.set(res.ok ? (res.overlays ?? null) : null);
                     this.props.set(plugin.transformProps(res.ok ? res.rows : [], widget.controls));
                     this.resultArrived.set(true);
                 })
@@ -365,6 +370,7 @@ export class WidgetHostComponent {
                     if (!isSharedRef(dataset.physicalRef))
                         this.runError.set(apiErrorMessage(e, 'The data query failed.'));
                     this.truncated.set(false);
+                    this.overlaySummary.set(null);
                     this.props.set({ labels: [], series: [] });
                     this.resultArrived.set(true);
                 });

@@ -187,6 +187,34 @@ describe('WidgetOptionsDialog', () => {
         expect((ref.close.mock.calls[1][0] as WidgetOptions).compare).toBeUndefined();
     });
 
+    it('BI-INSIGHTS-1 I-11 / I-7: round-trips the forecast band and anomaly markers; defaults write nothing extra', () => {
+        const { fixture, c, ref } = create(
+            { overlay: { forecast: { level: 0.95 }, anomaly: { sensitivity: 5 } } },
+            'line',
+        );
+        const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+        expect(text).toContain('Forecast band');
+        expect(text).toContain('Anomaly markers');
+        c.save();
+        expect((ref.close.mock.calls[0][0] as WidgetOptions).overlay).toEqual({
+            forecast: { level: 0.95 },
+            anomaly: { sensitivity: 5 },
+        });
+        c.schemaForm.form.patchValue({ forecastLevel: '0.8', anomalyOn: false });
+        c.save();
+        expect((ref.close.mock.calls[1][0] as WidgetOptions).overlay).toEqual({ forecast: {} });
+        c.schemaForm.form.patchValue({ forecastOn: false });
+        c.save();
+        expect((ref.close.mock.calls[2][0] as WidgetOptions).overlay).toBeUndefined();
+    });
+
+    it('hides the overlays for a pie and keeps a stored one as-is', () => {
+        const { fixture, c, ref } = create({ overlay: { anomaly: {} } }, 'pie');
+        expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Anomaly markers');
+        c.save();
+        expect((ref.close.mock.calls[0][0] as WidgetOptions).overlay).toEqual({ anomaly: {} });
+    });
+
     it('hides "Compare with" for a pie and keeps a stored one as-is', () => {
         const { fixture, c, ref } = create({ compare: { kind: 'average' } }, 'pie');
         expect((fixture.nativeElement as HTMLElement).textContent).not.toContain('Compare with');

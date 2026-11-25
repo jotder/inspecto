@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-434 test class(es): 434 unit, 0 real-HTTP control-plane, 0 IT.
+435 test class(es): 435 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -417,6 +417,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `StepRunnerTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/StepRunnerTest.java` | S2-3 — the engine side of a contributed {@code EXECUTED} Step: {@link StepRunner} through the real |
 | `TriggerCoalescerTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/TriggerCoalescerTest.java` | T13 — {@link TriggerCoalescer}: events fold into a non-overlapping run; storms collapse to far fewer |
 | `WebhookSinkTest` | `com.gamma.pipeline.exec` | unit | `platform/inspecto-engine/src/test/java/com/gamma/pipeline/exec/WebhookSinkTest.java` | {@link WebhookSink} over a real DuckDB relation and a capturing {@link WebhookSinkTransport} — everything |
+| `ChartOverlaysTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/ChartOverlaysTest.java` | BI-INSIGHTS-1 I-11 / I-7: {@link ChartOverlays} over a Widget's result rows — the forecast band is the kernel's |
 | `ColumnRoleContractTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/ColumnRoleContractTest.java` | The cross-language contract for a column's ANALYTIC ROLE — temporal / measure / dimension — pinning |
 | `ConditionExtensionsTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/ConditionExtensionsTest.java` | Condition Language extensions (Decision Kernel step 2): {@code negate} groups, field-to-field |
 | `ConditionSqlTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/ConditionSqlTest.java` | Parity tests: for every operator, {@link ConditionSql#predicate} evaluated by DuckDB over a table |

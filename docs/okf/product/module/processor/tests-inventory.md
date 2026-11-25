@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-487 test class(es): 195 unit, 292 real-HTTP control-plane, 0 IT.
+488 test class(es): 195 unit, 293 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -88,6 +88,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiBiCompareTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBiCompareTest.java` | BI-INSIGHTS-1 I-1 over real HTTP and DuckDB, under an ARMED authenticator: {@code POST /bi/query} with {@code compare} |
 | `ControlApiBiMaskingReviewTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBiMaskingReviewTest.java` | BI-QUERY-MASKING-1 security review (2026-10-23; {@code docs/archived-documents/plans-archive/bi-query-masking-design.md} section 12): one test per |
 | `ControlApiBindTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBindTest.java` | GAP-1 (deployment-topology-plan §10): {@code -Dcontrol.bind} restricts the control plane's listen |
+| `ControlApiBiOverlayTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBiOverlayTest.java` | BI-INSIGHTS-1 I-11 / I-7 over real HTTP and DuckDB, under an ARMED authenticator: {@code POST /bi/query} with |
 | `ControlApiBiQueryAdversarialTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBiQueryAdversarialTest.java` |  |
 | `ControlApiBiQueryMaskingTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBiQueryMaskingTest.java` | BI-QUERY-MASKING-1: classified entity keys in BI result rows are masked unless the caller holds |
 | `ControlApiBiQueryTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBiQueryTest.java` | Real-HTTP + real-DuckDB tests for the headless BI API (BI-7): {@code POST /bi/query} aggregates a |

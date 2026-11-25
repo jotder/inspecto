@@ -146,6 +146,10 @@ export class WidgetOptionsDialog implements AfterViewInit {
         categoryOrderAgg: this.data.categoryOrder?.agg ?? 'min',
         rowLinkLabelField: this.data.rowLink?.labelField ?? '', // UIE-6 link text column
         compareKind: this.data.compare?.kind ?? '', // BI-INSIGHTS-1 I-1
+        forecastOn: !!this.data.overlay?.forecast, // BI-INSIGHTS-1 I-11
+        forecastLevel: String(this.data.overlay?.forecast?.level ?? 0.8),
+        anomalyOn: !!this.data.overlay?.anomaly, // BI-INSIGHTS-1 I-7
+        anomalySensitivity: String(this.data.overlay?.anomaly?.sensitivity ?? 3),
     };
 
     save(): void {
@@ -288,6 +292,23 @@ export class WidgetOptionsDialog implements AfterViewInit {
                       ...(v['categoryOrderAgg'] === 'max' ? { agg: 'max' as const } : {}),
                   }
                 : undefined;
+        }
+        if ('forecastOn' in v || 'anomalyOn' in v) {
+            // BI-INSIGHTS-1 I-11 / I-7: both off writes no `overlay` at all.
+            const level = Number(v['forecastLevel']);
+            const sensitivity = Number(v['anomalySensitivity']);
+            const forecast =
+                v['forecastOn'] === true
+                    ? { ...(Number.isFinite(level) && level !== 0.8 ? { level } : {}) }
+                    : undefined;
+            const anomaly =
+                v['anomalyOn'] === true
+                    ? { ...(Number.isInteger(sensitivity) && sensitivity !== 3 ? { sensitivity } : {}) }
+                    : undefined;
+            o.overlay =
+                forecast || anomaly
+                    ? { ...(forecast ? { forecast } : {}), ...(anomaly ? { anomaly } : {}) }
+                    : undefined;
         }
         if ('compareKind' in v) {
             const kind = v['compareKind'];

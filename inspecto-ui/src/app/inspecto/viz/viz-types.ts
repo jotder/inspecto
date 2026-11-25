@@ -1,6 +1,7 @@
 import { NumberFormat } from './number-format';
 import type { HeatmapMatrix, HeatmapOptions } from './heatmap';
 import type { CompareKind } from './compare';
+import type { OverlayOptions, OverlayWire } from './chart-overlays';
 import { ColumnType, ConditionGroup } from 'app/inspecto/query';
 import { TreemapRow } from './treemap-layout';
 import type { ChartMarker } from './chart-markers';
@@ -104,6 +105,9 @@ export interface QuerySpec {
     /** BI-INSIGHTS-1 I-1: a comparison the server computes in the same statement (`compare.ts`). `field` defaults to the
      *  one grained dimension; `target` only for `kind: 'target'`. */
     compare?: { kind: CompareKind; field?: string; target?: number };
+    /** BI-INSIGHTS-1 I-11 / I-7: a forecast band and anomaly scores the server computes from this query's own result
+     *  (`chart-overlays.ts`). */
+    overlay?: OverlayWire;
 }
 
 /** The channels a plugin can map fields onto (Tableau-style). `rows` / `columns` are the heatmap's two axes. */
@@ -223,6 +227,9 @@ export interface VizRenderOptions {
      *  last year, the target (`kpi.target`; a KPI-bound tile: its KPI's target) or the average — computed by the
      *  server in the Widget's own query, drawn as a dashed series with the change and % in words. */
     compare?: { kind: CompareKind };
+    /** BI-INSIGHTS-1 I-11 / I-7 (line, bar, area over a grained date): a forecast band with its backtest accuracy, and
+     *  anomaly markers at a sensitivity 1–5 — computed by the server from the Widget's own result (`chart-overlays.ts`). */
+    overlay?: OverlayOptions;
     /** Progress list only: how many rows show before "+N more" (default: `limit`, else 10), and the value a full bar
      *  stands for (default: the largest value shown). */
     progress?: { limit?: number; max?: number };

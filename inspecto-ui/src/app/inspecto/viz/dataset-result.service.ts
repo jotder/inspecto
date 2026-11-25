@@ -6,6 +6,7 @@ import { apiErrorMessage } from 'app/inspecto/api/api-base';
 import { ColumnMeta, Condition, ConditionGroup, columnType } from 'app/inspecto/query';
 import { SqlRunResult } from 'app/inspecto/data-table/sql/sql-run';
 import { QueryMeasure, QuerySpec } from './viz-types';
+import type { OverlaySummary } from './chart-overlays';
 
 /**
  * De-dupes/caches identical {@link QuerySpec} runs so N widgets sharing a dataset + cross-filter compute
@@ -22,6 +23,8 @@ export interface DatasetRunResult extends SqlRunResult {
     /** The server cut the result at its row limit (`statistics.truncated`) — `rows` is only the first page, so a
      *  tile must say so rather than draw a partial dataset as if it were whole. */
     truncated?: boolean;
+    /** BI-INSIGHTS-1 I-11 / I-7: the server's overlay summary (method, backtest, or why there is none). */
+    overlays?: OverlaySummary[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -70,7 +73,12 @@ export class DatasetResultService {
         for (let attempt = 0; ; attempt++) {
             try {
                 const r = await firstValueFrom(this.bi.run(body));
-                return { ok: true, rows: r.rows, truncated: r.statistics?.truncated };
+                return {
+                    ok: true,
+                    rows: r.rows,
+                    truncated: r.statistics?.truncated,
+                    ...(r.overlays ? { overlays: r.overlays } : {}),
+                };
             } catch (e) {
                 const throttled = e instanceof HttpErrorResponse && e.status === 429;
                 if (throttled && attempt < delays.length) {
@@ -129,6 +137,7 @@ export function biQueryBody(spec: QuerySpec, cols: ColumnMeta[] = []): BiQueryBo
     if (spec.limit != null) body.limit = spec.limit;
     if (spec.queryId) body.query = spec.queryId;
     if (spec.compare) body.compare = spec.compare; // BI-INSIGHTS-1 I-1: computed in the same server statement
+    if (spec.overlay) body.overlay = spec.overlay; // BI-INSIGHTS-1 I-11 / I-7: from the same statement's result
     return body;
 }
 

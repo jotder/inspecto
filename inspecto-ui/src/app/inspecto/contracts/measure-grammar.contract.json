@@ -17,6 +17,7 @@
   "ratio": { "idSeparator": "_per_" },
   "compare": { "kinds": [ "previous", "lastYear", "target", "average" ],
                "suffixes": { "cmp": "__cmp", "delta": "__delta", "pct": "__pct" } },
+  "overlay": { "suffixes": { "fc": "__fc", "fcLo": "__fc_lo", "fcHi": "__fc_hi", "expected": "__expected", "z": "__z" } },
   "windowed": {
     "asOf": "2026-06-30",
     "field": "day",
