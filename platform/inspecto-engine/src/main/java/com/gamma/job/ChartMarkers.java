@@ -80,7 +80,7 @@ final class ChartMarkers {
         // negative sign on a value that rounds to zero (-0.001 → "-0"): round the same decimal the same way
         f.setRoundingMode(RoundingMode.HALF_UP);
         String s = f.format(new java.math.BigDecimal(Double.toString(v)));
-        return v < 0 && !s.startsWith("-") ? "-" + s : s;
+        return (v < 0 || 1 / v < 0) && !s.startsWith("-") ? "-" + s : s;
     }
 
     // ── statistics ──

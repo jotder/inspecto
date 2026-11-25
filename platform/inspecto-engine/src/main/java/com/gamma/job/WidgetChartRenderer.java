@@ -73,14 +73,14 @@ final class WidgetChartRenderer {
             double v = rows.isEmpty() ? Double.NaN : number(rows.get(0).get(w.measureIds().get(0)));
             return new Model(List.of(), List.of(w.measureLabels().get(0)), List.of(new double[] {v}));
         }
-        Map<String, Integer> cats = new LinkedHashMap<>();
-        for (Map<String, Object> r : rows) cats.putIfAbsent(String.valueOf(r.get(w.x())), cats.size());
+        Map<String, Integer> cats = new LinkedHashMap<>(); // keyed by category(): a null is the SPA's str(null) = ''
+        for (Map<String, Object> r : rows) cats.putIfAbsent(category(r, w), cats.size());
         Map<String, double[]> series = new LinkedHashMap<>();
         // each series' overlay cells (ChartOverlays' m__fc ... m__z), only where the rows carry them (the SPA's hasOverlay)
         Map<String, double[][]> cells = new LinkedHashMap<>();
         int n = cats.size();
         for (Map<String, Object> r : rows) {
-            int c = cats.get(String.valueOf(r.get(w.x())));
+            int c = cats.get(category(r, w));
             if (w.series() != null) {
                 String key = String.valueOf(r.get(w.series()));
                 double[] s = series.computeIfAbsent(key, k -> nans(n));
@@ -524,6 +524,11 @@ final class WidgetChartRenderer {
         } catch (NumberFormatException notANumber) {
             return Double.NaN;
         }
+    }
+
+    private static String category(Map<String, Object> r, ReportWidget w) {
+        Object v = r.get(w.x());
+        return v == null ? "" : String.valueOf(v);
     }
 
     private static double[] nans(int n) {

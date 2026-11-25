@@ -187,7 +187,10 @@ the caption are listed under the chart. A stacked or sorted chart draws no overl
 purpose: the words use the screen's default number wording (grouped, at most two decimals) whatever `options.format`
 says, a date label reads as the query returns it (`2026-10-21`), not the screen's long date, a `stacked` chart still
 draws grouped bars (its markers read the totals), a band under 14 px draws without its words, and a refused overlay
-fails the Job, as it errors the Widget on screen. The KPI tile draws no
+fails the Job, as it errors the Widget on screen. A stored marker or KPI band reads only when its value is a number
+(the screen tests presence), which differs only for a hand-edited non-number the registry's validation refuses; a cell
+holding a non-numeric string reads as a gap (the screen draws 0); marker words take the tone colour; a compared series
+(`compareOf`) is not drawn, so the statistics do not read it. The KPI tile draws no
 markers, as on screen (`MARKER_VIZ_TYPES`).
 
 **Insight-aware Show-Me (BI-INSIGHTS-1 I-20, 2026-11-25).** While a Widget is built, `suggestOverlays()`

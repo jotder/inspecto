@@ -140,6 +140,8 @@ class ChartMarkersContractTest {
         assertEquals("1,234.57", ChartMarkers.plain(1234.567));
         assertEquals("-2.5", ChartMarkers.plain(-2.5));
         assertEquals("-0", ChartMarkers.plain(-0.001), "Intl keeps the sign of a negative that rounds to zero");
+        assertEquals("-0", ChartMarkers.plain(-0.0), "and of negative zero itself");
+        assertEquals("0", ChartMarkers.plain(0.0));
         assertEquals("2.68", ChartMarkers.plain(2.675), "the shortest decimal is rounded, not the binary value");
         assertEquals("1.01", ChartMarkers.plain(1.005));
         assertEquals("1,000,000", ChartMarkers.plain(1e6));
@@ -174,5 +176,19 @@ class ChartMarkersContractTest {
                 new double[2], new double[2], new double[2], new double[2], new double[2])));
         assertTrue(Double.isNaN(WidgetChartRenderer.screenValues(overlaid, Map.of()).get(0)[1]),
                 "on an overlaid chart a forecast row carries no actual: a gap, not 0");
+    }
+
+    /** Verification finding: a null category is the screen's blank ('' from str(null)), so hideBlank drops it. */
+    @Test
+    void aNullCategoryIsBlankAndHideBlankDropsIt() {
+        ReportWidget w = ReportWidget.of("t", Map.of("vizType", "bar", "datasetId", "d",
+                "controls", Map.of("x", List.of(Map.of("field", "X")), "y", List.of(Map.of("field", "M", "agg", "sum")))));
+        java.util.Map<String, Object> blank = new java.util.HashMap<>();
+        blank.put(w.x(), null);
+        blank.put(w.measureIds().get(0), 100);
+        WidgetChartRenderer.Model m = WidgetChartRenderer.model(w, List.of(blank,
+                Map.of(w.x(), "a", w.measureIds().get(0), 10), Map.of(w.x(), "b", w.measureIds().get(0), 20)));
+        assertEquals("", m.categories().get(0));
+        assertArrayEquals(new double[] {10, 20}, WidgetChartRenderer.screenValues(m, Map.of("hideBlank", true)).get(0));
     }
 }
