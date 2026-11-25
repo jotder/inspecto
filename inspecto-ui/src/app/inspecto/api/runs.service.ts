@@ -388,6 +388,17 @@ export class RunsService {
     quarantine(name: string): Observable<AuditRow[]> {
         return this.http.get<AuditRow[]>(apiUrl(`/runs/${encodeURIComponent(name)}/quarantine`));
     }
+    /** Release ONE quarantined file back into the inbox and optionally trigger a manual run. */
+    releaseQuarantined(
+        name: string,
+        path: string,
+        reprocess = true,
+    ): Observable<{ pipeline: string; file: string; destination: string; status: string; runId?: string }> {
+        return this.http.post<{ pipeline: string; file: string; destination: string; status: string; runId?: string }>(
+            apiUrl(`/runs/${encodeURIComponent(name)}/quarantine/release`),
+            { path, reprocess },
+        );
+    }
     /**
      * The rejected ROWS behind a file's `error_rows` count — the audit ledgers carry only counts, the
      * content lives in the companion `<base>_errors.csv`. `file` is the input file's bare NAME (the

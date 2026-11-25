@@ -500,6 +500,7 @@ public final class CapabilityManifest {
             new Entry("POST", "/runs/([^/]+)/replay-rejects", Roles.CAN_OPERATE_RUNS),
             new Entry("POST", "/runs/([^/]+)/retries/retry-now", Roles.CAN_OPERATE_RUNS),
             new Entry("POST", "/runs/([^/]+)/retries/cancel", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/runs/([^/]+)/quarantine/release", Roles.CAN_OPERATE_RUNS),
             new Entry("POST", "/runs/([^/]+)/drain", Roles.CAN_OPERATE_RUNS),
             new Entry("POST", "/trigger", Roles.CAN_OPERATE_RUNS),
             // SettingsRoutes

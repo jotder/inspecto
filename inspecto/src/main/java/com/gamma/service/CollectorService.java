@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -2495,6 +2496,83 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         try (claim) {
             return Optional.ofNullable(action.call());
         }
+    }
+
+    /** Outcome of {@link #releaseQuarantined(String, String, boolean)}. */
+    public enum QuarantineReleaseStatus { RELEASED, NOT_FOUND, PATH_JAIL_VIOLATION, BUSY, CONFLICT }
+
+    public record QuarantineReleaseOutcome(QuarantineReleaseStatus status, String file, String destination,
+                                           String runId, String detail) {}
+
+    /**
+     * Release ONE quarantined file back into the pipeline's inbox ({@code dirs.poll}) under the pipeline's
+     * {@link #runGuard} claim (non-blocking), optionally triggering an immediate manual run.
+     */
+    public Optional<QuarantineReleaseOutcome> releaseQuarantined(String pipelineName, String relPath, boolean reprocess)
+            throws IOException {
+        Optional<PipelineConfig> cfgOpt = configFor(pipelineName);
+        if (cfgOpt.isEmpty()) return Optional.empty();
+        refuseIfTemplate(pipelineName);
+        PipelineConfig cfg = cfgOpt.get();
+
+        String normalized = relPath == null ? "" : relPath.trim().replace('\\', '/');
+        if (normalized.isEmpty() || normalized.startsWith("/") || normalized.contains("..") || normalized.contains(":")) {
+            return Optional.of(new QuarantineReleaseOutcome(QuarantineReleaseStatus.PATH_JAIL_VIOLATION,
+                    null, null, null, "'path' must be a relative path inside the quarantine directory"));
+        }
+        Path rel = Path.of(normalized);
+        if (rel.isAbsolute() || rel.startsWith(".restricted")) {
+            return Optional.of(new QuarantineReleaseOutcome(QuarantineReleaseStatus.PATH_JAIL_VIOLATION,
+                    null, null, null, "restricted quarantine files cannot be released"));
+        }
+
+        RunLease.Claim claim = runGuard.tryAcquire(pipelineName);
+        if (claim == null) {
+            return Optional.of(new QuarantineReleaseOutcome(QuarantineReleaseStatus.BUSY,
+                    null, null, null, "the pipeline is running a cycle now; nothing was changed — try again when it finishes"));
+        }
+        String fileName;
+        String destRel;
+        try (claim) {
+            String qd = cfg.dirs().quarantine();
+            String pd = cfg.dirs().poll();
+            if (qd == null || qd.isBlank() || pd == null || pd.isBlank()) {
+                return Optional.of(new QuarantineReleaseOutcome(QuarantineReleaseStatus.CONFLICT,
+                        null, null, null, "pipeline has no quarantine or poll directory configured"));
+            }
+            Path qRoot = Path.of(qd).toAbsolutePath().normalize();
+            Path src = qRoot.resolve(rel).normalize();
+            if (!src.startsWith(qRoot) || src.equals(qRoot) || qRoot.relativize(src).startsWith(".restricted")) {
+                return Optional.of(new QuarantineReleaseOutcome(QuarantineReleaseStatus.PATH_JAIL_VIOLATION,
+                        null, null, null, "'path' escapes the quarantine directory"));
+            }
+            if (!Files.isRegularFile(src)) {
+                return Optional.of(new QuarantineReleaseOutcome(QuarantineReleaseStatus.NOT_FOUND,
+                        null, null, null, "quarantined file not found: " + normalized));
+            }
+            Path relInQ = qRoot.relativize(src);
+            fileName = relInQ.getFileName().toString();
+            // Layout: <quarantine>/<relParent>/<reason>/<filename>
+            Path relParent = relInQ.getNameCount() >= 3 ? relInQ.subpath(0, relInQ.getNameCount() - 2) : null;
+            Path pollRoot = Path.of(pd).toAbsolutePath().normalize();
+            Path dst = (relParent != null ? pollRoot.resolve(relParent).resolve(fileName) : pollRoot.resolve(fileName))
+                    .normalize();
+            if (!dst.startsWith(pollRoot)) {
+                return Optional.of(new QuarantineReleaseOutcome(QuarantineReleaseStatus.PATH_JAIL_VIOLATION,
+                        null, null, null, "destination escapes the poll directory"));
+            }
+            if (dst.getParent() != null) Files.createDirectories(dst.getParent());
+            Files.move(src, dst, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            // Remove any companion <base>_errors.csv relocated beside the quarantined file so it does not linger.
+            String errName = com.gamma.etl.FileNames.errorsFileName(cfg, fileName);
+            Path errFile = src.getParent().resolve(errName);
+            if (!errFile.equals(src)) Files.deleteIfExists(errFile);
+            destRel = pollRoot.relativize(dst).toString().replace('\\', '/');
+            syncStatus();
+        }
+        String runId = reprocess ? triggerRunAsync(pipelineName, "manual").orElse(null) : null;
+        return Optional.of(new QuarantineReleaseOutcome(QuarantineReleaseStatus.RELEASED,
+                fileName, destRel, runId, null));
     }
 
     /** {@link #triggerRunAsync(String)} with an explicit trigger label ({@code manual} | {@code notify} — ACQ-6). */

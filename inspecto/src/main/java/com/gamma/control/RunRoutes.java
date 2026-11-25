@@ -71,6 +71,8 @@ final class RunRoutes implements RouteModule {
         api.get("/runs/([^/]+)/files",      (e, m) -> HostContext.of(api).service().statusStore().files(cfg(api, m)));
         api.get("/runs/([^/]+)/lineage",    (e, m) -> HostContext.of(api).service().statusStore().lineage(cfg(api, m), ApiContext.query(e, "batchId")));
         api.get("/runs/([^/]+)/quarantine", (e, m) -> HostContext.of(api).service().statusStore().quarantine(cfg(api, m)));
+        api.post("/runs/([^/]+)/quarantine/release", ApiContext.withCapability("canOperateRuns", (e, m) ->
+                releaseQuarantined(api, e, ApiContext.name(m))));
         // The Consignment output registry, scoped to one Consignment: every file it wrote, INCLUDING the
         // derived tables and summaries a post-sync step registered onto it. Until this the lane was
         // real and invisible — a chain could derive a table and nothing in the UI could show it.
@@ -375,6 +377,38 @@ final class RunRoutes implements RouteModule {
                     + policy.maxAttempts() + " used), so the file is quarantined under retry_exhausted if it fails "
                     + Math.max(0, policy.maxAttempts() - attempts) + " more time(s)");
         }
+        return out;
+    }
+
+    /**
+     * {@code POST /runs/{name}/quarantine/release {path, reprocess?}} — release ONE quarantined file back into the
+     * pipeline's inbox (and optionally trigger a manual run). Gated on {@code canOperateRuns}.
+     */
+    private Object releaseQuarantined(ApiContext api, HttpExchange e, String name) throws IOException {
+        if (HostContext.of(api).service().pathFor(name).isEmpty()) throw notFound(name);
+        if (HostContext.of(api).service().isTemplate(name))
+            throw new ApiException(409, ErrorCodes.CONFLICT, "pipeline '" + name + "' is a template and is not runnable");
+        Map<String, Object> body = api.body(e);
+        String relPath = ApiContext.str(body, "path");
+        if (relPath == null || relPath.isBlank())
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'path' (the quarantine-relative path)");
+        boolean reprocess = Boolean.TRUE.equals(body.get("reprocess"))
+                || "true".equalsIgnoreCase(String.valueOf(body.get("reprocess")));
+        CollectorService.QuarantineReleaseOutcome o = HostContext.of(api).service()
+                .releaseQuarantined(name, relPath, reprocess)
+                .orElseThrow(() -> notFound(name));
+        switch (o.status()) {
+            case PATH_JAIL_VIOLATION -> throw new ApiException(403, ErrorCodes.PATH_JAIL_VIOLATION, o.detail());
+            case NOT_FOUND -> throw new ApiException(404, ErrorCodes.NOT_FOUND, o.detail());
+            case BUSY, CONFLICT -> throw new ApiException(409, ErrorCodes.CONFLICT, o.detail());
+            case RELEASED -> { }
+        }
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("pipeline", name);
+        out.put("file", o.file());
+        out.put("destination", o.destination());
+        out.put("status", reprocess ? "reprocessing" : "released");
+        if (o.runId() != null) out.put("runId", o.runId());
         return out;
     }
 
