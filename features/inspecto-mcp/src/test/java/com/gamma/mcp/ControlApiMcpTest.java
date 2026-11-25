@@ -305,6 +305,53 @@ class ControlApiMcpTest {
         }
     }
 
+    /**
+     * W3 (widening plan §3): each Space health, storage and score tool, called by a person who lacks its route's
+     * capability, answers that route's own 403 — the same status the direct REST call answers the same token — and the
+     * person who holds it gets past the gate. Falsified: a router pointing at an open read turns the denied call into a pass.
+     */
+    @Test
+    void eachSpaceHealthAndScoreToolAnswersItsRoutesOwn403(@TempDir Path dir) throws Exception {
+        record Probe(String tool, Map<String, Object> args, String direct, String denied, String allowed) {}
+        List<Probe> probes = List.of(
+                new Probe("get_space_integrity", Map.of(), "/integrity", OPS, DEV),
+                new Probe("get_space_origin", Map.of(), "/origin", OPS, DEV),
+                new Probe("preview_template_upgrade", Map.of(), "/origin/upgrade", OPS, DEV),
+                new Probe("get_dataset_storage", Map.of("dataset", "orders"), "/datasets/orders/storage", DEV, OPS),
+                new Probe("verify_audit_chain", Map.of(), "/audit/verify", OPS, ADMIN),
+                new Probe("get_risk_score", Map.of("model", "m1", "key", "k1"), "/risk-scores/m1/k1", DEV, OPS),
+                new Probe("get_anomaly_score", Map.of("model", "m1", "key", "k1"), "/anomaly-scores/m1/k1", DEV, OPS),
+                new Probe("get_prediction", Map.of("kind", "churn-model", "model", "m1", "key", "k1"),
+                        "/predictions/churn-model/m1/k1", DEV, OPS));
+        assertEquals(McpTools.SPACE_HEALTH_TOOLS.size(), probes.size(), "a probe for every W3 tool");
+        try (Ctx c = open(dir)) {
+            // GET /datasets/{id}/storage also needs the Space's Add data switch on (its own 403 otherwise).
+            HttpResponse<String> addData = client.send(HttpRequest.newBuilder(URI.create(
+                    "http://localhost:" + c.port + "/api/v1/settings/data")).header("Authorization", ADMIN)
+                    .header("Content-Type", "application/json")
+                    .PUT(BodyPublishers.ofString("{\"selfImport\":true}")).build(), BodyHandlers.ofString());
+            assertEquals(200, addData.statusCode(), addData.body());
+            for (Probe p : probes) {
+                JsonNode denied = body(call(c.port, p.denied(), p.tool(), p.args())).path("result");
+                assertTrue(denied.path("isError").asBoolean(), p.tool() + ": " + denied);
+                assertTrue(denied.path("content").get(0).path("text").asText().startsWith("HTTP 403"), p.tool() + ": " + denied);
+                HttpResponse<String> rest = client.send(HttpRequest.newBuilder(URI.create(
+                        "http://localhost:" + c.port + "/api/v1" + p.direct())).header("Authorization", p.denied()).GET().build(),
+                        BodyHandlers.ofString());
+                assertEquals(403, rest.statusCode(), p.tool() + ": the direct call answers the same: " + rest.body());
+
+                JsonNode allowed = body(call(c.port, p.allowed(), p.tool(), p.args())).path("result");
+                assertFalse(allowed.path("content").get(0).path("text").asText().startsWith("HTTP 403"),
+                        p.tool() + ": the holder of the capability passes the gate: " + allowed);
+            }
+            // A replay matches on the raw path: the masked alias must reach the route as given, not as masked%3A…,
+            // or the route never recognises it as an alias. The route's 404 echoes the key it received.
+            String miss = body(call(c.port, OPS, "get_risk_score", Map.of("model", "m1", "key", "masked:ab12")))
+                    .path("result").path("content").get(0).path("text").asText();
+            assertTrue(miss.contains("'masked:ab12'"), "the route received the alias as given: " + miss);
+        }
+    }
+
     @Test
     void aToolCallIsAuditedNamingThePersonAndTheAgentClient(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {

@@ -1,6 +1,6 @@
 ---
 name: operate-runs
-description: Re-run, resume, pause, reprocess, replay rejects, retry or drain an Inspecto run, or trigger or replay a Job, after the cause is known. Use when the person asks to re-run or fix a failed run, and after diagnose-failed-run says a re-run will help. Covers what happens when the action is held as a Pending Action.
+description: Re-run, resume, pause, reprocess, replay rejects, retry or drain an Inspecto run, release a quarantined file, or trigger or replay a Job, after the cause is known. Use when the person asks to re-run or fix a failed run, and after diagnose-failed-run says a re-run will help. Covers what happens when the action is held as a Pending Action.
 ---
 
 # Operate runs
@@ -25,6 +25,7 @@ action on live data.
 | Retry rejected rows once the source is fixed | `operate_run` `replay-rejects` | |
 | Retry a waiting retry now / give up retrying | `operate_run` `retry-now` / `cancel-retries` | |
 | Discard what is queued | `operate_run` `drain` | **destroys queued work** — ask the person first, every time |
+| Put a quarantined file back into the inbox | `operate_run` `release-quarantined`, `body: {path, reprocess?}` | take the `path` from `list_quarantined_files`; read its `reason` first — a file set aside for bad content fails again |
 | Run a Job now / again | `trigger_job` / `replay_job_run` | `replay_job_run` takes the Job Run id |
 
 Always pass a one-line `reason` (at most 500 characters): the audit row keeps it, and an approver reads it first.
@@ -32,7 +33,7 @@ Always pass a one-line `reason` (at most 500 characters): the audit row keeps it
 ## Steps
 
 1. Say what you will do and why, in one sentence, and wait for the person's yes — always for `reprocess`,
-   `replay-rejects` and `drain`.
+   `replay-rejects`, `drain` and `release-quarantined`.
 2. Call the tool once.
 3. Read the answer:
 
@@ -55,13 +56,14 @@ Always pass a one-line `reason` (at most 500 characters): the audit row keeps it
 
 - Approve or decline a Pending Action, a Pending Change or an Action Request — a person does.
 - Re-run in a loop, or re-run a failure whose cause is config, upstream or the platform.
-- Drain or reprocess without the person's explicit yes.
-- Release a quarantined file or take a backup: there is no agent route for either yet.
+- Drain, reprocess or release a quarantined file without the person's explicit yes.
+- Release a file whose quarantine reason is not fixed, or guess its `path`.
+- Take a backup: there is no agent route for it yet.
 
 ## MCP Tools
 
-- `operate_run` — trigger, pause, resume, reprocess, replay-rejects, retry-now, cancel-retries or drain a run
+- `operate_run` — trigger, pause, resume, reprocess, replay-rejects, retry-now, cancel-retries, drain or release-quarantined
 - `trigger_job`, `replay_job_run` — run a Job now, or a past Job Run again
 - `get_run_status` — a manual run's state by its run id
-- `list_runs`, `get_run_batches`, `list_jobs`, `dataset_freshness` — the state before and after
+- `list_runs`, `get_run_batches`, `list_quarantined_files`, `list_jobs`, `dataset_freshness` — the state before and after
 - `get_pending_action`, `withdraw_action` — a held action's decision, or take it back

@@ -1,7 +1,7 @@
 // Negative fixtures for tools/check-agent-kit.mjs, plus the real Kit passing.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkGolden, checkSkill, run } from './check-agent-kit.mjs';
+import { checkGolden, checkSkill, checkSuites, run } from './check-agent-kit.mjs';
 
 const TOOLS = new Set(['propose_change', 'validate_config', 'list_datasets']);
 const PAGES = { howto_a: 'external', admin_b: 'internal' };
@@ -55,10 +55,31 @@ test('front matter name must match the folder', () => {
 
 test('golden tasks: bad JSON, duplicate ids, missing checks and unknown tools fail', () => {
     assert.ok(checkGolden('{', TOOLS)[0].includes('not JSON'));
-    const t = { id: 'a', role: 'developer', prompt: 'p', grade: [{ check: 'x' }], safety: [{ check: 'tool-before', tool: 'validate_config' }] };
+    const t = { id: 'a', role: 'developer', prompt: 'p', skills: ['s'], grade: [{ check: 'x' }], safety: [{ check: 'tool-before', tool: 'validate_config' }] };
     assert.deepEqual(checkGolden(JSON.stringify({ tasks: [t] }), TOOLS), []);
     assert.ok(checkGolden(JSON.stringify({ tasks: [t, t] }), TOOLS).some((x) => x.includes('duplicate')));
     assert.ok(checkGolden(JSON.stringify({ tasks: [{ ...t, safety: [] }] }), TOOLS).some((x) => x.includes('no safety')));
     assert.ok(checkGolden(JSON.stringify({ tasks: [{ ...t, safety: [{ check: 'tool-before', tool: 'nope_tool' }] }] }), TOOLS)
         .some((x) => x.includes('nope_tool')));
+});
+
+test('golden tasks: a missing or unknown skill fails (W10)', () => {
+    const t = { id: 'a', role: 'developer', prompt: 'p', skills: ['s'], grade: [{ check: 'x' }], safety: [{ check: 'y' }] };
+    const skills = new Set(['s']);
+    assert.deepEqual(checkGolden(JSON.stringify({ tasks: [t] }), TOOLS, skills), []);
+    assert.ok(checkGolden(JSON.stringify({ tasks: [{ ...t, skills: [] }] }), TOOLS, skills).some((x) => x.includes('no skills')));
+    assert.ok(checkGolden(JSON.stringify({ tasks: [{ ...t, skills: ['gone-skill'] }] }), TOOLS, skills)
+        .some((x) => x.includes("names skill 'gone-skill'")));
+});
+
+test('suites: an id two suites share fails (W10)', () => {
+    const t = { id: 'a', skills: ['s'] };
+    assert.deepEqual(checkSuites({ 'one.json': { tasks: [t] }, 'two.json': { tasks: [{ id: 'b', skills: ['s'] }] } }, ['s']), []);
+    const f = checkSuites({ 'one.json': { tasks: [t] }, 'two.json': { tasks: [t] } }, ['s']);
+    assert.ok(f.some((x) => x.includes("'a' is in both one.json and two.json")), f.join('\n'));
+});
+
+test('suites: a skill no golden task names fails (W10)', () => {
+    const f = checkSuites({ 'one.json': { tasks: [{ id: 'a', skills: ['s'] }] } }, ['s', 'untested']);
+    assert.deepEqual(f, ["untested: no golden task names this skill — add one to its role's suite"]);
 });

@@ -12,6 +12,7 @@ import com.gamma.control.ControlApi;
 import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.etl.SampleCorpora;
 import com.gamma.etl.StatusStore;
 import com.gamma.inspector.CollectorProcessor;
 import com.gamma.metrics.MetricRegistry;
@@ -119,19 +120,13 @@ class MobileMoneyPackGoldenTest {
     }
 
     @Test
-    void theCommittedCorpusIsTheSeededGeneratorsOutput() throws Exception {
-        Map<String, String> files = new MobileMoneyCorpus().generate().files();
-        Path samples = template().resolve("data").resolve("samples");
-        if (regenerate())
-            for (Map.Entry<String, String> f : files.entrySet()) {
-                Files.createDirectories(samples.resolve(f.getKey()).getParent());
-                Files.writeString(samples.resolve(f.getKey()), f.getValue());
-            }
-        for (Map.Entry<String, String> f : files.entrySet())
-            assertEquals(f.getValue(), Files.readString(samples.resolve(f.getKey())).replace("\r\n", "\n"),
-                    f.getKey() + " drifted from MobileMoneyCorpus (seed " + MobileMoneyCorpus.SEED
-                            + ") - regenerate with -Dmobilemoney.regenerate=true");
-        assertEquals(files, new MobileMoneyCorpus().generate().files(), "the generator is deterministic");
+    void theSeededGeneratorIsDeterministic() {
+        assertEquals(MobileMoneyCorpus.samples(), MobileMoneyCorpus.samples(), "the generator is deterministic");
+    }
+
+    @Test
+    void theCommittedSamplesMatchTheGeneratorWhenPresent() throws Exception {
+        SampleCorpora.assertCommittedMatches(template(), MobileMoneyCorpus.samples());
     }
 
     @Test
@@ -347,7 +342,7 @@ class MobileMoneyPackGoldenTest {
 
     /** {@code POST /spaces} with the template (every seed gate); the Space is closed again before the test drives it. */
     private static Path createSpace(Path root) throws Exception {
-        copyTree(template(), root.resolve("_templates").resolve("mobile-money"));
+        SampleCorpora.copyTemplate(template(), root.resolve("_templates").resolve("mobile-money"), MobileMoneyCorpus.samples());
         SpaceManager spaces = SpaceManager.discover(root);
         ControlApi api = new ControlApi(spaces, 0);
         try {
@@ -452,16 +447,6 @@ class MobileMoneyPackGoldenTest {
             while (rs.next()) out.add(rs.getString("column_name") + " " + rs.getString("column_type"));
         }
         return out;
-    }
-
-    private static void copyTree(Path src, Path dst) throws Exception {
-        try (Stream<Path> walk = Files.walk(src)) {
-            for (Path p : walk.toList()) {
-                Path t = dst.resolve(src.relativize(p).toString());
-                if (Files.isDirectory(p)) Files.createDirectories(t);
-                else Files.copy(p, t);
-            }
-        }
     }
 
     private static ConfigSource noPipelines() {

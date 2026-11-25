@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.gamma.etl.ConsignmentEventBus;
+import com.gamma.etl.LaCorpus;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.inspector.CollectorProcessor;
@@ -37,7 +38,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
-import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -68,13 +68,7 @@ class ControlApiTelecomPatternPacksTest {
     @BeforeAll
     static void buildTheLinkDataset() throws Exception {
         Path space = tmp.resolve("spaces").resolve("la-showcase");
-        try (Stream<Path> w = Files.walk(TEMPLATE)) {
-            for (Path p : w.toList()) {
-                Path to = space.resolve(TEMPLATE.relativize(p).toString());
-                if (Files.isDirectory(p)) Files.createDirectories(to);
-                else Files.copy(p, to);
-            }
-        }
+        LaCorpus.install(TEMPLATE, space);
         for (String feed : FEEDS)
             CollectorProcessor.run(PipelineConfig.load(space.resolve("config/telecom/" + feed + "_pipeline.toon").toString()));
         Path data = space.resolve("data");

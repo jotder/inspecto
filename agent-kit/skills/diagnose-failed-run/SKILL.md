@@ -20,6 +20,8 @@ changes.
 ## 2. Find the cause
 
 - `get_run_batches` with the run name: which batch failed, how many rows were rejected or parked, and the error text.
+- `list_quarantined_files` with the run name: whole files the run set aside (empty, corrupt, a duplicate), each with
+  its reason.
 - `list_incidents` and `get_incident` / `get_incident_briefs` — an Incident may already explain the failure.
 - `get_lineage` on the output Dataset — an upstream Dataset that did not refresh starves this run.
 - `get_pipeline` — what the run does; read only the steps the error names.
@@ -49,6 +51,7 @@ unavailable, now back) is fixed by a re-run — then use `operate-runs`.
 
 - `health` — per-subsystem health of the server
 - `list_runs`, `get_run_batches` — the ingest runs, and one run's batches with their errors
+- `list_quarantined_files` — the files a run set aside, and why
 - `list_job_runs`, `get_run` — Job Runs and one Job Run's failure reason
 - `dataset_freshness`, `get_lineage` — how stale an output is, and what feeds it
 - `list_incidents`, `get_incident`, `get_incident_briefs` — what was already raised about it

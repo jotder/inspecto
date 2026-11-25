@@ -382,7 +382,7 @@ final class McpTools {
     static final Map<String, String> RUN_ACTIONS = Map.of(
             "trigger", "trigger", "pause", "pause", "resume", "resume", "reprocess", "reprocess",
             "replay-rejects", "replay-rejects", "retry-now", "retries/retry-now", "cancel-retries", "retries/cancel",
-            "drain", "drain");
+            "drain", "drain", "release-quarantined", "quarantine/release");
 
     private static final String HELD_FOR_A_MACHINE = " Signed in as a person, it runs at once within that person's own rights "
             + "(needs canOperateRuns); as an unattended machine agent it is held as a Pending Action for a person to approve.";
@@ -399,12 +399,19 @@ final class McpTools {
                     "The batches of one ingest run: what each processed, failed or parked — where to look before a reprocess.",
                     List.of(id("run", "The run (Pipeline) name.")),
                     a -> new Call("GET", "/runs/" + seg(a.get("run")) + "/batches", null)),
+            new Tool("list_quarantined_files", "List a run's quarantined files",
+                    "The files one ingest run set aside instead of loading: each file's name, the reason, when, and the "
+                            + "path to pass to operate_run release-quarantined.",
+                    List.of(id("run", "The run (Pipeline) name.")),
+                    a -> new Call("GET", "/runs/" + seg(a.get("run")) + "/quarantine", null)),
             new Tool("operate_run", "Operate a run",
-                    "Trigger, pause, resume, reprocess a batch, replay rejected rows, retry now, cancel retries, or drain an "
-                            + "ingest run." + HELD_FOR_A_MACHINE + " Diagnose first (get_run_batches, list_job_runs).",
+                    "Trigger, pause, resume, reprocess a batch, replay rejected rows, retry now, cancel retries, drain an "
+                            + "ingest run, or release one quarantined file back into its inbox." + HELD_FOR_A_MACHINE
+                            + " Diagnose first (get_run_batches, list_quarantined_files, list_job_runs).",
                     List.of(id("run", "The run (Pipeline) name."),
                             new Arg("action", Kind.ENUM, true, "What to do.", List.copyOf(new java.util.TreeSet<>(RUN_ACTIONS.keySet()))),
-                            body("The action's own request body, when it takes one (reprocess: {batchId}).", false),
+                            body("The action's own request body, when it takes one (reprocess: {batchId}; "
+                                    + "release-quarantined: {path, reprocess?}, the path as list_quarantined_files gives it).", false),
                             text("reason", "Why — on the audit row, and shown to the approver when it is held.")),
                     McpTools::operateRun, true),
             new Tool("trigger_job", "Trigger a Job",
@@ -590,7 +597,71 @@ final class McpTools {
                     List.of(id("run", "The graph run id.")),
                     a -> new Call("POST", "/inv/graph/runs/" + seg(a.get("run")) + "/cancel", McpRoutes.jsonBytes(Map.of())), true));
 
-    /** Every tool: AK-1's reads, then AK-2b's, then AK-2d's, then AK-2e's, then AK-2f's. */
+    /** {@code get_prediction}'s kinds: the model component kinds {@code GET /predictions/{kind}/…} reads. */
+    static final List<String> PREDICTION_KINDS = List.of("churn-model", "forecast-model", "segmentation-model");
+
+    private static final String MASKED_KEY = " The entity key comes back masked (keyMasked: true): an agent never reveals.";
+
+    /**
+     * An {@link Kind#ID} value as a path segment, keeping {@code :} and {@code @} as they are: both are legal in a
+     * segment, and a replay matches its route on the raw path, so {@link #seg}'s {@code %3A} would reach the route
+     * undecoded and a {@code masked:} alias would never be recognised. The ID pattern admits no {@code /?#%}.
+     */
+    private static String idSeg(Object v) {
+        return seg(v).replace("%3A", ":").replace("%40", "@");
+    }
+
+    /**
+     * W3 (widening plan §3): reads for a Space's health, drift and storage and for an entity's scores. Each replays one
+     * GET route the gate already allows an agent; the route's own capability and masking decide the answer.
+     */
+    static final List<Tool> SPACE_HEALTH_TOOLS = List.of(
+            new Tool("get_space_integrity", "Check a Space's integrity",
+                    "The Space lock's report: broken links, duplicates, config files changed outside the server, and "
+                            + "what activation holds back. Report-only. Needs canAuthorWorkbench.",
+                    List.of(), get("/integrity")),
+            new Tool("get_space_origin", "Get a Space's origin",
+                    "The Space Template this Space was made from: files unchanged since, files the Space changed, and what "
+                            + "the Template changed since when its version moved. Needs canAuthorWorkbench.",
+                    List.of(), get("/origin")),
+            new Tool("preview_template_upgrade", "Preview a Space Template upgrade",
+                    "What upgrading this Space to its Template's newer version would do, per file: update, add, conflict, "
+                            + "kept or template-removed. Changes nothing; a person applies an upgrade. Needs canAuthorWorkbench.",
+                    List.of(), get("/origin/upgrade")),
+            new Tool("get_dataset_storage", "Get a Dataset's storage",
+                    "How a Dataset is stored: its files, the last compaction and the retention policy. Needs canUploadData, "
+                            + "and the Space's Add data switched on.",
+                    List.of(id("dataset", "The Dataset id.")),
+                    a -> new Call("GET", "/datasets/" + idSeg(a.get("dataset")) + "/storage", null)),
+            new Tool("verify_audit_chain", "Verify the audit chain",
+                    "Recompute this Space's audit hash chain and say whether it is unbroken, and where it breaks if not "
+                            + "(at most 100,000 records per call; past that it answers complete: false). Needs "
+                            + "canAdminister, so only an administrator's agent can; a machine agent never holds it.",
+                    List.of(), get("/audit/verify")),
+            new Tool("get_risk_score", "Get an entity's Risk Score",
+                    "One entity's latest Risk Score under a model: the score, whether it is high, and the factors that "
+                            + "add up to it. The key may be the masked alias another read gave you. Needs canWorkIncidents."
+                            + MASKED_KEY,
+                    List.of(id("model", "The Risk Score model id."), id("key", "The entity key, or its masked alias."),
+                            new Arg("investigation", Kind.ID, false,
+                                    "The Investigation whose masked alias the key is, when it came from one.")),
+                    a -> new Call("GET", "/risk-scores/" + idSeg(a.get("model")) + "/" + idSeg(a.get("key"))
+                            + query(a, "investigation", "investigation"), null)),
+            new Tool("get_anomaly_score", "Get an entity's Anomaly Score",
+                    "One entity's latest Anomaly Score under a model, with the per-feature explanation and its recent "
+                            + "runs. Needs canWorkIncidents." + MASKED_KEY,
+                    List.of(id("model", "The Anomaly model id."), id("key", "The entity key as stored (a masked alias is not resolved).")),
+                    a -> new Call("GET", "/anomaly-scores/" + idSeg(a.get("model")) + "/" + idSeg(a.get("key")), null)),
+            new Tool("get_prediction", "Get a prediction",
+                    "One entity's Customer Segment or Churn Score (latest and recent runs, with the explanation), or one "
+                            + "series' forecast (every step of the latest run). Needs canWorkIncidents." + MASKED_KEY,
+                    List.of(new Arg("kind", Kind.ENUM, true, "The model's kind.", PREDICTION_KINDS),
+                            id("model", "The model id."),
+                            id("key", "The entity key as stored, a forecast's series key (a masked alias is not resolved).")),
+                    a -> new Call("GET", "/predictions/" + a.get("kind") + "/" + idSeg(a.get("model")) + "/"
+                            + idSeg(a.get("key")), null)));
+
+    /** Every tool: AK-1's reads, then AK-2b's, then AK-2d's, then AK-2e's, then AK-2f's, then W3's. */
     static final List<Tool> ALL_TOOLS;
     static {
         List<Tool> all = new ArrayList<>(TOOLS);
@@ -598,6 +669,7 @@ final class McpTools {
         all.addAll(OPERATIONS_TOOLS);
         all.addAll(CASE_TOOLS);
         all.addAll(LA_TOOLS);
+        all.addAll(SPACE_HEALTH_TOOLS);
         ALL_TOOLS = List.copyOf(all);
     }
 

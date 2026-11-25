@@ -131,8 +131,16 @@ export function firedWatchText(label: string): string {
 }
 
 /** What an Alert Rule watches. Its Dataset, Investigation or Pipeline is the Scope column, so it is not repeated. */
+/** What a KPI rule (BI-INSIGHTS-1 I-17) reads, in words. */
+export function kpiWatchWords(r: AlertRule): string {
+    if (r.projection === 'probability') return 'Chance of meeting the KPI target';
+    if (r.projection === 'value') return r.rag ? 'RAG status of the projected landing' : 'Projected landing of the KPI';
+    return r.rag ? 'KPI RAG status' : 'KPI value so far this period';
+}
+
 export function ruleWatchText(r: AlertRule): string {
     if (r.metric) return ledgerMetricWords(r.metric);
+    if (r.kpi) return kpiWatchWords(r);
     if (r.valueMeasure?.name) return `Entities breaching ${valueMeasureWords(r.valueMeasure.name)}`;
     if (r.investigation) return workingSetWords(r.relation || 'entities', r.measure || 'count');
     if (r.maximumAge) return r.indexLag ? 'Link Analysis index lag' : 'Time since last publish';
@@ -144,6 +152,7 @@ export function ruleWatchText(r: AlertRule): string {
 /** The Condition cell: "above 5 over the last 1 hour", "at least 6", "older than 2 hours". */
 export function ruleConditionText(r: AlertRule): string {
     if (r.maximumAge) return `older than ${durationWords(r.maximumAge)}`;
+    if (r.kpi && r.rag) return r.rag === 'red' ? 'Red' : 'Amber or Red';
     const base = `${comparatorWords(r.comparator)} ${numberWords(r.threshold)}`;
     return r.window ? `${base} over the last ${durationWords(r.window)}` : base;
 }
@@ -151,6 +160,7 @@ export function ruleConditionText(r: AlertRule): string {
 /** The Scope cell: the Investigation, Dataset or Pipeline the rule watches; a ledger rule with none watches every Pipeline. */
 export function ruleScopeText(r: AlertRule): string {
     if (r.investigation) return `Investigation ${r.investigation}`;
+    if (r.kpi) return `KPI ${r.kpi}`;
     if (r.dataset) return `Dataset ${r.dataset}`;
     return r.onPipeline ? `Pipeline ${r.onPipeline}` : 'Every Pipeline';
 }

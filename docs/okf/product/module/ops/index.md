@@ -35,5 +35,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `LEGAL-HOLD-SCOPE-1` | P3 | feature | A legal hold does not yet protect a Pipeline's data partitions, and holds have no screen. | — |
+| `OPENAPI-ASN1-ROUTES-1` | P2 | defect | Eleven live routes have no operation in docs/api/openapi-v1.json, so OpenApiPathsContractTest is red on master: | — |
 | `UI-TOKENS-RUNS-BACKLOG-1` | P3 | defect | npm run lint:tokens (the UI workflow's design-system guard) flags four hand-rolled status fills (bg-amber-1…, bg-green-1…, bg-red-1…, bg-… | — |
 | `RUN-TRIGGER-ACTOR-SPOOF-1` | P3 | defect | ?actor= on POST /jobs/{name}/trigger, POST /jobs/runs/{id}/replay and POST /pipelines/authored/{id}/trigger is free text written into the… | — |

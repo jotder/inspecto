@@ -16,6 +16,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { seedData } from './space-data.mjs';
 
 export const INV = 'mm-structuring-case';
 export const DATASET = 'mm_links_dataset';
@@ -214,7 +215,7 @@ export function scaffold(spacesRoot, templatesDir = path.join(here, '..', 'space
   if (!fs.existsSync(base)) {
     for (const sub of ['config', 'data', 'audit', 'duckdb']) fs.mkdirSync(path.join(base, sub), { recursive: true });
     copy(path.join(templatesDir, id, 'config'), path.join(base, 'config'), id);
-    copy(path.join(templatesDir, id, 'data'), path.join(base, 'data'), null);
+    seedData(id, path.join(base, 'data'), templatesDir);
     fs.writeFileSync(path.join(base, 'space.toon'), `display_name: Mobile money network\ndescription: Scaffolded from the ${id} Space Template\ncreated_at: ${new Date().toISOString()}\nadmission: closed\n`);
     made.push(id);
   }

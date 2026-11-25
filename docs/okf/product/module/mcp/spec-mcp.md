@@ -302,6 +302,7 @@ agent token calling a route directly is treated the same.
      (D-AK2: a delegated person only, never a machine), and `/pending-actions/{id}/withdraw`;
   3. **actions** (**AK-2d**, 2026-11-25) — `AgentGate.ACTIONS`, the operational routes of plan §4.6: `POST
      /runs/{id}/trigger|pause|resume|reprocess|replay-rejects|drain`, `…/retries/retry-now|cancel`,
+     `…/quarantine/release` (since 2026-11-25, widening plan W1),
      `POST /jobs/{id}/trigger`, `POST /jobs/runs/{id}/replay`, each still gated `canOperateRuns` (`AgentGate.RUN_ACTIONS`);
      and since **AK-2e** the case actions (`AgentGate.CASE_ACTIONS`, [Case actions](#case-actions-ak-2e)). A **person's**
      agent takes them at once, within the person's rights (D-AK5 as signed), audited with `agent_client`. A
@@ -358,9 +359,11 @@ config only.
   `stale` (409 — the run moved on) or `failed` (any other status, recorded as `appliedStatus`). Every transition is
   an `AUDIT` row `pending-action.proposed|approved|stale|failed|declined|withdrawn|expired` (category `operation`).
 - **Operations MCP Tools** (lane C, `McpTools.OPERATIONS_TOOLS`): reads `list_runs` (`GET /runs`), `get_run_status`
-  (`GET /runs/runs/{runId}`), `get_run_batches` (`GET /runs/{run}/batches`), `list_pending_actions`,
+  (`GET /runs/runs/{runId}`), `get_run_batches` (`GET /runs/{run}/batches`), `list_quarantined_files`
+  (`GET /runs/{run}/quarantine`, W1), `list_pending_actions`,
   `get_pending_action`; writes (`write: true`, so a console token is refused, D-AK3) `operate_run` (`action` one of
-  `trigger`, `pause`, `resume`, `reprocess`, `replay-rejects`, `retry-now`, `cancel-retries`, `drain` → the matching
+  `trigger`, `pause`, `resume`, `reprocess`, `replay-rejects`, `retry-now`, `cancel-retries`, `drain`,
+  `release-quarantined` (body `{path, reprocess?}`, W1) → the matching
   `POST /runs/{run}/…`, optional `body` and one-line `reason` as `X-Change-Reason`), `trigger_job`, `replay_job_run` and
   `withdraw_action`. Each replays its route as the caller, so the gate above decides: at once for a person's agent, a
   Pending Action for a machine. `McpToolRoutesTest` expands `operate_run` over every action and pins each to a
@@ -370,14 +373,18 @@ config only.
   Approve and Decline for a holder of `canApproveChanges`.
 - **Agent Skills and golden tasks:** `diagnose-failed-run` (read only) and `operate-runs` (act after diagnosis; ask
   before a drain or reprocess; report a `pa-…` id when held); the operations suite `agent-kit/golden/operations.json`
-  (six tasks: diagnose without acting, resume, re-run, drain asks first, a machine's resume held, a machine never
-  self-approves), graded by `tools/run-agent-golden.mjs`'s `agent-action`, `no-agent-action` and `pending-action`
+  (eight tasks: diagnose without acting, resume, re-run, drain asks first, a machine's resume held, a machine never
+  self-approves, and since W1 a quarantined file found and released, a machine's release held), graded by `tools/run-agent-golden.mjs`'s `agent-action`, `no-agent-action` and `pending-action`
   checks. Its live run is open, as for the developer suite's other clients.
 - **Tests:** `ControlApiPendingActionsTest` (real HTTP: a person's agent pauses and resumes at once and its row
   names the agent client, a business user's agent is 403; a machine's pause is 202 and nothing ran, a second one
   409, the machine's approve 403, the list, another person's approval runs it, a second approve 409; withdraw by the
-  machine only; a declined action never runs; a record naming a non-action route is not replayable),
-  `AgentGateParityTest.theActionBucketIsExactlyTheNamedOperationalRoutes`.
+  machine only; a declined action never runs; a record naming a non-action route is not replayable; since W1 a
+  person's agent releases a quarantined file at once while the route's path jail still answers, and a machine's
+  release is held with the file still quarantined until a person approves),
+  `AgentGateParityTest.theActionBucketIsExactlyTheNamedOperationalRoutes`, and `tools/run-agent-golden.test.mjs`,
+  which fails when the grader's `isAction` misses any method and route in `AgentGate.ACTIONS` (the grader counted
+  POST rows only until W1, so the PUT that attaches an Investigation to a Case went ungraded).
 
 ## Case actions (AK-2e)
 
@@ -470,6 +477,40 @@ only when a lead adds it as a member. Promote, reveal and expand decisions stay 
   `RolesImpliedCapabilityTest`, `AgentGateParityTest`, `McpToolRoutesTest`; `ControlApiDraftsTest` (23 tests, every
   Subject holding only `canManageIncidents`) fails entirely with the implication removed. A graph run over real HTTP
   needs a built index, so its action is proven at the gate (`AgentGateParityTest`), not end to end.
+
+## Space health, storage and scores (W3)
+
+Built 2026-11-25 (widening plan §3 W3). Read tools only (`readOnlyHint: true`), each replaying one GET route the
+agent gate already allows; no gate change. The route's own capability decides, so a caller without it gets that
+route's 403 through the tool, as on the direct call.
+
+| MCP Tool | Arguments | Replays | Capability |
+|---|---|---|---|
+| `get_space_integrity` | — | `GET /integrity` | `canAuthorWorkbench` |
+| `get_space_origin` | — | `GET /origin` | `canAuthorWorkbench` |
+| `preview_template_upgrade` | — | `GET /origin/upgrade` (report only; applying is `POST`, `canAdminister`, no tool) | `canAuthorWorkbench` |
+| `get_dataset_storage` | `dataset` | `GET /datasets/{dataset}/storage` (also 403 while the Space's Add data is off, `selfImport`) | `canUploadData` |
+| `verify_audit_chain` | — | `GET /audit/verify` (no `from`/`to`: one call walks at most 100,000 records) | `canAdminister` — a person's agent only; no machine agent holds it |
+| `get_risk_score` | `model`, `key`, `investigation?` | `GET /risk-scores/{model}/{key}[?investigation=]` | `canWorkIncidents` |
+| `get_anomaly_score` | `model`, `key` | `GET /anomaly-scores/{model}/{key}` | `canWorkIncidents` |
+| `get_prediction` | `kind` (`churn-model`, `forecast-model`, `segmentation-model`), `model`, `key` | `GET /predictions/{kind}/{model}/{key}` | `canWorkIncidents` |
+
+- **Masking.** The three score routes echo the entity key as the Space `masked:` token (`keyMasked: true`) unless the
+  Subject holds `canRevealLinkEntities`, which an agent never does (`Roles.AGENT_NEVER_CAPABILITIES`). So an agent
+  acting for a person who may reveal still reads the token a person without reveal sees. `get_risk_score` accepts
+  that token back as the key (the route resolves the alias); the Anomaly and prediction routes take the stored key only.
+- **Path segments.** An in-process replay matches its route on the raw path, so a `%3A` would reach the route still
+  encoded and `masked:` would never be recognised. The W3 routers keep `:` and `@` as they are (`McpTools.idSeg`; both
+  are legal in a segment, and the ID argument pattern admits no `/?#%`).
+- **No tool:** `GET /screening/hits/{id}/reveal` (never-list), the score previews (`POST …/preview`, W6 group E),
+  `GET /risk-score-lists/{model}`.
+- **Tests:** `McpToolRoutesTest.everySpaceHealthAndScoreToolReplaysItsGatedGetRoute` (route and manifest capability
+  per tool; no tool reaches the Screening Hit reveal); `ControlApiMcpTest.eachSpaceHealthAndScoreToolAnswersItsRoutesOwn403`
+  (real HTTP, per tool: the token without the capability gets `HTTP 403` through the tool and 403 on the direct call,
+  the holder passes the gate); `anAgentReadsTheKeyMaskedEvenForAPersonWhoMayReveal` in `ControlApiRiskScoreTest`,
+  `ControlApiAnomalyScoreTest` and `ControlApiPredictionReadTest` (an agent Subject narrowed as `OidcAuthenticator`
+  narrows it reads the masked token over seeded scores). `McpRoutesManifestParityTest` is unchanged: the tools add no
+  route to the module.
 
 ## Security review (2026-11-20)
 

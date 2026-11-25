@@ -499,5 +499,12 @@ export function alertRuleSeed(q: ParamMap): Partial<AlertRule> {
             .filter(Boolean);
     const t = q.get('threshold');
     if (t != null && t !== '' && isFinite(Number(t))) seed.threshold = Number(t);
+    // BI-INSIGHTS-1 I-17: a KPI-bound Widget's "Alert me…" (`kpi-alert-link.ts`); only the values the engine reads.
+    const kpi = q.get('kpi');
+    if (kpi) seed.kpi = kpi;
+    const projection = q.get('projection');
+    if (projection === 'value' || projection === 'probability') seed.projection = projection;
+    const rag = q.get('rag');
+    if (rag === 'amber' || rag === 'red') seed.rag = rag;
     return seed;
 }

@@ -1523,6 +1523,15 @@ if (Test-Path $uiDist) {
 # PRODUCT-ASSEMBLY-1 PA-2: only the Product build's templates (the Assembly Plan's `templates`: the Product's own plus its Apps').
 $partnerIds = @($plan.partnerTemplates | ForEach-Object { $_.id })
 $staged = Copy-SpaceTemplates -RepoRoot $sandboxRoot -BundleDir $bundleDir -Only @($plan.templates | Where-Object { $partnerIds -notcontains $_ })
+# SPACES-CONSOLIDATION-1 P3b: a Link Analysis Template's corpus is generated, not committed, so the gallery copy staged above gets its data
+# from the Template's own generator (tools/seed-space-data.mjs, which needs Python for the la-* Templates). Run before the Space is composed
+# below and before the demo bake, so both read a gallery whose Templates carry their data.
+$seedSpaceData = Join-Path $sandboxRoot 'tools\seed-space-data.mjs'
+$generatable = @(& node $seedSpaceData --list | ForEach-Object { ($_ -split '\s+')[0] })
+foreach ($tplId in @($staged.Templates | Where-Object { $generatable -contains $_ })) {
+    & node $seedSpaceData $tplId --data (Join-Path $bundleDir "spaces\_templates\$tplId\data")
+    if ($LASTEXITCODE -ne 0) { throw "tools/seed-space-data.mjs could not generate the data of template '$tplId' (the reason is above)" }
+}
 # PA-6a (D-PA18): a partner App's templates come from its own folder (it is not in this repo's git), copied as they are.
 foreach ($pt in @($plan.partnerTemplates)) {
     if (-not $pt) { continue }

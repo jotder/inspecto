@@ -3,6 +3,7 @@ package com.gamma.control;
 import com.gamma.access.Roles;
 import com.gamma.entitystore.EntityTypes;
 import com.gamma.entitystore.LinkAnalysisSettings;
+import com.gamma.etl.LaCorpus;
 import com.gamma.job.JobConfig;
 import com.gamma.util.ToonHelper;
 import org.junit.jupiter.api.Test;
@@ -140,7 +141,7 @@ class LaClaimsTemplateTest {
             assertEquals(feed, p.get("name"));
             assertTrue(Files.exists(CFG.resolve("claims/" + feed + "_schema.toon")), feed + " schema");
             assertTrue(Files.exists(CFG.resolve("registry/datasets/" + feed + "_dataset.toon")), feed + " dataset");
-            try (var files = Files.list(TPL.resolve("data/inbox/" + feed))) {
+            try (var files = Files.list(LaCorpus.data(TPL).resolve("inbox/" + feed))) {
                 assertEquals(1, files.filter(f -> f.toString().endsWith(".csv")).count(), feed + " extract");
             }
         }

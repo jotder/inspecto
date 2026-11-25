@@ -322,6 +322,11 @@ interface ConsignmentIngestStrategy {
         if (scratchDir(cfg) == null) return "no scratch dir (dirs.temp / duckdb.temp_directory) for the branch-commit ledger";
         com.gamma.pipeline.PipelineGraph lifted = com.gamma.pipeline.PipelineLift.lift(cfg);
         List<com.gamma.pipeline.PipelineNode> sinks = writeSinks(lifted, segKey);
+        // OUTPUT-STORE-SINK-NOT-DRAWN-1 lifts output_store: as its own sink on a second branch off map, so
+        // the sink count no longer matches sinks[]; name the real cause (the at-rest chain) before counting.
+        if (cfg.outputStore() != null && sinks.stream().anyMatch(n -> "output_store".equals(n.id())))
+            return "the config-derived chain to output_store '" + cfg.outputStore() + "' runs on the at-rest "
+                    + "path (output_store:), not this lane (Platform Services D-11, 2026-10-04)";
         if (sinks.size() != cfg.sinks().size() || sinks.isEmpty())
             return segKey == null
                     ? "the lifted graph's sink count (" + sinks.size() + ") differs from sinks[] ("
