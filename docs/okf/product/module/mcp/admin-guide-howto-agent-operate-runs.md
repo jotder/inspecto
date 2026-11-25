@@ -26,8 +26,9 @@ the agent is decides what happens:
 
 An agent never approves and never takes a backup. It releases a quarantined file only after reading why the file was
 set aside, and asks the person first. Giving up on a backlog day discards that day's files for good, so the agent asks
-the person first there too; it never forces a drain in the quiet period or runs a day on the previous Reference — those
-stay on the **Runs ▸ Backlog** screen.
+the person first there too. Its tools never force a drain in the quiet period or run a day on the previous Reference;
+a machine agent calling the API directly could ask for either, so before approving a backlog action, open it and read
+its whole request (the query shows there).
 
 ## Before you start
 

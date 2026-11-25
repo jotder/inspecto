@@ -434,11 +434,15 @@ config only.
   a one-line `reason`) and the read `get_job_backlog` (`GET /jobs/backlog`). `operate_job_backlog` is the only tool
   annotated `destructiveHint: true` (`McpTools.Tool.destructive`), for `give-up`; skill `operate-runs` asks the person
   before a give-up as before a drain. The tools never send `?force=true` (drain in the quiet period) or
-  `?allowPrevious=true` (run a day on the previous Reference) — those stay a person's choice on the Runs ▸ Backlog
-  screen. Materialize, compact, baseline accept and clear, and scheduler settings stay refused (D-AK11). Tests:
-  `ControlApiAgentOpsActionsTest` (real HTTP, per route: a person's agent at once with `agent_client` on the row, a
-  business user's agent 403, a machine 202 with nothing changed until approved and the reason on the list and the read,
-  a declined give-up discards nothing, a machine without `canOperateRuns` 403 and no record), `McpToolRoutesTest`
+  `?allowPrevious=true` (run a day on the previous Reference). The routes still take them, so an agent calling the
+  Control API directly may: a person's agent within the person's rights, a machine's held with the query recorded —
+  `GET /pending-actions/{id}` shows it to the approver (the list does not). Materialize, compact, baseline accept and clear, and scheduler settings stay refused (D-AK11). Tests:
+  `ControlApiAgentOpsActionsTest` (real HTTP: per route, a person's agent at once with `agent_client` on the row, a
+  business user's agent 403 and a machine without `canOperateRuns` 403 with no record; a machine's single and all
+  Expectation evaluations, Alert evaluation, pause and give-up held as 202 with the reason on the list and the read —
+  the single evaluation, the Alerts, the pause and the give-up shown unchanged until approved; a declined give-up
+  discards nothing; drain, resume and run-day share the same gate entry and hold path but have no machine test of
+  their own), `McpToolRoutesTest`
   (every action's route is in `AgentGate.ACTIONS`, the day rule, the annotation), the grader's `ACTION_PATH`; golden
   tasks `ops-11` (re-evaluate after a fix) and `ops-12` (a machine's give-up held, then declined).
 - **The screen:** the Pending Changes screen has two tabs, *Pending Changes* and *Pending Actions*
