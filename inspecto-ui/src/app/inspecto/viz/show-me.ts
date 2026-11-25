@@ -1,6 +1,9 @@
 import { isIdColumn, ResultColumn, ResultSet } from './result-set';
 import { allViz } from './viz-registry';
-import { ChannelValue, ControlValues, FieldRole, VizField, VizFit, VizPlugin } from './viz-types';
+import { ChannelValue, ControlValues, FieldRole, VizField, VizFit, VizPlugin, VizRenderOptions } from './viz-types';
+import { anomalyThreshold, OVERLAY_SUFFIX, OVERLAY_VIZ_TYPES, OverlaySummary } from './chart-overlays';
+import { MARKER_VIZ_TYPES, MarkerKpi } from './chart-markers';
+import { formatNumber } from './number-format';
 
 /**
  * "Show Me" — rank the registered plugins for a field set (à la Tableau/Superset), and auto-assign fields to
@@ -129,4 +132,119 @@ function takeNext(roles: FieldRole[], pools: Record<FieldRole, VizField[]>, used
         }
     }
     return undefined;
+}
+
+// ── BI-INSIGHTS-1 I-20: insight-aware Show-Me ─────────────────────────────────────────────────────────────────────
+
+/** One overlay Show-Me offers for the Widget being built. `options` is the Widget's options with it added; nothing is
+ *  applied until the user clicks (a suggestion is only a suggestion). */
+export interface OverlaySuggestion<O extends VizRenderOptions = VizRenderOptions> {
+    id: 'forecast' | 'anomaly' | 'target' | 'rag';
+    text: string;
+    action: string;
+    options: O;
+}
+
+/** What {@link suggestOverlays} reads. `probe` is the overlay summary of the Widget's own `/bi/query` statement run with
+ *  `overlay: {forecast, anomaly}` (the I-11 / I-7 route); `probeRows` its rows. `kpi` is the bound KPI's definition. */
+export interface OverlaySuggestionInput<O extends VizRenderOptions = VizRenderOptions> {
+    vizType: string;
+    controls: ControlValues;
+    options: O;
+    probe?: readonly OverlaySummary[] | null;
+    probeRows?: readonly Record<string, unknown>[];
+    kpi?: MarkerKpi | null;
+}
+
+/** The cycle a detected period names at a grain, in words — or `null` when it names none (no "seasonal" claim then). */
+const CYCLE_WORD: Readonly<Record<string, Readonly<Record<number, string>>>> = {
+    day: { 7: 'weekly' },
+    week: { 52: 'yearly' },
+    month: { 12: 'yearly' },
+    quarter: { 4: 'yearly' },
+    hour: { 24: 'daily' },
+};
+
+/** True when the Widget can ask the server for overlays: a line / bar / area with a Measure over a grained date, neither stacked nor
+ *  value-sorted (the cases the overlay renderer draws, `chart-overlays.ts`). */
+export function overlayEligible(vizType: string, controls: ControlValues, options: VizRenderOptions): boolean {
+    const grain = controls['x']?.[0]?.grain;
+    return (
+        (OVERLAY_VIZ_TYPES as readonly string[]).includes(vizType) &&
+        !!grain &&
+        !!controls['y']?.length &&
+        grain !== 'auto' &&
+        !options.stacked &&
+        !options.sort
+    );
+}
+
+/**
+ * The overlays worth offering for this Widget, in the order shown. Statistical honesty (plan §10): a forecast band is
+ * offered only when the server found a seasonal cycle (`periodSource: detected`) AND had two seasons of history (no
+ * `reason`); anomaly markers only when at least one point passes the default sensitivity; a target line / band only
+ * when there is a target / bands to draw. An overlay already on the Widget is never offered again.
+ */
+export function suggestOverlays<O extends VizRenderOptions>(input: OverlaySuggestionInput<O>): OverlaySuggestion<O>[] {
+    const { vizType, controls, options, probe, probeRows = [], kpi } = input;
+    const out: OverlaySuggestion<O>[] = [];
+    if (overlayEligible(vizType, controls, options)) {
+        const grain = controls['x']![0].grain!;
+        const seasonal = (probe ?? []).find(
+            (s) => s.overlay === 'forecast' && !s.reason && s.periodSource === 'detected' && s.period != null,
+        );
+        const cycle = seasonal ? CYCLE_WORD[grain]?.[seasonal.period!] : undefined;
+        if (seasonal && !options.overlay?.forecast) {
+            const pattern = cycle
+                ? `${cycle[0].toUpperCase()}${cycle.slice(1)} seasonal pattern`
+                : `A ${seasonal.period}-${grain} cycle`;
+            out.push({
+                id: 'forecast',
+                text: `${pattern} found over ${seasonal.points} ${grain}s of history.`,
+                action: 'Add a forecast band',
+                options: { ...options, overlay: { ...options.overlay, forecast: {} } },
+            });
+        }
+        const scored = (probe ?? []).filter((s) => s.overlay === 'anomaly' && !s.reason && (s.scored ?? 0) > 0);
+        if (scored.length && !options.overlay?.anomaly) {
+            const threshold = anomalyThreshold(undefined);
+            const ids = new Set(scored.map((s) => s.of));
+            let flagged = 0;
+            for (const row of probeRows)
+                for (const id of ids) {
+                    const z = row[id + OVERLAY_SUFFIX.z];
+                    if (typeof z === 'number' && Math.abs(z) >= threshold) flagged++;
+                }
+            if (flagged > 0)
+                out.push({
+                    id: 'anomaly',
+                    text: `${formatNumber(flagged)} unusual ${flagged === 1 ? 'point' : 'points'} against the usual level.`,
+                    action: 'Show anomaly markers',
+                    options: { ...options, overlay: { ...options.overlay, anomaly: {} } },
+                });
+        }
+    }
+    if (MARKER_VIZ_TYPES.includes(vizType)) {
+        const markers = options.markers ?? [];
+        // The bound KPI's target first, as `resolveMarkers` draws it; else the Widget's own.
+        const kpiTarget = options.kpi?.kpiId ? kpi?.target : undefined;
+        const target = kpiTarget ?? options.kpi?.target;
+        if (target != null && !markers.some((m) => m.kind === 'target')) {
+            out.push({
+                id: 'target',
+                text: `${kpiTarget != null ? 'This KPI' : 'This Widget'} has a target of ${formatNumber(target)}.`,
+                action: 'Add a target line',
+                options: { ...options, markers: [...markers, { kind: 'target' }] },
+            });
+        }
+        if (options.kpi?.kpiId && kpi?.bands && !markers.some((m) => m.kind === 'rag')) {
+            out.push({
+                id: 'rag',
+                text: 'This KPI has green, amber and red bands.',
+                action: 'Add the target bands',
+                options: { ...options, markers: [...markers, { kind: 'rag' }] },
+            });
+        }
+    }
+    return out;
 }
