@@ -1387,6 +1387,11 @@ chapters:
         type: howto
         tracks[1]: operator
         audience: external
+      howto_agent_link_analysis:
+        file: docs/okf/product/module/mcp/admin-guide-howto-agent-link-analysis.md
+        type: howto
+        tracks[1]: operator
+        audience: external
       admin_guide_auth_security_abac_decisions:
         file: docs/okf/product/module/access/admin-guide-auth-security-abac-decisions.md
         type: unsorted

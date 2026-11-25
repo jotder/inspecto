@@ -77,12 +77,10 @@ function uniquePipelineIdValidator(taken: () => Set<string>): ValidatorFn {
                             [required]="true"
                             [error]="nameError()"
                         />
-
                         <inspecto-pen-field
                             label="Inbox folder (dirs.poll)"
                             formControlName="poll"
                             placeholder="data/inbox/orders_ingest"
-                            [mono]="true"
                         />
                     </div>
                 } @else {
@@ -93,17 +91,19 @@ function uniquePipelineIdValidator(taken: () => Set<string>): ValidatorFn {
                             [options]="existingPipelineOptions()"
                             [required]="true"
                         />
-
                         <inspecto-pen-field
                             label="Inbox folder (dirs.poll, optional)"
                             formControlName="poll"
                             placeholder="Leave blank to keep existing"
-                            [mono]="true"
                         />
                     </div>
                 }
 
-                <inspecto-collector-config #collector [specs]="collectorSpecs" (submitted)="save()" />
+                <inspecto-collector-config
+                    #collector
+                    [specs]="collectorSpecs"
+                    (submitted)="save()"
+                />
 
                 @if (error(); as err) {
                     <inspecto-alert variant="error">{{ err }}</inspecto-alert>
@@ -132,18 +132,16 @@ export class CollectorCreateDialog {
     @ViewChild('collector') private collector?: CollectorConfigComponent;
 
     readonly collectorSpecs = COLLECTOR_ATTRIBUTES;
+    readonly existingPipelines = signal<string[]>([]);
+    readonly existingPipelineOptions = computed<PickerOption[]>(() => this.existingPipelines().map((p) => ({ value: p, label: p })));
 
-    /** The pipeline name's error once touched, in words (the pen field renders it as an alert line). */
+    /** The Pipeline name's inline error, once the field was touched (the pen-field renders it). */
     nameError(): string {
         const c = this.form.controls.name;
         if (!c.touched) return '';
         if (c.hasError('required')) return 'A pipeline name is required.';
         return c.hasError('duplicate') ? 'A pipeline with this id already exists.' : '';
     }
-    readonly existingPipelines = signal<string[]>([]);
-    readonly existingPipelineOptions = computed<PickerOption[]>(() =>
-        this.existingPipelines().map((p) => ({ value: p, label: p })),
-    );
     private readonly existingSet = computed(() => new Set(this.existingPipelines().map((p) => p.toLowerCase())));
 
     readonly targetMode = signal<'new' | 'existing'>('new');
@@ -178,10 +176,7 @@ export class CollectorCreateDialog {
         this.targetMode.set(mode);
         this.error.set(null);
         if (mode === 'new') {
-            this.form.controls.name.setValidators([
-                Validators.required,
-                uniquePipelineIdValidator(() => this.existingSet()),
-            ]);
+            this.form.controls.name.setValidators([Validators.required, uniquePipelineIdValidator(() => this.existingSet())]);
             this.form.controls.existingPipeline.clearValidators();
         } else {
             this.form.controls.name.clearValidators();

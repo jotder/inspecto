@@ -62,34 +62,67 @@ final class AgentGate {
      * this a machine holding no right at all could fill the approvers' queue with comments on any id.
      */
     static final Map<String, String> MACHINE_HOLD_CAPABILITY = Map.of(
-            "POST /objects/([^/]+)/comments", Roles.CAN_WORK_INCIDENTS);
+            "POST /objects/([^/]+)/comments", Roles.CAN_WORK_INCIDENTS,
+            "POST /inv/graph/runs/([^/]+)/cancel", Roles.CAN_RUN_LINK_GRAPH_ANALYSIS);
 
-    /** Every action route: {@link #RUN_ACTIONS} and {@link #CASE_ACTIONS}. */
+    /**
+     * The Link Analysis actions (plan §6.6, AK-2f, operator 2026-11-25): work in a Draft — open one, add ops, undo,
+     * discard, rebase ({@code canDraftInvestigations}, which a machine agent may keep) — attach an Investigation to a Case
+     * ({@code canManageIncidents}) and start or cancel a graph run ({@code canRunLinkGraphAnalysis}). Never promote a Draft,
+     * edit an Investigation directly, reveal or approve an expand: those stay refused.
+     */
+    static final Set<String> LA_ACTIONS = Set.of(
+            "POST /inv/investigations/([^/]+)/drafts", "POST /inv/investigations/([^/]+)/drafts/([^/]+)/ops",
+            "POST /inv/investigations/([^/]+)/drafts/([^/]+)/undo", "POST /inv/investigations/([^/]+)/drafts/([^/]+)/discard",
+            "POST /inv/investigations/([^/]+)/drafts/([^/]+)/rebase", "PUT /inv/investigations/([^/]+)/case",
+            "POST /inv/graph/runs", "POST /inv/graph/runs/([^/]+)/cancel");
+
+    /** Every action route: {@link #RUN_ACTIONS}, {@link #CASE_ACTIONS} and {@link #LA_ACTIONS}. */
     static final Set<String> ACTIONS;
     static {
         Set<String> all = new java.util.HashSet<>(RUN_ACTIONS);
         all.addAll(CASE_ACTIONS);
+        all.addAll(LA_ACTIONS);
         ACTIONS = Set.copyOf(all);
     }
+
+    /**
+     * The read-shaped Link Analysis queries (plan §6.6, AK-2f, operator 2026-11-25: open to every agent): each persists
+     * nothing and runs under the caller's masking — an agent never holds {@code canRevealLinkEntities}, so it sees masked
+     * keys. {@code LinkAnalysisRateClasses} rate-limits them per caller.
+     */
+    static final Set<String> LA_READS = Set.of(
+            "POST /inv/projection", "POST /inv/projection/neighbors", "POST /inv/projection/neighbors/preview",
+            "POST /inv/projection/multi", "POST /inv/expand/preview", "POST /inv/schema/overlap-profile",
+            "POST /inv/reference-rows", "POST /inv/case-history", "POST /inv/entities/([^/]+)/resolve",
+            "POST /inv/entities/([^/]+)/suggest", "POST /inv/deep-links/resolve", "POST /inv/traversal/recursive-paths",
+            "POST /inv/presets/([^/]+)/run", "POST /inv/datasets/([^/]+)/query", "POST /inv/pattern/branching",
+            "POST /inv/pattern/temporal", "POST /inv/investigations/([^/]+)/replay",
+            "POST /inv/investigations/([^/]+)/dossier/verify", "POST /inv/investigations/([^/]+)/dossier/bundle/verify");
 
     /**
      * Writes an agent may make that change nothing governed: the MCP endpoint itself, validation and dry runs, the Ship
      * reads, taking back its own proposal, an Action Request (held for approval by its own design), {@code POST /db/query}
      * (the read the AK-1 {@code query_dataset} tool replays; SqlGuard and masking run as for the person) and a Pipeline
-     * run (D-AK2: a delegated person only — {@link #PERSON_ONLY}).
+     * run (D-AK2: a delegated person only — {@link #PERSON_ONLY}); and the Link Analysis queries ({@link #LA_READS}, AK-2f).
      */
-    static final Set<String> ALLOWED = Set.of(
-            "POST /mcp",
-            "POST /validate",
-            "POST /pipelines/([^/]+)/graph/validate",
-            "POST /pipelines/authored/([^/]+)/dry-run",
-            "POST /bundle/export",
-            "POST /promotion/preview",
-            "POST /pending-changes/([^/]+)/withdraw",
-            "POST /pending-actions/([^/]+)/withdraw",
-            "POST /action-requests",
-            "POST /db/query",
-            "POST /pipelines/authored/([^/]+)/run");
+    static final Set<String> ALLOWED;
+    static {
+        Set<String> all = new java.util.HashSet<>(Set.of(
+                "POST /mcp",
+                "POST /validate",
+                "POST /pipelines/([^/]+)/graph/validate",
+                "POST /pipelines/authored/([^/]+)/dry-run",
+                "POST /bundle/export",
+                "POST /promotion/preview",
+                "POST /pending-changes/([^/]+)/withdraw",
+                "POST /pending-actions/([^/]+)/withdraw",
+                "POST /action-requests",
+                "POST /db/query",
+                "POST /pipelines/authored/([^/]+)/run"));
+        all.addAll(LA_READS);
+        ALLOWED = Set.copyOf(all);
+    }
 
     /** {@link #ALLOWED} routes a machine agent may not call (D-AK2: never a run for a machine). */
     static final Set<String> PERSON_ONLY = Set.of("POST /pipelines/authored/([^/]+)/run");
@@ -158,7 +191,8 @@ final class AgentGate {
         return never(method, pattern)
                 ? "an agent client never approves, reveals, promotes, or changes Apps or access — a person must"
                 : "an agent client may not call " + method + " " + pattern + " — an agent proposes config changes (held "
-                        + "for approval), takes run and Case actions within its rights, validates, dry-runs and reads; sign in "
+                        + "for approval), takes run, Case and Link Analysis Draft actions within its rights, validates, dry-runs and "
+                        + "reads; sign in "
                         + "without the agent client for anything else";
     }
 }

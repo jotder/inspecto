@@ -75,4 +75,5 @@ and a comment it asked for is authored by the machine (`client:<id>`).
 ## Next
 
 - [Let an AI agent operate runs](admin-guide-howto-agent-operate-runs.md)
+- [Let an AI agent analyse a Case in Link Analysis](admin-guide-howto-agent-link-analysis.md)
 - [Let an AI agent propose changes](admin-guide-howto-agent-propose-changes.md)

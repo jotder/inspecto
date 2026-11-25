@@ -21,8 +21,6 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { PipelineCombined, PipelineNode, PipelinesService, IconMap, IconMapService } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
-import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
-import { FormsModule } from '@angular/forms';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
 import { GraphViewComponent } from 'app/inspecto/graph/graph-view.component';
 import { G6GraphData } from 'app/inspecto/graph/catalog-graph';
@@ -73,8 +71,6 @@ export type PipelinesViewMode = 'view' | 'editor' | 'topology';
         MatTooltipModule,
         GraphViewComponent,
         InspectoEmptyStateComponent,
-        InspectoOptionPickerComponent,
-        FormsModule,
         PipelineEditorComponent,
         TransferMenuComponent,
     ],
@@ -158,12 +154,6 @@ export class PipelinesComponent {
             .map((n) => n.store!)
             .sort((a, b) => a.localeCompare(b)),
     );
-
-    /** The same choices for the option picker, "All datasets" (no filter) first. */
-    readonly combinedDatasetPickerOptions = computed<PickerOption[]>(() => [
-        { value: '', label: 'All datasets' },
-        ...this.combinedDatasetOptions().map((ds) => ({ value: ds, label: ds })),
-    ]);
 
     /** Every pipeline in the topology as transfer references — what the export/import menu offers. */
     readonly transferItems = computed(() =>

@@ -251,12 +251,12 @@ system: the evidence cannot say something the code does not.
 | PUT | `/inv/investigations/([^/]+)/case` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationCaseRoutes.java:68` |
 | POST | `/inv/investigations/([^/]+)/dossier/bundle/verify` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DossierBundleRoutes.java:71` |
 | POST | `/inv/investigations/([^/]+)/dossier/verify` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DossierRoutes.java:78` |
-| POST | `/inv/investigations/([^/]+)/drafts` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:70` |
-| POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/discard` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:81` |
-| POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/ops` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:77` |
+| POST | `/inv/investigations/([^/]+)/drafts` | gated | `canDraftInvestigations` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:70` |
+| POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/discard` | gated | `canDraftInvestigations` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:81` |
+| POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/ops` | gated | `canDraftInvestigations` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:77` |
 | POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/promote` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:86` |
-| POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/rebase` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:84` |
-| POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/undo` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:79` |
+| POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/rebase` | gated | `canDraftInvestigations` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:84` |
+| POST | `/inv/investigations/([^/]+)/drafts/([^/]+)/undo` | gated | `canDraftInvestigations` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java:79` |
 | POST | `/inv/investigations/([^/]+)/embeds` | gated | `canShareInvestigation` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationEmbedRoutes.java:58` |
 | POST | `/inv/investigations/([^/]+)/embeds/([^/]+)/revoke` | gated | `canShareInvestigation` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationEmbedRoutes.java:60` |
 | POST | `/inv/investigations/([^/]+)/expand/preview` | gated | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationRoutes.java:159` |

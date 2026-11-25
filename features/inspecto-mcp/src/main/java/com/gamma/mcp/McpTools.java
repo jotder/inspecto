@@ -269,7 +269,8 @@ final class McpTools {
      * No tool router can produce such a path ({@code McpWriteToolsTest} asserts it); this is the belt to that brace.
      */
     static final List<Pattern> REFUSED = List.of(
-            Pattern.compile("[A-Z]+ .*/(approve|decline|decision|reveal|retry|mark-failed)(\\?.*)?"),
+            // AK-2f: a Draft promote and an expand deny too — a person promotes a Draft; an agent never decides an expand
+            Pattern.compile("[A-Z]+ .*/(approve|decline|decision|reveal|retry|mark-failed|promote|deny)(\\?.*)?"),
             Pattern.compile("[A-Z]+ /promotion/apply(\\?.*)?"),
             Pattern.compile("(POST|PUT|PATCH|DELETE) /(apps|access)(/.*)?"),
             Pattern.compile("[A-Z]+ /pending-changes/[^/]+/(approve|decline)(\\?.*)?"));
@@ -493,13 +494,110 @@ final class McpTools {
         return new Call(c.method(), c.path(), c.body(), Map.of("X-Change-Reason", reason));
     }
 
-    /** Every tool: AK-1's reads, then AK-2b's, then AK-2d's, then AK-2e's. */
+    /** {@code run_link_query}'s kinds → the read-shaped Link Analysis route each replays ({@code AgentGate.LA_READS}). */
+    static final Map<String, String> LINK_QUERIES = Map.ofEntries(
+            Map.entry("projection", "/inv/projection"), Map.entry("neighbors", "/inv/projection/neighbors"),
+            Map.entry("neighbors-preview", "/inv/projection/neighbors/preview"), Map.entry("multi", "/inv/projection/multi"),
+            Map.entry("expand-preview", "/inv/expand/preview"), Map.entry("paths", "/inv/traversal/recursive-paths"),
+            Map.entry("branching", "/inv/pattern/branching"), Map.entry("temporal", "/inv/pattern/temporal"),
+            Map.entry("case-history", "/inv/case-history"), Map.entry("reference-rows", "/inv/reference-rows"));
+
+    /** {@code get_investigation}'s views → the GET route tail each reads. */
+    static final List<String> INVESTIGATION_VIEWS = List.of("working-set", "log", "coverage", "case", "members",
+            "references", "measures", "data-changes", "drafts");
+
+    /** {@code work_draft}'s actions → the Draft write each replays ({@code AgentGate.LA_ACTIONS}). */
+    static final List<String> DRAFT_ACTIONS = List.of("ops", "undo", "discard", "rebase");
+
+    private static final String LA_HELD_FOR_A_MACHINE = " Signed in as a person, it runs at once within that person's own "
+            + "rights; as an unattended machine agent that a lead added to the Investigation it is held as a Pending Action.";
+
+    /** AK-2f: the analyst in Link Analysis (plan §6.6, operator 2026-11-25). Never promote, reveal or approve an expand. */
+    static final List<Tool> LA_TOOLS = List.of(
+            new Tool("list_investigations", "List Investigations",
+                    "The Link Analysis Investigations your person (or this machine) is a member of.", List.of(),
+                    get("/inv/investigations")),
+            new Tool("get_investigation", "Read an Investigation",
+                    "One view of an Investigation: its working set (the graph), log, coverage, linked Case, members, "
+                            + "references, measures, data changes since sealing, or its Drafts. Keys are masked: an agent never reveals.",
+                    List.of(id("investigation", "The Investigation id."),
+                            new Arg("view", Kind.ENUM, true, "What to read.", INVESTIGATION_VIEWS)),
+                    a -> new Call("GET", "/inv/investigations/" + seg(a.get("investigation")) + "/" + a.get("view"), null)),
+            new Tool("get_draft", "Read a Draft",
+                    "One view of a Draft: its working set, its log, or the conflicts a rebase would meet.",
+                    List.of(id("investigation", "The Investigation id."), id("draft", "The Draft id."),
+                            new Arg("view", Kind.ENUM, true, "What to read.", List.of("working-set", "log", "conflicts"))),
+                    a -> new Call("GET", "/inv/investigations/" + seg(a.get("investigation")) + "/drafts/" + seg(a.get("draft"))
+                            + "/" + a.get("view"), null)),
+            new Tool("explore_entity", "Explore an entity",
+                    "An Entity's profile or summary: its links, activity and the Incidents and Cases that name it (masked).",
+                    List.of(id("type", "The Entity Type."), id("key", "The entity key, as a Link Analysis read returned it."),
+                            new Arg("view", Kind.ENUM, true, "What to read.", List.of("profile", "summary")),
+                            text("dataset", "The Dataset to summarise the entity in — required for the summary.")),
+                    a -> {
+                        if ("summary".equals(a.get("view")) && a.get("dataset") == null)
+                            throw new BadArgs("'dataset' is required for the summary view");
+                        return new Call("GET", "/inv/entities/" + seg(a.get("type")) + "/" + seg(a.get("key")) + "/"
+                                + a.get("view") + query(a, "dataset", "dataset"), null);
+                    }),
+            new Tool("run_link_query", "Run a Link Analysis query",
+                    "Run one Link Analysis query over a Dataset: a projection, the neighbours of a set of entities (or a "
+                            + "count of what one step would add), a multi-Dataset projection, an unsaved expand, paths between "
+                            + "entities, a branching or temporal pattern, an entity's case history, or reference rows. Nothing "
+                            + "is saved; keys are masked.",
+                    List.of(new Arg("kind", Kind.ENUM, true, "Which query.", List.copyOf(new java.util.TreeSet<>(LINK_QUERIES.keySet()))),
+                            body("The query's request, as its route takes it (dataset, sourceCol, targetCol, seeds, depth, …).", true)),
+                    a -> new Call("POST", LINK_QUERIES.get((String) a.get("kind")), bodyOf(a))),
+            new Tool("run_preset", "Run a preset query",
+                    "Run one of the Space's preset Link Analysis queries over a Dataset. Nothing is saved; keys are masked.",
+                    List.of(id("preset", "The preset id."), body("The preset's parameters.", false)),
+                    a -> new Call("POST", "/inv/presets/" + seg(a.get("preset")) + "/run", bodyOf(a))),
+            new Tool("list_graph_algorithms", "List graph algorithms",
+                    "The graph-analysis algorithms this server runs, their limits and the budget a run takes.", List.of(),
+                    get("/inv/graph/algorithms")),
+            new Tool("list_graph_runs", "List graph runs", "The graph-analysis runs of this Space and their state.", List.of(),
+                    get("/inv/graph/runs")),
+            new Tool("get_graph_run", "Get a graph run", "One graph-analysis run: its state and, once done, its results (masked).",
+                    List.of(id("run", "The graph run id.")), a -> new Call("GET", "/inv/graph/runs/" + seg(a.get("run")), null)),
+            new Tool("open_draft", "Open a Draft",
+                    "Open your Draft on an Investigation you are a member of, to work on a copy of its graph. A person "
+                            + "promotes a Draft into the Investigation; you never do." + LA_HELD_FOR_A_MACHINE,
+                    List.of(id("investigation", "The Investigation id."), body("Optional: {\"label\": \"…\"}.", false),
+                            text("reason", "Why — shown to the approver when it is held.")),
+                    a -> withReason(new Call("POST", "/inv/investigations/" + seg(a.get("investigation")) + "/drafts", bodyOf(a)), a),
+                    true),
+            new Tool("work_draft", "Work in a Draft",
+                    "Add an op to your Draft (seed, expand, connect, exclude, hide, keep, annotate, threshold, window, resolve), undo one, rebase it onto the "
+                            + "Investigation's current log, or discard it." + LA_HELD_FOR_A_MACHINE,
+                    List.of(id("investigation", "The Investigation id."), id("draft", "The Draft id."),
+                            new Arg("action", Kind.ENUM, true, "What to do.", DRAFT_ACTIONS),
+                            body("The action's body: ops {op, …}; undo {undoes?}; rebase {confirm?, expectHead?}.", false),
+                            text("reason", "Why — shown to the approver when it is held.")),
+                    a -> withReason(new Call("POST", "/inv/investigations/" + seg(a.get("investigation")) + "/drafts/"
+                            + seg(a.get("draft")) + "/" + a.get("action"), bodyOf(a)), a), true),
+            new Tool("attach_investigation_to_case", "Attach an Investigation to a Case",
+                    "Link an Investigation to the Case it serves. Needs canManageIncidents, so only a person's agent can.",
+                    List.of(id("investigation", "The Investigation id."), id("case", "The Case id."),
+                            text("reason", "Why — on the audit row.")),
+                    a -> withReason(new Call("PUT", "/inv/investigations/" + seg(a.get("investigation")) + "/case",
+                            McpRoutes.jsonBytes(Map.of("caseRef", a.get("case")))), a), true),
+            new Tool("start_graph_run", "Start a graph run",
+                    "Start a graph-analysis run over an Investigation's graph (list_graph_algorithms names them). Needs "
+                            + "canRunLinkGraphAnalysis, so only a person's agent can; read it with get_graph_run.",
+                    List.of(body("The run request: {investigationId, algorithm, params}.", true), text("reason", "Why — on the audit row.")),
+                    a -> withReason(new Call("POST", "/inv/graph/runs", bodyOf(a)), a), true),
+            new Tool("cancel_graph_run", "Cancel a graph run", "Stop a graph run you started (an administrator's agent: any run).",
+                    List.of(id("run", "The graph run id.")),
+                    a -> new Call("POST", "/inv/graph/runs/" + seg(a.get("run")) + "/cancel", McpRoutes.jsonBytes(Map.of())), true));
+
+    /** Every tool: AK-1's reads, then AK-2b's, then AK-2d's, then AK-2e's, then AK-2f's. */
     static final List<Tool> ALL_TOOLS;
     static {
         List<Tool> all = new ArrayList<>(TOOLS);
         all.addAll(WRITE_TOOLS);
         all.addAll(OPERATIONS_TOOLS);
         all.addAll(CASE_TOOLS);
+        all.addAll(LA_TOOLS);
         ALL_TOOLS = List.copyOf(all);
     }
 

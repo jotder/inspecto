@@ -121,6 +121,25 @@ class AgentGateParityTest {
                 "POST /alerts/([^/]+)/ack", Roles.CAN_WORK_INCIDENTS,
                 "POST /alerts/([^/]+)/resolve", Roles.CAN_WORK_INCIDENTS,
                 "POST /cases/from-entities", Roles.CAN_MANAGE_INCIDENTS)), caseGates);
+        // AK-2f (operator 2026-11-25): Drafts, attach to a Case, graph runs — never promote or a direct Investigation edit
+        Map<String, String> laGates = new java.util.TreeMap<>();
+        for (String key : AgentGate.LA_ACTIONS) laGates.put(key, m.get(key));
+        assertEquals(new java.util.TreeMap<>(Map.of(
+                "POST /inv/investigations/([^/]+)/drafts", Roles.CAN_DRAFT_INVESTIGATIONS,
+                "POST /inv/investigations/([^/]+)/drafts/([^/]+)/ops", Roles.CAN_DRAFT_INVESTIGATIONS,
+                "POST /inv/investigations/([^/]+)/drafts/([^/]+)/undo", Roles.CAN_DRAFT_INVESTIGATIONS,
+                "POST /inv/investigations/([^/]+)/drafts/([^/]+)/discard", Roles.CAN_DRAFT_INVESTIGATIONS,
+                "POST /inv/investigations/([^/]+)/drafts/([^/]+)/rebase", Roles.CAN_DRAFT_INVESTIGATIONS,
+                "PUT /inv/investigations/([^/]+)/case", Roles.CAN_MANAGE_INCIDENTS,
+                "POST /inv/graph/runs", Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,
+                "POST /inv/graph/runs/([^/]+)/cancel", "exempt:self-service")), laGates);
+        for (String refused : java.util.List.of("POST /inv/investigations/([^/]+)/drafts/([^/]+)/promote",
+                "POST /inv/investigations/([^/]+)/ops", "POST /inv/investigations/([^/]+)/undo",
+                "POST /inv/investigations/([^/]+)/reveal", "POST /inv/investigations/([^/]+)/members",
+                "POST /inv/investigations/([^/]+)/pending/([^/]+)/approve", "POST /inv/investigations/([^/]+)/pending/([^/]+)/deny"))
+            assertEquals(AgentGate.Bucket.REFUSED, bucket(refused), refused);
+        // the machine set keeps the Draft right, never the right to promote it
+        assertTrue(Roles.AGENT_MACHINE_CAPABILITIES.contains(Roles.CAN_DRAFT_INVESTIGATIONS));
         // every action the manifest exempts needs a named right before a machine may queue it (phase-3 security review)
         Set<String> exemptActions = new TreeSet<>();
         for (String key : AgentGate.ACTIONS) if (String.valueOf(m.get(key)).startsWith("exempt:")) exemptActions.add(key);

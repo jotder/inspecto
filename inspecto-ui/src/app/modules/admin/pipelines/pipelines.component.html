@@ -62,13 +62,18 @@
                                 }
                             </mat-select>
                         </mat-form-field>
-                        <inspecto-option-picker
-                            class="w-52"
-                            label="By Dataset"
-                            [options]="combinedDatasetPickerOptions()"
-                            [ngModel]="combinedDataset() ?? ''"
-                            (ngModelChange)="setCombinedDataset($event)"
-                        />
+                        <!-- form-allow: a toolbar filter beside the Pipelines multi-select, bound to a signal, not a form --><mat-form-field class="w-52" subscriptSizing="dynamic">
+                            <mat-label>By Dataset</mat-label>
+                            <!-- form-allow: a toolbar filter beside the Pipelines multi-select, bound to a signal, not a form --><mat-select
+                                [value]="combinedDataset() ?? ''"
+                                (selectionChange)="setCombinedDataset($event.value)"
+                            >
+                                <mat-option value="">All datasets</mat-option>
+                                @for (ds of combinedDatasetOptions(); track ds) {
+                                    <mat-option [value]="ds">{{ ds }}</mat-option>
+                                }
+                            </mat-select>
+                        </mat-form-field>
                         <span class="text-secondary text-xs">
                             {{ combinedSelected().length || c.pipelines.length }} of {{ c.pipelines.length }} shown
                             @if (c.links.length) {
