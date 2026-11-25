@@ -123,7 +123,7 @@ public interface ApiContext extends WriteRootProvider {
             // capability is stamped — an event claiming "privileged by X" on an edition that checks
             // nothing would tell an auditor something false.
             attr(ex, ATTR_CAPABILITY, capability);
-            if (!s.capabilities().contains(capability))
+            if (!Roles.holds(s.capabilities(), capability))   // AK-2f: an implied capability counts
                 throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "missing capability '" + capability + "'");
         }
     }
@@ -239,7 +239,7 @@ public interface ApiContext extends WriteRootProvider {
                 attr(ex, ComponentAccess.ATTR_HELD_ROLES, priorHeld);
             }
         }
-        if (there == null || !there.id().equals(bound.id()) || !there.capabilities().contains(capability))
+        if (there == null || !there.id().equals(bound.id()) || !Roles.holds(there.capabilities(), capability))
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
                     "missing capability '" + capability + "' in the owning space");
     }
