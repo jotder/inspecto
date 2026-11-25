@@ -590,3 +590,18 @@ unrelated desktop app. Afterwards: the originals are gone, the live and kept fol
 the quarantine folder. **Two tracked paths now point at nothing:** `tools/la-demo-cases.mjs` and a brochure script name
 `la-preview-demo-20261116`; and the two `inspecto-basic-*` entries in `.claude/launch.json` (another lane's uncommitted file) name
 `C:\sandbox\la-basic\…`, stale since before this move. Not moved: classes C and D, the legacy rehearsal, E, F, G, H.
+
+## 23. P6: the legacy rehearsal and class C quarantined (operator yes, 2026-11-25)
+
+Second batch into `C:\sandbox\_pending-delete-20261125\` (same-drive renames; its `MANIFEST.txt` has a new section): **12 folders, 0.98 GB, 0
+failures**, which brings the quarantine to 12.74 GB. Nothing deleted.
+- **`legacy-c-data\`** (0.26 GB): `C:\data\{default, demo, ucc, telco-assurance, cricket-analytics}`, the data roots of the 2026-10/11
+  rehearsal, stamped for the `C:\sandbox\spaces` stubs, newer data living in the repo Spaces (D-SC10). `C:\data` is left as an empty folder.
+- **`legacy-stubs\`** (under 1 MB): the five matching config stubs from `C:\sandbox\spaces`, which now holds only the three private Spaces
+  (`inspecto-mfs`, `mfs-demo`, `la-mobile-money`), `_templates` and `onboarding-counters.tsv`.
+- **Class C** (0.72 GB): `ims-mfs-demo-backup` and `inspecto-mfs-backupsefore-map-move`, the older backups of the live installs; the P0
+  backups, whose counts and bytes were verified, are the fallback.
+
+Checked first: no process names any of them; no `.ref` or `space.toon` under the Preview, Basic, `spaces-preview`, canonical or private roots
+names the stubs or `C:\data`; the `_refs` pointers name only the three private Spaces. Still not moved: D, E, F, G, H. The quarantine can be
+deleted once the Preview and Basic installs have started once.
