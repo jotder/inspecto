@@ -156,6 +156,7 @@ inspecto-consignment-outputs.db.wal
 /features/inspecto-screening/target/
 /features/inspecto-anomaly/target/
 /features/inspecto-predictive/target/
+/features/inspecto-insights/target/
 /features/inspecto-realtime/target/
 /features/inspecto-mcp/target/
 /providers/inspecto-oidc/target/

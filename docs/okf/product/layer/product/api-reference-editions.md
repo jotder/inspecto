@@ -38,6 +38,7 @@ everything in Standard. ✅ in the edition · — not in it. An item marked — 
 | Action Requests | — | ✅ | ✅ |
 | AI Assist & Intelligence | — | ✅ | ✅ |
 | Anomaly Detection | — | ✅ | ✅ |
+| Business Insights | — | ✅ | ✅ |
 | Case Management | — | ✅ | ✅ |
 | Incidents | — | ✅ | ✅ |
 | Integration & Delivery | — | ✅ | ✅ |
@@ -108,6 +109,7 @@ everything in Standard. ✅ in the edition · — not in it. An item marked — 
 | Audit contract | ✅ | ✅ | ✅ |
 | Authentication and capability contract | ✅ | ✅ | ✅ |
 | Backup and restore | — | ✅ | ✅ |
+| Business Insights | — | ✅ | ✅ |
 | Case Management | — | ✅ | ✅ |
 | Case management and objects | — | ✅ | ✅ |
 | Collector and export connectors | ✅ | ✅ | ✅ |

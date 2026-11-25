@@ -13421,6 +13421,56 @@
         "x-generated" : true
       }
     },
+    "/insights/explain" : {
+      "post" : {
+        "tags" : [ "insights" ],
+        "summary" : "Explain the change of a Measure between one time bucket and the bucket before it",
+        "operationId" : "explainChange",
+        "description" : "BI-INSIGHTS-1 P2 (I-4, I-5, I-6), Business Insights add-on. Gated on canAuthorWorkbench. Every statement runs through the gates of POST /bi/query as the caller (dataset visibility, SQL guard, sandbox, masking): a classified dimension value comes back as its alias. Body: dataset, optional filters / when, exactly one of measure {agg, field} or ratio {num, den} (sum or count only - a non-additive aggregate is refused in words), field (date column), grain (day | week | month), at (a date inside the bucket to explain), dimensions (1-12), optional cover (0.5-1, default 0.8), related (0-10 Measures) and lookback (8-60 buckets, default 24). drivers: per dimension the contribution, share of the change and Jensen-Shannon surprise of each value, and the fewest values covering cover x the change; ranked. mixRate (ratio only): the exact shift-share split mix + rate = change. movedWith: correlation of the bucket-to-bucket changes, at least 8 pairs; never a cause. A dimension with more than 200 values is listed in refused. Pairs of dimensions (depth 2) are not offered.",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "dataset", "field", "grain", "at", "dimensions" ],
+                "properties" : {
+                  "dataset" : { "type" : "string" },
+                  "measure" : { "type" : "object" },
+                  "ratio" : { "type" : "object" },
+                  "filters" : { "type" : "array", "items" : { "type" : "object" } },
+                  "when" : { "type" : "object" },
+                  "field" : { "type" : "string" },
+                  "grain" : { "type" : "string", "enum" : [ "day", "week", "month" ] },
+                  "at" : { "type" : "string", "format" : "date" },
+                  "dimensions" : { "type" : "array", "items" : { "type" : "string" }, "maxItems" : 12 },
+                  "cover" : { "type" : "number", "minimum" : 0.5, "maximum" : 1 },
+                  "related" : { "type" : "array", "items" : { "type" : "object" }, "maxItems" : 10 },
+                  "lookback" : { "type" : "integer", "minimum" : 8, "maximum" : 60 }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped: data = {measure, kind (additive | ratio), grain, previous, current, before, after, delta, pct, cover, drivers[{dimension, explains, covered, surprise, cover[], elements[{value, before, after, contribution, share, surprise}] (top 20), valueCount}], mixRate[{dimension, before, after, mix, rate, parts[{value, w0, w1, r0, r1, mix, rate}]}] (ratio only), refused[{dimension, reason}], movedWith[{measure, before, after, pairs, r, movedWith, reason?}], movedWithNote, masking?}"
+          },
+          "403" : {
+            "description" : "The caller lacks canAuthorWorkbench."
+          },
+          "404" : {
+            "description" : "The dataset is unknown or not visible to the caller."
+          },
+          "422" : {
+            "description" : "A bad body, a non-additive aggregate, no value in one of the two buckets, a Measure the caller sees masked, or a failed statement."
+          },
+          "503" : {
+            "description" : "No Space write root, or the Business Insights module is not installed."
+          }
+        }
+      }
+    },
     "/inv/case-history" : {
       "post" : {
         "tags" : [ "inv" ],

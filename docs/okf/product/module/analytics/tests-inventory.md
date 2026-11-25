@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.analytics`](../../../../../product-map/module/analytics.toon).
 
-42 test class(es): 42 unit, 0 real-HTTP control-plane, 0 IT.
+43 test class(es): 43 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -40,6 +40,7 @@ mvn -o test -pl platform/inspecto-analytics -Dtest=ColumnProfilerTest,Md5BucketT
 | `BinningTest` | `com.gamma.analytics.distribution` | unit | `platform/inspecto-analytics/src/test/java/com/gamma/analytics/distribution/BinningTest.java` | {@link Binning}: hand figures for the JVM form, then the DuckDB form against it row by row (equal width over the |
 | `CorrelationDuckDbParityTest` | `com.gamma.analytics.distribution` | unit | `platform/inspecto-analytics/src/test/java/com/gamma/analytics/distribution/CorrelationDuckDbParityTest.java` | {@link CorrelationSql} (DuckDB {@code corr}, {@code regr_*}) against {@link Stats#correlation} and |
 | `OutlierDuckDbParityTest` | `com.gamma.analytics.distribution` | unit | `platform/inspecto-analytics/src/test/java/com/gamma/analytics/distribution/OutlierDuckDbParityTest.java` | {@link OutlierSql} (DuckDB) against the JVM definitions it is built on ({@link Stats#tukeyFences(double[], double, |
+| `DriversGoldenTest` | `com.gamma.analytics.drivers` | unit | `platform/inspecto-analytics/src/test/java/com/gamma/analytics/drivers/DriversGoldenTest.java` | Hand-computed goldens for I-4 contribution / surprise / minimal cover, I-5 mix vs rate and I-6 moved-with. |
 | `EntityGroupingParityTest` | `com.gamma.analytics.entity` | unit | `platform/inspecto-analytics/src/test/java/com/gamma/analytics/entity/EntityGroupingParityTest.java` | JVM ↔ DuckDB parity for entity grouping (ANALYTICS-CORE-1 S2): {@link EntityGrouping#group} and |
 | `EntityGroupingTest` | `com.gamma.analytics.entity` | unit | `platform/inspecto-analytics/src/test/java/com/gamma/analytics/entity/EntityGroupingTest.java` | The JVM form of entity grouping (ANALYTICS-CORE-1 S2): hand cases, the caps, determinism and D-M1. |
 | `ForecasterTest` | `com.gamma.analytics.forecast` | unit | `platform/inspecto-analytics/src/test/java/com/gamma/analytics/forecast/ForecasterTest.java` | {@link Forecaster} and {@link PredictionInterval}: hand-computed figures and the input rules (ANALYTICS-CORE-1 S5). |

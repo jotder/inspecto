@@ -1,0 +1,38 @@
+---
+type: ProductItem
+title: Business Insights
+item: module.insights
+description: Documentation hub for module.insights — every document about it, by slot.
+tags: [product-item, module]
+---
+
+# Business Insights (`module.insights`)
+
+> **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
+> [`module.insights`](../../../../../product-map/module/insights.toon). Editions, add-ons, order codes and dependencies are read
+> from the Product Map — never restated here. **Generated** by `tools/render-product-docs.mjs` from the files in
+> this folder — add or rename a file (`<slot>-<hub>.md` / `<slot>-<topic>.md`), never edit this table.
+
+| Slot | Status | Document |
+|---|---|---|
+| plan | missing | |
+| spec | missing | |
+| architecture | current | [Business Insights](architecture-insights.md) |
+| features | missing | |
+| feature-db | current | [Business Insights — feature database](feature-db.md) |
+| user-guide | missing | |
+| admin-guide | missing | |
+| api | current | [HTTP routes — module.insights](api-routes.md) |
+| tests | current | [Business Insights — tests inventory](tests-inventory.md) |
+| brochure | n/a | per edition / solution pack |
+
+Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: the reason says why; per-hub decisions in `slots-na.toon`).
+
+## Open work
+
+Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.insights` — the board is the only list; change the row there.
+
+| Row | Priority | Kind | Title | Hold |
+|---|---|---|---|---|
+| `BI-INSIGHTS-1` | P2 | feature | Advanced insights on business data in Widgets and Dashboards, authored and tuned as Insight Profiles. | — |
+| `BI-EXPLAIN-DEPTH2-1` | P3 | feature | "Explain this change" stops at one dimension (filed 2026-11-25, BI-INSIGHTS-1 P2). | — |
