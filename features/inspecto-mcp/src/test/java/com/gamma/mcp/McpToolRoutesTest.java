@@ -172,6 +172,47 @@ class McpToolRoutesTest {
                 "open_case_from_entities"), McpTools.CASE_TOOLS.stream().map(McpTools.Tool::name).toList());
     }
 
+    /**
+     * W3 (widening plan §3): each Space health, storage and score tool replays the one GET route the plan names, and that
+     * route's manifest gate is the capability the plan states — so the route's own 403 is what a caller without it meets.
+     * The never-list's Screening Hit reveal has no tool.
+     */
+    @Test
+    void everySpaceHealthAndScoreToolReplaysItsGatedGetRoute() {
+        Map<String, String[]> expected = new LinkedHashMap<>();
+        expected.put("get_space_integrity", new String[] {"/integrity", "canAuthorWorkbench"});
+        expected.put("get_space_origin", new String[] {"/origin", "canAuthorWorkbench"});
+        expected.put("preview_template_upgrade", new String[] {"/origin/upgrade", "canAuthorWorkbench"});
+        expected.put("get_dataset_storage", new String[] {"/datasets/x1/storage", "canUploadData"});
+        expected.put("verify_audit_chain", new String[] {"/audit/verify", "canAdminister"});
+        expected.put("get_risk_score", new String[] {"/risk-scores/x1/x1", "canWorkIncidents"});
+        expected.put("get_anomaly_score", new String[] {"/anomaly-scores/x1/x1", "canWorkIncidents"});
+        expected.put("get_prediction", new String[] {"/predictions/churn-model/x1/x1", "canWorkIncidents"});
+        assertEquals(List.copyOf(expected.keySet()), McpTools.SPACE_HEALTH_TOOLS.stream().map(McpTools.Tool::name).toList());
+        for (McpTools.Tool t : McpTools.SPACE_HEALTH_TOOLS) {
+            assertFalse(t.write(), t.name() + " only reads");
+            McpTools.Call c = t.router().route(t.validate(sample(t)));
+            String[] want = expected.get(t.name());
+            assertEquals("GET", c.method(), t.name());
+            assertEquals(want[0], c.path(), t.name());
+            assertTrue(CapabilityManifest.ENTRIES.stream().anyMatch(e -> e.method().equals("GET")
+                    && Pattern.matches(e.pattern(), c.path()) && want[1].equals(e.capability())),
+                    t.name() + " replays a route gated " + want[1] + ": " + c.path());
+        }
+        McpTools.Tool risk = McpTools.tool("get_risk_score");
+        assertEquals("/risk-scores/m1/masked:ab12?investigation=inv-1", risk.router().route(risk.validate(new LinkedHashMap<>(
+                Map.of("model", "m1", "key", "masked:ab12", "investigation", "inv-1")))).path(),
+                "a masked alias and its Investigation travel as the route takes them");
+        for (String kind : McpTools.PREDICTION_KINDS) {
+            McpTools.Tool p = McpTools.tool("get_prediction");
+            String path = p.router().route(p.validate(new LinkedHashMap<>(Map.of("kind", kind, "model", "m1", "key", "k1")))).path();
+            assertTrue(CapabilityManifest.ENTRIES.stream().anyMatch(e -> e.method().equals("GET")
+                    && Pattern.matches(e.pattern(), path)), "every prediction kind reaches the route: " + path);
+        }
+        for (McpTools.Call c : everyCall())
+            assertFalse(c.path().matches("/screening/hits/[^/]+/reveal"), "no tool reveals a Screening Hit: " + c.path());
+    }
+
     @Test
     void theEndpointIsReplayGated() {
         assertEquals("replay-gated", CapabilityManifest.exemptionFor("POST", "/mcp").category());
