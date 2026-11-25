@@ -906,6 +906,15 @@ public final class JobService implements AutoCloseable {
             bus.subscribe(this::mirrorPipelineCommit);   // bus is per-space, discarded with this service
         }
         packs.startWatching();   // P2c: react to jars dropped/removed at runtime (settle-delayed rescan)
+        // DATED-REFERENCE-RUNS-1 D-DR6: level-triggered reconcile loop on a 2-minute timer (and on events).
+        int reconcileSecs = Integer.getInteger("jobs.reconcile.intervalSeconds", 120);
+        if (reconcileSecs > 0) {
+            int mins = Math.max(1, reconcileSecs / 60);
+            scheduler.cron("by-day-reconcile",
+                    CronExpression.parse("0 */" + mins + " * * * *"),
+                    zone,
+                    () -> { if (!closing) dayReconciler().reconcileAll(Instant.now(), false); });
+        }
         started = true;
         log.info("JobService started: {} job(s) — {} cron-scheduled, {} event-triggered, {} signal-triggered",
                 jobs.size(), cronCount, eventCount, signalCount);
@@ -1101,6 +1110,52 @@ public final class JobService implements AutoCloseable {
         this.pipelineConfigs = supplier;
     }
 
+    private volatile DayReconciler dayReconciler;
+
+    /** The {@code schedule.mode: by_day} work-ledger reconciler for this Space ({@code DATED-REFERENCE-RUNS-1}). */
+    public DayReconciler dayReconciler() {
+        DayReconciler r = dayReconciler;
+        if (r != null) return r;
+        synchronized (this) {
+            if (dayReconciler == null) {
+                dayReconciler = new DayReconciler(
+                        this::configSnapshot,
+                        () -> pipelineConfigs == null ? List.of() : pipelineConfigs.get(),
+                        pipelineStore,
+                        zone,
+                        eventLog,
+                        new DayReconciler.RunSubmitter() {
+                            @Override
+                            public boolean submitDay(JobConfig cfg, String day, List<String> inputPaths,
+                                                     String ifVersionMissingOverride, boolean stale, String staleReason) {
+                                if (!jobs.containsKey(cfg.name()) || closing) return false;
+                                Map<String, String> dayArgs = new LinkedHashMap<>();
+                                dayArgs.put(DayReconciler.PARAM_DAY, day);
+                                dayArgs.put(DayReconciler.PARAM_INPUT_PATHS, String.join("\n", inputPaths));
+                                if (ifVersionMissingOverride != null)
+                                    dayArgs.put(DayReconciler.PARAM_IF_VERSION_MISSING, ifVersionMissingOverride);
+                                dayArgs.put(DayReconciler.PARAM_STALE, Boolean.toString(stale));
+                                if (staleReason != null) dayArgs.put(DayReconciler.PARAM_STALE_REASON, staleReason);
+                                String runId = newRunId(cfg.name());
+                                submitRun(runId, cfg.name(), "by_day:" + day, runId, null, 0,
+                                        new Firing(dayArgs, Map.of(), false));
+                                return true;
+                            }
+
+                            @Override
+                            public int activeCount(String jobName) {
+                                int count = 0;
+                                for (JobRun jr : liveRuns.values()) {
+                                    if (jobName.equals(jr.job()) && "RUNNING".equals(jr.status())) count++;
+                                }
+                                return count;
+                            }
+                        });
+            }
+            return dayReconciler;
+        }
+    }
+
     /** Read the gate progress left by an earlier run of this service; a bad line is skipped, a bad file is a WARN
      *  (the gates then wait for a full cycle, a late run and never a wrong one). */
     private void loadGate() {
@@ -1137,6 +1192,7 @@ public final class JobService implements AutoCloseable {
 
     private void onConsignmentEvent(ConsignmentEvent event) {
         if (!"SUCCESS".equals(event.status())) return;
+        dayReconciler().onConsignmentCommitted(event);
         for (JobConfig c : configs) {
             if (!c.enabled() || !c.hasEvent()) continue;
             List<String> upstreams = c.onPipelines();
@@ -1797,7 +1853,8 @@ public final class JobService implements AutoCloseable {
                             String correlationId, String causationId, int chainDepth, Firing firing) {
         fenceDelete(cfg);   // T25: surface a conflict if a declared delete races an active reader/writer
         String pipelineId = trackPipelineStart(job, cfg, name);   // T32: mark a pipeline job's stores active for the fence
-        Map<String, String> params = cfg != null ? cfg.params() : Map.of();
+        Map<String, String> params = new LinkedHashMap<>(cfg != null ? cfg.params() : Map.of());
+        if (firing != null && firing.args() != null) params.putAll(firing.args());
         RunContext ctx = new RunContext(runId, spaceId, name, trigger, correlationId, causationId,
                 chainDepth, params, runLogStore, runLogMax, runArtifactStore);
         if (unavailableJobs.contains(name)) {
@@ -2031,6 +2088,11 @@ public final class JobService implements AutoCloseable {
                 Map.of("job", name), res.durationMs() / 1000.0);
         log.info("[JOB] {} ({}) {} in {}ms — {}",
                 name, trigger, res.status(), res.durationMs(), res.message());
+        String byDay = params.get(DayReconciler.PARAM_DAY);
+        if (byDay != null && dayReconciler != null) {
+            dayReconciler.markDayFinished(name, byDay, res.durationMs());
+            if (!closing) dayReconciler.reconcileAll(Instant.now(), false);
+        }
     }
 
     /** Test seam: how a retry waits out its backoff. */

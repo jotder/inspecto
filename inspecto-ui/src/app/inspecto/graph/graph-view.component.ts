@@ -418,29 +418,49 @@ export function boxesOverlap(a: CanvasBox, b: CanvasBox): boolean {
 }
 
 /**
- * Labels and start tabs never collide (LA-EXEC-DEMO-POLISH-1, item 16): a label whose usual place under its node would
- * cover a start tab (SMURF-02's label lay on RELAY-01's tab in the showcase) moves to the first side of its own node,
- * of top, right and left, that is clear of every start tab, preferring one that also covers no node; with no such side
- * it stays under its node. The tab never moves: "the tab on top of a node" is how a start entity is recognised on every
- * canvas, so the label of the other node gives way. G6 5.1.1 has no label collision avoidance that could do this (its
- * `auto-adapt-label` hides labels by priority, and knows nothing of badges). Only the moved labels are returned.
+ * Format a link's canvas label (LA-EXEC-DEMO-POLISH-1 item 1): shows the link kind, any folded count not already in
+ * `kind`, and the summed Measure total (`data.total`) when present so transfer amounts or counts appear on the links.
+ */
+export function edgeLabelText(data: { kind?: string; total?: number | null; count?: number }): string {
+    const kind = data.kind ?? '';
+    const parts: string[] = [];
+    if (kind) parts.push(kind);
+    if (typeof data.count === 'number' && data.count > 1 && !kind.endsWith(` · ${data.count}`)) {
+        parts.push(String(data.count));
+    }
+    if (typeof data.total === 'number' && Number.isFinite(data.total)) {
+        parts.push(data.total.toLocaleString('en', { maximumFractionDigits: 2 }));
+    }
+    return parts.join(' · ');
+}
+
+/**
+ * Labels never collide with start tabs, other nodes, or each other (LA-EXEC-DEMO-POLISH-1, items 2 & 16): a label whose
+ * usual place under its node would cover a start tab, another node, or an already-placed label moves to the best clear
+ * side (`bottom`, `top`, `right`, `left`). Start tabs never move. Only the moved labels (non-`bottom`) are returned.
  */
 export function labelSidesClearOfStartTabs(nodes: readonly LabelledNode[]): Map<string, LabelSide> {
     const out = new Map<string, LabelSide>();
     const tabs = nodes.filter((n) => n.start).map((n) => startTabBox(n.x, n.y, n.h));
-    if (!tabs.length) return out;
+    const nodeBoxes = nodes.map((n): CanvasBox => [n.x - n.w / 2, n.y - n.h / 2, n.x + n.w / 2, n.y + n.h / 2]);
+    const placedLabels: CanvasBox[] = [];
     const clearOfTabs = (box: CanvasBox): boolean => tabs.every((t) => !boxesOverlap(t, box));
-    for (const n of nodes) {
-        if (!n.label || clearOfTabs(nodeLabelBox(n, 'bottom'))) continue;
-        const sides = (['top', 'right', 'left'] as const).filter((s) => clearOfTabs(nodeLabelBox(n, s)));
-        const coversNoNode = (s: LabelSide): boolean =>
-            nodes.every(
-                (o) =>
-                    o === n ||
-                    !boxesOverlap([o.x - o.w / 2, o.y - o.h / 2, o.x + o.w / 2, o.y + o.h / 2], nodeLabelBox(n, s)),
-            );
-        const side = sides.find(coversNoNode) ?? sides[0];
-        if (side) out.set(n.id, side);
+    const clearOfNodes = (idx: number, box: CanvasBox): boolean =>
+        nodeBoxes.every((nb, j) => j === idx || !boxesOverlap(nb, box));
+    const clearOfLabels = (box: CanvasBox): boolean => placedLabels.every((lb) => !boxesOverlap(lb, box));
+    const candidates: readonly LabelSide[] = ['bottom', 'top', 'right', 'left'];
+    for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        if (!n.label) continue;
+        const boxes = candidates.map((s) => ({ side: s, box: nodeLabelBox(n, s) }));
+        const pick =
+            boxes.find((c) => clearOfTabs(c.box) && clearOfNodes(i, c.box) && clearOfLabels(c.box)) ??
+            boxes.find((c) => clearOfTabs(c.box) && clearOfLabels(c.box)) ??
+            boxes.find((c) => clearOfTabs(c.box) && clearOfNodes(i, c.box)) ??
+            boxes.find((c) => clearOfTabs(c.box)) ??
+            boxes[0];
+        if (pick.side !== 'bottom') out.set(n.id, pick.side);
+        placedLabels.push(pick.box);
     }
     return out;
 }
@@ -1574,7 +1594,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                 const n = this.data?.nodes.find((x) => x.id === id);
                 return (n?.data.hoverLabel ?? n?.data.label ?? String(id)) as string;
             };
-            return `<b>${esc(data.kind)}</b><br/>${esc(label((d as EdgeData).source))} → ${esc(label((d as EdgeData).target))}${from}`;
+            const edgeText = edgeLabelText(data as { kind?: string; total?: number | null; count?: number });
+            return `<b>${esc(edgeText || data.kind)}</b><br/>${esc(label((d as EdgeData).source))} → ${esc(label((d as EdgeData).target))}${from}`;
         }
         const degree = this.data?.edges.filter((e) => e.source === d.id || e.target === d.id).length ?? 0;
         // The ringed (high-connectivity) node names its sealed contact count when served — the legend's "shown, not expanded".
@@ -2083,7 +2104,8 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
                     label: () =>
                         this.display?.edgeLabels !== false &&
                         !edgeLabelsHiddenByDensity(this.display, this.data?.edges.length ?? 0),
-                    labelText: (d): string => (d.data as { kind: string }).kind,
+                    labelText: (d): string =>
+                        edgeLabelText(d.data as { kind?: string; total?: number | null; count?: number }),
                     labelFill: () => this.styleFg,
                     labelFontSize: 9,
                     labelBackground: false,
@@ -2161,8 +2183,9 @@ export class GraphViewComponent implements AfterViewInit, OnChanges, OnDestroy {
         graph.on(NodeEvent.POINTER_ENTER, (e) => this.revealEdgeLabels(targetId(e), 'node', false));
         graph.on(EdgeEvent.POINTER_ENTER, (e) => this.revealEdgeLabels(targetId(e), 'edge', false));
         graph.on(NodeEvent.POINTER_LEAVE, () => this.revealEdgeLabels(undefined, 'node', false));
-        // Labels clear of the start tabs: placed again whenever drawing settles, and when a dragged node is let go.
+        // Labels clear of the start tabs and each other: placed again whenever drawing or layout settles, and when a dragged node is let go.
         graph.on(GraphEvent.AFTER_DRAW, () => this.scheduleRelabel());
+        graph.on(GraphEvent.AFTER_LAYOUT, () => this.scheduleRelabel());
         graph.on(NodeEvent.DRAG_START, () => (this.dragging = true));
         // A drag that ends off the canvas (a blur) may never send its dragend: any pointer release ends it here too.
         for (const end of [NodeEvent.DRAG_END, CommonEvent.POINTER_UP])

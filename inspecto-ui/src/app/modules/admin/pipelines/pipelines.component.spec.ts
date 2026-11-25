@@ -201,5 +201,37 @@ describe('PipelinesComponent', () => {
             c.setMode('view');
             expect(c.selectedNode()).toBeNull();
         });
+
+        it('filters Topology by Dataset and navigates to Editor on node double-click (JG4)', () => {
+            const fixture = build({
+                pipelines: [
+                    { name: 'dim_dial_digit', active: true },
+                    { name: 'cdr_enrich', active: false },
+                    { name: 'unrelated', active: true },
+                ],
+                nodes: [
+                    { id: 'dim_dial_digit/sink', type: 'sink.persistent', category: 'SINK', label: 'Sink', pipeline: 'dim_dial_digit', store: 'dim_dial_digit' },
+                    { id: 'store:dim_dial_digit', type: 'store', category: 'STORE', label: 'dim_dial_digit', store: 'dim_dial_digit' },
+                    { id: 'cdr_enrich/join', type: 'transform.join', category: 'TRANSFORM', label: 'Join', pipeline: 'cdr_enrich' },
+                    { id: 'unrelated/acq', type: 'acquisition', category: 'SOURCE', label: 'Acq', pipeline: 'unrelated' },
+                ],
+                edges: [
+                    { from: 'dim_dial_digit/sink', to: 'store:dim_dial_digit', rel: 'produces', kind: 'store' },
+                    { from: 'store:dim_dial_digit', to: 'cdr_enrich/join', rel: 'reference', kind: 'reference' },
+                ],
+                links: [],
+            });
+            fixture.detectChanges();
+            const c = fixture.componentInstance;
+            c.setMode('topology');
+
+            expect(c.combinedDatasetOptions()).toEqual(['dim_dial_digit']);
+            c.setCombinedDataset('dim_dial_digit');
+            expect(c.combinedSelected()).toEqual(['dim_dial_digit', 'cdr_enrich']);
+            expect(c.combinedG6()?.nodes.some((n) => n.id === 'unrelated/acq')).toBe(false);
+
+            c.onTopologyNodeDblClick('cdr_enrich/join');
+            expect(c.mode()).toBe('editor');
+        });
     });
 });

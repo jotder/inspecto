@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-483 test class(es): 195 unit, 288 real-HTTP control-plane, 0 IT.
+486 test class(es): 195 unit, 291 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -185,6 +185,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiJobActionsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJobActionsTest.java` | The Scheduler's per-job actions over real HTTP (the UI's live path): single-job detail |
 | `ControlApiJobArtifactDownloadTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJobArtifactDownloadTest.java` | {@code GET /jobs/{name}/runs/{runId}/artifacts/{artifact}/content} over real HTTP: a report Job delivers |
 | `ControlApiJobAuthorityTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJobAuthorityTest.java` | MAINT-TASK-AUTHORITY-1: a Job carries a SERVER-STAMPED author, the runner refuses an administrator-only task whose |
+| `ControlApiJobBacklogAndSplitGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJobBacklogAndSplitGateTest.java` | The capability gates of the Runs ▸ Backlog controls (DATED-REFERENCE-RUNS-1 P4: drain, pause, resume, run a day, give |
 | `ControlApiJobCrudTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJobCrudTest.java` | The job write contract over real HTTP ({@code POST /jobs}, {@code PUT /jobs/{name}}) — the shape an |
 | `ControlApiJobExpressionsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJobExpressionsTest.java` | {@code GET /jobs/expressions} over real HTTP (job-parameter-contract §4.3, step 6): the Expression |
 | `ControlApiJobIfMatchTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJobIfMatchTest.java` | Optimistic concurrency on {@code PUT /jobs/{name}} — {@code IFMATCH-COVERAGE-GAP-1}. |
@@ -256,6 +257,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiProblemFilesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiProblemFilesTest.java` | Real-HTTP tests for {@code GET /status/problem-files} — the cross-pipeline, file-grain companion to |
 | `ControlApiProvenanceTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiProvenanceTest.java` | The data-plane provenance query routes (T22) over real HTTP: param validation and the default-off gate. |
 | `ControlApiPublicationTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiPublicationTest.java` | ASSURE-BI-PUBLICATION-1 (operator 2026-09-29): the per-Space publication destination allowlist, and the |
+| `ControlApiQuarantineReleaseTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiQuarantineReleaseTest.java` | {@code GET /runs/{name}/quarantine} metadata enrichment and |
 | `ControlApiQueryRunAccessTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiQueryRunAccessTest.java` | {@code POST /queries/{id}/run} honours component access (R3) under an ARMED authenticator: a query |
 | `ControlApiQueryRunV1Test` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiQueryRunV1Test.java` | Real-HTTP + real-DuckDB tests for W4 query execution ({@code POST /queries/{id}/run}): a persisted |
 | `ControlApiRateLimitTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRateLimitTest.java` | Real-HTTP tests for the per-subject token-bucket throttle on the expensive routes |
@@ -325,6 +327,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ImportCapabilityGuardTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ImportCapabilityGuardTest.java` | {@link ImportCapabilityGuard} is COMPLETE against {@link CapabilityManifest}: for every writable kind, every declared |
 | `ImportRowFilterHugeExponentTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ImportRowFilterHugeExponentTest.java` | A decimal filter value with a huge exponent is refused before {@code BigDecimal.toPlainString} expands it into |
 | `IndexBuildOwnerRunAuthorityTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/IndexBuildOwnerRunAuthorityTest.java` | T5 residuals (a)+(b): the RUN path refuses an la.index.build Job whose owner is not its last editor, unless that |
+| `JobGraphRoutesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/JobGraphRoutesTest.java` | Backend routes for JOB-GRAPH-1: |
 | `JobWritersTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/JobWritersTest.java` | ASSURE-XLSX-ATTACHMENTS-1 re-verification finding 2: <b>every route that can write a {@code job} passes |
 | `KpiCompletenessWidgetTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/KpiCompletenessWidgetTest.java` | The completeness tile (§8-D, operator 2026-10-09: Signals behind a Dataset). The shipped {@code telco-ra} Space |
 | `KpiSnapshotJobTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/KpiSnapshotJobTest.java` | {@code kpi.snapshot} (`BI-INSIGHTS-1` P0, I-3) run by a real JobService: it is registered through ServiceLoader, |

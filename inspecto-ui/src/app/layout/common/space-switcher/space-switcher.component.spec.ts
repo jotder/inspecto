@@ -221,6 +221,28 @@ describe('SpaceSwitcherComponent', () => {
         });
     });
 
+    describe('LA-SPACE-SWITCHER-NAMES-1', () => {
+        it('keeps the Space name visible on phones instead of collapsing to icon-only', () => {
+            const { fixture } = create(true);
+            const nameEl = fixture.nativeElement.querySelector('[data-testid="space-switcher-name"]') as HTMLElement;
+            expect(nameEl.textContent!.trim()).toBe('Alpha');
+            expect(nameEl.classList).not.toContain('hidden');
+            expect(nameEl.classList).not.toContain('md:inline');
+        });
+
+        it('applies inspecto-space-switcher-menu so two-line Space names wrap without squeezing into 48 px', () => {
+            const { fixture } = create(true, false, undefined, {
+                spaces: [
+                    { id: 'alpha', displayName: 'Alpha', description: '', createdAt: '' },
+                    { id: 'la-mfs', displayName: 'Mobile financial services fraud', description: '', createdAt: '' },
+                ],
+            });
+            openMenu(fixture);
+            const panel = document.querySelector('.mat-mdc-menu-panel') as HTMLElement;
+            expect(panel.classList).toContain('inspecto-space-switcher-menu');
+        });
+    });
+
     it('stays on the current Space when the dialog is dismissed', () => {
         const { fixture, open, selectSpace } = create(true, true, undefined);
         openMenu(fixture).at(-2)!.click();

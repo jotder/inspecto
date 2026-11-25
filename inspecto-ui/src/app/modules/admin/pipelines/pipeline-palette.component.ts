@@ -87,8 +87,8 @@ import {
                                         [disabled]="readOnly()"
                                         [matTooltip]="p.note || p.label"
                                         [attr.aria-label]="'Add ' + p.label"
-                                        (click)="pick.emit(p.nodeType)"
-                                        (dragstart)="$event.dataTransfer?.setData('text/flow-node-type', p.nodeType)"
+                                        (click)="pick.emit(p.id === 'acquisition.dataset' ? p.id : p.nodeType)"
+                                        (dragstart)="$event.dataTransfer?.setData('text/flow-node-type', p.id === 'acquisition.dataset' ? p.id : p.nodeType)"
                                     >
                                         <mat-icon
                                             class="icon-size-6 shrink-0"

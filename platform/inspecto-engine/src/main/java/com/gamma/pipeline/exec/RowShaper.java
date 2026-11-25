@@ -113,6 +113,16 @@ public final class RowShaper {
          */
         default List<java.nio.file.Path> readFiles(String reference) { return List.of(); }
 
+        /**
+         * Resolve {@code reference} for a specific business {@code day} ({@code yyyy-MM-dd}) when
+         * {@code transform.join} declares {@code version_by:} ({@code DATED-REFERENCE-RUNS-1} P1).
+         * Default ignores {@code day} and delegates to {@link #resolve}.
+         */
+        default String resolveForDay(Connection conn, String reference, String day, String ifVersionMissing)
+                throws SQLException {
+            return resolve(conn, reference);
+        }
+
         /** The no-context default: any resolution attempt refuses with the reference it could not reach. */
         ReferenceResolver NONE = (conn, reference) -> {
             throw new IllegalStateException("no ReferenceResolver supplied — cannot resolve reference '"
@@ -1157,8 +1167,23 @@ public final class RowShaper {
             throw new IllegalArgumentException("transform.join node '" + node.id() + "' needs a 'reference'");
         List<String> on = joinOn(node);
         String match = joinMatch(node);
-        String ref = references.resolve(conn, reference);
+        String versionBy = strOrNull(node, "version_by");
+        String ifVersionMissing = strOrNull(node, "if_version_missing");
+        if (ifVersionMissing != null) {
+            if (versionBy == null)
+                throw new IllegalArgumentException("transform.join node '" + node.id() + "': if_version_missing "
+                        + "requires version_by:");
+            if (!JOIN_IF_VERSION_MISSING.contains(ifVersionMissing))
+                throw new IllegalArgumentException("transform.join node '" + node.id() + "': if_version_missing '"
+                        + ifVersionMissing + "' — use one of " + JOIN_IF_VERSION_MISSING);
+        }
         String data = table(prefix, PipelineRel.DATA);
+        if (versionBy != null && isKeyedJoin(node)) {
+            datedKeyedJoin(conn, node, input, reference, on, match, data, references, versionBy,
+                    ifVersionMissing == null ? "wait" : ifVersionMissing);
+            return List.of(new Relation(PipelineRel.DATA, data));
+        }
+        String ref = references.resolve(conn, reference);
         if (isKeyedJoin(node)) {
             keyedJoin(conn, node, input, ref, on, match, data);
             return List.of(new Relation(PipelineRel.DATA, data));
@@ -1425,11 +1450,14 @@ public final class RowShaper {
     public static final List<String> JOIN_MATCHES =
             List.of(JOIN_MATCH_EXACT, JOIN_MATCH_LONGEST_PREFIX, JOIN_MATCH_RANGE, JOIN_MATCH_ASOF, JOIN_MATCH_FUZZY);
 
+    public static final List<String> JOIN_IF_VERSION_MISSING = List.of("wait", "previous", "fail");
+
     /** The keyed form's settings (LOOKUP-1 P1b–P4); each needs {@code key:}, or {@code from:}/{@code to:} for a range. */
     public static final List<String> JOIN_KEYED_KEYS =
             List.of("columns", "as", "default", "exact_when", "duplicates", "order_by", "from", "to", "filter",
                     "lookups", "details", "normalize", "at", "max_miss_rate",
-                    "method", "threshold", "block", "block_prefix", "top_k");
+                    "method", "threshold", "block", "block_prefix", "top_k",
+                    "version_by", "if_version_missing");
 
     /** Default similarity threshold for {@code match: fuzzy} (0..1). */
     public static final double DEFAULT_FUZZY_THRESHOLD = 0.85;
@@ -1580,6 +1608,72 @@ public final class RowShaper {
      * equality — call records repeat numbers, so this does the prefix work once per number, not once per row and
      * column (measured 2026-11-22: 5M rows × 3 numbers, 6.6 s as three prefix joins, 2.3 s this way).
      */
+    /**
+     * Dated keyed join ({@code DATED-REFERENCE-RUNS-1} P1): resolves each distinct business day of
+     * {@code versionBy} to its own Reference version via {@link ReferenceResolver#resolveForDay} and runs
+     * {@link #keyedJoin} per day so resolve-once applies per {@code (day, value)}.
+     */
+    private static void datedKeyedJoin(Connection conn, PipelineNode node, String input, String reference,
+                                       List<String> on, String match, String data,
+                                       ReferenceResolver references, String versionBy,
+                                       String ifVersionMissing) throws SQLException {
+        List<String> inputCols = columnsOf(conn, input);
+        String actualVersionCol = inputCols.stream()
+                .filter(c -> c.equalsIgnoreCase(versionBy))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("transform.join node '" + node.id()
+                        + "': the rows have no version_by column '" + versionBy + "' (they have " + inputCols + ")"));
+        String dayExpr = "COALESCE(strftime(TRY_CAST(" + q(actualVersionCol) + " AS DATE), '%Y-%m-%d'), "
+                + "CASE WHEN length(trim(CAST(" + q(actualVersionCol) + " AS VARCHAR))) >= 10 "
+                + "AND substr(trim(CAST(" + q(actualVersionCol) + " AS VARCHAR)), 5, 1) = '-' "
+                + "AND substr(trim(CAST(" + q(actualVersionCol) + " AS VARCHAR)), 8, 1) = '-' "
+                + "THEN substr(trim(CAST(" + q(actualVersionCol) + " AS VARCHAR)), 1, 10) ELSE NULL END)";
+        List<String> days = new ArrayList<>();
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT DISTINCT " + dayExpr + " AS __vday FROM " + q(input)
+                     + " ORDER BY __vday NULLS LAST")) {
+            while (rs.next()) days.add(rs.getString(1));
+        }
+        if (days.isEmpty()) {
+            String ref = references.resolveForDay(conn, reference, null, "previous");
+            keyedJoin(conn, node, input, ref, on, match, data);
+            return;
+        }
+        if (days.size() == 1 && days.get(0) != null) {
+            String ref = references.resolveForDay(conn, reference, days.get(0), ifVersionMissing);
+            keyedJoin(conn, node, input, ref, on, match, data);
+            return;
+        }
+        List<String> partOutputs = new ArrayList<>();
+        List<String> tempTables = new ArrayList<>();
+        try {
+            for (int i = 0; i < days.size(); i++) {
+                String d = days.get(i);
+                String slice = data + "__vslice_" + i;
+                String partOut = data + "__vout_" + i;
+                tempTables.add(slice);
+                tempTables.add(partOut);
+                String pred = d == null ? "(" + dayExpr + " IS NULL)"
+                        : "(" + dayExpr + " = " + sqlStr(d) + ")";
+                exec(conn, "CREATE TABLE " + q(slice) + " AS SELECT * FROM " + q(input) + " WHERE " + pred);
+                String policy = d == null ? "previous" : ifVersionMissing;
+                String ref = references.resolveForDay(conn, reference, d, policy);
+                keyedJoin(conn, node, slice, ref, on, match, partOut);
+                partOutputs.add(partOut);
+            }
+            String unionSql = partOutputs.stream()
+                    .map(t -> "SELECT * FROM " + q(t))
+                    .collect(java.util.stream.Collectors.joining(" UNION ALL "));
+            exec(conn, "CREATE TABLE " + q(data) + " AS " + unionSql);
+        } finally {
+            for (String tmp : tempTables) {
+                try (Statement st = conn.createStatement()) {
+                    st.execute("DROP TABLE IF EXISTS " + q(tmp));
+                } catch (SQLException ignored) { }
+            }
+        }
+    }
+
     private static void keyedJoin(Connection conn, PipelineNode node, String input, String ref, List<String> on,
                                   String match, String data) throws SQLException {
         String id = node.id();

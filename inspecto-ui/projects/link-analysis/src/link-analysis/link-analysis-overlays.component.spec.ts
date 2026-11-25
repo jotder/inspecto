@@ -338,4 +338,18 @@ describe('Link Analysis legend - link styles', () => {
         expect(swatch('sms')?.getAttribute('data-pattern')).toBeNull();
         expect(swatch('sms')?.classList.contains('h-2')).toBe(true);
     });
+
+    it('LA-EXEC-DEMO-POLISH-1 item 6: explains the start mark in the legend when startCount > 0', () => {
+        TestBed.configureTestingModule({ imports: [LinkAnalysisLegendComponent], providers: [provideNoopAnimations()] });
+        const fixture = TestBed.createComponent(LinkAnalysisLegendComponent);
+        fixture.detectChanges();
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.querySelector('[data-testid="legend-start"]')).toBeNull();
+        fixture.componentRef.setInput('startCount', 2);
+        fixture.detectChanges();
+        const row = el.querySelector('[data-testid="legend-start"]');
+        expect(row?.textContent).toContain('start');
+        expect(row?.textContent).toContain('Start entity');
+        expect(row?.textContent).toContain('2');
+    });
 });

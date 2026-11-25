@@ -37,6 +37,14 @@ function create(inputs?: { name: string; embedded: boolean }, confirmResult = tr
                     quarantine: () => of([QUARANTINED]),
                     commits: () => of([]),
                     reprocess: () => of({}),
+                    releaseQuarantined: () =>
+                        of({
+                            pipeline: 'cdr_ingest',
+                            file: 'bad.csv',
+                            destination: 'bad.csv',
+                            status: 'reprocessing',
+                            runId: 'r-1',
+                        }),
                     drain: () =>
                         of({
                             pipeline: 'cdr_ingest',
@@ -121,16 +129,44 @@ describe('RunDetailComponent', () => {
         expect(actions.map((a) => a.hint)).toEqual([
             'Lineage & details',
             'Reprocess this batch',
+            'Release & reprocess',
             'View the rejected rows',
         ]);
         // The quarantine listing is synthesized off the on-disk layout with no consignment_id, so the
         // two batch-keyed actions hide per row — a batch row (Batches tab) still shows them.
         expect(actions.find((a) => a.hint === 'Lineage & details')!.visible!(QUARANTINED)).toBe(false);
         expect(actions.find((a) => a.hint === 'Reprocess this batch')!.visible!(QUARANTINED)).toBe(false);
+        expect(actions.find((a) => a.hint === 'Release & reprocess')!.visible!(QUARANTINED)).toBe(true);
+        expect(actions.find((a) => a.hint === 'Release & reprocess')!.visible!({ file: 'bad_errors.csv', path: 'parse_error/bad_errors.csv' })).toBe(false);
         expect(actions.find((a) => a.hint === 'Lineage & details')!.visible!(BATCH)).toBe(true);
         expect(actions.find((a) => a.hint === 'Reprocess this batch')!.visible!(BATCH)).toBe(true);
         // A quarantined file's whole content was rejected, so its rejected-row detail is always offered.
         expect(actions.find((a) => a.hint === 'View the rejected rows')!.visible).toBeUndefined();
+    });
+
+    it('hides Release & reprocess in the Business lens and blocks releaseQuarantineRow', () => {
+        const c = create().componentInstance;
+        c.selectedIndex = c.tabs.findIndex((t) => t.id === 'quarantine');
+        c.onTabChange();
+        TestBed.inject(LensService).selectLens('business');
+        expect(c.auditRowActions.map((a) => a.hint)).toEqual(['Lineage & details', 'View the rejected rows']);
+        const spy = vi.spyOn(TestBed.inject(RunsService), 'releaseQuarantined');
+        c.releaseQuarantineRow(QUARANTINED);
+        expect(spy).not.toHaveBeenCalled();
+    });
+
+    it('releasing a quarantined row asks for confirmation before calling the API', async () => {
+        const c = create().componentInstance;
+        const spy = vi.spyOn(TestBed.inject(RunsService), 'releaseQuarantined');
+        await c.releaseQuarantineRow(QUARANTINED);
+        expect(spy).toHaveBeenCalledWith('cdr_ingest', 'quarantine/bad.csv', true);
+    });
+
+    it('cancelling the confirm dialog skips the releaseQuarantined call', async () => {
+        const c = create(undefined, false).componentInstance;
+        const spy = vi.spyOn(TestBed.inject(RunsService), 'releaseQuarantined');
+        await c.releaseQuarantineRow(QUARANTINED);
+        expect(spy).not.toHaveBeenCalled();
     });
 
     it('offers the rejected rows only on files that actually rejected some', () => {

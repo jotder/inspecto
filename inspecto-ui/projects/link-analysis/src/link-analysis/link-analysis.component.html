@@ -1880,6 +1880,7 @@
                                 [edgeColors]="displayOptions().edgeColors"
                                 [edgePatterns]="displayOptions().edgePatterns"
                                 (edgeKindToggle)="toggleLinkKind($event)"
+                                [startCount]="startNodesDrawn()"
                                 [highConnectivity]="hubsDrawn()"
                                 [unexpanded]="unexpandedDrawn()"
                                 [onlyUnexpanded]="onlyUnexpanded()"
@@ -1908,17 +1909,22 @@
                                     <span>Investigation Working Set</span>
                                 }
                                 @if (revealOffer(); as offer) {
-                                    <!-- LA-FULL-CYCLE-TEST-1 D3: the canvas's way to the one Reveal for the nodes on screen -->
-                                    <span class="flex items-center gap-1" data-testid="la-reveal-offer">
-                                        {{
+                                    <!-- LA-FULL-CYCLE-TEST-1 D3 / LA-EXEC-DEMO-POLISH-1 item 3: prominent pill at the canvas foot -->
+                                    <span
+                                        class="bg-card text-default flex items-center gap-2 rounded-full border py-0.5 pl-2.5 pr-1 text-xs shadow-sm"
+                                        style="border-color: var(--gamma-border)"
+                                        data-testid="la-reveal-offer"
+                                    >
+                                        <span class="font-medium">{{
                                             offer.count === 1
                                                 ? '1 entity masked'
                                                 : offer.count.toLocaleString('en-GB') + ' entities masked'
-                                        }}
+                                        }}</span>
                                         <button
-                                            mat-stroked-button
+                                            mat-flat-button
+                                            color="primary"
                                             type="button"
-                                            class="!h-6 !min-h-0 !px-2 !text-[0.6875rem]"
+                                            class="!h-7 !min-h-0 !rounded-full !px-3 !text-xs"
                                             data-testid="la-reveal"
                                             [disabled]="!!offer.why"
                                             [disabledInteractive]="true"
@@ -1934,7 +1940,7 @@
                                             (click)="revealFromCanvas()"
                                         >
                                             <mat-icon
-                                                class="icon-size-3"
+                                                class="icon-size-3.5"
                                                 svgIcon="heroicons_outline:eye"
                                                 aria-hidden="true"
                                             ></mat-icon>

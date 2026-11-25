@@ -563,6 +563,23 @@ class ControlApiInvestigationsTest {
         }
     }
 
+    @Test
+    void anExpandThatFindsNothingNewIsNotRecordedAsAStep(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            assertEquals(200, post(c.port, "/inv/investigations", CREATE).statusCode());
+            assertEquals(200, post(c.port, "/inv/investigations/case-a/ops",
+                    "{\"op\":\"seed\",\"ids\":[\"nobody\"]}").statusCode());
+            HttpResponse<String> expand = post(c.port, "/inv/investigations/case-a/ops", "{\"op\":\"expand\"}");
+            assertEquals(200, expand.statusCode(), expand.body());
+            JsonNode data = JSON.readTree(expand.body()).get("data");
+            assertEquals("no_op", data.get("status").asText(), expand.body());
+            assertEquals(0, data.get("step").asInt(), expand.body());
+            JsonNode log = JSON.readTree(send(c.port, "GET", "/inv/investigations/case-a/log", null, null).body())
+                    .at("/data/entries");
+            assertEquals(1, log.size(), "only the seed step is in the log: " + log);
+        }
+    }
+
     private static List<String> texts(JsonNode array) {
         List<String> out = new ArrayList<>();
         for (JsonNode n : array) out.add(n.asText());

@@ -1,6 +1,7 @@
 package com.gamma.exchange;
 
 import com.gamma.control.HostContext;
+import com.gamma.control.SpaceAdmission;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
@@ -70,26 +71,26 @@ public final class ExchangeRoutes implements RouteModule {
         // owning Space's own approver was refused. Owner acts → the body's/grant's owner; consumer acts
         // (request, pin) → the consumer.
         api.post("/exchange/offers", ApiContext.withCapability("canOfferDatasets",
-                (e, m) -> spaceRoles(api, bodySpace(api, e, "owner")),
+                (e, m) -> spaceRoles(api, e, bodySpace(api, e, "owner")),
                 (e, m) -> putOffer(api, e)));
         // Cross-Space consequence D7: offering a Signal type is its own verb, not canOfferDatasets.
         api.post("/exchange/signal-offers", ApiContext.withCapability("canOfferSignals",
-                (e, m) -> spaceRoles(api, signalBodySpace(api, e, "owner", "canOfferSignals")),
+                (e, m) -> spaceRoles(api, e, signalBodySpace(api, e, "owner", "canOfferSignals")),
                 (e, m) -> putSignalOffer(api, e)));
         api.post("/exchange/refresh", ApiContext.withCapability("canOfferDatasets",
-                (e, m) -> spaceRoles(api, bodySpace(api, e, "owner")),
+                (e, m) -> spaceRoles(api, e, bodySpace(api, e, "owner")),
                 (e, m) -> refresh(api, e)));
         api.post("/exchange/requests", ApiContext.withCapability("canRequestShares",
-                (e, m) -> spaceRoles(api, signalBodySpace(api, e, "consumer", "canRequestShares")),
+                (e, m) -> spaceRoles(api, e, signalBodySpace(api, e, "consumer", "canRequestShares")),
                 (e, m) -> requestGrant(api, e)));
         api.post("/exchange/grants/([^/]+)/(approve|deny|revoke)", ApiContext.withCapability("canApproveShares",
-                (e, m) -> spaceRoles(api, grantOf(api, ApiContext.name(m)).owner()),
+                (e, m) -> spaceRoles(api, e, grantOf(api, ApiContext.name(m)).owner()),
                 (e, m) -> actOnGrant(api, e, ApiContext.name(m), ApiContext.param(m, 2))));
         api.post("/exchange/grants/([^/]+)/pin", ApiContext.withCapability("canRequestShares",
-                (e, m) -> spaceRoles(api, grantOf(api, ApiContext.name(m)).consumer()),
+                (e, m) -> spaceRoles(api, e, grantOf(api, ApiContext.name(m)).consumer()),
                 (e, m) -> pinGrant(api, e, ApiContext.name(m))));
         api.post("/exchange/grants/([^/]+)/expiry", ApiContext.withCapability("canApproveShares",
-                (e, m) -> spaceRoles(api, grantOf(api, ApiContext.name(m)).owner()),
+                (e, m) -> spaceRoles(api, e, grantOf(api, ApiContext.name(m)).owner()),
                 (e, m) -> expireGrant(api, e, ApiContext.name(m))));
         api.get("/exchange/grants", (e, m) -> listGrants(api, e));
         api.get("/exchange/datasets/([^/]+)/([^/]+)", (e, m) ->
@@ -277,7 +278,7 @@ public final class ExchangeRoutes implements RouteModule {
         Map<String, Object> body = api.body(e);
         String kind     = requireKind(body);
         String owner    = Exchange.SIGNAL.equals(kind)
-                ? requireSignalSpace(api, ApiContext.str(body, "owner"), "owner", "canRequestShares")
+                ? requireSignalSpace(api, e, ApiContext.str(body, "owner"), "owner", "canRequestShares")
                 : requireSpace(api, ApiContext.str(body, "owner"), "owner");
         String consumer = requireSpace(api, ApiContext.str(body, "consumer"), "consumer");
         String item     = requireItem(body);
@@ -602,14 +603,15 @@ public final class ExchangeRoutes implements RouteModule {
         Map<String, Object> body = api.body(e);
         boolean signal = e.getRequestURI().getPath().endsWith("/signal-offers")
                 || Exchange.SIGNAL.equals(ApiContext.str(body, "kind"));
-        return signal ? requireSignalSpace(api, ApiContext.str(body, field), field, capability)
+        return signal ? requireSignalSpace(api, e, ApiContext.str(body, field), field, capability)
                 : requireSpace(api, ApiContext.str(body, field), field);
     }
 
-    private static String requireSignalSpace(ApiContext api, String id, String field, String capability) {
+    private static String requireSignalSpace(ApiContext api, HttpExchange e, String id, String field, String capability) {
         if (id == null || !SpaceId.isValid(id))
             throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'" + field + "' must be a valid space id");
-        if (HostContext.of(api).spaces().space(SpaceId.of(id)).isEmpty()) throw notPermitted(capability);
+        SpaceContext ctx = HostContext.of(api).spaces().space(SpaceId.of(id)).orElse(null);
+        if (ctx == null || !SpaceAdmission.admits(e, ctx)) throw notPermitted(capability);
         return id;
     }
 
@@ -619,10 +621,12 @@ public final class ExchangeRoutes implements RouteModule {
                 "missing capability '" + capability + "' in the owning space");
     }
 
-    /** The config root holding {@code space}'s role table — what its capability gate is decided by. */
-    private static java.nio.file.Path spaceRoles(ApiContext api, String space) {
+    /** The config root holding {@code space}'s role table — what its capability gate is decided by (after Space admission). */
+    private static java.nio.file.Path spaceRoles(ApiContext api, HttpExchange e, String space) {
         SpaceContext ctx = HostContext.of(api).spaces().space(SpaceId.of(space))
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + space + "'"));
+        if (!SpaceAdmission.admits(e, ctx))
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such space '" + space + "'");
         java.nio.file.Path config = ctx.root().config();
         if (config == null) throw new ApiException(409, ErrorCodes.CONFLICT, "space '" + space + "' has no config root");
         return config;

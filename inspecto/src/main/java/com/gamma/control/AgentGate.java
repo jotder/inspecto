@@ -111,6 +111,7 @@ final class AgentGate {
         Set<String> all = new java.util.HashSet<>(Set.of(
                 "POST /mcp",
                 "POST /validate",
+                "POST /pipelines/([^/]+)/graph/validate",
                 "POST /pipelines/authored/([^/]+)/dry-run",
                 "POST /bundle/export",
                 "POST /promotion/preview",

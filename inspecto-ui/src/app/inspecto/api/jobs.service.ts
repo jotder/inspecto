@@ -432,4 +432,71 @@ export class JobsService {
     failures(days = 30): Observable<JobFailureDay[]> {
         return this.http.get<JobFailureDay[]>(apiUrl('/jobs/failures'), { params: toParams({ days }) });
     }
+
+    // ── DATED-REFERENCE-RUNS-1 P4: Runs ▸ Backlog ──
+    backlog(): Observable<JobBacklog[]> {
+        return this.http.get<JobBacklog[]>(apiUrl('/jobs/backlog'));
+    }
+    drainBacklog(job: string, force = false): Observable<{ job: string; submitted: number }> {
+        return this.http.post<{ job: string; submitted: number }>(
+            apiUrl(`/jobs/${encodeURIComponent(job)}/backlog/drain`),
+            {},
+            { params: force ? { force: 'true' } : {} },
+        );
+    }
+    pauseBacklog(job: string): Observable<{ job: string; paused: boolean }> {
+        return this.http.post<{ job: string; paused: boolean }>(
+            apiUrl(`/jobs/${encodeURIComponent(job)}/backlog/pause`),
+            {},
+        );
+    }
+    resumeBacklog(job: string): Observable<{ job: string; paused: boolean }> {
+        return this.http.post<{ job: string; paused: boolean }>(
+            apiUrl(`/jobs/${encodeURIComponent(job)}/backlog/resume`),
+            {},
+        );
+    }
+    runBacklogDay(
+        job: string,
+        day: string,
+        allowPrevious = false,
+    ): Observable<{ job: string; day: string; submitted: boolean }> {
+        return this.http.post<{ job: string; day: string; submitted: boolean }>(
+            apiUrl(`/jobs/${encodeURIComponent(job)}/backlog/days/${encodeURIComponent(day)}/run`),
+            {},
+            { params: allowPrevious ? { allowPrevious: 'true' } : {} },
+        );
+    }
+    giveUpWaiting(job: string, day: string): Observable<{ job: string; day: string; skipped: boolean }> {
+        return this.http.post<{ job: string; day: string; skipped: boolean }>(
+            apiUrl(`/jobs/${encodeURIComponent(job)}/backlog/days/${encodeURIComponent(day)}/give-up`),
+            {},
+        );
+    }
+}
+
+export interface DayBacklog {
+    day: string;
+    status: string;
+    pendingFiles: number;
+    pendingRows: number;
+    waitingReason: string | null;
+    stale: boolean;
+    staleReason: string | null;
+    referenceVersions: string | null;
+    firstArrivedAt: string | null;
+    updatedAt: string | null;
+}
+
+export interface JobBacklog {
+    jobName: string;
+    inputStream: string | null;
+    paused: boolean;
+    readyCount: number;
+    waitingCount: number;
+    runningCount: number;
+    staleCount: number;
+    oldestWaitingAgeSeconds: number;
+    estimatedDrainSeconds: number;
+    days: DayBacklog[];
 }

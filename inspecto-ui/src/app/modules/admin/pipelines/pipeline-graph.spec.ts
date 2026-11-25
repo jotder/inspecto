@@ -689,6 +689,22 @@ describe('edgeRefusal (mirrors PipelineValidator)', () => {
         // a bare `route:` with no key is not a named route
         expect(edgeRefusal(routed, 'r', 'sink', 'route:', rules)).toContain('does not emit');
     });
+
+    it('allows a reference edge from an acquisition node to a transform.join (JG2)', () => {
+        const jobGraph: AuthoredPipeline = {
+            name: 'cdr_enrich',
+            active: false,
+            nodes: [
+                { id: 'acq_ref', type: 'acquisition', config: { connector: 'dataset', dataset: 'dim_dial_digit' } },
+                { id: 'join', type: 'transform.join', config: { reference: 'reference/dim_dial_digit', match: 'longest_prefix' } },
+            ],
+            edges: [{ from: 'acq_ref', rel: 'reference', to: 'join' }],
+        };
+        expect(edgeRefusal(jobGraph, 'acq_ref', 'join', 'reference', rules)).toBeNull();
+        const g6 = authoredToG6(jobGraph, new Map([['acquisition', 'SOURCE'], ['transform.join', 'TRANSFORM']]));
+        expect(g6.nodes.find((n) => n.id === 'join')?.data.label).toBe('dim_dial_digit · longest_prefix');
+        expect((g6.edges[0].data as { reference?: boolean }).reference).toBe(true);
+    });
 });
 
 // ── Recipe view: chain detection (ELT amendment UI plan §1) ────────────────────────────────────────

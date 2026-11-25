@@ -1,9 +1,8 @@
 # Job graph — a Job's chain is its own Pipeline, drawn from store inputs to a store, joined to the rest in Topology
 
-**State:** 🟡 **PROPOSED 2026-11-22 — direction agreed with the operator; D-JG1…D-JG5 open; nothing built.**
-Board rows `JOB-GRAPH-1` [items: module.elt, layer.product] and `OUTPUT-STORE-SINK-NOT-DRAWN-1` (the defect fixed in
-JG1). Is P5 of [`2026-11-22-dated-reference-runs-plan.md`](2026-11-22-dated-reference-runs-plan.md) and the graph
-side of [`2026-11-22-reference-lookup-plan.md`](2026-11-22-reference-lookup-plan.md).
+**State:** ✅ **DONE 2026-11-25 — JG1 (`ca6bf0256`) and JG0, JG2–JG4 (`fea9792af`) built; archived.**
+Board rows `JOB-GRAPH-1` [items: module.elt, layer.product] and `OUTPUT-STORE-SINK-NOT-DRAWN-1` (both closed 2026-11-25). Is P5 of [`2026-11-22-dated-reference-runs-plan.md`](2026-11-22-dated-reference-runs-plan.md) and the graph
+side of [`2026-11-22-reference-lookup-plan.md`](../archived-documents/plans-archive/2026-11-22-reference-lookup-plan.md).
 
 ## 1. The problem
 

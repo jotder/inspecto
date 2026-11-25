@@ -140,7 +140,15 @@ public final class PipelineValidator {
         if (!hasKey && !hasBound) {
             for (String k : com.gamma.pipeline.exec.RowShaper.JOIN_KEYED_KEYS)
                 if (n.cfg(k) != null) return "'" + k + "' needs key: — the Reference's key column";
-            return null;
+            Object ifVersionMissing = n.cfg("if_version_missing");
+        if (ifVersionMissing != null) {
+            if (n.cfg("version_by") == null || n.cfg("version_by").toString().isBlank())
+                return "if_version_missing: requires version_by:";
+            if (!com.gamma.pipeline.exec.RowShaper.JOIN_IF_VERSION_MISSING.contains(ifVersionMissing.toString()))
+                return "if_version_missing '" + ifVersionMissing + "' — use one of "
+                        + com.gamma.pipeline.exec.RowShaper.JOIN_IF_VERSION_MISSING;
+        }
+        return null;
         }
         if (n.cfg("exact_when") != null && !"longest_prefix".equals(String.valueOf(match)))
             return "exact_when only applies to match: longest_prefix";
@@ -186,6 +194,14 @@ public final class PipelineValidator {
             for (Object k : dm.keySet())
                 if (!List.of("matched_key", "match_kind", "match_score").contains(String.valueOf(k)))
                     return "details: names '" + k + "' — use matched_key, match_kind and/or match_score";
+        Object ifVersionMissing = n.cfg("if_version_missing");
+        if (ifVersionMissing != null) {
+            if (n.cfg("version_by") == null || n.cfg("version_by").toString().isBlank())
+                return "if_version_missing: requires version_by:";
+            if (!com.gamma.pipeline.exec.RowShaper.JOIN_IF_VERSION_MISSING.contains(ifVersionMissing.toString()))
+                return "if_version_missing '" + ifVersionMissing + "' — use one of "
+                        + com.gamma.pipeline.exec.RowShaper.JOIN_IF_VERSION_MISSING;
+        }
         return null;
     }
 
@@ -211,6 +227,14 @@ public final class PipelineValidator {
                 for (Object out : renamed.values())
                     if (out != null && !out.toString().isBlank() && !names.add(out.toString().trim()))
                         return "two lookups write the output column '" + out + "' — give each a unique name";
+        }
+        Object ifVersionMissing = n.cfg("if_version_missing");
+        if (ifVersionMissing != null) {
+            if (n.cfg("version_by") == null || n.cfg("version_by").toString().isBlank())
+                return "if_version_missing: requires version_by:";
+            if (!com.gamma.pipeline.exec.RowShaper.JOIN_IF_VERSION_MISSING.contains(ifVersionMissing.toString()))
+                return "if_version_missing '" + ifVersionMissing + "' — use one of "
+                        + com.gamma.pipeline.exec.RowShaper.JOIN_IF_VERSION_MISSING;
         }
         return null;
     }

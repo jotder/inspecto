@@ -302,6 +302,14 @@ export class GrowExcludeStore {
                 break;
             }
             const step = inv.lastStep();
+            if (step?.status === 'no_op') {
+                if (d === 1 && !made.length) {
+                    this.lastChange.set({ text: 'Expand found nothing new, so no step was added.' });
+                    return true;
+                }
+                stop = ` Degree ${d} found nothing new, so the walk stopped there.`;
+                break;
+            }
             if (step?.status === 'pending') {
                 stop = d === 1 ? '' : ` Degree ${d} needs a second person’s approval, so the walk stopped there.`;
                 if (d === 1) {

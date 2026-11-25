@@ -700,7 +700,18 @@ compaction) remain the Phase-2 backlog.
 value. Transforms call it per field or as a Step; it is held per run or warm across runs and refreshed when
 the Reference Dataset changes. ⛔ never "cache" or "record cache" as the entity name — the cache is how a Lookup
 is held, not what it is. Not the inline `transform.lookup` code map. *(Proposed 2026-11-22,
-`superpower/2026-11-22-reference-lookup-plan.md`.)*
+`archived-documents/plans-archive/2026-11-22-reference-lookup-plan.md`.)*
+
+**Event day** — The calendar day of a record's event time, in its Pipeline's declared zone (`DATED-REFERENCE-RUNS-1`).
+
+**Reference version (dated)** — The Reference table valid for one business day (`reference.versions: daily`,
+`DATED-REFERENCE-RUNS-1`).
+
+**Work ledger** — Per Job, the days with input not yet processed; derived from the Consignment output registry
+(`consignment_outputs` MINUS `job_day_progress`, `DATED-REFERENCE-RUNS-1`).
+
+**Waiting** — A Run state: work exists for a day but its inputs are not ready; ends at the deadline
+(`DATED-REFERENCE-RUNS-1`).
 
 **Matrix** — The **intended user-facing name** for a summary / cube / roll-up data asset. It **is a Derived
 Table** (so it lives inside the **Dataset** umbrella) — "Matrix" is the label the Catalog and Studio are meant
@@ -1062,7 +1073,7 @@ RBAC data scopes, and despite its name it is not the *type of a Case*.
 
 **Snapshot** *(Link Analysis; `SnapshotStore`, `POST /inv/snapshots`)* — The **frozen content of one analysis as it stood when the analyst saved it**, optionally attached to a **Case**. Evidence, unlike a saved **View**, which only re-projects live data and so is not evidence. A Snapshot is an Instance with no Type. ⛔ Not the DuckDB or storage-level *snapshot* (a consistent read; see §6-B, where "generation pinning" is also banned), and not a **Dossier** (the custody-hashed report built from an Investigation's log, which may cite Snapshots as exhibits).
 
-**Saved view** *(Link Analysis; Component kind `link-analysis-view`, `LA-STUDIO-UI-REORG-1`, 2026-10-27)* — A **named graph an analyst keeps**: the query or start it was drawn from, its display state and the Entity Lists it uses. Opening it re-reads live data, so it is a starting point, not evidence. UI words: **File ▸ Save view** (save over the open one), **Save view as…** (a new name) and **File ▸ Open…** (the *Saved views* tab). The data-plane **View** (§6-B) is a different thing; say *saved view* in Link Analysis. ⛔ Not *case* or *Save as a case* (a **Case** is the Incident-management record), and ⛔ not a **Snapshot** (frozen evidence: **File ▸ Save this analysis**).
+**Saved view** *(Link Analysis; Component kind `link-analysis-view`, `LA-STUDIO-UI-REORG-1`, 2026-10-27)* — A **named graph an analyst keeps**: the query or start it was drawn from, its display state and the Entity Lists it uses. Opening it re-reads live data, so it is a starting point, not evidence. UI words: **File ▸ Save view** (save over the open one), **Save view as…** (a new name) and **File ▸ Open…** (the *Saved views* tab). The data-plane **View** (§6-B) is a different thing; say *saved view* in Link Analysis. ⛔ Not *case* or *Save as a case* (a **Case** is the Incident-management record), and ⛔ not a **Snapshot** (frozen evidence: **File ▸ Save snapshot…**).
 
 **Canvas mode** *(Link Analysis Studio; second toolbar, `LA-STUDIO-UI-REORG-1` §5.2, 2026-10-27)* — **What a drag on the canvas does**; exactly one is active: **Pan** (the default, `Esc` returns to it; Shift+drag still draws a lasso), **Lasso** (`L`, a drag selects), **Fisheye** (`F`, drag the magnifying lens over the graph) and **Link filter** (drag a lens; only the links inside it show). Display preferences such as snap lines and hover activate are not Canvas modes (they live under Display). ⛔ Not *lens* — a **Lens** (§1-A) is a persona-scoped view of the console, and the old "Lenses & selection" label is retired.
 

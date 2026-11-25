@@ -1,12 +1,12 @@
 ---
 type: ProductItem
-title: Link Analysis sample (invented data)
+title: Sample (invented data)
 item: solution-pack.la-sample
 description: Documentation hub for solution-pack.la-sample — every document about it, by slot.
 tags: [product-item, solution-pack]
 ---
 
-# Link Analysis sample (invented data) (`solution-pack.la-sample`)
+# Sample (invented data) (`solution-pack.la-sample`)
 
 > **Documentation hub** (`PRODUCT-DOCS-HUB-1`) for Product Map Item
 > [`solution-pack.la-sample`](../../../../../product-map/solution-pack/la-sample.toon). Editions, add-ons, order codes and dependencies are read

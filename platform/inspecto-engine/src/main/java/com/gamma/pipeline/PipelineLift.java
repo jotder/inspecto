@@ -57,6 +57,7 @@ public final class PipelineLift {
 
     /** Lift a loaded {@link PipelineConfig} into a {@link PipelineGraph}. */
     public static PipelineGraph lift(PipelineConfig cfg) {
+        if (cfg.isJobPipeline()) return liftJobPipeline(cfg);
         List<PipelineNode> nodes = new ArrayList<>();
         List<PipelineEdge> edges = new ArrayList<>();
 
@@ -143,6 +144,64 @@ public final class PipelineLift {
     }
 
     /**
+     * Lift a <b>Job Pipeline</b> (JOB-GRAPH-1): {@code collector.connector: dataset} with no parser/schema.
+     * Emits {@code acq (dataset) → steps[] → sink} without {@code parse} or {@code map}.
+     */
+    private static PipelineGraph liftJobPipeline(PipelineConfig cfg) {
+        List<PipelineNode> nodes = new ArrayList<>();
+        List<PipelineEdge> edges = new ArrayList<>();
+        PipelineNode acq = acquisitionNode(cfg);
+        Map<String, Object> acqCfg = new LinkedHashMap<>(acq.config());
+        acqCfg.put(PipelineStores.CONFIG_SOURCE_STORE, cfg.collector().dataset());
+        nodes.add(new PipelineNode(ACQ, acq.type(), cfg.collector().dataset(),
+                "Reads Dataset '" + cfg.collector().dataset() + "'", acqCfg, acq.use()));
+
+        String upstream = ACQ;
+        Map<String, Integer> seen = new LinkedHashMap<>();
+        List<PipelineConfig.Step> steps = cfg.steps();
+        for (int i = 0; i < steps.size(); i++) {
+            PipelineConfig.Step step = steps.get(i);
+            String kind = step.kind();
+            int nth = seen.merge(kind, 1, Integer::sum);
+            String id = kind + (nth == 1 ? "" : "__s" + i);
+            nodes.add(new PipelineNode(id, BuiltinNodeType.typeForStepKind(kind), stepLabel(kind), null,
+                    new LinkedHashMap<>(step.config()), null));
+            edges.add(PipelineEdge.data(upstream, id));
+            upstream = id;
+        }
+        String outStore = cfg.outputStore() != null ? cfg.outputStore() : cfg.identity().pipelineName();
+        emitSinks(nodes, edges, "", null, outStore, cfg, upstream, null, null);
+
+        if (cfg.webhookConfig() != null) {
+            String feed = sinkFeed(nodes, edges);
+            nodes.add(new PipelineNode(WEBHOOK, BuiltinNodeType.SINK_WEBHOOK.type(), "Webhook",
+                    "POSTs rows to Connection '" + cfg.webhook().connection() + "'",
+                    new LinkedHashMap<>(cfg.webhookConfig()), null));
+            if (feed != null) edges.add(PipelineEdge.data(feed, WEBHOOK));
+        }
+        if (cfg.excelConfig() != null) {
+            String feed = sinkFeed(nodes, edges);
+            nodes.add(new PipelineNode(EXCEL, BuiltinNodeType.SINK_EXCEL.type(), "Excel workbook",
+                    "Writes " + cfg.excel().path(), new LinkedHashMap<>(cfg.excelConfig()), null));
+            if (feed != null) edges.add(PipelineEdge.data(feed, EXCEL));
+        }
+        if (!cfg.disabledSteps().isEmpty()) {
+            List<PipelineNode> overlaid = new ArrayList<>(nodes.size());
+            for (PipelineNode n : nodes) {
+                if (cfg.disabledSteps().contains(n.id())) {
+                    Map<String, Object> c = new LinkedHashMap<>(n.config());
+                    c.put("enabled", false);
+                    overlaid.add(new PipelineNode(n.id(), n.type(), n.name(), n.description(), c, n.use()));
+                } else {
+                    overlaid.add(n);
+                }
+            }
+            nodes = overlaid;
+        }
+        return new PipelineGraph(cfg.identity().pipelineName(), cfg.active(), nodes, edges);
+    }
+
+    /**
      * The one schema's slice of a multi-schema lift: {@code map_<key>} plus every node reachable
      * downstream of it, with the edges among them. A <b>view</b> over the one lift, never a second
      * emitter — node ids and configs are the lift's own, so the branch↔sink pairing, the branch-commit
@@ -207,6 +266,7 @@ public final class PipelineLift {
      * </ul>
      */
     public static PipelineGraph stageTwo(PipelineConfig cfg) {
+        if (cfg.isJobPipeline()) return lift(cfg);
         String name = cfg.identity().pipelineName();
         List<PipelineConfig.Step> steps = cfg.steps();
         // A webhook alone is a Stage-2 chain worth running: "send what landed" needs no transform.

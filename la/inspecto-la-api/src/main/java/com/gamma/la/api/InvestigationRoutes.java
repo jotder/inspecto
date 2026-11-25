@@ -1375,14 +1375,21 @@ public final class InvestigationRoutes implements RouteModule {
         // D7-4: a Draft resumes from its last checkpoint (one apply for an op) instead of folding main prefix + own log again
         InvestigationEvaluator.State after = inv.draft() == null ? evaluate(next, -1, null)
                 : com.gamma.la.core.DraftCheckpoints.after(before, log, e);
+        String op = "undo".equals(e.get("kind")) ? "undo" : String.valueOf(e.get("op"));
+        @SuppressWarnings("unchecked") Map<String, Object> read = (Map<String, Object>) e.get("read");
+        boolean truncated = read != null && Boolean.TRUE.equals(read.get("truncated"));
+        if ("expand".equals(op) && after.entities.size() == before.entities.size()
+                && after.links.size() == before.links.size()
+                && after.highConnectivity.size() == before.highConnectivity.size()) {
+            Map<String, Object> noOp = stepResult(ex, inv, log, 0, op, e, before, after, read, truncated);
+            noOp.put("status", "no_op");
+            return noOp;
+        }
         e.put("workingSetHash", after.hash());
         int step = ((Number) e.get("step")).intValue();
         inv.appendStep(log.size(), step, canonical(e), canonical(setDoc(step, after)));
         if (inv.draft() != null) com.gamma.la.core.DraftCheckpoints.remember(inv.cacheKey(), inv.logToken(), next.size(), after);
 
-        String op = "undo".equals(e.get("kind")) ? "undo" : String.valueOf(e.get("op"));
-        @SuppressWarnings("unchecked") Map<String, Object> read = (Map<String, Object>) e.get("read");
-        boolean truncated = read != null && Boolean.TRUE.equals(read.get("truncated"));
         Inv.DraftRef draft = inv.draft();
         boolean undo = "undo".equals(op);
         emit(ex, draft == null ? LinkEventTypes.LINK_INVESTIGATION_STEPPED : undo ? LinkEventTypes.LINK_DRAFT_UNDONE : LinkEventTypes.LINK_DRAFT_OP_APPENDED,
@@ -1408,6 +1415,13 @@ public final class InvestigationRoutes implements RouteModule {
                     return b;
                 });
 
+        return stepResult(ex, inv, next, step, op, e, before, after, read, truncated);
+    }
+
+    private Map<String, Object> stepResult(HttpExchange ex, Inv inv, List<Map<String, Object>> logContext,
+                                           int step, String op, Map<String, Object> e,
+                                           InvestigationEvaluator.State before, InvestigationEvaluator.State after,
+                                           Map<String, Object> read, boolean truncated) throws IOException {
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("step", step);
         out.put("op", op);
@@ -1449,7 +1463,7 @@ public final class InvestigationRoutes implements RouteModule {
         // LA-17 slice 2: while a resolve is in force every step answers the merged nodes, so the canvas can redraw them.
         if (after.resolution != null) out.put("resolution", after.toMap().get("resolution"));
         out.put("workingSet", summary(after));
-        RestrictedLists.of(ex, inv.writeRoot(), next).stepAnswer(out);   // GE-8: a restricted list's members never echo
+        RestrictedLists.of(ex, inv.writeRoot(), logContext).stepAnswer(out);   // GE-8: a restricted list's members never echo
         return out;
     }
 

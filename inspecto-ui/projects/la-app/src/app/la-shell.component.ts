@@ -22,6 +22,7 @@ import { UserComponent } from 'app/layout/common/user/user.component';
 import { ConnectivityBannerComponent } from '@inspecto/core/components/connectivity-banner.component';
 import { EntitlementBannerComponent } from '@inspecto/core/components/entitlement-banner.component';
 import { APP_ENVIRONMENT } from '@inspecto/core/api/app-environment';
+import { LensService } from '@inspecto/core/api';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { LA_APP_SHORTCUTS, ShortcutsHelpDialog, isEditingTarget } from 'app/inspecto/shortcuts-help.dialog';
 import { appAreas, appOfUrl, areaIcon, productNav, ProductNavEntry } from '@inspecto/core/product/product-host';
@@ -56,6 +57,12 @@ export interface RailLink {
  * because the page always has a section for them (their own limits) and shows the others read-only unless they may
  * change them. Not on the landing page, which offers the areas.
  */
+export const LA_APP_APPROVALS_NAV: RailLink = {
+    path: 'approvals',
+    label: 'Approvals',
+    icon: 'heroicons_outline:check-badge',
+};
+
 export const LA_APP_SETTINGS_NAV: RailLink = {
     path: 'settings',
     label: 'Settings',
@@ -242,19 +249,22 @@ export const railLink = (n: ProductNavEntry): RailLink => ({ path: n.path, label
         </div>
     `,
     styles: `
-        /* Slim rail: the Space switcher shows only its icon (its label and chevron belong to the expanded rail). */
-        .slim-switcher ::ng-deep button {
-            min-width: 0 !important;
-            padding-inline: 0.625rem !important;
-        }
-        .slim-switcher ::ng-deep button span,
-        .slim-switcher ::ng-deep button mat-icon ~ mat-icon {
-            display: none !important;
+        /* Slim rail (sm+): the Space switcher shows only its icon; on phones (<600px) the top bar keeps the name. */
+        @media (min-width: 600px) {
+            .slim-switcher ::ng-deep button {
+                min-width: 0 !important;
+                padding-inline: 0.625rem !important;
+            }
+            .slim-switcher ::ng-deep button span,
+            .slim-switcher ::ng-deep button mat-icon ~ mat-icon {
+                display: none !important;
+            }
         }
     `,
 })
 export class LaShellComponent {
     private readonly env = inject(APP_ENVIRONMENT);
+    private readonly lens = inject(LensService);
     private readonly session = inject(SessionService);
     private readonly router = inject(Router);
     /** The Product's areas. PA-4: the server's nav when it resolved one for this Product, else the generated nav under the feature rule. */
@@ -283,12 +293,18 @@ export class LaShellComponent {
      */
     protected readonly nav = computed<RailLink[]>(() => [
         ...(this.switcher() ? (this.currentApp()?.areas ?? []) : this.areas()).map(railLink),
+        ...(this.session.features().investigations && this.lens.canApproveLinkExpansions?.()
+            ? [LA_APP_APPROVALS_NAV]
+            : []),
         LA_APP_SETTINGS_NAV,
     ]);
     protected readonly product = PRODUCT.brand.name;
     /** The Handbook's home (USER-HANDBOOK-1): the static site every bundle ships at /help/. */
     protected readonly helpHome = HELP_HOME;
-    protected readonly logo = this.env.appLogo;
+    protected readonly logo =
+        this.env.appLogo === 'assets/images/logo/inspecto-logo.svg'
+            ? 'assets/images/logo/inspecto-emblem.svg'
+            : this.env.appLogo;
     protected readonly footer = this.env.footerText;
     private readonly rail = inject(LaRailService);
     protected readonly expanded = this.rail.expanded;

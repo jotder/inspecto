@@ -346,7 +346,10 @@ export function toCombinedG6Data(c: PipelineCombined, iconMap?: IconMap): G6Grap
             id: `${e.from}->${e.to}:${e.rel}:${i}`,
             source: e.from,
             target: e.to,
-            data: { kind: e.kind === 'route' && e.routeKey ? `route:${e.routeKey}` : e.rel },
+            data:
+                e.kind === 'reference' || e.rel === 'reference'
+                    ? { kind: 'reference', reference: true }
+                    : { kind: e.kind === 'route' && e.routeKey ? `route:${e.routeKey}` : e.rel },
         })),
     };
 }
@@ -374,6 +377,22 @@ export function typeLabelMap(types: PipelineNodeType[]): Map<string, string> {
  * record count its source emitted on that relationship during the real last run, same painting rule as
  * {@link toPipelineG6Data}'s {@code counts} (edges with no recorded count are left at their default style).
  */
+/** Display label for an authored node (JG2: `transform.join` shows `Reference · match` when unnamed). */
+export function authoredNodeLabel(n: AuthoredNode): string {
+    if (n.name && n.name.trim()) return n.name;
+    if (n.type === 'transform.join') {
+        const rawRef = n.config?.['reference'];
+        if (typeof rawRef === 'string' && rawRef.trim()) {
+            const refName = rawRef.trim().replace(/^references?\//, '');
+            const match = typeof n.config?.['match'] === 'string' && n.config['match'].trim()
+                ? n.config['match'].trim()
+                : 'exact';
+            return `${refName} · ${match}`;
+        }
+    }
+    return n.id;
+}
+
 export function authoredToG6(
     pipeline: AuthoredPipeline,
     typeCat: Map<string, string>,
@@ -387,7 +406,7 @@ export function authoredToG6(
             return {
                 id: n.id,
                 data: {
-                    label: n.name && n.name.trim() ? n.name : n.id,
+                    label: authoredNodeLabel(n),
                     kind: categoryVisualKind(category),
                     status: statusOf ? statusOf(n) : 'configured',
                     ...(iconMap ? resolveNodeIcon(n.type, category, iconMap) : {}),
@@ -399,6 +418,7 @@ export function authoredToG6(
             // A derived display-only edge (the companion-enrichment line) carries no data, so no overlay;
             // `derived` styles it apart and keeps it out of edge selection (it is not editable).
             if (e.derived) return { id, source: e.from, target: e.to, data: { kind: e.rel, derived: true } };
+            if (e.rel === 'reference') return { id, source: e.from, target: e.to, data: { kind: 'reference', reference: true } };
             const count = lastRunCounts?.get(`${e.from}|${e.rel}`);
             return {
                 id,
@@ -1187,6 +1207,10 @@ export function edgeRefusal(
 ): string | null {
     const src = model?.nodes.find((n) => n.id === from);
     const dst = model?.nodes.find((n) => n.id === to);
+    // JG2: a Reference Dataset node (`acquisition` with `connector: dataset`) can wire a `reference` edge into `transform.join`
+    if (rel === 'reference' && src?.type === 'acquisition' && dst?.type === 'transform.join') {
+        return null;
+    }
     const srcRules = src ? rules.get(src.type) : undefined;
     const dstRules = dst ? rules.get(dst.type) : undefined;
 

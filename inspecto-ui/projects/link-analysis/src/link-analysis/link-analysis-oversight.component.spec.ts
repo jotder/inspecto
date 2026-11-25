@@ -45,6 +45,7 @@ const WS = {
         [log]="log"
         [workingSet]="ws"
         [revealed]="revealed"
+        [readsOnly]="readsOnly"
         [reveal]="reveal"
         (decided)="decided = decided + 1"
     ></inspecto-link-analysis-oversight>`,
@@ -53,6 +54,7 @@ class Host {
     log: InvestigationLog | null = LOG;
     ws: WorkingSet | null = WS;
     decided = 0;
+    readsOnly = false;
     revealed: Record<string, string> = {};
     /** The host store's reveal: it records what the server revealed, which flows back in as `revealed`. */
     reveal = vi.fn(async (tokens: string[]): Promise<number> => {
@@ -123,9 +125,21 @@ describe('LinkAnalysisOversightComponent (D-U6 / D-U7)', () => {
         expect(message).toContain('Ann Analyst asks to expand.');
         expect(message).not.toContain('p1');
         expect(message).toContain('It would read up to 500 rows, more than the 100 allowed without a second approval.');
-        await c.decide(PENDING, false); // a deny is not asked here: the reason box beside it is its own step
-        expect(inv.denyExpansion).toHaveBeenCalled();
+        await c.decide(PENDING, false);
+        expect(inv.denyExpansion).not.toHaveBeenCalled();
+        expect(confirm.confirmDestructive).toHaveBeenCalledTimes(2);
+    });
+
+    it('denies when confirmed, and hides Reveal when readsOnly is true', async () => {
+        const { f, c, el, inv, host, confirm } = create({ approve: true, reveal: true });
+        await c.decide(PENDING, false);
         expect(confirm.confirmDestructive).toHaveBeenCalledTimes(1);
+        expect(inv.denyExpansion).toHaveBeenCalledWith('inv-1', 'p1', undefined);
+
+        expect(el.querySelector('[data-testid=oversight-reveal]')).not.toBeNull();
+        host.readsOnly = true;
+        f.detectChanges();
+        expect(el.querySelector('[data-testid=oversight-reveal]')).toBeNull();
     });
 
     it('says no approvals are needed when nothing is held or masked (T-152)', () => {

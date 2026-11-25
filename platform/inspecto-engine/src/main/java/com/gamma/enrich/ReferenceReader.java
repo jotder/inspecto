@@ -38,6 +38,17 @@ public final class ReferenceReader {
      * a by-name one (naming what is missing, because that is a wiring mistake, not a config error).
      */
     public static String sqlFor(EnrichmentConfig.Reference r, List<PipelineConfig> pipelines) {
+        return sqlForDay(r, pipelines, null, null);
+    }
+
+    /**
+     * The read expression for {@code r} at a specific business {@code day} ({@code yyyy-MM-dd}), used by
+     * {@code transform.join} with {@code version_by:} ({@code DATED-REFERENCE-RUNS-1} P1). When the target
+     * pipeline does not declare {@code reference.versions: daily}, {@code day} is ignored and this behaves
+     * identically to {@link #sqlFor}.
+     */
+    public static String sqlForDay(EnrichmentConfig.Reference r, List<PipelineConfig> pipelines,
+                                   String day, String ifVersionMissing) {
         if (!r.byName()) return SqlViews.reader(r.format(), r.path(), false);   // as_of rejected at parse
         PipelineConfig p = (pipelines == null ? List.<PipelineConfig>of() : pipelines).stream()
                 .filter(c -> c.identity().pipelineName().equals(r.ref()))
@@ -55,7 +66,15 @@ public final class ReferenceReader {
         // SnapshotSwapLock.hold() block keeps the store from a compaction's hide and reveal until the block ends; any
         // other reader waits here for a compaction under way (SNAPSHOT-SWAP-READER-RESIDUALS-1).
         SnapshotSwapLock.pin(p.dirs().database()).close();
-        String glob = p.dirs().database() + "/**/*." + SqlViews.ext(format);
+        String ext = SqlViews.ext(format);
+        String glob;
+        if (p.reference().isDaily()) {
+            String resolvedDay = DatedReferences.resolveDay(
+                    r.ref(), java.nio.file.Path.of(p.dirs().database()), ext, day, ifVersionMissing);
+            glob = p.dirs().database() + "/" + DatedReferences.REF_DAY_COL + "=" + resolvedDay + "/**/*." + ext;
+        } else {
+            glob = p.dirs().database() + "/**/*." + ext;
+        }
         String reader = SqlViews.reader(format, glob, true);
         // Reference Phase-2 P1/P2: an `upsert`/`scd2` reference store is append-only (a version row per
         // key per batch); derive the view at read time — latest __valid_from wins per key, delete

@@ -42,6 +42,7 @@ describe('PipelineEditorComponent', () => {
         processorCatalog: ReturnType<typeof vi.fn>;
         pipelineGraphRaw: ReturnType<typeof vi.fn>;
         savePipelineGraph: ReturnType<typeof vi.fn>;
+        validatePipelineGraph: ReturnType<typeof vi.fn>;
         provenanceBatches: ReturnType<typeof vi.fn>;
         provenance: ReturnType<typeof vi.fn>;
         saveAsTemplate: ReturnType<typeof vi.fn>;
@@ -113,6 +114,7 @@ describe('PipelineEditorComponent', () => {
             savePipelineGraph: vi
                 .fn()
                 .mockReturnValue(of({ written: true, path: 'demo_pipeline.toon', name: 'demo', findings: [] })),
+            validatePipelineGraph: vi.fn().mockReturnValue(of({ valid: true, findings: [], refusals: [] })),
             provenanceBatches: vi.fn().mockReturnValue(of([])),
             provenance: vi.fn().mockReturnValue(of([])),
             saveAsTemplate: vi.fn().mockReturnValue(
@@ -2338,6 +2340,60 @@ describe('PipelineEditorComponent', () => {
                 expect.not.objectContaining({ loadError: expect.anything() }),
             );
             expect(c.selectedLoadError(), 'saved — the banner no longer claims it is broken').toBeNull();
+        });
+
+        it('PIPELINE-SAVE-HELD-TOAST-1: a 202 approval-held save keeps dirty and shows held toast instead of Saved', async () => {
+            const c = make();
+            c.select('demo');
+            c.dirty.set(true);
+            api.savePipelineGraph.mockReturnValue(
+                of({ status: 'pending', written: false, pendingChange: { id: 'pc-42' } }),
+            );
+
+            await c.save();
+
+            expect(c.dirty()).toBe(true);
+            expect(c.saving()).toBe(false);
+            expect(toast.success).not.toHaveBeenCalled();
+            expect(toast.info).toHaveBeenCalledWith(
+                'Held for approval as pc-42 — it applies once another approver accepts it under Pending Changes',
+            );
+        });
+
+        it('PIPELINE-SAVE-HELD-TOAST-1: a 202 approval-held activate keeps model/dirty unchanged and shows held toast', async () => {
+            const c = make();
+            c.select('demo');
+            api.savePipelineGraph.mockReturnValue(
+                of({ status: 'pending', written: false, pendingChange: { id: 'pc-99' } }),
+            );
+
+            await c.activate();
+
+            expect(c.isActive()).toBe(false);
+            expect(c.activating()).toBe(false);
+            expect(toast.success).not.toHaveBeenCalled();
+            expect(toast.info).toHaveBeenCalledWith(
+                'Held for approval as pc-99 — it applies once another approver accepts it under Pending Changes',
+            );
+        });
+
+        it('PIPELINE-SAVE-HELD-TOAST-1: validate() calls server-side validatePipelineGraph and merges findings', () => {
+            api.validatePipelineGraph = vi.fn().mockReturnValue(
+                of({
+                    valid: false,
+                    findings: [{ severity: 'ERROR', fieldPath: 'dirs.poll', message: 'path outside root', code: 'PATH_JAIL' }],
+                    refusals: [],
+                }),
+            );
+            const c = make();
+            c.select('demo');
+
+            c.validate();
+
+            expect(api.validatePipelineGraph).toHaveBeenCalledWith('demo', expect.objectContaining({ name: 'demo' }));
+            expect(c.findings().some((f) => f.code === 'PATH_JAIL' && f.message.includes('path outside root'))).toBe(
+                true,
+            );
         });
 
         it('select opens a tab and makes it active', () => {
