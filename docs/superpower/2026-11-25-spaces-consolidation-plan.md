@@ -481,3 +481,31 @@ Found by deleting the corpora in a lane and running every guard and the LA node 
   `data/samples` and sink seeds stay tracked (D-SC12).
 - **Not run end to end here:** `inspecto/package.ps1` (a full bundle build; its new step is parse-checked and its inputs are
   the tool the tests exercise), the demo bake, and `tools/seed-uat.ps1`.
+
+## 19. P4: launchers and the private Spaces (2026-11-25)
+
+**What the survey found.** Almost nothing tracked still points at the old roots: `tools/run-backend.ps1` already defaults
+`-SpacesRoot` to the repository's `spaces/` (the canonical root, D-SC2); `inspecto-demo-spaces` and `inspecto-geolink` in
+`.claude/launch.json` use `..\spaces` from their bundle folder; `inspecto-la-app` scaffolds its own throwaway root;
+`zain-dial-digit-demo` runs from its own folder; `inspecto-mfs` runs `tools/run-mfs.ps1` on its own root
+(`C:\sandbox\inspecto-mfs-root`, the second instance, which stays outside by D-SC11). The two `inspecto-basic-*` entries name
+`C:\sandbox\la-basic\…`, which no longer exists (P6). `.claude/launch.json` is another lane's uncommitted file and was not
+edited. `SPACES_DATA_ROOT` is not set by any tracked launcher.
+
+- **D-SC14 ✅ — the private Spaces attach on demand, detached by default.** A dev backend boots every Space under `spaces/`, and
+  attaching `inspecto-mfs` (29 GB), `mfs-demo` (14 GB) and `la-mobile-money` would open ~43 GB of real data and start their
+  Collectors and Pipelines on every boot. Their `<id>.ref` pointers live in `C:\sandbox\inspecto_spaces\_refs`;
+  `tools/attach-private-spaces.ps1 -Action Attach|Detach|Status` (`-Only <id>`) copies them into `spaces/` and removes them again,
+  touches only `<id>.ref` files, and refuses a real Space folder of the same id or a ref that names another folder. `/spaces/*.ref`
+  is git-ignored (a ref names a folder on this machine). The junction `spaces/inspecto-mfs` to the small second instance was removed
+  (the link only; its 5 916 files are untouched), so a plain dev boot no longer sees any `inspecto-mfs`.
+- **D-SC15 ✅ — `demo`, `default` and `ucc` keep their runtime state in the Space folder.** A Space with a data root is refused
+  while files remain under its own `data/` (`SpaceDataRoot.claim`), and these three keep tracked `data/samples` there (D-SC12), so
+  they cannot split, and **`SPACES_DATA_ROOT` must stay unset while they sit in the spaces root**. Only Spaces without tracked
+  samples get a data root in `inspecto_spaces`: the private three (a local `data_root:` in each `space.toon`), `telco-assurance`
+  and `cricket-analytics` (P1), and any Space created from a Template. This is a documented exception to D-SC1; their ~100 MB of
+  state is git-ignored.
+
+Verified: the script on a temporary spaces root (status, attach, an id clash, a foreign ref, a missing target, detach: only the
+matching ref is removed; exit code 1 on any problem). Not verified: a server boot (P5), and whether the file routes' safety roots
+cover a data root outside the spaces root.
