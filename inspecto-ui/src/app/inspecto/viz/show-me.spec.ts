@@ -238,6 +238,29 @@ describe('suggestOverlays (BI-INSIGHTS-1 I-20)', () => {
         );
     });
 
+    it('names the target the marker will draw: the bound KPI first, else the Widget own', () => {
+        const both: VizRenderOptions = { kpi: { kpiId: 'revenue', target: 500 } };
+        expect(suggestOverlays({ vizType: 'line', controls: {}, options: both, kpi: { target: 1200 } })[0].text).toBe(
+            'This KPI has a target of 1,200.',
+        );
+        expect(suggestOverlays({ vizType: 'line', controls: {}, options: both, kpi: null })[0].text).toBe(
+            'This Widget has a target of 500.',
+        );
+    });
+
+    it('sends no overlay suggestion for a chart with no Measure (the server would refuse the probe)', () => {
+        const noMeasure = { x: LINE.x };
+        expect(
+            suggestOverlays({
+                vizType: 'line',
+                controls: noMeasure,
+                options: {},
+                probe: [FORECAST, ANOMALY],
+                probeRows: ROWS,
+            }),
+        ).toEqual([]);
+    });
+
     it('offers the bound KPI target line and its bands, once each', () => {
         const options: VizRenderOptions = { kpi: { kpiId: 'revenue' } };
         const kpi = { target: 1200, bands: { green: 1000, amber: 800 } };

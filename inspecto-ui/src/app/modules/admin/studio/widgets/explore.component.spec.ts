@@ -350,6 +350,18 @@ describe('ExploreComponent', () => {
             expect(fixture.nativeElement.querySelector('[data-testid="overlay-suggestions"]')).toBeNull();
         });
 
+        it('drops a probe that answers after a later run (another bound Query)', async () => {
+            let answer!: (v: unknown) => void;
+            const fixture = await lineWidget(new Promise((r) => (answer = r)));
+            const c = fixture.componentInstance;
+            probeAnswer = null; // the re-run over the bound Query probes offline: no overlays
+            c.onBindQuery('long_calls');
+            await fixture.whenStable();
+            answer(SEASONAL); // the first statement's probe lands late
+            await fixture.whenStable();
+            expect(c.suggestions()).toEqual([]);
+        });
+
         it('"Not now" hides a suggestion without changing the Widget', async () => {
             const fixture = await lineWidget(SEASONAL);
             const c = fixture.componentInstance;

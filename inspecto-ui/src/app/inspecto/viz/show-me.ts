@@ -165,13 +165,14 @@ const CYCLE_WORD: Readonly<Record<string, Readonly<Record<number, string>>>> = {
     hour: { 24: 'daily' },
 };
 
-/** True when the Widget can ask the server for overlays: a line / bar / area over a grained date, neither stacked nor
+/** True when the Widget can ask the server for overlays: a line / bar / area with a Measure over a grained date, neither stacked nor
  *  value-sorted (the cases the overlay renderer draws, `chart-overlays.ts`). */
 export function overlayEligible(vizType: string, controls: ControlValues, options: VizRenderOptions): boolean {
     const grain = controls['x']?.[0]?.grain;
     return (
         (OVERLAY_VIZ_TYPES as readonly string[]).includes(vizType) &&
         !!grain &&
+        !!controls['y']?.length &&
         grain !== 'auto' &&
         !options.stacked &&
         !options.sort
@@ -225,11 +226,13 @@ export function suggestOverlays<O extends VizRenderOptions>(input: OverlaySugges
     }
     if (MARKER_VIZ_TYPES.includes(vizType)) {
         const markers = options.markers ?? [];
-        const target = options.kpi?.target ?? kpi?.target;
+        // The bound KPI's target first, as `resolveMarkers` draws it; else the Widget's own.
+        const kpiTarget = options.kpi?.kpiId ? kpi?.target : undefined;
+        const target = kpiTarget ?? options.kpi?.target;
         if (target != null && !markers.some((m) => m.kind === 'target')) {
             out.push({
                 id: 'target',
-                text: `${options.kpi?.kpiId && kpi?.target != null ? 'This KPI' : 'This Widget'} has a target of ${formatNumber(target)}.`,
+                text: `${kpiTarget != null ? 'This KPI' : 'This Widget'} has a target of ${formatNumber(target)}.`,
                 action: 'Add a target line',
                 options: { ...options, markers: [...markers, { kind: 'target' }] },
             });

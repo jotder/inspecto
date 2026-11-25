@@ -51,7 +51,7 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
   two weeks of data is projected, and never over a Dashboard's picked dates. An Alert Rule can watch the same thing
   (`kpi:` with `projection: value | probability` or `rag:`) — [KPI projection](../../module/engine/spec-kpi-projection.md).
 * **Suggested for this chart** (BI-INSIGHTS-1 I-20, 2026-11-25) — while you build a line, bar or area Widget over a
-  date grouped by day, week or month, the builder may suggest an overlay above the preview: "Weekly seasonal pattern
+  date grouped by a time grain (not *auto*), the builder may suggest an overlay above the preview: "Weekly seasonal pattern
   found over 112 days of history" → *Add a forecast band*; "3 unusual points against the usual level" → *Show
   anomaly markers*; and, for a Widget bound to a KPI, its target line and green / amber / red bands. A season is
   suggested only when the data shows one over two seasons; nothing changes until you click, and *Not now* hides it.

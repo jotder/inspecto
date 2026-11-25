@@ -399,7 +399,7 @@ Spec: [`okf/product/module/engine/spec-kpi-projection.md`](../okf/product/module
   preview; the logic is the pure `suggestOverlays()` beside `recommend()` in `inspecto/viz/show-me.ts`.
   `recommend()` itself is unchanged: it ranks Visualization Types from fields, before any query has run, so the
   signal could not live inside it.
-- **Seasonality signal = the I-11 / I-7 route, no new backend.** When the Widget is a line, bar or area over a grained
+- **Seasonality signal = the I-11 / I-7 route, no new backend.** When the Widget is a line, bar or area with a Measure over a grained
   date, neither stacked nor value-sorted, and a forecast or anomaly overlay is not on yet, the builder runs the
   Widget's own statement once more with `overlay: {forecast, anomaly}` through `POST /bi/query` (D-BI7: query
   time, nothing stored; an identical probe is served from `DatasetResultService`'s cache). `ChartOverlays` already
@@ -411,8 +411,9 @@ Spec: [`okf/product/module/engine/spec-kpi-projection.md`](../okf/product/module
   when the Widget or its bound KPI (`options.kpi.kpiId`, read from `/components/kpi/{id}`) has a target; the
   KPI's bands (`rag` marker) when the KPI has them. An overlay or marker already on is never offered again.
 - **Never applied without a click**: each suggestion carries the Widget's options with that one overlay added;
-  *Add …* sets them and re-runs the preview, *Not now* hides it for this builder session. A probe answering after the
-  Widget changed is dropped. The preview now also passes the result's overlay summary, so an applied band shows its
+  *Add …* sets them and re-runs the preview, *Not now* hides it for this builder session. A probe answering after a later preview run (another
+  chart, field or bound Query; a run counter) is dropped. A bound KPI's target wins over the Widget's own, as the
+  marker draws it. The preview now also passes the result's overlay summary, so an applied band shows its
   caption in the builder as on a Dashboard.
 - **Preview** (2026-11-25, a 112-day series with a weekly cycle and one spike): "Weekly seasonal pattern found over
   112 days of history" and "1 unusual point", both applied by click and drawn. The KPI target / bands suggestion is

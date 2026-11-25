@@ -175,6 +175,8 @@ export class ExploreComponent implements OnInit {
     private readonly kpiId = computed(() => this.options().kpi?.kpiId);
     /** Suggestions the user waved away, by id, for this builder session. */
     private readonly dismissed = signal<ReadonlySet<string>>(new Set());
+    /** Counts preview runs, so a probe answering after a later run (another chart, another bound Query) is dropped. */
+    private probeSeq = 0;
     readonly suggestions = computed<OverlaySuggestion<WidgetOptions>[]>(() =>
         this.dataset() && !this.viewBound()
             ? suggestOverlays({
@@ -501,6 +503,7 @@ export class ExploreComponent implements OnInit {
      */
     private runProbe(plugin: VizPlugin, ds: Dataset, queryId: string | undefined): void {
         const o = this.options();
+        const seq = ++this.probeSeq;
         this.probe.set(null);
         if (!overlayEligible(this.vizType(), this.controls(), o) || (o.overlay?.forecast && o.overlay?.anomaly)) return;
         const spec = plugin.buildQuery(this.controls(), {
@@ -511,12 +514,11 @@ export class ExploreComponent implements OnInit {
         });
         if (!spec.overlay) return; // a plugin that does not ask for overlays
         if (queryId) spec.queryId = queryId;
-        const asked = { vizType: this.vizType(), controls: this.controls() };
         this.datasetResult
             .run(spec, this.colMetas())
             .then((res) => {
                 // A probe that answers after the Widget moved on describes another chart — drop it.
-                if (asked.vizType !== this.vizType() || asked.controls !== this.controls()) return;
+                if (seq !== this.probeSeq) return;
                 if (res.ok && res.overlays?.length) this.probe.set({ summary: res.overlays, rows: res.rows });
             })
             .catch(() => undefined);
