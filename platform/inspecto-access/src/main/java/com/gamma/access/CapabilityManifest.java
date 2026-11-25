@@ -310,6 +310,11 @@ public final class CapabilityManifest {
             new Entry("POST", "/jobs/([^/]+)/reschedule", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/jobs/([^/]+)/trigger", Roles.CAN_OPERATE_RUNS),
             new Entry("POST", "/jobs/runs/([^/]+)/replay", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/jobs/([^/]+)/backlog/drain", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/jobs/([^/]+)/backlog/pause", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/jobs/([^/]+)/backlog/resume", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/jobs/([^/]+)/backlog/days/([^/]+)/run", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/jobs/([^/]+)/backlog/days/([^/]+)/give-up", Roles.CAN_OPERATE_RUNS),
             // NavRoutes
             new Entry("PUT", "/nav/menus", Roles.CAN_CURATE_MENUS),
             // NotificationRoutes
