@@ -1,6 +1,7 @@
 package com.gamma.mcp;
 
 import com.gamma.access.CapabilityManifest;
+import com.gamma.control.AgentGateProbe;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -96,6 +97,26 @@ class McpToolRoutesTest {
     @Test
     void noToolRouterCanProduceARefusedPath() {
         for (McpTools.Call c : everyCall()) assertFalse(McpTools.refused(c), c.method() + " " + c.path());
+    }
+
+    /**
+     * AK-2 widening plan W10: no tool ships whose route the host's agent gate refuses to a person's agent. Each call is
+     * bucketed under every manifest pattern it matches (an ungated GET has none and is its own pattern), through
+     * {@link AgentGateProbe} because {@code AgentGate} is package-private in {@code com.gamma.control}.
+     */
+    @Test
+    void noToolRouteIsRefusedToAPersonsAgent() {
+        for (McpTools.Call c : everyCall()) {
+            String route = c.path().contains("?") ? c.path().substring(0, c.path().indexOf('?')) : c.path();
+            List<String> patterns = new ArrayList<>();
+            for (CapabilityManifest.Entry e : CapabilityManifest.ENTRIES)
+                if (e.method().equals(c.method()) && Pattern.matches(e.pattern(), route)) patterns.add(e.pattern());
+            for (CapabilityManifest.Exemption e : CapabilityManifest.EXEMPTIONS)
+                if (e.method().equals(c.method()) && Pattern.matches(e.pattern(), route)) patterns.add(e.pattern());
+            if (patterns.isEmpty()) patterns.add(route);
+            for (String p : patterns)
+                assertNull(AgentGateProbe.refusalForPersonsAgent(c.method(), p), c.method() + " " + route + " as " + p);
+        }
     }
 
     @Test

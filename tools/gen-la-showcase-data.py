@@ -207,3 +207,8 @@ write_csv("inbox/mule_geo_legs", "MULE_GEO_LEGS_20260901.csv",
            "TO_LAT", "TO_LON", "TRANSFERS", "TOTAL_AMOUNT"],
           [[sc, ro, p, q, ch, LOC[p][0], LOC[q][0], f"{LOC[p][1]:.4f}", f"{LOC[p][2]:.4f}", f"{LOC[q][1]:.4f}",
             f"{LOC[q][2]:.4f}", n, f"{t:.2f}"] for (sc, ro, p, q, ch), (n, t) in sorted(legs.items())])
+
+# The staged/ folder explains itself (this file was committed with the corpus until SPACES-CONSOLIDATION-1 P3b; the corpus is generated now).
+STAGED_README = 'STAGED files - NOT ingested. Copy TRANSFERS_20260904.csv (the clean next day) OR TRANSFERS_20260906.csv (a gap day: 20260905 is missing) from data/staged/mule_transfers into data/inbox/mule_transfers; the next poll ingests it, pipeline.commit fires la_index_build and a new index version appears.\n'
+(ROOT / "staged").mkdir(parents=True, exist_ok=True)
+(ROOT / "staged" / "README.txt").write_bytes(STAGED_README.encode("utf-8"))

@@ -459,3 +459,25 @@ them.
 under `spaces/` is either configuration or inside the permitted exception, so the guard no longer carries any other debt,
 and the open items of §14–§16 shrink to the P3b consumers (the 18 `seed-la-*` scaffolds, `package-la-showcase.mjs`, the
 `package.ps1` Template gallery) and the two `staged/README.txt` files no generator writes.
+
+## 18. P3b built: the 17 generated LA corpora are untracked (2026-11-25)
+
+589 files and 90.9 MB leave the repository (`spaces/_templates/la-*/data/inbox` and `staged`); the ratchet baseline is empty.
+Found by deleting the corpora in a lane and running every guard and the LA node tests (41 failures, then 0):
+- **Scaffolds:** the 17 `tools/seed-la-*.mjs --scaffold` copies took the Template's `data/` with a copy; they now call
+  `tools/space-data.mjs` `seedData(template, dataDir, templatesDir)`: copy the Template's `data/` if it still ships one,
+  else run its generator (`tools/seed-space-data.mjs`). The Template gallery copy a scaffold makes carries no corpus.
+- **Packaging:** `tools/package-la-showcase.mjs` read `git show HEAD:` for every file, so the data zip would have been
+  silently empty (its own guard refuses a Template with no data); it now lists and reads each registered Template's
+  generated `data/` as well, single and composed (industry) Spaces alike. `inspecto/package.ps1` stages the gallery from
+  `git ls-tree HEAD`; after `Copy-SpaceTemplates` it runs the generator for every staged Template that has one, before the
+  Space is composed and before the demo bake.
+- **Tests:** the 17 `tools/gen-la-*-data.test.mjs` pinned "generator twice = the committed bytes" and read the corpus in
+  the Template; each now generates into a scratch folder with `--out` (the same assertions, "= the same bytes"), and
+  `seed-space-data.test.mjs` no longer compares with the repository. A missing Python is a named failure.
+- **The two `staged/README.txt` files** no generator wrote; `gen-la-mm-data.py` and `gen-la-showcase-data.py` now do, byte for
+  byte as committed.
+- **`.gitignore`:** `/spaces/_templates/*/data/inbox/` and `/staged/`, so a generator run without `--out` cannot be committed;
+  `data/samples` and sink seeds stay tracked (D-SC12).
+- **Not run end to end here:** `inspecto/package.ps1` (a full bundle build; its new step is parse-checked and its inputs are
+  the tool the tests exercise), the demo bake, and `tools/seed-uat.ps1`.

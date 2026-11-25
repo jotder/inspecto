@@ -1,6 +1,6 @@
 # Agent Kit AK-2 — widening what an agent can reach, task by task (plan and task specs)
 
-> **Status: PROPOSED 2026-11-25 — D-AK8…D-AK12 open (§5); W1 and W3 built 2026-11-25 (§3 W1, W3), the rest not started.** The follow-on to phases 1–3b of
+> **Status: PROPOSED 2026-11-25 — D-AK8…D-AK12 open (§5); W1, W3 and W10 built 2026-11-25 (§3), the rest not started.** The follow-on to phases 1–3b of
 > [`2026-11-20-agent-kit-ak2-plan.md`](2026-11-20-agent-kit-ak2-plan.md) (all built 2026-11-25). It takes the gaps a
 > peer's product review of that plan listed
 ([`2026-11-25-agent-kit-ak2-product-review.md`](2026-11-25-agent-kit-ak2-product-review.md)), keeps the ones
@@ -246,6 +246,23 @@ Recommended order: **W1, W10, W3, W2, W4, W5, W6, W7, W9, W8**. W1, W3 and W10 n
   approve or decline attempts".
 
 ### W10 — The Kit guard reads every golden suite and every tool's bucket
+
+> **Built 2026-11-25.** (1) The guard already read every `agent-kit/golden/*.json`; it now also requires each task's
+> `skills` to name real Agent Skills and task ids to be unique across suites. (2) `McpToolRoutesTest`
+> `noToolRouteIsRefusedToAPersonsAgent` buckets every call the tool table can produce under every manifest pattern it
+> matches, through a test-only `com.gamma.control.AgentGateProbe` in `inspecto-mcp`'s test tree (`AgentGate` is
+> package-private and `inspecto-processor` is on that module's test classpath only; main-code visibility unchanged).
+> (3) Built as "every Agent Skill is named by at least one golden task". The rule as written — every tool a skill's
+> `## MCP Tools` list names is exercised by its suite — fails all twelve skills today: the suites' checks name outcomes
+> (Pending Changes, action paths, replies) and only two tools by name (`validate_config`, `dry_run_pipeline` in
+> `tool-before`). Any tool could be checked — every call leaves an `mcp.tool.called` audit row the grader reads — but
+> that is a golden check per listed tool, most of them reads whose call proves little. **Proposed rule shape, not built:** every *write*
+> tool a skill lists is exercised by a grade or safety check (`tool`, a `propose_change` kind, or an action `path` the
+> tool replays) in a task that names the skill. It fails today for `run_pipeline_now` (author-pipeline),
+> `withdraw_change` (safe-config-change), `trigger_job` and `replay_job_run` (operate-runs), `withdraw_action`
+> (operate-runs, triage-incident, work-cases, analyse-in-link-analysis), `work_alert` and `open_case_from_entities`
+> (work-cases), `cancel_graph_run` and `attach_investigation_to_case` (analyse-in-link-analysis) — each needs a golden
+> task, which W8 and W4's live runs are the place for.
 
 - **Goal.** A tool cannot ship whose route the gate refuses, and a golden suite cannot name a tool that is gone.
 - **Today.** `AgentGateParityTest` pins every non-GET manifest route to one bucket; `McpRoutesManifestParityTest` pins
