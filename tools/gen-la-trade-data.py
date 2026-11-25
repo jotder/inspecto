@@ -36,10 +36,10 @@ from datetime import date, datetime, timedelta
 from itertools import accumulate
 from pathlib import Path
 
-from la_gen_io import Outputs
+from la_gen_io import Outputs, data_dir
 
 TOOLS = Path(__file__).resolve().parent
-DATA = TOOLS.parent / "spaces" / "_templates" / "la-trade" / "data"
+DATA = data_dir(TOOLS.parent / "spaces" / "_templates" / "la-trade" / "data")
 TRUTH = TOOLS / "gen-la-trade-data.ground-truth.json"
 SEED = 20261107
 rng = random.Random(SEED)

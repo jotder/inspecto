@@ -31,8 +31,10 @@ import random
 from datetime import datetime, timedelta
 from pathlib import Path
 
+from la_gen_io import data_dir
+
 TOOLS = Path(__file__).resolve().parent
-DATA = TOOLS.parent / "spaces" / "_templates" / "la-police" / "data"
+DATA = data_dir(TOOLS.parent / "spaces" / "_templates" / "la-police" / "data")
 TRUTH = TOOLS / "la-police-ground-truth.json"
 rng = random.Random(20261107)
 START, CUT, END = datetime(2025, 11, 1), datetime(2026, 11, 1), datetime(2026, 12, 1)   # rows at or after CUT are staged

@@ -17,11 +17,27 @@ from __future__ import annotations
 import contextlib
 import io
 import os
+import sys
 import time
 from pathlib import Path
 
 TRIES = 10
 PAUSE = 0.2
+
+
+def data_dir(default) -> Path:
+    """The folder a generator writes its corpus into (SPACES-CONSOLIDATION-1, D-SC4): `--out <dir>` or `--out=<dir>` —
+    a Space's data folder, which holds inbox/ and staged/ — else `default`, the Template's own data/ folder. Generating
+    into a Space keeps the corpus out of source control; the default stays until the committed corpora are untracked."""
+    args = sys.argv[1:]
+    for i, a in enumerate(args):
+        if a == "--out":
+            if i + 1 >= len(args):
+                raise SystemExit("--out needs a folder")
+            return Path(args[i + 1]).resolve()
+        if a.startswith("--out="):
+            return Path(a[len("--out="):]).resolve()
+    return Path(default)
 
 
 def retry(op):

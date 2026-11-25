@@ -37,7 +37,9 @@ import random
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent / "spaces" / "_templates" / "la-showcase" / "data" / "inbox"
+from la_gen_io import data_dir
+
+ROOT = data_dir(Path(__file__).resolve().parent.parent / "spaces" / "_templates" / "la-showcase" / "data") / "inbox"
 rng = random.Random(20261011)
 START = datetime(2026, 8, 1)
 DAYS = 60

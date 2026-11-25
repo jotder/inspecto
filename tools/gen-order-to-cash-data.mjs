@@ -18,12 +18,17 @@
 // due date (not late). Customer C-007 holds two alerting orders (O-1022, O-1041), so its collections Case groups two Incidents.
 //
 // Run: node tools/gen-order-to-cash-data.mjs   (pinned by tools/gen-order-to-cash-data.test.mjs and OrderToCashGoldenTest)
+//      node tools/gen-order-to-cash-data.mjs --out <data folder>   writes <data folder>/samples instead (SPACES-CONSOLIDATION-1),
+//      and deletes nothing there: only the default Template folder is cleared first.
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const SAMPLES = join(ROOT, 'spaces', '_templates', 'order-to-cash', 'data', 'samples');
+const outAt = process.argv.indexOf('--out');
+const OUT = outAt >= 0 ? process.argv[outAt + 1] : (process.argv.find((a) => a.startsWith('--out='))?.slice('--out='.length));
+if (outAt >= 0 && !OUT) throw new Error('--out needs a folder');
+const SAMPLES = OUT ? join(resolve(OUT), 'samples') : join(ROOT, 'spaces', '_templates', 'order-to-cash', 'data', 'samples');
 const TRUTH = join(ROOT, 'tools', 'gen-order-to-cash-data.ground-truth.json');
 const TERMS_DAYS = 14;
 const ALERT_THRESHOLD = 100;   // o2c_unmatched_value: one Incident per order whose unmatched value is at least this
@@ -100,7 +105,7 @@ payments.sort((a, b) => a.date.localeCompare(b.date) || a.order.localeCompare(b.
 payments.forEach((p, i) => { p.id = `P-${50001 + i}`; });
 
 // ---- files
-rmSync(SAMPLES, { recursive: true, force: true });
+if (!OUT) rmSync(SAMPLES, { recursive: true, force: true });
 function writeFeed(feed, prefix, header, rowsByDay) {
   mkdirSync(join(SAMPLES, feed), { recursive: true });
   for (const [d, rows] of Object.entries(rowsByDay).sort()) {

@@ -34,10 +34,10 @@ import random
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from la_gen_io import Outputs
+from la_gen_io import Outputs, data_dir
 
 TOOLS = Path(__file__).resolve().parent
-DATA = TOOLS.parent / "spaces" / "_templates" / "la-procurement" / "data"
+DATA = data_dir(TOOLS.parent / "spaces" / "_templates" / "la-procurement" / "data")
 TRUTH = TOOLS / "gen-la-procurement-data.ground-truth.json"
 rng = random.Random(20261108)
 START, LANDED_END, END = date(2025, 10, 1), date(2026, 9, 30), date(2026, 10, 31)

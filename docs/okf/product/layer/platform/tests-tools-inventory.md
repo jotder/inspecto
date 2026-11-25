@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-128 test file(s). Run one, or all:
+129 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -141,6 +141,7 @@ node --test tools/
 | `tools/seed-la-telco-ra.test.mjs` | node --test tools/seed-la-telco-ra.test.mjs  -  request building of the telecom revenue-assurance seed script against a MOCKED fetch (no server). |
 | `tools/seed-la-trade.test.mjs` | node --test tools/seed-la-trade.test.mjs  -  request building of the trade-based money-laundering seed script against a MOCKED fetch (no server). |
 | `tools/seed-la-utility.test.mjs` | node --test tools/seed-la-utility.test.mjs  -  request building of the utility seed script against a MOCKED fetch (no server). |
+| `tools/seed-space-data.test.mjs` | SPACES-CONSOLIDATION-1 P2: the generators write into any folder they are given, and the registry in |
 | `tools/seed-telco-fraud-demo.test.mjs` | node --test tools/seed-telco-fraud-demo.test.mjs |
 | `tools/seed-telco.test.mjs` | node --test tools/seed-telco.test.mjs - the Inspecto Telco demo seed (PRODUCT-ASSEMBLY-1 PA-5d): the scaffold against the |
 | `tools/ship.test.mjs` | Tests for tools/ship.mjs — PRODUCT-ASSEMBLY-1 PA-8. Run: node --test tools/ship.test.mjs |

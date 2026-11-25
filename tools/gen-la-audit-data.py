@@ -28,7 +28,9 @@ import random
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent / "spaces" / "_templates" / "la-audit" / "data"
+from la_gen_io import data_dir
+
+ROOT = data_dir(Path(__file__).resolve().parent.parent / "spaces" / "_templates" / "la-audit" / "data")
 rng = random.Random(20261016)
 LIMIT = 10000.0
 START = date(2025, 10, 1)
