@@ -91,6 +91,17 @@ describe('PendingActionsPanelComponent', () => {
         await expectNoA11yViolations(el);
     });
 
+    it('an approver gets no decision buttons until the whole request is on screen', async () => {
+        const { fixture } = await create({ get: vi.fn(() => throwError(() => ({ status: 500 }))) });
+        fixture.componentInstance.open(ACTION as unknown as Record<string, unknown>);
+        fixture.detectChanges();
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.textContent).toContain('POST /runs/orders/resume');
+        expect(buttons(el)).not.toContain('Approve');
+        expect(buttons(el)).not.toContain('Decline');
+        expect(el.textContent).toContain('Not decided');
+    });
+
     it('a non-approver sees the action but no decision buttons', async () => {
         const { fixture } = await create({}, false);
         fixture.componentInstance.open(ACTION as unknown as Record<string, unknown>);

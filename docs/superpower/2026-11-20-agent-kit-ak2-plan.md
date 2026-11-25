@@ -431,13 +431,13 @@ cannot release a quarantined file or take a backup until they ship.
 
 Reviewed on `c2e2e7dc3`: `AgentGate`, `PendingActions`, `PendingActionRoutes`, the two `ControlApi` doors,
 `PendingChanges.authorNow`, `Roles.admitMachine`, `MachineTrust` and `OidcAuthenticator.verify`. The question: can a
-machine agent act beyond its four rights, past the hold, or past four eyes, and can an approval run anything with more
+machine agent act beyond its rights, past the hold, or past four eyes, and can an approval run anything with more
 than the machine has?
 
 **Holds.**
 - A machine agent never decides: the never-list refuses every `…/approve` and `…/decline`, the decide handler refuses
   any agent Subject, and `AGENT_NEVER_CAPABILITIES` are stripped at sign-in and again at `admitMachine`.
-- It keeps at most `canAuthorWorkbench`, `canAuthorAlertRules`, `canWorkIncidents` and `canOperateRuns`, never
+- Beside a machine's usual `canOpenInboundInvestigation`, it keeps at most `canAuthorWorkbench`, `canAuthorAlertRules`, `canWorkIncidents` and `canOperateRuns`, never
   `canAdminister` or access configuration. A Pipeline run stays refused to it (`PERSON_ONLY`).
 - The token lifetime and replay checks still apply to it: `admits` runs before the machine is marked an agent.
 - `auth.oidc.agentMachineClients` must be a subset of `auth.oidc.clients`, without the SPA client, or the server
@@ -456,8 +456,8 @@ than the machine has?
 approval. `GET /pending-actions/{id}` now returns the whole request, and the tab shows "Runs on approval" with the
 path, query and body. Pinned by `ControlApiPendingActionsTest` and the panel spec.
 
-**Filed.** `RUN-TRIGGER-ACTOR-SPOOF-1` (P3 defect): `?actor=` on `POST /jobs/{name}/trigger` and
-`POST /jobs/runs/{id}/replay` is free text written into the run ledger's `trigger` field (`manual:<actor>`). Any
+**Filed.** `RUN-TRIGGER-ACTOR-SPOOF-1` (P3 defect): `?actor=` on `POST /jobs/{name}/trigger`,
+`POST /jobs/runs/{id}/replay` and `POST /pipelines/authored/{id}/trigger` is free text written into the run ledger's `trigger` field (`manual:<actor>`). Any
 caller holding `canOperateRuns` can name someone else there; the audit log still names the real caller. This was
 already true before phase 2; agents only widen who can do it.
 

@@ -50,5 +50,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P2 | feature | Postgres multi-user | operator |
 | `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` | P3 | chore | Drop the window_self_join workaround once a fixed DuckDB driver is pinned. | — |
 | `DUCKDB-2-0-1-HAVANA-TZ-1` | P3 | chore | DuckDB 2.0.1's zone data keeps Cuba on UTC−4 from 2026-11-01 to about mid-March 2027; the JDK's tzdata 2026b does not. | — |
-| `RUN-TRIGGER-ACTOR-SPOOF-1` | P3 | defect | ?actor= on POST /jobs/{name}/trigger and POST /jobs/runs/{id}/replay is free text written into the run ledger's trigger field (manual:<ac… | — |
+| `RUN-TRIGGER-ACTOR-SPOOF-1` | P3 | defect | ?actor= on POST /jobs/{name}/trigger, POST /jobs/runs/{id}/replay and POST /pipelines/authored/{id}/trigger is free text written into the… | — |
 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | The shapes the object-store ingest lane still refuses (sinks:, produces: reference, the readers). | operator |

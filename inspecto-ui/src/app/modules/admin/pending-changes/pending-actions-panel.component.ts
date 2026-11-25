@@ -57,8 +57,10 @@ export class PendingActionsPanelComponent implements OnInit {
     readonly decideError = signal<string | null>(null);
     readonly reason = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(500)] });
 
-    /** Approve / Decline show only for an approver, and only on an action still waiting. */
-    readonly canDecide = computed(() => this.lens.canApproveChanges() && this.selected()?.status === 'pending');
+    /** Approve / Decline show only for an approver, on an action still waiting, once its whole request is on screen. */
+    readonly canDecide = computed(
+        () => this.lens.canApproveChanges() && this.selected()?.status === 'pending' && !!this.selected()?.request,
+    );
 
     readonly columnDefs: ColDef<PendingAction>[] = [
         {
