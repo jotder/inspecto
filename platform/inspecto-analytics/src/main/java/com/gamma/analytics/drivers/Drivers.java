@@ -60,6 +60,8 @@ public final class Drivers {
             if (e.before() < 0 || e.after() < 0) negative = true;
         }
         double delta = after - before;
+        // rounding residue of summed doubles is no change: it would inflate every share
+        if (Math.abs(delta) <= 1e-9 * Math.max(Math.abs(before), Math.abs(after))) delta = 0;
         boolean shares = !negative && before > 0 && after > 0;
         List<Scored> scored = new ArrayList<>();
         double surprise = shares ? 0 : Double.NaN;

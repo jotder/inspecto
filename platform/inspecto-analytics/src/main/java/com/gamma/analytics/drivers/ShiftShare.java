@@ -34,6 +34,9 @@ public final class ShiftShare {
         for (Slice s : slices) {
             if (s.den0() < 0 || s.den1() < 0)
                 throw new IllegalArgumentException("a negative denominator has no mix and rate (slice '" + s.value() + "')");
+            if ((s.den0() == 0 && s.num0() != 0) || (s.den1() == 0 && s.num1() != 0))
+                throw new IllegalArgumentException("a value has a numerator but no denominator in one period, so the ratio"
+                        + " cannot be split exactly into mix and rate");
             n0 += s.num0();
             d0 += s.den0();
             n1 += s.num1();

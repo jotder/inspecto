@@ -58,6 +58,11 @@ approximated.
 - **Capability**: `canAuthorWorkbench` (Builder lens). A Business-lens viewer does not see the action yet — an
   open question for the operator, not a technical limit.
 - **A Widget on a saved Query** is not explained (the request needs the Dataset); the drawer says so.
+- **Mix and rate is not reachable from a tile yet**: no Widget authors a ratio today (`ratioMeasure` in
+  `inspecto/viz/query-spec.ts` has no production caller; ratios come from KPIs and Risk factors), so the drawer's
+  waterfall bridge appears only for a request that carries `ratio`. I-5 is proven at the route
+  (`ControlApiExplainTest`, an exact split) and in the dialog spec. An `avg` Widget is not mapped to sum ÷ count:
+  `count` counts rows, `avg` skips NULLs, so the split would not be exact.
 
 ## 4. UI
 

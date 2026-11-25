@@ -128,6 +128,22 @@ class DriversGoldenTest {
         assertTrue(e.getMessage().contains("earlier"), e.getMessage());
     }
 
+    @Test
+    void aNumeratorWithoutADenominatorIsRefusedNotSplitWrongly() {
+        // A 10/100 → 10/100, B 5/0 → 0/0: R .15 → .10, but no w·r term can carry B's 5 — mix + rate would be 0, not −.05
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> ShiftShare.decompose(List.of(
+                new ShiftShare.Slice("A", 10, 100, 10, 100), new ShiftShare.Slice("B", 5, 0, 0, 0))));
+        assertTrue(e.getMessage().contains("no denominator"), e.getMessage());
+    }
+
+    @Test
+    void aRoundingResidueIsNoChange() {
+        // 0.1 + 0.2 ≠ 0.3 in doubles: the totals differ by ~5e-17, which must not explain anything
+        Drivers.Dimension d = Drivers.explain("x", List.of(new Drivers.Element("a", 0.1, 0.3), new Drivers.Element("b", 0.2, 0)), 0.8);
+        assertEquals(0, d.delta());
+        assertFalse(d.explains());
+    }
+
     // ── I-6 moved with it ───────────────────────────────────────────────────────────────────────────────────────
 
     @Test

@@ -57,16 +57,6 @@ public final class BiSpecRunner {
         Path writeRoot = WriteGates.requireWriteRoot(api, "BI query execution");
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         ViewStore views = new ViewStore(writeRoot.resolve("views"));
-        MeasureCompiler.Compiled sql;
-        try {
-            sql = MeasureCompiler.compile(spec.withLimit(spec.limit() + 1));
-        } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
-        }
-        List<Finding> findings = SqlGuard.check(sql.sql());
-        if (!findings.isEmpty())
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "compiled BI query failed the SQL safety check");
-
         String datasetId = spec.dataset();
         Map<String, Object> dataset = store.get("dataset", datasetId)
                 .map(ComponentRegistry.Component::content)
@@ -80,6 +70,18 @@ public final class BiSpecRunner {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         }
         BiResultMasking masking = BiResultMasking.of(writeRoot, store, views, datasetId, dataset, BiResultMasking.mayReveal(ex));
+        // As /bi/query: a capped grouped spec is otherwise ordered by its group keys, so masked aliases would come back in
+        // the raw keys' order (BI-MASKING-STRUCTURED-RESIDUALS-1 (2)); for a caller who cannot reveal, order by the Measure.
+        spec = masking.stripCosmeticOrder(spec, null);
+        MeasureCompiler.Compiled sql;
+        try {
+            sql = MeasureCompiler.compile(spec.withLimit(spec.limit() + 1));
+        } catch (IllegalArgumentException bad) {
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
+        }
+        List<Finding> findings = SqlGuard.check(sql.sql());
+        if (!findings.isEmpty())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "compiled BI query failed the SQL safety check");
         masking.vet(spec, true, null);
         QueryExecutor.Request req = new QueryExecutor.Request(datasetId, relationSql, sql.sql(),
                 spec.limit(), 0, List.of(), List.of(), sql.params());

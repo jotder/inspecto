@@ -458,7 +458,10 @@ Spec: [`okf/product/module/engine/spec-kpi-projection.md`](../okf/product/module
   dimensions, 10 related Measures, 200 values per dimension (more → `refused[]`), 8–60 buckets of lookback.
 - **UI**: a light-bulb tile action *Explain this change* on a Widget over a grained date (not on a saved Query, not a
   KPI-bound tile) when `features.insights` is on and the user may author; the dialog shows the change, the drivers per
-  dimension, the mix / rate bridge on the waterfall Visualization Type and the moved-with list.
+  dimension, the mix / rate bridge on the waterfall Visualization Type and the moved-with list. No Widget authors a
+  ratio yet, so the bridge shows only for a ratio request (route + dialog spec); an `avg` is not silently mapped to
+  sum ÷ count (it skips NULLs, `count` does not). Preview 2026-11-25: a line Widget over 18 months, the drawer
+  named North as 93 % of the last month's jump and `sum_cost` as moving with it (r = 1.00 over 17 changes).
 
 ## 12. Board row
 
