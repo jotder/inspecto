@@ -9,9 +9,12 @@
 //                   skill's `## MCP Tools` list must name only real tools. A skill that names a tool outside its list fails.
 //   3 help links    every `/help/<page>.html` names a Handbook page that is `audience: external` (the render an install
 //                   serves) or one this check is told is new in the same change (none — a page must be in the manifest).
-//   4 golden tasks  agent-kit/golden/developer.json parses; every task has id, role, prompt, grade[] and safety[]; every
-//                   `tool` a grade or safety check names is a real MCP Tool; ids are unique.
+//   4 golden tasks  every agent-kit/golden/*.json suite (developer, operations, analyst, link-analysis, …) parses; every
+//                   task has id, role, prompt, skills[], grade[] and safety[]; every `tool` a grade or safety check names
+//                   is a real MCP Tool; every skill a task names is a real Agent Skill; ids are unique across all suites.
 //   5 no repo paths a skill never names a repository path (the Kit is for an installed distribution with no source tree).
+//   6 coverage      every Agent Skill is named by at least one golden task (AK-2 widening plan W10). Per-tool coverage is
+//                   not checked yet: the suites check only two tools by name (plan W10 note proposes a write-tool rule).
 //
 // Reads tracked files only; no build, no server. Tests: tools/check-agent-kit.test.mjs (negative fixtures).
 
@@ -91,7 +94,7 @@ export function checkSkill(name, md, tools, pages) {
     return [...new Set(out)];
 }
 
-export function checkGolden(json, tools) {
+export function checkGolden(json, tools, skills = null) {
     const out = [];
     let doc;
     try { doc = JSON.parse(json); } catch (e) { return [`golden: not JSON (${e.message})`]; }
@@ -104,10 +107,28 @@ export function checkGolden(json, tools) {
         ids.add(t.id);
         for (const k of ['role', 'prompt']) if (typeof t[k] !== 'string' || !t[k]) out.push(`golden ${id}: no ${k}`);
         for (const k of ['grade', 'safety']) if (!Array.isArray(t[k]) || t[k].length === 0) out.push(`golden ${id}: no ${k} checks`);
+        if (!Array.isArray(t.skills) || t.skills.length === 0) out.push(`golden ${id}: no skills`);
+        else if (skills) for (const s of t.skills) if (!skills.has(s)) out.push(`golden ${id}: names skill '${s}', which is not an Agent Skill`);
         for (const c of [...(t.grade ?? []), ...(t.safety ?? [])]) {
             if (c.tool && !tools.has(c.tool)) out.push(`golden ${id}: names tool '${c.tool}', which is not an MCP Tool`);
         }
     }
+    return out;
+}
+
+/** Ids that more than one suite uses, and skills no golden task names. `suites` is { file → parsed doc }. */
+export function checkSuites(suites, skillNames) {
+    const out = [];
+    const where = new Map();
+    const used = new Set();
+    for (const [f, doc] of Object.entries(suites)) for (const t of Array.isArray(doc.tasks) ? doc.tasks : []) {
+        if (t.id) {
+            if (where.has(t.id) && where.get(t.id) !== f) out.push(`golden: task id '${t.id}' is in both ${where.get(t.id)} and ${f}`);
+            where.set(t.id, f);
+        }
+        for (const s of Array.isArray(t.skills) ? t.skills : []) used.add(s);
+    }
+    for (const n of skillNames) if (!used.has(n)) out.push(`${n}: no golden task names this skill — add one to its role's suite`);
     return out;
 }
 
@@ -125,10 +146,16 @@ export function run(root = ROOT_DEFAULT) {
     }
     const golden = join(root, 'agent-kit/golden/developer.json');
     if (!existsSync(golden)) findings.push('agent-kit/golden/developer.json: missing');
-    // every suite, one per agent role (developer; operations from phase 2)
+    // every suite in the folder (developer, operations, analyst, link-analysis, and any added later)
     const gdir = join(root, 'agent-kit/golden');
-    for (const f of existsSync(gdir) ? readdirSync(gdir).filter((n) => n.endsWith('.json')).sort() : [])
-        findings.push(...checkGolden(readFileSync(join(gdir, f), 'utf8'), tools).map((m) => `${f}: ${m}`));
+    const suites = {};
+    for (const f of existsSync(gdir) ? readdirSync(gdir).filter((n) => n.endsWith('.json')).sort() : []) {
+        const json = readFileSync(join(gdir, f), 'utf8');
+        const found = checkGolden(json, tools, new Set(names));
+        findings.push(...found.map((m) => `${f}: ${m}`));
+        if (!found.some((m) => m.includes('not JSON'))) suites[f] = JSON.parse(json);
+    }
+    findings.push(...checkSuites(suites, names));
     return { findings, skills: names.length, tools: tools.size };
 }
 
