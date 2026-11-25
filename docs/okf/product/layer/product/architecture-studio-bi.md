@@ -169,6 +169,13 @@ without a new query; captions say what the forecast is, how it tested, how many 
 is none. The cog dialog offers *Forecast band*, its width (80 / 90 / 95 %), *Anomaly markers* and the starting
 sensitivity. The suffixes are pinned by `contracts/measure-grammar.contract.json` (`overlay`).
 
+**Insight-aware Show-Me (BI-INSIGHTS-1 I-20, 2026-11-25).** While a Widget is built, `suggestOverlays()`
+(`inspecto/viz/show-me.ts`) offers, above the preview, a forecast band when the server detected a seasonal cycle
+over two seasons ("Weekly seasonal pattern found over 112 days of history"), anomaly markers when a point passes the
+default sensitivity, and the target line or bands of the bound KPI. The signal is the same Widget statement sent once
+more with `overlay: {forecast, anomaly}` — the summary above, no other route. Nothing changes until the user clicks
+*Add …*; *Not now* hides a suggestion. Plan §11.6.
+
 **Dashboards.** A Dashboard config holds `tiles: [{widgetId, span}]`, an optional `filter`,
 `exposedFields` for the quick-filter chips, a viewer header (`description`, `asOf`, `illustrative`)
 and a viewer-only date range (`dateField`, `defaultRange`).
