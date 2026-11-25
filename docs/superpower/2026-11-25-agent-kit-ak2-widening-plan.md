@@ -2,7 +2,8 @@
 
 > **Status: PROPOSED 2026-11-25 — D-AK8…D-AK12 open (§5); nothing built.** The follow-on to phases 1–3b of
 > [`2026-11-20-agent-kit-ak2-plan.md`](2026-11-20-agent-kit-ak2-plan.md) (all built 2026-11-25). It takes the gaps a
-> peer's product review of that plan listed (2026-11-25, not on `origin/master` when this was written), keeps the ones
+> peer's product review of that plan listed
+([`2026-11-25-agent-kit-ak2-product-review.md`](2026-11-25-agent-kit-ak2-product-review.md)), keeps the ones
 > the code supports, and specifies each as a task small enough to build and review on its own. Board row:
 > `AGENT-KIT-1`. Product Map Items: `module.mcp`, `module.agent`, `module.access`, `layer.platform`. Every route,
 > class and count below was checked against `origin/master` `5c8effa9e` on 2026-11-25.
