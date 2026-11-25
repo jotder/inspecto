@@ -165,7 +165,8 @@ class ControlApiMcpWriteToolsTest {
             for (String r : List.of("validate_config", "dry_run_pipeline", "list_pending_changes", "get_pending_change",
                     "diff_pending_change", "export_bundle", "preview_promotion"))
                 assertTrue(byName.get(r).at("/annotations/readOnlyHint").asBoolean(false), r);
-            assertEquals(List.of("alert-rule", "dashboard", "expectation", "job", "pipeline", "widget"),
+            assertEquals(List.of("alert-rule", "dashboard", "decision-rule", "expectation", "job", "notification-rule",
+                            "pipeline", "widget"),
                     JSON.convertValue(byName.get("propose_change").at("/inputSchema/properties/kind/enum"), List.class));
         }
     }

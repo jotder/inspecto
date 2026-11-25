@@ -94,6 +94,26 @@ class McpToolRoutesTest {
             if (!"GET".equals(c.method())) assertTrue(inManifest(c.method(), c.path()), "not in the manifest: " + c.method() + " " + c.path());
     }
 
+    /**
+     * AK-2 widening plan W2: every route {@code propose_change} can replay is on {@code PendingChanges.REPLAYABLE}, so an
+     * agent's proposal is always held, never written. A kind whose route cannot be held is not on the allowlist.
+     */
+    @Test
+    void everyProposeChangeRouteReachesTheHold() {
+        McpTools.Tool t = McpTools.tool("propose_change");
+        int n = 0;
+        for (String kind : McpTools.CHANGE_ROUTES.keySet())
+            for (String op : McpTools.OPERATIONS) {
+                Map<String, Object> a = new LinkedHashMap<>(Map.of("kind", kind, "operation", op, "id", "x1"));
+                if (!"delete".equals(op)) a.put("content", Map.of());
+                McpTools.Call c = t.router().route(t.validate(a));
+                assertTrue(AgentGateProbe.reachesTheHold(c.method(), c.path()),
+                        kind + " " + op + " replays " + c.method() + " " + c.path() + ", which is not on PendingChanges.REPLAYABLE");
+                n++;
+            }
+        assertTrue(n >= 24, "every kind × operation was checked: " + n);
+    }
+
     @Test
     void noToolRouterCanProduceARefusedPath() {
         for (McpTools.Call c : everyCall()) assertFalse(McpTools.refused(c), c.method() + " " + c.path());

@@ -171,8 +171,14 @@ is passed on as the replayed route's JSON body, unchanged.
 **`propose_change` allowlist** (`McpTools.CHANGE_ROUTES`, the builder tutorials' kinds, each route on
 `PendingChanges.REPLAYABLE`): `pipeline` (create and update `PUT /pipelines/{id}/graph`, delete
 `DELETE /config/pipeline/{id}`), `expectation` (`POST /expectations`, `PUT|DELETE /expectations/{id}`), `alert-rule`
-(`/alerts/rules`), `job` (`/jobs`), `widget` and `dashboard` (`POST /components/{kind}`, `PUT|DELETE /components/{kind}/{id}`).
-An update or delete needs `id`, a create or update needs `content`, a delete takes none; anything else is a
+(`/alerts/rules`), `job` (`/jobs`), `widget` and `dashboard` (`POST /components/{kind}`, `PUT|DELETE /components/{kind}/{id}`);
+since AK-2 widening W2 step 1 (D-AK9), `decision-rule` (`POST /decision-rules`, `PUT|DELETE /decision-rules/{id}`) and
+`notification-rule` (`POST /notifications/rules`, `PUT|DELETE /notifications/rules/{id}`), both `canAuthorWorkbench`,
+which the machine agent set already held, so the set does not widen. **`notification-channel` stays out** although its
+route reaches the hold: the plan kept it out for `PENDING-CHANGE-SECRET-READBACK-1`, and that defect does not reach a
+Channel (`ChannelConfig` has no secret field and `GET /notifications/channels` returns every field), so adding it is
+the operator's call. `McpToolRoutesTest.everyProposeChangeRouteReachesTheHold` refuses a kind whose route is not on
+`PendingChanges.REPLAYABLE`. An update or delete needs `id`, a create or update needs `content`, a delete takes none; anything else is a
 `-32602` before any replay. The answer is the route's own: for an agent, always the **202 Pending Change** (the
 identity-keyed hold), carrying `agentClient` and `mcpTool: propose_change`.
 
@@ -192,6 +198,11 @@ the refusal list off, the reason header dropped, the replay not answering a hold
 read-only check (on a read-only install `propose_change` is a 423 and no Pending Change is recorded; the reads answer).
 `aReasonNoHeaderCanCarryIsHeldAndKeptExactly` (2026-11-24): a reason with "—", "→" and "€" is held and kept exactly;
 putting the reason back on the header turns it red with the live run's "Illegal character found in header".
+`ControlApiMcpProposeKindsTest` (W2, real HTTP, per added kind): the agent's create is held and nothing is live,
+another person's approval applies it, its update and delete are held, the same token's direct call is held, a machine
+agent's proposal is held; a kind outside the allowlist is `-32602` and records no Pending Change. Mutant: a kind mapped
+to `POST /decision-rules/{id}/simulate` (not on `REPLAYABLE`) turned the allowlist test, the W10 person's-agent test and
+the real-HTTP test red.
 
 **A replay that fails** with anything but an `ApiException` answers the tool `isError` with HTTP 500 and the exception's
 class name plus the correlation id, and is **logged at ERROR with its stack under that correlation id**

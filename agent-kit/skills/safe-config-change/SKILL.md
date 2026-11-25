@@ -1,6 +1,6 @@
 ---
 name: safe-config-change
-description: The one way an agent changes a running Inspecto - validate, dry-run, propose, then wait for another person to approve. Use before ANY create, update or delete of a Pipeline, Expectation, Alert Rule, Job, Widget or Dashboard, and whenever a change is refused, held or needs to be taken back.
+description: The one way an agent changes a running Inspecto - validate, dry-run, propose, then wait for another person to approve. Use before ANY create, update or delete of a Pipeline, Expectation, Alert Rule, Job, Widget, Dashboard, Decision Rule or Notification Rule, and whenever a change is refused, held or needs to be taken back.
 ---
 
 # Change Inspecto safely
@@ -23,13 +23,14 @@ approves it. That person is never you and never the person you act for (four eye
    `inspecto://glossary` if unsure).
 2. **Validate** with `validate_config`: `type` is `expectation`, `alert`, `job`, `widget` or `dashboard`, `config` is
    the draft. The answer is `{findings, clean}`. Fix every finding whose severity is an error and validate again.
-   Never propose a draft that is not clean.
+   Never propose a draft that is not clean. A Decision Rule or a Notification Rule has no `validate_config` type: its
+   own route checks the content before it holds it, so a bad draft comes back as a 422 naming the field.
 3. **Dry-run** a Pipeline with `dry_run_pipeline`: argument `pipeline` = the Pipeline id, and `body`
    `{pipeline: <draft graph>, sampleRows: [...]}`. This is also a
    Pipeline graph's validation: the draft is parsed and validated, then executed on a scratch database; nothing is
    written. Read each step's row count; a step that drops every row is a mistake until proven otherwise.
-4. **Propose** with `propose_change`: `kind` (pipeline, expectation, alert-rule, job, widget, dashboard), `operation`
-   (create, update, delete), `id` (required to update or delete, and to create a Pipeline), `content` (not for a
+4. **Propose** with `propose_change`: `kind` (pipeline, expectation, alert-rule, job, widget, dashboard, decision-rule,
+   notification-rule), `operation` (create, update, delete), `id` (required to update or delete, and to create a Pipeline), `content` (not for a
    delete) and a one-line `reason` of at most 500 characters. The reason is what the approver reads first: say what
    changes and why, in the person's terms.
 5. **Report** the Pending Change id (`pc-…`) to the person and that it waits for another person's approval. Offer
@@ -51,6 +52,17 @@ approves it. That person is never you and never the person you act for (four eye
 **One proposal per thing.** Get the draft right with `validate_config` (or a dry run) first; each `propose_change` that
 is refused costs a round trip, and each one accepted is a Pending Change a person must read. A Dashboard and its
 Widgets are a few proposals, not dozens.
+
+## Decision Rules and Notification Rules
+
+- A **Decision Rule** is `{name, targetType: pipeline|job, target, when, consequences, priority?, enabled?}`; `when`
+  is a condition tree `{kind: "group", op: "AND"|"OR", items: [{kind: "condition", field, operator, value?}]}`
+  (operators `= != < <= > >= contains startsWith endsWith in between isNull isNotNull matches`). A consequence
+  `{action: "emit-signal", params: {type: "<signal type>"}}` emits a signal when the rule applies.
+- A **Notification Rule** is `{id, eventType, category, minLevel?, titleTemplate?, bodyTemplate?, enabled?}`: it turns
+  every event of `eventType` (a signal type too) into a notification of `category`.
+- An update replaces the whole rule, and no MCP Tool lists these rules: to change one, ask the person for its current
+  content rather than guessing it.
 
 ## Taking a proposal back
 

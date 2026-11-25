@@ -259,7 +259,12 @@ final class McpTools {
             "job", List.of("POST /jobs", "PUT /jobs/{id}", "DELETE /jobs/{id}"),
             "widget", List.of("POST /components/widget", "PUT /components/widget/{id}", "DELETE /components/widget/{id}"),
             "dashboard", List.of("POST /components/dashboard", "PUT /components/dashboard/{id}",
-                    "DELETE /components/dashboard/{id}"));
+                    "DELETE /components/dashboard/{id}"),
+            // AK-2 widening W2 step 1 (D-AK9): canAuthorWorkbench, already in the machine agent set. notification-channel
+            // stays out until the operator says otherwise (plan W2 step 1, PENDING-CHANGE-SECRET-READBACK-1)
+            "decision-rule", List.of("POST /decision-rules", "PUT /decision-rules/{id}", "DELETE /decision-rules/{id}"),
+            "notification-rule", List.of("POST /notifications/rules", "PUT /notifications/rules/{id}",
+                    "DELETE /notifications/rules/{id}"));
 
     static final List<String> OPERATIONS = List.of("create", "update", "delete");
 
@@ -327,7 +332,8 @@ final class McpTools {
                                     + "/pipelines/authored/{id}/dry-run takes them.", false)),
                     a -> new Call("POST", "/pipelines/authored/" + seg(a.get("pipeline")) + "/dry-run", bodyOf(a))),
             new Tool("propose_change", "Propose a config change",
-                    "Propose creating, updating or deleting a Pipeline, Expectation, Alert Rule, Job, Widget or Dashboard. "
+                    "Propose creating, updating or deleting a Pipeline, Expectation, Alert Rule, Job, Widget, Dashboard, "
+                            + "Decision Rule or Notification Rule. "
                             + "The change is NOT applied: it becomes a Pending Change that another person must approve. "
                             + "'content' is the kind's own write body (for a Pipeline, its graph). Validate and dry-run first.",
                     List.of(new Arg("kind", Kind.ENUM, true, "What to change.", List.copyOf(new java.util.TreeSet<>(CHANGE_ROUTES.keySet()))),
