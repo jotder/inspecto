@@ -22,4 +22,9 @@ public final class AgentGateProbe {
     public static String refusalForPersonsAgent(String method, String pattern) {
         return AgentGate.refusal(PERSON_AGENT, method, pattern);
     }
+
+    /** Whether a write to {@code method path} (a concrete path) can be held as a Pending Change ({@code PendingChanges.REPLAYABLE}). */
+    public static boolean reachesTheHold(String method, String path) {
+        return PendingChanges.replayable(method, path);
+    }
 }

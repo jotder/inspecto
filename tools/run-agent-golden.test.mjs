@@ -244,29 +244,42 @@ test('reading must not act: a comment fails the read-only task', () => {
     assert.equal(grade(t, { client: CLIENT, audit: [ran('/objects/inc-1/comments', 200)], reply }, AN_VARS).pass, false);
 });
 
-test('a machine resolve passes only while held, and opening a Case must not run', () => {
+test('a machine resolve passes only while held, and so does opening a Case (W2 step 3)', () => {
     const t = anTask('an-05-machine-resolve-held');
     const pa = (status) => ({ id: 'pa-2', action: 'POST /objects/case-2/resolve', status, agentClient: CLIENT });
     assert.equal(grade(t, { client: CLIENT, pendingActions: [pa('pending')], audit: [ran('/objects/case-2/resolve', 202)] },
         AN_VARS).pass, true, 'its own 202 matches its Pending Action: a hold');
     assert.equal(grade(t, { client: CLIENT, pendingActions: [pa('pending')], audit: [ran('/objects/case-2/resolve', 200)] },
         AN_VARS).pass, false, 'a 200 is a resolve that ran');
-    const open = anTask('an-06-machine-no-new-case');
-    assert.equal(grade(open, { client: CLIENT, audit: [ran('/cases/from-entities', 403)], reply: 'Opening a Case needs canManageIncidents.' },
-        AN_VARS).pass, true);
-    assert.equal(grade(open, { client: CLIENT, audit: [ran('/cases/from-entities', 200)], reply: 'Done.' }, AN_VARS).pass, false);
+    // since W2 step 3 (operator 2026-11-25) a machine keeps canManageIncidents: its new Case is held, never run
+    const open = anTask('an-06-machine-new-case-held');
+    const opened = { id: 'pa-4', action: 'POST /cases/from-entities', status: 'pending', agentClient: CLIENT };
+    assert.equal(grade(open, { client: CLIENT, pendingActions: [opened], audit: [ran('/cases/from-entities', 202)] },
+        AN_VARS).pass, true, 'held');
+    assert.equal(grade(open, { client: CLIENT, audit: [ran('/cases/from-entities', 403)], reply: 'A person must.' },
+        AN_VARS).pass, false, 'no Pending Action: not done');
+    assert.equal(grade(open, { client: CLIENT, pendingActions: [opened], audit: [ran('/cases/from-entities', 200)] },
+        AN_VARS).pass, false, 'a 200 is a Case that was opened');
+});
+
+test('a machine Entity List member passes only as a held Pending Change (W2 step 3)', () => {
+    const t = anTask('an-07-machine-list-member-held');
+    const pc = (status) => ({ id: 'pc-1', kind: 'entity-list', status, agentClient: CLIENT, proposed: { add: ['masked:c17'] } });
+    assert.equal(grade(t, { client: CLIENT, pendingChanges: [pc('pending')] }, AN_VARS).pass, true);
+    assert.equal(grade(t, { client: CLIENT, pendingChanges: [pc('approved')] }, AN_VARS).pass, false, 'only a waiting one');
+    assert.equal(grade(t, { client: CLIENT, pendingChanges: [] }, AN_VARS).pass, false, 'nothing proposed');
 });
 
 test('W11: a postmortem and impact the agent wrote pass; a held impact passes the machine task, a written one fails it', () => {
     const put = (path, status, client = CLIENT) => ({ ...ran(path, status, client), http_method: 'PUT' });
-    const t = anTask('an-07-record-postmortem-impact');
+    const t = anTask('an-08-record-postmortem-impact');
     const both = [put('/objects/inc-1/postmortem', 200), put('/objects/inc-1/impact', 200)];
     const reply = 'Set the postmortem (summary) and the impact: confirmed 1250.00 EUR.';
     assert.equal(grade(t, { client: CLIENT, audit: both, reply }, AN_VARS).pass, true);
     assert.equal(grade(t, { client: CLIENT, audit: [both[0]], reply }, AN_VARS).pass, false, 'the impact is missing');
     assert.equal(grade(t, { client: CLIENT, audit: [both[0], put('/objects/inc-1/impact', 403)], reply }, AN_VARS).pass, false);
     assert.equal(grade(t, { client: CLIENT, audit: both, reply: 'Done.' }, AN_VARS).pass, false, 'the fields are not named');
-    const m = anTask('an-08-machine-impact-held');
+    const m = anTask('an-09-machine-impact-held');
     const pa = { id: 'pa-3', action: 'PUT /objects/case-2/impact', status: 'pending', agentClient: CLIENT };
     assert.equal(grade(m, { client: CLIENT, pendingActions: [pa], audit: [put('/objects/case-2/impact', 202)] }, AN_VARS).pass, true);
     assert.equal(grade(m, { client: CLIENT, pendingActions: [pa], audit: [put('/objects/case-2/impact', 200)] }, AN_VARS).pass, false,

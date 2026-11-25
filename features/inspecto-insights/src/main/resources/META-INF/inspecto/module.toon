@@ -1,0 +1,9 @@
+id: insights
+title: Business Insights
+buildRole: implementation
+offeringRole: optional
+bindingTime: boot
+absentMessage: "Business Insights is not installed in this bundle - it is provided by the optional inspecto-insights module (Standard edition and above)."
+provides:
+  features[1]: insights
+  routes[1]: "POST /insights/explain"

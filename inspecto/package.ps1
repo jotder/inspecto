@@ -432,6 +432,7 @@ $regReportJarSrc = $null
 $screeningJarSrc = $null
 $anomalyJarSrc = $null
 $predictiveJarSrc = $null
+$insightsJarSrc = $null
 $realtimeJarSrc = $null
 $mcpJarSrc = $null
 if ($Edition -ne 'Basic') {
@@ -598,6 +599,14 @@ if ($Edition -ne 'Basic') {
                         Select-Object -First 1 -ExpandProperty FullName
     if (-not $predictiveJarSrc -or -not (Test-Path $predictiveJarSrc)) {
         throw "$Edition edition requested but no JAR found matching $predictiveTargetDir\inspecto-predictive-*.jar. Run without -NoBuild, or build it with: mvn -o package -pl :inspecto-predictive -am -DskipTests"
+    }
+    # BI-INSIGHTS-1 P2: the Business Insights add-on (POST /insights/explain). THIN like inspecto-predictive; Standard and above (D-BI3).
+    $insightsTargetDir = Join-Path $sandboxRoot 'features\inspecto-insights\target'
+    $insightsJarSrc = Get-ChildItem -Path $insightsTargetDir -Filter 'inspecto-insights-*.jar' -ErrorAction SilentlyContinue |
+                      Where-Object { $_.Name -notlike '*-sources.jar' -and $_.Name -notlike '*-tests.jar' } |
+                      Select-Object -First 1 -ExpandProperty FullName
+    if (-not $insightsJarSrc -or -not (Test-Path $insightsJarSrc)) {
+        throw "$Edition edition requested but no JAR found matching $insightsTargetDir\inspecto-insights-*.jar. Run without -NoBuild, or build it with: mvn -o package -pl :inspecto-insights -am -DskipTests"
     }
     # PRODUCT-ASSEMBLY-1 PA-9d: the Real-time Detection add-on (windowed and Pattern Alert Rules on each Stream commit). THIN; requires ops; Standard and above (D-PA44).
     $realtimeTargetDir = Join-Path $sandboxRoot 'features\inspecto-realtime\target'
@@ -1125,6 +1134,20 @@ if ($predictiveJarSrc) {
         }
         Write-Host "  verified: JobTypeProvider and ComponentKindValidator registrations present in the Predictive Analytics module" -ForegroundColor DarkGray
     } finally { $paZip.Dispose() }
+}
+if ($insightsJarSrc) {
+    Copy-Item $insightsJarSrc "$libDir\inspecto-insights.jar"
+    Write-Host "Bundled Business Insights module -> inspecto-insights.jar" -ForegroundColor Green
+    # Thin jar: the only way it ships INERT is a missing META-INF/services entry - /insights/explain would answer 503.
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $biZip = [System.IO.Compression.ZipFile]::OpenRead("$libDir\inspecto-insights.jar")
+    try {
+        $biEntry = $biZip.Entries | Where-Object { $_.FullName -eq 'META-INF/services/com.gamma.spi.http.RouteModule' }
+        if (-not $biEntry) { throw "inspecto-insights.jar has no META-INF/services/com.gamma.spi.http.RouteModule - ExplainRoutes would never be discovered." }
+        $biReader = New-Object System.IO.StreamReader($biEntry.Open())
+        try { $biBody = $biReader.ReadToEnd() } finally { $biReader.Dispose() }
+        if ($biBody -notmatch [regex]::Escape('com.gamma.insights.ExplainRoutes')) { throw "inspecto-insights.jar's RouteModule service file does not list com.gamma.insights.ExplainRoutes - it lists only: $biBody" }
+    } finally { $biZip.Dispose() }
 }
 if ($realtimeJarSrc) {
     Copy-Item $realtimeJarSrc "$libDir\inspecto-realtime.jar"

@@ -86,9 +86,14 @@ A **machine agent** (`auth.oidc.agentMachineClients`) follows the same rules wit
 (`client:<id>`): it proposes and is held, and it never runs a Pipeline, approves or administers. Its run and Case actions
 are **held too**, as **Pending Actions**: a change approver (`canApproveChanges`, not the machine) approves or
 declines each one under `/pending-actions`, and an approved one runs as the
-machine. It never opens a Case (that needs `canManageIncidents`, which it never keeps). In Link Analysis it queries, and works in a Draft only on an Investigation a lead added it to, every write held; its
-role must grant `canDraftInvestigations` by name. Give it a role in
-the Space that grants only what it should author or operate; it never keeps more than the five capabilities above.
+machine. Since 2026-11-25 (AK-2 widening W2 step 3) it may also keep `canManageIncidents` and
+`canManageExclusionCategories`: its new Case, Investigation attach and Entity List edits are held too, but
+`canManageExclusionCategories` lets it **read a restricted Entity List's members** (the list itself, Screening hits,
+Investigation replays) — grant it to a machine role only if that is acceptable. In Link Analysis it queries, and works
+in a Draft only on an Investigation a lead added it to, every write held. Give it a role in the Space that grants only
+what it should author or operate; it never keeps more than `canAuthorWorkbench`, `canAuthorAlertRules`,
+`canWorkIncidents`, `canOperateRuns`, `canDraftInvestigations`, `canManageIncidents` and
+`canManageExclusionCategories` (plus `canOpenInboundInvestigation`, which any machine may keep).
 
 Every audit row of an agent's request names the person as the actor and the agent client as `agent_client`;
 search the audit log for it to see everything an agent did. The Pending Changes screen shows "via agent client"

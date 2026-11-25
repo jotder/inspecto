@@ -14,6 +14,11 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { Router } from '@angular/router';
+import { MatDialog } from '@angular/material/dialog';
+import { SessionService } from 'app/inspecto/auth/session.service';
+import { biQueryBody } from 'app/inspecto/viz/dataset-result.service';
+import { ExplainRequest, explainRequest } from 'app/inspecto/viz/explain-request';
+import { ExplainDialogComponent, ExplainDialogData } from './explain.dialog';
 import { LensService } from 'app/inspecto/api/lens.service';
 import { KpiAlertWatch, kpiAlertRuleParams } from 'app/inspecto/viz/kpi-alert-link';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -137,6 +142,19 @@ export interface DrillEvent extends DrillPair {
                         </button>
                     </mat-menu>
                 }
+                @if (explainable() && tileState() === 'ready') {
+                    <!-- BI-INSIGHTS-1 P2: drivers, mix and rate, moved with it — reads only (Business Insights add-on). -->
+                    <button
+                        mat-icon-button
+                        type="button"
+                        (click)="openExplain()"
+                        matTooltip="Explain this change"
+                        aria-label="Explain this change"
+                        data-testid="explain-change"
+                    >
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:light-bulb"></mat-icon>
+                    </button>
+                }
                 <ng-content select="[tileActions]" />
             </ng-container>
             @if (tileState() === 'ready') {
@@ -244,6 +262,8 @@ export class WidgetHostComponent {
     private elementRef = inject(ElementRef<HTMLElement>);
     private router = inject(Router);
     private lens = inject(LensService);
+    private session = inject(SessionService);
+    private dialog = inject(MatDialog);
 
     /** Self-fetch mode: only an id (the standalone route). */
     readonly widgetId = input<string | undefined>(undefined);
@@ -346,6 +366,32 @@ export class WidgetHostComponent {
     private readonly colMetas = computed<ColumnMeta[]>(() =>
         (this.resolvedDataset()?.columns ?? []).map((c) => ({ name: c.name, type: c.type })),
     );
+
+    /** BI-INSIGHTS-1 P2: the explain request for this Widget's last period, when the add-on is installed, the user may
+     *  author, and the Widget is a Measure over a grained date on a Dataset; null hides the action. */
+    readonly explainable = computed<ExplainRequest | null>(() => {
+        if (!this.session.features()['insights'] || !this.lens.canAuthorWorkbench()) return null;
+        const plugin = this.plugin();
+        const widget = this.resolvedWidget();
+        const dataset = this.resolvedDataset();
+        if (!plugin || !widget || !dataset || plugin.meta.viewKind || this.kpiBound()) return null;
+        const spec = plugin.buildQuery(widget.controls, {
+            datasetId: dataset.id,
+            sourceName: dataset.sourceName,
+            filters: this.filter(),
+            options: widget.options,
+        });
+        if (widget.queryId) spec.queryId = widget.queryId;
+        const out = explainRequest(biQueryBody(spec, this.colMetas()), dataset.columns ?? [], this.props().labels.at(-1));
+        return 'request' in out ? out.request : null;
+    });
+
+    openExplain(): void {
+        const request = this.explainable();
+        if (!request) return;
+        const data: ExplainDialogData = { title: this.tileTitle(), request };
+        this.dialog.open(ExplainDialogComponent, { data, width: '760px', maxWidth: '95vw' });
+    }
 
     constructor() {
         // Self-fetch: an id but no pre-loaded widget — fetch the widget, then its dataset.

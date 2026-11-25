@@ -269,6 +269,9 @@ public final class CapabilityManifest {
             // Preview: scores one entity and writes nothing; UNSAVED content additionally needs canAuthorWorkbench,
             // checked in the handler (as the Risk Score preview).
             new Entry("POST", "/anomaly-scores/preview", Roles.CAN_WORK_INCIDENTS),
+            // ExplainRoutes (BI-INSIGHTS-1 P2, inspecto-insights) — "Explain this change": drivers, mix vs rate, moved with
+            // it. Reads only what POST /bi/query would show the caller (same dataset visibility and masking beneath the gate).
+            new Entry("POST", "/insights/explain", Roles.CAN_AUTHOR_WORKBENCH),
             // PredictionRoutes (PREDICTIVE-SURFACE-1) — an entity's Customer Segment / Churn Score or a series' forecast,
             // the same read gate as scores (OD-8); the row PDP applies beneath the gate.
             new Entry("GET", "/predictions/([^/]+)/([^/]+)/([^/]+)", Roles.CAN_WORK_INCIDENTS),

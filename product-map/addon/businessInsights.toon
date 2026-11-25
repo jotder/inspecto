@@ -1,0 +1,13 @@
+id: addon.businessInsights
+kind: addon
+title: Business Insights
+offeringAddon: businessInsights
+billable: true
+orderCode: INS-AO-BUSINESS-INSIGHTS
+enforcement: build
+billing:
+  model: flat
+support:
+  tier: standard
+status: ga
+docs: docs/okf/product/addon/businessInsights/index.md

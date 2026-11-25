@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.gamma.inspector</groupId>
+        <artifactId>inspecto-parent</artifactId>
+        <version>4.0.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>inspecto-insights</artifactId>
+    <packaging>jar</packaging>
+
+    <name>Inspecto — Business Insights (optional)</name>
+    <description>
+        OPTIONAL add-on module (BI-INSIGHTS-1, D-BI2 / D-BI3): the "Business Insights" add-on. P2 ships "Explain this
+        change" (POST /insights/explain: I-4 drivers, I-5 mix vs rate, I-6 moved with it) through ExplainRoutes; P3 adds
+        Insight Profiles and the insight.scan Job here. Package com.gamma.insights. The statistics live in the Analytics
+        Kernel (com.gamma.analytics.drivers); every statement runs through the core's BiSpecRunner, the same guard,
+        sandbox and masking as POST /bi/query.
+
+        Contributed through the core's public seam com.gamma.spi.http.RouteModule (feature id "insights"). Bundled from
+        the Standard edition up; on Basic the core answers /insights/explain with 503 "not installed" (from module.toon).
+        THIN: no shade, no sidecar classifier. Built only under the edition profiles.
+    </description>
+
+    <dependencies>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-analytics</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-processor</artifactId>
+            <version>${project.version}</version>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-etl</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-http-spi</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-engine</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+</project>

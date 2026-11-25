@@ -435,6 +435,35 @@ Spec: [`okf/product/module/engine/spec-kpi-projection.md`](../okf/product/module
 - **Deliberately deferred**: no suggestion on the Dashboard tile or cog dialog (the builder only); no suggestion of
   a compare (I-1) or a different Visualization Type from the signal.
 
+### 11.8 P2 Explain — I-4 drivers, I-5 mix vs rate, I-6 moved with it — as built (2026-11-25)
+
+- **Module (D-BI2 / D-BI3, operator 2026-11-25)**: `features/inspecto-insights` (module id `insights`, add-on
+  `businessInsights`, Standard and above) is created now rather than in P3; P3's scan and Insight Profiles join it.
+  Product Map Items `module.insights` and `addon.businessInsights`.
+- **Route**: `POST /insights/explain`, gated on `canAuthorWorkbench` (no viewer-level capability exists; whether a
+  Business-lens reader should get it is an operator question). Body and response: the module hub
+  `okf/product/module/insights/architecture-insights.md` and `openapi-v1.json`.
+- **Kernel** `com.gamma.analytics.drivers`: `Drivers` (contribution, share, Jensen-Shannon surprise, minimal cover —
+  largest share first, which is the smallest set for a sum threshold), `ShiftShare` (mix + rate = ΔR exactly; a value
+  that appears or disappears is all mix), `MovedWith` (Pearson over bucket-to-bucket changes, ≥ 8 pairs, |r| ≥ 0.5).
+  Goldens: `DriversGoldenTest` (hand-computed region example, an exact mix/rate split) and `ControlApiExplainTest`.
+- **Deviations from §6, with the reason**: (1) one statement per dimension through the new core seam `BiSpecRunner`
+  (the `/bi/query` gates, guard, sandbox and masking as the caller), not one `GROUPING SETS` statement — masking
+  works per grouped column of one plain SELECT, and a second masking path for grouping sets was not worth the risk;
+  (2) the statistics run in the JVM over the masked rows (as `ChartOverlays`, §11.4) — no DuckDB form; (3) for a ratio,
+  the drivers use each value's term N_c ÷ D, so contributions add up to ΔR.
+- **Honesty**: sum and count (and a ratio of them) only; a non-additive aggregate is refused with the reason (an average
+  is pointed at the ratio form). No change → no shares, nothing explains. An empty earlier bucket → 422, never 0. A
+  masked Measure → 422. The moved-with note says it "does not say one causes the other".
+- **D-BI7**: depth 1 interactive; depth 2 deferred to the P3 Job — board row `BI-EXPLAIN-DEPTH2-1`. Caps: 12
+  dimensions, 10 related Measures, 200 values per dimension (more → `refused[]`), 8–60 buckets of lookback.
+- **UI**: a light-bulb tile action *Explain this change* on a Widget over a grained date (not on a saved Query, not a
+  KPI-bound tile) when `features.insights` is on and the user may author; the dialog shows the change, the drivers per
+  dimension, the mix / rate bridge on the waterfall Visualization Type and the moved-with list. No Widget authors a
+  ratio yet, so the bridge shows only for a ratio request (route + dialog spec); an `avg` is not silently mapped to
+  sum ÷ count (it skips NULLs, `count` does not). Preview 2026-11-25: a line Widget over 18 months, the drawer
+  named North as 93 % of the last month's jump and `sum_cost` as moving with it (r = 1.00 over 17 changes).
+
 ## 12. Board row
 
 Filed 2026-11-18 as **one** row, `BI-INSIGHTS-1` (P2, `BACKLOG.md` §3.6) — the board allows a lane at most one

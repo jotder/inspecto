@@ -1,0 +1,8 @@
+id: module.insights
+kind: module
+title: Business Insights
+parent: layer.features
+module: insights
+billable: false
+status: ga
+docs: docs/okf/product/module/insights/index.md

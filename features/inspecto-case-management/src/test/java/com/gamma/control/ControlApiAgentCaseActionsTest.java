@@ -36,8 +36,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * 2026-11-25: the §4.6 list, a new Case for people only): a person's agent comments on, accepts and assigns an Incident at
  * once, within the person's rights, its rows naming the agent client; a business user's agent gets nothing; a machine
  * agent's Case transition and comment are held as Pending Actions (202, nothing changed) that a change approver
- * approves, and then run as the machine; a machine agent never opens a Case from entities (it never keeps
- * {@code canManageIncidents}), and leaves no record trying.
+ * approves, and then run as the machine; a machine agent's new Case from entities is held as a Pending Action too (it
+ * keeps {@code canManageIncidents} since W2 step 3, operator 2026-11-25).
  */
 class ControlApiAgentCaseActionsTest {
 
@@ -190,14 +190,21 @@ class ControlApiAgentCaseActionsTest {
         }
     }
 
+    /**
+     * Until AK-2 widening W2 step 3 a machine agent never kept {@code canManageIncidents} and was refused a new Case. The
+     * operator's decision of 2026-11-25 (W2 step 3, D-AK9 Entity List edits, granted globally) lets it keep the right, so
+     * its request for a new Case is now HELD as a Pending Action: nothing is opened until a person approves.
+     */
     @Test
-    void aMachineNeverOpensACaseFromEntitiesAndLeavesNoRecord(@TempDir Path dir) throws Exception {
+    void aMachinesNewCaseFromEntitiesIsHeldNotRun(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
             String body = "{\"title\":\"ring\",\"entities\":[{\"id\":\"+15550001\",\"dataset\":\"calls\",\"label\":\"A\"}]}";
-            HttpResponse<String> bot = send(c, "POST", "/cases/from-entities", body, BOT);
-            assertEquals(403, bot.statusCode(), "a machine agent never keeps canManageIncidents: " + bot.body());
-            assertEquals(0, data(send(c, "GET", "/pending-actions", null, CHECKER), 200).get("total").asInt(),
-                    "refused before the hold: no record");
+            JsonNode held = data(send(c, "POST", "/cases/from-entities", body, BOT), 202);
+            assertFalse(held.get("ran").asBoolean(), held.toString());
+            assertEquals("POST /cases/from-entities", held.at("/pendingAction/action").asText(), held.toString());
+            assertEquals("pending", held.at("/pendingAction/status").asText(), held.toString());
+            assertEquals(403, send(c, "POST", "/pending-actions/" + held.at("/pendingAction/id").asText() + "/approve", "{}",
+                    BOT).statusCode(), "a machine agent never approves");
         }
     }
 }

@@ -39,6 +39,9 @@ is `work-cases`.
    `body: {"action": "accept"}` (a new Incident moves from IDENTIFIED to DIAGNOSING), then `action: assign` with
    `body: {"assignee": "<user>"}`. `action: ack` is for the object types whose Workflow has it — an Incident's does
    not, and answers 422.
+6. **A screening miss or a false match** belongs on an Entity List, not in a comment alone: when the person says to add
+   or remove an entity, propose it as `work-cases` § Entity Lists describes (`propose_change`, `kind: entity-list`) —
+   it is held for another person's approval.
 
 Always pass a one-line `reason` (at most 500 characters): the audit row keeps it, and an approver reads it first.
 
@@ -73,3 +76,4 @@ Always pass a one-line `reason` (at most 500 characters): the audit row keeps it
 - `edit_incident_or_case_record` — record its category, impact or a correlation link
 - `work_incident_or_case` — accept or assign it
 - `get_pending_action`, `withdraw_action` — a held action's decision, or take it back
+- `propose_change` — an Entity List change, held for approval

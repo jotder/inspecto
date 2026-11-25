@@ -1,6 +1,6 @@
 ---
 name: work-cases
-description: Move an Inspecto Incident or Case through its Workflow - investigate, escalate, resolve, close - write its record (postmortem, category, financial impact, Findings values, RCA, correlation links), acknowledge or resolve an Alert, or open a Case over the entities an investigation found. Use when the person asks to resolve or close an Incident or Case, to escalate one, to record its postmortem or impact, to link it to another, to clear an Alert, or to open a Case. Covers what happens when an action is held as a Pending Action.
+description: Move an Inspecto Incident or Case through its Workflow - investigate, escalate, resolve, close - write its record (postmortem, category, financial impact, Findings values, RCA, correlation links), acknowledge or resolve an Alert, open a Case over the entities an investigation found, or add to, retire or re-own an Entity List. Use when the person asks to resolve or close an Incident or Case, to escalate one, to record its postmortem or impact, to link it to another, to clear an Alert, to open a Case, or to change an Entity List. Covers what happens when an action is held as a Pending Action.
 ---
 
 # Work Incidents and Cases
@@ -14,7 +14,7 @@ person's explicit word, once, after `triage-incident` has said what the Incident
   rights (`canWorkIncidents`; opening a Case needs `canManageIncidents`). The audit row names the person and your agent
   client.
 - **An unattended machine agent**: every move is **held** as a **Pending Action** (`pa-…`) for a person to approve —
-  the answer is `202` with `ran: false`. A machine agent never opens a Case: it gets 403.
+  the answer is `202` with `ran: false`. Opening a Case is held the same way (since 2026-11-25).
 - **Nothing tells you in advance which you are.** Until an answer shows you are a machine agent (a 202 with a `pa-…`
   id), act as a person's agent: your move runs at once, so ask first for any move the person did not name.
 
@@ -26,7 +26,7 @@ person's explicit word, once, after `triage-incident` has said what the Incident
 | Resolve an Incident | `work_incident_or_case` `action: resolve`, `body: {"disposition": "…"}` | an Incident needs a disposition, and its postmortem first |
 | Resolve a Case | `work_incident_or_case` `action: resolve` | |
 | Clear an Alert | `work_alert` `action: ack` or `resolve` | |
-| Open a Case | `open_case_from_entities`, `body: {title, description, entities: [{id, dataset, label}]}` | a person's agent only; existing Incidents join as `{objectId}` |
+| Open a Case | `open_case_from_entities`, `body: {title, description, entities: [{id, dataset, label}]}` | existing Incidents join as `{objectId}`; held for a machine agent |
 | Write its record | `edit_incident_or_case_record` — see *Write the record* | postmortem, category and impact need `canWorkIncidents` |
 
 Always pass a one-line `reason` (at most 500 characters): it is what an approver and a later reviewer read first.
@@ -67,11 +67,27 @@ A regulator or an auditor may read the record later, so it holds only what you c
 | 202 with a Pending Action | held for a person (you are a machine agent) | report the `pa-…` id; stop |
 | 409 "already pending approval (pa-…)" | the same move is already waiting | do not ask again; report the id |
 | 422 | its Workflow does not allow this move from its status, or a required field (disposition, postmortem) is missing | tell the person what is missing; do not try another move to get round it |
-| 403 "missing capability …" | the person lacks the right — or, on opening a Case, you are a machine agent | say a person must do it (name the capability); never look for another route |
+| 403 "missing capability …" | the person (or the machine) lacks the right | say a person must do it (name the capability); never look for another route |
 | 409 | it changed under you, or a legal hold freezes it | read it again first |
 
 4. A held move may end `stale` or `failed` when approved: the Incident or Case moved on before the approval. Read it
    again before asking for anything else.
+
+## Entity Lists
+
+An Entity List decides whom Screening matches, so every change to one is **held** as a **Pending Change** (`pc-…`) for
+another person to approve — for a person's agent too (an agent never takes the 24-hour fast path a person's short-lived
+add has). Use `propose_change` with `kind: entity-list` and `id` = the list:
+
+| Want | `operation` | `content` | Needs |
+|---|---|---|---|
+| Add or remove members | `members` | `{add?: [...], remove?: [...], expiresAt?}` | `canManageIncidents` (a category list: `canManageExclusionCategories` too) |
+| Retire the list | `retire` | `{}` | the same |
+| Change an exclusion list's `ownerKind`, `autoApply` or `visibility` | `attributes` | `{ownerKind?, autoApply?, visibility?}` | `canManageExclusionCategories` |
+
+Your `reason` is recorded on the list's own history as well as shown to the approver. A 409 "already pending approval"
+means a change to that list is waiting: report it, do not propose a second one. Retiring a block list loosens control —
+propose it only on the person's explicit word.
 
 ## Never
 
@@ -89,5 +105,6 @@ A regulator or an auditor may read the record later, so it holds only what you c
 - `work_incident_or_case` — transition or resolve an Incident or Case
 - `work_alert` — acknowledge or resolve an Alert
 - `edit_incident_or_case_record` — write its postmortem, category, impact, Findings, RCA or correlation links
-- `open_case_from_entities` — open a Case (a person's agent only)
+- `open_case_from_entities` — open a Case (held for a machine agent)
+- `propose_change` — an Entity List change, held for approval
 - `get_pending_action`, `withdraw_action` — a held move's decision, or take it back

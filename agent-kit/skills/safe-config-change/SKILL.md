@@ -1,6 +1,6 @@
 ---
 name: safe-config-change
-description: The one way an agent changes a running Inspecto - validate, dry-run, propose, then wait for another person to approve. Use before ANY create, update or delete of a Pipeline, Expectation, Alert Rule, Job, Widget or Dashboard, and whenever a change is refused, held or needs to be taken back.
+description: The one way an agent changes a running Inspecto - validate, dry-run, propose, then wait for another person to approve. Use before ANY create, update or delete of a Pipeline, Expectation, Alert Rule, Job, Widget, Dashboard, Decision Rule, Notification Rule or Notification Channel, the KPI of a delivered Requirement, a Pipeline restore, and whenever a change is refused, held or needs to be taken back.
 ---
 
 # Change Inspecto safely
@@ -23,13 +23,15 @@ approves it. That person is never you and never the person you act for (four eye
    `inspecto://glossary` if unsure).
 2. **Validate** with `validate_config`: `type` is `expectation`, `alert`, `job`, `widget` or `dashboard`, `config` is
    the draft. The answer is `{findings, clean}`. Fix every finding whose severity is an error and validate again.
-   Never propose a draft that is not clean.
+   Never propose a draft that is not clean. A Decision Rule, a Notification Rule or a Notification Channel has no `validate_config` type: its
+   own route checks the content before it holds it, so a bad draft comes back as a 422 naming the field.
 3. **Dry-run** a Pipeline with `dry_run_pipeline`: argument `pipeline` = the Pipeline id, and `body`
    `{pipeline: <draft graph>, sampleRows: [...]}`. This is also a
    Pipeline graph's validation: the draft is parsed and validated, then executed on a scratch database; nothing is
    written. Read each step's row count; a step that drops every row is a mistake until proven otherwise.
-4. **Propose** with `propose_change`: `kind` (pipeline, expectation, alert-rule, job, widget, dashboard), `operation`
-   (create, update, delete), `id` (required to update or delete, and to create a Pipeline), `content` (not for a
+4. **Propose** with `propose_change`: `kind` (pipeline, expectation, alert-rule, job, widget, dashboard, decision-rule,
+   notification-rule, notification-channel; requirement-kpi and pipeline-restore, below), `operation` (create, update, delete; a
+   requirement-kpi only creates, a pipeline-restore only restores), `id` (required to update or delete, and to create a Pipeline), `content` (not for a
    delete) and a one-line `reason` of at most 500 characters. The reason is what the approver reads first: say what
    changes and why, in the person's terms.
 5. **Report** the Pending Change id (`pc-…`) to the person and that it waits for another person's approval. Offer
@@ -52,6 +54,30 @@ approves it. That person is never you and never the person you act for (four eye
 is refused costs a round trip, and each one accepted is a Pending Change a person must read. A Dashboard and its
 Widgets are a few proposals, not dozens.
 
+## Decision Rules, Notification Rules and Channels
+
+- A **Decision Rule** is `{name, targetType: pipeline|job, target, when, consequences, priority?, enabled?}`; `when`
+  is a condition tree `{kind: "group", op: "AND"|"OR", items: [{kind: "condition", field, operator, value?}]}`
+  (operators `= != < <= > >= contains startsWith endsWith in between isNull isNotNull matches`). A consequence
+  `{action: "emit-signal", params: {type: "<signal type>"}}` emits a signal when the rule applies.
+- A **Notification Rule** is `{id, eventType, category, minLevel?, titleTemplate?, bodyTemplate?, enabled?}`: it turns
+  every event of `eventType` (a signal type too) into a notification of `category`.
+- A **Notification Channel** is `{id, kind: EMAIL|WEBHOOK, target, description?, enabled?, template?, digestMinutes?}`:
+  where deliveries go (an address, or a URL). Never put a token or password in `target` — it is shown to everyone
+  who lists the Channels.
+- An update replaces the whole rule, and no MCP Tool lists these rules: to change one, ask the person for its current
+  content rather than guessing it.
+
+## A KPI from a Requirement, and restoring a Pipeline
+
+- **`requirement-kpi`** (operation `create` only): `id` is a delivered `kpi` Requirement (`list_requirements` shows
+  kind and status; one that already names a `kpi` has made its KPI). `content` is what only a builder knows:
+  `{dataset, measure, timeField, grain}`, optionally `id` (the KPI's own id; default the Requirement's), `direction`,
+  `bands`, `format`. The Requirement gives the title, target and unit. Check the Dataset with `describe_dataset` first.
+- **`pipeline-restore`** (operation `restore` only): `id` is the Pipeline and `version` a kept version from
+  `list_pipeline_versions`; no `content`. A restore is a save of that version, so the approver reads its diff against
+  the current config.
+
 ## Taking a proposal back
 
 `withdraw_change` takes back a proposal of the person you act for while it is still pending. Use it when the person
@@ -73,6 +99,7 @@ changes their mind or you proposed something wrong — then propose the correcte
 
 - `edition_and_modules` — the edition and which modules are present
 - `describe_dataset`, `get_pipeline`, `list_expectations`, `list_alert_rules`, `list_jobs` — what exists, to draft from
+- `list_requirements`, `list_pipeline_versions` — the Requirement a KPI comes from, the version a restore brings back
 - `list_pending_changes` — proposals already waiting
 - `get_pending_change` — one proposal, its author and agent client
 - `diff_pending_change` — the diff the approver reads

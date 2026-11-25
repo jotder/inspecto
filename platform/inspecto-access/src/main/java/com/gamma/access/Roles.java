@@ -261,10 +261,20 @@ public final class Roles {
      * its roles grant them: authoring the kinds an agent proposes, working Incidents, operating runs. Useful only because
      * every config write of an agent is held as a Pending Change and every action of a machine agent as a Pending Action;
      * never an {@link #AGENT_NEVER_CAPABILITIES} one, {@code canAdminister} or access configuration.
+     *
+     * <p>{@link #CAN_MANAGE_INCIDENTS} and {@link #CAN_MANAGE_EXCLUSION_CATEGORIES}: the operator's decision of 2026-11-25
+     * (AK-2 widening W2 step 3, D-AK9 "Entity List edits", granted GLOBALLY, not per route), so a machine agent may propose
+     * Entity List member, retire and attribute changes. Granted globally they also let it ask for a new Case from entities
+     * and an Investigation attach (both held as Pending Actions) and READ what the two rights read: the Entity Identity
+     * reads, and a {@code restricted} Entity List's members wherever {@code EntityListFacts.seesRestricted} decides —
+     * {@code GET /entity-lists/{id}}, Screening hits, the Dossier, the Grow preview, an Investigation's or Draft's replay
+     * and log — an operator-accepted exception to "an agent never reveals" (spec-mcp.md § Entity List edits, plan D-AK9).
+     * Its every write stays held.
      */
     public static final Set<String> AGENT_MACHINE_CAPABILITIES =
             Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_WORK_INCIDENTS, CAN_OPERATE_RUNS,
-                    CAN_DRAFT_INVESTIGATIONS);   // AK-2f: a Link Analysis Draft, every write held; never promote
+                    CAN_DRAFT_INVESTIGATIONS,   // AK-2f: a Link Analysis Draft, every write held; never promote
+                    CAN_MANAGE_INCIDENTS, CAN_MANAGE_EXCLUSION_CATEGORIES);   // W2 step 3, operator 2026-11-25
 
     /** What a machine Subject may keep: {@link #MACHINE_CAPABILITIES}, plus {@link #AGENT_MACHINE_CAPABILITIES} for an agent. */
     private static Set<String> machineKeeps(Subject subject) {

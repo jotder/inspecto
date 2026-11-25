@@ -32,7 +32,8 @@ machine agent capability set is **AK-2c** (phase 2, 2026-11-25, [Identity](#iden
 - [The agent gate (AK-2a)](#the-agent-gate-ak-2a) — held writes, default deny, the never-list.
 - [Write tools (AK-2b)](#write-tools-ak-2b) — validate, dry-run, propose, withdraw, Ship reads, run.
 - [Pending Actions (AK-2d)](#pending-actions-ak-2d) — a machine agent's run actions, held for a person.
-- [Case actions (AK-2e)](#case-actions-ak-2e) — an agent works Incidents, Cases and Alerts; a machine's are held.
+- Case actions (AK-2e) and record edits (W11) — an agent works Incidents, Cases and Alerts and writes their record; a
+  machine's are held: [spec-agent-case-actions.md](spec-agent-case-actions.md).
 - [Link Analysis (AK-2f)](#link-analysis-ak-2f) — queries for every agent; Drafts, held for a machine; never promote.
 - [Deferred](#deferred)
 
@@ -159,7 +160,9 @@ is passed on as the replayed route's JSON body, unchanged.
 |---|---|---|---|
 | `validate_config` | read | `type`, `config` | `POST /validate` (`{type, config}`); refusal findings come back as data |
 | `dry_run_pipeline` | read | `pipeline`, `body?` | `POST /pipelines/authored/{pipeline}/dry-run` |
-| `propose_change` | write | `kind`, `operation`, `id?`, `content?`, `reason?` | the kind's own write route, below; `reason` rides as the request attribute `RequestAttrs.ATTR_CHANGE_REASON`, which `PendingChanges.hold` reads before the `X-Change-Reason` header (an in-process replay need not be header-safe; a header holding "—" or "→" made the replay throw — `AGENT-PROPOSE-500-1`, fixed 2026-11-24) |
+| `propose_change` | write | `kind`, `operation`, `id?`, `version?`, `content?`, `reason?` | the kind's own write route, below; `reason` rides as the request attribute `RequestAttrs.ATTR_CHANGE_REASON`, which `PendingChanges.hold` reads before the `X-Change-Reason` header (an in-process replay need not be header-safe; a header holding "—" or "→" made the replay throw — `AGENT-PROPOSE-500-1`, fixed 2026-11-24) |
+| `list_requirements` | read | — | `GET /requirements` (W2 step 2: what a `requirement-kpi` proposal starts from) |
+| `list_pipeline_versions` | read | `pipeline` | `GET /pipelines/{pipeline}/history` (W2 step 2: what a `pipeline-restore` restores) |
 | `list_pending_changes` | read | `status?` | `GET /pending-changes` |
 | `get_pending_change`, `diff_pending_change` | read | `change` | `GET /pending-changes/{change}`, `…/diff` |
 | `withdraw_change` | write | `change` | `POST /pending-changes/{change}/withdraw` (author only) |
@@ -171,10 +174,53 @@ is passed on as the replayed route's JSON body, unchanged.
 **`propose_change` allowlist** (`McpTools.CHANGE_ROUTES`, the builder tutorials' kinds, each route on
 `PendingChanges.REPLAYABLE`): `pipeline` (create and update `PUT /pipelines/{id}/graph`, delete
 `DELETE /config/pipeline/{id}`), `expectation` (`POST /expectations`, `PUT|DELETE /expectations/{id}`), `alert-rule`
-(`/alerts/rules`), `job` (`/jobs`), `widget` and `dashboard` (`POST /components/{kind}`, `PUT|DELETE /components/{kind}/{id}`).
-An update or delete needs `id`, a create or update needs `content`, a delete takes none; anything else is a
+(`/alerts/rules`), `job` (`/jobs`), `widget` and `dashboard` (`POST /components/{kind}`, `PUT|DELETE /components/{kind}/{id}`);
+since AK-2 widening W2 step 1 (D-AK9), `decision-rule` (`POST /decision-rules`, `PUT|DELETE /decision-rules/{id}`) and
+`notification-rule` (`POST /notifications/rules`, `PUT|DELETE /notifications/rules/{id}`), both `canAuthorWorkbench`,
+which the machine agent set already held, so the set does not widen; and **`notification-channel`**
+(`POST /notifications/channels`, `PUT|DELETE /notifications/channels/{id}`, `canAuthorWorkbench`), added by the
+operator on 2026-11-25. The plan had kept it out until `PENDING-CHANGE-SECRET-READBACK-1` was fixed; that defect does
+not reach a Channel: `ChannelConfig` has no secret field (`id, kind, target, description, enabled, createdAt,
+template, digestMinutes`) and `GET /notifications/channels` already returns every field, so a Pending Change shows
+nothing the list does not. **W2 step 2** made the operations per kind (`CHANGE_ROUTES` is `kind → operation → route`;
+`OPERATIONS` is the enum of every operation, `McpTools.operations(kind)` what one kind offers): `requirement-kpi`
+offers `create` only (`POST /requirements/{id}/kpi`, `id` = the delivered kpi Requirement, `content` = the builder's
+`{dataset, measure, timeField, grain, …}`), and `pipeline-restore` offers `restore` only
+(`POST /pipelines/{id}/history/{version}/restore`, with the `version` argument and no `content`); both
+`canAuthorWorkbench`. An operation the kind does not offer, a `version` on any other kind, or a restore without one is
+`-32602` before any replay. Two read tools give the agent what those proposals start from, so it never guesses:
+`list_requirements` (`GET /requirements`) and `list_pipeline_versions` (`GET /pipelines/{pipeline}/history`), both
+ungated reads of config metadata, no data values. `McpToolRoutesTest.everyProposeChangeRouteReachesTheHold` refuses a
+kind whose route is not on `PendingChanges.REPLAYABLE`. An update or delete needs `id`, a create or update needs `content`, a delete takes none; anything else is a
 `-32602` before any replay. The answer is the route's own: for an agent, always the **202 Pending Change** (the
 identity-keyed hold), carrying `agentClient` and `mcpTool: propose_change`.
+
+**Entity List edits (W2 step 3, D-AK9 as signed).** `propose_change` `kind: entity-list`, `id` = the list, operation
+`members` (`POST /entity-lists/{id}/members`, `{add?, remove?, addRanges?, removeRanges?, expiresAt?}`), `retire`
+(`POST …/retire`) or `attributes` (`PUT …/attributes`, `{ownerKind?, autoApply?, visibility?}`); the route reads its
+own `reason` from the body, so the tool copies its `reason` argument there when the content has none. All three are
+on `REPLAYABLE`, and an agent's member change is held whatever its shape (the 24-hour fast path is a person's). The
+analyst skills `work-cases` (§ Entity Lists) and `triage-incident` describe them, not `safe-config-change`.
+
+**The machine agent set widened (operator, 2026-11-25).** `members` and `retire` need `canManageIncidents`,
+`attributes` `canManageExclusionCategories`. The operator chose to grant both to `Roles.AGENT_MACHINE_CAPABILITIES`
+**globally**, not per route, knowing what else they open to a machine agent listed in
+`-Dauth.oidc.agentMachineClients` (and only to such a client):
+- **Writes — every one held.** A new Case from entities and an Investigation attach become Pending Actions; the
+  findings-spec component writes and the three Entity List edits become Pending Changes; every other non-GET route
+  either right gates stays refused to agents (`AgentGateParityTest` pins the set and asserts no route either right
+  gates sits in `ALLOWED`, which runs at once).
+- **Reads — an operator-accepted exception to "an agent never reveals".** `canManageExclusionCategories` is also the
+  right that shows a holder a `restricted` Entity List (`EntityListFacts.seesRestricted`, every check below keys on
+  it), and `canManageIncidents` opens `GET /inv/entity-identities` (and `/group`). A machine agent whose roles grant
+  them now reads, at once: **`GET /entity-lists/{id}`** (also `?at=`) — the restricted list's full members, ranges and
+  expiring entries, raw unless the Space's masking mode masks that Entity Type; **Screening hits** naming a restricted
+  list's member; the **Dossier**'s `excludeBy`; the **Grow preview**'s exact (not rounded) counts;
+  **`POST /inv/investigations/{id}/replay`**, **`GET /inv/investigations/{id}/log`** and
+  **`GET …/drafts/{d}/replay`** and **`GET …/drafts/{d}/log`** — which keys a restricted exclusion step left out, with exact counts. (Found by the
+  W2 verification's security review; the first record named only Screening, the Dossier and the Grow preview.) This is a deliberate exception, recorded in the plan's D-AK9
+  **Signed** line; `AGENT_NEVER_CAPABILITIES` (approve, approve an expand, `canRevealLinkEntities`) is unchanged, and
+  a masked Link Analysis key stays masked.
 
 **The endpoint's refusal list** (`McpTools.REFUSED`): a replay whose method and path look like the never-list
 (`…/approve|decline|decision|reveal|retry|mark-failed`, `/promotion/apply`, `/apps` and `/access` writes) is refused
@@ -192,6 +238,15 @@ the refusal list off, the reason header dropped, the replay not answering a hold
 read-only check (on a read-only install `propose_change` is a 423 and no Pending Change is recorded; the reads answer).
 `aReasonNoHeaderCanCarryIsHeldAndKeptExactly` (2026-11-24): a reason with "—", "→" and "€" is held and kept exactly;
 putting the reason back on the header turns it red with the live run's "Illegal character found in header".
+`ControlApiMcpProposeKindsTest` (W2, real HTTP, per added kind): the agent's create is held and nothing is live,
+another person's approval applies it, its update and delete are held, the same token's direct call is held, a machine
+agent's proposal is held; a kind outside the allowlist is `-32602` and records no Pending Change. Mutant: a kind mapped
+to `POST /decision-rules/{id}/simulate` (not on `REPLAYABLE`) turned the allowlist test, the W10 person's-agent test and
+the real-HTTP test red; in step 2, `requirement-kpi` mapped to `POST /requirements/{id}/deliver` did the same.
+`McpToolRoutesTest.aKindRefusesAnOperationItDoesNotOffer` pins the per-kind operations. Step 3:
+`ControlApiMcpProposeKindsTest.anEntityListEditIsHeldEveryWay` (members, attributes and retire held then applied, the
+direct call held, a machine agent's members and attributes held); removing `canManageIncidents` from the machine set
+turned it, `AgentGateParityTest` and `ControlApiAgentCaseActionsTest.aMachinesNewCaseFromEntitiesIsHeldNotRun` red.
 
 **A replay that fails** with anything but an `ApiException` answers the tool `isError` with HTTP 500 and the exception's
 class name plus the correlation id, and is **logged at ERROR with its stack under that correlation id**
@@ -259,7 +314,8 @@ Per §7.3 and D-UE5 (signed: both modes, delegated first).
   that is not a listed machine client, is the SPA client, or is set without `auth.oidc.clients`) is a Subject that is
   **both** `machine()` and `agent()`: id `client:<client>`, `agentClient` = the client id. At admission it keeps
   `Roles.MACHINE_CAPABILITIES` plus `Roles.AGENT_MACHINE_CAPABILITIES` (`canAuthorWorkbench`, `canAuthorAlertRules`,
-  `canWorkIncidents`, `canOperateRuns`) where its roles grant them, never an `AGENT_NEVER_CAPABILITIES` one; an
+  `canWorkIncidents`, `canOperateRuns`, `canDraftInvestigations`, and since W2 step 3 `canManageIncidents` and
+  `canManageExclusionCategories` — § Entity List edits) where its roles grant them, never an `AGENT_NEVER_CAPABILITIES` one; an
   unlisted machine keeps `canOpenInboundInvestigation` only, as before. Being an agent, every config write it makes
   is held as a Pending Change, the agent gate applies, and it never approves; it may not run a Pipeline
   (`AgentGate.PERSON_ONLY`, D-AK2). The Pending Change records `authorMachine` (the token's `sub`), and
@@ -304,7 +360,7 @@ agent token calling a route directly is treated the same.
      /runs/{id}/trigger|pause|resume|reprocess|replay-rejects|drain`, `…/retries/retry-now|cancel`,
      `…/quarantine/release` (since 2026-11-25, widening plan W1),
      `POST /jobs/{id}/trigger`, `POST /jobs/runs/{id}/replay`, each still gated `canOperateRuns` (`AgentGate.RUN_ACTIONS`);
-     and since **AK-2e** the case actions (`AgentGate.CASE_ACTIONS`, [Case actions](#case-actions-ak-2e)). A **person's**
+     and since **AK-2e** the case actions (`AgentGate.CASE_ACTIONS`, [Case actions](spec-agent-case-actions.md#case-actions-ak-2e)). A **person's**
      agent takes them at once, within the person's rights (D-AK5 as signed), audited with `agent_client`. A
      **machine** agent's are held **before the handler** as a [Pending Action](#pending-actions-ak-2d);
   4. **refused (403)** — everything else: every route that only calls `holdRefusing*` (bundle import, onboarding
@@ -387,91 +443,6 @@ config only.
   which fails when the grader's `isAction` misses any method and route in `AgentGate.ACTIONS` (the grader counted
   POST rows only until W1, so the PUT that attaches an Investigation to a Case went ungraded).
 
-## Case actions (AK-2e)
-
-Phase 3, the Incident and Case analyst (plan §1.1, §4.6 analyst rows, §6.4). The operator's answers of 2026-11-25:
-exactly the §4.6 list (no Incident record edits — reversed the same day by D-AK8, § Record edits (W11) below), a new
-Case for people only, and `CASE-TRANSITION-FOUR-EYES-1` left a
-board row. No new machinery: the routes join the action bucket, so the gate and the [Pending Action](#pending-actions-ak-2d)
-hold above apply unchanged.
-
-- **The routes** (`AgentGate.CASE_ACTIONS`), each still on its own gate: `POST /objects/{id}/comments` (the
-  `collaboration` exemption — anyone who can see the object), `POST /incidents/{id}/briefs`,
-  `POST /objects/{id}/ack|assign|resolve|transition`, `POST /alerts/{id}/ack|resolve` (`canWorkIncidents`), and
-  `POST /cases/from-entities` (`canManageIncidents`). `AgentGateParityTest` pins the list and each route's gate.
-- **A person's agent** takes them at once, within the person's rights, audited with `agent_client`; the object's own
-  history records the person for an ack, assign, resolve or transition (`actorOf`: the Subject, never a body `actor`).
-- **A machine agent's** are held as Pending Actions, approved by the change approvers and replayed as the machine — a
-  comment it asked for is authored `client:<id>`. It never opens a Case: `canManageIncidents` is not in
-  `Roles.AGENT_MACHINE_CAPABILITIES`, so the hold's capability check answers 403 and leaves no record. A comment is
-  exempt from a capability, so a machine's hold on it needs `canWorkIncidents` (`AgentGate.MACHINE_HOLD_CAPABILITY`):
-  otherwise a machine with no right could queue comments on any id (phase-3 security review, plan §6.5).
-- **A Brief** files at most a `pending` Action Request, whose makers are the asking person and the Brief's agent
-  identity; its own four-eyes decide gate refuses both, and an agent never decides one (the never-list).
-- **Analyst MCP Tools** (`McpTools.CASE_TOOLS`, all `write: true`): `add_comment`, `build_incident_brief`,
-  `work_incident_or_case` (`action` one of `ack`, `assign`, `resolve`, `transition` → `POST /objects/{id}/…`),
-  `work_alert` (`ack`, `resolve`) and `open_case_from_entities`, each with a one-line `reason`. The reads were
-  already there (`list_incidents`, `get_incident`, `get_incident_briefs`, `list_alerts`).
-  `McpToolRoutesTest.everyCaseToolReplaysACaseActionAndEveryCaseActionHasATool` pins tools to routes both ways.
-- **Agent Skills and golden tasks:** `triage-incident` (read, Brief, comment, accept, assign — never close) and
-  `work-cases` (Workflow moves, resolve, Alerts, open a Case — always on the person's yes); the analyst suite
-  `agent-kit/golden/analyst.json` (six tasks: read without acting, Brief and comment, accept and assign, resolve a
-  Case, a machine's resolve held, a machine never opens a Case; and since W11 two record edits, § Record edits (W11)). `ACTION_PATH` in `tools/run-agent-golden.mjs` covers
-  the case routes. Its live run is open.
-- **The screen:** unchanged — the *Pending Actions* tab lists case actions too, its detail showing the comment text or
-  Workflow move it will run.
-- **Tests:** `ControlApiAgentCaseActionsTest` (`inspecto-case-management`, real HTTP: a person's agent comments on,
-  accepts and assigns an Incident at once and its row names the agent client, a business user's agent is 403 and
-  nothing is held; a machine's Case transition is 202 and nothing changed, its approve 403, the detail shows the
-  move, another person's approval runs it; a machine's comment is held and on approval is the machine's; a machine's
-  new Case is 403 with no record; a machine without `canWorkIncidents` cannot queue a comment), `AgentGateParityTest`,
-  `McpToolRoutesTest`.
-
-## Record edits (W11)
-
-Widening plan W11, D-AK8 as signed 2026-11-25 (not as recommended): an agent writes an Incident's or Case's record —
-what a regulator may read later — under the case-action rules above, unchanged.
-
-- **The routes** join `AgentGate.CASE_ACTIONS`, each on its own gate: `PUT /objects/{id}/postmortem`, `/category`,
-  `/impact` (`canWorkIncidents`; each writes its one attribute and answers 422 on any other key) and
-  `PUT /objects/{id}/findings`, `POST /objects/{id}/rca`, `POST` and `DELETE /objects/{id}/links` (the
-  `collaboration` exemption). The four exempt routes are in `AgentGate.MACHINE_HOLD_CAPABILITY` (`canWorkIncidents`),
-  as the comment is, so a machine without that right is refused before the hold and leaves no record.
-  `AgentGateParityTest` pins the sixteen case actions with their gates, and that `PATCH /objects/{id}`, merge and split
-  stay refused. Tags, merge, split and the Workflow transition guard (`CASE-TRANSITION-FOUR-EYES-1`) are out of scope.
-- **Attribution.** A link, an unlink and an RCA skeleton record the signed-in Subject (`ObjectRoutes.actorOf`), never a
-  body or query `actor`; before W11 those three took the body's (the query's, for an unlink) even for a signed-in caller.
-  The postmortem, category, impact and Findings already recorded `ApiContext.actor`.
-- **Pending Actions.** A PUT and a DELETE replay as a POST does (`ControlApi.replay` takes any method; the query rides
-  the replayed URI). The duplicate check compares the path with its query, so two unlinks of different Incidents are
-  two Pending Actions; the approver's detail shows the whole request, `?to=` included.
-- **MCP Tool** `edit_incident_or_case_record` (`McpTools.CASE_TOOLS`, `write: true`, `destructiveHint: false`):
-  `id`, `action` one of `postmortem`, `category`, `impact`, `findings` (→ `PUT /objects/{id}/…`), `rca`, `link`
-  (→ `POST`), `unlink` (→ `DELETE /objects/{id}/links?to=&relationship=`, from a body `{to, relationship?}` of ids and
-  nothing else), the route's own `body`, and a one-line `reason`. `McpTools.RECORD_EDITS` maps each action.
-- **Agent Skills and golden tasks:** `work-cases` § *Write the record* (only from evidence the agent read; read the
-  stored impact first, as `impact` replaces it; ask first, `MCP-AGENT-POSTURE-1`; name every field changed) and
-  `triage-incident` step 5; the analyst suite gains `an-07-record-postmortem-impact` (a person's agent writes both) and
-  `an-08-machine-impact-held`. The grader's `isAction` accepts the PUT routes and `DELETE …/links`. Their live run is open.
-- **Security review (2026-11-25).** What an agent may now write and who reads it: the postmortem, category and impact
-  feed the Incident's resolution gate, Accept and the impact ledger a regulator reads. (1) No right is widened: each route
-  keeps its own gate, and a person's agent never exceeds the person. (2) A machine's record edit is always held and
-  replays as the machine, so every value it wrote passed another person's approval with the body in view. (3)
-  Attribution: the body-`actor` re-attribution of link, unlink and RCA was fixed (above). (4) The exempt routes' machine
-  hold needs `canWorkIncidents`, so a right-less machine cannot fill the approvers' queue. (5) An unlink still meets the
-  legal-hold refusal (`ObjectService.unlink`). Residual: a machine's held edit to an object outside its data scope is
-  recorded and refused only at approval (the hold runs before the scope guard, as for every case action since AK-2e);
-  the approver sees the id. Accepted, as phase 3 did. Also low and accepted (verification, 2026-11-26): the duplicate
-  check compares the query and body as text, so a reordered query or a reformatted body is a second Pending Action (as
-  for bodies before W11); and a machine that loses `canWorkIncidents` after its Findings, RCA or link edit was held still
-  has it applied on approval — the approved replay skips the hold, as for a comment.
-- **Tests:** `ControlApiAgentRecordEditsTest` (`inspecto-case-management`, real HTTP, per route: a person's agent writes
-  at once and the audit row names `agent_client`; a business user's agent gets exactly the business user's answer — 403
-  on the three `canWorkIncidents` routes; a machine's edit is 202, nothing changed, the approver sees the request with
-  its query, another person's approval applies it; two unlinks of different Incidents are two Pending Actions; a machine
-  without `canWorkIncidents` is 403 on every route with no record; a body or query `actor` does not re-attribute a link
-  or RCA), `AgentGateParityTest`, `McpToolRoutesTest.unlinkCarriesItsOtherEndInTheQuery`, `tools/run-agent-golden.test.mjs`.
-
 ## Link Analysis (AK-2f)
 
 Phase 3b, the analyst in Link Analysis (plan §6.6). The operator's answers of 2026-11-25: the read-shaped Link Analysis
@@ -490,8 +461,11 @@ only when a lead adds it as a member. Promote, reveal and expand decisions stay 
   (`POST /inv/investigations/{id}/drafts`, `…/drafts/{d}/ops|undo|discard|rebase`); promote stays
   `canManageIncidents`. `Roles.holds` makes `canManageIncidents` imply it, and every capability check
   (`ApiContext.requireCapability`, `requireCapabilityIn`) goes through `holds`, so no person lost a right and no role
-  table changed. `AGENT_MACHINE_CAPABILITIES` keeps it; because admission strips `canManageIncidents` first, a
-  machine's role must grant `canDraftInvestigations` by name. An implied grant yields to an Access profile that
+  table changed. `AGENT_MACHINE_CAPABILITIES` keeps it; until W2 step 3 admission stripped `canManageIncidents`, so a
+  machine's role had to grant `canDraftInvestigations` by name — since then a machine agent keeps `canManageIncidents`
+  too, and its attach of an Investigation to a Case is held as a Pending Action
+  (`ControlApiAgentLinkAnalysisTest.aMachinesAttachIsHeldAndItNeverStartsAGraphRunOrPromotes`); promote stays refused
+  to every agent. An implied grant yields to an Access profile that
   denies `canDraftInvestigations` by name (`ApiContext.impliedButDenied`, phase-3b review): the authenticator strips
   only granted capabilities, so the deny is asked for at the check. In the Link Analysis product set, the Access
   catalogue (`linkgraph.draft`) and the LA app's Access page.

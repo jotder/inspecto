@@ -1,7 +1,7 @@
 ---
 type: How-to
 title: "Let an AI agent work Incidents and Cases"
-description: "Let an AI agent triage Incidents and work Cases on a Standard install: signed in as a person it comments, writes Briefs, accepts, assigns, resolves, writes the record (postmortem, category, impact, Findings, RCA, links) and opens Cases within that person's rights at once; as an unattended machine agent every such action waits as a Pending Action for a person to approve, and it never opens a Case."
+description: "Let an AI agent triage Incidents and work Cases on a Standard install: signed in as a person it comments, writes Briefs, accepts, assigns, resolves, writes the record (postmortem, category, impact, Findings, RCA, links) and opens Cases within that person's rights at once; as an unattended machine agent every such action waits as a Pending Action for a person to approve, opening a Case included."
 item: module.mcp
 audience: external
 status: current
@@ -21,7 +21,7 @@ Incidents and Cases — resolves it, clears an Alert, and opens a Case over the 
 - **Signed in as a person** (through an agent client): the action runs **at once**, within that person's own rights,
   exactly as if the person had pressed the button. The audit row names the person and the agent client.
 - **An unattended machine agent**: every action is **held** as a **Pending Action** and runs only once a person
-  approves it. A machine agent never opens a Case.
+  approves it — opening a Case too.
 
 An agent never approves anything — a Pending Action, a Pending Change or the Action Request a Brief proposes — and never
 merges, splits, tags or edits an Incident's priority or severity.
@@ -35,7 +35,10 @@ merges, splits, tags or edits an Incident's priority or severity.
   Commenting, the Findings values, an RCA skeleton and a link need only that they can see the Incident or Case.
 - **A machine agent:** set up as in *Let an AI agent operate runs* (listed in `auth.oidc.agentMachineClients`), holding
   a role that grants `canWorkIncidents` — every action of a machine needs it, a comment, Findings, RCA or link
-  included. It never keeps `canManageIncidents`, whatever its role grants.
+  included, and `canManageIncidents` to ask for a new Case. Since 2026-11-25 a machine
+  agent keeps `canManageIncidents` and `canManageExclusionCategories` when its role grants them; every write stays
+  held, but **`canManageExclusionCategories` also lets it read a restricted Entity List's members** (the Entity List
+  itself, Screening hits, Investigation replays). Grant it to a machine role only if that is acceptable.
 - **An approver:** a person who holds `canApproveChanges` and is on the Space's approver roster.
 
 ## Steps
@@ -73,7 +76,8 @@ and a comment it asked for is authored by the machine (`client:<id>`). A record 
 ## What can go wrong
 
 - 403 "missing capability canWorkIncidents" (or `canManageIncidents` for a new Case) — the person, or the machine's
-  role, lacks the right. A machine agent always gets 403 opening a Case.
+  role, lacks the right. A machine agent whose role grants `canManageIncidents` has its new Case held as a Pending
+  Action instead.
 - 404 — no such Incident or Case, or one the person may not see.
 - 422 "illegal transition" — the Workflow does not allow that move from the current status (a new Incident is
   `accept`ed, not acknowledged), or an Incident's resolve lacks its disposition or postmortem.

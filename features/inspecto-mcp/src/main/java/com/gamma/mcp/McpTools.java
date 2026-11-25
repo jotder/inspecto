@@ -249,19 +249,48 @@ final class McpTools {
     /**
      * The kinds {@code propose_change} may write — the ones the Handbook's builder tutorials use (plan §7) — each to its OWN
      * write route, every one on {@code PendingChanges.REPLAYABLE}, so an agent's write is always held as a Pending Change.
-     * {@code kind → [create, update, delete]} route templates; {@code {id}} is the URL-encoded target id. A Pipeline's
-     * create and update are both its graph save (a new id creates it).
+     * {@code kind → operation → route template}, the operations each kind offers (W2 step 2: per kind); {@code {id}} is the
+     * URL-encoded target id, {@code {version}} a kept Pipeline version. A Pipeline's create and update are both its graph
+     * save (a new id creates it).
      */
-    static final Map<String, List<String>> CHANGE_ROUTES = Map.of(
-            "pipeline", List.of("PUT /pipelines/{id}/graph", "PUT /pipelines/{id}/graph", "DELETE /config/pipeline/{id}"),
-            "expectation", List.of("POST /expectations", "PUT /expectations/{id}", "DELETE /expectations/{id}"),
-            "alert-rule", List.of("POST /alerts/rules", "PUT /alerts/rules/{id}", "DELETE /alerts/rules/{id}"),
-            "job", List.of("POST /jobs", "PUT /jobs/{id}", "DELETE /jobs/{id}"),
-            "widget", List.of("POST /components/widget", "PUT /components/widget/{id}", "DELETE /components/widget/{id}"),
-            "dashboard", List.of("POST /components/dashboard", "PUT /components/dashboard/{id}",
-                    "DELETE /components/dashboard/{id}"));
+    static final Map<String, Map<String, String>> CHANGE_ROUTES = Map.ofEntries(
+            crud("pipeline", "PUT /pipelines/{id}/graph", "PUT /pipelines/{id}/graph", "DELETE /config/pipeline/{id}"),
+            crud("expectation", "POST /expectations", "PUT /expectations/{id}", "DELETE /expectations/{id}"),
+            crud("alert-rule", "POST /alerts/rules", "PUT /alerts/rules/{id}", "DELETE /alerts/rules/{id}"),
+            crud("job", "POST /jobs", "PUT /jobs/{id}", "DELETE /jobs/{id}"),
+            crud("widget", "POST /components/widget", "PUT /components/widget/{id}", "DELETE /components/widget/{id}"),
+            crud("dashboard", "POST /components/dashboard", "PUT /components/dashboard/{id}", "DELETE /components/dashboard/{id}"),
+            // AK-2 widening W2 (D-AK9): every route below needs canAuthorWorkbench, already in the machine agent set.
+            crud("decision-rule", "POST /decision-rules", "PUT /decision-rules/{id}", "DELETE /decision-rules/{id}"),
+            crud("notification-rule", "POST /notifications/rules", "PUT /notifications/rules/{id}",
+                    "DELETE /notifications/rules/{id}"),
+            // operator 2026-11-25: a Channel carries no secret (ChannelConfig), so PENDING-CHANGE-SECRET-READBACK-1 does not reach it
+            crud("notification-channel", "POST /notifications/channels", "PUT /notifications/channels/{id}",
+                    "DELETE /notifications/channels/{id}"),
+            // id = the delivered kpi Requirement; content may name the KPI's own id
+            Map.entry("requirement-kpi", Map.of("create", "POST /requirements/{id}/kpi")),
+            // id = the Pipeline; a restore is a save of a kept version, held like one
+            Map.entry("pipeline-restore", Map.of("restore", "POST /pipelines/{id}/history/{version}/restore")),
+            // W2 step 3 (D-AK9, operator 2026-11-25): id = the Entity List. members and retire need canManageIncidents,
+            // attributes canManageExclusionCategories — both in the machine agent set since that decision; all held
+            Map.entry("entity-list", Map.of("members", "POST /entity-lists/{id}/members",
+                    "retire", "POST /entity-lists/{id}/retire", "attributes", "PUT /entity-lists/{id}/attributes")));
 
-    static final List<String> OPERATIONS = List.of("create", "update", "delete");
+    private static Map.Entry<String, Map<String, String>> crud(String kind, String create, String update, String delete) {
+        Map<String, String> ops = new LinkedHashMap<>();
+        ops.put("create", create);
+        ops.put("update", update);
+        ops.put("delete", delete);
+        return Map.entry(kind, java.util.Collections.unmodifiableMap(ops));
+    }
+
+    /** Every operation some kind offers — the {@code operation} enum; {@link #CHANGE_ROUTES} says which kind takes which. */
+    static final List<String> OPERATIONS = List.of("create", "update", "delete", "restore", "members", "retire", "attributes");
+
+    /** The operations {@code kind} offers, in {@link #OPERATIONS} order. */
+    static List<String> operations(String kind) {
+        return OPERATIONS.stream().filter(CHANGE_ROUTES.get(kind)::containsKey).toList();
+    }
 
     /**
      * The endpoint's own refusal list (plan §4.4 "Never offered"): a call whose method and path look like the never-list is
@@ -288,13 +317,28 @@ final class McpTools {
         String kind = (String) a.get("kind"), op = (String) a.get("operation");
         Object id = a.get("id");
         Map<String, Object> content = (Map<String, Object>) a.get("content");
+        String template = CHANGE_ROUTES.get(kind).get(op);
+        if (template == null) throw new BadArgs("a " + kind + " takes only " + operations(kind) + ", not " + op);
         if (!"create".equals(op) && id == null) throw new BadArgs("'id' is required to " + op + " a " + kind);
         if ("pipeline".equals(kind) && id == null) throw new BadArgs("'id' names the Pipeline to create");
-        if (!"delete".equals(op) && content == null) throw new BadArgs("'content' is required to " + op + " a " + kind);
-        if ("delete".equals(op) && content != null) throw new BadArgs("a delete takes no 'content'");
-        String template = CHANGE_ROUTES.get(kind).get(OPERATIONS.indexOf(op));
+        if (template.contains("{id}") && id == null) throw new BadArgs("'id' is required to " + op + " a " + kind);
+        // a delete and a restore carry no content: the route takes what it needs from its path
+        boolean takesContent = !"delete".equals(op) && !"restore".equals(op);
+        if (takesContent && content == null) throw new BadArgs("'content' is required to " + op + " a " + kind);
+        if (!takesContent && content != null) throw new BadArgs("a " + op + " takes no 'content'");
+        Object version = a.get("version");
+        if (template.contains("{version}") != (version != null))
+            throw new BadArgs(version == null ? "'version' (a kept version) is required to " + op + " a " + kind
+                    : "only a pipeline-restore takes 'version'");
         int sp = template.indexOf(' ');
-        String path = template.substring(sp + 1).replace("{id}", id == null ? "" : seg(id));
+        String path = template.substring(sp + 1).replace("{id}", id == null ? "" : seg(id))
+                .replace("{version}", version == null ? "" : String.valueOf(version));
+        if ("restore".equals(op)) content = Map.of();   // the route's POST body, read by nobody
+        // an Entity List edit records its reason on the list's own fact, from the body: the tool's reason serves there too
+        if ("entity-list".equals(kind) && !content.containsKey("reason") && a.get("reason") instanceof String r) {
+            content = new LinkedHashMap<>(content);
+            content.put("reason", r);
+        }
         Map<String, String> headers = new LinkedHashMap<>();
         if (a.get("reason") instanceof String reason) {
             // the route's own limit (PendingChanges.MAX_REASON), and one line, as the approver reads it. Carried under the
@@ -327,15 +371,32 @@ final class McpTools {
                                     + "/pipelines/authored/{id}/dry-run takes them.", false)),
                     a -> new Call("POST", "/pipelines/authored/" + seg(a.get("pipeline")) + "/dry-run", bodyOf(a))),
             new Tool("propose_change", "Propose a config change",
-                    "Propose creating, updating or deleting a Pipeline, Expectation, Alert Rule, Job, Widget or Dashboard. "
-                            + "The change is NOT applied: it becomes a Pending Change that another person must approve. "
-                            + "'content' is the kind's own write body (for a Pipeline, its graph). Validate and dry-run first.",
+                    "Propose creating, updating or deleting a Pipeline, Expectation, Alert Rule, Job, Widget, Dashboard, "
+                            + "Decision Rule, Notification Rule or Notification Channel; creating the KPI of a delivered kpi Requirement "
+                            + "(requirement-kpi, create only); or restoring a kept version of a Pipeline (pipeline-restore, "
+                            + "restore only); or an Entity List edit (entity-list: members, retire or attributes). The change "
+                            + "is NOT applied: it becomes a Pending Change that another person must approve. 'content' is the "
+                            + "kind's own write body (for a Pipeline, its graph). Validate and dry-run first.",
                     List.of(new Arg("kind", Kind.ENUM, true, "What to change.", List.copyOf(new java.util.TreeSet<>(CHANGE_ROUTES.keySet()))),
-                            new Arg("operation", Kind.ENUM, true, "create, update or delete.", OPERATIONS),
-                            new Arg("id", Kind.ID, false, "The target id (required to update or delete, and to create a Pipeline)."),
-                            new Arg("content", Kind.OBJECT, false, "The proposed content (not for a delete)."),
+                            new Arg("operation", Kind.ENUM, true, "create, update or delete; restore for a pipeline-restore "
+                                    + "(the only one it takes); create for a requirement-kpi (the only one it takes); members, "
+                                    + "retire or attributes for an entity-list (the only ones it takes).", OPERATIONS),
+                            new Arg("id", Kind.ID, false, "The target id (required to update, delete or restore, to create a "
+                                    + "Pipeline, for a requirement-kpi: the Requirement's id, for an entity-list: the list's id)."),
+                            new Arg("version", Kind.INT, false, "The kept version to restore (pipeline-restore only; "
+                                    + "GET /pipelines/{id}/history lists them)."),
+                            new Arg("content", Kind.OBJECT, false, "The proposed content (not for a delete or a restore)."),
                             text("reason", "Why — shown to the approver.")),
                     McpTools::proposeChange, true),
+            // W2 step 2: the reads a requirement-kpi and a pipeline-restore proposal start from, so an agent never guesses
+            new Tool("list_requirements", "List Requirements",
+                    "The Requirements of this Space with their kind and status; a delivered kpi one is what a "
+                            + "requirement-kpi proposal creates the KPI of (once: it names the KPI it created).",
+                    List.of(), get("/requirements")),
+            new Tool("list_pipeline_versions", "List a Pipeline's kept versions",
+                    "The kept config versions of one Pipeline, newest first: what a pipeline-restore proposal restores.",
+                    List.of(id("pipeline", "The Pipeline id.")),
+                    a -> new Call("GET", "/pipelines/" + seg(a.get("pipeline")) + "/history", null)),
             new Tool("list_pending_changes", "List Pending Changes",
                     "The Pending Changes of this Space, newest first; optionally only those in one status (pending, approved, "
                             + "declined, withdrawn, expired).",
@@ -510,7 +571,7 @@ final class McpTools {
                             McpRoutes.jsonBytes(Map.of())), a), true),
             new Tool("open_case_from_entities", "Open a Case from entities",
                     "Open a Case over the entities (and existing Incidents) an investigation found. Needs "
-                            + "canManageIncidents, so only a person's agent can — an unattended machine agent never may.",
+                            + "canManageIncidents; an unattended machine agent's request is held as a Pending Action.",
                     List.of(body("{title, description?, entities: [{id, dataset, label} or {objectId}]} — at most the "
                             + "server's entity cap.", true),
                             text("reason", "Why — on the audit row.")),

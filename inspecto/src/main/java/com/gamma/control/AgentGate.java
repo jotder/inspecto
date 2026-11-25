@@ -51,8 +51,8 @@ final class AgentGate {
      * assign, resolve or transition one, ack or resolve an Alert, open a Case from entities; and (widening plan W11, D-AK8
      * signed 2026-11-25) edit its record: the postmortem, category, impact, Findings values, an RCA skeleton, and adding or
      * removing a correlation link. Each is still gated by its own route — {@code canWorkIncidents}, {@code canManageIncidents}
-     * for a new Case (which a machine agent never keeps), the collaboration exemption of the comment, Findings, RCA and
-     * link routes.
+     * for a new Case (a machine agent keeps it since W2 step 3, operator 2026-11-25; its request is held), the
+     * collaboration exemption of the comment, Findings, RCA and link routes.
      */
     static final Set<String> CASE_ACTIONS = Set.of(
             "POST /objects/([^/]+)/comments", "POST /incidents/([^/]+)/briefs",
