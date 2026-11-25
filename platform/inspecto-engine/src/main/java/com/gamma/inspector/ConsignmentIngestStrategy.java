@@ -4,6 +4,8 @@ import com.gamma.etl.FileNames;
 import com.gamma.consignment.ConsignmentOutputs;
 import com.gamma.consignment.EventTimeBounds;
 import com.gamma.etl.Consignment;
+import com.gamma.etl.ConsignmentManifest;
+import com.gamma.etl.ManifestStore;
 import com.gamma.etl.MemberStatus;
 import com.gamma.etl.QuarantineManager;
 import com.gamma.query.DecisionRuleApplier;
@@ -907,13 +909,17 @@ interface ConsignmentIngestStrategy {
                                      Map<Integer, String> srcIdToFile, String writeScope,
                                      String selectedTable) throws Exception {
         boolean versioned = cfg.producesReference() && cfg.reference().load().versionedStore();
-        if (!cfg.outputPerMember() || versioned)
-            return writeAndTrace(conn, table, partCols, cfg, dbDir, consolidatedBaseName(survivors, batch, cfg),
+        if (!cfg.outputPerMember() || versioned) {
+            String baseName = consolidatedBaseName(survivors, batch, cfg);
+            if (!versioned) baseName = nonCollidingBaseName(baseName, batch, cfg, dbDir);
+            return writeAndTrace(conn, table, partCols, cfg, dbDir, baseName,
                     batch.batchId(), srcIdToFile, writeScope, selectedTable);
+        }
         List<Consignment.Member> owners = survivors.stream().filter(m -> srcIdToFile.containsKey(m.srcId())).toList();
         if (owners.size() == 1) {
             Consignment.Member m = owners.get(0);
-            return writeAndTrace(conn, table, partCols, cfg, dbDir, memberStem(cfg, m.file()),
+            String baseName = nonCollidingBaseName(memberStem(cfg, m.file()), batch, cfg, dbDir);
+            return writeAndTrace(conn, table, partCols, cfg, dbDir, baseName,
                     batch.batchId(), srcIdToFile, writeScope, selectedTable);
         }
         List<PartitionOutput> outputs = new java.util.ArrayList<>();
@@ -928,7 +934,8 @@ interface ConsignmentIngestStrategy {
             try {
                 // the member is its own branch-ledger scope: a second call under the same scope would read as
                 // "already committed" and drop its rows (see writeAndTrace)
-                Written w = writeAndTrace(conn, copy, partCols, cfg, dbDir, memberStem(cfg, m.file()), batch.batchId(),
+                String baseName = nonCollidingBaseName(memberStem(cfg, m.file()), batch, cfg, dbDir);
+                Written w = writeAndTrace(conn, copy, partCols, cfg, dbDir, baseName, batch.batchId(),
                         Map.of(m.srcId(), srcIdToFile.get(m.srcId())),
                         (writeScope == null ? "" : writeScope) + MEMBER_SCOPE + m.srcId(),
                         selectedTable);
@@ -942,6 +949,111 @@ interface ConsignmentIngestStrategy {
             }
         }
         return new Written(outputs, lineage, bounds);
+    }
+
+    /**
+     * Cross-batch output-name collision guard ({@code OUTPUT-NAME-OVERWRITE-1}): when {@code candidateBaseName}
+     * would write an output file that already exists in {@code dbDir} and belongs to an already-committed
+     * batch (either another batch, or an earlier committed execution of the same {@code batchId} under
+     * {@code on_change: reprocess}), disambiguate with {@code __<8 hex of batchId>} so the earlier output is
+     * never silently overwritten. An uncommitted retry of the same {@code batchId} (failover after crash
+     * before ack) keeps {@code candidateBaseName} so it overwrites its own partial output in place.
+     */
+    static String nonCollidingBaseName(String candidateBaseName, Consignment batch, PipelineConfig cfg, String dbDir) {
+        if (candidateBaseName == null || batch == null || cfg == null || dbDir == null) return candidateBaseName;
+        if (!hasCommittedCollision(candidateBaseName, batch.batchId(), cfg, dbDir)) return candidateBaseName;
+        String tag = shortBatchTag(batch.batchId());
+        String disambiguated = candidateBaseName + "__" + tag;
+        int suffix = 2;
+        while (!com.gamma.config.safety.PathJail.isUri(dbDir) && stemExistsInDbDir(dbDir, disambiguated)) {
+            disambiguated = candidateBaseName + "__" + tag + "_" + (suffix++);
+        }
+        return disambiguated;
+    }
+
+    private static boolean hasCommittedCollision(String candidateBaseName, String batchId,
+                                                 PipelineConfig cfg, String dbDir) {
+        boolean isUri = com.gamma.config.safety.PathJail.isUri(dbDir);
+        if (!isUri && !stemExistsInDbDir(dbDir, candidateBaseName)) return false;
+
+        String manifestsDir = cfg.dirs().manifestsDir();
+        if (manifestsDir == null || manifestsDir.isBlank()) return false;
+        java.nio.file.Path mDir = Paths.get(manifestsDir);
+        if (!java.nio.file.Files.isDirectory(mDir)) return false;
+
+        // If this exact batchId already has a committed manifest (e.g. on_change: reprocess with identical
+        // byte size), re-running it is a new execution rather than an uncommitted crash-before-ack retry.
+        if (java.nio.file.Files.isRegularFile(mDir.resolve(batchId + ".json"))) return true;
+
+        java.nio.file.Path dbRoot = isUri ? null : Paths.get(dbDir).toAbsolutePath().normalize();
+        try (java.util.stream.Stream<java.nio.file.Path> files = java.nio.file.Files.list(mDir)) {
+            for (java.nio.file.Path p : files.toList()) {
+                String fn = p.getFileName().toString();
+                if (!fn.endsWith(".json")) continue;
+                String otherId = fn.substring(0, fn.length() - ".json".length());
+                if (otherId.equals(batchId)) continue;
+                try {
+                    ConsignmentManifest m = ManifestStore.read(manifestsDir, otherId);
+                    if (m.outputs == null) continue;
+                    for (ConsignmentManifest.OutputEntry oe : m.outputs) {
+                        if (oe.outputFile() == null) continue;
+                        if (isUri) {
+                            int slash = oe.outputFile().lastIndexOf('/');
+                            String outName = slash >= 0 ? oe.outputFile().substring(slash + 1) : oe.outputFile();
+                            if (oe.outputFile().startsWith(dbDir) && matchesBaseName(outName, candidateBaseName))
+                                return true;
+                        } else {
+                            java.nio.file.Path outPath = Paths.get(oe.outputFile()).toAbsolutePath().normalize();
+                            if (outPath.startsWith(dbRoot)
+                                    && matchesBaseName(outPath.getFileName().toString(), candidateBaseName)) {
+                                return true;
+                            }
+                        }
+                    }
+                } catch (IOException ignored) { /* unreadable manifest — skip */ }
+            }
+        } catch (IOException ignored) { /* unreadable manifestsDir — skip */ }
+        return false;
+    }
+
+    private static boolean stemExistsInDbDir(String dbDir, String baseName) {
+        java.nio.file.Path root = Paths.get(dbDir).toAbsolutePath().normalize();
+        if (!java.nio.file.Files.isDirectory(root)) return false;
+        try (java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.walk(root)) {
+            return walk.filter(java.nio.file.Files::isRegularFile)
+                    .filter(p -> !isInStagingDir(root, p))
+                    .anyMatch(p -> matchesBaseName(p.getFileName().toString(), baseName));
+        } catch (IOException e) {
+            return false;
+        }
+    }
+
+    private static boolean isInStagingDir(java.nio.file.Path root, java.nio.file.Path file) {
+        java.nio.file.Path rel = root.relativize(file.toAbsolutePath().normalize());
+        for (java.nio.file.Path seg : rel) {
+            if (".staging".equals(seg.toString())) return true;
+        }
+        return false;
+    }
+
+    private static boolean matchesBaseName(String fileName, String baseName) {
+        String lowerFile = fileName.toLowerCase(java.util.Locale.ROOT);
+        String lowerBase = baseName.toLowerCase(java.util.Locale.ROOT);
+        if (!lowerFile.startsWith(lowerBase + "_")) return false;
+        String rest = lowerFile.substring(lowerBase.length() + 1);
+        return rest.startsWith("out.") || rest.matches("(?:[cg]\\d+_out|out\\d+)\\.[^.]+");
+    }
+
+    private static String shortBatchTag(String batchId) {
+        try {
+            byte[] hash = java.security.MessageDigest.getInstance("SHA-256")
+                    .digest(batchId.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            StringBuilder sb = new StringBuilder(8);
+            for (int i = 0; i < 4; i++) sb.append(String.format("%02x", hash[i]));
+            return sb.toString();
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is required by every JRE", e);
+        }
     }
 
     /** Separates a segment/batch scope from the member a per-member write belongs to (see {@link #segmentWrite}). */
