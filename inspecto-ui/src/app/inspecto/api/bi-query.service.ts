@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { apiUrl } from './api-base';
+import type { OverlaySummary } from 'app/inspecto/viz/chart-overlays';
 
 /** One validated measure on the wire — an agg name + column identifier, never SQL text. */
 export interface BiMeasure {
@@ -40,6 +41,9 @@ export interface BiQueryBody {
     /** BI-INSIGHTS-1 I-1: every Measure `m` also returns `m__cmp`, `m__delta` and `m__pct` against the previous
      *  period, the same period last year, a target or the average; an absent comparison is null, never 0. */
     compare?: { kind: 'previous' | 'lastYear' | 'target' | 'average'; field?: string; target?: number };
+    /** BI-INSIGHTS-1 I-11 / I-7: per Measure `m`, `m__fc` / `m__fc_lo` / `m__fc_hi` on new rows after the last bucket and
+     *  `m__expected` / `m__z` on every scored row, from this query's own result; `overlays[]` says how, or why not. */
+    overlay?: { forecast?: { horizon?: number; level?: number }; anomaly?: Record<string, never>; field?: string };
 }
 
 /** The Result Set contract `/bi/query` shares with `/queries/{id}/run`. */
@@ -50,13 +54,15 @@ export interface BiQueryResult {
             type: string;
             role?: string;
             /** Set on a comparison column only: which Measure it is drawn against, and which part it is. */
-            overlay?: { overlay: 'compare'; kind: string; of: string; part: 'cmp' | 'delta' | 'pct' };
+            overlay?: { overlay: 'compare' | 'forecast' | 'anomaly'; kind: string; of: string; part: string };
         }[];
         rowCount: number;
     };
     rows: Record<string, unknown>[];
     statistics: { rowCount: number; elapsedMs: number; truncated: boolean };
     sql: string;
+    /** Set when the body asked for an `overlay`: per overlay, Measure and series, the method and backtest, or the reason. */
+    overlays?: OverlaySummary[];
 }
 
 /**

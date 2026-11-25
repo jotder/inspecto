@@ -2,6 +2,7 @@ import { ConditionGroup } from 'app/inspecto/query';
 import { humanizeColumn } from '../column-label';
 import { channelMeasure, channelMeasureId } from '../query-spec';
 import { compareCell, compareFragment, hasCompare } from '../compare';
+import { hasOverlay, overlayCell, overlayFragment } from '../chart-overlays';
 import { ChannelValue, ControlValues, QuerySpec, TimeGrain, VizProps, VizRenderOptions, VizSeries } from '../viz-types';
 
 /**
@@ -63,12 +64,22 @@ export function buildXyQuery(values: ControlValues, ctx: QueryCtx): QuerySpec {
             ? {
                   orderBy: categoryOrderBy(
                       groupBy,
-                      compareFragment(ctx.options) ? undefined : ctx.options?.categoryOrder,
+                      compareFragment(ctx.options) || overlayFragment(ctx.options)
+                          ? undefined
+                          : ctx.options?.categoryOrder,
                   ),
               }
             : {}),
         ...withCompare(ctx),
+        // I-11 / I-7 read along a date grouped by day, week or month on x; any other x would only be refused (422).
+        ...(values.x?.[0]?.grain && values.x[0].grain !== 'auto' ? withOverlay(ctx) : {}),
     };
+}
+
+/** The `{overlay}` fragment of a query (BI-INSIGHTS-1 I-11 / I-7), or nothing — a spec without one keeps its exact shape. */
+export function withOverlay(ctx: QueryCtx): Pick<QuerySpec, 'overlay'> {
+    const overlay = overlayFragment(ctx.options);
+    return overlay ? { overlay } : {};
 }
 
 /** The `{compare}` fragment of a query (BI-INSIGHTS-1 I-1), or nothing — so a spec without one keeps its exact shape. */
@@ -111,12 +122,17 @@ export function transformXy(rows: Record<string, unknown>[], values: ControlValu
     const labels = distinct(rows, xField);
 
     const compared = hasCompare(rows, mId);
+    const overlaid = hasOverlay(rows, mId);
+    // I-11: a forecast row carries no actual — the line stops there (NaN), never drops to 0.
+    const value = (r: Record<string, unknown> | undefined): number =>
+        overlaid && r && r[mId] == null ? NaN : num(r?.[mId]);
     if (seriesField) {
         const seriesVals = distinct(rows, seriesField);
         const series: VizSeries[] = [];
         for (const sv of seriesVals) {
             const at = labels.map((l) => rows.find((row) => str(row[xField]) === l && str(row[seriesField]) === sv));
-            series.push({ label: sv, data: at.map((r) => num(r?.[mId])) });
+            series.push({ label: sv, data: at.map(value) });
+            if (overlaid) series[series.length - 1]['overlay'] = at.map((r) => overlayCell(r, mId));
             if (compared) series.push(...compareSeries(series[series.length - 1], at, mId));
         }
         return { labels, series };
@@ -125,7 +141,8 @@ export function transformXy(rows: Record<string, unknown>[], values: ControlValu
     const at = labels.map((l) => rows.find((row) => str(row[xField]) === l));
     // The legend/tooltip text: a reader's wording ("First ings score (total)", "Count"), not the SQL-ish
     // `sum(FIRST_INGS_SCORE)` — the same default the table plugin gives the column's header.
-    const main: VizSeries = { label: humanizeColumn(mId), data: at.map((r) => num(r?.[mId])) };
+    const main: VizSeries = { label: humanizeColumn(mId), data: at.map(value) };
+    if (overlaid) main['overlay'] = at.map((r) => overlayCell(r, mId));
     return { labels, series: compared ? [main, ...compareSeries(main, at, mId)] : [main] };
 }
 

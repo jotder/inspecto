@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { color } from 'chart.js/helpers';
 import { CHART_MARKER_BAND_ALPHA, CHART_MARKER_LINE, CHART_TONE } from 'app/inspecto/theme/chart-tokens';
 import { ResolvedMarker } from './chart-markers';
-import { chartMarkersPlugin, drawBands, drawLines, markerColor, markerLimits } from './chart-markers.plugin';
+import {
+    chartMarkersPlugin,
+    drawBands,
+    drawIntervals,
+    drawLines,
+    drawPoints,
+    markerColor,
+    markerLimits,
+} from './chart-markers.plugin';
 
 /** A canvas context that records what was drawn (jsdom has no 2D context). */
 function fakeCtx() {
@@ -24,6 +32,11 @@ function fakeCtx() {
         stroke: () => calls.push({ op: 'stroke', args: [], stroke: ctx.strokeStyle, dash }),
         fillRect: (...args: unknown[]) => calls.push({ op: 'fillRect', args, fill: ctx.fillStyle }),
         fillText: (...args: unknown[]) => calls.push({ op: 'fillText', args, fill: ctx.fillStyle }),
+        rect: () => undefined,
+        clip: () => calls.push({ op: 'clip', args: [] }),
+        closePath: () => undefined,
+        fill: () => calls.push({ op: 'fill', args: [], fill: ctx.fillStyle }),
+        arc: (...args: unknown[]) => calls.push({ op: 'arc', args, stroke: ctx.strokeStyle }),
     };
     return { ctx, calls };
 }
@@ -34,7 +47,10 @@ function fakeChart() {
     const chart = {
         ctx: ctx as unknown as CanvasRenderingContext2D,
         chartArea: { top: 0, bottom: 200, left: 10, right: 310, width: 300, height: 200 },
-        scales: { y: { getPixelForValue: (v: number) => 200 - v * 2 } },
+        scales: {
+            y: { getPixelForValue: (v: number) => 200 - v * 2 },
+            x: { getPixelForValue: (i: number) => 10 + i * 30 },
+        },
     };
     return { chart: chart as never, calls };
 }
@@ -122,5 +138,45 @@ describe('chart marker overlay', () => {
     it('takes every colour from the chart tokens', () => {
         expect(markerColor(line(1))).toBe(CHART_MARKER_LINE);
         expect(markerColor({ type: 'band', from: 1, to: 2, tone: 'warning', text: '' })).toBe(CHART_TONE.warning);
+    });
+
+    it('BI-INSIGHTS-1 I-11: fills a forecast interval behind the data and dashes its point forecast over it', () => {
+        const interval: ResolvedMarker = {
+            type: 'interval',
+            text: 'Forecast',
+            points: [
+                { index: 3, value: 50, lower: 40, upper: 60 },
+                { index: 4, value: 55, lower: 42, upper: 70 },
+            ],
+        };
+        expect(markerLimits([interval], 45, 50)).toEqual({ min: 40, max: 70 });
+        const back = fakeChart();
+        drawIntervals(back.chart, [interval], false);
+        expect(back.calls.find((c) => c.op === 'clip')).toBeTruthy();
+        // upper edge left to right, then lower edge right to left: one closed polygon
+        expect(back.calls.filter((c) => c.op === 'moveTo' || c.op === 'lineTo').map((c) => c.args)).toEqual([
+            [100, 80],
+            [130, 60],
+            [130, 116],
+            [100, 120],
+        ]);
+        expect(back.calls.find((c) => c.op === 'fill')?.fill).toBe(
+            color(CHART_TONE.info)
+                .alpha(CHART_MARKER_BAND_ALPHA * 2)
+                .rgbString(),
+        );
+        const front = fakeChart();
+        drawIntervals(front.chart, [interval], true);
+        const stroke = front.calls.find((c) => c.op === 'stroke')!;
+        expect(stroke.dash).toEqual([6, 4]);
+        expect(front.calls.filter((c) => c.op === 'arc')).toHaveLength(2);
+    });
+
+    it('BI-INSIGHTS-1 I-7: rings each flagged value in its tone', () => {
+        const { chart, calls } = fakeChart();
+        drawPoints(chart, [{ type: 'points', tone: 'error', text: 'Unusual', points: [{ index: 2, value: 90 }] }]);
+        const ring = calls.find((c) => c.op === 'arc')!;
+        expect(ring.args.slice(0, 3)).toEqual([70, 20, 7]);
+        expect(ring.stroke).toBe(CHART_TONE.error);
     });
 });

@@ -335,6 +335,36 @@ already exists there, and Q2/Q4 answer the questions an RA or finance lead asks 
   class of the Entity Type and every input's key column (fail closed when untraceable). A hand-declared Dataset is
   never touched, except a bare `_latest` from a template, which is adopted. Spec: `okf/product/module/engine/spec-model-output-datasets.md`.
 
+### 11.4 P1 I-11 forecast band and I-7 anomaly markers — as built (2026-11-25)
+
+- **Wire**: `POST /bi/query` takes `overlay: {forecast?: {horizon? 1–60, level? 0.5–0.99}, anomaly?: {}, field?}`;
+  `field` defaults to the one grained `groupBy` column (none or several → 422). Per Measure / ratio `m`:
+  `m__fc`, `m__fc_lo`, `m__fc_hi` on `horizon` new rows after the last bucket (the Measure NULL there) and
+  `m__expected`, `m__z` on scored rows, marked `{overlay: forecast | anomaly, kind, of, part}`; the response's
+  `overlays[]` states per overlay, Measure and series the method, period (`detected` or `calendar`), backtest
+  `{origins, horizon, pairs, mape, smape, mae, coverage}`, or the reason. A name clash with a result column → 422.
+- **D-BI7 as built**: `ChartOverlays` (`platform/inspecto-engine`, `com.gamma.query`) computes both from the rows the
+  Widget's own sandboxed statement returned — after `BiResultMasking`, under the same row cap, no second statement, no
+  storage — in the JVM, not as SQL inside the statement. Reason: `Backtest` and `SeasonalBaseline` have no SQL form,
+  and `ForecastSql` needs a separate regularity check statement first; `Forecaster` is `ForecastSql`'s JVM twin
+  (`ForecastSqlParityTest`), so the band and its backtest describe one model. A masked Measure arrives as text and gets
+  no overlay; a masked series key reaches the summary only as its alias.
+- **Kernel first production callers**: `Forecaster` + `PredictionInterval` (Holt-Winters, default weights),
+  `Backtest` + `Accuracy` (rolling origin from two seasons, at most 60 origins), `SeasonalityDetector` (period
+  among the grain's calendar cycles, else the first: 7 / 52 / 12; a weekly cycle switches the anomaly baseline to
+  weekday), `SeasonalBaseline` + its robust z (floor 5 % of the median, at least 7 points).
+- **Honesty rules**: fewer than two seasons, a gap, an empty bucket, a cut result, more than 20 series or a
+  non-number → no forecast and the reason; a missing value is never 0 (the SPA leaves a forecast row's actual as a
+  gap). The anomaly sensitivity (1–5 → |z| 5, 4, 3.5, 3, 2.5) is the renderer's: the server's scores do not depend on
+  it, so the slider under the chart re-draws without a query.
+- **UI**: `options.overlay` (`chart-overlays.ts`) on line, bar, area; sent only when x is a grained date. Drawn
+  through the Chart Markers plugin (D-BI9) as two new resolved kinds — `interval` (filled band + dashed point
+  forecast) and `points` (rings) — not as extra Chart.js datasets, so the band is one drawing path with I-2.
+- **Deliberately deferred**: the Report PDF (added to `REPORT-CHART-MARKERS-1`) and the public share viewer (it
+  forwards only `tableSort`) do not ask for overlays; the method is fixed (Holt-Winters, default weights — no
+  per-Widget tuning before Insight Profiles, P3); `SeasonalBaseline` has no week-of-year or month slot, so a week /
+  month series is scored against all its other buckets; the baseline is the visible range, not a trailing window.
+
 ## 12. Board row
 
 Filed 2026-11-18 as **one** row, `BI-INSIGHTS-1` (P2, `BACKLOG.md` §3.6) — the board allows a lane at most one

@@ -1,6 +1,7 @@
 import { AttributeSpec } from 'app/inspecto/component-model';
 import { CHART_PALETTES } from 'app/inspecto/theme/chart-tokens';
 import { COMPARE_VIZ_TYPES } from 'app/inspecto/viz/compare';
+import { OVERLAY_VIZ_TYPES } from 'app/inspecto/viz/chart-overlays';
 import { MARKER_VIZ_TYPES } from 'app/inspecto/viz/chart-markers';
 
 /**
@@ -301,6 +302,61 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
             { value: 'average', label: 'Average' },
         ],
     },
+    // BI-INSIGHTS-1 I-11 / I-7 (line, bar, area): computed by the server from the Widget's own result (`options.overlay`).
+    {
+        key: 'forecastOn',
+        label: 'Forecast band',
+        type: 'boolean',
+        tier: 'required',
+        required: false,
+        default: false,
+        help:
+            'Draws the expected next periods with a shaded band, and says how accurate the same forecast was on this ' +
+            'history. Needs a date on the x axis grouped by day, week or month, and two full seasons of history (two ' +
+            'weeks of days, two years of months); with less, or with a missing period, it says why instead of guessing.',
+    },
+    {
+        key: 'forecastLevel',
+        label: 'Forecast band width',
+        type: 'select',
+        tier: 'required',
+        required: false,
+        default: '0.8',
+        dependsOn: { key: 'forecastOn', equals: true },
+        options: [
+            { value: '0.8', label: '80 % of outcomes' },
+            { value: '0.9', label: '90 % of outcomes' },
+            { value: '0.95', label: '95 % of outcomes' },
+        ],
+    },
+    {
+        key: 'anomalyOn',
+        label: 'Anomaly markers',
+        type: 'boolean',
+        tier: 'required',
+        required: false,
+        default: false,
+        help:
+            'Rings the values far from what is usual for that period (the same weekday when the data has a weekly ' +
+            'pattern). Needs a date on the x axis grouped by day, week or month.',
+    },
+    {
+        key: 'anomalySensitivity',
+        label: 'Anomaly sensitivity',
+        type: 'select',
+        tier: 'required',
+        required: false,
+        default: '3',
+        dependsOn: { key: 'anomalyOn', equals: true },
+        help: 'The starting point of the slider under the chart; a viewer can move it without changing the Widget.',
+        options: [
+            { value: '1', label: '1 — only the most extreme values' },
+            { value: '2', label: '2' },
+            { value: '3', label: '3 — balanced' },
+            { value: '4', label: '4' },
+            { value: '5', label: '5 — the most values' },
+        ],
+    },
     // Gauge: the scale the arc spans (`options.gauge`); a blank end keeps its default (0 / 100) and writes nothing.
     { key: 'gaugeMin', label: 'Gauge: minimum', type: 'number', tier: 'required', required: false, placeholder: '0' },
     { key: 'gaugeMax', label: 'Gauge: maximum', type: 'number', tier: 'required', required: false, placeholder: '100' },
@@ -403,6 +459,10 @@ export const WIDGET_OPTION_VIZ_TYPES: Record<string, string | readonly string[]>
     categoryOrderDir: CATEGORY_ORDER_VIZ_TYPES,
     categoryOrderAgg: CATEGORY_ORDER_VIZ_TYPES,
     compareKind: COMPARE_VIZ_TYPES,
+    forecastOn: OVERLAY_VIZ_TYPES,
+    forecastLevel: OVERLAY_VIZ_TYPES,
+    anomalyOn: OVERLAY_VIZ_TYPES,
+    anomalySensitivity: OVERLAY_VIZ_TYPES,
     kpiId: MARKER_VIZ_TYPES,
 };
 // ── end per-Visualization-Type options ──────────────────────────────────────────────────────────────────────

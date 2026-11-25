@@ -143,6 +143,32 @@ Colours come from `CHART_TONE` and `CHART_MARKER_LINE` only, and the canvas text
 marker. The Widget editor's cog dialog adds and removes them (`chart-markers-editor.component.ts`) and
 offers the KPI picker on those four types.
 
+**Forecast band and anomaly markers (BI-INSIGHTS-1 I-11, I-7, 2026-11-25).** A `line`, `bar` or `area` Widget
+whose x axis is a date grouped by day, week or month may carry `options.overlay` (`{forecast?: {horizon?, level?},
+anomaly?: {sensitivity?}}`, `inspecto/viz/chart-overlays.ts`). The query sends `overlay` (`{forecast?, anomaly: {}}`;
+never along any other x, so a stale option cannot refuse the Widget) and the server's `ChartOverlays`
+(`platform/inspecto-engine`, `com.gamma.query`) computes it from the rows the Widget's own statement returned —
+after masking, under the same row cap, no second query (D-BI7) — with the Analytics Kernel only:
+- **Forecast**: Holt-Winters additive (`Forecaster`, the JVM twin of `ForecastSql`) with its `PredictionInterval`
+  at `level` (80 % by default) on `horizon` new rows after the last bucket (`m__fc`, `m__fc_lo`, `m__fc_hi`, the
+  Measure NULL there), one series per value of the other grouped column. The period is the one
+  `SeasonalityDetector` finds among the grain's calendar cycles, else the first of them (7 days, 52 weeks, 12
+  months); the horizon defaults to the period, at most 24. The rolling-origin `Backtest` of the same model on the
+  same series (origins from two seasons on, at most 60) gives MAPE, sMAPE, MAE and the band's coverage
+  (`Accuracy`). Fewer than two seasons, a gap between buckets, a bucket with no value, a cut result, more than 20
+  series or a masked Measure give no forecast and the reason, never a guessed band.
+- **Anomaly**: per bucket, the robust z against a `SeasonalBaseline` over the series' other buckets in the result
+  (by weekday when the grain is a day and the detector finds a 7-day cycle; at least 7 points) — `m__expected`
+  (the baseline's median) and `m__z`.
+The columns are marked in `resultSet.columns[].overlay` (`{overlay: forecast | anomaly, kind, of, part}`) and the
+response adds `overlays[]`: per overlay, Measure and series, the method, period and its source, the backtest, or
+the reason. The SPA draws both through the Chart Markers plugin (D-BI9): an `interval` marker fills the band behind
+the data and dashes the point forecast over it, a `points` marker rings each value whose |z| reaches the
+sensitivity's threshold (1–5 → 5, 4, 3.5, 3, 2.5). A slider under the chart moves the sensitivity for the viewer
+without a new query; captions say what the forecast is, how it tested, how many values are flagged — or why there
+is none. The cog dialog offers *Forecast band*, its width (80 / 90 / 95 %), *Anomaly markers* and the starting
+sensitivity. The suffixes are pinned by `contracts/measure-grammar.contract.json` (`overlay`).
+
 **Dashboards.** A Dashboard config holds `tiles: [{widgetId, span}]`, an optional `filter`,
 `exposedFields` for the quick-filter chips, a viewer header (`description`, `asOf`, `illustrative`)
 and a viewer-only date range (`dateField`, `defaultRange`).
@@ -216,3 +242,8 @@ there; its relation is validated when it is read, by
 - Chart Markers are drawn on screen only: the Report PDF (`WidgetChartRenderer`) does not draw them yet
   (`REPORT-CHART-MARKERS-1` on the board). On a public share a KPI-bound marker draws only when the KPI
   definition is readable; otherwise a `target` line falls back to the Widget's own target and `rag` draws nothing.
+- The forecast band and anomaly markers (I-11, I-7) are drawn on screen only: the Report PDF does not ask for them
+  (`REPORT-CHART-MARKERS-1`), and the public share viewer does not forward `overlay` (it forwards only
+  `tableSort`). The anomaly baseline is the result's own buckets, so a narrower date range changes the scores; a
+  week or month grain has no seasonal slot in `SeasonalBaseline` (weekday / hour only) and is scored against every
+  other bucket.

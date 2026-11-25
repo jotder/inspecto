@@ -45,6 +45,14 @@ import { COMPARE_LABEL, CompareCell, CompareKind, compareText } from './compare'
 import { KpiDefinition, KpiRange } from 'app/inspecto/api/kpis.service';
 import { ComponentsService } from 'app/inspecto/api/components.service';
 import { MARKER_VIZ_TYPES, needsKpi, ResolvedMarker, resolveMarkers } from './chart-markers';
+import {
+    DEFAULT_SENSITIVITY,
+    OVERLAY_VIZ_TYPES,
+    OverlayCell,
+    OverlaySummary,
+    overlayNote,
+    resolveOverlays,
+} from './chart-overlays';
 import { ChannelId, VizPlugin, VizProps, VizRenderOptions, VizSeries } from './viz-types';
 
 /** componentKey → Angular component, for plugins that render via the escape hatch (`render.kind:'component'`).
@@ -116,6 +124,28 @@ const COMPONENT_BY_KEY: Record<string, Type<unknown>> = {
                     @if (compareNote(); as n) {
                         <p class="text-secondary mt-1 text-xs" data-testid="compare-note">{{ n }}</p>
                     }
+                    @if (showSensitivity()) {
+                        <label
+                            class="text-secondary mt-1 flex items-center gap-2 text-xs"
+                            data-testid="anomaly-sensitivity"
+                        >
+                            <span>Anomaly sensitivity</span>
+                            <input
+                                type="range"
+                                min="1"
+                                max="5"
+                                step="1"
+                                class="w-28"
+                                [value]="sensitivity()"
+                                [attr.aria-valuetext]="sensitivity() + ' of 5'"
+                                (input)="sensitivityOverride.set(+$any($event.target).value)"
+                            />
+                            <span aria-hidden="true">{{ sensitivity() }} of 5</span>
+                        </label>
+                    }
+                    @for (line of overlayLines(); track $index) {
+                        <p class="text-secondary mt-1 text-xs" data-testid="overlay-note">{{ line }}</p>
+                    }
                 }
             }
             @case ('aggrid') {
@@ -176,6 +206,45 @@ export class VizRenderComponent {
     readonly kpiAsOf = input<string | undefined>(undefined);
     /** KPI only: the host Dashboard's picked dates; a `kpiId`-bound KPI is evaluated over them instead of at `asOf`. */
     readonly kpiRange = input<KpiRange | null | undefined>(undefined);
+    /** BI-INSIGHTS-1 I-11 / I-7: the server's overlay summary for this result (method, backtest, or why there is none). */
+    readonly overlaySummary = input<OverlaySummary[] | null | undefined>(undefined);
+    /** The viewer's own sensitivity from the slider under the chart; `null` = the Widget's stored one. A presentation
+     *  choice: the server's scores are the same at every setting, so moving it re-draws without a new query. */
+    readonly sensitivityOverride = signal<number | null>(null);
+    readonly sensitivity = computed(
+        () => this.sensitivityOverride() ?? this.renderOptions()?.overlay?.anomaly?.sensitivity ?? DEFAULT_SENSITIVITY,
+    );
+    private readonly overlaysSupported = computed(() =>
+        (OVERLAY_VIZ_TYPES as readonly string[]).includes(this.plugin().meta.type),
+    );
+    /** I-11 / I-7: the forecast band and flagged points as Chart Markers, drawn by the one markers plugin (D-BI9). */
+    private readonly overlayMarkers = computed<ResolvedMarker[]>(() => {
+        const o = this.renderOptions();
+        if (!this.overlaysSupported() || (!o?.overlay?.forecast && !o?.overlay?.anomaly)) return [];
+        const p = this.sortedProps();
+        const series = p.series.map((s) => ({
+            label: s.label,
+            data: s.data,
+            overlay: s['overlay'] as OverlayCell[] | undefined,
+        }));
+        return resolveOverlays(
+            series,
+            p.labels.map((l) => fullDateLabel(l) ?? categoryLabel(l)),
+            o,
+            this.sensitivity(),
+            (l) => categoryLabel(seriesLabel(l)),
+        );
+    });
+    readonly showSensitivity = computed(
+        () => this.overlaysSupported() && !!this.renderOptions()?.overlay?.anomaly && !!this.overlaySummary()?.length,
+    );
+    /** The caption lines: the forecast, its tested accuracy, the flagged count — or why there is none. */
+    readonly overlayLines = computed<string[]>(() => {
+        if (!this.overlaysSupported()) return [];
+        const flagged = this.overlayMarkers().reduce((n, m) => n + (m.type === 'points' ? m.points.length : 0), 0);
+        const grain = grainUnit(this.props().labels);
+        return overlayNote(this.overlaySummary(), flagged, this.sensitivity(), grain);
+    });
     /** Emits the clicked category's label (bar/line/area/pie/bubble) — the drill-down seam. Gauge has no filterable
      *  categories, so it never emits. */
     readonly categoryClick = output<string>();
@@ -278,7 +347,9 @@ export class VizRenderComponent {
      * category totals when the series are stacked — per stack, as Chart.js stacks them: a Combo's bars and lines
      * on the same axis are two stacks (its stack key falls back to the dataset type), never one sum.
      */
-    readonly markers = computed<ResolvedMarker[]>(() => {
+    readonly markers = computed<ResolvedMarker[]>(() => [...this.staticMarkers(), ...this.overlayMarkers()]);
+
+    private readonly staticMarkers = computed<ResolvedMarker[]>(() => {
         const o = this.renderOptions();
         if (!this.marksSupported() || !o?.markers?.length) return [];
         const p = this.sortedProps();
@@ -357,6 +428,10 @@ export class VizRenderComponent {
                     // I-1: the change at each point moves with its point
                     ...(Array.isArray(s['compare'])
                         ? { compare: order.map((i) => (s['compare'] as CompareCell[])[i]) }
+                        : {}),
+                    // I-11 / I-7: the forecast and score at each point move with it
+                    ...(Array.isArray(s['overlay'])
+                        ? { overlay: order.map((i) => (s['overlay'] as OverlayCell[])[i]) }
                         : {}),
                 }),
             ),
@@ -781,4 +856,12 @@ export function seriesLabel(label: string): string {
     if (label === 'count' || label === 'count(*)') return 'Count';
     const m = /^(\w+)\((\w+)\)$/.exec(label);
     return m ? words(m[2]) : label;
+}
+
+/** What one bucket of the time axis is called in the caption: a day, a week (labels a week apart) or a month. */
+function grainUnit(labels: readonly string[]): string {
+    if (labels.some((l) => /^d{4}-d{2}$/.test(l))) return 'month';
+    const days = labels.filter((l) => /^d{4}-d{2}-d{2}$/.test(l)).map((l) => Date.parse(l));
+    if (days.length >= 2 && days[1] - days[0] >= 7 * 86_400_000) return 'week';
+    return days.length ? 'day' : 'bucket';
 }

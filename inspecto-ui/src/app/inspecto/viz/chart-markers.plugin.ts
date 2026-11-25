@@ -9,13 +9,17 @@ import { ResolvedMarker } from './chart-markers';
  * Chart.js's option resolver. It
  * - widens the value axis `y` so every marker value and finite band edge is on the chart (`afterDataLimits`),
  * - shades bands BEHIND the data (`beforeDatasetsDraw`),
- * - draws lines OVER the data, each with its label in words (`afterDatasetsDraw`).
+ * - draws lines OVER the data, each with its label in words (`afterDatasetsDraw`),
+ * - BI-INSIGHTS-1 I-11 / I-7: fills a forecast `interval` behind the data with its dashed point forecast over it, and
+ *   rings the anomaly `points` over the data — by category index on the `x` scale; their words are the text
+ *   alternative and the caption, not canvas labels.
  * Colours: `CHART_TONE` / `CHART_MARKER_LINE` only (canvas cannot read CSS variables); label text in the theme's muted
  * text colour, handed in by the chart host.
  */
 export const MARKER_PLUGIN_ID = 'inspectoMarkers';
 
 export function markerColor(m: ResolvedMarker): string {
+    if (m.type === 'interval') return CHART_TONE.info;
     return m.tone ? CHART_TONE[m.tone] : CHART_MARKER_LINE;
 }
 
@@ -28,7 +32,14 @@ export function markerLimits(
     let lo = min;
     let hi = max;
     for (const m of markers) {
-        const vs = m.type === 'line' ? [m.value] : [m.from, m.to];
+        const vs =
+            m.type === 'line'
+                ? [m.value]
+                : m.type === 'band'
+                  ? [m.from, m.to]
+                  : m.type === 'interval'
+                    ? m.points.flatMap((p) => [p.lower, p.upper])
+                    : m.points.map((p) => p.value);
         for (const v of vs) {
             if (v == null) continue;
             lo = Math.min(lo, v);
@@ -46,6 +57,8 @@ type MarkerChart = Pick<Chart, 'chartArea' | 'ctx'> & {
 export function chartMarkersPlugin(markers: readonly ResolvedMarker[], textColor: string, font: string): Plugin {
     const bands = markers.filter((m) => m.type === 'band');
     const lines = markers.filter((m) => m.type === 'line');
+    const intervals = markers.filter((m) => m.type === 'interval');
+    const rings = markers.filter((m) => m.type === 'points');
     return {
         id: MARKER_PLUGIN_ID,
         afterDataLimits: (_chart, args) => {
@@ -55,8 +68,15 @@ export function chartMarkersPlugin(markers: readonly ResolvedMarker[], textColor
             scale.min = min;
             scale.max = max;
         },
-        beforeDatasetsDraw: (chart) => drawBands(chart as unknown as MarkerChart, bands, textColor, font),
-        afterDatasetsDraw: (chart) => drawLines(chart as unknown as MarkerChart, lines, textColor, font),
+        beforeDatasetsDraw: (chart) => {
+            drawBands(chart as unknown as MarkerChart, bands, textColor, font);
+            drawIntervals(chart as unknown as MarkerChart, intervals, false);
+        },
+        afterDatasetsDraw: (chart) => {
+            drawLines(chart as unknown as MarkerChart, lines, textColor, font);
+            drawIntervals(chart as unknown as MarkerChart, intervals, true);
+            drawPoints(chart as unknown as MarkerChart, rings);
+        },
     };
 }
 
@@ -128,6 +148,83 @@ export function drawLines(chart: MarkerChart, lines: readonly ResolvedMarker[], 
         placed.push([top, top + LABEL_HEIGHT]);
         ctx.textBaseline = 'top';
         ctx.fillText(l.text, area.right - 4, top);
+    }
+    ctx.restore();
+}
+
+/**
+ * A forecast interval: `line = false` fills the band between its lower and upper values (behind the data); `line = true`
+ * draws its point forecast dashed (over the data). A single point is drawn as a short vertical bar and a dot.
+ */
+export function drawIntervals(chart: MarkerChart, intervals: readonly ResolvedMarker[], line: boolean): void {
+    const x = chart.scales['x'];
+    const y = chart.scales['y'];
+    const area = chart.chartArea;
+    if (!x || !y || !area || !intervals.length) return;
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(area.left, area.top, area.right - area.left, area.bottom - area.top);
+    ctx.clip();
+    for (const m of intervals) {
+        if (m.type !== 'interval' || !m.points.length) continue;
+        const px = m.points.map((p) => x.getPixelForValue(p.index));
+        const c = markerColor(m);
+        if (!line) {
+            ctx.fillStyle = color(c)
+                .alpha(CHART_MARKER_BAND_ALPHA * 2)
+                .rgbString();
+            if (m.points.length === 1) {
+                const top = y.getPixelForValue(m.points[0].upper);
+                ctx.fillRect(px[0] - 4, top, 8, y.getPixelForValue(m.points[0].lower) - top);
+                continue;
+            }
+            ctx.beginPath();
+            m.points.forEach((p, i) =>
+                i ? ctx.lineTo(px[i], y.getPixelForValue(p.upper)) : ctx.moveTo(px[i], y.getPixelForValue(p.upper)),
+            );
+            for (let i = m.points.length - 1; i >= 0; i--) ctx.lineTo(px[i], y.getPixelForValue(m.points[i].lower));
+            ctx.closePath();
+            ctx.fill();
+        } else {
+            ctx.strokeStyle = c;
+            ctx.fillStyle = c;
+            ctx.lineWidth = 2;
+            ctx.setLineDash([6, 4]);
+            ctx.beginPath();
+            m.points.forEach((p, i) =>
+                i ? ctx.lineTo(px[i], y.getPixelForValue(p.value)) : ctx.moveTo(px[i], y.getPixelForValue(p.value)),
+            );
+            ctx.stroke();
+            ctx.setLineDash([]);
+            for (let i = 0; i < m.points.length; i++) {
+                ctx.beginPath();
+                ctx.arc(px[i], y.getPixelForValue(m.points[i].value), 2.5, 0, 2 * Math.PI);
+                ctx.fill();
+            }
+        }
+    }
+    ctx.restore();
+}
+
+/** Anomaly points: a ring around each flagged value, in the marker's tone, over the data. */
+export function drawPoints(chart: MarkerChart, rings: readonly ResolvedMarker[]): void {
+    const x = chart.scales['x'];
+    const y = chart.scales['y'];
+    const area = chart.chartArea;
+    if (!x || !y || !area || !rings.length) return;
+    const ctx = chart.ctx;
+    ctx.save();
+    for (const m of rings) {
+        if (m.type !== 'points') continue;
+        ctx.strokeStyle = markerColor(m);
+        ctx.lineWidth = 2.5;
+        ctx.setLineDash([]);
+        for (const p of m.points) {
+            ctx.beginPath();
+            ctx.arc(x.getPixelForValue(p.index), y.getPixelForValue(p.value), 7, 0, 2 * Math.PI);
+            ctx.stroke();
+        }
     }
     ctx.restore();
 }
