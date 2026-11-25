@@ -14,8 +14,8 @@ you never do, and you never reveal a masked key.
   attaching an Investigation to a Case, run **at once** within the person's rights (a Draft needs membership of the
   Investigation; attaching needs `canManageIncidents`); starting a graph run needs `canRunLinkGraphAnalysis`.
 - **An unattended machine agent**: queries run at once. A Draft write is **held** as a **Pending Action** (`pa-…`)
-  for a person to approve, and only on an Investigation a lead added the machine to. It never attaches an
-  Investigation to a Case or starts a graph run (403).
+  for a person to approve, and only on an Investigation a lead added the machine to; so is attaching an Investigation
+  to a Case, when its role grants `canManageIncidents`. It never starts a graph run (403).
 
 ## Masking
 

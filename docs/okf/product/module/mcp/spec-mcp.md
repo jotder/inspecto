@@ -216,7 +216,7 @@ analyst skills `work-cases` (§ Entity Lists) and `triage-incident` describe the
   expiring entries, raw unless the Space's masking mode masks that Entity Type; **Screening hits** naming a restricted
   list's member; the **Dossier**'s `excludeBy`; the **Grow preview**'s exact (not rounded) counts;
   **`POST /inv/investigations/{id}/replay`**, **`GET /inv/investigations/{id}/log`** and
-  **`GET …/drafts/{d}/replay`** — which keys a restricted exclusion step left out, with exact counts. (Found by the
+  **`GET …/drafts/{d}/replay`** and **`GET …/drafts/{d}/log`** — which keys a restricted exclusion step left out, with exact counts. (Found by the
   W2 verification's security review; the first record named only Screening, the Dossier and the Grow preview.) This is a deliberate exception, recorded in the plan's D-AK9
   **Signed** line; `AGENT_NEVER_CAPABILITIES` (approve, approve an expand, `canRevealLinkEntities`) is unchanged, and
   a masked Link Analysis key stays masked.
@@ -445,7 +445,8 @@ config only.
 ## Case actions (AK-2e)
 
 Phase 3, the Incident and Case analyst (plan §1.1, §4.6 analyst rows, §6.4). The operator's answers of 2026-11-25:
-exactly the §4.6 list (no Incident record edits), a new Case for people only, and `CASE-TRANSITION-FOUR-EYES-1` left a
+exactly the §4.6 list (no Incident record edits), a new Case for people only (superseded by W2 step 3, operator
+2026-11-25: a machine agent's new Case is held as a Pending Action), and `CASE-TRANSITION-FOUR-EYES-1` left a
 board row. No new machinery: the routes join the action bucket, so the gate and the [Pending Action](#pending-actions-ak-2d)
 hold above apply unchanged.
 
@@ -471,8 +472,9 @@ hold above apply unchanged.
   `McpToolRoutesTest.everyCaseToolReplaysACaseActionAndEveryCaseActionHasATool` pins tools to routes both ways.
 - **Agent Skills and golden tasks:** `triage-incident` (read, Brief, comment, accept, assign — never close) and
   `work-cases` (Workflow moves, resolve, Alerts, open a Case — always on the person's yes); the analyst suite
-  `agent-kit/golden/analyst.json` (six tasks: read without acting, Brief and comment, accept and assign, resolve a
-  Case, a machine's resolve held, a machine never opens a Case). `ACTION_PATH` in `tools/run-agent-golden.mjs` covers
+  `agent-kit/golden/analyst.json` (seven tasks since W2: read without acting, Brief and comment, accept and assign,
+  resolve a Case, a machine's resolve held, a machine's new Case held — until W2 step 3 "a machine never opens a
+  Case" — and a machine's Entity List member held). `ACTION_PATH` in `tools/run-agent-golden.mjs` covers
   the case routes. Its live run is open.
 - **The screen:** unchanged — the *Pending Actions* tab lists case actions too, its detail showing the comment text or
   Workflow move it will run.
