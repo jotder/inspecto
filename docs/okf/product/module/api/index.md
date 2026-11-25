@@ -36,4 +36,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | `COMPONENT-VALIDATE-ALL-1` | P3 | feature | a dry run (executing preview) for a KPI, Reconciliation, Dataset, Widget or Dashboard: | — |
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
+| `OPENAPI-ASN1-ROUTES-1` | P2 | defect | Two live ASN.1 routes have no operation in docs/api/openapi-v1.json, so OpenApiPathsContractTest is red on master: | — |
 | `ERROR-CATALOGUE-1` | P3 | feature | an error catalogue: | — |

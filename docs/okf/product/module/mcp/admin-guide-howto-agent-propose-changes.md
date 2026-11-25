@@ -31,8 +31,9 @@ person** approves it. The agent never approves, never reveals a masked value, an
 
 1. **At the identity provider**, register one public client per agent product — here `claude-code` — with
    authorization code and PKCE, in the same realm as the console's client. Its tokens must carry the install's
-   audience and the same roles claim as the console's, and must name the client in `azp` or `client_id`. Do not enable
-   a service account on it.
+   audience and the same roles claim as the console's, and must name the client in `azp` or `client_id`. Allow the
+   `offline_access` scope on it (Claude Code always asks for it) and check the people who will use the agent hold the
+   `offline_access` role. Do not enable a service account on it.
 2. **On the server**, list the client as an agent client and restart:
 
    ```text
@@ -109,6 +110,9 @@ naming the person as the actor.
 
 ## What can go wrong
 
+- The sign-in page answers `invalid_scope` ("Invalid scopes: openid offline_access"), or the browser says
+  "Authentication Successful" but the agent asks to sign in again — the agent client does not allow `offline_access`,
+  or the person lacks the `offline_access` role (Keycloak logs `Offline tokens not allowed for the user or client`).
 - The agent's tools answer 403 "needs sign-in through an agent client" — the token came from the console's client, or
   the client is not in `auth.oidc.agentClients`.
 - 403 "an agent client may not call …" — the agent tried a step that is closed to agents: uploading a file,

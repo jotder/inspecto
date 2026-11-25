@@ -389,8 +389,9 @@ client (admin guide); an approved rename or Dataset delete has side effects the 
 ## Deferred
 
 - Phase 2 and 3 of the plan ([`2026-11-20-agent-kit-ak2-plan.md`](../../../../superpower/2026-11-20-agent-kit-ak2-plan.md)
-  §1.1, §6): the machine agent capability set (AK-2c), operational actions (AK-2d), case actions (AK-2e); D-AK5 and
-  D-AK6 open.
+  §1.1, §6): the machine agent capability set (AK-2c), operational actions (AK-2d), case actions (AK-2e). D-AK5, D-AK6
+  and D-AK7 signed 2026-11-24 (plan §8): a person's agent takes operational and case actions within the person's rights,
+  at once and audited; a machine's actions are held as **Pending Actions** (the Pending Change machinery, its own term).
 - `validate_app` (no route; `APP-KIT-DELIVERY-1`).
 - The plan's AK-2b end-to-end proof on a Standard install with Keycloak (validate → dry-run → propose → a second
   person approves; `propose_action` → approve → sent): the real-HTTP tests prove the same chain with an in-test
