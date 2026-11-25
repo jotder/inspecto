@@ -15,14 +15,15 @@ code: features/inspecto-mcp
 
 An AI agent does an operations support engineer's work: it reads health, runs and freshness, diagnoses a failed run,
 and — once the cause is known — re-runs, resumes, pauses, reprocesses a batch, replays rejected rows, retries or drains a
-run, or triggers or replays a Job. Who the agent is decides what happens:
+run, releases a quarantined file back into its inbox, or triggers or replays a Job. Who the agent is decides what happens:
 
 - **Signed in as a person** (through an agent client): the action runs **at once**, within that person's own rights,
   exactly as if the person had pressed the button. The audit row names the person and the agent client.
 - **An unattended machine agent**: every action is **held** as a **Pending Action** and runs only once a person
   approves it.
 
-An agent never approves, never releases a quarantined file and never takes a backup.
+An agent never approves and never takes a backup. It releases a quarantined file only after reading why the file was
+set aside, and asks the person first.
 
 ## Before you start
 

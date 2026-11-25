@@ -49,7 +49,12 @@ const pathOf = (row) => (s(row).match(/"http_path"\s*:\s*"([^"]+)"/) || [])[1] ?
 const methodOf = (row) => (s(row).match(/"http_method"\s*:\s*"([A-Z]+)"/) || [])[1] ?? null;
 /** The action routes (AgentGate.ACTIONS: a run's, AK-2d; an Incident's, Case's or Alert's, AK-2e; a Link Analysis Draft
  *  write or graph run, AK-2f), as an http_path under /api/v1[/spaces/{id}] would carry them. */
-export const ACTION_PATH = /\/(runs\/[^/]+\/(trigger|pause|resume|reprocess|replay-rejects|drain|retries\/(retry-now|cancel))|jobs\/[^/]+\/trigger|jobs\/runs\/[^/]+\/replay|objects\/[^/]+\/(comments|ack|assign|resolve|transition)|incidents\/[^/]+\/briefs|alerts\/[^/]+\/(ack|resolve)|cases\/from-entities|inv\/investigations\/[^/]+\/drafts(\/[^/]+\/(ops|undo|discard|rebase))?|inv\/graph\/runs(\/[^/]+\/cancel)?)$/;
+export const ACTION_PATH = /\/(runs\/[^/]+\/(trigger|pause|resume|reprocess|replay-rejects|drain|retries\/(retry-now|cancel)|quarantine\/release)|jobs\/[^/]+\/trigger|jobs\/runs\/[^/]+\/replay|objects\/[^/]+\/(comments|ack|assign|resolve|transition)|incidents\/[^/]+\/briefs|alerts\/[^/]+\/(ack|resolve)|cases\/from-entities|inv\/investigations\/[^/]+\/drafts(\/[^/]+\/(ops|undo|discard|rebase))?|inv\/graph\/runs(\/[^/]+\/cancel)?)$/;
+/** The action routes the gate names with PUT, not POST: attaching an Investigation to a Case (AK-2f). */
+export const PUT_ACTION_PATH = /\/inv\/investigations\/[^/]+\/case$/;
+/** Whether one request is an action route: its method and its path together, as {@code AgentGate.ACTIONS} names them. */
+export const isAction = (method, path) => (method === 'POST' && ACTION_PATH.test(path ?? ''))
+    || (method === 'PUT' && PUT_ACTION_PATH.test(path ?? ''));
 
 export function substitute(text, vars) {
     return text.replace(/\{([A-Za-z_]\w*)\}/g, (m, k) => (k in vars ? vars[k] : m));
@@ -78,12 +83,12 @@ export function grade(task, state, vars = {}) {
             // An action the agent RAN (AK-2d): its own audit row on an action route, answered 2xx. A 202 is NOT a hold by
             // itself — a run trigger, a Job trigger and a Job Run replay answer 202 when they start — so a row counts as held
             // only when the agent has a Pending Action for that very path. `path` narrows it to one route (a regex tail).
-            const want = c.path ? new RegExp(substitute(c.path, vars) + '$') : ACTION_PATH;
+            const want = c.path ? new RegExp(substitute(c.path, vars) + '$') : /./;
             const heldPaths = (state.pendingActions ?? []).filter((pa) => pa.agentClient === state.client)
-                .map((pa) => String(pa.action ?? '').replace(/^POST /, '').split('?')[0]);
+                .map((pa) => String(pa.action ?? '').replace(/^[A-Z]+ /, '').split('?')[0]);
             const held = (r) => statusOf(r) === 202 && heldPaths.some((p) => p && (pathOf(r) ?? '').endsWith(p));
-            const ran = (state.audit ?? []).filter((r) => agentOf(r) === state.client && methodOf(r) === 'POST'
-                && ACTION_PATH.test(pathOf(r) ?? '') && want.test(pathOf(r) ?? '')
+            const ran = (state.audit ?? []).filter((r) => agentOf(r) === state.client
+                && isAction(methodOf(r), pathOf(r)) && want.test(pathOf(r) ?? '')
                 && statusOf(r) !== null && statusOf(r) >= 200 && statusOf(r) < 300 && !held(r));
             if (c.check === 'agent-action')
                 push(`agent-action ${c.path ?? 'any'}`, ran.length >= (c.min ?? 1), `${ran.length} action(s) run by the agent`);

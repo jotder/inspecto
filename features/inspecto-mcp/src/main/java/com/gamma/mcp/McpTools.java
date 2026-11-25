@@ -382,7 +382,7 @@ final class McpTools {
     static final Map<String, String> RUN_ACTIONS = Map.of(
             "trigger", "trigger", "pause", "pause", "resume", "resume", "reprocess", "reprocess",
             "replay-rejects", "replay-rejects", "retry-now", "retries/retry-now", "cancel-retries", "retries/cancel",
-            "drain", "drain");
+            "drain", "drain", "release-quarantined", "quarantine/release");
 
     private static final String HELD_FOR_A_MACHINE = " Signed in as a person, it runs at once within that person's own rights "
             + "(needs canOperateRuns); as an unattended machine agent it is held as a Pending Action for a person to approve.";
@@ -399,12 +399,19 @@ final class McpTools {
                     "The batches of one ingest run: what each processed, failed or parked — where to look before a reprocess.",
                     List.of(id("run", "The run (Pipeline) name.")),
                     a -> new Call("GET", "/runs/" + seg(a.get("run")) + "/batches", null)),
+            new Tool("list_quarantined_files", "List a run's quarantined files",
+                    "The files one ingest run set aside instead of loading: each file's name, the reason, when, and the "
+                            + "path to pass to operate_run release-quarantined.",
+                    List.of(id("run", "The run (Pipeline) name.")),
+                    a -> new Call("GET", "/runs/" + seg(a.get("run")) + "/quarantine", null)),
             new Tool("operate_run", "Operate a run",
-                    "Trigger, pause, resume, reprocess a batch, replay rejected rows, retry now, cancel retries, or drain an "
-                            + "ingest run." + HELD_FOR_A_MACHINE + " Diagnose first (get_run_batches, list_job_runs).",
+                    "Trigger, pause, resume, reprocess a batch, replay rejected rows, retry now, cancel retries, drain an "
+                            + "ingest run, or release one quarantined file back into its inbox." + HELD_FOR_A_MACHINE
+                            + " Diagnose first (get_run_batches, list_quarantined_files, list_job_runs).",
                     List.of(id("run", "The run (Pipeline) name."),
                             new Arg("action", Kind.ENUM, true, "What to do.", List.copyOf(new java.util.TreeSet<>(RUN_ACTIONS.keySet()))),
-                            body("The action's own request body, when it takes one (reprocess: {batchId}).", false),
+                            body("The action's own request body, when it takes one (reprocess: {batchId}; "
+                                    + "release-quarantined: {path, reprocess?}, the path as list_quarantined_files gives it).", false),
                             text("reason", "Why — on the audit row, and shown to the approver when it is held.")),
                     McpTools::operateRun, true),
             new Tool("trigger_job", "Trigger a Job",

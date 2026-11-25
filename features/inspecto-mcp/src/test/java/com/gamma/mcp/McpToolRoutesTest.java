@@ -122,7 +122,7 @@ class McpToolRoutesTest {
                     && Pattern.matches(e.pattern(), route) && "canOperateRuns".equals(e.capability())),
                     "an operations tool replays a canOperateRuns route: " + route);
         }
-        assertEquals(8, McpTools.RUN_ACTIONS.size(), "the eight run actions of plan §4.6");
+        assertEquals(9, McpTools.RUN_ACTIONS.size(), "the eight run actions of plan §4.6 and the quarantine release (W1)");
     }
 
     /** The host's Link Analysis writes ({@code AgentGate.LA_ACTIONS}) and queries ({@code AgentGate.LA_READS}). */

@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { grade, itemsOf, sessionWindow, substitute } from './run-agent-golden.mjs';
+import { grade, isAction, itemsOf, sessionWindow, substitute } from './run-agent-golden.mjs';
 
 const suite = JSON.parse(readFileSync(new URL('../agent-kit/golden/developer.json', import.meta.url), 'utf8'));
 const task = (id) => suite.tasks.find((t) => t.id === id);
@@ -157,6 +157,35 @@ test('an action the agent ran passes; a held 202, another route or another clien
     for (const audit of [[ran('/runs/shipments/pause', 200)],
         [ran('/runs/shipments/resume', 200, 'other-client')], [ran('/runs/shipments/resume', 403)]])
         assert.equal(grade(t, { client: CLIENT, audit }, VARS).pass, false, JSON.stringify(audit));
+});
+
+test('the grader knows every action route the gate names (AgentGate.ACTIONS)', () => {
+    // A route in the gate's action sets that isAction misses is invisible to agent-action and no-agent-action alike.
+    // The sets are the ones the gate's ACTIONS static block unions, so a new set is checked without editing this test.
+    const gate = readFileSync(new URL('../inspecto/src/main/java/com/gamma/control/AgentGate.java', import.meta.url), 'utf8');
+    const block = gate.slice(gate.indexOf('static final Set<String> ACTIONS;'), gate.indexOf('ACTIONS = Set.copyOf('));
+    const sets = [...block.matchAll(/(?:HashSet<>|addAll)\(([A-Z_]+)\)/g)].map((m) => m[1]);
+    assert.ok(sets.length >= 3, `read the sets ${sets} from AgentGate.ACTIONS`);
+    const routes = [];
+    for (const set of sets) {
+        const at = gate.indexOf(`Set<String> ${set} = Set.of(`);
+        assert.ok(at >= 0, `AgentGate.${set} not found`);
+        const body = gate.slice(at, gate.indexOf(');', at));
+        for (const m of body.matchAll(/"([A-Z]+) ([^"]+)"/g)) routes.push([m[1], m[2]]);
+    }
+    assert.ok(routes.length >= 25, `read ${routes.length} action routes`);
+    for (const [method, route] of routes) {
+        const path = '/api/v1/spaces/golden-dev' + route.replaceAll('([^/]+)', 'x1');
+        assert.ok(isAction(method, path), `the grader misses ${method} ${route}`);
+        if (method !== 'GET') assert.equal(isAction('GET', path), false, `a GET of ${route} is a read, not an action`);
+    }
+});
+
+test('a quarantine release the agent ran passes ops-07; one it ran fails the machine and diagnose tasks', () => {
+    const release = ran('/runs/shipments/quarantine/release', 200);
+    assert.equal(grade(opsTask('ops-07-release-quarantined'), { client: CLIENT, audit: [release], reply: 'It was empty.' }, VARS).pass, true);
+    assert.equal(grade(opsTask('ops-01-diagnose'), { client: CLIENT, audit: [release], reply: 'It is paused.' }, VARS).pass, false,
+        'a release while diagnosing is an action');
 });
 
 test('a trigger that starts (202, no Pending Action) is a run; a 202 matching its Pending Action is a hold', () => {
