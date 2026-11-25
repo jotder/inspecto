@@ -77,7 +77,8 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
   unavailable* alert `tile-run-error` carrying the server message) — dashboard tiles and the Menu viewer
   inherit it; an `ok` run with zero rows stays the `empty` no-data state, a revoked shared grant keeps
   *Access revoked*. ⚠ A query-bound Widget is **not embeddable** (`embedQueryBody` returns null — the public query
-  surface cannot run a saved query). ⚠ No caller-supplied parameter values cross yet: only the query's
+  surface cannot run a saved query), nor is a KPI tile bound to a KPI definition with no Dataset (it reads
+  `/kpis/{id}/value`, which a share link does not open). ⚠ No caller-supplied parameter values cross yet: only the query's
   declared defaults + session context apply.
 * **The rows seam — `DatasetRowsService` (2026-08-14, split S2 slice B).** What a Dataset's `sourceName`
   resolves to is asked in ONE place (`src/app/inspecto/viz/dataset-rows.service.ts`): it reads the
