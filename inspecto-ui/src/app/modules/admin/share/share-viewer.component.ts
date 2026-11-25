@@ -54,7 +54,9 @@ interface TileVm {
  * and a named-measure `expression` cannot cross the wire.
  */
 export function embedQueryBody(widget: EmbedWidget): PublicQueryBody | null {
-    if (widget.viewId || widget.queryId) return null;
+    // No Dataset (a KPI tile bound to a KPI definition, `options.kpi.kpiId`): the public query reads only the
+    // Dashboard's Datasets, so such a tile is not embeddable — never a query for dataset `null`.
+    if (widget.viewId || widget.queryId || !widget.datasetId) return null;
     const plugin = getViz(widget.vizType);
     if (!plugin) return null;
     const spec = plugin.buildQuery(widget.controls ?? {}, {

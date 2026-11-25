@@ -32,6 +32,18 @@ describe('embedQueryBody', () => {
         expect(embedQueryBody({ ...BAR_WIDGET, queryId: 'long_calls' })).toBeNull();
     });
 
+    it('declares a KPI tile bound to a KPI definition (no Dataset) not embeddable, instead of querying dataset null', () => {
+        expect(
+            embedQueryBody({
+                name: 'Monthly sales',
+                datasetId: '',
+                vizType: 'kpi',
+                controls: {},
+                options: { kpi: { kpiId: 'monthly_sales' } },
+            } as Parameters<typeof embedQueryBody>[0]),
+        ).toBeNull();
+    });
+
     it('declares view-bound and expression-measure widgets not embeddable', () => {
         expect(embedQueryBody({ ...BAR_WIDGET, viewId: 'geo-1' })).toBeNull();
         expect(
