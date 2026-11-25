@@ -2608,7 +2608,7 @@ public final class PipelineConfig {
         // relocated one layer down: the config saves, loads, arms — and runs the wrong pipeline quietly.
         // Same fail-safe posture as route:/summarize/join above; lifted in plan slice A5, which routes a
         // steps: pipeline to the graph executor that can actually walk it.
-        if (active && explicitSteps) {
+        if (active && explicitSteps && !isJobPipeline()) {
             if (outputStore == null) {
                 throw new IllegalStateException(
                         "steps: does not execute on the linear ingest path — author a top-level "
@@ -2628,6 +2628,23 @@ public final class PipelineConfig {
                                 + "output_store, which cannot name N branches");
             }
         }
+    }
+
+    /**
+     * Whether this config is a <b>Job Pipeline</b> (JOB-GRAPH-1): an ordinary Pipeline whose input is a
+     * Dataset ({@code collector.connector: dataset} + {@code collector.dataset}) and has no parser/schema —
+     * it reads an already-landed Dataset at rest, runs its {@code steps:} chain, and writes to a persistent
+     * sink via {@code PipelineJobRunner}.
+     */
+    public boolean isJobPipeline() {
+        return collector.hasDataset()
+                && schemas.single() == null
+                && (schemas.selector() == null || !schemas.selector().hasSchemas())
+                && (schemas.segments() == null || schemas.segments().isEmpty())
+                && schemas.ingesterClass() == null
+                && fixedWidth == null
+                && json == null
+                && textRegex == null;
     }
 
     /** The side-effect half of {@link #prepare()}: create the status directory, if one is configured. */

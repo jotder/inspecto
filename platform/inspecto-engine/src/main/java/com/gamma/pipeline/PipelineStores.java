@@ -65,12 +65,27 @@ public final class PipelineStores {
         }
     }
 
-    /** Data stores this graph consumes at rest — the {@code source_store} of every node that declares one. */
+    /**
+     * The data store {@code n} consumes at rest: {@link #CONFIG_SOURCE_STORE} if set, else {@code dataset}
+     * on an {@code acquisition} node with {@code connector: dataset}; {@code null} otherwise.
+     */
+    public static String sourceStoreOf(PipelineNode n) {
+        Object s = n.cfg(CONFIG_SOURCE_STORE);
+        if (s != null && !s.toString().isBlank()) return s.toString();
+        if (BuiltinNodeType.ACQUISITION.type().equals(n.type())
+                && "dataset".equalsIgnoreCase(String.valueOf(n.cfg("connector")))) {
+            Object ds = n.cfg("dataset");
+            if (ds != null && !ds.toString().isBlank()) return ds.toString();
+        }
+        return null;
+    }
+
+    /** Data stores this graph consumes at rest — the {@code source_store} (or {@code dataset}) of every node that declares one. */
     public static Set<String> consumed(PipelineGraph g) {
         Set<String> out = new LinkedHashSet<>();
         for (PipelineNode n : g.nodes()) {
-            Object s = n.cfg(CONFIG_SOURCE_STORE);
-            if (s != null && !s.toString().isBlank()) out.add(s.toString());
+            String s = sourceStoreOf(n);
+            if (s != null) out.add(s);
         }
         return out;
     }

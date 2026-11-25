@@ -894,6 +894,7 @@ com.gamma.etl.PipelineConfig | public Webhook webhook()
 com.gamma.etl.PipelineConfig | public Xlsx xlsx()
 com.gamma.etl.PipelineConfig | public boolean active()
 com.gamma.etl.PipelineConfig | public boolean hasExplicitSteps()
+com.gamma.etl.PipelineConfig | public boolean isJobPipeline()
 com.gamma.etl.PipelineConfig | public boolean outputPerMember()
 com.gamma.etl.PipelineConfig | public boolean producesReference()
 com.gamma.etl.PipelineConfig | public boolean rejectsAllOrNothing()
@@ -2131,6 +2132,7 @@ com.gamma.pipeline.PipelineRel | public static final String DROPPED
 com.gamma.pipeline.PipelineRel | public static final String DUPLICATE
 com.gamma.pipeline.PipelineRel | public static final String GAP
 com.gamma.pipeline.PipelineRel | public static final String INVALID
+com.gamma.pipeline.PipelineRel | public static final String REFERENCE
 com.gamma.pipeline.PipelineRel | public static final String REJECT_PREFIX
 com.gamma.pipeline.PipelineRel | public static final String ROUTE_PREFIX
 com.gamma.pipeline.PipelineRel | public static final String UNMATCHED
@@ -2147,6 +2149,7 @@ com.gamma.pipeline.PipelineStores | public static List<Link> superimpose(Collect
 com.gamma.pipeline.PipelineStores | public static List<Produced> producedStores(PipelineGraph)
 com.gamma.pipeline.PipelineStores | public static Set<String> consumed(PipelineGraph)
 com.gamma.pipeline.PipelineStores | public static Set<String> produced(PipelineGraph)
+com.gamma.pipeline.PipelineStores | public static String sourceStoreOf(PipelineNode)
 com.gamma.pipeline.PipelineStores | public static final String CONFIG_SOURCE_STORE
 com.gamma.pipeline.PipelineStores | public static final String CONFIG_STORE
 com.gamma.pipeline.PipelineStores.Link | public record Link(String producer, String store, String consumer)

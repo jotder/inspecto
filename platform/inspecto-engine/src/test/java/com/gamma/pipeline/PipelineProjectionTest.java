@@ -179,6 +179,31 @@ class PipelineProjectionTest {
                 && "orders".equals(l.get("store")) && "ORDERS_ROLLUP".equals(l.get("consumer"))));
     }
 
+    @Test
+    @SuppressWarnings("unchecked")
+    void combinedEmitsReferenceEdgesFromReferenceStoreToJoin() {
+        PipelineGraph ref = new PipelineGraph("dim_dial_digit", true,
+                List.of(PipelineNode.of("acq", "acquisition"),
+                        new PipelineNode("sink", "sink.persistent", "dim_dial_digit", null,
+                                Map.of(PipelineStores.CONFIG_STORE, "dim_dial_digit"), null)),
+                List.of(PipelineEdge.data("acq", "sink")));
+        PipelineGraph job = new PipelineGraph("cdr_enrich", false,
+                List.of(PipelineNode.of("acq", "acquisition", Map.of("connector", "dataset", "dataset", "cdr")),
+                        new PipelineNode("join", "transform.join", null, null,
+                                Map.of("reference", "reference/dim_dial_digit", "on", List.of("dial_prefix")), null),
+                        new PipelineNode("sink", "sink.persistent", "cdr_enriched", null,
+                                Map.of(PipelineStores.CONFIG_STORE, "cdr_enriched"), null)),
+                List.of(PipelineEdge.data("acq", "join"), PipelineEdge.data("join", "sink")));
+
+        Map<String, Object> c = PipelineProjection.combined(List.of(ref, job));
+        List<Map<String, Object>> edges = (List<Map<String, Object>>) c.get("edges");
+        assertTrue(edges.stream().anyMatch(e -> "reference".equals(e.get("kind"))
+                        && "reference".equals(e.get("rel"))
+                        && "store:dim_dial_digit".equals(e.get("from"))
+                        && "cdr_enrich/join".equals(e.get("to"))),
+                "combined topology emits reference edge from Reference store to join node");
+    }
+
     // ── helpers ──────────────────────────────────────────────────────────────────
 
     private static Map<String, Object> byType(List<Map<String, Object>> cat, String type) {

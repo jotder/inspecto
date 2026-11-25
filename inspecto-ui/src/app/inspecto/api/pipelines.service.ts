@@ -207,10 +207,18 @@ export interface CombinedEdge {
     from: string;
     to: string;
     rel: string;
-    kind: 'data' | 'control' | 'route' | 'store';
+    kind: 'data' | 'control' | 'route' | 'store' | 'reference';
     routeKey?: string;
     restsOnDisk?: boolean; // on store edges: whether the joined store rests on disk
     pipeline?: string;
+}
+
+/** Response from `POST /pipelines/{name}/split-job-pipeline` (JG3). */
+export interface SplitJobPipelineResponse {
+    preview: boolean;
+    onboardingPipeline: { name: string; path: string; before: string; after: string };
+    jobPipeline: { name: string; path: string; before: string; after: string };
+    job: { name: string; path: string; after: string };
 }
 
 /** The combined pipeline+job topology (GET /pipelines/combined): pipelines joined at shared store nodes (T24). */
@@ -576,6 +584,17 @@ export class PipelinesService {
     /** The combined pipeline+job topology — every pipeline joined at the shared store nodes (T24). */
     combined(): Observable<PipelineCombined> {
         return this.http.get<PipelineCombined>(apiUrl('/pipelines/combined'));
+    }
+
+    /** Split an existing `steps:` + `output_store:` Pipeline into an onboarding Pipeline + Job Pipeline (JG3). */
+    splitJobPipeline(
+        name: string,
+        opts: { preview?: boolean; outputStore?: string } = {},
+    ): Observable<SplitJobPipelineResponse> {
+        return this.http.post<SplitJobPipelineResponse>(
+            apiUrl(`/pipelines/${encodeURIComponent(name)}/split-job-pipeline`),
+            opts,
+        );
     }
 
     // ── the canonical round-trip (W5, U-A): the editor edits *_pipeline.toon itself ──

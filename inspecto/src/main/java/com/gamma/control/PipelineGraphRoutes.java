@@ -85,6 +85,8 @@ final class PipelineGraphRoutes implements RouteModule {
         api.put("/pipelines/([^/]+)/graph", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> saveGraph(api, e, ApiContext.name(m), api.body(e))));
         api.post("/pipelines/([^/]+)/graph/validate", (e, m) -> validateGraph(api, ApiContext.name(m), api.body(e)));
+        api.post("/pipelines/([^/]+)/split-job-pipeline", ApiContext.withCapability("canAuthorWorkbench",
+                (e, m) -> splitJobPipeline(api, ApiContext.name(m), api.body(e))));
     }
 
     /**
@@ -271,6 +273,7 @@ final class PipelineGraphRoutes implements RouteModule {
         ETags.set(ex, ETags.of(ContentHash.of(raw)));
         Map<String, Object> editable = PipelineEditable.toMap(cfg, raw);
         attachCompanionEnrichments(api, cfg.identity().pipelineName(), editable);
+        if (cfg.isJobPipeline()) attachReferenceNodes(editable);
         return editable;
     }
 
@@ -614,13 +617,202 @@ final class PipelineGraphRoutes implements RouteModule {
     static Map<String, Object> withoutDerivedEdges(Map<String, Object> body) {
         if (!(body.get("edges") instanceof List<?> edges)) return body;
         List<Object> kept = new ArrayList<>();
-        for (Object o : edges)
-            if (!(o instanceof Map<?, ?> em && Boolean.TRUE.equals(em.get("derived"))
-                    && COMPANION_REL.equals(em.get("rel")))) kept.add(o);
-        if (kept.size() == edges.size()) return body;
+        java.util.Set<String> refSources = new java.util.LinkedHashSet<>();
+        java.util.Set<String> nonRefNodes = new java.util.LinkedHashSet<>();
+        for (Object o : edges) {
+            if (o instanceof Map<?, ?> em) {
+                String rel = String.valueOf(em.get("rel"));
+                if (Boolean.TRUE.equals(em.get("derived")) && COMPANION_REL.equals(rel)) continue;
+                if (PipelineRel.REFERENCE.equals(rel)) {
+                    refSources.add(String.valueOf(em.get("from")));
+                    continue;
+                }
+                nonRefNodes.add(String.valueOf(em.get("from")));
+                nonRefNodes.add(String.valueOf(em.get("to")));
+            }
+            kept.add(o);
+        }
         Map<String, Object> out = new LinkedHashMap<>(body);
         out.put("edges", kept);
+        // Drop synthetic/side-input acquisition nodes that only feed `reference` edges so MULTI_ACQUISITION does not fire.
+        if (!refSources.isEmpty() && body.get("nodes") instanceof List<?> nodes) {
+            List<Object> keptNodes = new ArrayList<>();
+            for (Object n : nodes) {
+                if (n instanceof Map<?, ?> nm) {
+                    String id = String.valueOf(nm.get("id"));
+                    if ("acquisition".equals(nm.get("type")) && refSources.contains(id) && !nonRefNodes.contains(id)) {
+                        continue;
+                    }
+                }
+                keptNodes.add(n);
+            }
+            out.put("nodes", keptNodes);
+        }
         return out;
+    }
+
+    /**
+     * Synthesize Reference Dataset nodes + {@code reference} edges for each {@code transform.join} in a Job Pipeline
+     * so opening it in the editor renders its Reference side inputs wired to their joins (JG2).
+     */
+    @SuppressWarnings("unchecked")
+    private static void attachReferenceNodes(Map<String, Object> editable) {
+        if (!(editable.get("nodes") instanceof List<?> rawNodes) || !(editable.get("edges") instanceof List<?> rawEdges)) return;
+        List<Map<String, Object>> nodes = (List<Map<String, Object>>) rawNodes;
+        List<Map<String, Object>> edges = (List<Map<String, Object>>) rawEdges;
+        Map<String, String> refNodeByStore = new LinkedHashMap<>();
+        List<Map<String, Object>> newNodes = new ArrayList<>();
+        for (Map<String, Object> n : nodes) {
+            if (!"transform.join".equals(n.get("type"))) continue;
+            if (!(n.get("config") instanceof Map<?, ?> cfg)) continue;
+            Object rawRef = cfg.get("reference");
+            if (rawRef == null) continue;
+            String ref = rawRef.toString().trim();
+            String store = ref.startsWith("reference/") ? ref.substring("reference/".length())
+                    : ref.startsWith("references/") ? ref.substring("references/".length()) : null;
+            if (store == null || store.isBlank()) continue;
+            String refNodeId = refNodeByStore.computeIfAbsent(store, s -> {
+                String id = "acq__ref_" + s;
+                Map<String, Object> rc = new LinkedHashMap<>();
+                rc.put("connector", "dataset");
+                rc.put("dataset", s);
+                Map<String, Object> nm = new LinkedHashMap<>();
+                nm.put("id", id);
+                nm.put("type", "acquisition");
+                nm.put("name", s);
+                nm.put("config", rc);
+                newNodes.add(nm);
+                return id;
+            });
+            Map<String, Object> em = new LinkedHashMap<>();
+            em.put("from", refNodeId);
+            em.put("rel", PipelineRel.REFERENCE);
+            em.put("to", n.get("id"));
+            edges.add(em);
+        }
+        nodes.addAll(newNodes);
+    }
+
+    /**
+     * <b>JG3 — Split into Job Pipeline.</b> Moves a {@code steps:} + {@code output_store:} chain out of an
+     * onboarding Pipeline into its own Job Pipeline ({@code <configRoot>/<outStore>/<outStore>_pipeline.toon}, D-JG5)
+     * and creates/repoints its {@code type: pipeline} Job ({@code on_pipeline: <name>}, D-JG4).
+     */
+    @SuppressWarnings("unchecked")
+    private Object splitJobPipeline(ApiContext api, String name, Map<String, Object> body) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "split job pipeline");
+        CollectorService service = HostContext.of(api).service();
+        PipelineConfig cfg = service.configFor(name)
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no pipeline named '" + name + "'"));
+        Path onboardingPath = service.pathFor(name)
+                .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no config file for pipeline '" + name + "'"));
+        if (cfg.isJobPipeline())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + name + "' is already a Job Pipeline");
+        String outStore = body != null && body.get("outputStore") instanceof String s && !s.isBlank()
+                ? s.trim().toLowerCase().replace(' ', '_')
+                : cfg.outputStore();
+        if (outStore == null || outStore.isBlank())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                    "pipeline '" + name + "' has no output_store: to split into a Job Pipeline");
+        if (cfg.steps().isEmpty() && cfg.webhookConfig() == null && cfg.excelConfig() == null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                    "pipeline '" + name + "' has no Stage-2 chain to split");
+
+        Map<String, Object> onboardingRaw = ConfigLoader.filesystem().decode(onboardingPath.toString());
+        String beforeOnboarding = Files.readString(onboardingPath, StandardCharsets.UTF_8);
+
+        Map<String, Object> afterOnboardingMap = new LinkedHashMap<>(onboardingRaw);
+        afterOnboardingMap.remove("output_store");
+        afterOnboardingMap.remove("steps");
+        afterOnboardingMap.remove("webhook");
+        afterOnboardingMap.remove("excel");
+        if (afterOnboardingMap.get("processing") instanceof Map<?, ?> proc) {
+            Map<String, Object> procCopy = new LinkedHashMap<>((Map<String, Object>) proc);
+            procCopy.remove("join");
+            procCopy.remove("dedup");
+            procCopy.remove("summarize");
+            procCopy.remove("profile");
+            afterOnboardingMap.put("processing", procCopy);
+        }
+        String afterOnboarding = ConfigCodec.toToon(afterOnboardingMap);
+
+        String inputDataset = PipelineLift.lift(cfg).node("sink")
+                .map(n -> n.cfg(com.gamma.pipeline.PipelineStores.CONFIG_STORE))
+                .map(String::valueOf)
+                .orElse(cfg.identity().pipelineName());
+        Map<String, Object> jobPipeMap = new LinkedHashMap<>();
+        jobPipeMap.put("name", outStore);
+        jobPipeMap.put("active", false);
+        Map<String, Object> collector = new LinkedHashMap<>();
+        collector.put("connector", "dataset");
+        collector.put("dataset", inputDataset);
+        jobPipeMap.put("collector", collector);
+        Map<String, Object> dirs = new LinkedHashMap<>();
+        dirs.put("database", "database/" + outStore);
+        jobPipeMap.put("dirs", dirs);
+        Map<String, Object> output = new LinkedHashMap<>();
+        output.put("format", cfg.output().format() != null ? cfg.output().format() : "PARQUET");
+        jobPipeMap.put("output", output);
+        jobPipeMap.put("output_store", outStore);
+        if (onboardingRaw.get("steps") != null) {
+            jobPipeMap.put("steps", onboardingRaw.get("steps"));
+        } else if (!cfg.steps().isEmpty()) {
+            List<Map<String, Object>> stepsList = new ArrayList<>();
+            for (PipelineConfig.Step st : cfg.steps()) {
+                stepsList.add(Map.of(st.kind(), st.config()));
+            }
+            jobPipeMap.put("steps", stepsList);
+        }
+        if (onboardingRaw.get("webhook") != null) jobPipeMap.put("webhook", onboardingRaw.get("webhook"));
+        if (onboardingRaw.get("excel") != null) jobPipeMap.put("excel", onboardingRaw.get("excel"));
+        String jobPipeToon = ConfigCodec.toToon(jobPipeMap);
+
+        // D-JG5: own folder named after output Dataset
+        Path parent = onboardingPath.getParent();
+        Path configRoot = parent != null && !parent.equals(writeRoot) && parent.getParent() != null
+                ? parent.getParent() : writeRoot;
+        Path jobFolder = configRoot.resolve(outStore);
+        Path jobPipePath = jobFolder.resolve(outStore + "_pipeline.toon");
+
+        // D-JG4: type: pipeline Job triggered on_pipeline of its input
+        String jobName = outStore + "_job";
+        Path jobPath = jobFolder.resolve(outStore + "_job.toon");
+        String relPipeRef = writeRoot.relativize(jobPipePath).toString().replace('\\', '/');
+        Map<String, Object> jobBody = new LinkedHashMap<>();
+        jobBody.put("name", jobName);
+        jobBody.put("type", "pipeline");
+        jobBody.put("enabled", true);
+        jobBody.put("pipeline_config", relPipeRef);
+        jobBody.put("on_pipeline", cfg.identity().pipelineName());
+        String jobToon = ConfigCodec.toToon(Map.of("job", jobBody));
+
+        boolean preview = body != null && Boolean.TRUE.equals(body.get("preview"));
+        if (!preview) {
+            Files.createDirectories(jobFolder);
+            AtomicFiles.write(onboardingPath, afterOnboarding.getBytes(StandardCharsets.UTF_8), ".cfg-");
+            AtomicFiles.write(jobPipePath, jobPipeToon.getBytes(StandardCharsets.UTF_8), ".cfg-");
+            AtomicFiles.write(jobPath, jobToon.getBytes(StandardCharsets.UTF_8), ".job-");
+            service.refreshConfigs();
+            service.registerPipeline(jobPipePath);
+        }
+
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("preview", preview);
+        resp.put("onboardingPipeline", Map.of(
+                "name", cfg.identity().pipelineName(),
+                "path", onboardingPath.toString().replace('\\', '/'),
+                "before", beforeOnboarding,
+                "after", afterOnboarding));
+        resp.put("jobPipeline", Map.of(
+                "name", outStore,
+                "path", jobPipePath.toString().replace('\\', '/'),
+                "before", "",
+                "after", jobPipeToon));
+        resp.put("job", Map.of(
+                "name", jobName,
+                "path", jobPath.toString().replace('\\', '/'),
+                "after", jobToon));
+        return resp;
     }
 
     /** Parse a pipeline definition (400 on a malformed shape) and validate it (422 on validation errors). */

@@ -16,7 +16,7 @@ import { FormBuilder, ReactiveFormsModule, ValidatorFn } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { map } from 'rxjs';
+import { firstValueFrom, map } from 'rxjs';
 import { ToastrService } from 'ngx-toastr';
 import {
     STALE_WRITE_MESSAGE,
@@ -38,6 +38,8 @@ import { JoinAddedColumnsComponent } from './join-added-columns.component';
 import { JoinLookupsEditorComponent } from './join-lookups-editor.component';
 import { parseLookups } from './join-lookups';
 import { pipelineOptionLoader, referenceOptionLoader } from 'app/inspecto/components/entity-option-loaders';
+import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
+import { DatasetsService } from 'app/modules/admin/studio/datasets/datasets.service';
 import { EnrichmentEditorComponent } from 'app/inspecto/enrichment/enrichment-editor.component';
 import { ENRICHMENT_WIRING_ATTRIBUTES } from 'app/inspecto/enrichment/enrichment-attributes';
 import { enrichmentWiringDefaults } from 'app/inspecto/enrichment/enrichment-wiring';
@@ -190,6 +192,14 @@ function mergeFormValues(
         @if (isJoin()) {
             <!-- LOOKUP-1 P1d: what the keyed join adds, from the saved settings and the Reference's columns -->
             <inspecto-join-added-columns [config]="node().config ?? {}" [inputColumns]="upstreamColumns()" />
+            @if (!readOnly()) {
+                <div class="mt-2">
+                    <button mat-stroked-button type="button" (click)="addAnotherLookup.emit()">
+                        <mat-icon class="icon-size-4 mr-1" svgIcon="heroicons_outline:plus"></mat-icon>
+                        Add another lookup
+                    </button>
+                </div>
+            }
         }
         @if (!isEnrichment() && formSpecs().length) {
             <!-- Schema-driven config for known node types, rendered FLAT (redesign R6): one idiom
@@ -365,10 +375,14 @@ export class PipelineConfigDefinitionComponent {
     /** The rows the tab's sample thread parsed — what the inline test runs over (read, never written). */
     readonly sampleRows = input<Record<string, unknown>[] | undefined>(undefined);
 
+    /** Whether a `reference` edge is wired to this `transform.join` node (JG2: `reference:` is bound by the edge). */
+    readonly hasReferenceEdge = input(false);
     /** The edited node, rebuilt by {@link submit} — the host applies it to the in-memory model. */
     readonly applied = output<AuthoredNode>();
     /** Whether the pane holds edits since creation / the last successful submit. */
     readonly dirtyChange = output<boolean>();
+    /** Insert another `transform.join` node right after this join (JG2). */
+    readonly addAnotherLookup = output<void>();
 
     @ViewChild('config') private schemaForm?: InspectoSchemaFormComponent;
     @ViewChild(PipelineExtraConfigComponent) private extraConfig?: PipelineExtraConfigComponent;
@@ -423,8 +437,32 @@ export class PipelineConfigDefinitionComponent {
         this.lookupsEditable() ? this.split().extraRows.filter((r) => r.key !== 'lookups') : this.split().extraRows,
     );
 
-    /** Loaders for the schema-driven config form's entity-reference keys (join's Reference picker). */
-    readonly configLoaders = { reference: referenceOptionLoader() };
+    private readonly datasetsApi = inject(DatasetsService, { optional: true });
+    private readonly datasetRowsApi = inject(DatasetRowsService, { optional: true });
+
+    private readonly refColumnLoader = async (v: Record<string, unknown>) => {
+        const raw = String(v['reference'] ?? '').trim();
+        const match = raw.match(/^references?\/(.+)$/);
+        const id = match?.[1]?.trim();
+        if (!id || !this.datasetsApi || !this.datasetRowsApi) return [];
+        try {
+            const cols = await this.datasetRowsApi.columns(await firstValueFrom(this.datasetsApi.get(id)));
+            return cols.map((c) => ({ value: c.name, label: c.type ? `${c.name} (${c.type.toLowerCase()})` : c.name }));
+        } catch {
+            return [];
+        }
+    };
+
+    /** Loaders for the schema-driven config form's entity-reference & column-picker keys (JG2). */
+    readonly configLoaders = {
+        reference: referenceOptionLoader(),
+        on: async () => this.upstreamColumns().map((c) => ({ value: c, label: c })),
+        key: this.refColumnLoader,
+        from: this.refColumnLoader,
+        to: this.refColumnLoader,
+        columns: this.refColumnLoader,
+        default: this.refColumnLoader,
+    };
     /**
      * Per-key validators for rules the published spec cannot express. Both belong to
      * `transform.summarize`: the pipeline never parses that block and the Job that does runs on its own

@@ -978,19 +978,16 @@ public final class PipelineJobRunner implements Job {
     /** A seed: one {@code source_store} node, its store, and its at-rest format. */
     private record Seed(String node, String store, String format) {}
 
-    /** Every {@code source_store} node in the pipeline (≥1); a {@code transform.merge} downstream joins/unions them. */
+    /** Every {@code source_store} (or {@code acquisition} with {@code connector: dataset}) node in the pipeline (≥1). */
     private static List<Seed> seedsOf(PipelineGraph g) {
-        List<Seed> seeds = g.nodes().stream()
-                .filter(n -> {
-                    Object s = n.cfg(PipelineStores.CONFIG_SOURCE_STORE);
-                    return s != null && !s.toString().isBlank();
-                })
-                .map(n -> {
-                    Object fmt = n.cfg("format");
-                    return new Seed(n.id(), n.cfg(PipelineStores.CONFIG_SOURCE_STORE).toString(),
-                            fmt == null || fmt.toString().isBlank() ? "PARQUET" : fmt.toString().toUpperCase());
-                })
-                .toList();
+        List<Seed> seeds = new ArrayList<>();
+        for (PipelineNode n : g.nodes()) {
+            String store = PipelineStores.sourceStoreOf(n);
+            if (store == null) continue;
+            Object fmt = n.cfg("format");
+            seeds.add(new Seed(n.id(), store,
+                    fmt == null || fmt.toString().isBlank() ? "PARQUET" : fmt.toString().toUpperCase()));
+        }
         if (seeds.isEmpty())
             throw new IllegalArgumentException("pipeline '" + g.name() + "' declares no '"
                     + PipelineStores.CONFIG_SOURCE_STORE + "' — a pipeline job reads data at rest (§3.8)");
