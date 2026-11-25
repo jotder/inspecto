@@ -68,7 +68,8 @@ and a comment it asked for is authored by the machine (`client:<id>`).
 ## What can go wrong
 
 - 403 "missing capability canWorkIncidents" (or `canManageIncidents` for a new Case) — the person, or the machine's
-  role, lacks the right. A machine agent always gets 403 opening a Case.
+  role, lacks the right. A machine agent whose role grants `canManageIncidents` has its new Case held as a Pending
+  Action instead.
 - 404 — no such Incident or Case, or one the person may not see.
 - 422 "illegal transition" — the Workflow does not allow that move from the current status (a new Incident is
   `accept`ed, not acknowledged), or an Incident's resolve lacks its disposition or postmortem.
