@@ -49,8 +49,36 @@ class ControlApiPredictionReadTest {
         if ("Bearer revealer".equals(auth))
             return Optional.of(new Subject("rev", Set.of("canWorkIncidents", "canRevealLinkEntities")));
         if ("Bearer nocap".equals(auth)) return Optional.of(new Subject("nc", Set.of("canAuthorWorkbench")));
+        if ("Bearer agent".equals(auth)) return Optional.of(agentFor("rev", Set.of("canWorkIncidents", "canRevealLinkEntities")));
         return Optional.empty();
     };
+
+    /** The person's Subject through an MCP agent client, narrowed as {@code OidcAuthenticator} narrows it (AK-2a). */
+    private static Subject agentFor(String id, Set<String> personCaps) {
+        Set<String> kept = new java.util.HashSet<>(personCaps);
+        kept.removeAll(com.gamma.access.Roles.AGENT_NEVER_CAPABILITIES);
+        return new Subject(id, Set.copyOf(kept), null, Map.of(), null, null, null, "claude-code");
+    }
+
+    /**
+     * W3 (AK-2 widening plan §3, check before building {@code get_prediction}): an agent acting for a person who may
+     * reveal reads the key masked, with the same token the person's screen shows a caller without reveal.
+     * Falsified: an agent Subject that kept {@code canRevealLinkEntities} reads the raw key.
+     */
+    @Test
+    void anAgentReadsTheKeyMaskedEvenForAPersonWhoMayReveal(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, ChurnCorpus::plant)) {
+            churn(c);
+            String path = "/predictions/churn-model/churn/lapsing";
+            assertEquals("lapsing", data(get(c.port, path, "revealer")).get("entityKey").asText(),
+                    "precondition: the person sees the raw key");
+            JsonNode agent = data(get(c.port, path, "agent"));
+            assertTrue(agent.get("keyMasked").asBoolean(), agent.toString());
+            assertEquals(data(get(c.port, path, "analyst")).get("entityKey"), agent.get("entityKey"),
+                    "the token a person without reveal sees");
+            assertFalse(agent.toString().contains("\"lapsing\""), "the raw key is nowhere in the body: " + agent);
+        }
+    }
 
     @AfterEach
     void tearDown() { Authenticators.forTest(null); }

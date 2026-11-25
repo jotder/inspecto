@@ -1,6 +1,6 @@
 # Agent Kit AK-2 — widening what an agent can reach, task by task (plan and task specs)
 
-> **Status: PROPOSED 2026-11-25 — D-AK8…D-AK12 open (§5); W1 and W10 built 2026-11-25 (§3), the rest not started.** The follow-on to phases 1–3b of
+> **Status: PROPOSED 2026-11-25 — D-AK8…D-AK12 open (§5); W1, W3 and W10 built 2026-11-25 (§3), the rest not started.** The follow-on to phases 1–3b of
 > [`2026-11-20-agent-kit-ak2-plan.md`](2026-11-20-agent-kit-ak2-plan.md) (all built 2026-11-25). It takes the gaps a
 > peer's product review of that plan listed
 ([`2026-11-25-agent-kit-ak2-product-review.md`](2026-11-25-agent-kit-ak2-product-review.md)), keeps the ones
@@ -118,6 +118,12 @@ Recommended order: **W1, W10, W3, W2, W4, W5, W6, W7, W9, W8**. W1, W3 and W10 n
 - **Docs.** `spec-mcp.md` § Write tools, skill `safe-config-change`, a new skill only if a golden task needs one.
 
 ### W3 — Read tools for Space health, storage and scores
+
+> **Built 2026-11-25.** The eight tools as proposed (`McpTools.SPACE_HEALTH_TOOLS`), no gate change. The check before
+> building held: each score route masks the key unless the Subject holds `canRevealLinkEntities`, and an agent Subject
+> never does, so an agent acting for a person who may reveal reads the masked token (one test per score route). Only
+> `get_risk_score` resolves a masked key passed back; the Anomaly Score and prediction routes take the stored key only.
+> `verify_audit_chain` takes no `from`/`to`. Tables and tests: `spec-mcp.md` § Space health, storage and scores (W3).
 
 - **Goal.** An agent can answer "is this Space healthy, drifting or filling up" and "why is this entity scored like
   this" from tools, not from a person's screenshot.

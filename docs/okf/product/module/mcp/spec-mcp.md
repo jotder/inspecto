@@ -478,6 +478,40 @@ only when a lead adds it as a member. Promote, reveal and expand decisions stay 
   Subject holding only `canManageIncidents`) fails entirely with the implication removed. A graph run over real HTTP
   needs a built index, so its action is proven at the gate (`AgentGateParityTest`), not end to end.
 
+## Space health, storage and scores (W3)
+
+Built 2026-11-25 (widening plan §3 W3). Read tools only (`readOnlyHint: true`), each replaying one GET route the
+agent gate already allows; no gate change. The route's own capability decides, so a caller without it gets that
+route's 403 through the tool, as on the direct call.
+
+| MCP Tool | Arguments | Replays | Capability |
+|---|---|---|---|
+| `get_space_integrity` | — | `GET /integrity` | `canAuthorWorkbench` |
+| `get_space_origin` | — | `GET /origin` | `canAuthorWorkbench` |
+| `preview_template_upgrade` | — | `GET /origin/upgrade` (report only; applying is `POST`, `canAdminister`, no tool) | `canAuthorWorkbench` |
+| `get_dataset_storage` | `dataset` | `GET /datasets/{dataset}/storage` (also 403 while the Space's Add data is off, `selfImport`) | `canUploadData` |
+| `verify_audit_chain` | — | `GET /audit/verify` (no `from`/`to`: one call walks at most 100,000 records) | `canAdminister` — a person's agent only; no machine agent holds it |
+| `get_risk_score` | `model`, `key`, `investigation?` | `GET /risk-scores/{model}/{key}[?investigation=]` | `canWorkIncidents` |
+| `get_anomaly_score` | `model`, `key` | `GET /anomaly-scores/{model}/{key}` | `canWorkIncidents` |
+| `get_prediction` | `kind` (`churn-model`, `forecast-model`, `segmentation-model`), `model`, `key` | `GET /predictions/{kind}/{model}/{key}` | `canWorkIncidents` |
+
+- **Masking.** The three score routes echo the entity key as the Space `masked:` token (`keyMasked: true`) unless the
+  Subject holds `canRevealLinkEntities`, which an agent never does (`Roles.AGENT_NEVER_CAPABILITIES`). So an agent
+  acting for a person who may reveal still reads the token a person without reveal sees. `get_risk_score` accepts
+  that token back as the key (the route resolves the alias); the Anomaly and prediction routes take the stored key only.
+- **Path segments.** An in-process replay matches its route on the raw path, so a `%3A` would reach the route still
+  encoded and `masked:` would never be recognised. The W3 routers keep `:` and `@` as they are (`McpTools.idSeg`; both
+  are legal in a segment, and the ID argument pattern admits no `/?#%`).
+- **No tool:** `GET /screening/hits/{id}/reveal` (never-list), the score previews (`POST …/preview`, W6 group E),
+  `GET /risk-score-lists/{model}`.
+- **Tests:** `McpToolRoutesTest.everySpaceHealthAndScoreToolReplaysItsGatedGetRoute` (route and manifest capability
+  per tool; no tool reaches the Screening Hit reveal); `ControlApiMcpTest.eachSpaceHealthAndScoreToolAnswersItsRoutesOwn403`
+  (real HTTP, per tool: the token without the capability gets `HTTP 403` through the tool and 403 on the direct call,
+  the holder passes the gate); `anAgentReadsTheKeyMaskedEvenForAPersonWhoMayReveal` in `ControlApiRiskScoreTest`,
+  `ControlApiAnomalyScoreTest` and `ControlApiPredictionReadTest` (an agent Subject narrowed as `OidcAuthenticator`
+  narrows it reads the masked token over seeded scores). `McpRoutesManifestParityTest` is unchanged: the tools add no
+  route to the module.
+
 ## Security review (2026-11-20)
 
 An independent review of the AK-1 change (the module, the `/mcp` rate-limit line, the manifest exemption)
