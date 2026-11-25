@@ -66,16 +66,16 @@ tags: [api, routes, generated]
 | POST | `/inv/investigations/{investigationId}/dossier/bundle/verify` | Verify a Dossier bundle | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DossierBundleRoutes.java` |
 | POST | `/inv/investigations/{investigationId}/dossier/verify` | Verify a Dossier manifest | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DossierRoutes.java` |
 | GET | `/inv/investigations/{investigationId}/drafts` | List Drafts of an Investigation | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java` |
-| POST | `/inv/investigations/{investigationId}/drafts` | Fork a Draft of an Investigation | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java` |
+| POST | `/inv/investigations/{investigationId}/drafts` | Fork a Draft of an Investigation | inv | `canDraftInvestigations` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java` |
 | GET | `/inv/investigations/{investigationId}/drafts/{draftId}` | One Draft of an Investigation | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java` |
 | GET | `/inv/investigations/{investigationId}/drafts/{draftId}/conflicts` | Conflicts a Draft rebase would meet | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java` |
-| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/discard` | Discard a Draft | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java` |
+| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/discard` | Discard a Draft | inv | `canDraftInvestigations` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java` |
 | GET | `/inv/investigations/{investigationId}/drafts/{draftId}/log` | A Draft's own step log | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java` |
-| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/ops` | Append a step to a Draft | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java` |
+| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/ops` | Append a step to a Draft | inv | `canDraftInvestigations` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java` |
 | POST | `/inv/investigations/{investigationId}/drafts/{draftId}/promote` | Promote a Draft into the main log | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java` |
-| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/rebase` | Rebase a Draft onto the main head | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java` |
+| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/rebase` | Rebase a Draft onto the main head | inv | `canDraftInvestigations` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java` |
 | GET | `/inv/investigations/{investigationId}/drafts/{draftId}/replay` | Replay a Draft's log | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java` |
-| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/undo` | Undo the latest Draft step | inv | `canManageIncidents` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java` |
+| POST | `/inv/investigations/{investigationId}/drafts/{draftId}/undo` | Undo the latest Draft step | inv | `canDraftInvestigations` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java` |
 | GET | `/inv/investigations/{investigationId}/drafts/{draftId}/working-set` | A Draft's Working Set | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/DraftRoutes.java` |
 | GET | `/inv/investigations/{investigationId}/embeds` | List the read-only embed links of an Investigation | inv | — | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationEmbedRoutes.java` |
 | POST | `/inv/investigations/{investigationId}/embeds` | Mint a read-only embed link to an Investigation | inv | `canShareInvestigation` | `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationEmbedRoutes.java` |

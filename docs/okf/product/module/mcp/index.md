@@ -21,7 +21,7 @@ tags: [product-item, module]
 | features | missing | |
 | feature-db | current | [MCP endpoint — feature database](feature-db.md) |
 | user-guide | missing | |
-| admin-guide | current | [Let an AI agent operate runs](admin-guide-howto-agent-operate-runs.md) · [Let an AI agent propose changes](admin-guide-howto-agent-propose-changes.md) · [Let an AI agent work Incidents and Cases](admin-guide-howto-agent-work-incidents.md) · [MCP endpoint — administrator guide](admin-guide-mcp.md) |
+| admin-guide | current | [Let an AI agent analyse a Case in Link Analysis](admin-guide-howto-agent-link-analysis.md) · [Let an AI agent operate runs](admin-guide-howto-agent-operate-runs.md) · [Let an AI agent propose changes](admin-guide-howto-agent-propose-changes.md) · [Let an AI agent work Incidents and Cases](admin-guide-howto-agent-work-incidents.md) · [MCP endpoint — administrator guide](admin-guide-mcp.md) |
 | api | current | [HTTP routes — module.mcp](api-routes.md) |
 | tests | current | [Agent Kit golden runs — the compatibility matrix](tests-agent-golden.md) · [MCP endpoint — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |

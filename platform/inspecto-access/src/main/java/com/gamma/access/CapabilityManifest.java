@@ -76,11 +76,13 @@ public final class CapabilityManifest {
             // DraftRoutes (D7-3) - forking, writing, undoing and discarding a Draft change an analyst's working copy of the evidence,
             // so they are Case work like every Investigation write. NOT self-service-exempt: the capability is the precedent and the
             // handler's actor / role check (the Draft's actor writes; the actor or a lead discards; a reviewer never writes) is the real gate.
-            new Entry("POST", "/inv/investigations/([^/]+)/drafts", Roles.CAN_MANAGE_INCIDENTS),
-            new Entry("POST", "/inv/investigations/([^/]+)/drafts/([^/]+)/ops", Roles.CAN_MANAGE_INCIDENTS),
-            new Entry("POST", "/inv/investigations/([^/]+)/drafts/([^/]+)/undo", Roles.CAN_MANAGE_INCIDENTS),
-            new Entry("POST", "/inv/investigations/([^/]+)/drafts/([^/]+)/discard", Roles.CAN_MANAGE_INCIDENTS),
-            new Entry("POST", "/inv/investigations/([^/]+)/drafts/([^/]+)/rebase", Roles.CAN_MANAGE_INCIDENTS),
+            // AK-2f (operator 2026-11-25): on canDraftInvestigations, which canManageIncidents implies (Roles.holds), so a machine
+            // agent may keep it; promote stays canManageIncidents.
+            new Entry("POST", "/inv/investigations/([^/]+)/drafts", Roles.CAN_DRAFT_INVESTIGATIONS),
+            new Entry("POST", "/inv/investigations/([^/]+)/drafts/([^/]+)/ops", Roles.CAN_DRAFT_INVESTIGATIONS),
+            new Entry("POST", "/inv/investigations/([^/]+)/drafts/([^/]+)/undo", Roles.CAN_DRAFT_INVESTIGATIONS),
+            new Entry("POST", "/inv/investigations/([^/]+)/drafts/([^/]+)/discard", Roles.CAN_DRAFT_INVESTIGATIONS),
+            new Entry("POST", "/inv/investigations/([^/]+)/drafts/([^/]+)/rebase", Roles.CAN_DRAFT_INVESTIGATIONS),
             new Entry("POST", "/inv/investigations/([^/]+)/drafts/([^/]+)/promote", Roles.CAN_MANAGE_INCIDENTS),
             // EntityListRoutes (LA-17) — an Entity List is appended to the Space's identity fact log, evidence
             // like the op log, so changing one is Case work. The two GETs are reads (Space access only).
@@ -748,5 +750,5 @@ public final class CapabilityManifest {
             Roles.CAN_BUILD_LINK_INDEX, Roles.CAN_SHARE_INVESTIGATION, Roles.CAN_MANAGE_EXCLUSION_CATEGORIES,
             Roles.CAN_UPLOAD_DATA, Roles.CAN_AUTHOR_ALERT_RULES, Roles.CAN_MANAGE_INCIDENTS, Roles.CAN_WORK_INCIDENTS,
             Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_ADMINISTER, Roles.CAN_CONFIGURE_ACCESS,
-            Roles.CAN_OPEN_INBOUND_INVESTIGATION));
+            Roles.CAN_OPEN_INBOUND_INVESTIGATION, Roles.CAN_DRAFT_INVESTIGATIONS));
 }

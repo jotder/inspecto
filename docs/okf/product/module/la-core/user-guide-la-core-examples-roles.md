@@ -98,6 +98,7 @@ If a control is greyed out, hover it: it names what is missing.
 |---|---|
 | Explore, analyse, save a view, export | Sign-in |
 | Start an Investigation, take steps, Drafts, link or attach to a Case, add to a watch or block list | *Manage Incidents and Cases* (`canManageIncidents`) |
+| Work in your own Draft (open, ops, undo, discard, rebase) without the rest of the above — for an unattended AI agent's role; never promote | *Draft work* (`canDraftInvestigations`; *Manage Incidents and Cases* includes it) |
 | Run on the Server side of the catalogue, **Compute risk** | `canRunLinkGraphAnalysis` |
 | Build a link index | `canBuildLinkIndex` |
 | Approve or deny a held large expand (never your own) | *Approve link expansions* (`canApproveLinkExpansions`) |

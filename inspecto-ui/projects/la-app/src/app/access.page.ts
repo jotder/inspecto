@@ -41,5 +41,6 @@ export class AccessPageComponent {
         canAdminister: 'Administer Spaces and their settings',
         canConfigureAccess: 'Edit roles and access',
         canOpenInboundInvestigation: 'Open Investigations from another system',
+        canDraftInvestigations: 'Work in Drafts (not promote)',
     };
 }

@@ -2434,7 +2434,7 @@
         "tags" : [ "inv" ],
         "summary" : "Fork a Draft of an Investigation",
         "operationId" : "postInvInvestigationsByInvestigationIdDrafts",
-        "description" : "Creates the caller's own working copy forked from the main log (body optional at step, label); one live Draft per member. Gated on canManageIncidents; a lead or analyst. 403 for a role that does not fork; 422 for a bad at or label; 409 when the member already has a live Draft, the Space is full or the id is taken; 404 for a non-member; 503 when read-only or the Draft store is busy.",
+        "description" : "Creates the caller's own working copy forked from the main log (body optional at step, label); one live Draft per member. Gated on canDraftInvestigations (which canManageIncidents implies); a lead or analyst. 403 for a role that does not fork; 422 for a bad at or label; 409 when the member already has a live Draft, the Space is full or the id is taken; 404 for a non-member; 503 when read-only or the Draft store is busy.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -2603,7 +2603,7 @@
         "tags" : [ "inv" ],
         "summary" : "Append a step to a Draft",
         "operationId" : "postInvInvestigationsByInvestigationIdDraftsByDraftIdOps",
-        "description" : "Appends one op to the Draft with the same validation and sealing as the main log (body op plus its params). Gated on canManageIncidents; the Draft's actor only. 403 for a lead or reviewer who is not its actor; 404 for a non-member or an unknown Draft; 409 when the Draft is closed, its base changed or its index pin expired (rebase first); 422 for an invalid op.",
+        "description" : "Appends one op to the Draft with the same validation and sealing as the main log (body op plus its params). Gated on canDraftInvestigations (which canManageIncidents implies); the Draft's actor only. 403 for a lead or reviewer who is not its actor; 404 for a non-member or an unknown Draft; 409 when the Draft is closed, its base changed or its index pin expired (rebase first); 422 for an invalid op.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -2633,7 +2633,7 @@
         "tags" : [ "inv" ],
         "summary" : "Undo the latest Draft step",
         "operationId" : "postInvInvestigationsByInvestigationIdDraftsByDraftIdUndo",
-        "description" : "Revert the newest effective step of the Draft's own ops (a recorded undo entry). Optional body {undoes: step} names the step the caller means to revert (LA-GROW-EXCLUDE-UNDO-RACE-1): when another step is the newest by now the answer is 409 CONFLICT_STALE_VERSION naming it and nothing is written; undoes not a whole number from 1 is 422. Without a body the newest step is undone. 409 CONFLICT when there is nothing to undo. Gated on canManageIncidents; only the Draft's actor may undo: 403 for a lead or reviewer who is not.",
+        "description" : "Revert the newest effective step of the Draft's own ops (a recorded undo entry). Optional body {undoes: step} names the step the caller means to revert (LA-GROW-EXCLUDE-UNDO-RACE-1): when another step is the newest by now the answer is 409 CONFLICT_STALE_VERSION naming it and nothing is written; undoes not a whole number from 1 is 422. Without a body the newest step is undone. 409 CONFLICT when there is nothing to undo. Gated on canDraftInvestigations (which canManageIncidents implies); only the Draft's actor may undo: 403 for a lead or reviewer who is not.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -2676,7 +2676,7 @@
         "tags" : [ "inv" ],
         "summary" : "Discard a Draft",
         "operationId" : "postInvInvestigationsByInvestigationIdDraftsByDraftIdDiscard",
-        "description" : "Closes the Draft with an audit marker, deletes its log and sealed sets, and releases its index pins; a repeat answers alreadyDiscarded. Gated on canManageIncidents; the Draft's actor or a lead. 403 for anyone else who can see it; 404 for a non-member or an unknown Draft; 409 when the Draft was promoted; 422 for a malformed Draft id.",
+        "description" : "Closes the Draft with an audit marker, deletes its log and sealed sets, and releases its index pins; a repeat answers alreadyDiscarded. Gated on canDraftInvestigations (which canManageIncidents implies); the Draft's actor or a lead. 403 for anyone else who can see it; 404 for a non-member or an unknown Draft; 409 when the Draft was promoted; 422 for a malformed Draft id.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",
@@ -2736,7 +2736,7 @@
         "tags" : [ "inv" ],
         "summary" : "Rebase a Draft onto the main head",
         "operationId" : "postInvInvestigationsByInvestigationIdDraftsByDraftIdRebase",
-        "description" : "Replays the Draft's effective ops over the current main head, re-pins index versions and swaps the result in (body optional confirm list of superseded or blocked steps, expectHead). Gated on canManageIncidents; the Draft's actor only. 409 when expectHead is not the head or a conflict is unconfirmed, or the Draft is closed; 422 for a bad confirm or expectHead; 403 for a non-actor; 404 for a non-member or unknown Draft.",
+        "description" : "Replays the Draft's effective ops over the current main head, re-pins index versions and swaps the result in (body optional confirm list of superseded or blocked steps, expectHead). Gated on canDraftInvestigations (which canManageIncidents implies); the Draft's actor only. 409 when expectHead is not the head or a conflict is unconfirmed, or the Draft is closed; 422 for a bad confirm or expectHead; 403 for a non-actor; 404 for a non-member or unknown Draft.",
         "parameters" : [ {
           "name" : "investigationId",
           "in" : "path",

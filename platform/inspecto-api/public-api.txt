@@ -13,6 +13,7 @@ com.gamma.access.Roles | public static Map<String, Def> effective(HttpExchange)
 com.gamma.access.Roles | public static Map<String, Def> effective(Path)
 com.gamma.access.Roles | public static Map<String, Def> validate(Object)
 com.gamma.access.Roles | public static Subject admitMachine(Path, Subject)
+com.gamma.access.Roles | public static boolean holds(Set<String>, String)
 com.gamma.access.Roles | public static final Map<String, Def> SEED
 com.gamma.access.Roles | public static final Set<String> AGENT_MACHINE_CAPABILITIES
 com.gamma.access.Roles | public static final Set<String> AGENT_NEVER_CAPABILITIES
@@ -28,6 +29,7 @@ com.gamma.access.Roles | public static final String CAN_AUTHOR_WORKBENCH
 com.gamma.access.Roles | public static final String CAN_BUILD_LINK_INDEX
 com.gamma.access.Roles | public static final String CAN_CONFIGURE_ACCESS
 com.gamma.access.Roles | public static final String CAN_CURATE_MENUS
+com.gamma.access.Roles | public static final String CAN_DRAFT_INVESTIGATIONS
 com.gamma.access.Roles | public static final String CAN_MANAGE_EXCLUSION_CATEGORIES
 com.gamma.access.Roles | public static final String CAN_MANAGE_INCIDENTS
 com.gamma.access.Roles | public static final String CAN_OFFER_DATASETS

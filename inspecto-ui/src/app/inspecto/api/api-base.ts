@@ -57,6 +57,7 @@ export const CAPABILITY_NAMES: Readonly<Record<string, string>> = {
     canUploadData: 'Upload data',
     canOpenInboundInvestigation: 'Open inbound Investigations',
     canAuthorAlertRules: 'Alert Rule authoring',
+    canDraftInvestigations: 'Draft work in Link Analysis',
 };
 
 /** "Needs Workbench author." for a known capability id; a plain sentence for an unknown one (the id goes to the console). */

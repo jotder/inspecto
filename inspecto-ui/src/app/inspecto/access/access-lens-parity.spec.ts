@@ -23,6 +23,9 @@ const SERVER_ONLY_NODES: Record<string, string> = {
     // No screen offers a Signal type (`POST /exchange/signal-offers` is API-only); a ROLE profile denying the node
     // still strips `canOfferSignals` server-side (`AccessGrants`), so dropping it would lose that.
     'exchange.offer-signals': 'canOfferSignals',
+    // AGENT-KIT-1 AK-2f: the Draft right exists for a machine agent's role (no person needs it — canManageIncidents
+    // implies it server-side), so no screen gates on it; a ROLE profile denying the node still strips it server-side.
+    'linkgraph.draft': 'canDraftInvestigations',
 };
 
 /** Lens capabilities with no catalog node: backend-only gates no Access profile can deny yet. */
