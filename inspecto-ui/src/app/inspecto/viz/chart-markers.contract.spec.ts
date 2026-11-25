@@ -12,6 +12,8 @@ function expectMatches(actual: unknown[], expected: Expected[]): void {
     expect(actual.length).toBe(expected.length);
     expected.forEach((e, i) => {
         const a = actual[i] as Record<string, unknown>;
+        // nothing beyond what the contract states (an extra tone would draw a colour the PDF does not)
+        expect(Object.keys(a).filter((k) => a[k] !== undefined && !(k in e))).toEqual([]);
         for (const [k, v] of Object.entries(e)) {
             if (typeof v === 'number') expect(a[k] as number).toBeCloseTo(v, 9);
             else expect(a[k] ?? null).toEqual(v);

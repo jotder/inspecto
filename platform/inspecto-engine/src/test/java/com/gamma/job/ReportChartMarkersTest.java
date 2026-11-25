@@ -92,6 +92,7 @@ class ReportChartMarkersTest {
     }
 
     @Test
+    @SuppressWarnings("unchecked")
     void theChartPageDrawsTheMarkersAndOverlaysTheScreenDraws(@TempDir Path writeRoot, @TempDir Path outDir) throws Exception {
         seed(writeRoot, 28, ALL);
         Drawn d = draw(writeRoot, outDir);
@@ -110,7 +111,17 @@ class ReportChartMarkersTest {
         BufferedImage img = d.image();
         assertTrue(img.getHeight() > WidgetChartRenderer.CHART_H, "the overlays' words are listed under the chart");
         assertTrue(count(img, WidgetChartRenderer.TONE.get("info")) > 200, "the target line is drawn in the info tone");
-        assertTrue(count(img, WidgetChartRenderer.FORECAST) > 20, "the dashed point forecast is drawn");
+        // the forecast shares the info tone with the target line (as on screen): it is the ink the overlay adds
+        Map<String, Object> plain = new LinkedHashMap<>(new ComponentStore(writeRoot.resolve("registry")).get("widget", "daily")
+                .orElseThrow().content());
+        Map<String, Object> noOverlay = new LinkedHashMap<>((Map<String, Object>) plain.get("options"));
+        noOverlay.remove("overlay");
+        plain.put("options", noOverlay);
+        ReportWidget without = ReportWidget.of("daily", plain);
+        BufferedImage bare = WidgetChartRenderer.render(without, d.rows().result().rows(), false, List.of(),
+                ReportJob.boundKpi(writeRoot, without));
+        assertTrue(count(img, WidgetChartRenderer.FORECAST) > count(bare, WidgetChartRenderer.FORECAST) + 20,
+                "the forecast band and its dashed point forecast are drawn");
         assertTrue(count(img, WidgetChartRenderer.TONE.get("error")) > 20, "the anomaly ring is drawn");
     }
 

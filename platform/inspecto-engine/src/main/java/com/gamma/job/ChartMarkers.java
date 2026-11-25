@@ -76,9 +76,11 @@ final class ChartMarkers {
     private static String fixed(double v, String pattern) {
         if (!Double.isFinite(v)) return "—";
         DecimalFormat f = new DecimalFormat(pattern, DecimalFormatSymbols.getInstance(Locale.ROOT));
-        f.setRoundingMode(RoundingMode.HALF_UP);   // Intl's halfExpand: half away from zero
-        String s = f.format(v);
-        return "-0".equals(s) || s.matches("-0\\.0+") ? s.substring(1) : s;
+        // Intl rounds the shortest decimal that reads back as v (2.675 → 2.68), half away from zero, and keeps a
+        // negative sign on a value that rounds to zero (-0.001 → "-0"): round the same decimal the same way
+        f.setRoundingMode(RoundingMode.HALF_UP);
+        String s = f.format(new java.math.BigDecimal(Double.toString(v)));
+        return v < 0 && !s.startsWith("-") ? "-" + s : s;
     }
 
     // ── statistics ──

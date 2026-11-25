@@ -3,116 +3,724 @@
   "markers": [
     {
       "name": "lines over the drawn values, the Widget's own target",
-      "markers": [{"kind": "constant", "value": 50, "label": "Cap"}, {"kind": "average"}, {"kind": "percentile", "p": 90},
-                  {"kind": "percentile", "p": 50.5}, {"kind": "target"}],
-      "values": [10, 20, 30, 40], "target": 45, "kpi": null,
+      "markers": [
+        {
+          "kind": "constant",
+          "value": 50,
+          "label": "Cap"
+        },
+        {
+          "kind": "average"
+        },
+        {
+          "kind": "percentile",
+          "p": 90
+        },
+        {
+          "kind": "percentile",
+          "p": 50.5
+        },
+        {
+          "kind": "target"
+        }
+      ],
+      "values": [
+        10,
+        20,
+        30,
+        40
+      ],
+      "target": 45,
+      "kpi": null,
       "expected": [
-        {"type": "line", "value": 50, "text": "Cap 50", "dashed": true},
-        {"type": "line", "value": 25, "text": "Average 25", "dashed": true},
-        {"type": "line", "value": 37, "text": "90th percentile 37", "dashed": true},
-        {"type": "line", "value": 45, "text": "Target 45", "dashed": false, "tone": "info"}
+        {
+          "type": "line",
+          "value": 50,
+          "text": "Cap 50",
+          "dashed": true
+        },
+        {
+          "type": "line",
+          "value": 25,
+          "text": "Average 25",
+          "dashed": true
+        },
+        {
+          "type": "line",
+          "value": 37,
+          "text": "90th percentile 37",
+          "dashed": true
+        },
+        {
+          "type": "line",
+          "value": 45,
+          "text": "Target 45",
+          "dashed": false,
+          "tone": "info"
+        }
       ]
     },
     {
       "name": "the bound KPI's target wins over the Widget's, RAG up with a label",
-      "markers": [{"kind": "target"}, {"kind": "rag", "label": "Status"}],
-      "values": [], "target": 45,
-      "kpi": {"direction": "up", "target": 60, "bands": {"green": 50, "amber": 30}},
+      "markers": [
+        {
+          "kind": "target"
+        },
+        {
+          "kind": "rag",
+          "label": "Status"
+        }
+      ],
+      "values": [],
+      "target": 45,
+      "kpi": {
+        "direction": "up",
+        "target": 60,
+        "bands": {
+          "green": 50,
+          "amber": 30
+        }
+      },
       "expected": [
-        {"type": "line", "value": 60, "text": "Target 60", "dashed": false, "tone": "info"},
-        {"type": "band", "from": null, "to": 30, "tone": "error", "text": "Status: Red below 30"},
-        {"type": "band", "from": 30, "to": 50, "tone": "warning", "text": "Status: Amber 30–50"},
-        {"type": "band", "from": 50, "to": null, "tone": "success", "text": "Status: Green at or above 50"}
+        {
+          "type": "line",
+          "value": 60,
+          "text": "Target 60",
+          "dashed": false,
+          "tone": "info"
+        },
+        {
+          "type": "band",
+          "from": null,
+          "to": 30,
+          "tone": "error",
+          "text": "Status: Red below 30"
+        },
+        {
+          "type": "band",
+          "from": 30,
+          "to": 50,
+          "tone": "warning",
+          "text": "Status: Amber 30–50"
+        },
+        {
+          "type": "band",
+          "from": 50,
+          "to": null,
+          "tone": "success",
+          "text": "Status: Green at or above 50"
+        }
       ]
     },
     {
       "name": "RAG down",
-      "markers": [{"kind": "rag"}], "values": [1], "kpi": {"direction": "down", "bands": {"green": 10, "amber": 20}},
+      "markers": [
+        {
+          "kind": "rag"
+        }
+      ],
+      "values": [
+        1
+      ],
+      "kpi": {
+        "direction": "down",
+        "bands": {
+          "green": 10,
+          "amber": 20
+        }
+      },
       "expected": [
-        {"type": "band", "from": null, "to": 10, "tone": "success", "text": "Green at or below 10"},
-        {"type": "band", "from": 10, "to": 20, "tone": "warning", "text": "Amber 10–20"},
-        {"type": "band", "from": 20, "to": null, "tone": "error", "text": "Red above 20"}
+        {
+          "type": "band",
+          "from": null,
+          "to": 10,
+          "tone": "success",
+          "text": "Green at or below 10"
+        },
+        {
+          "type": "band",
+          "from": 10,
+          "to": 20,
+          "tone": "warning",
+          "text": "Amber 10–20"
+        },
+        {
+          "type": "band",
+          "from": 20,
+          "to": null,
+          "tone": "error",
+          "text": "Red above 20"
+        }
       ]
     },
     {
       "name": "RAG band",
-      "markers": [{"kind": "rag"}], "values": [], "kpi": {"direction": "band", "bands": {"green": [40, 60], "amber": [20, 80]}},
+      "markers": [
+        {
+          "kind": "rag"
+        }
+      ],
+      "values": [],
+      "kpi": {
+        "direction": "band",
+        "bands": {
+          "green": [
+            40,
+            60
+          ],
+          "amber": [
+            20,
+            80
+          ]
+        }
+      },
       "expected": [
-        {"type": "band", "from": null, "to": 20, "tone": "error", "text": "Red below 20"},
-        {"type": "band", "from": 20, "to": 40, "tone": "warning", "text": "Amber 20–40"},
-        {"type": "band", "from": 40, "to": 60, "tone": "success", "text": "Green 40–60"},
-        {"type": "band", "from": 60, "to": 80, "tone": "warning", "text": "Amber 60–80"},
-        {"type": "band", "from": 80, "to": null, "tone": "error", "text": "Red above 80"}
+        {
+          "type": "band",
+          "from": null,
+          "to": 20,
+          "tone": "error",
+          "text": "Red below 20"
+        },
+        {
+          "type": "band",
+          "from": 20,
+          "to": 40,
+          "tone": "warning",
+          "text": "Amber 20–40"
+        },
+        {
+          "type": "band",
+          "from": 40,
+          "to": 60,
+          "tone": "success",
+          "text": "Green 40–60"
+        },
+        {
+          "type": "band",
+          "from": 60,
+          "to": 80,
+          "tone": "warning",
+          "text": "Amber 60–80"
+        },
+        {
+          "type": "band",
+          "from": 80,
+          "to": null,
+          "tone": "error",
+          "text": "Red above 80"
+        }
       ]
     },
     {
       "name": "green equal to amber leaves no amber zone",
-      "markers": [{"kind": "rag"}], "values": [], "kpi": {"direction": "up", "bands": {"green": 50, "amber": 50}},
+      "markers": [
+        {
+          "kind": "rag"
+        }
+      ],
+      "values": [],
+      "kpi": {
+        "direction": "up",
+        "bands": {
+          "green": 50,
+          "amber": 50
+        }
+      },
       "expected": [
-        {"type": "band", "from": null, "to": 50, "tone": "error", "text": "Red below 50"},
-        {"type": "band", "from": 50, "to": null, "tone": "success", "text": "Green at or above 50"}
+        {
+          "type": "band",
+          "from": null,
+          "to": 50,
+          "tone": "error",
+          "text": "Red below 50"
+        },
+        {
+          "type": "band",
+          "from": 50,
+          "to": null,
+          "tone": "success",
+          "text": "Green at or above 50"
+        }
       ]
     },
     {
       "name": "a marker that cannot be placed is dropped; bands are put in order",
-      "markers": [{"kind": "average"}, {"kind": "percentile", "p": 13}, {"kind": "percentile", "p": 0}, {"kind": "target"},
-                  {"kind": "rag"}, {"kind": "band", "tone": "info"}, {"kind": "band", "from": 5, "to": 5, "tone": "info"},
-                  {"kind": "band", "from": 100, "to": 1, "tone": "warning"},
-                  {"kind": "band", "to": 1234.567, "tone": "info", "label": "Low"},
-                  {"kind": "constant", "value": "7"}],
-      "values": [], "kpi": null,
+      "markers": [
+        {
+          "kind": "average"
+        },
+        {
+          "kind": "percentile",
+          "p": 13
+        },
+        {
+          "kind": "percentile",
+          "p": 0
+        },
+        {
+          "kind": "target"
+        },
+        {
+          "kind": "rag"
+        },
+        {
+          "kind": "band",
+          "tone": "info"
+        },
+        {
+          "kind": "band",
+          "from": 5,
+          "to": 5,
+          "tone": "info"
+        },
+        {
+          "kind": "band",
+          "from": 100,
+          "to": 1,
+          "tone": "warning"
+        },
+        {
+          "kind": "band",
+          "to": 1234.567,
+          "tone": "info",
+          "label": "Low"
+        },
+        {
+          "kind": "constant",
+          "value": "7"
+        }
+      ],
+      "values": [],
+      "kpi": null,
       "expected": [
-        {"type": "band", "from": 1, "to": 100, "tone": "warning", "text": "Band 1–100"},
-        {"type": "band", "from": null, "to": 1234.567, "tone": "info", "text": "Low below 1,234.57"}
+        {
+          "type": "band",
+          "from": 1,
+          "to": 100,
+          "tone": "warning",
+          "text": "Band 1–100"
+        },
+        {
+          "type": "band",
+          "from": null,
+          "to": 1234.567,
+          "tone": "info",
+          "text": "Low below 1,234.57"
+        }
+      ]
+    },
+    {
+      "name": "percentile bounds, teen ordinals, trimmed labels",
+      "markers": [
+        {
+          "kind": "percentile",
+          "p": 100
+        },
+        {
+          "kind": "percentile",
+          "p": 99
+        },
+        {
+          "kind": "percentile",
+          "p": 1
+        },
+        {
+          "kind": "percentile",
+          "p": 11
+        },
+        {
+          "kind": "percentile",
+          "p": 12
+        },
+        {
+          "kind": "percentile",
+          "p": 13
+        },
+        {
+          "kind": "percentile",
+          "p": 22
+        },
+        {
+          "kind": "constant",
+          "value": 5,
+          "label": "  Cap  "
+        },
+        {
+          "kind": "constant",
+          "value": 5,
+          "label": "   "
+        }
+      ],
+      "values": [
+        0,
+        100
+      ],
+      "kpi": null,
+      "expected": [
+        {
+          "type": "line",
+          "value": 99,
+          "text": "99th percentile 99",
+          "dashed": true
+        },
+        {
+          "type": "line",
+          "value": 1,
+          "text": "1st percentile 1",
+          "dashed": true
+        },
+        {
+          "type": "line",
+          "value": 11,
+          "text": "11th percentile 11",
+          "dashed": true
+        },
+        {
+          "type": "line",
+          "value": 12,
+          "text": "12th percentile 12",
+          "dashed": true
+        },
+        {
+          "type": "line",
+          "value": 13,
+          "text": "13th percentile 13",
+          "dashed": true
+        },
+        {
+          "type": "line",
+          "value": 22,
+          "text": "22nd percentile 22",
+          "dashed": true
+        },
+        {
+          "type": "line",
+          "value": 5,
+          "text": "Cap 5",
+          "dashed": true
+        },
+        {
+          "type": "line",
+          "value": 5,
+          "text": "Reference 5",
+          "dashed": true
+        }
       ]
     }
   ],
   "overlays": [
     {
       "name": "one series: forecast band at 90 %, a flagged point at sensitivity 5",
-      "labels": ["2026-01", "2026-02", "2026-03"],
-      "overlay": {"forecast": {"level": 0.9}, "anomaly": {"sensitivity": 5}},
-      "series": [{"label": "EU", "data": [10, 12, null], "overlay": [
-        {"fc": null, "lo": null, "hi": null, "expected": 7, "z": 3},
-        {"fc": null, "lo": null, "hi": null, "expected": 12, "z": 1},
-        {"fc": 14, "lo": 11, "hi": 17.5, "expected": null, "z": null}]}],
+      "labels": [
+        "2026-01",
+        "2026-02",
+        "2026-03"
+      ],
+      "overlay": {
+        "forecast": {
+          "level": 0.9
+        },
+        "anomaly": {
+          "sensitivity": 5
+        }
+      },
+      "series": [
+        {
+          "label": "EU",
+          "data": [
+            10,
+            12,
+            null
+          ],
+          "overlay": [
+            {
+              "fc": null,
+              "lo": null,
+              "hi": null,
+              "expected": 7,
+              "z": 3
+            },
+            {
+              "fc": null,
+              "lo": null,
+              "hi": null,
+              "expected": 12,
+              "z": 1
+            },
+            {
+              "fc": 14,
+              "lo": 11,
+              "hi": 17.5,
+              "expected": null,
+              "z": null
+            }
+          ]
+        }
+      ],
       "expected": [
-        {"type": "interval", "points": [{"index": 2, "value": 14, "lower": 11, "upper": 17.5}],
-         "text": "Forecast 2026-03 to 2026-03, 90 % band 11–17.5"},
-        {"type": "points", "tone": "error", "points": [{"index": 0, "value": 10}],
-         "text": "Unusual value at 2026-01 (10, expected 7)"}
+        {
+          "type": "interval",
+          "points": [
+            {
+              "index": 2,
+              "value": 14,
+              "lower": 11,
+              "upper": 17.5
+            }
+          ],
+          "text": "Forecast 2026-03 to 2026-03, 90 % band 11–17.5"
+        },
+        {
+          "type": "points",
+          "tone": "error",
+          "points": [
+            {
+              "index": 0,
+              "value": 10
+            }
+          ],
+          "text": "Unusual value at 2026-01 (10, expected 7)"
+        }
       ]
     },
     {
       "name": "two series are named; default sensitivity 3 flags |z| = 3.5 (3.4 is not); a series without cells draws nothing",
-      "labels": ["a", "b"],
-      "overlay": {"anomaly": {}},
+      "labels": [
+        "a",
+        "b"
+      ],
+      "overlay": {
+        "anomaly": {}
+      },
       "series": [
-        {"label": "EU", "data": [5, 9], "overlay": [{"fc": null, "lo": null, "hi": null, "expected": 8, "z": -3.5},
-                                                     {"fc": null, "lo": null, "hi": null, "expected": 8, "z": 3.4}]},
-        {"label": "US", "data": [1, 2], "overlay": [{"fc": null, "lo": null, "hi": null, "expected": 1, "z": 0},
-                                                     {"fc": null, "lo": null, "hi": null, "expected": 1, "z": 4}]},
-        {"label": "APAC", "data": [3, 3]}],
+        {
+          "label": "EU",
+          "data": [
+            5,
+            9
+          ],
+          "overlay": [
+            {
+              "fc": null,
+              "lo": null,
+              "hi": null,
+              "expected": 8,
+              "z": -3.5
+            },
+            {
+              "fc": null,
+              "lo": null,
+              "hi": null,
+              "expected": 8,
+              "z": 3.4
+            }
+          ]
+        },
+        {
+          "label": "US",
+          "data": [
+            1,
+            2
+          ],
+          "overlay": [
+            {
+              "fc": null,
+              "lo": null,
+              "hi": null,
+              "expected": 1,
+              "z": 0
+            },
+            {
+              "fc": null,
+              "lo": null,
+              "hi": null,
+              "expected": 1,
+              "z": 4
+            }
+          ]
+        },
+        {
+          "label": "APAC",
+          "data": [
+            3,
+            3
+          ]
+        }
+      ],
       "expected": [
-        {"type": "points", "tone": "error", "points": [{"index": 0, "value": 5}], "text": "EU: Unusual value at a (5, expected 8)"},
-        {"type": "points", "tone": "error", "points": [{"index": 1, "value": 2}], "text": "US: Unusual value at b (2, expected 1)"}
+        {
+          "type": "points",
+          "tone": "error",
+          "points": [
+            {
+              "index": 0,
+              "value": 5
+            }
+          ],
+          "text": "EU: Unusual value at a (5, expected 8)"
+        },
+        {
+          "type": "points",
+          "tone": "error",
+          "points": [
+            {
+              "index": 1,
+              "value": 2
+            }
+          ],
+          "text": "US: Unusual value at b (2, expected 1)"
+        }
+      ]
+    },
+    {
+      "name": "a sensitivity below 1 is 1 (|z| 5)",
+      "labels": [
+        "a",
+        "b"
+      ],
+      "overlay": {
+        "anomaly": {
+          "sensitivity": 0
+        }
+      },
+      "series": [
+        {
+          "label": "EU",
+          "data": [
+            1,
+            2
+          ],
+          "overlay": [
+            {
+              "fc": null,
+              "lo": null,
+              "hi": null,
+              "expected": 0,
+              "z": 4.9
+            },
+            {
+              "fc": null,
+              "lo": null,
+              "hi": null,
+              "expected": 0,
+              "z": -5
+            }
+          ]
+        }
+      ],
+      "expected": [
+        {
+          "type": "points",
+          "tone": "error",
+          "points": [
+            {
+              "index": 1,
+              "value": 2
+            }
+          ],
+          "text": "Unusual value at b (2, expected 0)"
+        }
+      ]
+    },
+    {
+      "name": "a sensitivity above 5 is 5 (|z| 2.5)",
+      "labels": [
+        "a",
+        "b"
+      ],
+      "overlay": {
+        "anomaly": {
+          "sensitivity": 9
+        }
+      },
+      "series": [
+        {
+          "label": "EU",
+          "data": [
+            1,
+            2
+          ],
+          "overlay": [
+            {
+              "fc": null,
+              "lo": null,
+              "hi": null,
+              "expected": 0,
+              "z": 2.4
+            },
+            {
+              "fc": null,
+              "lo": null,
+              "hi": null,
+              "expected": 0,
+              "z": 2.5
+            }
+          ]
+        }
+      ],
+      "expected": [
+        {
+          "type": "points",
+          "tone": "error",
+          "points": [
+            {
+              "index": 1,
+              "value": 2
+            }
+          ],
+          "text": "Unusual value at b (2, expected 0)"
+        }
       ]
     }
   ],
   "notes": [
     {
       "name": "fewer than two seasons: the reason, no band",
-      "summary": [{"overlay": "forecast", "of": "sum_amount", "series": {}, "reason": "fewer than two seasons (14 days)"}],
-      "flagged": 0, "sensitivity": null, "unit": "day",
-      "expected": ["No forecast: fewer than two seasons (14 days)."]
+      "summary": [
+        {
+          "overlay": "forecast",
+          "of": "sum_amount",
+          "series": {},
+          "reason": "fewer than two seasons (14 days)"
+        }
+      ],
+      "flagged": 0,
+      "sensitivity": null,
+      "unit": "day",
+      "expected": [
+        "No forecast: fewer than two seasons (14 days)."
+      ]
     },
     {
       "name": "a tested forecast and the flagged count",
       "summary": [
-        {"overlay": "forecast", "of": "sum_amount", "series": {}, "method": "holt-winters", "period": 12, "periodSource": "calendar",
-         "level": 0.8, "horizon": 6, "backtest": {"origins": 4, "mape": 12.34, "coverage": 0.75}},
-        {"overlay": "anomaly", "of": "sum_amount", "series": {}, "scored": 20, "seasonality": "weekday"}],
-      "flagged": 2, "sensitivity": null, "unit": "month",
+        {
+          "overlay": "forecast",
+          "of": "sum_amount",
+          "series": {},
+          "method": "holt-winters",
+          "period": 12,
+          "periodSource": "calendar",
+          "level": 0.8,
+          "horizon": 6,
+          "backtest": {
+            "origins": 4,
+            "mape": 12.34,
+            "coverage": 0.75
+          }
+        },
+        {
+          "overlay": "anomaly",
+          "of": "sum_amount",
+          "series": {},
+          "scored": 20,
+          "seasonality": "weekday"
+        }
+      ],
+      "flagged": 2,
+      "sensitivity": null,
+      "unit": "month",
       "expected": [
         "Forecast of the next 6 months, 80 % band (Holt-Winters, a 12-month calendar season). Tested on this history from 4 starting points: average error 12.3 %, 75.0 % of actual values inside the band.",
         "2 unusual values at sensitivity 3 of 5 (at least 3.5 robust deviations from the same weekday)."
@@ -120,9 +728,81 @@
     },
     {
       "name": "nothing scored: the reason",
-      "summary": [{"overlay": "anomaly", "of": "sum_amount", "series": {}, "reason": "fewer than 7 points"}],
-      "flagged": 0, "sensitivity": 1, "unit": "day",
-      "expected": ["No anomaly markers: fewer than 7 points."]
+      "summary": [
+        {
+          "overlay": "anomaly",
+          "of": "sum_amount",
+          "series": {},
+          "reason": "fewer than 7 points"
+        }
+      ],
+      "flagged": 0,
+      "sensitivity": 1,
+      "unit": "day",
+      "expected": [
+        "No anomaly markers: fewer than 7 points."
+      ]
+    },
+    {
+      "name": "two forecast series are named; symmetric error; not tested",
+      "summary": [
+        {
+          "overlay": "forecast",
+          "of": "m",
+          "series": {
+            "region": "EU"
+          },
+          "period": 7,
+          "periodSource": "detected",
+          "level": 0.9,
+          "horizon": 1,
+          "backtest": {
+            "origins": 3,
+            "mape": null,
+            "smape": 8.25,
+            "coverage": null
+          }
+        },
+        {
+          "overlay": "forecast",
+          "of": "m",
+          "series": {
+            "region": "US"
+          },
+          "period": 7,
+          "periodSource": "calendar",
+          "level": 0.8,
+          "horizon": 2,
+          "backtest": {
+            "reason": "too short"
+          }
+        }
+      ],
+      "flagged": 0,
+      "sensitivity": null,
+      "unit": "day",
+      "expected": [
+        "EU: Forecast of the next 1 day, 90 % band (Holt-Winters, a 7-day season found in the data). Tested on this history from 3 starting points: symmetric error 8.3 %.",
+        "US: Forecast of the next 2 days, 80 % band (Holt-Winters, a 7-day calendar season). Not tested: too short."
+      ]
+    },
+    {
+      "name": "none flagged at the top sensitivity",
+      "summary": [
+        {
+          "overlay": "anomaly",
+          "of": "m",
+          "series": {},
+          "scored": 9,
+          "seasonality": "all"
+        }
+      ],
+      "flagged": 0,
+      "sensitivity": 9,
+      "unit": "day",
+      "expected": [
+        "No unusual values at sensitivity 5 of 5 (at least 2.5 robust deviations from the other values shown)."
+      ]
     }
   ]
 }

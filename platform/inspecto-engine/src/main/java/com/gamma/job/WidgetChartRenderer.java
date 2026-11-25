@@ -37,14 +37,16 @@ final class WidgetChartRenderer {
     private static final Color TEXT = new Color(0x33, 0x33, 0x33);
     private static final Color MUTED = new Color(0x77, 0x77, 0x77);
     private static final Color GRID = new Color(0xE2, 0xE2, 0xE2);
-    /** A marker line with no tone of its own (the SPA's CHART_MARKER_LINE). */
-    static final Color MARKER_LINE = new Color(0x4A, 0x4A, 0x4A);
-    /** The status tones (the SPA's CHART_TONE): success, warning, error, info. */
+    /** A marker with no tone of its own: the SPA's CHART_MARKER_LINE ({@code theme/chart-tokens.ts}). */
+    static final Color MARKER_LINE = new Color(0x64, 0x74, 0x8B);
+    /** The status tones: the SPA's CHART_TONE values (success, warning, error, info). */
     static final Map<String, Color> TONE = Map.of(
-            "success", new Color(0x2E, 0x7D, 0x32), "warning", new Color(0xB2, 0x6A, 0x00),
-            "error", new Color(0xC6, 0x28, 0x28), "info", new Color(0x15, 0x65, 0xC0));
-    /** The forecast band and its dashed point forecast. */
-    static final Color FORECAST = new Color(0x5E, 0x35, 0xB1);
+            "success", new Color(0x22, 0xC5, 0x5E), "warning", new Color(0xF5, 0x9E, 0x0B),
+            "error", new Color(0xEF, 0x44, 0x44), "info", new Color(0x5B, 0x8F, 0xF9));
+    /** The forecast band and its dashed point forecast: CHART_TONE.info, as the SPA's markerColor gives an interval. */
+    static final Color FORECAST = TONE.get("info");
+    /** A band's fill: CHART_MARKER_BAND_ALPHA (0.12). */
+    private static final int BAND_ALPHA = 31;
     private static final int NOTE_LINE = 16;
     private static final int MARGIN = 20, AXIS_W = 72, AXIS_H = 56, TICKS = 5;
     /** The widest value the axis spans: past it a bar is drawn at the bound, so the axis arithmetic stays finite. */
@@ -135,7 +137,8 @@ final class WidgetChartRenderer {
         boolean stacked = truthy(o.get("stacked"));
         if (ChartMarkers.MARKER_VIZ_TYPES.contains(w.vizType()) && o.get("markers") instanceof List<?> markers && !markers.isEmpty()) {
             Object target = o.get("kpi") instanceof Map<?, ?> k ? k.get("target") : null;
-            out.addAll(ChartMarkers.resolve(markers, ChartMarkers.population(m.values(), m.categories().size(), stacked),
+            List<double[]> drawn = screenValues(m, o);
+            out.addAll(ChartMarkers.resolve(markers, ChartMarkers.population(drawn, drawn.isEmpty() ? 0 : drawn.get(0).length, stacked),
                     target, kpi, ChartMarkers::plain));
         }
         if (ChartMarkers.OVERLAY_VIZ_TYPES.contains(w.vizType()) && o.get("overlay") instanceof Map<?, ?> ov
@@ -155,6 +158,34 @@ final class WidgetChartRenderer {
             }
         }
         return new Marks(out, notes);
+    }
+
+    /**
+     * The values the screen draws, which its statistics read: the SPA's transformXy reads a missing or non-number cell
+     * as 0 (a gap only when the rows carry overlay columns), and its sortedProps drops blank categories
+     * ({@code hideBlank}), orders by the first series ({@code sort}) and keeps the first {@code limit}. The PDF still
+     * draws every category in axis order (a print snapshot); only the statistics follow the screen's set.
+     */
+    static List<double[]> screenValues(Model m, Map<?, ?> o) {
+        List<double[]> vals = new ArrayList<>();
+        for (int s = 0; s < m.values().size(); s++) {
+            double[] v = m.values().get(s).clone();
+            if (m.overlays().get(s) == null) for (int i = 0; i < v.length; i++) if (Double.isNaN(v[i])) v[i] = 0;
+            vals.add(v);
+        }
+        List<Integer> order = new ArrayList<>();
+        for (int i = 0; i < m.categories().size(); i++)
+            if (!truthy(o.get("hideBlank")) || !m.categories().get(i).trim().isEmpty()) order.add(i);
+        if (truthy(o.get("sort")) && !vals.isEmpty()) {
+            int dir = "asc".equals(o.get("sort")) ? 1 : -1;
+            double[] first = vals.get(0);
+            order.sort((a, b) -> dir * Double.compare(Double.isNaN(first[a]) ? 0 : first[a], Double.isNaN(first[b]) ? 0 : first[b]));
+        }
+        Double limit = ChartMarkers.finite(o.get("limit"));
+        if (limit != null && limit > 0 && limit < order.size()) order = order.subList(0, (int) (double) limit);
+        List<double[]> out = new ArrayList<>();
+        for (double[] v : vals) out.add(order.stream().mapToDouble(i -> v[i]).toArray());
+        return out;
     }
 
     private static boolean truthy(Object v) {
@@ -340,8 +371,7 @@ final class WidgetChartRenderer {
             if ("band".equals(r.type())) {
                 int y0 = r.to() == null ? top : yClamped(r.to(), lo, hi, top, bottom);
                 int y1 = r.from() == null ? bottom : yClamped(r.from(), lo, hi, top, bottom);
-                Color c = tone(r.tone(), TONE.get("info"));
-                g.setColor(alpha(c, 34));
+                g.setColor(alpha(tone(r.tone(), MARKER_LINE), BAND_ALPHA));
                 g.fillRect(left, y0, right - left, Math.max(1, y1 - y0));
             } else if ("interval".equals(r.type()) && !r.points().isEmpty()) {
                 List<ChartMarkers.Point> pts = r.points();
@@ -416,10 +446,15 @@ final class WidgetChartRenderer {
             String text = fit(r.text(), fm, (right - left) / 2 - 8);
             int base = band ? (r.to() == null ? top : yClamped(r.to(), lo, hi, top, bottom)) + fm.getAscent() + 2
                     : yClamped(r.value(), lo, hi, top, bottom) - 5;
+            if (band) {
+                int y0 = r.to() == null ? top : yClamped(r.to(), lo, hi, top, bottom);
+                int y1 = r.from() == null ? bottom : yClamped(r.from(), lo, hi, top, bottom);
+                if (y1 - y0 < 14) continue;   // too thin to hold its words: they stay in the list under the chart
+            }
             List<Integer> used = band ? left0 : right0;
             for (int guard = 0; guard < 40 && clashes(used, base, step); guard++) base += band ? step : -step;
             used.add(base);
-            Color c = band ? tone(r.tone(), TONE.get("info")) : tone(r.tone(), MARKER_LINE);
+            Color c = tone(r.tone(), MARKER_LINE);
             label(g, text, band ? left + 4 : right - 4 - fm.stringWidth(text), base, c);
         }
     }

@@ -174,8 +174,10 @@ Java2D) draws a bar or line Widget's Chart Markers and its forecast band and ano
 `ChartMarkers` (`platform/inspecto-engine`, `com.gamma.job`) is the server twin of `resolveMarkers`, `kpiBands`,
 `resolveOverlays` and `overlayNote`; both sides are held to one committed file,
 `contracts/chart-markers.contract.json` (`ChartMarkersContractTest`, `chart-markers.contract.spec.ts`), so the same
-markers give the same lines, bands and words. The statistics read every drawn value, or the category totals when
-`stacked`, as on screen. The bound KPI (`options.kpi.kpiId`) is read from the Space's registry only when a marker
+markers give the same lines, bands and words. The statistics read the screen's value set (`screenValues`): a missing
+cell counts as 0 (a gap only on an overlaid chart), `hideBlank`, `sort` and `limit` apply first, and `stacked` reads
+the category totals. Tones are the screen's `CHART_TONE` hex values, an untoned line is `CHART_MARKER_LINE`, bands
+shade at the screen's alpha, and numbers round as Intl does (shortest decimal, half away from zero, `-0` kept). The bound KPI (`options.kpi.kpiId`) is read from the Space's registry only when a marker
 needs it; an unreadable KPI leaves `rag` undrawn and the target on the Widget's own, as after a failed read on screen.
 `ReportWidget` asks for `overlay` exactly as `buildXyQuery` does (a line or bar whose x channel picked a grain), and
 `ReportJob` runs the same `ChartOverlays.apply` over its own masked rows, so masking is unchanged and fewer than two
@@ -183,7 +185,9 @@ seasons gives the reason, not a band. Bands shade behind the data and lines draw
 labelled in words (a line's words at its right end, moved apart when two lines sit close); the overlays' words and
 the caption are listed under the chart. A stacked or sorted chart draws no overlay and says so. Differences kept on
 purpose: the words use the screen's default number wording (grouped, at most two decimals) whatever `options.format`
-says, and a date label reads as the query returns it (`2026-10-21`), not the screen's long date. The KPI tile draws no
+says, a date label reads as the query returns it (`2026-10-21`), not the screen's long date, a `stacked` chart still
+draws grouped bars (its markers read the totals), a band under 14 px draws without its words, and a refused overlay
+fails the Job, as it errors the Widget on screen. The KPI tile draws no
 markers, as on screen (`MARKER_VIZ_TYPES`).
 
 **Insight-aware Show-Me (BI-INSIGHTS-1 I-20, 2026-11-25).** While a Widget is built, `suggestOverlays()`

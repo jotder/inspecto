@@ -51,6 +51,7 @@ class ChartMarkersContractTest {
         assertEquals(expected.size(), actual.size(), name + ": " + actual);
         for (int i = 0; i < expected.size(); i++) {
             ChartMarkers.Resolved a = actual.get(i);
+            if (!expected.get(i).containsKey("tone")) assertNull(a.tone(), name + " [" + i + "]: a tone the contract does not state");
             for (Map.Entry<String, Object> e : expected.get(i).entrySet()) {
                 String where = name + " [" + i + "]." + e.getKey();
                 Object v = e.getValue();
@@ -138,7 +139,9 @@ class ChartMarkersContractTest {
     void numbersAreWordedAsTheScreenWordsThem() {
         assertEquals("1,234.57", ChartMarkers.plain(1234.567));
         assertEquals("-2.5", ChartMarkers.plain(-2.5));
-        assertEquals("0", ChartMarkers.plain(-0.001));
+        assertEquals("-0", ChartMarkers.plain(-0.001), "Intl keeps the sign of a negative that rounds to zero");
+        assertEquals("2.68", ChartMarkers.plain(2.675), "the shortest decimal is rounded, not the binary value");
+        assertEquals("1.01", ChartMarkers.plain(1.005));
         assertEquals("1,000,000", ChartMarkers.plain(1e6));
         assertEquals("—", ChartMarkers.plain(Double.NaN));
         assertEquals("3.0", ChartMarkers.oneDecimal(3));
@@ -151,6 +154,25 @@ class ChartMarkersContractTest {
         assertArrayEquals(new double[] {1, 2, Double.NaN, 10, 20, 30}, ChartMarkers.population(series, 3, false));
         assertArrayEquals(new double[] {11, 22, 30}, ChartMarkers.population(series, 3, true));
         assertEquals(16.5, ChartMarkers.average(new double[] {11, 22, Double.NaN}), 1e-9,
-                "an absent value is left out of the average, never read as 0");
+                "a non-finite value is left out of the population");
+    }
+
+    /**
+     * Verification finding: the screen's transformXy draws a missing cell as 0 (a gap only on an overlaid chart) and its
+     * sortedProps applies hideBlank, sort and limit before the statistics read the values.
+     */
+    @Test
+    void theStatisticsReadTheScreensValueSet() {
+        WidgetChartRenderer.Model m = new WidgetChartRenderer.Model(List.of("b", " ", "a", "c"), List.of("s"),
+                List.of(new double[] {10, 99, Double.NaN, 40}));
+        assertArrayEquals(new double[] {10, 99, 0, 40}, WidgetChartRenderer.screenValues(m, Map.of()).get(0),
+                "a missing point counts as 0, as the screen draws it");
+        assertArrayEquals(new double[] {40, 10}, WidgetChartRenderer.screenValues(m,
+                Map.of("hideBlank", true, "sort", "desc", "limit", 2)).get(0), "blank dropped, sorted by value, cut to 2");
+        WidgetChartRenderer.Model overlaid = new WidgetChartRenderer.Model(List.of("a", "b"), List.of("s"),
+                List.of(new double[] {1, Double.NaN}), java.util.Collections.singletonList(new ChartMarkers.Cells(
+                new double[2], new double[2], new double[2], new double[2], new double[2])));
+        assertTrue(Double.isNaN(WidgetChartRenderer.screenValues(overlaid, Map.of()).get(0)[1]),
+                "on an overlaid chart a forecast row carries no actual: a gap, not 0");
     }
 }
