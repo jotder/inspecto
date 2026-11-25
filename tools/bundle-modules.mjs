@@ -58,7 +58,7 @@ export const CLASSPATH_ORDER = [
     'inspecto-policy',
     'inspecto-connectors', 'inspecto-notify-channels', 'inspecto-backup',
     'inspecto-entity-list', 'inspecto-la-storage', 'inspecto-la-core', 'inspecto-la-api', 'inspecto-la-store-pg', 'inspecto-geo-link',
-    'inspecto-exchange', 'inspecto-observability', 'inspecto-ops', 'inspecto-case-management', 'inspecto-action-requests', 'inspecto-regulatory-reporting', 'inspecto-reconciliation', 'inspecto-scoring', 'inspecto-screening', 'inspecto-anomaly', 'inspecto-predictive', 'inspecto-realtime', 'inspecto-mcp',
+    'inspecto-exchange', 'inspecto-observability', 'inspecto-ops', 'inspecto-case-management', 'inspecto-action-requests', 'inspecto-regulatory-reporting', 'inspecto-reconciliation', 'inspecto-scoring', 'inspecto-screening', 'inspecto-anomaly', 'inspecto-predictive', 'inspecto-insights', 'inspecto-realtime', 'inspecto-mcp',
     'inspecto-agent', 'inspecto-intelligence',
 ];
 
@@ -159,7 +159,7 @@ export function mavenProfiles(edition, root = REPO_ROOT) {
 
 /**
  * The first-party modules staged for `edition`, in classpath order.
- * Basic 7, Standard 27, Advanced 31, Preview 31 — first-party only; add PG_SIDECAR for the jar count.
+ * Basic 7, Standard 28, Advanced 32, Preview 32 — first-party only; add PG_SIDECAR for the jar count.
  * ⚠ Those numbers are ASSERTED by tools/check-sbom-modules.mjs against this table — it parses this very line.
  */
 export function bundleModules(edition) {

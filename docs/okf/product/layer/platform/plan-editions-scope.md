@@ -27,7 +27,7 @@ The organising rule is one sentence, and it is the most load-bearing sentence in
 
 * **The three editions** — Basic, Standard, Advanced — as build flavours of one commit, and the five
   mechanisms that assemble them.
-* **The 24**<!--count:optional-modules--> **optional modules**, the 31<!--count:advanced-first-party-jars--> first-party jars an Advanced bundle stages (plus the `postgresql.jar` sidecar), and the shape assertions that prove each staged
+* **The 25**<!--count:optional-modules--> **optional modules**, the 32<!--count:advanced-first-party-jars--> first-party jars an Advanced bundle stages (plus the `postgresql.jar` sidecar), and the shape assertions that prove each staged
   jar can do its job.
 * **The absence contract** — the provider seams, the five stub route groups, and the requirement that a
   missing module answers with an explanation rather than a not-found.
