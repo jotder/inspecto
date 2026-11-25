@@ -447,6 +447,14 @@ final class McpTools {
     /** {@code work_incident_or_case}'s actions → the route tail each replays (every one in {@code AgentGate.CASE_ACTIONS}). */
     static final List<String> CASE_MOVES = List.of("ack", "assign", "resolve", "transition");
 
+    /**
+     * {@code edit_incident_or_case_record}'s actions (widening plan W11, D-AK8 signed 2026-11-25) → the method and route
+     * tail each replays (every one in {@code AgentGate.CASE_ACTIONS}); {@code unlink} carries its body as the query.
+     */
+    static final Map<String, String> RECORD_EDITS = Map.of(
+            "postmortem", "PUT postmortem", "category", "PUT category", "impact", "PUT impact",
+            "findings", "PUT findings", "rca", "POST rca", "link", "POST links", "unlink", "DELETE links");
+
     /** {@code work_alert}'s actions → the route tail each replays. */
     static final List<String> ALERT_MOVES = List.of("ack", "resolve");
 
@@ -479,6 +487,21 @@ final class McpTools {
                             text("reason", "Why — on the audit row, and shown to the approver when it is held.")),
                     a -> withReason(new Call("POST", "/objects/" + seg(a.get("id")) + "/" + a.get("action"), bodyOf(a)), a),
                     true),
+            new Tool("edit_incident_or_case_record", "Edit an Incident's or Case's record",
+                    "Write one part of an Incident's or Case's record: its postmortem, category, financial impact, Findings "
+                            + "values, an RCA skeleton, or add or remove a correlation link to another Incident or Case. "
+                            + "Write only what the evidence you read supports, and say which fields you changed. "
+                            + "postmortem, category and impact need canWorkIncidents; findings, rca, link and unlink are open "
+                            + "to anyone who can see the object." + CASE_HELD_FOR_A_MACHINE
+                            + " Read it first (get_incident): impact REPLACES the whole impact, so send every field you keep.",
+                    List.of(id("id", "The Incident or Case id."),
+                            new Arg("action", Kind.ENUM, true, "What to write.", List.copyOf(new java.util.TreeSet<>(RECORD_EDITS.keySet()))),
+                            body("The route's own body: postmortem {postmortem: {...}}; category {category}; impact {impact: "
+                                    + "{suspected?, confirmed?, recovered?, prevented?, currency, period?, basis?}}; findings "
+                                    + "{findings: {key: scalar}}; rca {template: name} or {sections: [...]}; link {to, "
+                                    + "relationship?}; unlink {to, relationship?}.", true),
+                            text("reason", "Why — on the audit row, and shown to the approver when it is held.")),
+                    McpTools::editRecord, true),
             new Tool("work_alert", "Acknowledge or resolve an Alert",
                     "Acknowledge or resolve one fired Alert. Needs canWorkIncidents." + CASE_HELD_FOR_A_MACHINE,
                     List.of(id("alert", "The Alert id."), new Arg("action", Kind.ENUM, true, "What to do.", ALERT_MOVES),
@@ -492,6 +515,21 @@ final class McpTools {
                             + "server's entity cap.", true),
                             text("reason", "Why — on the audit row.")),
                     a -> withReason(new Call("POST", "/cases/from-entities", bodyOf(a)), a), true));
+
+    @SuppressWarnings("unchecked")
+    private static Call editRecord(Map<String, Object> a) {
+        String[] route = RECORD_EDITS.get((String) a.get("action")).split(" ");
+        String path = "/objects/" + seg(a.get("id")) + "/" + route[1];
+        if (!"DELETE".equals(route[0])) return withReason(new Call(route[0], path, bodyOf(a)), a);
+        Map<String, Object> b = (Map<String, Object>) a.get("body");
+        for (String k : b.keySet())
+            if (!"to".equals(k) && !"relationship".equals(k)) throw new BadArgs("unlink takes {to, relationship?}, not '" + k + "'");
+        for (String k : List.of("to", "relationship"))
+            if (b.get(k) != null && !(b.get(k) instanceof String v && ID.matcher(v).matches()))
+                throw new BadArgs("unlink '" + k + "' must be an id");
+        if (b.get("to") == null) throw new BadArgs("unlink needs {to}: the other Incident or Case");
+        return withReason(new Call("DELETE", path + query(b, "to", "to", "relationship", "relationship"), null), a);
+    }
 
     /** The call with the {@code reason} argument carried as {@code X-Change-Reason}, checked as {@link #proposeChange} checks it. */
     private static Call withReason(Call c, Map<String, Object> a) {

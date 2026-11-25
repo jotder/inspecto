@@ -52,6 +52,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `LA-CONFIG-LIMITS-RESIDUALS-1` | P3 | feature | Re-measure LA-CONFIG-LIMITS-1's doubled defaults on a server-class host before a customer deployment relies on them. | — |
 | `LA-DAILY-INGEST-1` | P3 | feature | Hive JDBC / Kerberos, the db Collector door and SCD2 / as-of join for daily LA ingestion. | demand |
 | `LA-WHITEPAPER-DEMO-1` | P3 | chore | A timed whitepaper-demo rehearsal with a sceptical second person. | external |
+| `LA-EXPAND-TESTS-RED-1` | P3 | defect | Three Link Analysis expand tests fail on master (la/inspecto-geo-link): | — |
 | `LA-VIDEO-LOUDNESS-FLAKY-1` | P3 | chore | tools/la-video-mix.test.mjs "the audio stage masters a synthetic film to -16 LUFS…" failed once in the pre-commit guard step (measured -1… | — |
 | `HOWTO-DOC-DRIFT-1` | P3 | chore | internal hub pages that contradict the code, found writing the P3 how-tos: | — |
 | `USER-TRAINING-1` | P3 | feature | training on the Handbook's worked example. | — |

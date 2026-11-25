@@ -30,7 +30,12 @@ is `work-cases`.
    filed as an Action Request — a person other than the one who asked must approve it, never you.
 4. **Say what you found** in a comment: `add_comment` with one short paragraph — the cause, the evidence, the next step.
    Name a Brief by its id rather than pasting it.
-5. **Accept and assign** only on the person's word: `work_incident_or_case` `action: transition` with
+5. **Record what you found** only on the person's word, and only from the evidence you read in steps 1–3:
+   `edit_incident_or_case_record` `action: category` (`body: {"category": "…"}`), `action: impact` (read the stored
+   impact first — this replaces it), or `action: link` to tie it to the Incident or Case it belongs with. Name every
+   field you changed, old and new; `work-cases` § *Write the record* has every body. Nothing tells you whether your
+   write lands at once or is held (`MCP-AGENT-POSTURE-1`), so ask first.
+6. **Accept and assign** only on the person's word: `work_incident_or_case` `action: transition` with
    `body: {"action": "accept"}` (a new Incident moves from IDENTIFIED to DIAGNOSING), then `action: assign` with
    `body: {"assignee": "<user>"}`. `action: ack` is for the object types whose Workflow has it — an Incident's does
    not, and answers 422.
@@ -57,6 +62,7 @@ Always pass a one-line `reason` (at most 500 characters): the audit row keeps it
 - Approve or decline a Pending Action, a Pending Change or an Action Request — a person does.
 - Paste a masked value into a comment: what the Incident shows you masked stays masked.
 - Assign to someone the person did not name.
+- Write a category, impact or link the evidence you read does not show.
 
 ## MCP Tools
 
@@ -64,5 +70,6 @@ Always pass a one-line `reason` (at most 500 characters): the audit row keeps it
 - `get_risk_score`, `get_anomaly_score`, `get_prediction` — an entity's score and its explanation (key masked)
 - `build_incident_brief` — investigate and save a Brief, optionally filing its next step as an Action Request
 - `add_comment` — say what you found on the Incident's thread
+- `edit_incident_or_case_record` — record its category, impact or a correlation link
 - `work_incident_or_case` — accept or assign it
 - `get_pending_action`, `withdraw_action` — a held action's decision, or take it back

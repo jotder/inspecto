@@ -486,7 +486,8 @@ public final class ObjectRoutes implements RouteModule {
 
     /**
      * {@code POST /objects/{id}/links} (Phase 4) — correlate this object with another: body
-     * {@code {to, relationship?, actor?}} (e.g. a CASE {@code CONTAINS} an INCIDENT). A missing {@code to}
+     * {@code {to, relationship?, actor?}} (e.g. a CASE {@code CONTAINS} an INCIDENT); {@code actor} per {@link #actorOf}
+     * (W11: an agent may link, so a body field must not re-attribute a Subject's act). A missing {@code to}
      * → 400; an unknown {@code id} or {@code to} → 404. Idempotent (a duplicate edge returns the existing one).
      */
     private Object createLink(ApiContext api, HttpExchange ex, String fromId, Map<String, Object> body) {
@@ -494,7 +495,7 @@ public final class ObjectRoutes implements RouteModule {
         if (to == null) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body must include 'to'");
         requireVisible(api, ex, to);
         try {
-            return OpsEngine.of(api).link(fromId, to, ApiContext.str(body, "relationship"), ApiContext.str(body, "actor")).toMap();
+            return OpsEngine.of(api).link(fromId, to, ApiContext.str(body, "relationship"), actorOf(ex, body)).toMap();
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }
@@ -515,7 +516,8 @@ public final class ObjectRoutes implements RouteModule {
         if (to == null || to.isBlank()) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "query must include 'to'");
         requireVisible(api, ex, to);
         try {
-            if (!OpsEngine.of(api).unlink(fromId, to, relationship, ApiContext.query(ex, "actor")))
+            String actor = ApiContext.subject(ex).map(Subject::id).orElseGet(() -> ApiContext.query(ex, "actor"));
+            if (!OpsEngine.of(api).unlink(fromId, to, relationship, actor))
                 throw new ApiException(404, ErrorCodes.NOT_FOUND, "no such link " + fromId + " -> " + to);
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
@@ -627,7 +629,7 @@ public final class ObjectRoutes implements RouteModule {
             }
         }
         try {
-            return maskedNotes(api, ex, id, toNoteMaps(OpsEngine.of(api).applyRca(id, template, ApiContext.str(body, "actor"))));
+            return maskedNotes(api, ex, id, toNoteMaps(OpsEngine.of(api).applyRca(id, template, actorOf(ex, body))));
         } catch (java.util.NoSuchElementException notFound) {
             throw new ApiException(404, ErrorCodes.NOT_FOUND, notFound.getMessage());
         }

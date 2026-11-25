@@ -132,9 +132,11 @@ final class PendingActions {
         PendingChanges.underStoreLock(root, () -> {
             for (Map<String, Object> other : list(root)) {
                 expireIfDue(ex, root, other);   // an expired, unswept record never blocks a new request
-                // the same action = the same route, path AND body: a drain or retry names its batch or file in the body
+                // the same action = the same route, path, query AND body: a drain or retry names its batch or file in the
+                // body, an unlink its other end in the query (W11: DELETE /objects/{id}/links?to=)
                 if ("pending".equals(other.get("status")) && rec.get("action").equals(other.get("action"))
                         && other.get("request") instanceof Map<?, ?> otherReq
+                        && request.get("path").equals(otherReq.get("path"))
                         && request.get("body").equals(otherReq.get("body")))
                     throw new ApiException(409, ErrorCodes.CONFLICT, "the same action (" + rec.get("action")
                             + ") is already pending approval (" + other.get("id") + ")");

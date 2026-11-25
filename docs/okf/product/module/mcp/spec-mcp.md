@@ -340,8 +340,8 @@ config only.
 - **The hold** — `PendingActions.holdIfMachineAction`, called by `ControlApi.routeDispatch` and every
   `ControlApi.replay` right before the handler (after the capability, policy and agent gates, so a machine still needs
   `canOperateRuns`): a Subject that is `machine()` and `agent()` calling an `ACTION` route gets **202**
-  `{status: pending, ran: false, pendingAction}` and nothing runs. One pending record per action (same method and
-  path; else 409).
+  `{status: pending, ran: false, pendingAction}` and nothing runs. One pending record per action (same method, path,
+  query and body; else 409 — the query since W11, whose unlink names its other end there).
 - **The record** — `pending-actions/pa-<UTC stamp>-<6 hex>.json` in the Space's config tree: `action`
   (`METHOD path`), `route` (the matched pattern), the author (`client:<id>`), its roles, `agentClient`,
   `authorMachine`, `mcpTool`, `reason` (`X-Change-Reason`), `createdAt` / `expiresAt` (the approval policy's clock),
@@ -390,7 +390,8 @@ config only.
 ## Case actions (AK-2e)
 
 Phase 3, the Incident and Case analyst (plan §1.1, §4.6 analyst rows, §6.4). The operator's answers of 2026-11-25:
-exactly the §4.6 list (no Incident record edits), a new Case for people only, and `CASE-TRANSITION-FOUR-EYES-1` left a
+exactly the §4.6 list (no Incident record edits — reversed the same day by D-AK8, § Record edits (W11) below), a new
+Case for people only, and `CASE-TRANSITION-FOUR-EYES-1` left a
 board row. No new machinery: the routes join the action bucket, so the gate and the [Pending Action](#pending-actions-ak-2d)
 hold above apply unchanged.
 
@@ -415,7 +416,7 @@ hold above apply unchanged.
 - **Agent Skills and golden tasks:** `triage-incident` (read, Brief, comment, accept, assign — never close) and
   `work-cases` (Workflow moves, resolve, Alerts, open a Case — always on the person's yes); the analyst suite
   `agent-kit/golden/analyst.json` (six tasks: read without acting, Brief and comment, accept and assign, resolve a
-  Case, a machine's resolve held, a machine never opens a Case). `ACTION_PATH` in `tools/run-agent-golden.mjs` covers
+  Case, a machine's resolve held, a machine never opens a Case; and since W11 two record edits, § Record edits (W11)). `ACTION_PATH` in `tools/run-agent-golden.mjs` covers
   the case routes. Its live run is open.
 - **The screen:** unchanged — the *Pending Actions* tab lists case actions too, its detail showing the comment text or
   Workflow move it will run.
@@ -425,6 +426,51 @@ hold above apply unchanged.
   move, another person's approval runs it; a machine's comment is held and on approval is the machine's; a machine's
   new Case is 403 with no record; a machine without `canWorkIncidents` cannot queue a comment), `AgentGateParityTest`,
   `McpToolRoutesTest`.
+
+## Record edits (W11)
+
+Widening plan W11, D-AK8 as signed 2026-11-25 (not as recommended): an agent writes an Incident's or Case's record —
+what a regulator may read later — under the case-action rules above, unchanged.
+
+- **The routes** join `AgentGate.CASE_ACTIONS`, each on its own gate: `PUT /objects/{id}/postmortem`, `/category`,
+  `/impact` (`canWorkIncidents`; each writes its one attribute and answers 422 on any other key) and
+  `PUT /objects/{id}/findings`, `POST /objects/{id}/rca`, `POST` and `DELETE /objects/{id}/links` (the
+  `collaboration` exemption). The four exempt routes are in `AgentGate.MACHINE_HOLD_CAPABILITY` (`canWorkIncidents`),
+  as the comment is, so a machine without that right is refused before the hold and leaves no record.
+  `AgentGateParityTest` pins the sixteen case actions with their gates, and that `PATCH /objects/{id}`, merge and split
+  stay refused. Tags, merge, split and the Workflow transition guard (`CASE-TRANSITION-FOUR-EYES-1`) are out of scope.
+- **Attribution.** A link, an unlink and an RCA skeleton record the signed-in Subject (`ObjectRoutes.actorOf`), never a
+  body or query `actor`; before W11 those three took the body's (the query's, for an unlink) even for a signed-in caller.
+  The postmortem, category, impact and Findings already recorded `ApiContext.actor`.
+- **Pending Actions.** A PUT and a DELETE replay as a POST does (`ControlApi.replay` takes any method; the query rides
+  the replayed URI). The duplicate check compares the path with its query, so two unlinks of different Incidents are
+  two Pending Actions; the approver's detail shows the whole request, `?to=` included.
+- **MCP Tool** `edit_incident_or_case_record` (`McpTools.CASE_TOOLS`, `write: true`, `destructiveHint: false`):
+  `id`, `action` one of `postmortem`, `category`, `impact`, `findings` (→ `PUT /objects/{id}/…`), `rca`, `link`
+  (→ `POST`), `unlink` (→ `DELETE /objects/{id}/links?to=&relationship=`, from a body `{to, relationship?}` of ids and
+  nothing else), the route's own `body`, and a one-line `reason`. `McpTools.RECORD_EDITS` maps each action.
+- **Agent Skills and golden tasks:** `work-cases` § *Write the record* (only from evidence the agent read; read the
+  stored impact first, as `impact` replaces it; ask first, `MCP-AGENT-POSTURE-1`; name every field changed) and
+  `triage-incident` step 5; the analyst suite gains `an-07-record-postmortem-impact` (a person's agent writes both) and
+  `an-08-machine-impact-held`. The grader's `isAction` accepts the PUT routes and `DELETE …/links`. Their live run is open.
+- **Security review (2026-11-25).** What an agent may now write and who reads it: the postmortem, category and impact
+  feed the Incident's resolution gate, Accept and the impact ledger a regulator reads. (1) No right is widened: each route
+  keeps its own gate, and a person's agent never exceeds the person. (2) A machine's record edit is always held and
+  replays as the machine, so every value it wrote passed another person's approval with the body in view. (3)
+  Attribution: the body-`actor` re-attribution of link, unlink and RCA was fixed (above). (4) The exempt routes' machine
+  hold needs `canWorkIncidents`, so a right-less machine cannot fill the approvers' queue. (5) An unlink still meets the
+  legal-hold refusal (`ObjectService.unlink`). Residual: a machine's held edit to an object outside its data scope is
+  recorded and refused only at approval (the hold runs before the scope guard, as for every case action since AK-2e);
+  the approver sees the id. Accepted, as phase 3 did. Also low and accepted (verification, 2026-11-26): the duplicate
+  check compares the query and body as text, so a reordered query or a reformatted body is a second Pending Action (as
+  for bodies before W11); and a machine that loses `canWorkIncidents` after its Findings, RCA or link edit was held still
+  has it applied on approval — the approved replay skips the hold, as for a comment.
+- **Tests:** `ControlApiAgentRecordEditsTest` (`inspecto-case-management`, real HTTP, per route: a person's agent writes
+  at once and the audit row names `agent_client`; a business user's agent gets exactly the business user's answer — 403
+  on the three `canWorkIncidents` routes; a machine's edit is 202, nothing changed, the approver sees the request with
+  its query, another person's approval applies it; two unlinks of different Incidents are two Pending Actions; a machine
+  without `canWorkIncidents` is 403 on every route with no record; a body or query `actor` does not re-attribute a link
+  or RCA), `AgentGateParityTest`, `McpToolRoutesTest.unlinkCarriesItsOtherEndInTheQuery`, `tools/run-agent-golden.test.mjs`.
 
 ## Link Analysis (AK-2f)
 

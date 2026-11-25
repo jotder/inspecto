@@ -303,6 +303,13 @@ needs only W3 and can start now.
 
 ### W11 — An analyst agent edits an Incident's or Case's record
 
+> **Built 2026-11-25.** As specified; the "Today" table matched the code. Building it found two gaps, both fixed: (1) the
+> Pending Action duplicate check compared method and path without the query, so a second machine unlink of a different
+> Incident (`DELETE …/links?to=`) was refused as a duplicate — it now compares the query too; (2) `POST …/links`,
+> `DELETE …/links` and `POST …/rca` recorded the body's (the query's) `actor` even for a signed-in caller, so an agent
+> could attribute a link or an RCA to someone else — they now use `actorOf`, as the lifecycle moves do. Security review:
+> `spec-mcp.md` § Record edits (W11). Golden tasks `an-07` and `an-08`; their live run is part of W4.
+
 - **Goal.** The analyst agent finishes an Incident or Case, not only triages it: the RCA, the postmortem, the
   category, the financial impact, the Findings values and the correlation links (D-AK8 as signed 2026-11-25, which
   reverses the "no record edits" line of the same morning).

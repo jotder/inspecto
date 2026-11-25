@@ -63,6 +63,15 @@ class McpToolRoutesTest {
                 }
                 continue;
             }
+            if (t.name().equals("edit_incident_or_case_record")) {   // W11: every record edit, unlink's query included
+                for (String action : McpTools.RECORD_EDITS.keySet()) {
+                    Map<String, Object> a = sample(t);
+                    a.put("action", action);
+                    a.put("body", Map.of("to", "x2"));
+                    calls.add(t.router().route(t.validate(a)));
+                }
+                continue;
+            }
             if (!t.name().equals("propose_change")) {
                 calls.add(t.router().route(t.validate(sample(t))));
                 continue;
@@ -177,20 +186,45 @@ class McpToolRoutesTest {
 
     /** The host's case action routes ({@code AgentGate.CASE_ACTIONS}, pinned there by {@code AgentGateParityTest}). */
     private static final List<String> CASE_ACTION_ROUTES = List.of(
-            "/objects/[^/]+/comments", "/incidents/[^/]+/briefs", "/objects/[^/]+/ack", "/objects/[^/]+/assign",
-            "/objects/[^/]+/resolve", "/objects/[^/]+/transition", "/alerts/[^/]+/ack", "/alerts/[^/]+/resolve",
-            "/cases/from-entities");
+            "POST /objects/[^/]+/comments", "POST /incidents/[^/]+/briefs", "POST /objects/[^/]+/ack",
+            "POST /objects/[^/]+/assign", "POST /objects/[^/]+/resolve", "POST /objects/[^/]+/transition",
+            "POST /alerts/[^/]+/ack", "POST /alerts/[^/]+/resolve", "POST /cases/from-entities",
+            // W11 (D-AK8 signed 2026-11-25): the record edits
+            "PUT /objects/[^/]+/postmortem", "PUT /objects/[^/]+/category", "PUT /objects/[^/]+/impact",
+            "PUT /objects/[^/]+/findings", "POST /objects/[^/]+/rca", "POST /objects/[^/]+/links",
+            "DELETE /objects/[^/]+/links");
 
     @Test
     void everyCaseToolReplaysACaseActionAndEveryCaseActionHasATool() {
         java.util.Set<String> reached = new java.util.TreeSet<>();
         for (McpTools.Tool t : McpTools.CASE_TOOLS) assertTrue(t.write(), t.name() + " acts, so it is a write tool");
-        for (McpTools.Call c : everyCall())
-            if ("POST".equals(c.method()))
-                for (String route : CASE_ACTION_ROUTES) if (c.path().matches(route)) reached.add(route);
-        assertEquals(new java.util.TreeSet<>(CASE_ACTION_ROUTES), reached, "AK-2e: a tool for every case action of plan §4.6");
-        assertEquals(List.of("add_comment", "build_incident_brief", "work_incident_or_case", "work_alert",
-                "open_case_from_entities"), McpTools.CASE_TOOLS.stream().map(McpTools.Tool::name).toList());
+        for (McpTools.Call c : everyCall()) {
+            String path = c.path().contains("?") ? c.path().substring(0, c.path().indexOf('?')) : c.path();
+            for (String route : CASE_ACTION_ROUTES) {
+                int sp = route.indexOf(' ');
+                if (c.method().equals(route.substring(0, sp)) && path.matches(route.substring(sp + 1))) reached.add(route);
+            }
+        }
+        assertEquals(new java.util.TreeSet<>(CASE_ACTION_ROUTES), reached, "AK-2e and W11: a tool for every case action");
+        assertEquals(List.of("add_comment", "build_incident_brief", "work_incident_or_case", "edit_incident_or_case_record",
+                "work_alert", "open_case_from_entities"), McpTools.CASE_TOOLS.stream().map(McpTools.Tool::name).toList());
+    }
+
+    /** W11: unlink carries its other end as the route's query, and takes nothing else. */
+    @Test
+    void unlinkCarriesItsOtherEndInTheQuery() {
+        McpTools.Tool t = McpTools.tool("edit_incident_or_case_record");
+        McpTools.Call c = t.router().route(t.validate(new LinkedHashMap<>(Map.of("id", "CASE-1", "action", "unlink",
+                "body", Map.of("to", "INC-2", "relationship", "CONTAINS")))));
+        assertEquals("DELETE", c.method());
+        assertEquals("/objects/CASE-1/links?to=INC-2&relationship=CONTAINS", c.path());
+        for (Map<String, Object> bad : List.of(Map.<String, Object>of(), Map.<String, Object>of("to", "a/../b"),
+                Map.<String, Object>of("to", "INC-2", "actor", "alice")))
+            assertThrows(McpTools.BadArgs.class, () -> t.router().route(t.validate(new LinkedHashMap<>(Map.of(
+                    "id", "CASE-1", "action", "unlink", "body", bad)))), String.valueOf(bad));
+        McpTools.Call put = t.router().route(t.validate(new LinkedHashMap<>(Map.of("id", "INC-1", "action", "impact",
+                "body", Map.of("impact", Map.of("confirmed", "10", "currency", "EUR"))))));
+        assertEquals("PUT /objects/INC-1/impact", put.method() + " " + put.path());
     }
 
     /**

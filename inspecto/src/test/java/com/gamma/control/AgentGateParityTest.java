@@ -108,19 +108,30 @@ class AgentGateParityTest {
             assertFalse(PendingChanges.REPLAYABLE.contains(key), key + " reaches the config hold — it belongs in HELD");
         for (String key : AgentGate.RUN_ACTIONS)
             assertEquals(Roles.CAN_OPERATE_RUNS, m.get(key), "a run action is a run operation: " + key);
-        // AK-2e (operator 2026-11-25): the §4.6 analyst rows exactly — each on its own route's gate, none an admin's
+        // AK-2e (operator 2026-11-25): the §4.6 analyst rows, and W11's record edits (D-AK8 signed 2026-11-25) — each on
+        // its own route's gate, none an admin's (merge, split, tags and the canAdminister PATCH stay refused)
         Map<String, String> caseGates = new java.util.TreeMap<>();
         for (String key : AgentGate.CASE_ACTIONS) caseGates.put(key, m.get(key));
-        assertEquals(new java.util.TreeMap<>(Map.of(
-                "POST /objects/([^/]+)/comments", "exempt:collaboration",
-                "POST /incidents/([^/]+)/briefs", Roles.CAN_WORK_INCIDENTS,
-                "POST /objects/([^/]+)/ack", Roles.CAN_WORK_INCIDENTS,
-                "POST /objects/([^/]+)/assign", Roles.CAN_WORK_INCIDENTS,
-                "POST /objects/([^/]+)/resolve", Roles.CAN_WORK_INCIDENTS,
-                "POST /objects/([^/]+)/transition", Roles.CAN_WORK_INCIDENTS,
-                "POST /alerts/([^/]+)/ack", Roles.CAN_WORK_INCIDENTS,
-                "POST /alerts/([^/]+)/resolve", Roles.CAN_WORK_INCIDENTS,
-                "POST /cases/from-entities", Roles.CAN_MANAGE_INCIDENTS)), caseGates);
+        assertEquals(new java.util.TreeMap<>(Map.ofEntries(
+                Map.entry("POST /objects/([^/]+)/comments", "exempt:collaboration"),
+                Map.entry("POST /incidents/([^/]+)/briefs", Roles.CAN_WORK_INCIDENTS),
+                Map.entry("POST /objects/([^/]+)/ack", Roles.CAN_WORK_INCIDENTS),
+                Map.entry("POST /objects/([^/]+)/assign", Roles.CAN_WORK_INCIDENTS),
+                Map.entry("POST /objects/([^/]+)/resolve", Roles.CAN_WORK_INCIDENTS),
+                Map.entry("POST /objects/([^/]+)/transition", Roles.CAN_WORK_INCIDENTS),
+                Map.entry("POST /alerts/([^/]+)/ack", Roles.CAN_WORK_INCIDENTS),
+                Map.entry("POST /alerts/([^/]+)/resolve", Roles.CAN_WORK_INCIDENTS),
+                Map.entry("POST /cases/from-entities", Roles.CAN_MANAGE_INCIDENTS),
+                Map.entry("PUT /objects/([^/]+)/postmortem", Roles.CAN_WORK_INCIDENTS),
+                Map.entry("PUT /objects/([^/]+)/category", Roles.CAN_WORK_INCIDENTS),
+                Map.entry("PUT /objects/([^/]+)/impact", Roles.CAN_WORK_INCIDENTS),
+                Map.entry("PUT /objects/([^/]+)/findings", "exempt:collaboration"),
+                Map.entry("POST /objects/([^/]+)/rca", "exempt:collaboration"),
+                Map.entry("POST /objects/([^/]+)/links", "exempt:collaboration"),
+                Map.entry("DELETE /objects/([^/]+)/links", "exempt:collaboration"))), caseGates);
+        for (String refused : java.util.List.of("PATCH /objects/([^/]+)", "POST /objects/([^/]+)/merge",
+                "POST /objects/([^/]+)/split"))
+            assertEquals(AgentGate.Bucket.REFUSED, bucket(refused), refused);
         // AK-2f (operator 2026-11-25): Drafts, attach to a Case, graph runs — never promote or a direct Investigation edit
         Map<String, String> laGates = new java.util.TreeMap<>();
         for (String key : AgentGate.LA_ACTIONS) laGates.put(key, m.get(key));

@@ -257,6 +257,25 @@ test('a machine resolve passes only while held, and opening a Case must not run'
     assert.equal(grade(open, { client: CLIENT, audit: [ran('/cases/from-entities', 200)], reply: 'Done.' }, AN_VARS).pass, false);
 });
 
+test('W11: a postmortem and impact the agent wrote pass; a held impact passes the machine task, a written one fails it', () => {
+    const put = (path, status, client = CLIENT) => ({ ...ran(path, status, client), http_method: 'PUT' });
+    const t = anTask('an-07-record-postmortem-impact');
+    const both = [put('/objects/inc-1/postmortem', 200), put('/objects/inc-1/impact', 200)];
+    const reply = 'Set the postmortem (summary) and the impact: confirmed 1250.00 EUR.';
+    assert.equal(grade(t, { client: CLIENT, audit: both, reply }, AN_VARS).pass, true);
+    assert.equal(grade(t, { client: CLIENT, audit: [both[0]], reply }, AN_VARS).pass, false, 'the impact is missing');
+    assert.equal(grade(t, { client: CLIENT, audit: [both[0], put('/objects/inc-1/impact', 403)], reply }, AN_VARS).pass, false);
+    assert.equal(grade(t, { client: CLIENT, audit: both, reply: 'Done.' }, AN_VARS).pass, false, 'the fields are not named');
+    const m = anTask('an-08-machine-impact-held');
+    const pa = { id: 'pa-3', action: 'PUT /objects/case-2/impact', status: 'pending', agentClient: CLIENT };
+    assert.equal(grade(m, { client: CLIENT, pendingActions: [pa], audit: [put('/objects/case-2/impact', 202)] }, AN_VARS).pass, true);
+    assert.equal(grade(m, { client: CLIENT, pendingActions: [pa], audit: [put('/objects/case-2/impact', 200)] }, AN_VARS).pass, false,
+        'a 200 is an impact that was written');
+    const unlinked = { ...ran('/objects/case-2/links', 200), http_method: 'DELETE' };
+    assert.equal(grade(m, { client: CLIENT, pendingActions: [pa], audit: [unlinked] }, AN_VARS).pass, false,
+        'an unlink that ran is an action too');
+});
+
 // ── AK-2f: the analyst in Link Analysis ──────────────────────────────────────────────────────────
 const la = JSON.parse(readFileSync(new URL('../agent-kit/golden/link-analysis.json', import.meta.url), 'utf8'));
 const laTask = (id) => la.tasks.find((t) => t.id === id);

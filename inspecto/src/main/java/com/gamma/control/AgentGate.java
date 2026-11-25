@@ -47,24 +47,34 @@ final class AgentGate {
             "POST /jobs/([^/]+)/trigger", "POST /jobs/runs/([^/]+)/replay");
 
     /**
-     * The case actions (plan §4.6, analyst rows, AK-2e, operator 2026-11-25: the §4.6 list, no record edits): comment on
-     * an Incident or Case, build an Incident Brief, ack, assign, resolve or transition one, ack or resolve an Alert, open
-     * a Case from entities. Each is still gated by its own route — {@code canWorkIncidents}, {@code canManageIncidents}
-     * for a new Case (which a machine agent never keeps), the comment route's collaboration exemption.
+     * The case actions (plan §4.6, analyst rows, AK-2e): comment on an Incident or Case, build an Incident Brief, ack,
+     * assign, resolve or transition one, ack or resolve an Alert, open a Case from entities; and (widening plan W11, D-AK8
+     * signed 2026-11-25) edit its record: the postmortem, category, impact, Findings values, an RCA skeleton, and adding or
+     * removing a correlation link. Each is still gated by its own route — {@code canWorkIncidents}, {@code canManageIncidents}
+     * for a new Case (which a machine agent never keeps), the collaboration exemption of the comment, Findings, RCA and
+     * link routes.
      */
     static final Set<String> CASE_ACTIONS = Set.of(
             "POST /objects/([^/]+)/comments", "POST /incidents/([^/]+)/briefs",
             "POST /objects/([^/]+)/ack", "POST /objects/([^/]+)/assign", "POST /objects/([^/]+)/resolve",
             "POST /objects/([^/]+)/transition", "POST /alerts/([^/]+)/ack", "POST /alerts/([^/]+)/resolve",
-            "POST /cases/from-entities");
+            "POST /cases/from-entities",
+            "PUT /objects/([^/]+)/postmortem", "PUT /objects/([^/]+)/category", "PUT /objects/([^/]+)/impact",
+            "PUT /objects/([^/]+)/findings", "POST /objects/([^/]+)/rca", "POST /objects/([^/]+)/links",
+            "DELETE /objects/([^/]+)/links");
 
     /**
      * The capability a machine agent's hold needs on an action route the manifest exempts (phase-3 security review): a
      * comment is open to anyone who can see the object, but the hold runs before the route's scope guard, so without
-     * this a machine holding no right at all could fill the approvers' queue with comments on any id.
+     * this a machine holding no right at all could fill the approvers' queue with comments on any id. The record edits
+     * open as collaboration (Findings, RCA, links — W11) need the same right.
      */
     static final Map<String, String> MACHINE_HOLD_CAPABILITY = Map.of(
             "POST /objects/([^/]+)/comments", Roles.CAN_WORK_INCIDENTS,
+            "PUT /objects/([^/]+)/findings", Roles.CAN_WORK_INCIDENTS,
+            "POST /objects/([^/]+)/rca", Roles.CAN_WORK_INCIDENTS,
+            "POST /objects/([^/]+)/links", Roles.CAN_WORK_INCIDENTS,
+            "DELETE /objects/([^/]+)/links", Roles.CAN_WORK_INCIDENTS,
             "POST /inv/graph/runs/([^/]+)/cancel", Roles.CAN_RUN_LINK_GRAPH_ANALYSIS);
 
     /**

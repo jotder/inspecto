@@ -1,6 +1,6 @@
 ---
 name: work-cases
-description: Move an Inspecto Incident or Case through its Workflow - investigate, escalate, resolve, close - acknowledge or resolve an Alert, or open a Case over the entities an investigation found. Use when the person asks to resolve or close an Incident or Case, to escalate one, to clear an Alert, or to open a Case. Covers what happens when an action is held as a Pending Action.
+description: Move an Inspecto Incident or Case through its Workflow - investigate, escalate, resolve, close - write its record (postmortem, category, financial impact, Findings values, RCA, correlation links), acknowledge or resolve an Alert, or open a Case over the entities an investigation found. Use when the person asks to resolve or close an Incident or Case, to escalate one, to record its postmortem or impact, to link it to another, to clear an Alert, or to open a Case. Covers what happens when an action is held as a Pending Action.
 ---
 
 # Work Incidents and Cases
@@ -27,8 +27,30 @@ person's explicit word, once, after `triage-incident` has said what the Incident
 | Resolve a Case | `work_incident_or_case` `action: resolve` | |
 | Clear an Alert | `work_alert` `action: ack` or `resolve` | |
 | Open a Case | `open_case_from_entities`, `body: {title, description, entities: [{id, dataset, label}]}` | a person's agent only; existing Incidents join as `{objectId}` |
+| Write its record | `edit_incident_or_case_record` — see *Write the record* | postmortem, category and impact need `canWorkIncidents` |
 
 Always pass a one-line `reason` (at most 500 characters): it is what an approver and a later reviewer read first.
+
+## Write the record
+
+A regulator or an auditor may read the record later, so it holds only what you can show:
+
+- **Only from evidence you read** in this session — `get_incident`, its Briefs, the run, the score, the comments. Never
+  a value you guessed, rounded or carried from another Incident. Nothing to show it → leave the field and say so.
+- **Read the record first** (`get_incident`). `impact` **replaces** the whole impact: send every amount you keep, with
+  its `currency`. `findings` sends `{findings: {key: value}}` and nothing else.
+- **Ask first**, naming each field and value, unless the person named them: you may be a machine agent whose edit is
+  held, or a person's agent whose edit lands at once (`MCP-AGENT-POSTURE-1`: nothing tells you which).
+- **Say which fields you changed**, old and new, in your reply and in the `reason`.
+
+| `action` | `body` |
+|---|---|
+| `postmortem` | `{"postmortem": {"summary": "…", …}}` — an Incident needs one before it resolves |
+| `category` | `{"category": "…"}` — Accept's categorisation |
+| `impact` | `{"impact": {"suspected"?, "confirmed"?, "recovered"?, "prevented"?, "currency", "period"?, "basis"?}}` — amounts as decimal strings; a closed one answers 409 |
+| `findings` | `{"findings": {"recordsAffected": "42", …}}` — the Case type's Findings fields only (422 otherwise) |
+| `rca` | `{"template": "<name>"}` or `{"sections": ["What happened", "Why", …]}` — seeds one comment per section |
+| `link` / `unlink` | `{"to": "<other Incident or Case id>", "relationship"?: "CONTAINS"}` — default `RELATED_TO` |
 
 ## Steps
 
@@ -56,7 +78,8 @@ Always pass a one-line `reason` (at most 500 characters): it is what an approver
 - Resolve, close or open a Case without the person's explicit yes. A request that names the move (or the Case to
   open, with its title and entities) is that yes; ask only when you chose the move yourself.
 - Approve or decline a Pending Action, a Pending Change or an Action Request — a person does.
-- Merge or split Cases, or edit an Incident's priority or severity: those are an administrator's, not an agent's.
+- Merge or split Cases, tag one, or edit an Incident's priority or severity: those are an administrator's, not an agent's.
+- Write a record value you did not read evidence for, or an `impact` without reading the one it replaces.
 - Use a second move to get round a refused one.
 
 ## MCP Tools
@@ -65,5 +88,6 @@ Always pass a one-line `reason` (at most 500 characters): it is what an approver
 - `get_risk_score`, `get_anomaly_score`, `get_prediction` — the entity's score now (key masked)
 - `work_incident_or_case` — transition or resolve an Incident or Case
 - `work_alert` — acknowledge or resolve an Alert
+- `edit_incident_or_case_record` — write its postmortem, category, impact, Findings, RCA or correlation links
 - `open_case_from_entities` — open a Case (a person's agent only)
 - `get_pending_action`, `withdraw_action` — a held move's decision, or take it back
