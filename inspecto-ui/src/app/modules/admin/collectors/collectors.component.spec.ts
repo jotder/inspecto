@@ -11,6 +11,7 @@ import {
     RunsService,
     CollectorView,
     CollectorsService,
+    LensService,
 } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
@@ -46,8 +47,10 @@ let toastr: { success: ReturnType<typeof vi.fn>; warning: ReturnType<typeof vi.f
 function create(
     list: Observable<CollectorView[]> = of([COLLECTOR]),
     metrics: Observable<AcquisitionMetrics> = of(METRICS),
+    canAuthor = true,
 ) {
     toastr = { success: vi.fn(), warning: vi.fn(), error: vi.fn() };
+    const dialog = { open: vi.fn(() => ({ afterClosed: () => of({ created: true, pipeline: 'new_pipe' }) })) };
     TestBed.configureTestingModule({
         imports: [CollectorsComponent],
         providers: [
@@ -55,14 +58,15 @@ function create(
             { provide: CollectorsService, useValue: { list: () => list } },
             { provide: AcquisitionMetricsService, useValue: { get: () => metrics } },
             { provide: RunsService, useValue: { trigger: () => of({ runId: 'run-1' }) } },
-            { provide: MatDialog, useValue: {} },
+            { provide: MatDialog, useValue: dialog },
+            { provide: LensService, useValue: { canAuthorWorkbench: () => canAuthor } },
             { provide: InspectoConfirmService, useValue: { confirm: () => Promise.resolve(true) } },
             { provide: ToastrService, useValue: toastr },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
         ],
     });
-    const fixture = TestBed.createComponent(CollectorsComponent);
+    const fixture = TestBed.overrideProvider(MatDialog, { useValue: dialog }).createComponent(CollectorsComponent);
     fixture.detectChanges(); // runs ngOnInit (list + metrics load)
     return fixture;
 }
@@ -91,5 +95,26 @@ describe('CollectorsComponent', () => {
         await fixture.componentInstance.trigger(COLLECTOR);
         expect(toastr.success).toHaveBeenCalledWith('Pipeline "cdr_ingest" run started.');
         expect(toastr.warning).not.toHaveBeenCalled();
+    });
+
+    it('shows New collector when canAuthorWorkbench is true and reloads after creation', () => {
+        const fixture = create();
+        const btn = Array.from((fixture.nativeElement as HTMLElement).querySelectorAll('button')).find((b) =>
+            b.textContent?.includes('New collector'),
+        );
+        expect(btn).toBeTruthy();
+        const loadSpy = vi.spyOn(fixture.componentInstance, 'load');
+        btn!.click();
+        expect(loadSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it('hides New collector when canAuthorWorkbench is false', () => {
+        const noAuth = create(of([COLLECTOR]), of(METRICS), false);
+        expect((noAuth.nativeElement as HTMLElement).textContent).not.toContain('New collector');
+    });
+
+    it('hides New collector when collectors endpoint 404s', () => {
+        const unavail = create(throwError(() => ({ status: 404 })), of(METRICS), true);
+        expect((unavail.nativeElement as HTMLElement).textContent).not.toContain('New collector');
     });
 });

@@ -253,10 +253,21 @@ public final class NodeAttributes {
                             + "default; the explicit empty-list opt-out (data_extensions[0]:) is authored "
                             + "in the pipeline file. Blank = .csv .tsv .txt .json .jsonl .ndjson .xml"));
 
+    /**
+     * The pipeline's inbox folder ({@code dirs.poll}) — borrowed from {@code dirs:} onto the
+     * {@code acquisition} node (lift {@code PipelineEditable:612}, lower {@code :987}). Kept separate
+     * from {@link #COLLECTOR} because {@code COLLECTOR} is the {@code collector:} block shared with
+     * Add data's feed dialog, which owns its own inbox.
+     */
+    public static final List<NodeAttribute> INBOX = List.of(
+            NodeAttribute.of("poll", "Inbox folder", "string", "required").required(false)
+                    .placeholder("data/inbox/<pipeline>")
+                    .help("Local folder the pipeline polls or stages remote files into (dirs.poll). Relative paths resolve under this Space's data directory."));
+
     /** The {@code acquisition} node's published spec: the {@code collector:} block it authors, plus
-     *  the marker-dedup + unpack keys it borrows from {@code processing:}/{@code dirs:}. */
+     *  the inbox folder, marker-dedup, unpack, and trigger keys it borrows from {@code dirs:}/{@code processing:}/{@code trigger:}. */
     public static final List<NodeAttribute> ACQUISITION =
-            Stream.of(COLLECTOR, MARKER_DEDUP, UNPACK, TRIGGER).flatMap(List::stream).toList();
+            Stream.of(INBOX, COLLECTOR, MARKER_DEDUP, UNPACK, TRIGGER).flatMap(List::stream).toList();
 
     /**
      * The {@code output:} block, shared by all three sink kinds and Onboarding's Dataset & Go-live stage —
