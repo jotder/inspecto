@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { seed } from './seed-space-data.mjs';
 import { run, buildPlan, scaffold, INV, HACKED, HOPS, FIRST_HOP, FIRST_DEPOSIT, ACCOUNTS, LOOKALIKE } from './seed-la-crypto.mjs';
 
 const OFF = { pending: false, draft: false };
@@ -24,12 +25,18 @@ function mock(listItems = []) {
   return { fetchFn, calls };
 }
 
-/** The landed transfers, as [from, to] pairs, read from the template's own data files. */
+let corpus;
+/** The landed transfers, as [from, to] pairs, read from the generated corpus of the template. */
 function landedTransfers() {
-  const dir = new URL('../spaces/_templates/la-crypto/data/inbox/transfer/', import.meta.url);
+  if (!corpus) {   // the template's data is generated once into a scratch folder: the repository no longer commits it (P3b)
+    corpus = fs.mkdtempSync(path.join(os.tmpdir(), 'la-crypto-'));
+    process.on('exit', () => fs.rmSync(corpus, { recursive: true, force: true }));
+    seed('la-crypto', corpus);
+  }
+  const dir = path.join(corpus, 'inbox', 'transfer');
   const pairs = [];
   for (const f of fs.readdirSync(dir)) {
-    for (const line of fs.readFileSync(new URL(f, dir), 'utf8').split('\n').slice(1)) {
+    for (const line of fs.readFileSync(path.join(dir, f), 'utf8').split('\n').slice(1)) {
       const c = line.split(',');
       if (c.length > 2) pairs.push([c[1], c[2]]);
     }

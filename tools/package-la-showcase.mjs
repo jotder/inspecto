@@ -27,6 +27,9 @@
 //
 // COMMITTED CONTENT ONLY, the rule of inspecto/package-spaces.ps1: files are read from `git show HEAD:<path>`, so an
 // uncommitted edit or an untracked file in the working tree never ships.
+// The one exception is a Template's DATA: the corpus is no longer committed (SPACES-CONSOLIDATION-1 P3b), so the data zip is
+// built from the Template's own generator (tools/seed-space-data.mjs, which needs Python): deterministic, so it is the
+// same bytes the commit used to carry.
 //
 // Usage: node tools/package-la-showcase.mjs <template-id> [--version <v>] [--min-product <v>] [--out <dir>]
 //   --version      the downloads' version (default: the reactor version in pom.xml)
