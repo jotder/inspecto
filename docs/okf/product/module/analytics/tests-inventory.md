@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.analytics`](../../../../../product-map/module/analytics.toon).
 
-41 test class(es): 41 unit, 0 real-HTTP control-plane, 0 IT.
+42 test class(es): 42 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -45,6 +45,7 @@ mvn -o test -pl platform/inspecto-analytics -Dtest=ColumnProfilerTest,Md5BucketT
 | `ForecasterTest` | `com.gamma.analytics.forecast` | unit | `platform/inspecto-analytics/src/test/java/com/gamma/analytics/forecast/ForecasterTest.java` | {@link Forecaster} and {@link PredictionInterval}: hand-computed figures and the input rules (ANALYTICS-CORE-1 S5). |
 | `ForecastSqlParityTest` | `com.gamma.analytics.forecast` | unit | `platform/inspecto-analytics/src/test/java/com/gamma/analytics/forecast/ForecastSqlParityTest.java` | {@link ForecastSql} against {@link Forecaster}: the same series through DuckDB and the JVM give the same rows — |
 | `ForecastTemplateGoldenTest` | `com.gamma.analytics.forecast` | unit | `platform/inspecto-analytics/src/test/java/com/gamma/analytics/forecast/ForecastTemplateGoldenTest.java` | The golden test of the forecast kernel: the {@code business-assurance} Space Template's Holt-Winters SQL is the |
+| `PeriodProjectionTest` | `com.gamma.analytics.forecast` | unit | `platform/inspecto-analytics/src/test/java/com/gamma/analytics/forecast/PeriodProjectionTest.java` | `BI-INSIGHTS-1` I-12 — {@link PeriodProjection}: the landing of a period in progress, its measured interval and |
 | `IsolationForestTest` | `com.gamma.analytics.model` | unit | `platform/inspecto-analytics/src/test/java/com/gamma/analytics/model/IsolationForestTest.java` |  |
 | `KMeansDuckDbParityTest` | `com.gamma.analytics.model` | unit | `platform/inspecto-analytics/src/test/java/com/gamma/analytics/model/KMeansDuckDbParityTest.java` | {@link KMeansSql} (nearest stored centroid in DuckDB) against {@link KMeans.Model#assign}: every row, incl. NULL / NaN. |
 | `KMeansTest` | `com.gamma.analytics.model` | unit | `platform/inspecto-analytics/src/test/java/com/gamma/analytics/model/KMeansTest.java` |  |

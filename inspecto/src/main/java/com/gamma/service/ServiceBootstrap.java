@@ -198,7 +198,10 @@ public final class ServiceBootstrap {
                             com.gamma.etl.EditionFeatures.refusal(com.gamma.etl.EditionFeatures.REALTIME));
                 // A measure rule (BI-5) has no metric/window — it names a Dataset measure instead, so log
                 // that shape; printing metric/window for it read "null gte 1.0 over null".
-                if (r.isMeasureRule())
+                if (r.isKpiRule())
+                    log.info("Armed alert rule '{}' ({} {} {}) from the registry",
+                            r.name(), r.kpiSignal(), r.comparator(), r.threshold());
+                else if (r.isMeasureRule())
                     log.info("Armed alert rule '{}' ({} {} {} over Dataset {}) from the registry",
                             r.name(), r.measure(), r.comparator(), r.threshold(), r.dataset());
                 else

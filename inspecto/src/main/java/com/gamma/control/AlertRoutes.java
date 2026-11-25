@@ -285,6 +285,7 @@ final class AlertRoutes implements RouteModule {
                     + "POST /inv/investigations/{id}/alert-rules, which checks that you own the Investigation");
         requireGroupingColumns(writeRoot, dataRoot, rule);
         requireWindow(writeRoot, dataRoot, rule);
+        KpiAlertProbe.requireReadable(writeRoot, rule);   // BI-INSIGHTS-1 I-17: the KPI, read as the rule's owner
         requireRunbook(writeRoot, rule);
         return rule;
     }

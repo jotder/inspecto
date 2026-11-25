@@ -183,6 +183,16 @@ public final class AlertService {
         this.groupedProbe = probe;
     }
 
+    /**
+     * Wire the BI-INSIGHTS-1 I-17 KPI-rule evaluator: the rule → the value it watches (the KPI's value to date, the RAG
+     * rank, the projected landing or P(target met)), empty when unknown. {@code null} leaves KPI rules inert.
+     */
+    public void kpiProbe(java.util.function.Function<AlertRule, java.util.OptionalDouble> probe) {
+        this.kpiProbe = probe;
+    }
+
+    private volatile java.util.function.Function<AlertRule, java.util.OptionalDouble> kpiProbe;
+
     /** Wire the LA-23 Investigation-rule evaluator (a Function so this engine never names the optional module). */
     public void investigationProbe(java.util.function.Function<AlertRule, InvestigationMeasureProbe.Reading> probe) {
         this.investigationProbe = probe;
@@ -310,7 +320,9 @@ public final class AlertService {
      *  or severity edit keeps the open keys (the next sweep heals or fires them against the new condition). */
     private static boolean sameKeys(AlertRule a, AlertRule b) {
         return a.isGrouped() == b.isGrouped() && java.util.Objects.equals(a.dataset(), b.dataset())
-                && java.util.Objects.equals(a.measure(), b.measure()) && a.by().equals(b.by());
+                && java.util.Objects.equals(a.measure(), b.measure()) && a.by().equals(b.by())
+                && java.util.Objects.equals(a.kpi(), b.kpi()) && java.util.Objects.equals(a.projection(), b.projection())
+                && java.util.Objects.equals(a.rag(), b.rag());
     }
 
     /**
@@ -324,15 +336,15 @@ public final class AlertService {
     private void retireKeys(AlertRule old) {
         openKeys.remove(old.name());
         healthyStreak.keySet().removeIf(k -> k.startsWith(old.name() + "|"));
-        if (old.isMeasureRule() && !old.isGrouped()) {
+        if ((old.isMeasureRule() || old.isKpiRule()) && !old.isGrouped()) {
             // The scalar Measure rule's one "key": its edge state goes and its still-active ALERT resolves, as a
             // `by` rule's per-key ALERTs do below. Its Incident, likewise, stays with triage.
-            openMeasures.remove(old.name() + "|" + old.dataset());
+            openMeasures.remove(old.name() + "|" + old.scalarScope());
             // …and its cooldown: a re-created rule that is still breaching must raise its Alert at once, not sit in
             // a dead rule's cooldown with no Alert open (and later "clear" an Alert it never raised).
-            lastFired.remove(old.name() + "|" + old.dataset());
+            lastFired.remove(old.name() + "|" + old.scalarScope());
             try {
-                String alertId = records.activeAlertIndex(old.dataset(), "rule").get(old.name());
+                String alertId = records.activeAlertIndex(old.scalarScope(), "rule").get(old.name());
                 if (alertId != null) records.resolveAlert(alertId, actor(old) + ":rule-changed");
             } catch (RuntimeException e) {
                 log.warn("could not retire the open Alert of alert rule {}: {}", old.name(), e.getMessage());
@@ -661,26 +673,16 @@ public final class AlertService {
             }
             var probe = measureProbe;
             if (probe == null) continue;
-            java.util.OptionalDouble value = probe.apply(rule.dataset(), rule.measure());
-            if (value.isEmpty()) continue;                // unknown: neither fires nor heals
-            String measureKey = rule.name() + "|" + rule.dataset();
-            if (rule.breached(value.getAsDouble())) {
-                healthyStreak.remove(measureKey);   // a relapse inside the streak restarts it
-                // Edge-triggered like a by-rule key (TELECOM-ALERT-REFIRE-1): an already-open breach raises nothing
-                // new, however many sweeps re-read it — only a heal re-arms it. It used to re-fire every cooldown.
-                // measureOpen seeds a restart from the still-active ALERT, so a restart does not re-fire either.
-                if (measureOpen(rule, measureKey)) {
-                    refreshMeasureAlert(rule, value.getAsDouble());   // ALERT-VALUE-REFRESH-1: carry the current value
-                    continue;
-                }
-                // Open only once an Alert was actually raised — a heal must never clear an Alert that never fired.
-                if (fire(rule, rule.dataset(), rule.dataset(), value.getAsDouble(), nowMs, out))
-                    openMeasures.put(measureKey, Boolean.TRUE);
-            } else if (measureOpen(rule, measureKey)) {
-                if (!healed(measureKey, rule.healAfterSweeps())) continue;
-                openMeasures.put(measureKey, Boolean.FALSE);
-                healMeasure(rule, measureKey, value.getAsDouble(), nowMs);
-            }
+            evaluateScalar(rule, probe.apply(rule.dataset(), rule.measure()), nowMs, out);
+        }
+
+        // KPI rules (BI-INSIGHTS-1 I-17) read their KPI's period in progress through the KPI probe, which runs as the
+        // rule's owner and answers empty for anything it cannot vouch for (an unreadable KPI, no projection): unknown.
+        for (AlertRule rule : ruleSet) {
+            if (!rule.isKpiRule()) continue;
+            var probe = kpiProbe;
+            if (probe == null) continue;
+            evaluateScalar(rule, probe.apply(rule), nowMs, out);
         }
 
         // Investigation rules (LA-23) are scoped to their Investigation: the scope — and so the cooldown key, the
@@ -703,6 +705,7 @@ public final class AlertService {
                 // because BOTH shapes use `dataset:`, so this skip has to be stated separately.
                 if (rule.isFreshnessRule()) continue;
                 if (rule.isInvestigationRule()) continue;   // its own pass above; no window, so inWindow would NPE
+                if (rule.isKpiRule()) continue;             // likewise: its own pass above, no window
                 if (rule.onPipeline() != null && !matches(rule.onPipeline(), display, id)) continue;
                 if (ledger == null) ledger = status.batches(cfg);   // one read per pipeline pass
                 List<Map<String, String>> rows = inWindow(rule, ledger, nowMs);
@@ -914,12 +917,40 @@ public final class AlertService {
         return true;
     }
 
+    /**
+     * One scalar rule's reading — a Dataset measure rule's value or a KPI rule's: edge-triggered, healed after
+     * {@link AlertRule#healAfterSweeps} healthy sweeps, keyed on {@link AlertRule#scalarScope}. An empty reading is
+     * UNKNOWN: it neither fires nor heals.
+     */
+    private void evaluateScalar(AlertRule rule, java.util.OptionalDouble value, long nowMs, List<Alert> out) {
+        if (value.isEmpty()) return;
+        String scope = rule.scalarScope();
+        String measureKey = rule.name() + "|" + scope;
+        if (rule.breached(value.getAsDouble())) {
+            healthyStreak.remove(measureKey);   // a relapse inside the streak restarts it
+            // Edge-triggered like a by-rule key (TELECOM-ALERT-REFIRE-1): an already-open breach raises nothing
+            // new, however many sweeps re-read it — only a heal re-arms it. It used to re-fire every cooldown.
+            // measureOpen seeds a restart from the still-active ALERT, so a restart does not re-fire either.
+            if (measureOpen(rule, measureKey)) {
+                refreshMeasureAlert(rule, value.getAsDouble());   // ALERT-VALUE-REFRESH-1: carry the current value
+                return;
+            }
+            // Open only once an Alert was actually raised — a heal must never clear an Alert that never fired.
+            if (fire(rule, scope, scope, value.getAsDouble(), nowMs, out))
+                openMeasures.put(measureKey, Boolean.TRUE);
+        } else if (measureOpen(rule, measureKey)) {
+            if (!healed(measureKey, rule.healAfterSweeps())) return;
+            openMeasures.put(measureKey, Boolean.FALSE);
+            healMeasure(rule, measureKey, value.getAsDouble(), nowMs);
+        }
+    }
+
     /** Whether the scalar Measure rule was breached at its last readable sweep; on its first sweep in this
      *  instance, whether it left an ALERT open (the restart case — see {@link #openMeasures}). */
     private boolean measureOpen(AlertRule rule, String measureKey) {
         return openMeasures.computeIfAbsent(measureKey, k -> {
             try {
-                return records.hasActiveAlert(rule.dataset(), rule.name());
+                return records.hasActiveAlert(rule.scalarScope(), rule.name());
             } catch (RuntimeException e) {
                 log.warn("could not read the open Alert of alert rule {}: {}", rule.name(), e.getMessage());
                 return Boolean.FALSE;
@@ -936,7 +967,7 @@ public final class AlertService {
      */
     private void refreshMeasureAlert(AlertRule rule, double value) {
         try {
-            String scope = rule.dataset();
+            String scope = rule.scalarScope();
             String alertId = records.activeAlertIndex(scope, "rule").get(rule.name());
             if (alertId == null) return;
             AlertStore.Row row = records.findAlert(alertId).orElse(null);
@@ -965,9 +996,13 @@ public final class AlertService {
      */
     private void healMeasure(AlertRule rule, String measureKey, double value, long nowMs) {
         lastFired.remove(measureKey);   // the fire() cooldown key — the next breach must fire at once
-        String scope = rule.dataset();
-        String message = String.format(Locale.ROOT, "CLEARED: %s on %s no longer breaches alert rule %s (now %s)",
-                rule.measure(), textScope(rule, scope), rule.name(), value);
+        String scope = rule.scalarScope();
+        String watched = rule.isKpiRule() ? rule.kpiSignal() : rule.measure();
+        String message = rule.isKpiRule()
+                ? String.format(Locale.ROOT, "CLEARED: the %s no longer breaches alert rule %s (now %s)",
+                watched, rule.name(), value)
+                : String.format(Locale.ROOT, "CLEARED: %s on %s no longer breaches alert rule %s (now %s)",
+                watched, textScope(rule, scope), rule.name(), value);
         log.info("[ALERT-CLEARED] {}", message);
         EventLog.current().emit(Event.builder(EventType.ALERT_CLEARED)
                 .level(EventLevel.INFO)
@@ -975,8 +1010,8 @@ public final class AlertService {
                 .pipeline(scope)
                 .message(message)
                 .attr("rule", rule.name())
-                .attr("dataset", scope)
-                .attr("measure", rule.measure())
+                .attr(rule.isKpiRule() ? "kpi" : "dataset", rule.isKpiRule() ? rule.kpi() : scope)
+                .attr("measure", watched)
                 .attr("value", value)
                 .attr("severity", rule.severity())
                 .attr(com.gamma.notify.Notification.RECIPIENT_ATTR, recipient(rule))
@@ -984,12 +1019,13 @@ public final class AlertService {
         try {
             Map<String, Object> payload = new LinkedHashMap<>();
             payload.put("rule", rule.name());
-            payload.put("dataset", scope);
-            payload.put("measure", rule.measure());
+            payload.put(rule.isKpiRule() ? "kpi" : "dataset", rule.isKpiRule() ? rule.kpi() : scope);
+            payload.put("measure", watched);
             payload.put("value", value);
             payload.put("owner", rule.owner());
             Signal s = new Signal(null, "alert-rule.cleared", Instant.ofEpochMilli(nowMs),
-                    Severity.INFO, Ref.of("alert-rule", rule.name()), Ref.of("dataset", scope),
+                    Severity.INFO, Ref.of("alert-rule", rule.name()),
+                    rule.isKpiRule() ? Ref.of("kpi", rule.kpi()) : Ref.of("dataset", scope),
                     "alert:" + measureKey,   // the fired Signal's correlation key
                     null, null, null, message, payload, 1);
             EventLog.current().emit(s.toEvent());
@@ -1666,6 +1702,9 @@ public final class AlertService {
             if (rule.investigation() != null) attrs.put("investigation", rule.investigation());
             if (rule.relation() != null) attrs.put("relation", rule.relation());
             if (rule.measure() != null) attrs.put("measure", rule.measure());
+            if (rule.kpi() != null) attrs.put("kpi", rule.kpi());
+            if (rule.projection() != null) attrs.put("projection", rule.projection());
+            if (rule.rag() != null) attrs.put("rag", rule.rag());
             attrs.put("comparator", rule.comparator());
             attrs.put("threshold", String.valueOf(rule.threshold()));
             if (rule.window() != null) attrs.put("window", rule.window());
@@ -1708,7 +1747,7 @@ public final class AlertService {
         // rule+pipeline) via the "rule" dedupe attribute already present in attrs.
         java.util.Optional<String> incidentId = incidents.openIncident(title, alert.message(),
                 rule.severity(), pipeline, new LinkedHashMap<>(attrs), "rule");
-        if (incidentId.isEmpty() && rule.isMeasureRule()) {
+        if (incidentId.isEmpty() && (rule.isMeasureRule() || rule.isKpiRule())) {
             // A scalar Measure rule heals (healMeasure), so a relapse meets its still-active Incident exactly as a
             // `by` key does (persistKeyObjects): re-open it if an operator RESOLVED it (`reopen` answers false from
             // IDENTIFIED/DIAGNOSING), and link the relapse Alert to it either way.

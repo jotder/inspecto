@@ -44,6 +44,12 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
   KPI tile bound to a KPI: that KPI's own target). A period with nothing to compare with shows a gap and "No
   previous period", never 0. Computed by the server in the Widget's own query, masked like it
   ([Studio BI](architecture-studio-bi.md) §4).
+* **Where the period lands** (BI-INSIGHTS-1 I-12, 2026-11-25) — a KPI tile bound to a KPI also says where the period
+  in progress will land: a badge "Projected: Amber" beside the actual's "RAG: Red", and "Lands at SAR 2,300 (SAR
+  2,200–SAR 2,400, 80 % range) · 97 % chance of meeting the target". When it cannot say, it says why ("No
+  projection: needs two seasons of history…"): only a count or sum KPI on a week, month, quarter or year grain with
+  two weeks of data is projected, and never over a Dashboard's picked dates. An Alert Rule can watch the same thing
+  (`kpi:` with `projection: value | probability` or `rag:`) — [KPI projection](../../module/engine/spec-kpi-projection.md).
 * **Widgets are library citizens** — identity + tags, the browsable Viz Library gallery, a standalone
   `WidgetHost` render path, and one shared `DatasetResultService` result layer: it runs
   `POST /bi/query` (DuckDB) and unmappable specs (named-Measure SQL, OR filters) fail honestly.

@@ -147,4 +147,35 @@ class ScalarMeasureAlertObjectsTest {
         assertEquals("IDENTIFIED", of(objects, ObjectType.INCIDENT, null).stream()
                 .filter(i -> "cases".equals(i.attributes().get("dataset"))).findFirst().orElseThrow().status(), "its Incident stays with triage");
     }
+
+    @Test
+    void aCriticalKpiRuleOpensAnIncidentHealsItsAlertAndRelinksARelapse() {
+        // BI-INSIGHTS-1 I-17: a KPI rule on its projection is a scalar rule scoped to "kpi:<id>"
+        AlertRule kpiRule = AlertRule.fromMap(Map.of("name", "revenue-off-track", "kpi", "monthly_revenue",
+                "projection", "probability", "comparator", "lt", "threshold", 0.5, "severity", "CRITICAL"));
+        ObjectService objects = new ObjectService(new InMemoryObjectStore());
+        java.util.Optional<com.gamma.objects.ObjectAccess> ops = java.util.Optional.of(objects.access());
+        AlertService svc = new AlertService(List.of(kpiRule), noPipelines(), emptyStore(), AlertRecords.of(alerts, ops),
+                AlertRecords.incidentsOf(ops));
+        AtomicReference<OptionalDouble> chance = new AtomicReference<>(OptionalDouble.of(0.2));
+        svc.kpiProbe(r -> chance.get());
+
+        assertEquals(1, svc.evaluateRules().size());
+        OperationalObject opened = incident(objects);
+        assertEquals("IDENTIFIED", opened.status());
+        assertEquals("monthly_revenue", opened.attributes().get("kpi"));
+        assertEquals("probability", opened.attributes().get("projection"));
+        assertTrue(opened.title().contains("P(target met) of KPI monthly_revenue"), opened.title());
+
+        chance.set(OptionalDouble.of(0.9));                             // heals: the Alert resolves, the Incident stays
+        svc.evaluateRules();
+        assertEquals(0, alerts.allActive().size());
+        assertEquals("IDENTIFIED", incident(objects).status());
+
+        chance.set(OptionalDouble.of(0.1));                             // relapse: linked to the same Incident
+        assertEquals(1, svc.evaluateRules().size());
+        OperationalObject same = incident(objects);
+        AlertStore.Row relapse = alerts.allActive().get(0);
+        assertTrue(objects.linksOf(same.id()).stream().anyMatch(l -> l.toId().equals(relapse.id())));
+    }
 }

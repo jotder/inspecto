@@ -192,4 +192,64 @@ class KpiEvaluatorTest {
     void aColumnTheRelationLacksFailsInDuckDbRatherThanReadingZero() {
         assertThrows(java.sql.SQLException.class, () -> eval(Map.of("measure", "sum(missing)")));
     }
+
+    // ── BI-INSIGHTS-1 I-12: projection ──────────────────────────────────────────────────────────────────────────
+
+    /** Sales every day of 2026 to Aug 13: 100 on a weekday, 20 on a weekend (ISO day 6, 7), one row per day. */
+    private static final String DAILY = "SELECT CAST(d AS DATE) AS sale_date, CAST(CASE WHEN isodow(d) >= 6 THEN 20 ELSE 100 END "
+            + "AS DOUBLE) AS amount FROM range(TIMESTAMP '2026-01-01', TIMESTAMP '2026-08-14', INTERVAL 1 DAY) AS t(d)";
+
+    private static KpiDefinition daily(Map<String, Object> overrides) {
+        Map<String, Object> m = new LinkedHashMap<>(Map.of("dataset", "sales", "measure", "sum(amount)",
+                "timeField", "sale_date", "grain", "month"));
+        m.putAll(overrides);
+        return KpiDefinition.fromMap("k", m);
+    }
+
+    @Test
+    void aMonthInProgressLandsAtItsActualPlusTheDaysLeftAtTheirWeeklyPattern() throws Exception {
+        KpiEvaluator.Projection p = KpiEvaluator.project(daily(Map.of("target", 2000, "bands", Map.of("green", 2400, "amber", 2200))),
+                DAILY, AS_OF);
+        assertTrue(p.projected(), p.result().reason());
+        // Aug 1–13: 9 weekdays + 4 weekend days = 980. Aug 14–31: 12 weekdays + 6 weekend days = 1,320 left.
+        assertEquals(980.0, p.toDate());
+        assertEquals(18, p.result().horizon());
+        assertEquals(1320.0, p.result().remaining(), 15.0, "the weekly pattern, forecast");
+        assertEquals(2300.0, p.result().value(), 15.0);
+        assertEquals(7, p.result().period());
+        assertEquals(KpiDefinition.Rag.AMBER, p.rag(), "2,300 lands at or above amber 2,200, below green 2,400");
+        assertEquals(KpiDefinition.Rag.RED, p.kpi().rag(p.toDate()), "while the actual so far (980) is red");
+        assertTrue(p.probability() > 0.99, "the target of 2,000 (at least) is all but certain: " + p.probability());
+    }
+
+    @Test
+    void theProbabilityReadsTheDirectionAndFallsBackToTheGreenThreshold() throws Exception {
+        assertTrue(KpiEvaluator.project(daily(Map.of("direction", "down", "target", 2000)), DAILY, AS_OF).probability() < 0.01,
+                "at most 2,000 while 2,300 is projected");
+        assertTrue(KpiEvaluator.project(daily(Map.of("bands", Map.of("green", 2200, "amber", 2000))), DAILY, AS_OF)
+                .probability() > 0.99, "no target: the green threshold is the goal");
+        assertNull(KpiEvaluator.project(daily(Map.of()), DAILY, AS_OF).probability(), "nothing to meet");
+    }
+
+    @Test
+    void whatCannotBeProjectedSaysWhy() throws Exception {
+        KpiEvaluator.Projection avg = KpiEvaluator.project(daily(Map.of("measure", "avg(amount)")), DAILY, AS_OF);
+        assertFalse(avg.projected());
+        assertTrue(avg.result().reason().contains("does not add up"), avg.result().reason());
+        KpiEvaluator.Projection day = KpiEvaluator.project(daily(Map.of("grain", "day")), DAILY, AS_OF);
+        assertTrue(day.result().reason().contains("day-grain"), day.result().reason());
+        KpiEvaluator.Projection empty = KpiEvaluator.project(daily(Map.of()), DAILY + " WHERE false", AS_OF);
+        assertTrue(empty.result().reason().contains("no row"), empty.result().reason());
+        // ten days of data: less than two weeks
+        String short10 = DAILY.replace("TIMESTAMP '2026-01-01'", "TIMESTAMP '2026-08-04'");
+        assertTrue(KpiEvaluator.project(daily(Map.of()), short10, AS_OF).result().reason().contains("two seasons"));
+    }
+
+    @Test
+    void theDailyHistoryIsOneBucketedStatementCutInTheKpisZone() {
+        String sql = KpiEvaluator.dailySql(daily(Map.of("timezone", "Asia/Kolkata")),
+                new KpiDefinition.Window(LocalDate.parse("2024-08-14"), LocalDate.parse("2026-08-14"))).sql();
+        assertTrue(sql.contains("TIMESTAMPTZ '2024-08-14 00:00:00+05:30'"), sql);
+        assertTrue(sql.contains("STRFTIME"), "grouped by the day, as a YYYY-MM-DD label: " + sql);
+    }
 }

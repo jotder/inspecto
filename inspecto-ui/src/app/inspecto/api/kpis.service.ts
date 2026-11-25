@@ -53,6 +53,27 @@ export interface KpiValue {
     unit?: string | null;
     format?: Record<string, unknown> | null;
     owner?: string | null;
+    /** `?projection=true` only (BI-INSIGHTS-1 I-12): where the period to date lands, or why it cannot be said. */
+    projection?: KpiProjection;
+}
+
+/** Where a period in progress lands: the landing, its interval, P(target met) and the RAG of the landing. */
+export interface KpiProjection {
+    status: 'projected' | 'none';
+    /** `none` only: why there is no projection (too little history, a Measure that does not add up, a range). */
+    reason?: string;
+    value?: number;
+    toDate?: number | null;
+    lower?: number;
+    upper?: number;
+    /** The interval's level, e.g. 0.8. */
+    level?: number;
+    /** P(the target is met), 0–1; `null` when the KPI has no target and no bands. */
+    probability?: number | null;
+    band?: 'GREEN' | 'AMBER' | 'RED' | null;
+    tone?: string;
+    daysLeft?: number;
+    historyDays?: number;
 }
 
 /** KPI definitions: authored through `/components/kpi` (ComponentsService), evaluated here. */
@@ -63,10 +84,12 @@ export class KpisService {
     /**
      * One evaluation. With a `range` (a Dashboard's picked dates, both ends inclusive) the Measure runs over those
      * days and the comparison is the equal-length period before them; `asOf` is then ignored by the server.
+     * `projection` asks for {@link KpiProjection} too (a range always answers `none`).
      */
-    value(id: string, asOf?: string, range?: KpiRange | null): Observable<KpiValue> {
+    value(id: string, asOf?: string, range?: KpiRange | null, projection = false): Observable<KpiValue> {
+        const when = range ? { from: range.from, to: range.to } : { asOf };
         return this.http.get<KpiValue>(apiUrl(`/kpis/${encodeURIComponent(id)}/value`), {
-            params: toParams(range ? { from: range.from, to: range.to } : { asOf }),
+            params: toParams(projection ? { ...when, projection: 'true' } : when),
         });
     }
 }

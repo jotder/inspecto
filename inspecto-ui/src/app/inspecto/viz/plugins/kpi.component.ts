@@ -3,7 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { formatNumber, NumberFormat } from '../number-format';
-import { targetStatus } from '../target-status';
+import { projectionStatus, targetStatus } from '../target-status';
 import { kpiDelta, toneBadge } from '../kpi-delta';
 import { COMPARE_LABEL, CompareKind } from '../compare';
 import { KpiRange, KpisService, KpiValue } from 'app/inspecto/api/kpis.service';
@@ -88,6 +88,14 @@ export function nextKpiMode(mode: KpiMode): KpiMode {
                     <inspecto-status-badge [value]="t.badge" [label]="t.text" />
                 </div>
             }
+            @if (projectionLine(); as p) {
+                <div class="mt-2" data-testid="kpi-projection">
+                    @if (p.badge; as b) {
+                        <inspecto-status-badge [value]="b.value" [label]="b.label" />
+                    }
+                    <div class="text-secondary mt-1 text-xs" [title]="p.text">{{ p.text }}</div>
+                </div>
+            }
         </div>
     `,
 })
@@ -134,9 +142,10 @@ export class KpiComponent {
             this.definition.set(null);
             this.failed.set(false);
             if (!id) return;
+            // I-12: a period in progress also says where it lands; a picked range is not one, so it is not asked.
             const read = this.injector
                 .get(KpisService)
-                .value(id, asOf, range)
+                .value(id, asOf, range, !range)
                 .subscribe({ next: (v) => this.definition.set(v), error: () => this.failed.set(true) });
             onCleanup(() => read.unsubscribe());
         });
@@ -230,6 +239,15 @@ export class KpiComponent {
         const s = targetStatus(v, this.eTarget(), this.eBetter(), this.eFormat());
         return s ? { text: s.text, badge: toneBadge(s.met ? 'good' : 'bad') } : null;
     });
+
+    /**
+     * I-12: where the period to date lands — the RAG of the landing as a badge ("Projected: Amber", beside the RAG of
+     * the actual) and the landing, its range and the chance of meeting the target in words; "No projection: <why>"
+     * when the server cannot make one. Bound tiles only; the mini size keeps just the number.
+     */
+    readonly projectionLine = computed(() =>
+        this.effectiveMode() === 'mini' ? null : projectionStatus(this.definition()?.projection, this.eFormat()),
+    );
 
     cycle(): void {
         this.mode.update(nextKpiMode);

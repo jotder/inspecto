@@ -104,6 +104,110 @@ public final class KpiEvaluator {
         return run(kpi, relationSql, w);
     }
 
+    // ── I-12: target-attainment projection ──────────────────────────────────────────────────────────────────────
+
+    /** The aggregates whose daily parts add up to the period — the only ones a period can be projected from. */
+    public static final java.util.Set<String> ADDITIVE = java.util.Set.of("count", "sum");
+    /** Days of history the projection reads before the period's last day to date (two years). */
+    static final int HISTORY_DAYS = 730;
+
+    /**
+     * Where the period holding {@code asOf} lands (`BI-INSIGHTS-1` I-12): its value to date plus a forecast of the days
+     * left, from the Analytics Kernel's {@link com.gamma.analytics.forecast.PeriodProjection}. The history is the KPI's
+     * own Measure per day over the LIVE Dataset (at most {@value #HISTORY_DAYS} days back, from the first day with data),
+     * read in one bucketed statement — never KPI History, whose rows are whole periods and cannot say what the rest of
+     * a period holds. A day with no row is 0 (a count or sum of nothing). Computed at query time (D-BI7).
+     *
+     * @return the projection, or one with {@code projected = false} and the reason it cannot be made
+     */
+    public static Projection project(KpiDefinition kpi, String relationSql, LocalDate asOf) throws SQLException, IOException {
+        KpiDefinition.Window cur = kpi.current(asOf);
+        Double toDateValue = run(kpi, relationSql, cur);
+        double toDate = toDateValue == null ? 0 : toDateValue;
+        if (kpi.grain() == KpiDefinition.Grain.DAY)
+            return Projection.none(kpi, "a day-grain KPI's period has no smaller bucket to forecast", toDateValue);
+        if (!ADDITIVE.contains(kpi.measure().agg()))
+            return Projection.none(kpi, "'" + kpi.measure().agg() + "' does not add up day by day, so the period cannot be "
+                    + "projected from its days (count and sum can)", toDateValue);
+        LocalDate periodEnd = kpi.grain().plus(cur.from(), 1);
+        int horizon = (int) java.time.temporal.ChronoUnit.DAYS.between(cur.to(), periodEnd);
+        LocalDate from = cur.to().minusDays(HISTORY_DAYS);
+        Map<LocalDate, Double> byDay = daily(kpi, relationSql, new KpiDefinition.Window(from, cur.to()));
+        LocalDate first = byDay.keySet().stream().min(LocalDate::compareTo).orElse(null);
+        if (first == null) return Projection.none(kpi, "the Dataset holds no row in the last " + HISTORY_DAYS + " days", toDateValue);
+        int n = (int) java.time.temporal.ChronoUnit.DAYS.between(first, cur.to());
+        double[] series = new double[n];
+        for (int i = 0; i < n; i++) series[i] = byDay.getOrDefault(first.plusDays(i), 0.0);
+        var r = com.gamma.analytics.forecast.PeriodProjection.project(series, toDate, horizon,
+                com.gamma.analytics.time.SeasonalityDetector.candidatesFor(com.gamma.analytics.time.TimeGrain.DAY), 7);
+        return new Projection(r, toDateValue, kpi);
+    }
+
+    /**
+     * A projection with the KPI's reading of it: the RAG of the landing ({@link KpiDefinition#rag}) and P(target met),
+     * the goal being the target (direction up: at least; down: at most), else the green band's threshold, else the
+     * green interval for direction band; no target and no bands ⇒ no probability.
+     */
+    public record Projection(com.gamma.analytics.forecast.PeriodProjection.Result result, Double toDate, KpiDefinition kpi) {
+        static Projection none(KpiDefinition kpi, String reason, Double toDate) {
+            return new Projection(new com.gamma.analytics.forecast.PeriodProjection.Result(false, reason,
+                    toDate == null ? 0 : toDate, 0, Double.NaN, Double.NaN, Double.NaN, Double.NaN, 0, 0, 0, false, 0, null),
+                    toDate, kpi);
+        }
+
+        public boolean projected() { return result.projected(); }
+
+        public KpiDefinition.Rag rag() { return projected() ? kpi.rag(result.value()) : null; }
+
+        /** P(target met), or {@code null} when there is no projection or nothing to meet. */
+        public Double probability() {
+            if (!projected()) return null;
+            KpiDefinition.Bands b = kpi.bands();
+            java.util.OptionalDouble p;
+            if (kpi.direction() == KpiDefinition.Direction.BAND) {
+                if (b == null) return null;
+                p = result.probability(com.gamma.analytics.forecast.PeriodProjection.Goal.BETWEEN, b.greenLo(), b.greenHi());
+            } else {
+                Double t = kpi.target() != null ? kpi.target()
+                        : b == null ? null : kpi.direction() == KpiDefinition.Direction.UP ? b.greenLo() : b.greenHi();
+                if (t == null) return null;
+                p = result.probability(kpi.direction() == KpiDefinition.Direction.UP
+                        ? com.gamma.analytics.forecast.PeriodProjection.Goal.AT_LEAST
+                        : com.gamma.analytics.forecast.PeriodProjection.Goal.AT_MOST, t, t);
+            }
+            return p.isPresent() ? p.getAsDouble() : null;
+        }
+    }
+
+    /** The KPI's Measure per day of {@code w}, in its zone; a day with no row is absent. One bucketed statement. */
+    static Map<LocalDate, Double> daily(KpiDefinition kpi, String relationSql, KpiDefinition.Window w) throws SQLException, IOException {
+        MeasureCompiler.Compiled sql = dailySql(kpi, w);
+        List<Finding> findings = SqlGuard.check(sql.sql());
+        if (!findings.isEmpty())
+            throw new IllegalArgumentException("compiled KPI query failed the SQL safety check: " + findings.get(0).message());
+        int maxRows = (int) java.time.temporal.ChronoUnit.DAYS.between(w.from(), w.to()) + 1;
+        QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request(kpi.dataset(), relationSql, sql.sql(), maxRows, 0,
+                List.of(), List.of(), sql.params()), com.gamma.sql.SqlSandboxPolicy.defaultPolicy(), kpi.zone());
+        Map<LocalDate, Double> out = new java.util.HashMap<>();
+        for (Map<String, Object> row : r.rows()) {
+            Object day = row.get(kpi.timeField());
+            if (day == null) continue;
+            out.put(LocalDate.parse(String.valueOf(day)), row.get(kpi.measure().id()) instanceof Number v ? v.doubleValue() : 0.0);
+        }
+        return out;
+    }
+
+    /** {@link #sql}'s window CTE with the Measure grouped by the day of {@code timeField} — package-visible for a test. */
+    static MeasureCompiler.Compiled dailySql(KpiDefinition kpi, KpiDefinition.Window w) {
+        String col = com.gamma.util.SqlIdent.q(kpi.timeField());
+        int days = (int) java.time.temporal.ChronoUnit.DAYS.between(w.from(), w.to()) + 1;
+        MeasureCompiler.Compiled measure = MeasureCompiler.compile(new MeasureCompiler.Spec(WINDOW, List.of(kpi.measure()),
+                List.of(kpi.timeField()), Map.of(kpi.timeField(), "day"), List.of(), List.of(), days));
+        return new MeasureCompiler.Compiled("WITH " + com.gamma.util.SqlIdent.q(WINDOW) + " AS (SELECT * FROM " + com.gamma.util.SqlIdent.q(kpi.dataset())
+                + " WHERE " + col + " >= TIMESTAMPTZ '" + instant(kpi, w.from()) + "' AND " + col + " < TIMESTAMPTZ '"
+                + instant(kpi, w.to()) + "') " + measure.sql(), measure.params());
+    }
+
     private static LocalDate edgeDay(KpiDefinition kpi, String relationSql, String agg) throws SQLException, IOException {
         String sql = "SELECT CAST(CAST(CAST(" + agg + "(" + com.gamma.util.SqlIdent.q(kpi.timeField()) + ") AS TIMESTAMPTZ) AS DATE) AS VARCHAR) AS d FROM "
                 + com.gamma.util.SqlIdent.q(kpi.dataset());

@@ -54,6 +54,22 @@ public final class PredictionInterval {
                 / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1);
     }
 
+    /**
+     * The standard normal distribution function Φ(x) — Abramowitz &amp; Stegun 26.2.17, absolute error below 7.5e-8.
+     * The inverse of {@link #normalQuantile} to that accuracy; a probability read off a forecast's interval
+     * ({@link PeriodProjection}) uses it.
+     */
+    public static double normalCdf(double x) {
+        if (Double.isNaN(x)) throw new IllegalArgumentException("normal cdf of NaN");
+        if (x == Double.POSITIVE_INFINITY) return 1;
+        if (x == Double.NEGATIVE_INFINITY) return 0;
+        double ax = Math.abs(x);
+        double t = 1 / (1 + 0.2316419 * ax);
+        double poly = t * (0.319381530 + t * (-0.356563782 + t * (1.781477937 + t * (-1.821255978 + t * 1.330274429))));
+        double upper = Math.exp(-ax * ax / 2) / Math.sqrt(2 * Math.PI) * poly;   // P(Z > |x|)
+        return x >= 0 ? 1 - upper : upper;
+    }
+
     /** {@code z(level)}: the two-sided multiplier of a central interval holding {@code level} (0 &lt; level &lt; 1). */
     public static double z(double level) {
         if (!(level > 0 && level < 1)) throw new IllegalArgumentException("interval level must be between 0 and 1, got " + level);

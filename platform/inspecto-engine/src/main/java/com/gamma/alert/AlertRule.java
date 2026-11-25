@@ -133,7 +133,25 @@ public record AlertRule(String name, String metric, String comparator, double th
                         String investigation, String relation, String description,
                         List<String> by, int stormCap, String owner, Map<String, Object> valueMeasure,
                         int healAfterSweeps, Map<String, Object> extra, String runbook, boolean indexLag,
-                        AlertWindow eventWindow) {
+                        AlertWindow eventWindow, String kpi, String projection, String rag) {
+
+    /** Every pre-{@code kpi} (pre-BI-INSIGHTS-1 I-17) caller of the full shape: not a KPI rule. */
+    public AlertRule(String name, String metric, String comparator, double threshold,
+                     String window, String severity, String onPipeline,
+                     String dataset, String measure, Object when, String maximumAge,
+                     String investigation, String relation, String description,
+                     List<String> by, int stormCap, String owner, Map<String, Object> valueMeasure,
+                     int healAfterSweeps, Map<String, Object> extra, String runbook, boolean indexLag,
+                     AlertWindow eventWindow) {
+        this(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when, maximumAge,
+                investigation, relation, description, by, stormCap, owner, valueMeasure, healAfterSweeps, extra, runbook,
+                indexLag, eventWindow, null, null, null);
+    }
+
+    /** What a KPI rule's {@code projection} key may watch: the projected landing, or P(target met). */
+    public static final Set<String> PROJECTIONS = Set.of("value", "probability");
+    /** The status a KPI rule's {@code rag} key fires at (or worse), with its rank — the value such a rule reads. */
+    public static final Map<String, Integer> RAG_RANKS = Map.of("amber", 1, "red", 2);
 
     /**
      * Every key {@link #fromMap} models (and the R3 {@code shares} envelope key, which the save routes carry
@@ -141,7 +159,8 @@ public record AlertRule(String name, String metric, String comparator, double th
      */
     static final Set<String> MODELLED = Set.of("name", "metric", "comparator", "threshold", "window", "severity",
             "onPipeline", "dataset", "measure", "when", "maximumAge", "investigation", "relation", "description",
-            "by", "stormCap", "owner", "valueMeasure", "healAfterSweeps", "shares", "runbook", "indexLag", "pattern");
+            "by", "stormCap", "owner", "valueMeasure", "healAfterSweeps", "shares", "runbook", "indexLag", "pattern",
+            "kpi", "projection", "rag");
     /** The prefix of an author-owned annotation key: kept through every save, never refused. */
     public static final String AUTHOR_PREFIX = "x-";
 
@@ -319,6 +338,11 @@ public record AlertRule(String name, String metric, String comparator, double th
         relation = (relation == null || relation.isBlank()) ? null : relation.trim().toLowerCase(Locale.ROOT);
         valueMeasure = (valueMeasure == null || valueMeasure.isEmpty()) ? null
                 : java.util.Collections.unmodifiableMap(new java.util.LinkedHashMap<>(valueMeasure));
+        kpi = (kpi == null || kpi.isBlank()) ? null : kpi.trim();
+        projection = lower(projection);
+        projection = (projection == null || projection.isEmpty()) ? null : projection;
+        rag = lower(rag);
+        rag = (rag == null || rag.isEmpty()) ? null : rag;
         if (eventWindow != null && eventWindow.isPattern()) {
             // PA-9c Pattern rule (D-PA40): its Measure, comparator and threshold are fixed - "at least one match" for
             // a sequence, "at least one silent Window" for an absence - as a freshness rule's are.
@@ -341,6 +365,7 @@ public record AlertRule(String name, String metric, String comparator, double th
                     "a windowed alert takes comparator gt or gte; 'too few events in a window' is an absence Pattern");
             require(healAfterSweeps == 0, "a windowed alert fires once per window and key; it takes no healAfterSweeps");
         }
+        require(kpi == null || valueMeasure == null, "a KPI alert (kpi:) takes no alert.valueMeasure");
         if (valueMeasure != null) {
             // LA-18 value-measure rule: an Investigation rule whose Measure is a named value Measure over the WHOLE
             // Dataset the Investigation is bound to. It watches the COUNT of entities breaching the Measure's own
@@ -355,6 +380,30 @@ public record AlertRule(String name, String metric, String comparator, double th
                     "alert.valueMeasure.name must be one of " + VALUE_MEASURES);
             comparator = "gte";
             threshold = 1;
+        } else if (kpi != null) {
+            // KPI rule (BI-INSIGHTS-1 I-17): watches a saved KPI's own Measure for its period to date — its value, its
+            // RAG, or (projection:) where the period lands / P(target met). The KPI names the Dataset and Measure.
+            require(dataset == null && measure == null && metric == null && window == null && maximumAge == null
+                            && when == null && investigation == null && relation == null && !indexLag
+                            && onPipeline == null,
+                    "a KPI alert (kpi:) watches the KPI's own Measure: it takes no dataset, measure, metric, window, "
+                            + "maximumAge, when, investigation, indexLag or onPipeline");
+            require(projection == null || PROJECTIONS.contains(projection),
+                    "alert.projection must be one of " + new java.util.TreeSet<>(PROJECTIONS));
+            if (rag != null) {
+                require(RAG_RANKS.containsKey(rag), "alert.rag must be amber or red (fires at that status or worse)");
+                require(!"probability".equals(projection),
+                        "alert.rag reads a status: it pairs with the KPI's value or projection: value, not a probability");
+                // The value such a rule reads is the RAG rank (green 0, amber 1, red 2); fixed here as a freshness
+                // rule's are, so no author comparator can invert it.
+                comparator = "gte";
+                threshold = RAG_RANKS.get(rag);
+            } else if ("probability".equals(projection)) {
+                require(threshold > 0 && threshold <= 1, "alert.threshold of a projection: probability rule is a "
+                        + "probability, above 0 and at most 1");
+            }
+        } else if (rag != null || projection != null) {
+            throw new IllegalArgumentException("alert.rag and alert.projection apply to a KPI alert (kpi:) only");
         } else if (investigation != null) {
             // Investigation rule (LA-23): a scalar Measure over one relation of an Investigation's Working Set.
             // It reads the sealed log — never a Dataset, a ledger or a clock — so none of those shapes apply.
@@ -437,8 +486,9 @@ public record AlertRule(String name, String metric, String comparator, double th
         by = by == null ? List.of() : by.stream().map(c -> c == null ? "" : c.trim()).filter(c -> !c.isEmpty())
                 .distinct().toList();
         if (healAfterSweeps != 0) {
-            require(dataset != null && maximumAge == null && investigation == null,
-                    "alert.healAfterSweeps applies to a Dataset measure rule (dataset: + measure:); this rule is not one");
+            require((dataset != null || kpi != null) && maximumAge == null && investigation == null,
+                    "alert.healAfterSweeps applies to a Dataset measure rule (dataset: + measure:) or a KPI rule (kpi:); "
+                            + "this rule is not one");
             require(healAfterSweeps >= 1 && healAfterSweeps <= MAX_HEAL_AFTER_SWEEPS,
                     "alert.healAfterSweeps must be a whole number from 1 to " + MAX_HEAL_AFTER_SWEEPS);
         } else {
@@ -533,7 +583,7 @@ public record AlertRule(String name, String metric, String comparator, double th
         long seconds = Math.max(1, pollMultiple(maximumAge) * pollIntervalMs / 1000);
         return new AlertRule(name, metric, comparator, threshold, window, severity, onPipeline, dataset, measure, when,
                 seconds + "s", investigation, relation, description, by, stormCap, owner, valueMeasure,
-                0, extra, runbook, indexLag, eventWindow);   // 0 = the default heal count (a freshness rule declares none; the ctor refuses a stated one)
+                0, extra, runbook, indexLag, eventWindow, kpi, projection, rag);   // 0 = the default heal count (a freshness rule declares none; the ctor refuses a stated one)
     }
 
     /** The elapsed-time span a freshness rule allows between publications (a literal limit; see {@link #resolvedFor}). */
@@ -562,7 +612,9 @@ public record AlertRule(String name, String metric, String comparator, double th
                 str(alert.get("name")),
                 str(alert.get("metric")),
                 str(alert.get("comparator")),
-                alert.get("maximumAge") == null && rawPattern == null ? number(alert.get("threshold")) : 0,
+                // a freshness, Pattern or KPI-status (rag:) rule has a fixed threshold the constructor sets
+                alert.get("maximumAge") == null && rawPattern == null && alert.get("rag") == null
+                        ? number(alert.get("threshold")) : 0,
                 windowBlock ? null : str(rawWindow),
                 str(alert.get("severity")),
                 str(alert.get("onPipeline")),
@@ -582,7 +634,34 @@ public record AlertRule(String name, String metric, String comparator, double th
                 unmodelled(alert),
                 str(alert.get("runbook")),
                 flag(alert.get("indexLag"), "alert.indexLag"),
-                windowBlock ? AlertWindow.fromMap(rawWindow, rawPattern) : null);
+                windowBlock ? AlertWindow.fromMap(rawWindow, rawPattern) : null,
+                str(alert.get("kpi")),
+                str(alert.get("projection")),
+                str(alert.get("rag")));
+    }
+
+    /** Whether this is a BI-INSIGHTS-1 I-17 KPI rule: a saved KPI's value, RAG or projection — disjoint from the rest. */
+    public boolean isKpiRule() {
+        return kpi != null;
+    }
+
+    /** The scope prefix of a KPI rule's Alerts and Incidents ({@code kpi:<id>}), so a KPI never collides with a Dataset id. */
+    public static final String KPI_SCOPE = "kpi:";
+
+    /**
+     * The scope a scalar rule's Alert, cooldown and Incident are keyed on: a Dataset measure rule's Dataset, a KPI rule's
+     * {@code kpi:<id>}.
+     */
+    public String scalarScope() {
+        return kpi != null ? KPI_SCOPE + kpi : dataset;
+    }
+
+    /** What a KPI rule reads, in words: the value to date, its RAG, the projected landing or its RAG, or P(target met). */
+    public String kpiSignal() {
+        if (kpi == null) return null;
+        if ("probability".equals(projection)) return "P(target met) of KPI " + kpi;
+        String what = "value".equals(projection) ? "projected landing" : "value to date";
+        return rag != null ? "RAG of the " + what + " of KPI " + kpi : what + " of KPI " + kpi;
     }
 
     /** Whether this is a PA-9b windowed rule: a Dataset measure evaluated per event-time Window on each commit. */
@@ -668,6 +747,9 @@ public record AlertRule(String name, String metric, String comparator, double th
         if (valueMeasure != null) m.put("valueMeasure", valueMeasure);
         if (maximumAge != null) m.put("maximumAge", maximumAge);
         if (indexLag) m.put("indexLag", true);
+        if (kpi != null) m.put("kpi", kpi);
+        if (projection != null) m.put("projection", projection);
+        if (rag != null) m.put("rag", rag);
         m.put("comparator", comparator);
         m.put("threshold", threshold);
         if (window != null) m.put("window", window);

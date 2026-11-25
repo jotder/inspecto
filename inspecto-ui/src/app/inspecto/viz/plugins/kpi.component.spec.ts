@@ -166,6 +166,56 @@ describe('KpiComponent (UIE-1)', () => {
             await expectNoA11yViolations(el);
         });
 
+        it('BI-INSIGHTS-1 I-12: shows where the period lands, its range, the chance and the RAG of the landing in words', async () => {
+            const { el, text } = bound({
+                ...served,
+                projection: {
+                    status: 'projected',
+                    value: 120,
+                    lower: 100,
+                    upper: 140,
+                    level: 0.8,
+                    probability: 0.123,
+                    band: 'AMBER',
+                    tone: 'warning',
+                },
+            });
+            const line = el.querySelector('[data-testid="kpi-projection"]')!;
+            expect(line.textContent).toContain('Projected: Amber');
+            expect(line.textContent).toContain(
+                'Lands at SAR 120.00 (SAR 100.00–SAR 140.00, 80 % range) · 12 % chance of meeting the target',
+            );
+            // the RAG of the actual stays beside it
+            expect(text('kpi-band')).toBe('RAG: Red');
+            await expectNoA11yViolations(el);
+        });
+
+        it('BI-INSIGHTS-1 I-12: says why there is no projection, with no badge', () => {
+            const { el, text } = bound({
+                ...served,
+                projection: { status: 'none', reason: 'needs two seasons of history (14 buckets of 7), has 5' },
+            });
+            expect(text('kpi-projection')).toBe('No projection: needs two seasons of history (14 buckets of 7), has 5');
+            expect(el.querySelector('[data-testid="kpi-projection"] inspecto-status-badge')).toBeNull();
+        });
+
+        it('BI-INSIGHTS-1 I-12: asks for the projection on a period read, never on a picked range', () => {
+            TestBed.configureTestingModule({
+                imports: [KpiComponent],
+                providers: [provideNoopAnimations(), provideHttpClient(withXhr()), provideHttpClientTesting()],
+            });
+            const fixture = TestBed.createComponent(KpiComponent);
+            const http = TestBed.inject(HttpTestingController);
+            const url = environment.apiBaseUrl + '/v1/kpis/refunds/value';
+            fixture.componentRef.setInput('kpiId', 'refunds');
+            fixture.detectChanges();
+            expect(http.expectOne((r) => r.url === url).request.params.get('projection')).toBe('true');
+            fixture.componentRef.setInput('range', { from: '2026-08-01', to: '2026-08-10' });
+            fixture.detectChanges();
+            expect(http.expectOne((r) => r.url === url).request.params.has('projection')).toBe(false);
+            http.verify();
+        });
+
         it("evaluates at the host Dashboard's asOf day, re-reads when it changes, and sends none when blank", () => {
             TestBed.configureTestingModule({
                 imports: [KpiComponent],
