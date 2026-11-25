@@ -509,3 +509,31 @@ edited. `SPACES_DATA_ROOT` is not set by any tracked launcher.
 Verified: the script on a temporary spaces root (status, attach, an id clash, a foreign ref, a missing target, detach: only the
 matching ref is removed; exit code 1 on any problem). Not verified: a server boot (P5), and whether the file routes' safety roots
 cover a data root outside the spaces root.
+
+## 20. P5: boot and smoke (2026-11-25)
+
+**The safe boot set.** A throwaway spaces root (`C:\sandbox\p5-root`) held only `<id>.ref` pointers to the three synthetic Spaces that
+moved to `inspecto_spaces`: `telco-assurance`, `cricket-analytics` and `la-mobile-money`. The two real-data Spaces (`inspecto-mfs`,
+`mfs-demo`) were **not attached**, so nothing started a Collector on a private extract; their file counts and bytes were identical
+before and after (4 848 files 14 427 974 049 B; 61 225 files 30 603 577 987 B). `la-mobile-money` had no state backup, so its 13 270 files
+(59 959 975 B) were copied and counted equal first (`C:\sandboxackup\spaces-p0-20261125\la-mobile-money-state`).
+**The build:** the existing deploy bundle's `lib\*.jar` (built 2026-11-24 12:17; this checkout has no `runtime\`) on the system JDK 27,
+without `inspecto-oidc.jar` and `inspecto-policy.jar`; with them the server exits at start (`OidcAuthenticator` needs its
+configuration), because the bundle's edition above Basic authenticates.
+
+| Probe | Result |
+|---|---|
+| `GET /health` | 200 `{"status":"UP"}` after 14 s; `SpaceManager: 3 space(s) booted` |
+| `GET /api/v1/spaces` | 200; all three `integrity: ready` (`la-mobile-money` first `computing`), each `location.dataFolder` in `inspecto_spaces\<id>`, `referenced: true`, `holdsData: true` |
+| `GET …/datasets/<name>/rows?limit=2` | 200, 2 rows each: `telco-assurance/assurance_benefit`, `la-mobile-money/agent_master_dataset`, `cricket-analytics/matches` (reads of a data root outside the spaces root) |
+| `POST …/cricket-analytics/runs/matches/trigger` | 202; the run wrote its status file under `inspecto_spaces\cricket-analytics\data\matches\status` (a write there); no safety-root refusal in the log |
+| first boot stamps | `.inspecto-space` written for all three, each naming its Space folder |
+| **P0.4, the second checkout** | a second copy of `cricket-analytics` (config only, same `data_root:`) on another spaces root was **refused**: "data_root … belongs to the Space at …\spaces\cricket-analytics, not …\p5b\spaces\cricket-analytics"; 0 Spaces booted; the original's stamp and data untouched |
+
+**Seen at boot:** `la-mobile-money` lost 16 `.processed` markers under `data/<feed>/markers/` and gained DuckDB files
+(`inspecto-acquisition.db` and three WALs); its inbox is empty, so nothing is re-ingested. Housekeeping, not a defect found; noted
+because the state moved with the Space. Both servers were stopped and their ports closed; the scratch roots were deleted.
+
+**Not verified:** a boot of the private Spaces (deliberately; it needs a copy of their data, not the original), the assistant's
+`assist.safety.roots` file routes against a data root outside the spaces root, a boot of a **fresh** build of master (the bundle is a
+day old), the `SPACES_DATA_ROOT` mount form, and `demo`, `default` and `ucc` in the canonical root with their tracked samples.
