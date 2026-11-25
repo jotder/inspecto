@@ -84,6 +84,7 @@ final class PipelineGraphRoutes implements RouteModule {
         api.get("/pipelines/([^/]+)/graph/raw", (e, m) -> editableGraph(api, e, ApiContext.name(m)));
         api.put("/pipelines/([^/]+)/graph", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> saveGraph(api, e, ApiContext.name(m), api.body(e))));
+        api.post("/pipelines/([^/]+)/graph/validate", (e, m) -> validateGraph(api, ApiContext.name(m), api.body(e)));
     }
 
     /**
@@ -424,6 +425,75 @@ final class PipelineGraphRoutes implements RouteModule {
         r.put("name", name);
         r.put("findings", findings);
         return r;
+    }
+
+    /**
+     * {@code POST /pipelines/{name}/graph/validate} — server-side validation of an authored graph
+     * draft without writing anything: runs structural {@link PipelineValidator}, lowering, and
+     * {@link SaveGate}, returning {@code {valid, findings, refusals}}.
+     */
+    private Object validateGraph(ApiContext api, String name, Map<String, Object> body) throws IOException {
+        Map<String, Object> withId = new LinkedHashMap<>(body == null ? Map.of() : body);
+        withId.put("name", name);
+        PipelineGraph g;
+        try {
+            g = PipelineCodec.fromMap(withoutDerivedEdges(withId));
+        } catch (IllegalArgumentException e) {
+            throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, e.getMessage());
+        }
+
+        List<Object> findings = new ArrayList<>();
+        List<Map<String, Object>> refusals = new ArrayList<>();
+        boolean hasErrors = false;
+
+        ComponentRegistry registry = api.writeRoot() == null ? null : componentRegistry(api);
+        PipelineValidator.Result vr = PipelineValidator.validate(g, registry);
+        for (PipelineValidator.Issue issue : vr.errors()) {
+            hasErrors = true;
+            findings.add(Map.of("severity", "ERROR", "code", issue.code(), "message", issue.message()));
+        }
+        for (PipelineValidator.Issue issue : vr.warnings()) {
+            findings.add(Map.of("severity", "WARNING", "code", issue.code(), "message", issue.message()));
+        }
+        if (registry != null) {
+            try {
+                checkJoinReferences(api, g);
+            } catch (ApiException ex) {
+                hasErrors = true;
+                findings.add(Map.of("severity", "ERROR", "code", UNKNOWN_JOIN_REFERENCE, "message", ex.getMessage()));
+            }
+        }
+
+        if (vr.ok()) {
+            Path writeRoot = api.writeRoot();
+            Path target = writeRoot != null ? saveTarget(api, writeRoot, name) : null;
+            boolean existsOnDisk = target != null && Files.exists(target);
+            Map<String, Object> existing = existsOnDisk
+                    ? ConfigLoader.filesystem().decode(target.toString()) : new LinkedHashMap<>();
+            try {
+                Map<String, Object> lowered = PipelineEditable.lower(g, existing, g.active() || existing.isEmpty());
+                Path baseDir = target != null ? target.getParent() : writeRoot;
+                List<Finding> gateFindings = SaveGate.check(api, "pipeline", lowered, writeRoot, baseDir,
+                        SaveGate.Referents.MUST_EXIST);
+                if (SaveGate.refuses(gateFindings)) hasErrors = true;
+                findings.addAll(gateFindings);
+            } catch (PipelineCompileException ex) {
+                hasErrors = true;
+                for (PipelineCompileException.Refusal r : ex.refusals()) {
+                    Map<String, Object> rm = new LinkedHashMap<>();
+                    rm.put("code", r.code());
+                    if (r.nodeId() != null) rm.put("nodeId", r.nodeId());
+                    rm.put("message", r.message());
+                    refusals.add(rm);
+                }
+            }
+        }
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("valid", !hasErrors && refusals.isEmpty());
+        out.put("findings", findings);
+        out.put("refusals", refusals);
+        return out;
     }
 
     /** The file {@link #saveGraph} writes for {@code name}: the registered path when it is inside the write root,

@@ -634,6 +634,22 @@ export class PipelinesService {
         );
     }
 
+    /** Server-side validation of an authored pipeline graph without writing anything. */
+    validatePipelineGraph(
+        name: string,
+        pipeline: AuthoredPipeline,
+    ): Observable<{
+        valid: boolean;
+        findings: { severity?: string; fieldPath?: string; message: string; code?: string; guidance?: string }[];
+        refusals: PipelineRefusal[];
+    }> {
+        return this.http.post<{
+            valid: boolean;
+            findings: { severity?: string; fieldPath?: string; message: string; code?: string; guidance?: string }[];
+            refusals: PipelineRefusal[];
+        }>(apiUrl(`/pipelines/${encodeURIComponent(name)}/graph/validate`), withoutDerivedEdges(pipeline));
+    }
+
     /**
      * Copy a pipeline into a non-runnable authoring template. The server repoints every environment
      * binding (dirs, stream, collector id, DuckLake path) into a `templates/<id>/` sandbox and copies the

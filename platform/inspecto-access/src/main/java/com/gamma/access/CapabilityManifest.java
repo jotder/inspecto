@@ -597,6 +597,7 @@ public final class CapabilityManifest {
             new Exemption("POST", "/components/transform/describe", "read-shaped", "describes a draft's derived shape"),
             new Exemption("POST", "/components/sql/ast", "read-shaped", "parses author SQL into DuckDB's read-only tree; nothing binds or executes"),
             new Exemption("POST", "/validate", "read-shaped", "validates a config draft, writes nothing"),
+            new Exemption("POST", "/pipelines/([^/]+)/graph/validate", "read-shaped", "validates a pipeline graph draft, writes nothing"),
             new Exemption("POST", "/config/preview/parsing", "read-shaped", "previews parsing of a draft"),
             new Exemption("POST", "/config/preview/schema", "read-shaped", "previews a derived schema"),
             new Exemption("POST", "/config/suggest/schema", "read-shaped", "suggests a schema from a sample"),

@@ -39,6 +39,7 @@ final class AgentGate {
     static final Set<String> ALLOWED = Set.of(
             "POST /mcp",
             "POST /validate",
+            "POST /pipelines/([^/]+)/graph/validate",
             "POST /pipelines/authored/([^/]+)/dry-run",
             "POST /bundle/export",
             "POST /promotion/preview",

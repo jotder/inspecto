@@ -45,6 +45,8 @@ import {
     LensService,
     apiErrorMessage,
     datasetManualHint,
+    heldChange,
+    heldMessage,
 } from 'app/inspecto/api';
 import {
     type AttributeSpec,
@@ -1643,8 +1645,14 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                 ? this.api.savePipelineGraph(id, m, { ifMatch: this.draftIfMatch })
                 : this.api.savePipelineGraph(id, m);
         save$.subscribe({
-            next: () => {
+            next: (res) => {
                 this.saving.set(false);
+                const held = heldChange(res);
+                if (held) {
+                    // Held by an approval policy (202): nothing was written, so keep dirty, baseline and draft state intact.
+                    this.toast.info(heldMessage(held));
+                    return;
+                }
                 this.dirty.set(false);
                 // The stack SURVIVES a save (undoing past it re-arms dirty against this new baseline).
                 this.stampBaseline(id, m);
@@ -3160,10 +3168,52 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         else this.validate();
     }
 
-    /** Walk the pipeline for activation-blocking issues; opens the findings panel. */
+    /** Walk the pipeline for activation-blocking issues; opens the findings panel and runs server validation. */
     validate(): PipelineFinding[] {
         const f = this.refreshFindings();
         this.bottomTab.set('validation');
+        const m = this.model();
+        const id = this.selectedId();
+        if (m && id && typeof this.api.validatePipelineGraph === 'function') {
+            this.api.validatePipelineGraph(id, m).subscribe({
+                next: (res) => {
+                    if (this.selectedId() !== id) return;
+                    const serverFindings: PipelineFinding[] = [
+                        ...(res.refusals ?? []).map((r) => ({
+                            severity: 'error' as const,
+                            nodeId: r.nodeId,
+                            message: r.message,
+                            code: r.code,
+                        })),
+                        ...(res.findings ?? []).map((sf) => ({
+                            severity: (sf.severity === 'WARNING'
+                                ? 'warning'
+                                : sf.severity === 'INFO'
+                                  ? 'info'
+                                  : 'error') as PipelineFinding['severity'],
+                            message: sf.fieldPath ? `${sf.fieldPath}: ${sf.message}` : sf.message,
+                            code: sf.code,
+                            guidance: sf.guidance,
+                        })),
+                    ];
+                    const current = this.refreshFindings();
+                    const seen = new Set(current.map((x) => `${x.code ?? ''}:${x.message}`));
+                    const merged = [...current];
+                    for (const sf of serverFindings) {
+                        const key = `${sf.code ?? ''}:${sf.message}`;
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            merged.push(sf);
+                        }
+                    }
+                    this.findings.set(merged);
+                },
+                error: (err) => {
+                    if (this.selectedId() !== id) return;
+                    if (!this.showRefusals(err)) this.onWriteError(err, 'Validation failed');
+                },
+            });
+        }
         return f;
     }
 
@@ -3365,8 +3415,13 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     private setActive(id: string, updated: AuthoredPipeline, ok: string, goingLive: boolean): void {
         this.activating.set(true);
         this.api.savePipelineGraph(id, updated).subscribe({
-            next: () => {
+            next: (res) => {
                 this.activating.set(false);
+                const held = heldChange(res);
+                if (held) {
+                    this.toast.info(heldMessage(held));
+                    return;
+                }
                 this.model.set(updated);
                 this.dirty.set(false);
                 this.stampBaseline(id, updated); // this write IS a save — same baseline rule
