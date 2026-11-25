@@ -41,7 +41,7 @@ phase ends in a role an agent can actually do:
 |---|---|---|---|---|
 | **1** | **Developer** | outside, through the Agent Kit | builds Spaces and Apps: Pipelines, Expectations, Alert Rules, Widgets, Dashboards, Jobs; validates, dry-runs, proposes | the agent identity (§4.2–§4.3), the identity-keyed hold (§4.1), the config write tools (§4.4) |
 | **2** | **Operations support engineer** | outside; often unattended | watches health, runs and freshness; diagnoses a failed run; re-runs, resumes, drains, reprocesses | operational actions (§4.6), the machine agent capability set (§4.5); product gaps `QUARANTINE-RELEASE-1`, `BACKUP-DATA-1` |
-| **3** | **Incident and Case analyst** | outside, and inside as the Assistant's Incident Brief | triages Incidents, writes Briefs, comments, assigns, proposes a transition or an outbound action | case actions (§4.6); product gap `CASE-TRANSITION-FOUR-EYES-1` |
+| **3** | **Incident and Case analyst** | outside, and inside as the Assistant's Incident Brief | triages Incidents, writes Briefs, comments, assigns, proposes a transition or an outbound action; **3b:** analyses Cases in Link Analysis: runs its queries, works in a Draft, starts graph runs | case actions (§4.6); product gap `CASE-TRANSITION-FOUR-EYES-1`; **3b:** Link Analysis (§6.6) |
 | **4** | **Helpdesk** | **inside** Inspecto, as the Assistant | explains the screen or Widget a user is looking at, grounded in the Handbook and the user's own rights | no write path: its own plan, [`2026-11-20-assistant-screen-help-plan.md`](2026-11-20-assistant-screen-help-plan.md) |
 
 Phases 1–3 share this plan's gate (§4.1); phase 4 shares only the masking and audit rules (§5). Phase 4 depends on no
@@ -327,6 +327,7 @@ and a security review of what it added.
 | **AK-2c** machines — **built 2026-11-25** (§6.2 lane A; [spec-mcp.md § Identity](../okf/product/module/mcp/spec-mcp.md#identity)) | 2 | `auth.oidc.agentMachineClients` and the agent capability set | a machine in the set proposes and is held; one outside it keeps one capability; an approval attempt is 403 |
 | **AK-2d** operational actions — **gate and Pending Actions built 2026-11-25** (§6.2 lane B; [spec-mcp.md § Pending Actions](../okf/product/module/mcp/spec-mcp.md#pending-actions-ak-2d)); tools, Skills, screen, golden suite and Handbook how-to built 2026-11-25 (lane C); live operations golden run open | 2 | the operations rows of §4.6, the held-action record per D-AK6, the operations MCP Tools and Skills | a person's agent re-runs a failed run and reprocesses at once, within the person's rights, audited with `agentClient` (D-AK5 as signed); a machine's resume is held as a Pending Action |
 | **AK-2e** case actions — **built 2026-11-25** (§6.4; [spec-mcp.md § Case actions](../okf/product/module/mcp/spec-mcp.md#case-actions-ak-2e)); live analyst golden run open | 3 | the analyst rows of §4.6, the analyst MCP Tools and Skills | a person's agent comments, assigns and resolves at once, within the person's rights (D-AK5 as signed); a machine's resolve is held as a Pending Action; an agent never approves an Action Request |
+| **AK-2f** the analyst in Link Analysis — **planned 2026-11-25** (§6.6) | 3b | the read-shaped LA queries for every agent; Drafts, attach to a Case and graph runs for a person's agent; Drafts for a machine agent through `canDraftInvestigations`, held; LA MCP Tools, Skill `analyse-in-link-analysis`, golden tasks on an LA showcase Space | an agent's projection is masked; a person's agent drafts and starts a graph run at once; a machine's Draft op is held; no agent promotes or reveals |
 | close, per phase | 1–3 | security review of what the phase added, hub `module/mcp` spec and guides, the role's Handbook how-to | review at confidence ≥ 8 finds nothing |
 
 AK-2a ships before any write tool (spec-mcp.md "Deferred to AK-2": a verified agent client must be on the row before an
@@ -523,6 +524,72 @@ true before phase 3, the same family as `RUN-TRIGGER-ACTOR-SPOOF-1`.
 - The person who approves a machine's Brief (the Pending Action) is not a maker of the Action Request it files, so the
   same person may approve both. Each approval is a person reading the request; enforcing two different people would
   be a change to Action Request four-eyes, not to the agent gate.
+
+### 6.6 Phase 3b plan: the analyst in Link Analysis (operator, 2026-11-25)
+
+The operator asked that the Incident and Case analyst also **analyse Cases in Link Analysis**. Today an agent can make
+Link Analysis GET requests, but no MCP Tool reaches a `/inv` route; the analysis itself (about 18 read-shaped POSTs:
+`POST /inv/projection`, `…/projection/neighbors` and its preview, `…/projection/multi`, `…/traversal/recursive-paths`,
+`…/pattern/branching|temporal`, `…/presets/{id}/run`, `…/datasets/{id}/query`, `…/expand/preview`,
+`…/entities/{id}/resolve|suggest`, `…/case-history`, `…/reference-rows`, `…/schema/overlap-profile`,
+`…/deep-links/resolve`, `…/investigations/{id}/replay`) is refused, and so is every Investigation write.
+
+**Operator answers, 2026-11-25:**
+
+| | Answer |
+|---|---|
+| D-AK3b-1 reads | **Open the read-shaped Link Analysis POSTs to every agent**, a person's and a machine's: they persist nothing and run under the caller's masking (an agent never holds `canRevealLinkEntities`, so it always sees masked keys). |
+| D-AK3b-2 writes | **Drafts only** for a person's agent: open a Draft on an Investigation, add ops to it, undo, discard, rebase, plus attach an Investigation to a Case. **Promote stays people-only**, and with it the existing promote four-eyes (`DraftPromote`). No direct Investigation edits (`…/ops`, `…/undo`, `…/reorder`), no members, hand-off, template, embeds, snapshots or uploads. |
+| D-AK3b-3 machines | **A machine agent may work in a Draft, every write held as a Pending Action.** It needs a new, narrower right than `canManageIncidents` (which it never keeps, phase 3). |
+| D-AK3b-4 graph runs | **A person's agent may start and cancel graph runs** (`POST /inv/graph/runs`, `canRunLinkGraphAnalysis`) within the person's rights and the existing Link Analysis rate classes. A machine agent does not: it does not keep that right. |
+
+**Design.**
+
+- **Reads.** The read-shaped LA routes join `AgentGate.ALLOWED`, as `POST /db/query` did in phase 1. No hold: they
+  write nothing. `LinkAnalysisRateClasses` already rate-limits them per caller. `reference-rows` with `reveal: true`
+  still demands `canRevealLinkEntities`, which no agent holds.
+- **The new right `canDraftInvestigations`.** It gates the five Draft writes (`POST /inv/investigations/{id}/drafts`,
+  `…/drafts/{d}/ops|undo|discard|rebase`) instead of `canManageIncidents`. So that no person loses a right, `Roles`
+  treats `canManageIncidents` as **implying** `canDraftInvestigations`, in the seed and in an authored `roles.toon`
+  alike; the seed grants nothing new. `AGENT_MACHINE_CAPABILITIES` gains `canDraftInvestigations`, not
+  `canManageIncidents`. Promote stays `canManageIncidents`. This changes the capability vocabulary: the manifest,
+  `KNOWN_CAPABILITIES`, the Roles screen, `GLOSSARY.md` and the access hub all name it.
+- **Actions.** The five Draft writes, `PUT /inv/investigations/{id}/case` and `POST /inv/graph/runs` (with its
+  self-service cancel) join the action bucket (as `AgentGate.LA_ACTIONS`). A person's agent acts at once within the
+  person's rights. A machine agent's Draft writes are held as Pending Actions and replay as the machine; its attach and
+  graph run answer 403 at the hold, leaving no record.
+- **Who may open a Draft.** A Draft is opened on an Investigation the caller can see (owner, member or share). A
+  machine agent is no member of anything today. The build decides, and asks the operator, whether a person adds a
+  machine as an Investigation member, or a machine may draft only on Investigations shared with its role.
+- **MCP Tools.** Reads: `list_investigations`, `get_investigation` (working set, log, coverage, Case),
+  `explore_entity` (resolve, profile, summary, case history), `expand_neighbors` (`projection/neighbors` and its
+  preview), `find_paths` (`traversal/recursive-paths`), `find_pattern` (branching, temporal), `run_preset`,
+  `get_graph_run`. Writes: `open_draft`, `draft_ops` (add or remove nodes and links, undo), `discard_draft`,
+  `attach_investigation_to_case`, `start_graph_run`, `cancel_graph_run`. Each replays its route as the caller.
+- **Agent Skill `analyse-in-link-analysis`**, rewritten for a customer from this repo's `case-analysis` skill: start
+  from a Case's entities, expand one step at a time, look for paths and patterns, put what matters in a Draft, and
+  report the Draft for a person to promote. Never reveal, never promote.
+- **Golden tasks** on an LA showcase Space with a known ground truth (`spaces/_templates/la-*`): find the link between
+  two entities and report it without acting; put the found ring in a Draft (a person's agent); a machine's Draft op is
+  held; an agent never promotes or reveals; start a graph run and report its top result.
+- **Handbook how-to** *Let an AI agent analyse a Case in Link Analysis*; spec and admin-guide sections; the security
+  review.
+
+**Security review focus.** Masking on every read path an agent reaches (projection, reference rows, case history,
+graph-run results, the Draft working set); the implication `canManageIncidents` → `canDraftInvestigations` cannot
+widen anyone; a machine's Draft never reaches the Investigation without a person's promote; the rate classes hold
+for agents; graph-run cost.
+
+**Steps** (one lane, once the operator says go):
+
+| Step | Delivers | Proof |
+|---|---|---|
+| 3b-1 reads | the read-shaped LA routes in `ALLOWED`; the read MCP Tools | `AgentGateParityTest` pins them; a real-HTTP test: an agent's projection answers masked keys where its person's own request would reveal |
+| 3b-2 the right | `canDraftInvestigations`, the implication, the machine set, the manifest and vocabulary | a person with only `canManageIncidents` (seed or authored) still drafts; a role with only `canDraftInvestigations` drafts but cannot promote |
+| 3b-3 actions | Draft writes, attach to a Case and graph runs as actions; the write MCP Tools | a person's agent drafts and starts a graph run at once; a machine's Draft op is 202 and, approved, runs as the machine; a machine's promote, attach and graph run are refused with no record |
+| 3b-4 close | Skill, golden suite, how-to, docs, security review | `check-agent-kit`, grader tests, the review |
+
+Open before the build: how a machine agent comes to see an Investigation (above).
 
 ## 7. Risks
 
