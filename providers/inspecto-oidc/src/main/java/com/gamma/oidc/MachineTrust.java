@@ -39,8 +39,19 @@ final class MachineTrust {
     private final Duration maxLifetime;   // null = no ceiling
     private final boolean refuseReplay;
     private final Map<String, Instant> seen = new ConcurrentHashMap<>();   // jti → forget after
+    /** {@code -Dauth.oidc.agentMachineClients} (AGENT-KIT-1 AK-2c): the machine clients that are agents. */
+    private final Set<String> agentMachines;
 
     MachineTrust(Set<String> clients, String spaClient, Duration maxLifetime, boolean refuseReplay) {
+        this(clients, spaClient, maxLifetime, refuseReplay, Set.of());
+    }
+
+    MachineTrust(Set<String> clients, String spaClient, Duration maxLifetime, boolean refuseReplay,
+                 Set<String> agentMachines) {
+        if (!clients.containsAll(agentMachines) || agentMachines.contains(spaClient))
+            throw new IllegalStateException("inspecto-oidc: every -Dauth.oidc.agentMachineClients entry must be a machine "
+                    + "client listed in -Dauth.oidc.clients (and not the SPA client)");
+        this.agentMachines = Set.copyOf(agentMachines);
         this.clients = Set.copyOf(clients);
         this.spaClient = spaClient;
         this.maxLifetime = maxLifetime;
@@ -53,10 +64,12 @@ final class MachineTrust {
                 .map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toSet());
         Duration max = lifetime(System.getProperty("auth.oidc.maxTokenLifetime"));
         boolean replay = flag(System.getProperty("auth.oidc.refuseReplay"), "auth.oidc.refuseReplay");
+        Set<String> agentMachines = csv(System.getProperty("auth.oidc.agentMachineClients", ""));
         if (clients.isEmpty()) {
-            if (max != null || replay)
-                throw new IllegalStateException("inspecto-oidc: -Dauth.oidc.maxTokenLifetime and "
-                        + "-Dauth.oidc.refuseReplay apply to machine clients only; set -Dauth.oidc.clients too");
+            if (max != null || replay || !agentMachines.isEmpty())
+                throw new IllegalStateException("inspecto-oidc: -Dauth.oidc.maxTokenLifetime, "
+                        + "-Dauth.oidc.refuseReplay and -Dauth.oidc.agentMachineClients apply to machine clients only; "
+                        + "set -Dauth.oidc.clients too");
             return null;
         }
         String audience = System.getProperty("auth.oidc.audience");
@@ -67,7 +80,8 @@ final class MachineTrust {
         if (replay && max == null)
             throw new IllegalStateException("inspecto-oidc: -Dauth.oidc.refuseReplay requires "
                     + "-Dauth.oidc.maxTokenLifetime");
-        return new MachineTrust(clients, System.getProperty("auth.oidc.clientId", "inspecto-spa"), max, replay);
+        return new MachineTrust(clients, System.getProperty("auth.oidc.clientId", "inspecto-spa"), max, replay,
+                agentMachines);
     }
 
     /** Whether a token whose signature, issuer, audience and expiry already verified may be used now. */
@@ -103,6 +117,16 @@ final class MachineTrust {
         if (policy != null && policy.clients.contains(client) && !client.equals(policy.spaClient)) return client;
         Object gty = claims.getClaim("gty");
         return "client_credentials".equals(gty) || "client-credentials".equals(gty) ? client : null;
+    }
+
+    /**
+     * The machine agent a machine token came from (AGENT-KIT-1 AK-2c), or {@code null}: {@code machine} (from
+     * {@link #machineClient}) is listed in {@code -Dauth.oidc.agentMachineClients}. Such a Subject is both a machine and
+     * an agent: it keeps the agent machine capability set ({@code Roles.AGENT_MACHINE_CAPABILITIES}), every config write
+     * it makes is held as a Pending Change, every action as a Pending Action, and it never approves.
+     */
+    static String agentMachineClient(String machine, MachineTrust policy) {
+        return machine != null && policy != null && policy.agentMachines.contains(machine) ? machine : null;
     }
 
     /**

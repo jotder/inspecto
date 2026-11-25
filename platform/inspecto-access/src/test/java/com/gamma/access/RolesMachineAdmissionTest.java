@@ -39,6 +39,22 @@ class RolesMachineAdmissionTest {
     }
 
     @Test
+    void aMachineAgentKeepsTheAgentSetButNeverApprovesRevealsOrAdministers(@TempDir Path root) throws Exception {
+        Roles.write(root, Map.of(), List.of(), List.of("ops-bot"));
+        Set<String> granted = Set.of(Roles.CAN_OPEN_INBOUND_INVESTIGATION, Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_AUTHOR_ALERT_RULES,
+                Roles.CAN_WORK_INCIDENTS, Roles.CAN_OPERATE_RUNS, Roles.CAN_APPROVE_CHANGES, Roles.CAN_REVEAL_LINK_ENTITIES,
+                Roles.CAN_ADMINISTER, Roles.CAN_CONFIGURE_ACCESS, Roles.CAN_MANAGE_INCIDENTS);
+        Subject agent = new Subject("client:ops-bot", granted, null, Map.of(), null, null, "svc-ops", "ops-bot");
+        assertEquals(Set.of(Roles.CAN_OPEN_INBOUND_INVESTIGATION, Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_AUTHOR_ALERT_RULES,
+                Roles.CAN_WORK_INCIDENTS, Roles.CAN_OPERATE_RUNS), Roles.admitMachine(root, agent).capabilities());
+        assertEquals("ops-bot", Roles.admitMachine(root, agent).agentClient(), "still an agent");
+        Subject plain = new Subject("client:ops-bot", granted, null, Map.of(), null, null, "svc-ops", null);
+        assertEquals(Set.of(Roles.CAN_OPEN_INBOUND_INVESTIGATION), Roles.admitMachine(root, plain).capabilities(),
+                "the agent set is kept only for a machine agent");
+        assertTrue(java.util.Collections.disjoint(Roles.AGENT_MACHINE_CAPABILITIES, Roles.AGENT_NEVER_CAPABILITIES));
+    }
+
+    @Test
     void aMachineIsRefusedWhereItsClientIsNotNamedOrNoSpaceIsBound(@TempDir Path root) throws Exception {
         Subject m = machine("fraudpro", Set.of(Roles.CAN_OPEN_INBOUND_INVESTIGATION));
         assertEquals(403, assertThrows(ApiException.class, () -> Roles.admitMachine(root, m)).status, "no roles.toon");

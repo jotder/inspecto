@@ -1,0 +1,85 @@
+<div class="mt-4 flex items-center gap-3">
+    <mat-button-toggle-group aria-label="Which actions to list" [value]="filter()" (change)="setFilter($event.value)">
+        <mat-button-toggle value="pending">Waiting</mat-button-toggle>
+        <mat-button-toggle value="all">All</mat-button-toggle>
+    </mat-button-toggle-group>
+    <button mat-icon-button (click)="load()" [disabled]="loading()" aria-label="Refresh the Pending Actions">
+        <mat-icon [svgIcon]="'heroicons_outline:arrow-path'"></mat-icon>
+    </button>
+</div>
+
+@if (error()) {
+    <inspecto-alert class="mt-4" variant="error" title="Could not load the Pending Actions">{{
+        error()
+    }}</inspecto-alert>
+} @else {
+    <div class="mt-4">
+        <inspecto-data-table
+            stateKey="pending-actions"
+            exportName="pending-actions"
+            [rows]="actions()"
+            [columns]="columnDefs"
+            [loading]="loading()"
+            (rowClick)="open($event)"
+            noRowsTitle="No actions waiting"
+            noRowsHint="When an unattended AI agent asks to re-run, resume, reprocess or drain a run, its request waits here for a person."
+        />
+    </div>
+}
+
+@if (selected(); as a) {
+    <section class="bg-card mt-6 rounded-2xl p-6 shadow" aria-labelledby="pa-title">
+        <div class="flex items-start gap-3">
+            <div class="min-w-0 flex-1">
+                <h2 id="pa-title" class="text-lg font-semibold">{{ a.action }}</h2>
+                <p class="text-secondary text-sm">
+                    Asked by {{ a.author }}
+                    @if (a.mcpTool) {
+                        (MCP Tool {{ a.mcpTool }})
+                    }
+                    on {{ a.createdAt | date: 'medium' }} · expires {{ a.expiresAt | date: 'medium' }}
+                    @if (a.fourEyes) {
+                        · a person must decide
+                    }
+                </p>
+            </div>
+            <inspecto-status-badge [value]="a.status" />
+            <button mat-icon-button (click)="close()" aria-label="Close the action">
+                <mat-icon [svgIcon]="'heroicons_outline:x-mark'"></mat-icon>
+            </button>
+        </div>
+
+        @if (a.reason) {
+            <p class="mt-3 text-sm"><span class="font-semibold">Reason:</span> {{ a.reason }}</p>
+        }
+        @if (a.decidedBy) {
+            <p class="text-secondary mt-1 text-sm">
+                {{ a.status }} by {{ a.decidedBy }} on {{ a.decidedAt | date: 'medium' }}
+                @if (a.appliedStatus) {
+                    · the run answered {{ a.appliedStatus }}
+                }
+                @if (a.decisionReason) {
+                    — {{ a.decisionReason }}
+                }
+            </p>
+        }
+
+        @if (decideError()) {
+            <inspecto-alert class="mt-4" variant="error" title="Not decided">{{ decideError() }}</inspecto-alert>
+        }
+
+        @if (canDecide()) {
+            <div class="mt-4 flex flex-col gap-2 sm:flex-row sm:items-start">
+                <inspecto-pen-field
+                    class="flex-1"
+                    label="Reason (optional)"
+                    [maxlength]="500"
+                    [formControl]="reason"
+                    [error]="reason.touched && reason.hasError('maxlength') ? 'At most 500 characters.' : ''"
+                ></inspecto-pen-field>
+                <button mat-stroked-button color="warn" [disabled]="deciding()" (click)="decline()">Decline</button>
+                <button mat-flat-button color="primary" [disabled]="deciding()" (click)="approve()">Approve</button>
+            </div>
+        }
+    </section>
+}

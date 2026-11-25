@@ -125,7 +125,10 @@ export function run(root = ROOT_DEFAULT) {
     }
     const golden = join(root, 'agent-kit/golden/developer.json');
     if (!existsSync(golden)) findings.push('agent-kit/golden/developer.json: missing');
-    else findings.push(...checkGolden(readFileSync(golden, 'utf8'), tools));
+    // every suite, one per agent role (developer; operations from phase 2)
+    const gdir = join(root, 'agent-kit/golden');
+    for (const f of existsSync(gdir) ? readdirSync(gdir).filter((n) => n.endsWith('.json')).sort() : [])
+        findings.push(...checkGolden(readFileSync(join(gdir, f), 'utf8'), tools).map((m) => `${f}: ${m}`));
     return { findings, skills: names.length, tools: tools.size };
 }
 

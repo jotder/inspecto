@@ -46,6 +46,7 @@ Two rules the server cannot check for you:
 | Key | Default | What it does |
 |---|---|---|
 | `auth.oidc.agentClients` | unset (no agent clients) | Comma list of client ids whose **person** tokens are an agent acting for that person. Needs `auth.oidc.audience`. Boot refuses a client that is also in `auth.oidc.clients` (machines) or is `auth.oidc.clientId` (the console). |
+| `auth.oidc.agentMachineClients` | unset (no machine agents) | Comma list of **machine** clients (client credentials, each also in `auth.oidc.clients`) that are unattended agents. Such a client keeps, where its roles grant them, `canAuthorWorkbench`, `canAuthorAlertRules`, `canWorkIncidents` and `canOperateRuns` beside a machine's usual `canOpenInboundInvestigation`; every config write it makes is held for a person, and it never approves. The Space must still name it in `roles.toon` `identity.machineClients`. |
 | `mcp.publicOrigin` | the request's scheme and `Host` | The origin agents reach the install at, for example `https://inspecto.example.com`. Set it behind a TLS-terminating reverse proxy, or the metadata names `http://…`. |
 | `auth.oidc.scopes` | `openid` | The scopes the metadata lists as `scopes_supported` (space-separated; the console's sign-in uses the same key). |
 
@@ -70,8 +71,18 @@ location = /.well-known/oauth-protected-resource { proxy_pass http://inspecto:80
   person the agent acts for cannot approve it either). It may withdraw its own proposal.
 - **Validate, dry-run, export a bundle, preview a promotion, raise an Action Request, run a Pipeline** (within
   the person's own rights).
+- **Operate runs** (trigger, pause, resume, reprocess, replay rejects, retry, drain; trigger a Job, replay a Job
+  Run) **at once**, within the person's own rights — the same as the person pressing the button, with the agent
+  client on the audit row.
 - **Nothing else:** every other write is refused (`403`, "an agent client may not call …"), and an agent never
   approves, declines, reveals, promotes, or changes Apps or access.
+
+A **machine agent** (`auth.oidc.agentMachineClients`) follows the same rules with its client as the actor
+(`client:<id>`): it proposes and is held, and it never runs a Pipeline, approves or administers. Its run actions
+are **held too**, as **Pending Actions**: a change approver (`canApproveChanges`, not the machine) approves or
+declines each one under `/pending-actions`, and an approved one runs as the
+machine. Give it a role in
+the Space that grants only what it should author or operate; it never keeps more than the four capabilities above.
 
 Every audit row of an agent's request names the person as the actor and the agent client as `agent_client`;
 search the audit log for it to see everything an agent did. The Pending Changes screen shows "via agent client"

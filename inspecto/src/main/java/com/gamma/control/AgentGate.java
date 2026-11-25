@@ -17,6 +17,9 @@ import java.util.Set;
  *   <li>{@link Bucket#HELD} — the route reaches {@code PendingChanges.hold} / {@code holdSet} ({@link PendingChanges#REPLAYABLE}),
  *       where an agent's write always becomes a Pending Change;</li>
  *   <li>{@link Bucket#ALLOWED} — reads, and the few writes that change nothing governed ({@link #ALLOWED});</li>
+ *   <li>{@link Bucket#ACTION} — the operational actions of plan §4.6 ({@link #ACTIONS}, AK-2d): a person's agent takes
+ *       them at once, within the person's rights (D-AK5); a machine agent's are held as Pending Actions
+ *       ({@code PendingActions.holdIfMachineAction});</li>
  *   <li>{@link Bucket#REFUSED} — everything else (403), including every route that only calls {@code holdRefusing*}
  *       (those do not hold when no policy covers the kind) and the never-list ({@link #never}), which overrides the
  *       other two: an agent never approves, reveals, promotes, administers Apps or changes access.</li>
@@ -28,7 +31,18 @@ final class AgentGate {
 
     private AgentGate() {}
 
-    enum Bucket { HELD, ALLOWED, REFUSED }
+    enum Bucket { HELD, ALLOWED, ACTION, REFUSED }
+
+    /**
+     * The operational actions (plan §4.6, operations rows, AK-2d): a run's trigger, pause, resume, reprocess, rejects
+     * replay, retry now, retry cancel and drain; a Job's trigger and a Job Run's replay. Each is still gated by its own
+     * capability ({@code canOperateRuns}).
+     */
+    static final Set<String> ACTIONS = Set.of(
+            "POST /runs/([^/]+)/trigger", "POST /runs/([^/]+)/pause", "POST /runs/([^/]+)/resume",
+            "POST /runs/([^/]+)/reprocess", "POST /runs/([^/]+)/replay-rejects",
+            "POST /runs/([^/]+)/retries/retry-now", "POST /runs/([^/]+)/retries/cancel", "POST /runs/([^/]+)/drain",
+            "POST /jobs/([^/]+)/trigger", "POST /jobs/runs/([^/]+)/replay");
 
     /**
      * Writes an agent may make that change nothing governed: the MCP endpoint itself, validation and dry runs, the Ship
@@ -43,6 +57,7 @@ final class AgentGate {
             "POST /bundle/export",
             "POST /promotion/preview",
             "POST /pending-changes/([^/]+)/withdraw",
+            "POST /pending-actions/([^/]+)/withdraw",
             "POST /action-requests",
             "POST /db/query",
             "POST /pipelines/authored/([^/]+)/run");
@@ -95,6 +110,7 @@ final class AgentGate {
         String key = method + " " + pattern;
         if (PendingChanges.REPLAYABLE.contains(key) && !NOT_HELD.contains(key)) return Bucket.HELD;
         if (ALLOWED.contains(key)) return Bucket.ALLOWED;
+        if (ACTIONS.contains(key)) return Bucket.ACTION;
         return Bucket.REFUSED;
     }
 

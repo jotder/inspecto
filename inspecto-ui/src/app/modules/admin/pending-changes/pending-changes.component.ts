@@ -19,6 +19,8 @@ import {
 import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { InspectoLineDiffComponent } from 'app/inspecto/components/line-diff.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
+import { InspectoSectionTabsComponent, SectionTab } from 'app/inspecto/components/section-tabs.component';
+import { PendingActionsPanelComponent } from './pending-actions-panel.component';
 import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { StatusBadgeComponent, statusBadgeHtml } from 'app/inspecto/components/status-badge.component';
@@ -54,6 +56,8 @@ export type PendingChangesFilter = 'pending' | 'all';
         InspectoAlertComponent,
         InspectoLineDiffComponent,
         InspectoPageHeaderComponent,
+        InspectoSectionTabsComponent,
+        PendingActionsPanelComponent,
         InspectoSkeletonComponent,
         StatusBadgeComponent,
     ],
@@ -67,6 +71,12 @@ export class PendingChangesComponent implements OnInit {
     protected readonly lens = inject(LensService);
     private readonly session = inject(SessionService);
 
+    /** Which inbox shows: config changes, or a machine agent's held run actions (AGENT-KIT-1 AK-2d). */
+    readonly view = signal<'changes' | 'actions'>('changes');
+    readonly tabs: SectionTab[] = [
+        { id: 'changes', label: 'Pending Changes' },
+        { id: 'actions', label: 'Pending Actions' },
+    ];
     readonly filter = signal<PendingChangesFilter>('pending');
     readonly changes = signal<PendingChange[]>([]);
     readonly loading = signal(false);
