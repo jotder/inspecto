@@ -185,11 +185,33 @@
                 @if (options().subtitle) {
                     <div class="text-secondary -mt-1 mb-2 text-sm">{{ options().subtitle }}</div>
                 }
+                @if (suggestions().length) {
+                    <inspecto-alert class="mb-3 block" variant="info" title="Suggested for this chart">
+                        <ul class="flex flex-col gap-1" data-testid="overlay-suggestions">
+                            @for (s of suggestions(); track s.id) {
+                                <li class="flex flex-wrap items-center gap-2" [attr.data-suggestion]="s.id">
+                                    <span>{{ s.text }}</span>
+                                    <button mat-stroked-button color="primary" (click)="applySuggestion(s)">
+                                        {{ s.action }}
+                                    </button>
+                                    <button
+                                        mat-button
+                                        (click)="dismissSuggestion(s)"
+                                        [attr.aria-label]="'Not now: ' + s.action"
+                                    >
+                                        Not now
+                                    </button>
+                                </li>
+                            }
+                        </ul>
+                    </inspecto-alert>
+                }
                 <inspecto-viz-render
                     [plugin]="p"
                     [props]="props()"
                     [title]="sourceName()"
                     [renderOptions]="options()"
+                    [overlaySummary]="overlaySummary()"
                 />
             }
         </div>

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, Input, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { concatMap, map, of, tap } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
@@ -12,14 +12,19 @@ import { ComponentType, ComponentsService, SessionService, apiErrorMessage } fro
 import { ColumnMeta } from 'app/inspecto/query';
 import {
     ControlValues,
+    OverlaySuggestion,
     VizField,
     VizPlugin,
     VizProps,
     allViz,
     autoAssignChannels,
     getViz,
+    overlayEligible,
     recommend,
+    suggestOverlays,
 } from 'app/inspecto/viz';
+import type { OverlaySummary } from 'app/inspecto/viz/chart-overlays';
+import type { KpiDefinition } from 'app/inspecto/api/kpis.service';
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
 import { DatasetRows, DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';
@@ -158,6 +163,53 @@ export class ExploreComponent implements OnInit {
     });
     readonly recommended = computed<VizPlugin[]>(() => (this.dataset() ? recommend(this.fields()) : []));
     readonly plugin = computed<VizPlugin | null>(() => getViz(this.vizType()) ?? null);
+
+    // ── BI-INSIGHTS-1 I-20: insight-aware Show-Me ──
+    /** The overlay summary + rows of the Widget's statement run with `overlay: {forecast, anomaly}` (the I-11 / I-7
+     *  route) — the seasonality and anomaly signal; null until a probe answered. */
+    private readonly probe = signal<{ summary: OverlaySummary[]; rows: Record<string, unknown>[] } | null>(null);
+    /** The preview's own overlay summary, so an applied forecast band shows its caption here too. */
+    readonly overlaySummary = signal<OverlaySummary[] | undefined>(undefined);
+    /** The bound KPI's definition (`options.kpi.kpiId`), read only to offer its target line / bands. */
+    private readonly kpiDef = signal<KpiDefinition | null>(null);
+    private readonly kpiId = computed(() => this.options().kpi?.kpiId);
+    /** Suggestions the user waved away, by id, for this builder session. */
+    private readonly dismissed = signal<ReadonlySet<string>>(new Set());
+    readonly suggestions = computed<OverlaySuggestion<WidgetOptions>[]>(() =>
+        this.dataset() && !this.viewBound()
+            ? suggestOverlays({
+                  vizType: this.vizType(),
+                  controls: this.controls(),
+                  options: this.options(),
+                  probe: this.probe()?.summary,
+                  probeRows: this.probe()?.rows,
+                  kpi: this.kpiDef(),
+              }).filter((s) => !this.dismissed().has(s.id))
+            : [],
+    );
+
+    constructor() {
+        effect((onCleanup) => {
+            const id = this.kpiId();
+            this.kpiDef.set(null);
+            if (!id) return;
+            const read = this.componentsApi.get('kpi', id).subscribe({
+                next: (c) => this.kpiDef.set(c.content as unknown as KpiDefinition),
+                error: () => this.kpiDef.set(null),
+            });
+            onCleanup(() => read.unsubscribe());
+        });
+    }
+
+    /** Apply a suggestion — only ever on the user's click — and re-run the preview with it. */
+    applySuggestion(s: OverlaySuggestion<WidgetOptions>): void {
+        this.options.set(s.options);
+        this.run();
+    }
+
+    dismissSuggestion(s: OverlaySuggestion<WidgetOptions>): void {
+        this.dismissed.set(new Set([...this.dismissed(), s.id]));
+    }
     readonly sourceName = computed(() => this.dataset()?.sourceName ?? 'data');
 
     /** The view-bound plugins (geo-map / link-analysis) — offered without a dataset; excluded from Show-Me. The
@@ -435,9 +487,39 @@ export class ExploreComponent implements OnInit {
             .then((res) => {
                 if (!res.ok && queryId) this.toastr.error(res.error ?? 'The bound query could not run.');
                 this.props.set(plugin.transformProps(res.ok ? res.rows : [], this.controls()));
+                this.overlaySummary.set(res.ok ? res.overlays : undefined);
             })
             .catch(() => this.props.set({ labels: [], series: [] }))
             .finally(() => this.running.set(false));
+        this.runProbe(plugin, ds, queryId);
+    }
+
+    /**
+     * The seasonality / anomaly signal for Show-Me: the same statement with `overlay: {forecast, anomaly}` through the
+     * same `/bi/query` route (D-BI7: query time, nothing stored). Only for a Widget the overlays can draw on, and only
+     * while one of them is not on yet; an identical probe is served from the result cache, never re-run.
+     */
+    private runProbe(plugin: VizPlugin, ds: Dataset, queryId: string | undefined): void {
+        const o = this.options();
+        this.probe.set(null);
+        if (!overlayEligible(this.vizType(), this.controls(), o) || (o.overlay?.forecast && o.overlay?.anomaly)) return;
+        const spec = plugin.buildQuery(this.controls(), {
+            datasetId: ds.id,
+            sourceName: ds.sourceName,
+            filters: null,
+            options: { ...o, overlay: { forecast: {}, anomaly: {} } },
+        });
+        if (!spec.overlay) return; // a plugin that does not ask for overlays
+        if (queryId) spec.queryId = queryId;
+        const asked = { vizType: this.vizType(), controls: this.controls() };
+        this.datasetResult
+            .run(spec, this.colMetas())
+            .then((res) => {
+                // A probe that answers after the Widget moved on describes another chart — drop it.
+                if (asked.vizType !== this.vizType() || asked.controls !== this.controls()) return;
+                if (res.ok && res.overlays?.length) this.probe.set({ summary: res.overlays, rows: res.rows });
+            })
+            .catch(() => undefined);
     }
 
     save(): void {
