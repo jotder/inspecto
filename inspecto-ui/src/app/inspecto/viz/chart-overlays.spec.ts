@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import MEASURE_CONTRACT from 'app/inspecto/contracts/measure-grammar.contract.json';
 import {
     anomalyThreshold,
+    grainUnit,
     OVERLAY_SUFFIX,
     overlayCell,
     overlayFragment,
@@ -18,6 +19,13 @@ describe('chart overlays (I-11, I-7)', () => {
     it('reads its column suffixes from the contract the engine is pinned to', () => {
         // MeasureGrammarContractTest (Java) compares the same file with ChartOverlays.FC / FC_LO / FC_HI / EXPECTED / Z.
         expect(MEASURE_CONTRACT.overlay.suffixes).toEqual(OVERLAY_SUFFIX);
+    });
+
+    it('names the time bucket by the labels the compiler returns', () => {
+        expect(grainUnit(['2026-01-05', '2026-01-06'])).toBe('day');
+        expect(grainUnit(['2026-01-05', '2026-01-12'])).toBe('week');
+        expect(grainUnit(['2026-01', '2026-02'])).toBe('month');
+        expect(grainUnit(['North', 'South'])).toBe('bucket');
     });
 
     it('sends the forecast and a bare anomaly request; the sensitivity stays in the browser', () => {

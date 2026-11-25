@@ -238,3 +238,11 @@ export function overlayNote(
     }
     return lines;
 }
+
+/** What one bucket of the time axis is called in the caption: a day, a week (labels a week apart) or a month. */
+export function grainUnit(labels: readonly string[]): string {
+    if (labels.some((l) => /^\d{4}-\d{2}$/.test(l))) return 'month';
+    const days = labels.filter((l) => /^\d{4}-\d{2}-\d{2}$/.test(l)).map((l) => Date.parse(l));
+    if (days.length >= 2 && days[1] - days[0] >= 7 * 86_400_000) return 'week';
+    return days.length ? 'day' : 'bucket';
+}
