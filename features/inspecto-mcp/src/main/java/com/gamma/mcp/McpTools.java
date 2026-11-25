@@ -261,10 +261,12 @@ final class McpTools {
             crud("widget", "POST /components/widget", "PUT /components/widget/{id}", "DELETE /components/widget/{id}"),
             crud("dashboard", "POST /components/dashboard", "PUT /components/dashboard/{id}", "DELETE /components/dashboard/{id}"),
             // AK-2 widening W2 (D-AK9): every route below needs canAuthorWorkbench, already in the machine agent set.
-            // notification-channel stays out until the operator says otherwise (plan W2 step 1)
             crud("decision-rule", "POST /decision-rules", "PUT /decision-rules/{id}", "DELETE /decision-rules/{id}"),
             crud("notification-rule", "POST /notifications/rules", "PUT /notifications/rules/{id}",
                     "DELETE /notifications/rules/{id}"),
+            // operator 2026-11-25: a Channel carries no secret (ChannelConfig), so PENDING-CHANGE-SECRET-READBACK-1 does not reach it
+            crud("notification-channel", "POST /notifications/channels", "PUT /notifications/channels/{id}",
+                    "DELETE /notifications/channels/{id}"),
             // id = the delivered kpi Requirement; content may name the KPI's own id
             Map.entry("requirement-kpi", Map.of("create", "POST /requirements/{id}/kpi")),
             // id = the Pipeline; a restore is a save of a kept version, held like one
@@ -361,7 +363,7 @@ final class McpTools {
                     a -> new Call("POST", "/pipelines/authored/" + seg(a.get("pipeline")) + "/dry-run", bodyOf(a))),
             new Tool("propose_change", "Propose a config change",
                     "Propose creating, updating or deleting a Pipeline, Expectation, Alert Rule, Job, Widget, Dashboard, "
-                            + "Decision Rule or Notification Rule; creating the KPI of a delivered kpi Requirement "
+                            + "Decision Rule, Notification Rule or Notification Channel; creating the KPI of a delivered kpi Requirement "
                             + "(requirement-kpi, create only); or restoring a kept version of a Pipeline (pipeline-restore, "
                             + "restore only). The change is NOT applied: it becomes a Pending Change that another person must "
                             + "approve. 'content' is the kind's own write body (for a Pipeline, its graph). Validate and dry-run first.",

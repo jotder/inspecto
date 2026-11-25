@@ -104,7 +104,10 @@ needs only W3 and can start now.
   1. **Create, update, delete kinds:** `decision-rule`, `notification-channel`, `notification-rule` join
      `CHANGE_ROUTES` with the same three operations. A Notification Channel body can carry a secret reference: the
      tool result and `get_pending_change` must not echo a secret (`PENDING-CHANGE-SECRET-READBACK-1` is the open
-     defect on that path — fix it first or keep `notification-channel` out).
+     defect on that path — fix it first or keep `notification-channel` out). **Checked at build (2026-11-25): the
+     defect does not reach a Channel** — `ChannelConfig` has no secret field (`id, kind, target, description, enabled,
+     createdAt, template, digestMinutes`) and `GET /notifications/channels` already returns every field, so a Pending
+     Change shows nothing the list does not. The operator added `notification-channel` on that finding.
   2. **Single-operation kinds:** `requirement-kpi` (create only) and `pipeline-restore` (one operation, `restore`,
      with the history version as an argument). `OPERATIONS` becomes per kind instead of one list.
   3. **Entity List edits** (`members`, `retire`, `attributes`) — **in, D-AK9 as signed.** They change who Screening
@@ -368,7 +371,7 @@ under it are the decision.
   postmortem, category, impact, Findings, correlation links) at once within that person's rights; a machine agent's
   edit is held as a Pending Action. Task W11.
 - **D-AK9 — all four groups:** Decision Rule; Notification Rule (Notification Channel once
-  `PENDING-CHANGE-SECRET-READBACK-1` is fixed); Requirement KPI and Pipeline restore; **and Entity List edits** (W2
+  `PENDING-CHANGE-SECRET-READBACK-1` is fixed — added at build on 2026-11-25, as that defect does not reach a Channel); Requirement KPI and Pipeline restore; **and Entity List edits** (W2
   step 3). Each widens what a machine agent may propose; every machine write stays held.
 - **D-AK10 — as recommended:** group A for every agent; B, D and E once masking is proven per route; C for a
   person's agent only.

@@ -176,10 +176,12 @@ is passed on as the replayed route's JSON body, unchanged.
 (`/alerts/rules`), `job` (`/jobs`), `widget` and `dashboard` (`POST /components/{kind}`, `PUT|DELETE /components/{kind}/{id}`);
 since AK-2 widening W2 step 1 (D-AK9), `decision-rule` (`POST /decision-rules`, `PUT|DELETE /decision-rules/{id}`) and
 `notification-rule` (`POST /notifications/rules`, `PUT|DELETE /notifications/rules/{id}`), both `canAuthorWorkbench`,
-which the machine agent set already held, so the set does not widen. **`notification-channel` stays out** although its
-route reaches the hold: the plan kept it out for `PENDING-CHANGE-SECRET-READBACK-1`, and that defect does not reach a
-Channel (`ChannelConfig` has no secret field and `GET /notifications/channels` returns every field), so adding it is
-the operator's call. **W2 step 2** made the operations per kind (`CHANGE_ROUTES` is `kind → operation → route`;
+which the machine agent set already held, so the set does not widen; and **`notification-channel`**
+(`POST /notifications/channels`, `PUT|DELETE /notifications/channels/{id}`, `canAuthorWorkbench`), added by the
+operator on 2026-11-25. The plan had kept it out until `PENDING-CHANGE-SECRET-READBACK-1` was fixed; that defect does
+not reach a Channel: `ChannelConfig` has no secret field (`id, kind, target, description, enabled, createdAt,
+template, digestMinutes`) and `GET /notifications/channels` already returns every field, so a Pending Change shows
+nothing the list does not. **W2 step 2** made the operations per kind (`CHANGE_ROUTES` is `kind → operation → route`;
 `OPERATIONS` is the enum of every operation, `McpTools.operations(kind)` what one kind offers): `requirement-kpi`
 offers `create` only (`POST /requirements/{id}/kpi`, `id` = the delivered kpi Requirement, `content` = the builder's
 `{dataset, measure, timeField, grain, …}`), and `pipeline-restore` offers `restore` only

@@ -113,7 +113,7 @@ class McpToolRoutesTest {
         for (McpTools.Call c : calls)
             assertTrue(AgentGateProbe.reachesTheHold(c.method(), c.path()),
                     c.method() + " " + c.path() + " is not on PendingChanges.REPLAYABLE");
-        assertEquals(8 * 3 + 2, calls.size(), "every kind × the operations it offers was checked");
+        assertEquals(9 * 3 + 2, calls.size(), "every kind × the operations it offers was checked");
     }
 
     /** W2 step 2: a kind refuses an operation it does not offer, and only a restore takes a version, before any replay. */

@@ -222,6 +222,15 @@ class ControlApiMcpProposeKindsTest {
         }
     }
 
+    /** Operator 2026-11-25: a Notification Channel joins too — it carries no secret field to read back. */
+    @Test
+    void aNotificationChannelIsHeldEveryWay(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            crudKindIsHeldEveryWay(c, "notification-channel", "channel", "/notifications/channels", "oncall_hook",
+                    id -> Map.of("id", id, "kind", "WEBHOOK", "target", "https://hooks.example.test/oncall"));
+        }
+    }
+
     // ── W2 step 2: requirement-kpi (create only) and pipeline-restore (restore only) ───────────
 
     private static final Map<String, Object> FROM_REQ =
@@ -305,11 +314,11 @@ class ControlApiMcpProposeKindsTest {
         }
     }
 
-    /** A Notification Channel is not on the allowlist (plan W2 step 1): the tool refuses it before any replay. */
+    /** An Enrichment (not holdable) and a Connection are not on the allowlist: the tool refuses them before any replay. */
     @Test
     void aKindOutsideTheAllowlistIsRefusedBeforeAnyReplay(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
-            for (String kind : List.of("notification-channel", "enrichment", "connection")) {
+            for (String kind : List.of("enrichment", "connection", "case-rule")) {
                 HttpResponse<String> res = rpc(c.port, AGENT, Map.of("name", "propose_change", "arguments",
                         args(kind, "create", null, Map.of("id", "ch1", "kind", "WEBHOOK", "target", "https://example.test/h"))));
                 assertEquals(McpRoutes.INVALID_PARAMS, JSON.readTree(res.body()).at("/error/code").asInt(), kind + " → " + res.body());
