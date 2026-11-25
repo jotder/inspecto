@@ -194,6 +194,8 @@ export const ALERT_RULE_ATTRIBUTES: AttributeSpec[] = [
         label: 'Pipeline scope',
         type: 'autocomplete',
         tier: 'optional',
+        // A KPI rule watches the KPI's own Measure; `AlertRule` refuses a Pipeline scope on it.
+        dependsOn: { key: 'kind', notEquals: 'kpi' },
         placeholder: 'e.g. cdr_ingest',
         help: 'Limit the rule to one Pipeline; leave blank to watch every Pipeline.',
     },

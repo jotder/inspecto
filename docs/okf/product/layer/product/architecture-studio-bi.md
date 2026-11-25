@@ -250,8 +250,9 @@ there; its relation is validated when it is read, by
   (`REPORT-CHART-MARKERS-1` on the board). On a public share a KPI-bound marker draws only when the KPI
   definition is readable; otherwise a `target` line falls back to the Widget's own target and `rag` draws nothing.
 - The forecast band and anomaly markers (I-11, I-7) are drawn on screen only: the Report PDF does not ask for them
-  (`REPORT-CHART-MARKERS-1`), and the public share viewer does not forward `overlay` (it forwards only
-  `tableSort`). The anomaly baseline is the result's own buckets, so a narrower date range changes the scores; a
+  (`REPORT-CHART-MARKERS-1`). The public share viewer forwards `overlay` and the date grain beside `tableSort`, and
+  `POST /public/dashboards/{token}/query` computes both from its fenced rows after `BiResultMasking.forPublicShare`
+  (a masked Measure gets no band, a masked series key reaches the summary only as its alias). The anomaly baseline is the result's own buckets, so a narrower date range changes the scores; a
   week or month grain has no seasonal slot in `SeasonalBaseline` (weekday / hour only) and is scored against every
   other bucket. A stacked or value-sorted chart draws neither (a band follows each series' own values in time order)
   and says so under the chart; only `line`, `bar` and `area` send `overlay`, so a Widget switched to another type keeps

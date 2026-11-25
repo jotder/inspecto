@@ -91,7 +91,12 @@ A KPI rule takes no `dataset`, `measure`, `metric`, `window`, `maximumAge`, `whe
 - A rule carries its owner's **id, not their roles**: a KPI or Dataset shared to the owner only through a role is not
   readable by the rule (fail closed, refused at save). Share it to the owner, or leave it unshared.
 - The sweep re-reads a projection on every sweep (a backtest per KPI rule); fine for tens of rules, not thousands.
-- The Studio Alert Rule editor does not offer `kpi` / `projection` yet (authored through `/alerts/rules` or a bundle).
+- Studio authors these rules: the Alert Rule editor's *Watch: A KPI* kind asks the KPI and *Alert on* (its value,
+  its RAG, the projected landing, the projected landing's RAG, the chance of meeting the target), writing `kpi`,
+  `projection` and `rag`; a RAG watch sends `comparator: gte` and the status rank, as the engine fixes them. A
+  KPI-bound Widget's *Alert me…* (tile action, for who may author Alert Rules) opens that form prefilled on the
+  Alerts pane (`/alerts?newRule=1&kpi=…[&projection=value]`, `kpi-alert-link.ts`) — a draft; the save goes through
+  `POST /alerts/rules` and every gate above, approval hold included.
 
 ## Tests
 

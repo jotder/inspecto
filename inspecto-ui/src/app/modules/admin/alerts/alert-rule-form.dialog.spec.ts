@@ -572,7 +572,19 @@ describe('AlertRuleFormDialog', () => {
         c.save();
         const body = (save.mock.calls[0] as unknown[])[0] as Record<string, unknown>;
         expect(body).toMatchObject({ name: 'revenue_low', kpi: 'monthly_revenue', comparator: 'lt', threshold: 1000 });
-        for (const k of ['kind', 'kpiWatch', 'projection', 'rag', 'metric', 'window', 'dataset', 'measure'])
+        // A KPI rule takes no Pipeline scope (`AlertRule` refuses `onPipeline` on one).
+        expect(c.schemaForm.form.get('onPipeline')?.disabled).toBe(true);
+        for (const k of [
+            'kind',
+            'kpiWatch',
+            'projection',
+            'rag',
+            'metric',
+            'window',
+            'dataset',
+            'measure',
+            'onPipeline',
+        ])
             expect(body).not.toHaveProperty(k);
     });
 

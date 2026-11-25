@@ -50,6 +50,8 @@ configured instance bound to a Dataset's Result Set; a **Dashboard** is a layout
   projection: needs two seasons of history…"): only a count or sum KPI on a week, month, quarter or year grain with
   two weeks of data is projected, and never over a Dashboard's picked dates. An Alert Rule can watch the same thing
   (`kpi:` with `projection: value | probability` or `rag:`) — [KPI projection](../../module/engine/spec-kpi-projection.md).
+  On a KPI tile, the bell (*Alert me…*) drafts that rule on the KPI or on where its period lands; review it on the
+  Alerts page and save it to arm it.
 * **Suggested for this chart** (BI-INSIGHTS-1 I-20, 2026-11-25) — while you build a line, bar or area Widget over a
   date grouped by a time grain (not *auto*), the builder may suggest an overlay above the preview: "Weekly seasonal pattern
   found over 112 days of history" → *Add a forecast band*; "3 unusual points against the usual level" → *Show

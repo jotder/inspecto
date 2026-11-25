@@ -362,8 +362,8 @@ already exists there, and Q2/Q4 answer the questions an RA or finance lead asks 
   a forecast label is a gap, never 0. Past 20 series the summary is one refusal per Measure and overlay. Drawn
   through the Chart Markers plugin (D-BI9) as two new resolved kinds — `interval` (filled band + dashed point
   forecast) and `points` (rings) — not as extra Chart.js datasets, so the band is one drawing path with I-2.
-- **Deliberately deferred**: the Report PDF (added to `REPORT-CHART-MARKERS-1`) and the public share viewer (it
-  forwards only `tableSort`) do not ask for overlays; the method is fixed (Holt-Winters, default weights — no
+- **Deliberately deferred**: the Report PDF (added to `REPORT-CHART-MARKERS-1`) does not ask for overlays (the public
+  share viewer does since §11.7); the method is fixed (Holt-Winters, default weights — no
   per-Widget tuning before Insight Profiles, P3); `SeasonalBaseline` has no week-of-year or month slot, so a week /
   month series is scored against all its other buckets; the baseline is the visible range, not a trailing window.
 
@@ -390,8 +390,21 @@ Spec: [`okf/product/module/engine/spec-kpi-projection.md`](../okf/product/module
   projection a KPI cannot have.
 - **Found in passing and fixed**: `ObjectReadMasking` treated every Alert scope as a Dataset id; a `kpi:` scope made
   `GET /alerts` fail (500). A `kpi:` scope now masks nothing (its text holds no key).
-- **Deliberately deferred**: the Studio Alert Rule editor's KPI fields; "arm from a Widget" (I-17's UI half); a role-aware
+- **Deliberately deferred**: (the editor's KPI fields and "arm from a Widget" shipped in §11.7); a role-aware
   owner for rule evaluation (would need roles stamped on the rule, as Jobs stamp `updatedByRoles`).
+
+### 11.7 P1 leftovers — overlays on a public share, KPI Alert Rules in the UI (2026-11-25)
+
+- **Share**: `POST /public/dashboards/{token}/query` parses `overlay` as `/bi/query` does and runs `ChartOverlays`
+  over the rows after `BiResultMasking.forPublicShare` (no reveal, same cap, no second statement); the response adds
+  `overlays`. The share viewer's `embedQueryBody` now forwards `grains` (a grained date axis used to go out raw) and
+  `overlay` — still never any other option — and passes `options.overlay` and the summary to the renderer.
+- **Editor**: *Watch: A KPI* + *Alert on* (form-only, like `kind`) → `kpi` / `projection` / `rag`; comparator and
+  threshold hide on a RAG watch, which sends `gte` + the rank (the engine fixes them anyway). Leaving the KPI kind
+  resets the watch, or a hidden RAG watch would hide comparator and threshold for a metric rule.
+- **Arm from a Widget = a link, not a second write path**: the tile's *Alert me…* menu (value / projected landing)
+  navigates to `/alerts?newRule=1&kpi=…` — the Risk Scores handshake (D-RP9) — so the draft is saved through
+  `POST /alerts/rules`, its save gate and approval hold. Shown only to who may author Alert Rules.
 
 ### 11.6 P1 I-20 insight-aware Show-Me — as built (2026-11-25)
 
