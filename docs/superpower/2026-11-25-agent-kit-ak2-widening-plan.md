@@ -1,6 +1,7 @@
 # Agent Kit AK-2 — widening what an agent can reach, task by task (plan and task specs)
 
-> **Status: PROPOSED 2026-11-25 — D-AK8…D-AK12 open (§5); W1, W3 and W10 built 2026-11-25 (§3), the rest not started.** The follow-on to phases 1–3b of
+> **Status: APPROVED 2026-11-25 — D-AK8…D-AK12 signed (operator interview, §5; D-AK8 not as recommended, which adds
+> task W11); W1, W3 and W10 built 2026-11-25 (§3), the rest not started.** The follow-on to phases 1–3b of
 > [`2026-11-20-agent-kit-ak2-plan.md`](2026-11-20-agent-kit-ak2-plan.md) (all built 2026-11-25). It takes the gaps a
 > peer's product review of that plan listed
 ([`2026-11-25-agent-kit-ak2-product-review.md`](2026-11-25-agent-kit-ak2-product-review.md)), keeps the ones
@@ -49,17 +50,20 @@ These are the phase 1–3 rules, restated so a task spec does not repeat them:
 | # | Task | Kind of change | Effort | Waits on |
 |---|---|---|---|---|
 | **W1** | Release a quarantined file | one action route, one tool option | 1 day | nothing |
-| **W2** | `propose_change` for the kinds already held | tool allowlist, machine capability set | 3–4 days | D-AK9 |
+| **W2** | `propose_change` for the kinds already held | tool allowlist, machine capability set | 4–5 days | the D-AK12 gate (D-AK9 signed) |
 | **W3** | Read tools for Space health, storage and scores | tools only (GET routes) | 2–3 days | nothing |
 | **W4** | Live golden runs: operations, analyst, Link Analysis, other clients | chore, no code | 2–3 days per client | an identity provider install; D-AK12 for order |
 | **W5** | Shape reference and error catalogue as MCP Resources | resources | 3 days after its two board rows | `COMPONENT-REFERENCE-GENERATED-1`, `ERROR-CATALOGUE-1` |
-| **W6** | Previews, simulators and Space tests, one group at a time | allowed bucket, five groups | 1.5–2 weeks in all | D-AK10 |
-| **W7** | Operations, second set: evaluate and the Job backlog | action routes | 3–4 days | D-AK11 |
+| **W6** | Previews, simulators and Space tests, one group at a time | allowed bucket, five groups | 1.5–2 weeks in all | the D-AK12 gate (D-AK10 signed) |
+| **W7** | Operations, second set: evaluate and the Job backlog | action routes | 3–4 days | the D-AK12 gate (D-AK11 signed) |
 | **W8** | Golden tasks that try to talk the agent into the never-list | golden tasks, grader | 3–5 days | W4 (a working live harness) |
 | **W9** | Two read-only Agent Skills: review a proposal, audit a Space | skills, golden tasks | 2–3 days each | W3 |
 | **W10** | The Kit guard reads every golden suite and every tool's bucket | guard | 1 day | nothing |
+| **W11** | An analyst agent edits an Incident's or Case's record | action routes, one tool | 3–4 days | the D-AK12 gate (D-AK8 signed) |
 
-Recommended order: **W1, W10, W3, W2, W4, W5, W6, W7, W9, W8**. W1, W3 and W10 need no decision and can start now.
+Recommended order: **W1, W10, W3, W4, then W2, W11, W5, W6, W7, W9, W8**. **The D-AK12 gate:** W2, W6, W7 and W11
+start only after the operations and analyst suites have each had one live run (W4). W5 waits on its two board rows; W9
+needs only W3 and can start now.
 
 ### W1 — Release a quarantined file
 
@@ -103,8 +107,10 @@ Recommended order: **W1, W10, W3, W2, W4, W5, W6, W7, W9, W8**. W1, W3 and W10 n
      defect on that path — fix it first or keep `notification-channel` out).
   2. **Single-operation kinds:** `requirement-kpi` (create only) and `pipeline-restore` (one operation, `restore`,
      with the history version as an argument). `OPERATIONS` becomes per kind instead of one list.
-  3. **Entity List edits** (`members`, `retire`, `attributes`): only if D-AK9 says so — they change who Screening
-     matches, which is analyst data, not builder config.
+  3. **Entity List edits** (`members`, `retire`, `attributes`) — **in, D-AK9 as signed.** They change who Screening
+     matches, which is analyst data, so `members` and `retire` add `canManageIncidents` and `attributes` adds
+     `canManageExclusionCategories` to what a machine agent may propose (held, like every machine write). The
+     analyst skills, not `safe-config-change`, describe them; one analyst golden task (add a member, held).
 - **Machine agents.** D-AK4 defines the machine agent capability set as "the authoring capabilities of the
   `propose_change` kinds". Every kind added here widens that set, so each new kind names the capability it adds and
   D-AK9 signs the list.
@@ -190,7 +196,7 @@ Recommended order: **W1, W10, W3, W2, W4, W5, W6, W7, W9, W8**. W1, W3 and W10 n
   | **D** analytic reads | `POST /bi/query`, `/queries/{id}/run`, `/recon/columns`, `/recon/breaks`, `/recon/rows`, `/recon/run` | exemptions, `read-shaped` or `stateless-compute` | returns data rows: masking, SQL guard and per-caller rate limit, as `POST /db/query` has |
   | **E** analyst previews | `POST /risk-scores/preview`, `/anomaly-scores/preview`, `/screening/check` | `canWorkIncidents`; exemption | `screening/check` takes names in the body: the audit row must not store them in clear |
 
-- **Change per group.** The routes join `AgentGate.ALLOWED` (group C also `PERSON_ONLY` if D-AK10 says so); one MCP
+- **Change per group.** The routes join `AgentGate.ALLOWED` (group C also `PERSON_ONLY`, D-AK10 as signed); one MCP
   Tool per route or per family (`preview_config`, `simulate_decision_rule`, `run_space_tests`, `query_measure`,
   `run_saved_query`, `reconcile_preview`, `preview_score`, `check_screening`); the developer skills change from
   "propose and read the refusal" to "preview, then propose".
@@ -272,12 +278,45 @@ Recommended order: **W1, W10, W3, W2, W4, W5, W6, W7, W9, W8**. W1, W3 and W10 n
   `## MCP Tools` list names a tool its role's suite never exercises.
 - **Proof.** A negative fixture for each new check in `check-agent-kit.test.mjs`.
 
+### W11 — An analyst agent edits an Incident's or Case's record
+
+- **Goal.** The analyst agent finishes an Incident or Case, not only triages it: the RCA, the postmortem, the
+  category, the financial impact, the Findings values and the correlation links (D-AK8 as signed 2026-11-25, which
+  reverses the "no record edits" line of the same morning).
+- **Today.** Each route exists, refused to every agent (in no `AgentGate` bucket):
+
+  | Route | Gate (`CapabilityManifest`) |
+  |---|---|
+  | `PUT /objects/{id}/postmortem`, `PUT /objects/{id}/category`, `PUT /objects/{id}/impact` | `canWorkIncidents` (each writes only its one attribute, 422 on any other key) |
+  | `PUT /objects/{id}/findings`, `POST /objects/{id}/rca`, `POST` and `DELETE /objects/{id}/links` | exemptions, `collaboration` (open to anyone who can see the object) |
+
+- **Change.**
+  - The six routes join `AgentGate.CASE_ACTIONS`: a person's agent edits at once within that person's rights; a
+    machine agent's edit is held as a Pending Action (D-AK5, D-AK6). `AgentGateParityTest` pins the case actions with
+    their gates; extend its map.
+  - The four `collaboration` routes have no capability of their own, and the machine hold runs before the route's
+    scope check, so each needs a `MACHINE_HOLD_CAPABILITY` entry (`canWorkIncidents`), as comments got in the phase-3
+    security review.
+  - One MCP Tool `edit_incident_or_case_record` with an enum (`postmortem`, `category`, `impact`, `findings`,
+    `rca`, `link`, `unlink`) and the route's own body, `operate_run` style; `destructiveHint: false`.
+  - The golden grader counts actions by method and path (`isAction` in `tools/run-agent-golden.mjs`): its parity test
+    fails until it accepts these PUT and DELETE routes. Widen it there.
+  - Skills `work-cases` and `triage-incident`: write the record only from evidence the agent read, and say which
+    Incident fields it changed; two analyst golden tasks (a person's agent records a postmortem and impact; a
+    machine's impact edit is held).
+- **Not in scope.** Tags (`/tags/*`, authoring config under `canAuthorWorkbench`, not part of D-AK8's question);
+  merge and split (`canAdminister`); the Workflow transition guard (`CASE-TRANSITION-FOUR-EYES-1`).
+- **Proof.** As W1 for each route (person at once, audited with `agentClient`; machine 202 and nothing changed until a
+  person approves; a token without the right gets the route's own refusal); the machine hold on a `collaboration`
+  route is refused to a machine without `canWorkIncidents` and leaves no record; falsify by removing one entry.
+- **Review.** A security review of the six routes, as each phase had: an agent now writes what a regulator may read
+  (impact, postmortem).
+
 ## 4. Not in this plan
 
 Each needs its own plan and an operator ask before any work:
 
-- **Analyst record edits** — RCA, postmortem, category, impact, links, findings, tags. The operator set the analyst's
-  actions on 2026-11-25 as "the §4.6 list, no record edits" (`AgentGate.CASE_ACTIONS`). D-AK8 keeps that.
+- **Tags** — creating, renaming and applying tags (`/tags/*`): authoring config, not part of D-AK8's question.
 - **A set of Pending Changes approved as one**, **a signed proof of validation on a proposal**, **a scratch Space for
   an agent to build in**, **a Requirement that an agent delivers end to end** — new product features with no route
   today; the review's most valuable ideas and its largest (weeks each).
@@ -287,7 +326,11 @@ Each needs its own plan and an operator ask before any work:
 - **Industry skill packs** and **refusal telemetry feeding the recipes** — after W4 and W5 show what is missing.
 - **The helpdesk role** — its own plan, [`2026-11-20-assistant-screen-help-plan.md`](2026-11-20-assistant-screen-help-plan.md).
 
-## 5. Decisions — open
+## 5. Decisions — signed 2026-11-25
+
+All five signed in an operator interview on 2026-11-25: D-AK9, D-AK10, D-AK11 and D-AK12 as recommended, with D-AK9
+widened to Entity List edits; **D-AK8 not as recommended.** The table keeps what was recommended; the **Signed** lines
+under it are the decision.
 
 | # | Question | Recommended |
 |---|---|---|
@@ -297,13 +340,29 @@ Each needs its own plan and an operator ask before any work:
 | **D-AK11** | Which further operational writes are actions? | **Evaluate and the Job backlog (W7): yes, as actions — a machine's are held.** Materialize, compact, baseline and scheduler settings: no, until someone asks. |
 | **D-AK12** | Order of live runs | **The three unrun suites with Claude first, then other clients on the developer suite.** Widening (W2, W6, W7) starts only after the operations and analyst suites have one live run each. |
 
+**Signed 2026-11-25 (operator interview):**
+- **D-AK8 — yes, within rights (not as recommended).** A person's agent edits an Incident's or Case's record (RCA,
+  postmortem, category, impact, Findings, correlation links) at once within that person's rights; a machine agent's
+  edit is held as a Pending Action. Task W11.
+- **D-AK9 — all four groups:** Decision Rule; Notification Rule (Notification Channel once
+  `PENDING-CHANGE-SECRET-READBACK-1` is fixed); Requirement KPI and Pipeline restore; **and Entity List edits** (W2
+  step 3). Each widens what a machine agent may propose; every machine write stays held.
+- **D-AK10 — as recommended:** group A for every agent; B, D and E once masking is proven per route; C for a
+  person's agent only.
+- **D-AK11 — as recommended:** evaluate and the Job backlog are actions; materialize, compact, baseline and scheduler
+  settings stay refused until someone asks.
+- **D-AK12 — as recommended, a gate:** the operations, analyst and Link Analysis suites live with Claude first, then
+  the developer suite on the Gemini CLI, Codex CLI and a local model. W2, W6, W7 and W11 start only after the
+  operations and analyst suites have one live run each (W11 is under the gate because it widens the analyst role).
+
 ## 6. Risks
 
 - **The allowed bucket grows from 11 named writes (plus the Link Analysis reads) to about 30.** Each is a place where "persists nothing" must stay
   true. Mitigation: the before-and-after read in every W6 proof, and the per-group review.
-- **A wider machine capability set.** W2 and W7 add rights to unattended agents. Every such write stays held, and the
+- **A wider machine capability set.** W2, W7 and W11 add rights to unattended agents (W2's Entity List edits bring
+  `canManageIncidents` and `canManageExclusionCategories`). Every such write stays held, and the
   set is still per client (`auth.oidc.agentMachineClients`).
-- **Tool sprawl.** 58 tools today; this plan adds roughly 25. Prefer one tool with an enum (`operate_run`
+- **Tool sprawl.** 67 tools today (after W1 and W3); this plan adds roughly 20 more. Prefer one tool with an enum (`operate_run`
   style) over one tool per route, and keep each skill's `## MCP Tools` list short.
 - **Stale premises.** The review this plan answers was a day old and already wrong on Link Analysis. Each task
   re-checks its "Today" paragraph against the code before building.
