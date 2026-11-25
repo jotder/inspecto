@@ -6,9 +6,12 @@ metadata:
 ---
 
 **Two installs, one set of shared Spaces (operator, 2026-11-02).** The real-data Spaces live once in
-`C:\sandbox\spaces\<id>`: `inspecto-mfs` (MFS; `space.toon data_root: "C:/data/inspecto-mfs"` - the 28.9 GB state; the
-repo junction `spaces\inspecto-mfs` -> `C:\sandbox\inspecto-mfs-root\inspecto-mfs` is a stale 1 MB refill, not used),
-`mfs-demo` (IMS, 16 GB) and `la-mobile-money`. Each install boots them through `spaces\<id>.ref` files (one absolute path):
+`C:\sandbox\spaces\<id>` (config only; **their state moved 2026-11-25** to `C:\sandbox\inspecto_spaces\<id>`, each `space.toon` naming it
+in `data_root:`): `inspecto-mfs` (MFS; `data_root: "C:/sandbox/inspecto_spaces/inspecto-mfs"`, formerly `C:/data/inspecto-mfs` - the
+28.9 GB state; the repo junction `spaces\inspecto-mfs` to `C:\sandbox\inspecto-mfs-root\inspecto-mfs` was removed in P4, that second
+instance is only run by `tools/run-mfs.ps1`), `mfs-demo` (IMS, 16 GB, its state in `inspecto_spaces\mfs-demo`) and `la-mobile-money`
+(`inspecto_spaces\la-mobile-money`). Each install boots them through `spaces\<id>.ref` files (one absolute path); the repo's own
+`spaces\` attaches them on demand with `tools/attach-private-spaces.ps1` (SPACES-CONSOLIDATION-1 P4):
 - **Preview** `C:\sandbox\inspecto-preview\inspecto-la` on :8080, built `-Edition Preview -DemoAuth -Ui la-app -NoBakeDemo` *(removed 2026-11-10 by `PRODUCT-ASSEMBLY-1` PA-2; today `-Edition Preview -Product la -Distribution demo -NoBakeDemo`)*
   (demo sign-in); also holds the synthetic LA showcases (la-showcase, la-claims, la-audit, la-daily-feed, ...).
   **Since 2026-11-18** it runs from `start-preview.ps1` against `C:\sandbox\spaces-preview`; its `la-mobile-money` is the

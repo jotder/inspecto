@@ -537,3 +537,71 @@ because the state moved with the Space. Both servers were stopped and their port
 **Not verified:** a boot of the private Spaces (deliberately; it needs a copy of their data, not the original), the assistant's
 `assist.safety.roots` file routes against a data root outside the spaces root, a boot of a **fresh** build of master (the bundle is a
 day old), the `SPACES_DATA_ROOT` mount form, and `demo`, `default` and `ucc` in the canonical root with their tracked samples.
+
+## 21. P6 inventory (read-only, 2026-11-25) — nothing deleted
+
+`C:\sandbox` holds 73 folders (156.4 GB) and 290 loose files (296 MB). Sizes are from a read-only scan (`robocopy /L`); a folder is
+"referenced" when a tracked file names it (`git grep` on `origin/master`). **Nothing has been moved or deleted; every class below needs
+your yes first.** Folders and files owned by the second Windows account `User` (all `la-*` bundles, `la-share`, `ims-mfs-demo`,
+`inspecto-mfs-root`, `bi-p2-explain` and 22 loose files) may refuse a delete from the shift account; that is untested.
+
+| Class | Size | What it is | Proposal |
+|---|---|---|---|
+| **A** regenerable bundles and installs | 11.6 GB, 12 | `la-cv-pilot`, `la-cv-L1`, `-L2`, `-L2b`, `-L3` (extracted standard bundles carrying the 11 industry Spaces, 2026-11-20..22, owner `User`); `la-preview-demo-20261116` and `la-basic-20261116` (dated installs; docs and `tools/la-demo-cases.mjs` name the first, `.claude/launch.json` names `la-basic` without the date, so that entry is stale); `la-video-basic`, `-shots`, `-zero` (video-production leftovers); `rfpdemo-run`, `preview-la-run` (October) | quarantine, then delete once you confirm nothing runs from them |
+| **B** snapshots and scratch | 0.7 GB, 24 | `bypass-b2`, `ps-s4`, `verify-fc-canvas` (source-tree copies; `ps-s4` is only a temp-dir name in a test); `o6-verify-m2`, `duckdb201-verify-scratch`, `gate-persist-affected`, `lane-*`, `ui-bundle-verify-*`, `vrs-scratch`, `verif-scratch`, `b3p2-probe`, `spike-inputs`, `la-perf-runtime-evidence` (JFR evidence), …; plus the loose gate and lane logs (2026-10-31..11-24, the largest 92.7 MB) | delete after a glance; keep `la-perf-runtime-evidence` if the perf plan cites it |
+| **C** older backups of live installs | 0.8 GB, 2 | `ims-mfs-demo-backup`, `inspecto-mfs-backups\before-map-move` | delete once you accept the P0 backups as the fallback |
+| **D** delivered or built artifacts | 7.3 GB, 6 | `la-share` (its `TEAM-NOTE.txt`: three zips and the case videos sent to the team), `builds` (the `inspecto-basic-la-app` zip and sha), `la-deploy-pkgs`, `inspecto` (4.2 GB: `inspecto-la`, `-la-data`, `-la-spaces`, `inspecto-relocatable` from the relocatable-roots verification), `inspecto_training` (video), `la-video-out` (an mp4) | **ask the owner**; archive off the box rather than delete |
+| **E** live environments | 67 GB, 15 | `inspecto-clean` (this checkout), `inspecto_spaces`, `spaces` (config of the private Spaces **and** five legacy stubs), `inspecto-preview` (the Preview install on :8080 per `.claude/memory/preview-la-demo.md`, 10.5 GB, whose `backup\` and `parked\` are redeploy debris), `spaces-preview`, `ims-mfs-demo` (the Basic install on :8098), `inspecto-mfs-root` and `inspecto-mfs-bundle` (`tools/run-mfs.ps1`), `archive` (named by three skills), `la-voice` (`tools/la-video-voice.mjs`), `zain-dial-digit-demo` (a launch entry), `drill-ha` (named by the HA drill guide), `ims-spaces`, `data`, `spaces-rfp` (a client working set: back up, never `git clean -x`) | keep; prune inside `inspecto-preview\backup` and `parked` later |
+| **F** other lanes | 1.3 GB, 3 | `bi-p2-explain`, `ak2-decisions` (registered worktrees) and `.m2-bi-p2-explain` | not mine: leave until their lanes push |
+| **G** other projects, tooling | 1.2 GB, 10 | `asn-decoders` (its own git clone), `cgi_decoder`, `vuln-db`, `zain-sudan`, `HUR`, `incubetor`, `.idea`, `.vscode`, `.graalvm-cache`, and `antigravity` (0.8 GB, written today, three Spaces, owner unknown) | out of scope; ask about `antigravity` |
+| **H** backups of this effort | 66 GB, 1 | `backup\spaces-p0-20261125` (about 48 GB: both full copies of the real data, and the config and state copies) beside older ones: `ucc-file-processor` 10 GB (2026-07-30), `duckdb_cli` 2.9 GB, `fuse-demo-v17.2.0` 1.4 GB, `downloads` 1.4 GB, four `ims-mfs-demo-predeploy-*` of 0.39 GB, … | keep the P0 set until the private Spaces have booted from `inspecto_spaces` (they have not); ask about the older ones |
+
+**Legacy rehearsal (D-SC10):** `C:\data\{default,demo,ucc,telco-assurance,cricket-analytics}` (0.37 GB) and the five stubs
+`C:\sandbox\spaces\{default,demo,ucc,telco-assurance,cricket-analytics}` (config copies from 2026-09/10): quarantine together.
+
+**One thing to verify before the live installs next start:** the Preview and Basic demo installs boot `inspecto-mfs`, `mfs-demo` and
+`la-mobile-money` through `spaces\<id>.ref` to `C:\sandbox\spaces\<id>`. Their state now lives under `inspecto_spaces`, named by each
+`space.toon`'s `data_root:`, so they should find it, but neither install has been started since the move. The team memory note that
+described the old `C:\data` path is corrected in this change.
+
+**How a delete would go:** move each approved class into `C:\sandbox\_pending-delete-<date>\` first (a same-drive rename, instant and
+reversible), run the live installs and a boot once, then delete the quarantine folder. Nothing in class E, F, G or H moves without a
+separate yes.
+
+## 22. P6: classes A and B quarantined (operator yes, 2026-11-25)
+
+Moved, not deleted, into `C:\sandbox\_pending-delete-20261125\` (a same-drive rename, instant and reversible; `MANIFEST.txt` there lists
+every name, size and original path; move a folder back to `C:\sandbox\<name>` to restore it). **35 folders, 11.76 GB, and 156 loose
+`*.log` files, 279.8 MB**; 0 failures (the renames of the `User`-owned folders succeeded too).
+- **A (12 folders):** `la-cv-pilot`, `la-cv-L1`, `-L2`, `-L2b`, `-L3`, `la-preview-demo-20261116`, `la-basic-20261116`, `la-video-basic`, `-shots`,
+  `-zero`, `rfpdemo-run`, `preview-la-run`.
+- **B (23 folders):** the source-tree copies, verification scratch and lane folders listed in section 21, and `la-perf-runtime-evidence`
+  (no tracked file names it). **`spike-inputs` stayed:** `docs/superpower/2026-11-20-agent-kit-ak2-plan.md` cites it as the spike's full
+  record, and that plan is active.
+- **The loose logs:** every top-level `*.log` older than six hours (gate, lane, serve and verify logs, 2026-10-31 to 11-24).
+
+Checked first: no process had a command line naming any of these folders; none was a registered worktree; the only listener on `:8090` is an
+unrelated desktop app. Afterwards: the originals are gone, the live and kept folders (`inspecto-clean`, `inspecto_spaces`, `spaces`,
+`inspecto-preview`, `spaces-preview`, `ims-mfs-demo`, `inspecto-mfs-root`, `inspecto-mfs-bundle`, `archive`, `la-voice`,
+`zain-dial-digit-demo`, `drill-ha`, `spike-inputs`, `la-share`, `builds`, `backup`, `bi-p2-explain`) are all in place, and
+`C:\sandbox` is down to 42 folders and 135 loose files. (`ak2-decisions` is gone too, removed by its own lane, not by this move.)
+
+**To delete for good:** start the Preview and Basic installs once (they were not touched, but have not run since the move), then remove
+the quarantine folder. **Two tracked paths now point at nothing:** `tools/la-demo-cases.mjs` and a brochure script name
+`la-preview-demo-20261116`; and the two `inspecto-basic-*` entries in `.claude/launch.json` (another lane's uncommitted file) name
+`C:\sandbox\la-basic\…`, stale since before this move. Not moved: classes C and D, the legacy rehearsal, E, F, G, H.
+
+## 23. P6: the legacy rehearsal and class C quarantined (operator yes, 2026-11-25)
+
+Second batch into `C:\sandbox\_pending-delete-20261125\` (same-drive renames; its `MANIFEST.txt` has a new section): **12 folders, 0.98 GB, 0
+failures**, which brings the quarantine to 12.74 GB. Nothing deleted.
+- **`legacy-c-data\`** (0.26 GB): `C:\data\{default, demo, ucc, telco-assurance, cricket-analytics}`, the data roots of the 2026-10/11
+  rehearsal, stamped for the `C:\sandbox\spaces` stubs, newer data living in the repo Spaces (D-SC10). `C:\data` is left as an empty folder.
+- **`legacy-stubs\`** (under 1 MB): the five matching config stubs from `C:\sandbox\spaces`, which now holds only the three private Spaces
+  (`inspecto-mfs`, `mfs-demo`, `la-mobile-money`), `_templates` and `onboarding-counters.tsv`.
+- **Class C** (0.72 GB): `ims-mfs-demo-backup` and `inspecto-mfs-backupsefore-map-move`, the older backups of the live installs; the P0
+  backups, whose counts and bytes were verified, are the fallback.
+
+Checked first: no process names any of them; no `.ref` or `space.toon` under the Preview, Basic, `spaces-preview`, canonical or private roots
+names the stubs or `C:\data`; the `_refs` pointers name only the three private Spaces. Still not moved: D, E, F, G, H. The quarantine can be
+deleted once the Preview and Basic installs have started once.
