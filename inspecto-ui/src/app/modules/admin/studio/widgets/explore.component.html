@@ -191,7 +191,7 @@
                             @for (s of suggestions(); track s.id) {
                                 <li class="flex flex-wrap items-center gap-2" [attr.data-suggestion]="s.id">
                                     <span>{{ s.text }}</span>
-                                    <button mat-stroked-button color="primary" (click)="applySuggestion(s)">
+                                    <button mat-stroked-button (click)="applySuggestion(s)">
                                         {{ s.action }}
                                     </button>
                                     <button
