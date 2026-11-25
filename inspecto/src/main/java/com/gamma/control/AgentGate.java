@@ -36,15 +36,19 @@ final class AgentGate {
     /**
      * The operational actions (plan §4.6, operations rows, AK-2d): a run's trigger, pause, resume, reprocess, rejects
      * replay, retry now, retry cancel and drain, and the release of one quarantined file (widening plan W1, the route
-     * of {@code QUARANTINE-RELEASE-1}); a Job's trigger and a Job Run's replay. Each is still gated by its own
-     * capability ({@code canOperateRuns}).
+     * of {@code QUARANTINE-RELEASE-1}); a Job's trigger and a Job Run's replay; and (widening plan W7, D-AK11 signed
+     * 2026-11-25) evaluating the Expectations or Alert Rules, and a Job's backlog: drain, pause, resume, run one day now,
+     * give up waiting on one day. Each is still gated by its own capability ({@code canOperateRuns}).
      */
     static final Set<String> RUN_ACTIONS = Set.of(
             "POST /runs/([^/]+)/trigger", "POST /runs/([^/]+)/pause", "POST /runs/([^/]+)/resume",
             "POST /runs/([^/]+)/reprocess", "POST /runs/([^/]+)/replay-rejects",
             "POST /runs/([^/]+)/retries/retry-now", "POST /runs/([^/]+)/retries/cancel", "POST /runs/([^/]+)/drain",
             "POST /runs/([^/]+)/quarantine/release",
-            "POST /jobs/([^/]+)/trigger", "POST /jobs/runs/([^/]+)/replay");
+            "POST /jobs/([^/]+)/trigger", "POST /jobs/runs/([^/]+)/replay",
+            "POST /expectations/evaluate", "POST /expectations/([^/]+)/evaluate", "POST /alerts/evaluate",
+            "POST /jobs/([^/]+)/backlog/drain", "POST /jobs/([^/]+)/backlog/pause", "POST /jobs/([^/]+)/backlog/resume",
+            "POST /jobs/([^/]+)/backlog/days/([^/]+)/run", "POST /jobs/([^/]+)/backlog/days/([^/]+)/give-up");
 
     /**
      * The case actions (plan §4.6, analyst rows, AK-2e): comment on an Incident or Case, build an Incident Brief, ack,

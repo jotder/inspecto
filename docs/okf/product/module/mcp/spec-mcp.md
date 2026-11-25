@@ -424,14 +424,31 @@ config only.
   `withdraw_action`. Each replays its route as the caller, so the gate above decides: at once for a person's agent, a
   Pending Action for a machine. `McpToolRoutesTest` expands `operate_run` over every action and pins each to a
   `canOperateRuns` manifest route.
+- **Evaluate and the Job backlog (widening plan W7, D-AK11 signed 2026-11-25).** Eight more `canOperateRuns` routes join
+  `AgentGate.RUN_ACTIONS` — an evaluation saves results and can open an Incident or fire an Alert that notifies, and a
+  give-up discards a day, so they are actions, not allowed reads: `POST /expectations/evaluate`,
+  `POST /expectations/{id}/evaluate`, `POST /alerts/evaluate`, `POST /jobs/{id}/backlog/drain|pause|resume`,
+  `POST /jobs/{id}/backlog/days/{day}/run` and `…/days/{day}/give-up`. Tools: `evaluate_expectations` (optional
+  `expectation`: one by name, else every enabled one), `evaluate_alerts`, `operate_job_backlog` (`action` one of
+  `drain`, `pause`, `resume`, `run-day`, `give-up`; `day` required for the last two and refused for the others; each with
+  a one-line `reason`) and the read `get_job_backlog` (`GET /jobs/backlog`). `operate_job_backlog` is the only tool
+  annotated `destructiveHint: true` (`McpTools.Tool.destructive`), for `give-up`; skill `operate-runs` asks the person
+  before a give-up as before a drain. The tools never send `?force=true` (drain in the quiet period) or
+  `?allowPrevious=true` (run a day on the previous Reference) — those stay a person's choice on the Runs ▸ Backlog
+  screen. Materialize, compact, baseline accept and clear, and scheduler settings stay refused (D-AK11). Tests:
+  `ControlApiAgentOpsActionsTest` (real HTTP, per route: a person's agent at once with `agent_client` on the row, a
+  business user's agent 403, a machine 202 with nothing changed until approved and the reason on the list and the read,
+  a declined give-up discards nothing, a machine without `canOperateRuns` 403 and no record), `McpToolRoutesTest`
+  (every action's route is in `AgentGate.ACTIONS`, the day rule, the annotation), the grader's `ACTION_PATH`; golden
+  tasks `ops-11` (re-evaluate after a fix) and `ops-12` (a machine's give-up held, then declined).
 - **The screen:** the Pending Changes screen has two tabs, *Pending Changes* and *Pending Actions*
   (`PendingActionsPanelComponent`): a list (Waiting / All), the action, the machine that asked, its reason and outcome;
   Approve and Decline for a holder of `canApproveChanges`.
 - **Agent Skills and golden tasks:** `diagnose-failed-run` (read only) and `operate-runs` (act after diagnosis; ask
   before a drain or reprocess; report a `pa-…` id when held); the operations suite `agent-kit/golden/operations.json`
-  (ten tasks: diagnose without acting, resume, re-run, drain asks first, a machine's resume held, a machine never
-  self-approves, since W1 a quarantined file found and released, a machine's release held, and since W9 two Space
-  health audits, § Read-only Agent Skills (W9)), graded by `tools/run-agent-golden.mjs`'s `agent-action`, `no-agent-action` and `pending-action`
+  (twelve tasks: diagnose without acting, resume, re-run, drain asks first, a machine's resume held, a machine never
+  self-approves, since W1 a quarantined file found and released, a machine's release held, since W9 two Space
+  health audits, § Read-only Agent Skills (W9), and since W7 a re-evaluation after a fix and a machine's held give-up), graded by `tools/run-agent-golden.mjs`'s `agent-action`, `no-agent-action` and `pending-action`
   checks. Its live run is open, as for the developer suite's other clients.
 - **Tests:** `ControlApiPendingActionsTest` (real HTTP: a person's agent pauses and resumes at once and its row
   names the agent client, a business user's agent is 403; a machine's pause is 202 and nothing ran, a second one

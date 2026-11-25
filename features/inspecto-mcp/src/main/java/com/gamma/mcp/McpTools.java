@@ -59,10 +59,15 @@ final class McpTools {
      * {@code write}: the tool changes something once a person approves it (a proposal, a withdrawal, an Action Request, a
      * Pipeline run) — D-AK3: only an agent Subject (a verified agent client) may call it; MCP annotations say so.
      */
-    record Tool(String name, String title, String description, List<Arg> args, Router router, boolean write) {
+    record Tool(String name, String title, String description, List<Arg> args, Router router, boolean write,
+                boolean destructive) {
 
         Tool(String name, String title, String description, List<Arg> args, Router router) {
-            this(name, title, description, args, router, false);
+            this(name, title, description, args, router, false, false);
+        }
+
+        Tool(String name, String title, String description, List<Arg> args, Router router, boolean write) {
+            this(name, title, description, args, router, write, false);
         }
 
         /** The validated arguments, by name; refuses an unknown, missing, mistyped or oversized one. */
@@ -141,8 +146,8 @@ final class McpTools {
             d.put("description", description);
             d.put("inputSchema", schema);
             // AK-2b: a write tool is not read-only, and not destructive either — a proposal changes nothing until a person
-            // approves it (plan §4.4).
-            d.put("annotations", Map.of("readOnlyHint", !write, "destructiveHint", false,
+            // approves it (plan §4.4). W7: a tool one of whose actions discards work (a backlog give-up) says so.
+            d.put("annotations", Map.of("readOnlyHint", !write, "destructiveHint", destructive,
                     "idempotentHint", !write, "openWorldHint", false));
             return d;
         }
@@ -445,6 +450,10 @@ final class McpTools {
             "replay-rejects", "replay-rejects", "retry-now", "retries/retry-now", "cancel-retries", "retries/cancel",
             "drain", "drain", "release-quarantined", "quarantine/release");
 
+    /** {@code operate_job_backlog}'s actions (widening plan W7) → the backlog route tail; {@code {day}} is the day argument. */
+    static final Map<String, String> JOB_BACKLOG_ACTIONS = Map.of(
+            "drain", "drain", "pause", "pause", "resume", "resume", "run-day", "days/{day}/run", "give-up", "days/{day}/give-up");
+
     private static final String HELD_FOR_A_MACHINE = " Signed in as a person, it runs at once within that person's own rights "
             + "(needs canOperateRuns); as an unattended machine agent it is held as a Pending Action for a person to approve.";
 
@@ -485,6 +494,33 @@ final class McpTools {
                     List.of(id("runId", "The Job Run id."), text("reason", "Why — shown to the approver when it is held.")),
                     a -> withReason(new Call("POST", "/jobs/runs/" + seg(a.get("runId")) + "/replay", McpRoutes.jsonBytes(Map.of())), a),
                     true),
+            new Tool("evaluate_expectations", "Evaluate Expectations",
+                    "Check the data again now: evaluate one Expectation, or every enabled one when no expectation is given. "
+                            + "Each result is saved, and a failed one opens an Incident and notifies." + HELD_FOR_A_MACHINE
+                            + " Use it after a fix, to see whether the check passes.",
+                    List.of(new Arg("expectation", Kind.ID, false, "Only this Expectation (its name); every enabled one when absent."),
+                            text("reason", "Why — on the audit row, and shown to the approver when it is held.")),
+                    a -> withReason(new Call("POST", a.get("expectation") == null ? "/expectations/evaluate"
+                            : "/expectations/" + seg(a.get("expectation")) + "/evaluate", McpRoutes.jsonBytes(Map.of())), a),
+                    true),
+            new Tool("evaluate_alerts", "Evaluate Alert Rules",
+                    "Evaluate every Alert Rule now. A rule that breaches fires an Alert, which can notify people."
+                            + HELD_FOR_A_MACHINE,
+                    List.of(text("reason", "Why — on the audit row, and shown to the approver when it is held.")),
+                    a -> withReason(new Call("POST", "/alerts/evaluate", McpRoutes.jsonBytes(Map.of())), a), true),
+            new Tool("operate_job_backlog", "Operate a Job's backlog",
+                    "Work a by-day Job's backlog: drain the ready days now, pause or resume it, run one day now, or give up "
+                            + "waiting on one day. give-up DISCARDS that day: its files are marked skipped and never run — ask "
+                            + "the person first." + HELD_FOR_A_MACHINE + " Read the backlog first (get_job_backlog).",
+                    List.of(id("job", "The Job id."),
+                            new Arg("action", Kind.ENUM, true, "What to do.", List.copyOf(new java.util.TreeSet<>(JOB_BACKLOG_ACTIONS.keySet()))),
+                            new Arg("day", Kind.ID, false, "The business day (yyyy-MM-dd) — run-day and give-up only."),
+                            text("reason", "Why — on the audit row, and shown to the approver when it is held.")),
+                    McpTools::operateJobBacklog, true, true),
+            new Tool("get_job_backlog", "Get the Job backlog",
+                    "Every by-day Job's backlog: paused or not, and each day's status (ready, waiting and why, running) with "
+                            + "its pending files and rows.",
+                    List.of(), get("/jobs/backlog")),
             new Tool("list_pending_actions", "List Pending Actions",
                     "The Pending Actions of this Space (a machine agent's held run and Case actions), newest first; optionally only "
                             + "those in one status (pending, approved, declined, withdrawn, expired, stale, failed).",
@@ -503,6 +539,15 @@ final class McpTools {
     private static Call operateRun(Map<String, Object> a) {
         String route = RUN_ACTIONS.get((String) a.get("action"));
         return withReason(new Call("POST", "/runs/" + seg(a.get("run")) + "/" + route, bodyOf(a)), a);
+    }
+
+    private static Call operateJobBacklog(Map<String, Object> a) {
+        String route = JOB_BACKLOG_ACTIONS.get((String) a.get("action"));
+        boolean perDay = route.contains("{day}");
+        if (perDay != (a.get("day") != null))
+            throw new BadArgs(perDay ? "'day' is required for " + a.get("action") : "'day' is only for run-day and give-up");
+        if (perDay) route = route.replace("{day}", seg(a.get("day")));
+        return withReason(new Call("POST", "/jobs/" + seg(a.get("job")) + "/backlog/" + route, McpRoutes.jsonBytes(Map.of())), a);
     }
 
     /** {@code work_incident_or_case}'s actions → the route tail each replays (every one in {@code AgentGate.CASE_ACTIONS}). */

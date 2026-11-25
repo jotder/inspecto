@@ -240,6 +240,11 @@ needs only W3 and can start now.
 
 ### W7 — Operations, second set: evaluate and the Job backlog
 
+> **Built 2026-11-26.** As specified, the eight routes in `AgentGate.RUN_ACTIONS`. Two choices at build: a read tool
+> `get_job_backlog` (`GET /jobs/backlog`), so the agent names a day the backlog lists rather than guessing one; and the
+> tools never send `?force=true` or `?allowPrevious=true`, which stay a person's choice on the Backlog screen. Golden
+> tasks `ops-11` and `ops-12`; their live run is part of W4.
+
 - **Goal.** After a fix, the operations agent can re-check and clear what piled up, not only re-run.
 - **Today.** Refused, all `canOperateRuns`: `POST /expectations/evaluate`, `POST /expectations/{id}/evaluate`,
   `POST /alerts/evaluate`, `POST /jobs/{id}/backlog/drain`, `…/pause`, `…/resume`, `…/days/{day}/run`,

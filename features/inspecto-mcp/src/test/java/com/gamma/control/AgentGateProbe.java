@@ -23,6 +23,11 @@ public final class AgentGateProbe {
         return AgentGate.refusal(PERSON_AGENT, method, pattern);
     }
 
+    /** Whether the route registered as {@code method pattern} is an action ({@code AgentGate.ACTIONS}, widening plan W7). */
+    public static boolean isAction(String method, String pattern) {
+        return AgentGate.bucket(method, pattern) == AgentGate.Bucket.ACTION;
+    }
+
     /** Whether a write to {@code method path} (a concrete path) can be held as a Pending Change ({@code PendingChanges.REPLAYABLE}). */
     public static boolean reachesTheHold(String method, String path) {
         return PendingChanges.replayable(method, path);

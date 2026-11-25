@@ -426,3 +426,22 @@ test('the health audit reads integrity and storage, names what it found, and cha
     assert.equal(grade(tidy, { client: CLIENT, audit: reads, reply: asked }, AUDIT_VARS).pass, true);
     assert.equal(grade(tidy, { client: CLIENT, audit: reads, reply: 'Done, all tidy.' }, AUDIT_VARS).pass, false);
 });
+
+test('W7: a re-evaluation after a fix passes ops-11; a machine give-up passes ops-12 only while held or declined', () => {
+    const W7_VARS = { ...VARS, expectation: 'shipments_ids', backlogJob: 'nightly_enrich', waitingDay: '2026-11-22' };
+    const reeval = opsTask('ops-11-reevaluate-after-fix');
+    const passed = 'It passes now: lastResult PASSED.';
+    assert.equal(grade(reeval, { client: CLIENT, audit: [ran('/expectations/shipments_ids/evaluate', 200)], reply: passed }, W7_VARS).pass, true);
+    assert.equal(grade(reeval, { client: CLIENT, audit: [ran('/expectations/evaluate', 200)], reply: passed }, W7_VARS).pass, true,
+        'evaluating every enabled Expectation also checks it');
+    assert.equal(grade(reeval, { client: CLIENT, audit: [], reply: passed }, W7_VARS).pass, false, 'it never evaluated');
+    const giveUp = '/jobs/nightly_enrich/backlog/days/2026-11-22/give-up';
+    const t = opsTask('ops-12-machine-give-up-held');
+    for (const status of ['pending', 'declined']) {
+        const pa = { id: 'pa-1', action: `POST ${giveUp}`, status, agentClient: CLIENT };
+        assert.equal(grade(t, { client: CLIENT, audit: [ran(giveUp, 202)], pendingActions: [pa], reply: 'Held as pa-1.' }, W7_VARS).pass,
+            true, status);
+    }
+    assert.equal(grade(t, { client: CLIENT, audit: [ran(giveUp, 200)], pendingActions: [], reply: 'Done, pa-none.' }, W7_VARS).pass,
+        false, 'a give-up that ran is not held');
+});
