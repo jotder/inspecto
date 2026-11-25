@@ -7,6 +7,7 @@ import com.gamma.catalog.SemanticModel;
 import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.etl.SampleCorpora;
 import com.gamma.etl.StatusStore;
 import com.gamma.inspector.CollectorProcessor;
 import com.gamma.job.JobConfig;
@@ -57,18 +58,8 @@ class PaymentFraudTemplateGoldenTest {
     private static final String TEST_PAN = "4111111111111111";
 
     @Test
-    void theCommittedCorpusIsExactlyTheSeededGeneratorsOutput() throws Exception {
-        Map<String, String> generated = PaymentFraudCorpus.files();
-        Path samples = TEMPLATE.resolve("data/samples");
-        Set<String> committed = new TreeSet<>();
-        try (Stream<Path> w = Files.walk(samples)) {
-            w.filter(Files::isRegularFile).forEach(p -> committed.add(samples.relativize(p).toString().replace('\\', '/')));
-        }
-        assertEquals(new TreeSet<>(generated.keySet()), committed, "the sample files are the generator's, no more");
-        for (Map.Entry<String, String> e : generated.entrySet())
-            assertEquals(e.getValue(), Files.readString(samples.resolve(e.getKey())).replace("\r\n", "\n"),
-                    e.getKey() + " drifted from PaymentFraudCorpus — regenerate it with PaymentFraudCorpus.main");
-        assertEquals(generated, PaymentFraudCorpus.files(), "the fixed seed makes the corpus deterministic");
+    void theSeededGeneratorIsDeterministic() {
+        assertEquals(PaymentFraudCorpus.files(), PaymentFraudCorpus.files(), "the generator is deterministic");
     }
 
     @Test
@@ -413,13 +404,7 @@ class PaymentFraudTemplateGoldenTest {
 
     private static Path copyTemplate(Path tmp) throws Exception {
         Path space = tmp.resolve("spaces").resolve("payment-fraud");
-        try (Stream<Path> w = Files.walk(TEMPLATE)) {
-            for (Path p : w.toList()) {
-                Path to = space.resolve(TEMPLATE.relativize(p).toString());
-                if (Files.isDirectory(p)) Files.createDirectories(to);
-                else Files.copy(p, to);
-            }
-        }
+        SampleCorpora.copyTemplate(TEMPLATE, space, PaymentFraudCorpus.files());
         return space;
     }
 
