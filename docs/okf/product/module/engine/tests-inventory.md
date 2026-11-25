@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-434 test class(es): 434 unit, 0 real-HTTP control-plane, 0 IT.
+435 test class(es): 435 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -42,6 +42,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `EventAlertBridgeTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/EventAlertBridgeTest.java` | MODULE-REORG-P7 ALERT residue retirement: SEQUENCE_GAP and PIPELINE_CONSERVATION_IMBALANCE domain events are each |
 | `FreshnessAlertTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/FreshnessAlertTest.java` | DUCKLE-C1 Dataset freshness: the three states, the fresh→stale edge, and the all-clear. |
 | `IndexLagAlertTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/IndexLagAlertTest.java` | LA-DATA-TRUST-1 S4: (a) Files waiting for the Link Analysis index longer than a limit - an Alert Rule with |
+| `KpiAlertRuleTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/KpiAlertRuleTest.java` | `BI-INSIGHTS-1` I-17 — an Alert Rule on a KPI ({@code kpi:}) or on its projection ({@code projection:}): the shapes it |
 | `MeasureAlertTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/MeasureAlertTest.java` | BI-5 measure alerts: dataset+measure rules evaluated via the wired probe, cooldown, validation. |
 | `PatternSqlOracleTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/PatternSqlOracleTest.java` | PA-9c: the Pattern SQL ({@link WindowSql#sequence}, {@link WindowSql#absence}) against an independent oracle — a |
 | `PerEntityAlertTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/PerEntityAlertTest.java` | ASSURE-PER-ENTITY-ALERTS-1 — a Dataset measure Alert Rule with {@code by} evaluates the Measure per key over |

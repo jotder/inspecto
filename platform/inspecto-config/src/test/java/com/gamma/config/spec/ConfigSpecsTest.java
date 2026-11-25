@@ -689,6 +689,20 @@ class ConfigSpecsTest {
                 "measure", "count", "severity", "WARNING")));
     }
 
+    /**
+     * BI-INSIGHTS-1 I-17: a KPI rule is its own shape (no metric or window), and a RAG rule fixes its own threshold;
+     * a probability rule still needs one.
+     */
+    @Test
+    void aKpiRuleIsNotRefusedForOmittingTheLedgerFields() {
+        assertEquals(List.of(), alertErrors(Map.of("name", "sales-amber", "kpi", "monthly_sales",
+                "projection", "value", "rag", "amber", "severity", "CRITICAL")));
+        assertEquals(List.of(), alertErrors(Map.of("name", "sales-chance", "kpi", "monthly_sales",
+                "projection", "probability", "comparator", "lt", "threshold", "0.5", "severity", "CRITICAL")));
+        assertEquals(List.of("alert.threshold"), alertErrors(Map.of("name", "sales-chance", "kpi", "monthly_sales",
+                "projection", "probability", "severity", "CRITICAL")));
+    }
+
     /** ...while the ledger rule keeps every requirement it had, now stated per shape. */
     @Test
     void aLedgerRuleStillNeedsMetricThresholdAndWindow() {

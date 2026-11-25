@@ -927,6 +927,18 @@ public final class ConfigSpecs {
                         "A Dataset measure rule only: how many consecutive healthy sweeps before its Alert is "
                                 + "cleared (the all-clear). Until then a relapse raises nothing new. Default 1 "
                                 + "(clear on the first healthy sweep); at most 1000."),
+                // BI-INSIGHTS-1 I-17: a KPI Alert Rule watches a KPI's value to date or its projection.
+                FieldSpec.of("alert.kpi", "KPI", FieldType.STRING,
+                        "The id of a KPI the rule watches (its value to date, or with alert.projection its "
+                                + "projection). Takes no metric, window, dataset or measure."),
+                FieldSpec.enumField("alert.projection", "Projection signal",
+                        List.of("value", "probability"), null,
+                        "A KPI rule only: watch the projected landing (value) or the chance of meeting the "
+                                + "target (probability, 0..1) instead of the value to date."),
+                FieldSpec.enumField("alert.rag", "RAG at or worse than",
+                        List.of("amber", "red"), null,
+                        "A KPI rule only: fire when the RAG band is at or worse than this; fixes the comparator "
+                                + "and threshold."),
                 // Runbook link (operator 2026-10-10): the guidance its Incident or Case page shows.
                 FieldSpec.of("alert.runbook", "Runbook", FieldType.STRING,
                         "The id of a Runbook component. The Incident or Case this rule raises shows that Runbook. "
@@ -954,8 +966,9 @@ public final class ConfigSpecs {
                         Severity.ERROR,
                         List.of("alert.threshold"),
                         raw -> {
-                            if ("freshness".equals(alertShape(raw)) || present(raw, "alert.pattern")) {
-                                return true;   // a freshness or Pattern rule fixes its own threshold
+                            if ("freshness".equals(alertShape(raw)) || present(raw, "alert.pattern")
+                                    || nonBlank(raw, "alert.rag")) {
+                                return true;   // a freshness, Pattern or KPI RAG rule fixes its own threshold
                             }
                             String t = str(raw, "alert.threshold");
                             if (t == null) {
@@ -989,6 +1002,7 @@ public final class ConfigSpecs {
      */
     private static String alertShape(Map<String, Object> raw) {
         if (nonBlank(raw, "alert.investigation")) return "investigation";
+        if (nonBlank(raw, "alert.kpi")) return "kpi";
         if (nonBlank(raw, "alert.maximumAge")) return "freshness";
         if (nonBlank(raw, "alert.dataset")) return "measure";
         return "ledger";

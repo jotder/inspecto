@@ -87,6 +87,19 @@ public record Alert(String rule, String severity, String pipeline, String metric
             return new Alert(r.name(), r.severity(), pipeline, r.indexLag() ? "index-lag" : "freshness", value, r.comparator(),
                     r.threshold(), r.maximumAge(), epochMillis, freshMsg);
         }
+        // A KPI rule (BI-INSIGHTS-1 I-17) reads its KPI's period in progress. A status rule's value is the RAG rank, so
+        // its sentence names the status, never "2 at or above 2".
+        if (r.isKpiRule()) {
+            String period = r.projection() != null ? "the period in progress, projected" : "the period to date";
+            String msg = r.rag() != null
+                    ? String.format(Locale.ROOT, "%s: the %s is %s, at or worse than %s (over %s)", r.severity(),
+                    r.kpiSignal(), value >= 2 ? "RED" : value >= 1 ? "AMBER" : "GREEN",
+                    r.rag().toUpperCase(Locale.ROOT), period)
+                    : String.format(Locale.ROOT, "%s: the %s is %s, %s the threshold of %s (over %s)", r.severity(),
+                    r.kpiSignal(), number(value), comparatorWords(r.comparator()), number(r.threshold()), period);
+            return new Alert(r.name(), r.severity(), pipeline, r.kpiSignal(), value, r.comparator(), r.threshold(), null,
+                    epochMillis, msg);
+        }
         // A measure rule (BI-5) has no ledger metric/window: label it by its measure over its dataset.
         // An Investigation rule (LA-23) is labelled by relation + measure, over the SEALED Working Set — it never
         // reads current data, and saying so keeps the alert from over-claiming.
@@ -147,6 +160,8 @@ public record Alert(String rule, String severity, String pipeline, String metric
 
     static String title(AlertRule r, String scope) {
         if (r.description() != null) return r.description() + " — " + scope;
+        if (r.isKpiRule() && r.rag() != null)
+            return capital(r.kpiSignal()) + " is " + r.rag().toUpperCase(java.util.Locale.ROOT) + " or worse";
         if (r.isFreshnessRule()) return r.indexLag()
                 ? "Dataset " + scope + " has Files waiting for the Link Analysis index for over " + r.maximumAge()
                 : r.eventDateColumn() != null
@@ -165,6 +180,7 @@ public record Alert(String rule, String severity, String pipeline, String metric
     /** What was measured, where: {@code Sum of exposure_sar on fraud_cases_open}, {@code Error rate on EVENTS}. */
     private static String subject(AlertRule r, String scope) {
         if (r.metric() != null) return metricLabel(r.metric()) + " on " + scope;
+        if (r.isKpiRule()) return capital(r.kpiSignal());
         if (r.isValueMeasureRule()) return "Entities breaching " + valueMeasureLabel(String.valueOf(r.valueMeasure().get("name"))) + " in " + scope;
         if (r.isInvestigationRule()) return measureLabel(r.measure()) + " of " + r.relation() + " in " + scope;
         return measureLabel(r.measure()) + " on " + scope;
@@ -282,5 +298,19 @@ public record Alert(String rule, String severity, String pipeline, String metric
         if (d > 0) return d + " d" + (h % 24 > 0 ? " " + (h % 24) + " h" : "");
         if (h > 0) return h + " h" + (min % 60 > 0 ? " " + (min % 60) + " min" : "");
         return min + " min";
+    }
+
+    private static String capital(String s) {
+        return s.isEmpty() ? s : Character.toUpperCase(s.charAt(0)) + s.substring(1);
+    }
+
+    private static String comparatorWords(String comparator) {
+        return switch (comparator) {
+            case "gt" -> "above";
+            case "gte" -> "at or above";
+            case "lt" -> "below";
+            case "lte" -> "at or below";
+            default -> comparator;
+        };
     }
 }

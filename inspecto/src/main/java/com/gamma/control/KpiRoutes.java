@@ -38,6 +38,9 @@ import com.gamma.access.WriteGates;
  *       inclusive) against the comparison the KPI declares applied to it: a Dashboard's picked dates. Both or neither;
  *       {@code from} after {@code to}, a future day or a span over {@value #MAX_RANGE_DAYS} days → 400. When given,
  *       {@code asOf} is ignored and the answer's {@code asOf} is {@code to}.</li>
+ *   <li>{@code &projection=true} adds {@code projection} (`BI-INSIGHTS-1` I-12, {@link #projection}): where the period
+ *       to date lands, its interval, P(target met) and the RAG of the landing — or {@code status: none} and why (a
+ *       range is never a period in progress). Same gates, same masking: it reads the KPI's own Measure, per day.</li>
  * </ul>
  *
  * <p>A read, so ungated like {@code POST /bi/query}. Fail closed: write root unset → 503; an unsafe id → 400; an
@@ -99,7 +102,9 @@ final class KpiRoutes implements RouteModule {
         BiResultMasking masking = BiResultMasking.of(writeRoot, store, new ViewStore(writeRoot.resolve("views")), kpi.dataset(),
                 dataset, BiResultMasking.mayReveal(ex));
         masking.vetMeasure(kpi.measure());
+        boolean wantProjection = "true".equals(ApiContext.query(ex, "projection"));
         KpiEvaluator.Result r;
+        KpiEvaluator.Projection projection = null;
         try {
             String relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
             if (!ranged && kpi.asOfLatest() && (asOfParam == null || asOfParam.isBlank())) {   // opt-in: follow the data, never past today
@@ -107,6 +112,7 @@ final class KpiRoutes implements RouteModule {
                 if (latest != null && latest.isBefore(asOf)) asOf = latest;
             }
             r = ranged ? KpiEvaluator.evaluateRange(kpi, relationSql, rangeFrom, asOf) : KpiEvaluator.evaluate(kpi, relationSql, asOf);
+            if (wantProjection && !ranged) projection = KpiEvaluator.project(kpi, relationSql, asOf);
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
@@ -114,7 +120,49 @@ final class KpiRoutes implements RouteModule {
         } catch (IOException e) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
         }
-        return response(kpi, content, asOf, r);
+        Map<String, Object> out = response(kpi, content, asOf, r);
+        if (wantProjection) out.put("projection", ranged
+                ? Map.of("status", "none", "reason", "a picked range of days is not a period in progress")
+                : projection(projection));
+        return out;
+    }
+
+    /**
+     * The I-12 answer ({@code ?projection=true}): {@code status} {@code projected} | {@code none} (with {@code reason});
+     * when projected, the landing {@code value}, its {@code lower} / {@code upper} at {@code level}, the
+     * {@code probability} of meeting the target (null with nothing to meet), the RAG {@code band} / {@code tone} of the
+     * landing, and how it was made ({@code daysLeft}, {@code historyDays}, {@code season}, {@code backtest}).
+     */
+    static Map<String, Object> projection(KpiEvaluator.Projection p) {
+        var r = p.result();
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("status", r.projected() ? "projected" : "none");
+        if (!r.projected()) {
+            m.put("reason", r.reason());
+            return m;
+        }
+        m.put("value", r.value());
+        m.put("toDate", p.toDate());
+        m.put("remaining", r.remaining());
+        m.put("lower", r.lower());
+        m.put("upper", r.upper());
+        m.put("level", com.gamma.analytics.forecast.PeriodProjection.LEVEL);
+        m.put("probability", p.probability());
+        m.put("band", p.rag() == null ? null : p.rag().name());
+        m.put("tone", KpiDefinition.tone(p.rag()));
+        m.put("daysLeft", r.horizon());
+        m.put("historyDays", r.history());
+        if (r.horizon() > 0) {
+            m.put("season", Map.of("days", r.period(), "detected", r.detected()));
+            Map<String, Object> bt = new LinkedHashMap<>();
+            bt.put("origins", r.origins());
+            bt.put("mapePct", r.accuracy().mape().isPresent() ? r.accuracy().mape().getAsDouble() : null);
+            bt.put("coverage", r.accuracy().coverage().isPresent() ? r.accuracy().coverage().getAsDouble() : null);
+            m.put("backtest", bt);
+            m.put("method", "Holt-Winters additive over the Measure per day; the interval is how far the same projection "
+                    + "missed at each past origin (scaled MAD), P from a normal interval of that width");
+        }
+        return m;
     }
 
     private static Map<String, Object> response(KpiDefinition kpi, Map<String, Object> content, LocalDate asOf,

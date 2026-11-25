@@ -83,7 +83,9 @@ public final class ObjectReadMasking {
     }
 
     private Set<String> sensitiveOf(String dataset) {
-        return dataset == null ? Set.of()
+        // A KPI rule's scope (BI-INSIGHTS-1 I-17) is "kpi:<id>", not a Dataset: its text names no key — only the KPI,
+        // a number or a status, from a Measure the save gate vetted not to reveal — so there is nothing to mask.
+        return dataset == null || dataset.startsWith(com.gamma.alert.AlertRule.KPI_SCOPE) ? Set.of()
                 : sensitive.computeIfAbsent(dataset, d -> EvidenceMasker.sensitiveColumns(registry, views, d));
     }
 

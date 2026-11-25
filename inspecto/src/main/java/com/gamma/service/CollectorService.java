@@ -861,6 +861,14 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // R2-05 follow-up: fired Alert / Incident text names a Dataset by its readable name from the SAME
         // per-Space registry the probe reads (the id stays in every attribute and the event).
         alerting.datasetLabel(measureProbe::label);
+        // BI-INSIGHTS-1 I-17: KPI rules read their KPI (value, RAG or projection) as the rule's owner, over the SAME
+        // per-Space roots as the measure probe.
+        alerting.kpiProbe(com.gamma.control.KpiAlertProbe.of(
+                () -> com.gamma.pipeline.SpaceConfigRoot.forSpace(probeSpace),
+                () -> {
+                    String dd = System.getProperty("data.dir", root.dataDir());
+                    return (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd);
+                }));
         // LA-23: Investigation rules, evaluated by the optional inspecto-geo-link module when it ships (absent it,
         // they are inert). ⚠ The root is resolved the way ControlApi.writeRoot() resolves where the Investigation
         // routes WROTE — this Space's config dir, else -Dassist.write.root as read at construction — and NOT by

@@ -11480,6 +11480,15 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "name" : "projection",
+          "in" : "query",
+          "required" : false,
+          "description" : "true adds `projection` (BI-INSIGHTS-1 I-12): where the period to date lands (its actual plus a forecast of the days left), its interval, P(target met) and the RAG of the landing; or status none with the reason (a range, a day grain, a Measure that is not count or sum, under two weeks of history). Same gates and masking as the value.",
+          "schema" : {
+            "type" : "string",
+            "enum" : [ "true", "false" ]
+          }
         } ],
         "responses" : {
           "200" : {
@@ -17137,6 +17146,29 @@
           },
           "owner" : {
             "type" : [ "string", "null" ]
+          },
+          "projection" : {
+            "type" : "object",
+            "description" : "Only with ?projection=true. status projected: value, toDate, remaining, lower, upper, level, probability (null with no target and no bands), band, tone, daysLeft, historyDays, season, backtest, method. status none: reason.",
+            "required" : [ "status" ],
+            "properties" : {
+              "status" : { "type" : "string", "enum" : [ "projected", "none" ] },
+              "reason" : { "type" : "string" },
+              "value" : { "type" : "number" },
+              "toDate" : { "type" : [ "number", "null" ] },
+              "remaining" : { "type" : "number" },
+              "lower" : { "type" : "number" },
+              "upper" : { "type" : "number" },
+              "level" : { "type" : "number" },
+              "probability" : { "type" : [ "number", "null" ] },
+              "band" : { "type" : [ "string", "null" ], "enum" : [ "GREEN", "AMBER", "RED", null ] },
+              "tone" : { "type" : "string" },
+              "daysLeft" : { "type" : "integer" },
+              "historyDays" : { "type" : "integer" },
+              "season" : { "type" : "object" },
+              "backtest" : { "type" : "object" },
+              "method" : { "type" : "string" }
+            }
           }
         }
       },

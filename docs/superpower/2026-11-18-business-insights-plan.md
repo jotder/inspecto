@@ -54,7 +54,7 @@ noisy their settings would have been on history.
 | KPI value on demand, period to date or a range | BUILT | `KpiEvaluator.java`, `GET /kpis/{id}/value` (`KpiRoutes.java:57`) |
 | **KPI history** (values stored per period) | ABSENT | nothing persists `KpiEvaluator` output |
 | Alert Rule on a Dataset Measure, per entity (`by`), windowed | BUILT | `alert/AlertRule.java` (BI-5, PA-9b) |
-| Alert Rule on a KPI id or on a projection | ABSENT | rules take `dataset` + `measure` |
+| Alert Rule on a KPI id or on a projection | BUILT 2026-11-25 (P1 I-17, §11.5) | `kpi` / `projection` / `rag` on `AlertRule` |
 | REPORT Job: CSV / XLSX / PNG / PDF; PDF draws bar, line and kpi Widgets; emits `REPORT_READY` | BUILT | `job/ReportJob.java`, `ReportWidget.java:23` |
 
 ### 2.3 Analytic engines that could feed insights
@@ -366,6 +366,32 @@ already exists there, and Q2/Q4 answer the questions an RA or finance lead asks 
   forwards only `tableSort`) do not ask for overlays; the method is fixed (Holt-Winters, default weights — no
   per-Widget tuning before Insight Profiles, P3); `SeasonalBaseline` has no week-of-year or month slot, so a week /
   month series is scored against all its other buckets; the baseline is the visible range, not a trailing window.
+
+### 11.5 P1 I-12 projection + I-17 Alert Rule on a KPI — as built (2026-11-25)
+
+Spec: [`okf/product/module/engine/spec-kpi-projection.md`](../okf/product/module/engine/spec-kpi-projection.md).
+
+- **I-12**: `GET /kpis/{id}/value?projection=true` → `projection` {landing, 80 % interval, P(target met), RAG of the
+  landing, or `status: none` + reason}. Landing = value to date + Holt-Winters forecast of the **days** left; the
+  interval is **measured**, not assumed: rolling-origin `Backtest` of the same H-day total at every past day, sigma =
+  scaled MAD of those misses about 0. New kernel class `analytics/forecast/PeriodProjection` and
+  `PredictionInterval.normalCdf` — the first production callers of `Backtest`, `Accuracy` and `SeasonalityDetector`, beside `ChartOverlays` (§11.4)
+  on `Forecaster` (the Java twin of `ForecastSql`; one small series per KPI, so no SQL form is needed).
+- **History = the live Dataset per day, not KPI History** (decided with evidence): KPI History holds whole periods at
+  the KPI's grain and cannot say what the rest of a period holds; it also exists only where a Job was scheduled.
+- **"Less than two seasons → no projection"** became: count/sum Measure only, grain wider than a day, ≥ 2 weekly seasons
+  (14 days) AND ≥ 8 past projections of the days left to measure the interval on. A range is never projected.
+- **KPI tile**: "Projected: Amber" badge beside "RAG: Red", and the landing, range and chance in words; hidden in the
+  mini size; never asked on a picked range.
+- **I-17**: `AlertRule` gained `kpi`, `projection` (`value` | `probability`) and `rag` (`amber` | `red`). A KPI rule is
+  a scalar rule scoped to `kpi:<id>` (edge-triggered, healed, Incident at CRITICAL, relapse relinked). Save gate and
+  sweep both read the KPI **as the rule's owner** (id only, no roles — a role-only share is refused, fail closed),
+  vet the Measure with no reveal, and refuse a status/probability rule on a KPI with no target or bands, or a
+  projection a KPI cannot have.
+- **Found in passing and fixed**: `ObjectReadMasking` treated every Alert scope as a Dataset id; a `kpi:` scope made
+  `GET /alerts` fail (500). A `kpi:` scope now masks nothing (its text holds no key).
+- **Deliberately deferred**: the Studio Alert Rule editor's KPI fields; "arm from a Widget" (I-17's UI half); a role-aware
+  owner for rule evaluation (would need roles stamped on the rule, as Jobs stamp `updatedByRoles`).
 
 ## 12. Board row
 
