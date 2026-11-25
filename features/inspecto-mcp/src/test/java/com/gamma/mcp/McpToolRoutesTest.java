@@ -67,13 +67,22 @@ class McpToolRoutesTest {
                 calls.add(t.router().route(t.validate(sample(t))));
                 continue;
             }
-            for (String kind : McpTools.CHANGE_ROUTES.keySet())
-                for (String op : McpTools.OPERATIONS) {
-                    Map<String, Object> a = new LinkedHashMap<>(Map.of("kind", kind, "operation", op, "id", "x1"));
-                    if (!"delete".equals(op)) a.put("content", Map.of());
-                    calls.add(t.router().route(t.validate(a)));
-                }
+            calls.addAll(proposeCalls());
         }
+        return calls;
+    }
+
+    /** {@code propose_change} for every kind × the operations that kind offers (W2 step 2: per kind). */
+    private static List<McpTools.Call> proposeCalls() {
+        McpTools.Tool t = McpTools.tool("propose_change");
+        List<McpTools.Call> calls = new ArrayList<>();
+        for (String kind : McpTools.CHANGE_ROUTES.keySet())
+            for (String op : McpTools.operations(kind)) {
+                Map<String, Object> a = new LinkedHashMap<>(Map.of("kind", kind, "operation", op, "id", "x1"));
+                if ("restore".equals(op)) a.put("version", 2L);
+                else if (!"delete".equals(op)) a.put("content", Map.of());
+                calls.add(t.router().route(t.validate(a)));
+            }
         return calls;
     }
 
@@ -100,18 +109,31 @@ class McpToolRoutesTest {
      */
     @Test
     void everyProposeChangeRouteReachesTheHold() {
+        List<McpTools.Call> calls = proposeCalls();
+        for (McpTools.Call c : calls)
+            assertTrue(AgentGateProbe.reachesTheHold(c.method(), c.path()),
+                    c.method() + " " + c.path() + " is not on PendingChanges.REPLAYABLE");
+        assertEquals(8 * 3 + 2, calls.size(), "every kind × the operations it offers was checked");
+    }
+
+    /** W2 step 2: a kind refuses an operation it does not offer, and only a restore takes a version, before any replay. */
+    @Test
+    void aKindRefusesAnOperationItDoesNotOffer() {
         McpTools.Tool t = McpTools.tool("propose_change");
-        int n = 0;
-        for (String kind : McpTools.CHANGE_ROUTES.keySet())
-            for (String op : McpTools.OPERATIONS) {
-                Map<String, Object> a = new LinkedHashMap<>(Map.of("kind", kind, "operation", op, "id", "x1"));
-                if (!"delete".equals(op)) a.put("content", Map.of());
-                McpTools.Call c = t.router().route(t.validate(a));
-                assertTrue(AgentGateProbe.reachesTheHold(c.method(), c.path()),
-                        kind + " " + op + " replays " + c.method() + " " + c.path() + ", which is not on PendingChanges.REPLAYABLE");
-                n++;
-            }
-        assertTrue(n >= 24, "every kind × operation was checked: " + n);
+        assertEquals(List.of("create"), McpTools.operations("requirement-kpi"));
+        assertEquals(List.of("restore"), McpTools.operations("pipeline-restore"));
+        for (Map<String, Object> bad : List.<Map<String, Object>>of(
+                Map.of("kind", "requirement-kpi", "operation", "update", "id", "r1", "content", Map.of()),
+                Map.of("kind", "requirement-kpi", "operation", "create", "content", Map.of()),            // no Requirement
+                Map.of("kind", "pipeline-restore", "operation", "create", "id", "p1", "content", Map.of()),
+                Map.of("kind", "pipeline-restore", "operation", "restore", "id", "p1"),                   // no version
+                Map.of("kind", "pipeline-restore", "operation", "restore", "id", "p1", "version", 2L, "content", Map.of()),
+                Map.of("kind", "widget", "operation", "restore", "id", "w1", "version", 2L),
+                Map.of("kind", "widget", "operation", "create", "content", Map.of(), "version", 2L)))
+            assertThrows(McpTools.BadArgs.class, () -> t.router().route(t.validate(bad)), bad.toString());
+        McpTools.Call restore = t.router().route(t.validate(
+                Map.of("kind", "pipeline-restore", "operation", "restore", "id", "orders", "version", 3L)));
+        assertEquals("POST /pipelines/orders/history/3/restore", restore.method() + " " + restore.path());
     }
 
     @Test

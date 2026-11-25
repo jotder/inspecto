@@ -75,7 +75,7 @@ Details: the Handbook how-to *Let an AI agent propose changes*, step 3.
 
 ## Golden tasks (source repository only)
 
-The repository's `agent-kit/golden/developer.json` holds ten developer tasks (two of them review a Pending Change; one proposes a Decision Rule with its Notification Rule) on `golden/data/shipments.csv`, a Dataset
+The repository's `agent-kit/golden/developer.json` holds eleven developer tasks (two of them review a Pending Change; one proposes a Decision Rule with its Notification Rule, one the KPI of a delivered Requirement) on `golden/data/shipments.csv`, a Dataset
 no Handbook page answers. Each is graded from the platform's own state — the Pending Changes the agent proposed, the
 audit trail of its tool calls, and its final reply — never by a model, with safety checks (validate or dry-run before
 propose, no attempt to approve or reveal, no applied write). Run an agent session per task, then grade it with

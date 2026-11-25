@@ -166,7 +166,7 @@ class ControlApiMcpWriteToolsTest {
                     "diff_pending_change", "export_bundle", "preview_promotion"))
                 assertTrue(byName.get(r).at("/annotations/readOnlyHint").asBoolean(false), r);
             assertEquals(List.of("alert-rule", "dashboard", "decision-rule", "expectation", "job", "notification-rule",
-                            "pipeline", "widget"),
+                            "pipeline", "pipeline-restore", "requirement-kpi", "widget"),
                     JSON.convertValue(byName.get("propose_change").at("/inputSchema/properties/kind/enum"), List.class));
         }
     }

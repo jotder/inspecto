@@ -159,7 +159,9 @@ is passed on as the replayed route's JSON body, unchanged.
 |---|---|---|---|
 | `validate_config` | read | `type`, `config` | `POST /validate` (`{type, config}`); refusal findings come back as data |
 | `dry_run_pipeline` | read | `pipeline`, `body?` | `POST /pipelines/authored/{pipeline}/dry-run` |
-| `propose_change` | write | `kind`, `operation`, `id?`, `content?`, `reason?` | the kind's own write route, below; `reason` rides as the request attribute `RequestAttrs.ATTR_CHANGE_REASON`, which `PendingChanges.hold` reads before the `X-Change-Reason` header (an in-process replay need not be header-safe; a header holding "—" or "→" made the replay throw — `AGENT-PROPOSE-500-1`, fixed 2026-11-24) |
+| `propose_change` | write | `kind`, `operation`, `id?`, `version?`, `content?`, `reason?` | the kind's own write route, below; `reason` rides as the request attribute `RequestAttrs.ATTR_CHANGE_REASON`, which `PendingChanges.hold` reads before the `X-Change-Reason` header (an in-process replay need not be header-safe; a header holding "—" or "→" made the replay throw — `AGENT-PROPOSE-500-1`, fixed 2026-11-24) |
+| `list_requirements` | read | — | `GET /requirements` (W2 step 2: what a `requirement-kpi` proposal starts from) |
+| `list_pipeline_versions` | read | `pipeline` | `GET /pipelines/{pipeline}/history` (W2 step 2: what a `pipeline-restore` restores) |
 | `list_pending_changes` | read | `status?` | `GET /pending-changes` |
 | `get_pending_change`, `diff_pending_change` | read | `change` | `GET /pending-changes/{change}`, `…/diff` |
 | `withdraw_change` | write | `change` | `POST /pending-changes/{change}/withdraw` (author only) |
@@ -177,8 +179,16 @@ since AK-2 widening W2 step 1 (D-AK9), `decision-rule` (`POST /decision-rules`, 
 which the machine agent set already held, so the set does not widen. **`notification-channel` stays out** although its
 route reaches the hold: the plan kept it out for `PENDING-CHANGE-SECRET-READBACK-1`, and that defect does not reach a
 Channel (`ChannelConfig` has no secret field and `GET /notifications/channels` returns every field), so adding it is
-the operator's call. `McpToolRoutesTest.everyProposeChangeRouteReachesTheHold` refuses a kind whose route is not on
-`PendingChanges.REPLAYABLE`. An update or delete needs `id`, a create or update needs `content`, a delete takes none; anything else is a
+the operator's call. **W2 step 2** made the operations per kind (`CHANGE_ROUTES` is `kind → operation → route`;
+`OPERATIONS` is the enum of every operation, `McpTools.operations(kind)` what one kind offers): `requirement-kpi`
+offers `create` only (`POST /requirements/{id}/kpi`, `id` = the delivered kpi Requirement, `content` = the builder's
+`{dataset, measure, timeField, grain, …}`), and `pipeline-restore` offers `restore` only
+(`POST /pipelines/{id}/history/{version}/restore`, with the `version` argument and no `content`); both
+`canAuthorWorkbench`. An operation the kind does not offer, a `version` on any other kind, or a restore without one is
+`-32602` before any replay. Two read tools give the agent what those proposals start from, so it never guesses:
+`list_requirements` (`GET /requirements`) and `list_pipeline_versions` (`GET /pipelines/{pipeline}/history`), both
+ungated reads of config metadata, no data values. `McpToolRoutesTest.everyProposeChangeRouteReachesTheHold` refuses a
+kind whose route is not on `PendingChanges.REPLAYABLE`. An update or delete needs `id`, a create or update needs `content`, a delete takes none; anything else is a
 `-32602` before any replay. The answer is the route's own: for an agent, always the **202 Pending Change** (the
 identity-keyed hold), carrying `agentClient` and `mcpTool: propose_change`.
 
@@ -202,7 +212,8 @@ putting the reason back on the header turns it red with the live run's "Illegal 
 another person's approval applies it, its update and delete are held, the same token's direct call is held, a machine
 agent's proposal is held; a kind outside the allowlist is `-32602` and records no Pending Change. Mutant: a kind mapped
 to `POST /decision-rules/{id}/simulate` (not on `REPLAYABLE`) turned the allowlist test, the W10 person's-agent test and
-the real-HTTP test red.
+the real-HTTP test red; in step 2, `requirement-kpi` mapped to `POST /requirements/{id}/deliver` did the same.
+`McpToolRoutesTest.aKindRefusesAnOperationItDoesNotOffer` pins the per-kind operations.
 
 **A replay that fails** with anything but an `ApiException` answers the tool `isError` with HTTP 500 and the exception's
 class name plus the correlation id, and is **logged at ERROR with its stack under that correlation id**

@@ -95,8 +95,14 @@ class ControlApiMcpProposeKindsTest {
     }
 
     private Ctx open(Path dir) throws Exception {
-        Path pipe = PipelineConfigBatchTest.writePipeline(Files.createDirectories(dir.resolve("cfg")), "");
+        return open(dir, false);
+    }
+
+    /** {@code pipelineInRoot}: the Pipeline lives in the write root (inactive), so its saves keep versions to restore. */
+    private Ctx open(Path dir, boolean pipelineInRoot) throws Exception {
         Path root = Files.createDirectories(dir.resolve("root"));
+        Path pipe = pipelineInRoot ? PipelineConfigBatchTest.writePipeline(root, "", false)
+                : PipelineConfigBatchTest.writePipeline(Files.createDirectories(dir.resolve("cfg")), "");
         System.setProperty("assist.write.root", root.toString());
         try {
             CollectorService svc = new CollectorService(List.of(pipe), 3600, 1);
@@ -213,6 +219,89 @@ class ControlApiMcpProposeKindsTest {
         try (Ctx c = open(dir)) {
             crudKindIsHeldEveryWay(c, "notification-rule", "notification-rule", "/notifications/rules", "failed_batches",
                     ControlApiMcpProposeKindsTest::notificationRule);
+        }
+    }
+
+    // ── W2 step 2: requirement-kpi (create only) and pipeline-restore (restore only) ───────────
+
+    private static final Map<String, Object> FROM_REQ =
+            Map.of("dataset", "orders", "measure", "sum(amount)", "timeField", "order_date", "grain", "month");
+
+    /** A delivered kpi Requirement over a Dataset 'orders' (a person raises, accepts and delivers it). */
+    private void deliveredRequirement(Ctx c, String id) throws Exception {
+        for (String[] step : List.of(new String[] {"/requirements", "{\"id\":\"" + id + "\",\"title\":\"Refund exposure\","
+                        + "\"kind\":\"kpi\",\"target\":35,\"comparator\":\"<=\",\"unit\":\"SAR\"}"},
+                new String[] {"/requirements/" + id + "/decision", "{\"accept\":true}"},
+                new String[] {"/requirements/" + id + "/deliver", "{}"})) {
+            HttpResponse<String> r = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + step[0]))
+                    .header("Content-Type", "application/json").header("Authorization", CHECKER)
+                    .POST(BodyPublishers.ofString(step[1])).build(), BodyHandlers.ofString());
+            assertEquals(200, r.statusCode(), step[0] + ": " + r.body());
+        }
+    }
+
+    private static void seedOrders(Ctx c) throws Exception {
+        new com.gamma.pipeline.ViewStore(c.root.resolve("views")).write(new com.gamma.pipeline.ViewDefinition("orders_view",
+                "flow-x", List.of(), "SELECT * FROM (VALUES (DATE '2026-07-02', 10.0), (DATE '2026-08-01', 20.0)) AS t(order_date, amount)",
+                "2026-08-01T00:00:00Z"));
+        c.registry().write("dataset", "orders", Map.of("view", "orders_view"));
+    }
+
+    @Test
+    void aRequirementsKpiIsHeldEveryWay(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            seedOrders(c);
+            for (String r : List.of("refunds", "refunds_direct", "refunds_bot")) deliveredRequirement(c, r);
+
+            String pc = heldId(propose(c.port, AGENT, args("requirement-kpi", "create", "refunds", FROM_REQ)));
+            assertFalse(c.registry().exists("kpi", "refunds"), "nothing is live before approval");
+            approve(c, pc);
+            assertTrue(c.registry().exists("kpi", "refunds"), "another person's approval creates the KPI");
+
+            HttpResponse<String> direct = rest(c, "POST", "/requirements/refunds_direct/kpi", FROM_REQ, AGENT);
+            assertEquals(202, direct.statusCode(), "the same token's direct call is held: " + direct.body());
+            assertFalse(c.registry().exists("kpi", "refunds_direct"));
+
+            heldId(propose(c.port, BOT, args("requirement-kpi", "create", "refunds_bot", FROM_REQ)));
+            assertFalse(c.registry().exists("kpi", "refunds_bot"), "a machine agent's proposal wrote nothing");
+        }
+    }
+
+    @Test
+    void aPipelineRestoreIsHeldEveryWay(@TempDir Path dir) throws Exception {
+        String priorRoots = System.getProperty("assist.safety.roots");
+        System.setProperty("assist.safety.roots", dir.toString());
+        try (Ctx c = open(dir, true)) {
+            for (String d : List.of("first", "second")) {   // two saves by a person: kept versions 1 and 2
+                HttpResponse<String> p = rest(c, "POST", "/config/patch",
+                        Map.of("type", "pipeline", "name", "mini_etl", "patch", Map.of("description", d)), CHECKER);
+                assertEquals(200, p.statusCode(), p.body());
+            }
+            Path pipe = c.root.resolve("mini_pipeline.toon");
+            String before = Files.readString(pipe);
+            String v1 = Files.readString(c.root.resolve(".history/pipelines/mini_etl/v1.toon"));
+            assertNotEquals(v1, before, "precondition: the file is not version 1");
+
+            Map<String, Object> restore = args("pipeline-restore", "restore", "mini_etl", null);
+            restore.put("version", 1);
+            String pc = heldId(propose(c.port, AGENT, restore));
+            assertEquals(before, Files.readString(pipe), "nothing is restored before approval");
+            approve(c, pc);
+            assertEquals(v1, Files.readString(pipe), "another person's approval restores version 1");
+
+            HttpResponse<String> direct = rest(c, "POST", "/pipelines/mini_etl/history/2/restore", Map.of(), AGENT);
+            assertEquals(202, direct.statusCode(), "the same token's direct call is held: " + direct.body());
+            assertEquals(v1, Files.readString(pipe), "the direct call restored nothing");
+            String directId = JSON.readTree(direct.body()).at("/data/pendingChange/id").asText();
+            assertEquals(200, rest(c, "POST", "/pending-changes/" + directId + "/withdraw", Map.of(), AGENT).statusCode());
+
+            Map<String, Object> byBot = args("pipeline-restore", "restore", "mini_etl", null);
+            byBot.put("version", 2);
+            heldId(propose(c.port, BOT, byBot));
+            assertEquals(v1, Files.readString(pipe), "a machine agent's proposal restored nothing");
+        } finally {
+            if (priorRoots == null) System.clearProperty("assist.safety.roots");
+            else System.setProperty("assist.safety.roots", priorRoots);
         }
     }
 
