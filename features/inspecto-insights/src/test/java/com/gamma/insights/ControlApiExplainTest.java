@@ -217,6 +217,25 @@ class ControlApiExplainTest {
     }
 
     @Test
+    void maskedValuesNeverComeBackInTheirRawKeysOrder(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        // Without region N: K1 (…101) has E 100 → 160, K2 (…202) has S 200 → 190. Raw key order puts K1 first; the Measure
+        // order (Jan K2 200 highest) puts K2 first — a viewer's aliases must follow the Measure, never the raw key.
+        try (Ctx c = open(cfg, root)) {
+            String filter = "\"filters\":[{\"field\":\"region\",\"op\":\"!=\",\"value\":\"N\"}],\"dimensions\":[\"msisdn\"],";
+            String ratio = "\"ratio\":{\"num\":{\"agg\":\"sum\",\"field\":\"amount\"},\"den\":{\"agg\":\"count\"}}";
+            JsonNode raw = data(explain(c, "revealer", filter + ratio));
+            assertEquals(K1, raw.get("mixRate").get(0).get("parts").get(0).get("value").asText(), "the probe: raw order is K1 first");
+            String k2Alias = null;
+            for (JsonNode e : data(explain(c, "author", filter + SUM)).get("drivers").get(0).get("elements"))
+                if (e.get("before").asDouble() == 200) k2Alias = e.get("value").asText();
+            assertNotNull(k2Alias);
+            JsonNode masked = data(explain(c, "author", filter + ratio));
+            assertEquals(k2Alias, masked.get("mixRate").get(0).get("parts").get(0).get("value").asText(),
+                    "a viewer's parts follow the Measure, not the raw key");
+        }
+    }
+
+    @Test
     void aNonAdditiveAggregateIsRefusedInWords(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             for (String agg : List.of("median", "countDistinct", "p90", "avg")) {
