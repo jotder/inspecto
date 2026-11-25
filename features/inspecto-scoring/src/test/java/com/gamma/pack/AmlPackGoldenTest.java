@@ -7,6 +7,7 @@ import com.gamma.catalog.SemanticModel;
 import com.gamma.enrich.EnrichmentConfig;
 import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.etl.SampleCorpora;
 import com.gamma.etl.StatusStore;
 import com.gamma.inspector.CollectorProcessor;
 import com.gamma.job.JobConfig;
@@ -62,23 +63,13 @@ class AmlPackGoldenTest {
     private static boolean regenerate() { return Boolean.getBoolean("aml.regenerate"); }
 
     @Test
-    void theCommittedCorpusIsTheSeededGeneratorsOutput() throws Exception {
-        Map<String, String> files = AmlCorpus.files();
-        Path samples = TEMPLATE.resolve("data/samples");
-        if (regenerate())
-            for (Map.Entry<String, String> f : files.entrySet()) {
-                Files.createDirectories(samples.resolve(f.getKey()).getParent());
-                Files.writeString(samples.resolve(f.getKey()), f.getValue());
-            }
-        Set<String> committed = new TreeSet<>();
-        try (Stream<Path> w = Files.walk(samples)) {
-            w.filter(Files::isRegularFile).forEach(p -> committed.add(samples.relativize(p).toString().replace('\\', '/')));
-        }
-        assertEquals(new TreeSet<>(files.keySet()), committed, "the sample files are the generator's, no more");
-        for (Map.Entry<String, String> f : files.entrySet())
-            assertEquals(f.getValue(), Files.readString(samples.resolve(f.getKey())).replace("\r\n", "\n"),
-                    f.getKey() + " drifted from AmlCorpus (seed " + AmlCorpus.SEED + ") - regenerate with -Daml.regenerate=true");
-        assertEquals(files, AmlCorpus.files(), "the generator is deterministic");
+    void theSeededGeneratorIsDeterministic() {
+        assertEquals(AmlCorpus.files(), AmlCorpus.files(), "the generator is deterministic");
+    }
+
+    @Test
+    void theCommittedSamplesMatchTheGeneratorWhenPresent() throws Exception {
+        SampleCorpora.assertCommittedMatches(TEMPLATE, AmlCorpus.files());
     }
 
     /** A zero-row seed of every sink, so the seed gate can check Alert Rule and KPI fields and each Job has a sink to read first. */
@@ -205,13 +196,7 @@ class AmlPackGoldenTest {
 
     static Path copyTemplate(Path tmp) throws Exception {
         Path space = tmp.resolve("spaces").resolve("aml");
-        try (Stream<Path> w = Files.walk(TEMPLATE)) {
-            for (Path p : w.toList()) {
-                Path to = space.resolve(TEMPLATE.relativize(p).toString());
-                if (Files.isDirectory(p)) Files.createDirectories(to);
-                else Files.copy(p, to);
-            }
-        }
+        SampleCorpora.copyTemplate(TEMPLATE, space, AmlCorpus.files());
         return space;
     }
 

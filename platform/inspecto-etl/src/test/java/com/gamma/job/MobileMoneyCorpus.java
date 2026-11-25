@@ -24,10 +24,15 @@ import java.util.Set;
  * tier-1 limit out. Each typology plants offenders ({@link #offenders}, one JUST above the threshold) and
  * look-alikes ({@link #lookAlikes}, one exactly AT it plus realistic benign patterns). Reconciliation plants are
  * {@code pair|type|key} Breaks ({@link #breaks}) with benign keys ({@link #benignBreaks}).
- * {@code MobileMoneyPackGoldenTest} pins the committed samples to this output; regenerate with
- * {@code -Dmobilemoney.regenerate=true}.
+ * {@code MobileMoneyPackGoldenTest} builds its samples from this output on every run ({@link #samples}); none is read from the Template.
  */
-final class MobileMoneyCorpus {
+public final class MobileMoneyCorpus {
+
+    /** The fixed-seed sample files of the Template (relative path under {@code data/samples} to content): what the repository
+     *  used to commit. Public so tests in other modules build the same corpus ({@code SPACES-CONSOLIDATION-1} P2.3). */
+    public static java.util.Map<String, String> samples() {
+        return new MobileMoneyCorpus().generate().files();
+    }
 
     static final long SEED = 20261009L;
     static final LocalDate DAY = LocalDate.of(2026, 7, 1);

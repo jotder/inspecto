@@ -25,10 +25,15 @@ import java.util.Set;
  * threshold. Each typology gets planted offenders ({@link #offenders}) — including one JUST above the
  * threshold — and planted look-alikes ({@link #lookAlikes}) that must stay silent: one exactly AT the
  * threshold (the rules are {@code gt}) and the realistic benign patterns. {@code TelcoFraudTemplateGoldenTest}
- * asserts the committed samples are byte-identical to this output; regenerate with the environment variable
- * {@code TELCO_FRAUD_REGENERATE=true}.
+ * builds its samples from this output on every run ({@link #samples}); none is read from the Template.
  */
-final class TelcoFraudCorpus {
+public final class TelcoFraudCorpus {
+
+    /** The fixed-seed sample files of the Template (relative path under {@code data/samples} to content): what the repository
+     *  used to commit. Public so tests in other modules build the same corpus ({@code SPACES-CONSOLIDATION-1} P2.3). */
+    public static java.util.Map<String, String> samples() {
+        return new TelcoFraudCorpus().generate().files();
+    }
 
     static final long SEED = 20260930L;
     static final String CDR_FILE = "cdr/CDR_20260701.csv";

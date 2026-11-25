@@ -1,6 +1,7 @@
 package com.gamma.control;
 
 import com.gamma.etl.PipelineConfig;
+import com.gamma.etl.SampleCorpora;
 import com.gamma.inspector.CollectorProcessor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -14,7 +15,6 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
-import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -41,7 +41,9 @@ class TelcoComposedBypassTest {
     @Test
     void theOtherAppsTrafficRaisesOnlyThePinnedCrossAppIncident(@TempDir Path tmp) throws Exception {
         Path templates = Files.createDirectories(tmp.resolve("_templates"));
-        for (String part : PARTS) copyTree(REPO.resolve("spaces/_templates").resolve(part), templates.resolve(part));
+        Map<String, Map<String, String>> samples = Map.of("telco-ra", com.gamma.job.TelcoRaCorpus.samples(),
+                "telco-fraud", TelcoFraudCorpus.samples(), "telco-bypass", Map.of());
+        for (String part : PARTS) SampleCorpora.copyTemplate(REPO.resolve("spaces/_templates").resolve(part), templates.resolve(part), samples.get(part));
         Path plan = tmp.resolve("plan.json");
         node("tools/assemble.mjs", "--product", "telco", "--edition", "standard", "--out", plan.toString());
         node("tools/compose-space.mjs", "--plan", plan.toString(), "--templates", templates.toString());
@@ -83,15 +85,5 @@ class TelcoComposedBypassTest {
         assertTrue(p.waitFor(120, TimeUnit.SECONDS), script + " did not finish");
         assertEquals(0, p.exitValue(), script + ": " + out);
         return out;
-    }
-
-    private static void copyTree(Path from, Path to) throws Exception {
-        try (Stream<Path> s = Files.walk(from)) {
-            for (Path p : s.toList()) {
-                Path target = to.resolve(from.relativize(p).toString());
-                if (Files.isDirectory(p)) Files.createDirectories(target);
-                else Files.copy(p, target);
-            }
-        }
     }
 }
