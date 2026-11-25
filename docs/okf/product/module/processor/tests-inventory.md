@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-481 test class(es): 195 unit, 286 real-HTTP control-plane, 0 IT.
+483 test class(es): 195 unit, 288 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -68,6 +68,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiActivationHoldsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiActivationHoldsTest.java` | SE-1b (D-SE12) over real HTTP: the activation holds, end to end — the Space lock reports, {@link ActivationHolds} |
 | `ControlApiAgentClientTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAgentClientTest.java` | The agent marker over real HTTP (AGENT-KIT-1 AK-2a, plan {@code 2026-11-20-agent-kit-ak2-plan.md} §4.1, D-AK1): an |
 | `ControlApiAgentInvokeTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAgentInvokeTest.java` | Real-HTTP tests for the S6 "gated agentic write" round-trip: an A2UI {@code invoke} action against |
+| `ControlApiAgentMachineTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAgentMachineTest.java` | The machine agent over real HTTP (AGENT-KIT-1 AK-2c, plan {@code 2026-11-20-agent-kit-ak2-plan.md} §4.5, §6.2 lane A): |
 | `ControlApiAlertAckTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAlertAckTest.java` | MODULE-REORG-P7-INCIDENTS slice 3 — {@code POST /alerts/{id}/ack\|resolve} over real HTTP. Rule-fired Alerts live in |
 | `ControlApiAlertFromEventTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAlertFromEventTest.java` | MODULE-REORG-P7 ALERT residue retirement - a {@code SEQUENCE_GAP} / conservation-imbalance Event is an Alert on |
 | `ControlApiAlertOwnerTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAlertOwnerTest.java` | DUCKLE-C1 residual 2 — <b>owner-routed alerting</b>, over real HTTP: the capture point and the feed. |
@@ -226,6 +227,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiOutputLoadTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOutputLoadTest.java` | {@code BASIC-ELT-PROFILE-1} O6 ({@code output.load}): the save path refuses a {@code replace} / {@code period} on a store |
 | `ControlApiPackParserPreviewTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiPackParserPreviewTest.java` | Real-HTTP proof of operator decision D4 (parser-plugins-trust-design.md slice P4, 2026-09-25): |
 | `ControlApiParsersTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiParsersTest.java` | Real-HTTP tests for the parser-catalog routes: {@code GET /parsers} (the self-describing |
+| `ControlApiPendingActionsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiPendingActionsTest.java` | Operational actions and Pending Actions over real HTTP (AGENT-KIT-1 AK-2d, plan §4.6 and §6.2 lane B, D-AK5 and D-AK6 |
 | `ControlApiPendingChangesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiPendingChangesTest.java` | Maker-checker over real HTTP (`ASSURE-MAKER-CHECKER-1` S1–S3): the approval policy, the hold, the Pending |
 | `ControlApiPipelineBundleTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiPipelineBundleTest.java` | The TRANSFER-ARCH-1 selective bundle over real HTTP ({@code PipelineBundleRoutes}): |
 | `ControlApiPipelineCreateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiPipelineCreateTest.java` | Integration tests for {@code POST /runs} (v4.1.0, scope {@code control}): register a new |

@@ -48,6 +48,12 @@ export function runbookOptionLoader(): AttributeOptionLoader {
     return async () => toOptions((await firstValueFrom(components.list('runbook'))).map((d) => d.name));
 }
 
+/** Saved KPI definitions (`/components/kpi`) — the Widget's KPI a Chart Marker reads (BI-INSIGHTS-1 I-2). */
+export function kpiOptionLoader(): AttributeOptionLoader {
+    const components = inject(ComponentsService);
+    return async () => toOptions((await firstValueFrom(components.list('kpi'))).map((d) => d.name));
+}
+
 /** Saved Risk Score models (`/components/risk-score`) — the `risk.score` Job's `model` parameter. */
 export function riskScoreModelOptionLoader(): AttributeOptionLoader {
     const components = inject(ComponentsService);

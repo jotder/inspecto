@@ -302,6 +302,28 @@ already exists there, and Q2/Q4 answer the questions an RA or finance lead asks 
   restates one closed period); rows older than 3 years are dropped. Each run rewrites the KPI's one file
   atomically (`ScoreOutputDirs.swapIn`, the snapshot-swap lock).
 
+### 11.2 P0 I-2 Chart Markers — as built (2026-11-24)
+
+- **Stored shape**: `options.markers` on a `line`, `bar`, `area` or `combo` Widget (`MARKER_VIZ_TYPES`; any other
+  type ignores them): `constant` (`value`), `target` (`value` optional), `average`, `percentile` (`p` 1–99),
+  `band` (`from` / `to`, either open, `tone` = a status tone) and `rag`; each may carry a `label`.
+- **Resolved at render, in the browser** (D-BI7: query-time, no new storage): `inspecto-ui/src/app/inspecto/viz/chart-markers.ts`.
+  Statistics read the values on the value axis `y` as drawn (a Combo's bars while its lines sit on the right axis;
+  category totals per stack when stacked, a Combo's bars and lines being two stacks as in Chart.js); a percentile is a
+  whole number, by `quantile_cont`'s rule. A target line takes its own value, else the
+  bound KPI's target, else `options.kpi.target`. A marker that cannot be placed is dropped, never guessed.
+- **KPI binding**: `options.kpi.kpiId` (the KPI tile's existing key), chosen in the cog dialog on the four types; the
+  definition is read from `/components/kpi/{id}` only when a marker needs it, and `rag` follows `KpiDefinition.rag`
+  (up / down thresholds, band intervals). A failed read leaves `rag` undrawn and the target line on the Widget's own target.
+  The cog dialog now keeps a KPI tile's `kpiId` through a save (it was dropped before).
+- **Drawing (D-BI9)**: one inline Chart.js plugin per chart (`chart-markers.plugin.ts`), built from resolved markers so
+  nothing passes Chart.js's option resolver: `afterDataLimits` widens `y` to every marker, bands are shaded behind the
+  data, lines drawn over it with their words. Colours from `CHART_TONE` / `CHART_MARKER_LINE` only; the canvas text
+  alternative lists every marker (WCAG 1.1.1, 1.4.1).
+- **Deliberately deferred**: the Report PDF (`WidgetChartRenderer`, Java2D) does not draw markers — it already prints a
+  plain snapshot without palette or sort — filed as `REPORT-CHART-MARKERS-1`. Decimation of many markers on long series
+  (§10) was not needed: markers are a handful of lines, not series.
+
 ## 12. Board row
 
 Filed 2026-11-18 as **one** row, `BI-INSIGHTS-1` (P2, `BACKLOG.md` §3.6) — the board allows a lane at most one

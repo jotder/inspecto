@@ -15,6 +15,8 @@ import {
 import { Chart, ChartData, ChartOptions, ChartType, registerables } from 'chart.js';
 import { resolveChartTokens, themedChartConfig } from 'app/inspecto/theme/chart-theme';
 import { InspectoEmptyStateComponent } from './empty-state.component';
+import { markerAltText, ResolvedMarker } from 'app/inspecto/viz/chart-markers';
+import { chartMarkersPlugin } from 'app/inspecto/viz/chart-markers.plugin';
 
 Chart.register(...registerables);
 
@@ -57,6 +59,9 @@ export class InspectoChartComponent implements AfterViewInit, OnChanges, OnDestr
     /** The host's own text alternative, for a chart whose data points do not read as values (the Waterfall's
      *  `[low, high]` bars, the Combo's two kinds). Absent: {@link altText} is derived from the first series. */
     @Input() ariaLabel: string | null = null;
+    /** Chart Markers (BI-INSIGHTS-1 I-2), already resolved: drawn by the overlay plugin on the value axis `y` and
+     *  stated in the text alternative. */
+    @Input() markers: readonly ResolvedMarker[] = [];
     /** Shown in place of the canvas when there is nothing to plot. */
     @Input() emptyMessage = 'No data to chart yet.';
     /**
@@ -89,6 +94,11 @@ export class InspectoChartComponent implements AfterViewInit, OnChanges, OnDestr
     /** Text alternative for the canvas (WCAG 1.1.1 — canvases are invisible to screen readers): the chart
      *  type plus each category's first-series value, capped so long series don't produce an essay. */
     get altText(): string {
+        const marks = markerAltText(this.markers);
+        return marks ? `${this.baseAltText()} ${marks}` : this.baseAltText();
+    }
+
+    private baseAltText(): string {
         if (this.ariaLabel) return this.ariaLabel;
         const d = this.data;
         if (!d?.labels?.length) return `${this.type} chart`;
@@ -150,6 +160,7 @@ export class InspectoChartComponent implements AfterViewInit, OnChanges, OnDestr
         if (!this.data || !this.hasData || !this.canvas) return;
         // The caller's options (Widget renderOptions: legend, axis titles, stacked, formats) deep-merge OVER the
         // shared theme, so an override composes with the theme's typography/colours instead of losing them.
+        const tokens = resolveChartTokens();
         const config = themedChartConfig(
             this.type,
             this.data,
@@ -162,8 +173,9 @@ export class InspectoChartComponent implements AfterViewInit, OnChanges, OnDestr
                 },
                 ...this.options,
             },
-            resolveChartTokens(),
+            tokens,
         );
+        if (this.markers.length) config.plugins = [chartMarkersPlugin(this.markers, tokens.muted, tokens.font)];
         this.chart = new Chart(this.canvas.nativeElement, config);
     }
 }

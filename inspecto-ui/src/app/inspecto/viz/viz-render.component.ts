@@ -1,9 +1,11 @@
 import {
     ChangeDetectionStrategy,
     Component,
+    Injector,
     Type,
     computed,
     effect,
+    inject,
     input,
     isDevMode,
     output,
@@ -38,9 +40,11 @@ import {
     waterfallSteps,
     waterfallTones,
 } from './waterfall-chart';
-import { comboAltText, comboChartData, comboSeriesFormat, comboUsesSecondaryAxis } from './combo-chart';
+import { comboAltText, comboChartData, comboSeriesFormat, comboUsesSecondaryAxis, isLineSeries } from './combo-chart';
 import { COMPARE_LABEL, CompareCell, CompareKind, compareText } from './compare';
-import { KpiRange } from 'app/inspecto/api/kpis.service';
+import { KpiDefinition, KpiRange } from 'app/inspecto/api/kpis.service';
+import { ComponentsService } from 'app/inspecto/api/components.service';
+import { MARKER_VIZ_TYPES, needsKpi, ResolvedMarker, resolveMarkers } from './chart-markers';
 import { ChannelId, VizPlugin, VizProps, VizRenderOptions, VizSeries } from './viz-types';
 
 /** componentKey → Angular component, for plugins that render via the escape hatch (`render.kind:'component'`).
@@ -106,6 +110,7 @@ const COMPONENT_BY_KEY: Record<string, Type<unknown>> = {
                         [data]="data"
                         [options]="chartJsOptions()"
                         [ariaLabel]="chartAriaLabel()"
+                        [markers]="markers()"
                         (elementClick)="onElementClick($event)"
                     />
                     @if (compareNote(); as n) {
@@ -252,7 +257,56 @@ export class VizRenderComponent {
         return r.kind === 'component' ? (COMPONENT_BY_KEY[r.componentKey] ?? this.loadedComponent()) : null;
     });
 
+    private readonly injector = inject(Injector);
+
+    /** The bound KPI's definition (`options.kpi.kpiId`) when a Chart Marker reads it (a target line with no value of
+     *  its own, or the RAG bands); `null` until read, and on a failed read (those markers then fall back / drop). */
+    private readonly markerKpi = signal<KpiDefinition | null>(null);
+
+    /** Whether this Widget's type draws Chart Markers. */
+    private readonly marksSupported = computed(() => MARKER_VIZ_TYPES.includes(this.plugin().meta.type));
+
+    /** The id of the KPI the markers need, or '' — a stable string, so the read effect re-runs only when it changes. */
+    private readonly markerKpiId = computed(() => {
+        const o = this.renderOptions();
+        return this.marksSupported() && needsKpi(o?.markers) ? (o?.kpi?.kpiId ?? '') : '';
+    });
+
+    /**
+     * BI-INSIGHTS-1 I-2: the Widget's Chart Markers, resolved to lines and bands. The statistics read the values on the
+     * value axis `y` as drawn: every series, a Combo's bars only while its lines sit on the right axis, and the
+     * category totals when the series are stacked — per stack, as Chart.js stacks them: a Combo's bars and lines
+     * on the same axis are two stacks (its stack key falls back to the dataset type), never one sum.
+     */
+    readonly markers = computed<ResolvedMarker[]>(() => {
+        const o = this.renderOptions();
+        if (!this.marksSupported() || !o?.markers?.length) return [];
+        const p = this.sortedProps();
+        const combo = this.plugin().meta.type === 'combo';
+        const onY = combo && comboUsesSecondaryAxis(p, o) ? p.series.filter((s) => !isLineSeries(s)) : p.series;
+        const stacks = combo ? [onY.filter((s) => !isLineSeries(s)), onY.filter(isLineSeries)] : [onY];
+        const totals = (group: VizSeries[]) =>
+            group.length ? p.labels.map((_, i) => group.reduce((sum, s) => sum + (Number(s.data[i]) || 0), 0)) : [];
+        const values = o.stacked ? stacks.flatMap(totals) : onY.flatMap((s) => s.data);
+        return resolveMarkers(o.markers, { values, target: o.kpi?.target, kpi: this.markerKpi(), format: o.format });
+    });
+
     constructor() {
+        // A Chart Marker bound to the Widget's KPI reads its definition (target, direction, bands) — one read in
+        // flight, cancelled when the id changes. A failed read leaves the KPI-only markers undrawn, never guessed.
+        effect((onCleanup) => {
+            const id = this.markerKpiId();
+            this.markerKpi.set(null);
+            if (!id) return;
+            const read = this.injector
+                .get(ComponentsService)
+                .get('kpi', id)
+                .subscribe({
+                    next: (c) => this.markerKpi.set(c.content as unknown as KpiDefinition),
+                    error: () => this.markerKpi.set(null),
+                });
+            onCleanup(() => read.unsubscribe());
+        });
         // Resolve a registered async loader when the plugin needs one (keeps MapLibre/G6 out of eager bundles).
         // The stale-key guard drops a resolution that lands after the plugin has already changed.
         effect(() => {

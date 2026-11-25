@@ -3,6 +3,7 @@ import type { HeatmapMatrix, HeatmapOptions } from './heatmap';
 import type { CompareKind } from './compare';
 import { ColumnType, ConditionGroup } from 'app/inspecto/query';
 import { TreemapRow } from './treemap-layout';
+import type { ChartMarker } from './chart-markers';
 
 /**
  * The visualization seam — a framework-agnostic `VizPlugin` registry that is the **first `ComponentKind`
@@ -258,6 +259,10 @@ export interface VizRenderOptions {
     gauge?: { min?: number; max?: number };
     /** Heatmap only: the colour scale (`sequential` default, `diverging` around `midpoint`, `status` by tone). */
     heatmap?: HeatmapOptions;
+    /** BI-INSIGHTS-1 I-2, line / bar / area / combo only (`MARKER_VIZ_TYPES`): Chart Markers — reference lines
+     *  (constant, target, average, percentile) and bands (a toned range, or the bound KPI's RAG bands) on the value
+     *  axis. Drawn by the overlay in `chart-markers.plugin.ts`; a type outside the list ignores them. */
+    markers?: ChartMarker[];
 }
 
 /** UIE-6: the operational objects a table row can open — each has a detail route taking its id. */

@@ -19,7 +19,7 @@ AK-1 is **read-only**: no MCP Tool changes anything. **AK-2a** (identity first, 
 agent-client allowlist, the agent marker on every audit row, protected-resource metadata and the host's agent gate
 ([Identity](#identity), [The agent gate](#the-agent-gate-ak-2a)); still no write tool. Write tools (validate →
 dry-run → Pending Change) and `propose_action` are **AK-2b** (2026-11-20, [Write tools](#write-tools-ak-2b)); the
-machine agent capability set is phase 2.
+machine agent capability set is **AK-2c** (phase 2, 2026-11-25, [Identity](#identity)).
 
 **On this page**
 
@@ -31,6 +31,7 @@ machine agent capability set is phase 2.
 - [Identity](#identity) — the delegated-person and machine modes, and what is built of each.
 - [The agent gate (AK-2a)](#the-agent-gate-ak-2a) — held writes, default deny, the never-list.
 - [Write tools (AK-2b)](#write-tools-ak-2b) — validate, dry-run, propose, withdraw, Ship reads, run.
+- [Pending Actions (AK-2d)](#pending-actions-ak-2d) — a machine agent's run actions, held for a person.
 - [Deferred](#deferred)
 
 ## Placement
@@ -250,14 +251,21 @@ Per §7.3 and D-UE5 (signed: both modes, delegated first).
   3. Client registration: the agent client is registered in the customer's IdP by its administrator (the
      specification's Client ID Metadata Documents and the deprecated dynamic registration are the IdP's
      business, not Inspecto's).
-- **Machine — unattended agents.** Client credentials, admitted per Space exactly as today
-  (`MachineTrust`, `Roles.admitMachine`, the Space's `machineClients`). Reads need no capability
-  (operator 2026-09-15), so an admitted machine can use the AK-1 tools today. The **agent capability set**
-  (read plus Draft authoring, never approve, never reveal) widens `Roles.MACHINE_CAPABILITIES` and lands
-  with AK-2's write tools.
+- **Machine — unattended agents** (**built in AK-2c**, 2026-11-25). Client credentials, admitted per Space
+  exactly as any machine (`MachineTrust`, `Roles.admitMachine`, the Space's `identity.machineClients`). A machine
+  client also listed in `-Dauth.oidc.agentMachineClients` (a subset of `auth.oidc.clients`; boot refuses an entry
+  that is not a listed machine client, is the SPA client, or is set without `auth.oidc.clients`) is a Subject that is
+  **both** `machine()` and `agent()`: id `client:<client>`, `agentClient` = the client id. At admission it keeps
+  `Roles.MACHINE_CAPABILITIES` plus `Roles.AGENT_MACHINE_CAPABILITIES` (`canAuthorWorkbench`, `canAuthorAlertRules`,
+  `canWorkIncidents`, `canOperateRuns`) where its roles grant them, never an `AGENT_NEVER_CAPABILITIES` one; an
+  unlisted machine keeps `canOpenInboundInvestigation` only, as before. Being an agent, every config write it makes
+  is held as a Pending Change, the agent gate applies, and it never approves; it may not run a Pipeline
+  (`AgentGate.PERSON_ONLY`, D-AK2). The Pending Change records `authorMachine` (the token's `sub`), and
+  `PendingChanges.authorNow` replays an approved machine change as that machine: re-admitted by the Space (403 when
+  the Space no longer names the client) and filtered to what a machine agent keeps, so approval never widens it.
 - **What is built:** the endpoint accepts any Subject the host's `Authenticator` resolves — a person's own
-  token (the SPA client), a person through an allowlisted agent client (AK-2a), or an admitted machine. The
-  machine agent capability set is phase 2 (AK-2c).
+  token (the SPA client), a person through an allowlisted agent client (AK-2a), an admitted machine, or an admitted
+  machine agent (AK-2c).
 
 ## The agent gate (AK-2a)
 
@@ -289,8 +297,13 @@ agent token calling a route directly is treated the same.
   2. **allowed** — reads (GET), and `POST /mcp`, `/validate`, `/pipelines/authored/{id}/dry-run`,
      `/bundle/export`, `/promotion/preview`, `/pending-changes/{id}/withdraw`, `/action-requests` (held by its
      own design), `/db/query` (the read the AK-1 `query_dataset` tool replays) and `/pipelines/authored/{id}/run`
-     (D-AK2: a delegated person only, never a machine);
-  3. **refused (403)** — everything else: every route that only calls `holdRefusing*` (bundle import, onboarding
+     (D-AK2: a delegated person only, never a machine), and `/pending-actions/{id}/withdraw`;
+  3. **actions** (**AK-2d**, 2026-11-25) — `AgentGate.ACTIONS`, the operational routes of plan §4.6: `POST
+     /runs/{id}/trigger|pause|resume|reprocess|replay-rejects|drain`, `…/retries/retry-now|cancel`,
+     `POST /jobs/{id}/trigger`, `POST /jobs/runs/{id}/replay`, each still gated `canOperateRuns`. A **person's**
+     agent takes them at once, within the person's rights (D-AK5 as signed), audited with `agent_client`. A
+     **machine** agent's are held **before the handler** as a [Pending Action](#pending-actions-ak-2d);
+  4. **refused (403)** — everything else: every route that only calls `holdRefusing*` (bundle import, onboarding
      imports, Dataset registration — they do not hold when no policy covers the kind), every other read-shaped
      POST, and the never-list.
   `AgentGateParityTest` pins every non-GET `CapabilityManifest` entry and exemption to one bucket, the held bucket
@@ -302,7 +315,7 @@ agent token calling a route directly is treated the same.
   `POST /pending-changes/{id}/approve|decline` also refuses a marked Subject in the route itself.
 - **An approved agent change replays as what proposed it:** `PendingChanges.authorNow` reads the record's
   `agentClient`, sets the marker on the rebuilt author Subject and removes `AGENT_NEVER_CAPABILITIES`, so approval
-  never widens what the change runs with. (The machine `MACHINE_CAPABILITIES` filter joins with AK-2c.)
+  never widens what the change runs with; a machine author is re-admitted and filtered too (AK-2c, [Identity](#identity)).
 - **Tests** (real HTTP unless noted): `ControlApiAgentClientTest` (a direct write held with no policy while the
   person's own token writes; bundle import and a settings write 403; reads open; neither the agent nor its person
   approves; another person's approval applies it and the applied row names the agent client; every audit row of
@@ -313,6 +326,55 @@ agent token calling a route directly is treated the same.
   gate off; the gate and the approve check off together; `authorNow` dropping the marker; the MDC stamp off; the
   OIDC capability drop off; the pin refusing an agent client; the boot overlap check off; the 401 challenge off.
 - **Basic:** no module (D-UE4).
+
+## Pending Actions (AK-2d)
+
+D-AK6 as signed (2026-11-24) and the operator's answers of 2026-11-25: a machine agent's operational action is held
+as a **Pending Action** (`GLOSSARY.md`) — the Pending Change machinery under its own term; a Pending Change stays
+config only.
+
+- **The hold** — `PendingActions.holdIfMachineAction`, called by `ControlApi.routeDispatch` and every
+  `ControlApi.replay` right before the handler (after the capability, policy and agent gates, so a machine still needs
+  `canOperateRuns`): a Subject that is `machine()` and `agent()` calling an `ACTION` route gets **202**
+  `{status: pending, ran: false, pendingAction}` and nothing runs. One pending record per action (same method and
+  path; else 409).
+- **The record** — `pending-actions/pa-<UTC stamp>-<6 hex>.json` in the Space's config tree: `action`
+  (`METHOD path`), `route` (the matched pattern), the author (`client:<id>`), its roles, `agentClient`,
+  `authorMachine`, `mcpTool`, `reason` (`X-Change-Reason`), `createdAt` / `expiresAt` (the approval policy's clock),
+  `approverCapability: canApproveChanges`, `fourEyes: true`, and the request (method, path with query, body). Signed
+  with the Space's Pending Change key under its own MAC domain (`PendingChanges.domainMac`, domain `pending-action`),
+  so neither record type verifies as the other; written under the Pending Change store's lock.
+- **Routes** (`PendingActionRoutes`): `GET /pending-actions` (`?status=`, capped at 500 with `total` and
+  `truncated`, no raw request), `GET /pending-actions/{id}` (request method and path only),
+  `POST …/{id}/approve` and `…/decline` (`canApproveChanges`; four-eyes; the approver roster; an agent refused by
+  the gate and by the route), `POST …/{id}/withdraw` (the asking machine only, `self-service` exemption).
+- **Approve** — under the store lock: MAC verified, expiry applied, still pending; the record must still name an
+  `ACTION` route and its path must match it (else 409, nothing dispatched); the request replays as the machine
+  (`PendingChanges.authorNow`: re-admitted by the Space, filtered to what a machine agent keeps) with the record as
+  `PendingActions.ATTR_APPROVED_ACTION`, which lets that one request through the hold. Outcome: `approved` (2xx),
+  `stale` (409 — the run moved on) or `failed` (any other status, recorded as `appliedStatus`). Every transition is
+  an `AUDIT` row `pending-action.proposed|approved|stale|failed|declined|withdrawn|expired` (category `operation`).
+- **Operations MCP Tools** (lane C, `McpTools.OPERATIONS_TOOLS`): reads `list_runs` (`GET /runs`), `get_run_status`
+  (`GET /runs/runs/{runId}`), `get_run_batches` (`GET /runs/{run}/batches`), `list_pending_actions`,
+  `get_pending_action`; writes (`write: true`, so a console token is refused, D-AK3) `operate_run` (`action` one of
+  `trigger`, `pause`, `resume`, `reprocess`, `replay-rejects`, `retry-now`, `cancel-retries`, `drain` → the matching
+  `POST /runs/{run}/…`, optional `body` and one-line `reason` as `X-Change-Reason`), `trigger_job`, `replay_job_run` and
+  `withdraw_action`. Each replays its route as the caller, so the gate above decides: at once for a person's agent, a
+  Pending Action for a machine. `McpToolRoutesTest` expands `operate_run` over every action and pins each to a
+  `canOperateRuns` manifest route.
+- **The screen:** the Pending Changes screen has two tabs, *Pending Changes* and *Pending Actions*
+  (`PendingActionsPanelComponent`): a list (Waiting / All), the action, the machine that asked, its reason and outcome;
+  Approve and Decline for a holder of `canApproveChanges`.
+- **Agent Skills and golden tasks:** `diagnose-failed-run` (read only) and `operate-runs` (act after diagnosis; ask
+  before a drain or reprocess; report a `pa-…` id when held); the operations suite `agent-kit/golden/operations.json`
+  (six tasks: diagnose without acting, resume, re-run, drain asks first, a machine's resume held, a machine never
+  self-approves), graded by `tools/run-agent-golden.mjs`'s `agent-action`, `no-agent-action` and `pending-action`
+  checks. Its live run is open, as for the developer suite's other clients.
+- **Tests:** `ControlApiPendingActionsTest` (real HTTP: a person's agent pauses and resumes at once and its row
+  names the agent client, a business user's agent is 403; a machine's pause is 202 and nothing ran, a second one
+  409, the machine's approve 403, the list, another person's approval runs it, a second approve 409; withdraw by the
+  machine only; a declined action never runs; a record naming a non-action route is not replayable),
+  `AgentGateParityTest.theActionBucketIsExactlyTheNamedOperationalRoutes`.
 
 ## Security review (2026-11-20)
 

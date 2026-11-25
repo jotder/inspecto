@@ -192,7 +192,7 @@ The parent plan's §7.2 is corrected in the same change as this plan.
 | Machine capabilities | `Roles.MACHINE_CAPABILITIES = {canOpenInboundInvestigation}`; every other grant is dropped at `admitMachine` | AK-2c widens it (D-UE5, D-AK4). |
 | MCP audit attributes | `McpRoutes.replay` stamps `via: mcp`, the tool name and `mcpClient` | **Gap:** `mcpClient` is self-reported and unverified — read from each request's `_meta` key `io.modelcontextprotocol/clientInfo` (the modern revision has no `initialize`). |
 | The hold's route list | `PendingChanges.REPLAYABLE`, pinned by `ConfigWriteFunnelTest` | The routes that reach the hold — the agent allowlist's starting point (§4.1). |
-| Author at approval | `PendingChanges.authorNow` rebuilds the author's Subject from their current Roles when an approved change replays | **Gap for AK-2c:** the rebuilt Subject carries no machine flag and no `MACHINE_CAPABILITIES` filter. |
+| Author at approval | `PendingChanges.authorNow` rebuilds the author's Subject from their current Roles when an approved change replays | **Gap for AK-2c** (closed 2026-11-25): the rebuilt Subject carried no machine flag and no `MACHINE_CAPABILITIES` filter; the record now keeps `authorMachine` and the replay is re-admitted and filtered. |
 | An agent is a second maker | `IncidentBriefRoutes` (four-eyes treats the person who asked and the Assistant as two makers, so neither may approve) | The precedent D-AK1 follows. |
 
 ## 4. Design
@@ -324,8 +324,8 @@ and a security review of what it added.
 |---|---|---|---|
 | **AK-2a** identity first — **built 2026-11-20** ([spec-mcp.md § The agent gate](../okf/product/module/mcp/spec-mcp.md#the-agent-gate-ak-2a)) | 1 | `auth.oidc.agentClients`, the Subject's agent marker on every audit row, RFC 9728 metadata and the 401 header, the identity-keyed hold in `PendingChanges.hold`/`holdSet`, the three-bucket default deny and never-list at the host gate, `authorNow` keeping the marker, `agentClient` on the Pending Change and its screen | real-HTTP tests: an agent-client token's direct `PUT` is held (202); the SPA client's is not; a `holdRefusing`-only write (bundle import) is 403 for the agent; the agent token's approve is 403; approval per D-AK1; falsified (remove the marker check → the direct `PUT` writes) |
 | **AK-2b** write tools — **built 2026-11-20** ([spec-mcp.md § Write tools](../okf/product/module/mcp/spec-mcp.md#write-tools-ak-2b); the Keycloak end-to-end run is left to AK-4) | 1 | the §4.4 tools, the endpoint refusal list, the manifest category, tool definitions and the `openapi.fragment.json` | end to end on a Standard install with Keycloak: validate → dry-run → propose → a second person approves → the change is live; `propose_action` → approve → sent |
-| **AK-2c** machines | 2 | `auth.oidc.agentMachineClients` and the agent capability set | a machine in the set proposes and is held; one outside it keeps one capability; an approval attempt is 403 |
-| **AK-2d** operational actions | 2 | the operations rows of §4.6, the held-action record per D-AK6, the operations MCP Tools and Skills | a person's agent re-runs a failed run and reprocesses at once, within the person's rights, audited with `agentClient` (D-AK5 as signed); a machine's resume is held as a Pending Action |
+| **AK-2c** machines — **built 2026-11-25** (§6.2 lane A; [spec-mcp.md § Identity](../okf/product/module/mcp/spec-mcp.md#identity)) | 2 | `auth.oidc.agentMachineClients` and the agent capability set | a machine in the set proposes and is held; one outside it keeps one capability; an approval attempt is 403 |
+| **AK-2d** operational actions — **gate and Pending Actions built 2026-11-25** (§6.2 lane B; [spec-mcp.md § Pending Actions](../okf/product/module/mcp/spec-mcp.md#pending-actions-ak-2d)); tools, Skills, screen, golden suite and Handbook how-to built 2026-11-25 (lane C); live operations golden run open | 2 | the operations rows of §4.6, the held-action record per D-AK6, the operations MCP Tools and Skills | a person's agent re-runs a failed run and reprocesses at once, within the person's rights, audited with `agentClient` (D-AK5 as signed); a machine's resume is held as a Pending Action |
 | **AK-2e** case actions | 3 | the analyst rows of §4.6, the analyst MCP Tools and Skills | a person's agent comments, assigns and resolves at once, within the person's rights (D-AK5 as signed); a machine's resolve is held as a Pending Action; an agent never approves an Action Request |
 | close, per phase | 1–3 | security review of what the phase added, hub `module/mcp` spec and guides, the role's Handbook how-to | review at confidence ≥ 8 finds nothing |
 
@@ -410,6 +410,22 @@ notifications and the tasks extension stay deferred to AK-3 / AK-4.
   plan's §7.5 named it. `tools/check-agent-kit.mjs` runs before the copy. The packager finds `skills/` beside itself and
   reads `VERSION` in place of `pom.xml`, so an operator builds the vendor packages on site with Node.js (writes
   `agent-kit/packages/`). The golden tasks stay in the repo (grading needs `tools/run-agent-golden.mjs`).
+
+### 6.2 Phase 2 build (operator, 2026-11-25: "take on phase 2")
+
+Two operator answers on 2026-11-25 settle what §8 left to the build: a **Pending Action is approved by the change
+approvers** (`canApproveChanges`, four-eyes, the approver roster — as a Pending Change), and **approvers decide it on
+the Pending Changes screen** (a second tab, the same approve / decline / withdraw flow). Built in three lanes, each
+pushed on its own:
+
+| Lane | Delivers | Proof |
+|---|---|---|
+| **A — AK-2c machines** | `-Dauth.oidc.agentMachineClients` (a subset of `auth.oidc.clients`, boot refusal otherwise); a machine token from a listed client is a Subject that is both `machine()` and `agent()` (`agentClient` = its client id); `Roles.AGENT_MACHINE_CAPABILITIES` = `canAuthorWorkbench`, `canAuthorAlertRules`, `canWorkIncidents`, `canOperateRuns` kept at `admitMachine` beside `MACHINE_CAPABILITIES`, never an `AGENT_NEVER_CAPABILITIES` one; the Pending Change records `authorMachine`, and `authorNow` re-applies the machine filter and marker (the §3 gap) | a listed machine's config write is held (202); an unlisted machine keeps one capability; the machine's approve is 403; an approved machine change replays with the machine filter (falsified: drop the filter → the replay runs with a person's capabilities) |
+| **B — AK-2d actions** | `AgentGate.Bucket.ACTION` for the operations routes of §4.6 plus `POST /jobs/{id}/trigger`: allowed for a person's agent within the person's rights (D-AK5); for a machine agent the host holds the request **before the handler** as a **Pending Action** (`pa-` id, same store, MAC, lock and expiry as a Pending Change; `GLOSSARY.md` gains the term); `GET /pending-actions`, `…/{id}`, `…/{id}/approve`, `…/decline`, `…/withdraw`; approve replays the request as the machine (`authorNow`), a stale one is the route's own refusal (409) or expiry | a person's agent re-runs and reprocesses at once (200, `agent_client` on the row); a machine's resume is 202 and nothing ran; a second person approves → it runs as the machine; the machine's approve is 403; a replay of a record naming a non-action route dispatches nothing |
+| **C — tools, Skills, screen, close** | MCP Tools `list_runs`, `get_run_status`, `operate_run`, `replay_job_run`, `trigger_job`, `list_pending_actions`, `get_pending_action`, `withdraw_action`; the Pending Changes screen's *Pending Actions* tab; Agent Skills `diagnose-failed-run` and `operate-runs`; an operations golden suite; the Handbook how-to; the hub docs; a security review | as §6, close per phase |
+
+Not in phase 2: the role's product gaps `QUARANTINE-RELEASE-1` and `BACKUP-DATA-1` (§1.1) stay board rows; an agent
+cannot release a quarantined file or take a backup until they ship.
 
 ## 7. Risks
 

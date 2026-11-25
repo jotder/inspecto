@@ -127,6 +127,22 @@ The answer is the shared Result Set:
 fails closed: 503 without a write root, 404 for an unknown or not-visible Dataset, 422 for a bad spec.
 The public embed, the `report` Job and the Measure-alert probe compile through `MeasureCompiler` too.
 
+**Chart Markers (BI-INSIGHTS-1 I-2, 2026-11-24).** A `line`, `bar`, `area` or `combo` Widget may carry
+`options.markers` (`MARKER_VIZ_TYPES` in `inspecto/viz/chart-markers.ts`): reference lines (`constant`,
+`target`, `average`, `percentile` with `p` 1–99) and bands (`band` with `from` / `to` / `tone`, or `rag` = the
+bound KPI's red, amber and green zones). `resolveMarkers` turns them into lines and bands with their words at
+render time; the Chart.js overlay `chartMarkersPlugin` (`chart-markers.plugin.ts`, decision D-BI9) widens the
+value axis `y` to every marker, shades bands behind the data and draws lines over it, each labelled. The
+statistics read the values on `y` as drawn: every series, a Combo's bars only while its lines sit on the
+right axis, the category totals per stack when stacked (a Combo's bars and lines are two stacks, as Chart.js
+draws them); a percentile is a whole number, by DuckDB's `quantile_cont` rule. A `target` line
+takes its own `value`, else the bound KPI's target, else `options.kpi.target`; the KPI is
+`options.kpi.kpiId`, read from `/components/kpi/{id}` only when a marker needs it, and its bands follow the
+server's `KpiDefinition.rag` rule. A marker that cannot be placed is dropped, never drawn at a guess.
+Colours come from `CHART_TONE` and `CHART_MARKER_LINE` only, and the canvas text alternative lists every
+marker. The Widget editor's cog dialog adds and removes them (`chart-markers-editor.component.ts`) and
+offers the KPI picker on those four types.
+
 **Dashboards.** A Dashboard config holds `tiles: [{widgetId, span}]`, an optional `filter`,
 `exposedFields` for the quick-filter chips, a viewer header (`description`, `asOf`, `illustrative`)
 and a viewer-only date range (`dateField`, `defaultRange`).
@@ -197,3 +213,6 @@ there; its relation is validated when it is read, by
 - A comparison grouped by a withheld (`masked:withheld`) key shows equal `average`/`previous` values for rows sharing
   that key: it tells which rows share a key, never the key (open question for the masking owner). `average` is the
   mean over every result row before the row limit, not only the rows shown.
+- Chart Markers are drawn on screen only: the Report PDF (`WidgetChartRenderer`) does not draw them yet
+  (`REPORT-CHART-MARKERS-1` on the board). On a public share a KPI-bound marker draws only when the KPI
+  definition is readable; otherwise a `target` line falls back to the Widget's own target and `rag` draws nothing.
