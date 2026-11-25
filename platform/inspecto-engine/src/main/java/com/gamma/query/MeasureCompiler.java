@@ -1,6 +1,7 @@
 package com.gamma.query;
 
 import com.gamma.analytics.time.TimeGrain;
+import com.gamma.analytics.time.TimeSeriesSql;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -116,6 +117,65 @@ public final class MeasureCompiler {
         public boolean hidden() { return agg != null; }
     }
 
+    /** The comparison kinds a spec may ask for (BI-INSIGHTS-1 I-1). Contract-pinned with the SPA like {@link #AGGS}. */
+    static final List<String> COMPARE_KINDS = List.of("previous", "lastYear", "target", "average");
+    /** The suffixes of the three columns a comparison adds per Measure / ratio: the compared value, the change, the % change. */
+    public static final String CMP = "__cmp", DELTA = "__delta", PCT = "__pct";
+
+    /**
+     * A comparison computed in the Widget's own statement (BI-INSIGHTS-1 I-1, D-BI7 — query time, no storage, the same
+     * caps, guard, sandbox and masking). For every Measure and ratio {@code m} it adds {@code m__cmp} (the compared value),
+     * {@code m__delta} ({@code m − m__cmp}) and {@code m__pct} (the change as a percentage of {@code |m__cmp|}). A comparison
+     * that has no value — no row in the earlier bucket, a zero baseline for the % — is NULL, never 0.
+     * <ul>
+     *   <li>{@code previous}: the bucket before, along {@code field} (a grained {@code groupBy} column), per the other
+     *       grouped columns — the kernel's {@code TimeSeriesSql.shift}, matched by bucket, so a gap gives NULL.</li>
+     *   <li>{@code lastYear}: the same period a year earlier — a day looks at the same date (29 Feb at 28 Feb), a week 52 weeks
+     *       back (the same weekdays), a month 12 months back.</li>
+     *   <li>{@code target}: a constant, {@code target} (the SPA sends the bound KPI's target).</li>
+     *   <li>{@code average}: the mean of the Measure over the result's rows along {@code field}, per the other grouped columns.</li>
+     * </ul>
+     * Each comparison sees only the rows the spec's filters, condition and window keep: the first bucket of a filtered range
+     * has no previous value.
+     */
+    public record Compare(String kind, String field, Double target) {
+        public Compare {
+            if (kind == null || !COMPARE_KINDS.contains(kind))
+                throw new IllegalArgumentException("unknown compare kind '" + kind + "' (one of " + COMPARE_KINDS + ")");
+            if ("target".equals(kind) && (target == null || !Double.isFinite(target)))
+                throw new IllegalArgumentException("compare 'target' needs a finite number 'target'");
+            if (!"target".equals(kind) && target != null)
+                throw new IllegalArgumentException("compare '" + kind + "' takes no 'target'");
+            if (field != null) safeIdent(field, "compare field");
+        }
+
+        boolean shifted() {
+            return "previous".equals(kind) || "lastYear".equals(kind);
+        }
+    }
+
+    /** What one comparison column is: the kind, the Measure / ratio id it compares, and which part ({@code cmp | delta | pct}). */
+    public record CompareColumn(String kind, String of, String part) {}
+
+    /** The comparison columns a spec returns, by result column name, in select order; empty without a comparison. */
+    public static Map<String, CompareColumn> compareColumns(Spec spec) {
+        Map<String, CompareColumn> out = new LinkedHashMap<>();
+        if (spec.compare() == null) return out;
+        for (String id : valueIds(spec)) {
+            out.put(id + CMP, new CompareColumn(spec.compare().kind(), id, "cmp"));
+            out.put(id + DELTA, new CompareColumn(spec.compare().kind(), id, "delta"));
+            out.put(id + PCT, new CompareColumn(spec.compare().kind(), id, "pct"));
+        }
+        return out;
+    }
+
+    private static List<String> valueIds(Spec spec) {
+        List<String> ids = new ArrayList<>();
+        for (Measure m : spec.measures()) ids.add(m.id());
+        for (Ratio r : spec.ratios()) ids.add(r.id());
+        return ids;
+    }
+
     /** The aggregates a hidden {@code orderBy} term may carry; {@code min} is the default. Closed vocabulary. */
     static final List<String> ORDER_AGGS = List.of("min", "max");
 
@@ -137,37 +197,44 @@ public final class MeasureCompiler {
      */
     public record Spec(String dataset, List<Measure> measures, List<String> groupBy,
                        Map<String, String> grains, List<Filter> filters, List<Sort> orderBy, int limit,
-                       Map<String, Object> when, Window window, List<Ratio> ratios) {
+                       Map<String, Object> when, Window window, List<Ratio> ratios, Compare compare) {
         public Spec {
             ratios = ratios == null ? List.of() : List.copyOf(ratios);
+        }
+
+        /** The pre-{@code compare} shape. */
+        public Spec(String dataset, List<Measure> measures, List<String> groupBy,
+                    Map<String, String> grains, List<Filter> filters, List<Sort> orderBy, int limit,
+                    Map<String, Object> when, Window window, List<Ratio> ratios) {
+            this(dataset, measures, groupBy, grains, filters, orderBy, limit, when, window, ratios, null);
         }
 
         /** The pre-{@code when} shape: every existing caller stays source-compatible. */
         public Spec(String dataset, List<Measure> measures, List<String> groupBy,
                     Map<String, String> grains, List<Filter> filters, List<Sort> orderBy, int limit) {
-            this(dataset, measures, groupBy, grains, filters, orderBy, limit, null, null, null);
+            this(dataset, measures, groupBy, grains, filters, orderBy, limit, null, null, null, null);
         }
 
         /** The pre-{@code window} shape: no window, no ratios. */
         public Spec(String dataset, List<Measure> measures, List<String> groupBy,
                     Map<String, String> grains, List<Filter> filters, List<Sort> orderBy, int limit,
                     Map<String, Object> when) {
-            this(dataset, measures, groupBy, grains, filters, orderBy, limit, when, null, null);
+            this(dataset, measures, groupBy, grains, filters, orderBy, limit, when, null, null, null);
         }
 
         /** The same spec with another row cap — how a route asks for ONE row past its cap to detect truncation. */
         public Spec withLimit(int newLimit) {
-            return new Spec(dataset, measures, groupBy, grains, filters, orderBy, newLimit, when, window, ratios);
+            return new Spec(dataset, measures, groupBy, grains, filters, orderBy, newLimit, when, window, ratios, compare);
         }
 
         /** The same spec with another ORDER BY. */
         public Spec withOrderBy(List<Sort> newOrderBy) {
-            return new Spec(dataset, measures, groupBy, grains, filters, newOrderBy, limit, when, window, ratios);
+            return new Spec(dataset, measures, groupBy, grains, filters, newOrderBy, limit, when, window, ratios, compare);
         }
 
         /** The same spec re-pointed at another relation — how a route runs it over a bound query's CTE. */
         public Spec withDataset(String newDataset) {
-            return new Spec(newDataset, measures, groupBy, grains, filters, orderBy, limit, when, window, ratios);
+            return new Spec(newDataset, measures, groupBy, grains, filters, orderBy, limit, when, window, ratios, compare);
         }
 
         /** True when the result is aggregated: at least one measure or ratio. */
@@ -304,9 +371,61 @@ public final class MeasureCompiler {
             when = copy;
         }
 
+        Compare compare = parseCompare(body.get("compare"), measures, ratios, groupBy, grains, orderBy);
+
         int limit = body.get("limit") instanceof Number n ? n.intValue() : defaultLimit;
         return new Spec(dataset, measures, groupBy, grains, filters, orderBy,
-                Math.max(1, Math.min(maxLimit, limit)), when, window, ratios);
+                Math.max(1, Math.min(maxLimit, limit)), when, window, ratios, compare);
+    }
+
+    /**
+     * The body's {@code compare}: {@code {kind, field?, target?}}; unknown keys refused; {@code null} = none. {@code field}
+     * defaults to the one grained {@code groupBy} column ({@code average}: else the first {@code groupBy} column).
+     */
+    private static Compare parseCompare(Object raw, List<Measure> measures, List<Ratio> ratios, List<String> groupBy,
+                                        Map<String, String> grains, List<Sort> orderBy) {
+        if (raw == null) return null;
+        if (!(raw instanceof Map<?, ?> c)) throw new IllegalArgumentException("'compare' must be an object {kind, field?, target?}");
+        for (Object k : c.keySet())
+            if (!"kind".equals(k) && !"field".equals(k) && !"target".equals(k))
+                throw new IllegalArgumentException("unknown compare key '" + k + "' (kind, field, target)");
+        String kind = trimToNull(c.get("kind"));
+        Double target = null;
+        if (c.get("target") != null) {
+            if (!(c.get("target") instanceof Number n)) throw new IllegalArgumentException("compare 'target' must be a number");
+            target = n.doubleValue();
+        }
+        String field = trimToNull(c.get("field"));
+        Compare probe = new Compare(kind, field, target);   // validates kind / target / field shape
+        if (measures.isEmpty() && ratios.isEmpty())
+            throw new IllegalArgumentException("compare needs at least one measure or ratio");
+        if (orderBy.stream().anyMatch(Sort::hidden))
+            throw new IllegalArgumentException("compare cannot be combined with an orderBy on a column outside the result");
+        List<String> grained = groupBy.stream().filter(grains::containsKey).toList();
+        if (probe.shifted()) {
+            if (field == null) {
+                if (grained.size() != 1)
+                    throw new IllegalArgumentException("compare '" + kind + "' needs one time dimension with a grain"
+                            + (grained.isEmpty() ? "" : " - name it as 'field' (one of " + grained + ")"));
+                field = grained.get(0);
+            } else if (!grained.contains(field))
+                throw new IllegalArgumentException("compare field '" + field + "' must be a groupBy column with a time grain");
+        } else if ("average".equals(kind)) {
+            if (groupBy.isEmpty()) throw new IllegalArgumentException("compare 'average' needs at least one groupBy column");
+            if (field == null) field = grained.size() == 1 ? grained.get(0) : groupBy.get(0);
+            else if (!groupBy.contains(field))
+                throw new IllegalArgumentException("compare field '" + field + "' must be a groupBy column");
+        } else field = null;
+        Compare compare = new Compare(kind, field, target);
+        Spec shape = new Spec("x", measures, groupBy, grains, List.of(), List.of(), 1, null, null, ratios, compare);
+        // A grouped column, Measure or ratio named like a compare column would come back renamed (DuckDB adds _1), and the
+        // change would be read against the wrong column: refuse every such clash.
+        List<String> taken = new ArrayList<>(groupBy);
+        taken.addAll(valueIds(shape));
+        for (String col : compareColumns(shape).keySet())
+            if (taken.stream().anyMatch(g -> g.equalsIgnoreCase(col)))
+                throw new IllegalArgumentException("result column '" + col + "' clashes with a compare column name");
+        return compare;
     }
 
     /** One {@code {agg, field}} body entry. An {@link #AS_OF_AGGS} name needs the spec's window ({@code windowed}). */
@@ -387,11 +506,93 @@ public final class MeasureCompiler {
 
     /** {@code p} collects bound operand values; {@code null} renders them as escaped literals. */
     private static String build(Spec spec, List<Object> p) {
+        if (spec.compare() != null) return buildCompare(spec, p);
+        StringBuilder sql = new StringBuilder(aggregate(spec, p, false));
+        appendOrderAndLimit(spec, sql);
+        return sql.toString();
+    }
+
+    /** The reserved CTE names a comparison statement is built from. */
+    private static final String CMP_BASE = "__cmp_base", CMP_SHIFT = "__cmp_shift";
+
+    /**
+     * A spec with a {@link Compare}: {@code WITH __cmp_base AS (<the aggregate, grained columns as bucket starts>)
+     * [, __cmp_shift AS (<kernel shift>)] SELECT <dims formatted as without a comparison>, <values>, <cmp, delta, pct>
+     * FROM … ORDER BY … LIMIT …}. Every bound value sits in the base, so the parameters keep their order; the outer
+     * statement carries only quoted identifiers and fixed SQL.
+     */
+    private static String buildCompare(Spec spec, List<Object> p) {
+        Compare c = spec.compare();
+        List<String> ids = valueIds(spec);
+        List<String> others = spec.groupBy().stream().filter(g -> !g.equals(c.field())).toList();
+        StringBuilder sql = new StringBuilder("WITH ").append(q(CMP_BASE)).append(" AS (")
+                .append(aggregate(spec, p, true)).append(")");
+        String from = CMP_BASE;
+        if (c.shifted()) {
+            TimeGrain grain = TimeGrain.parse(spec.grains().get(c.field()));
+            int periods = 1;
+            TimeGrain step = null;
+            if ("lastYear".equals(c.kind()))
+                switch (grain) {
+                    case DAY -> step = TimeGrain.YEAR;
+                    case WEEK -> periods = 52;
+                    case MONTH -> periods = 12;
+                    default -> throw new IllegalArgumentException("compare 'lastYear' has no rule for grain '" + grain.wire() + "'");
+                }
+            List<TimeSeriesSql.Shifted> shifted = ids.stream().map(id -> new TimeSeriesSql.Shifted(id, id + CMP)).toList();
+            String shift = TimeSeriesSql.shift(new TimeSeriesSql.Shift(CMP_BASE, c.field(), grain, null, others, periods,
+                    shifted, step));
+            sql.append(", ").append(q(CMP_SHIFT)).append(" AS (").append(shift).append(")");
+            from = CMP_SHIFT;
+        }
         List<String> select = new ArrayList<>();
+        for (String dim : spec.groupBy())
+            select.add(isBucketed(dim, spec.grains()) ? formatBucket(q(dim), spec.grains().get(dim)) + " AS " + q(dim) : q(dim));
+        for (String id : ids) {
+            String v = q(id);
+            // min / max may return text or a date: the change and the mean are read as numbers through VARCHAR (a cast
+            // every type has), so a value with no number reads NULL instead of failing the statement.
+            String nv = asNumber(v);
+            String cmp = switch (c.kind()) {
+                case "target" -> "CAST(" + c.target() + " AS DOUBLE)";   // a parsed finite double, printed by Java
+                case "average" -> "AVG(" + nv + ") OVER (" + (others.isEmpty() ? ""
+                        : "PARTITION BY " + String.join(", ", others.stream().map(com.gamma.util.SqlIdent::q).toList())) + ")";
+                default -> q(id + CMP);
+            };
+            String ncmp = "previous".equals(c.kind()) || "lastYear".equals(c.kind()) ? asNumber(cmp) : cmp;
+            select.add(v);
+            select.add(cmp + " AS " + q(id + CMP));
+            select.add("(" + nv + " - " + ncmp + ") AS " + q(id + DELTA));
+            select.add("100.0 * (" + nv + " - " + ncmp + ") / NULLIF(ABS(" + ncmp + "), 0) AS " + q(id + PCT));
+        }
+        sql.append(" SELECT ").append(String.join(", ", select)).append(" FROM ").append(q(from));
+        appendOrderAndLimit(spec, sql);
+        return sql.toString();
+    }
+
+    /** {@code expr} as a DOUBLE, NULL when it holds no number (text, a date). */
+    private static String asNumber(String expr) {
+        return "TRY_CAST(CAST(" + expr + " AS VARCHAR) AS DOUBLE)";
+    }
+
+    /**
+     * A statement prefixed by a {@code WITH "name" AS (…) } clause (a bound query, a KPI window): a compiled statement that
+     * already opens with {@code WITH} (a comparison) has its CTEs appended to the prefix's, since two {@code WITH}s do not parse.
+     */
+    public static String withPrefix(String withClause, String sql) {
+        if (sql.startsWith("WITH ")) return withClause.stripTrailing() + ", " + sql.substring("WITH ".length());
+        return withClause + sql;
+    }
+
+    /** {@code SELECT … FROM … WHERE … GROUP BY …}; {@code rawBuckets} returns a grained column as its bucket start. */
+    private static String aggregate(Spec spec, List<Object> p, boolean rawBuckets) {
+        List<String> select = new ArrayList<>();
+        java.util.function.Function<String, String> grouped = dim -> rawBuckets && isBucketed(dim, spec.grains())
+                ? TimeGrain.parse(spec.grains().get(dim)).truncateSql(q(dim)) : dimExpression(dim, spec.grains());
         // A bucketed dimension keeps its own name as the alias, so the client reads back the same column
         // whether or not a grain was applied.
         for (String dim : spec.groupBy())
-            select.add(dimExpression(dim, spec.grains()) + (isBucketed(dim, spec.grains()) ? " AS " + q(dim) : ""));
+            select.add(grouped.apply(dim) + (isBucketed(dim, spec.grains()) ? " AS " + q(dim) : ""));
         for (Measure m : spec.measures()) select.add(measureExpression(m, spec.window(), p) + " AS " + q(m.id()));
         for (Ratio r : spec.ratios()) select.add(ratioExpression(r) + " AS " + q(r.id()));
 
@@ -421,7 +622,12 @@ public final class MeasureCompiler {
             // The full expression, not the alias: a bucketed dimension's alias is the raw column's own name,
             // so grouping by the alias would be ambiguous with the underlying column.
             sql.append(" GROUP BY ").append(String.join(", ",
-                    spec.groupBy().stream().map(d -> dimExpression(d, spec.grains())).toList()));
+                    spec.groupBy().stream().map(grouped).toList()));
+        return sql.toString();
+    }
+
+    /** {@code ORDER BY … LIMIT n} over the result's own column names (or a hidden aggregate, never with a comparison). */
+    private static void appendOrderAndLimit(Spec spec, StringBuilder sql) {
         if (!spec.orderBy().isEmpty()) {
             List<String> terms = new ArrayList<>();
             for (Sort s : spec.orderBy())
@@ -436,7 +642,6 @@ public final class MeasureCompiler {
                     spec.groupBy().stream().map(d -> q(d) + " ASC").toList()));
         }
         sql.append(" LIMIT ").append(spec.limit());
-        return sql.toString();
     }
 
     private static boolean isBucketed(String dim, Map<String, String> grains) {
@@ -453,8 +658,13 @@ public final class MeasureCompiler {
     private static String dimExpression(String dim, Map<String, String> grains) {
         String grain = grains == null ? null : grains.get(dim);
         if (grain == null) return q(dim);
+        return formatBucket(TimeGrain.parse(grain).truncateSql(q(dim)), grain);
+    }
+
+    /** A bucket start as the UI's category label: {@code YYYY-MM-DD}, or {@code YYYY-MM} for a month. */
+    private static String formatBucket(String bucket, String grain) {
         String format = "month".equals(grain) ? "%Y-%m" : "%Y-%m-%d";
-        return "STRFTIME(" + TimeGrain.parse(grain).truncateSql(q(dim)) + ", '" + format + "')";
+        return "STRFTIME(" + bucket + ", '" + format + "')";
     }
 
     /** The aggregate of a measure in a spec: {@link #aggExpression}, or a window-relative one bound to the as-of date. */

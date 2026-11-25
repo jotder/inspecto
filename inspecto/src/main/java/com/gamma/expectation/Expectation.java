@@ -63,7 +63,8 @@ public record Expectation(String name, String description, String targetType, St
     public Expectation {
         require(name != null && !name.isBlank(), "expectation.name is required");
         kind = lower(kind);
-        require(KINDS.contains(kind), "expectation.kind must be one of " + KINDS);
+        // null first: Set.of(...).contains(null) throws, which turned a draft with no kind into a 500 (golden run 2026-11-24)
+        require(kind != null && KINDS.contains(kind), "expectation.kind must be one of " + KINDS);
         targetType = targetType == null ? "pipeline" : targetType.trim().toLowerCase(Locale.ROOT);
         require(TARGET_TYPES.contains(targetType), "expectation.targetType must be one of " + TARGET_TYPES);
         require(target != null && !target.isBlank(), "expectation.target is required");
@@ -186,9 +187,11 @@ public record Expectation(String name, String description, String targetType, St
         public Baseline {
             require(window >= 1 && window <= MAX_WINDOW,
                     "expectation.baselineWindow must be between 1 and " + MAX_WINDOW);
+            // a null entry is refused here, before List.copyOf, which throws NullPointerException on one (a 500 otherwise)
+            if (measures != null)
+                for (String ms : measures)
+                    require(ms != null && MEASURES.contains(ms), "expectation.measures entries must be one of " + MEASURES);
             measures = measures == null || measures.isEmpty() ? List.of("row_count") : List.copyOf(measures);
-            for (String ms : measures)
-                require(MEASURES.contains(ms), "expectation.measures entries must be one of " + MEASURES);
             columns = idents(columns, "columns");
             groupBy = idents(groupBy, "groupBy");
             boolean perColumn = measures.stream().anyMatch(ms -> !"row_count".equals(ms));

@@ -83,7 +83,34 @@ the statement. It accepts:
 - three grains: `day`, `week`, `month`;
 - an optional trailing `window` (`{field, asOf, days?}`), which also enables the as-of aggregate
   `recency`;
-- `ratios` of two aggregations.
+- `ratios` of two aggregations;
+- an optional `compare` (`{kind, field?, target?}`, BI-INSIGHTS-1 I-1), below.
+
+**Compare (I-1).** A Widget's *Compare with* option (`options.compare.kind`: `previous`, `lastYear`, `target`,
+`average`; line, bar, area and KPI) travels as `compare` and is computed **in the Widget's own statement** (D-BI7:
+no storage, the same row cap, guard, sandbox and masking). `MeasureCompiler` wraps the aggregate as
+`WITH "__cmp_base" AS (…)`, grained columns kept as bucket starts, and adds three columns per Measure and ratio `m`:
+`m__cmp` (the compared value), `m__delta` and `m__pct` (the change in % of `|m__cmp|`), marked in
+`resultSet.columns[].overlay` (`{overlay: compare, kind, of, part}`, `ResultSetDescriptor.markCompare`).
+
+- `previous` / `lastYear` use the Analytics kernel's `TimeSeriesSql.shift` along `field` (the one grained
+  `groupBy` column by default), per the other grouped columns, matched by bucket: a missing bucket gives NULL.
+  `lastYear` is 12 months back for a month, 52 weeks for a week (the same weekdays) and, for a day, the same
+  date a year earlier (the kernel's `Shift.step`; 29 February looks at 28 February).
+- `target` is a constant (`options.kpi.target`); a KPI tile bound to a KPI compares its value with that KPI's
+  own target instead. `average` is the mean of the result's rows along `field`, per the other grouped columns.
+- A comparison with no value — no earlier bucket, a zero baseline for the % — is NULL, never 0. A Measure that
+  returns text or a date (`max` of a name) still shows its compared value; its change is NULL.
+- It is refused (422) with no Measure, with `previous`/`lastYear` and no grained column, and with a hidden-aggregate
+  `orderBy` (the SPA drops its category order then). A bound Query's `WITH` is merged with the comparison's
+  (`MeasureCompiler.withPrefix`).
+- Each comparison sees only the rows the filters, condition and window keep: the first bucket of a filtered range
+  has no previous value.
+
+The SPA draws the compared series dashed in its Measure's colour, named by its kind ("Amount · previous period"),
+adds the change to the tooltip and states the last category's change under the chart ("Latest (Mar 2026): ▼ Down
+25.0 % (−5) vs previous period"). The kinds and column suffixes are pinned on both sides by
+`contracts/measure-grammar.contract.json` (`compare`).
 
 The text then passes `SqlGuard.check` (422 on failure), the Dataset resolves through
 `DatasetRelation.relationSql`, and it runs in the same ephemeral DuckDB sandbox as
@@ -99,6 +126,22 @@ The answer is the shared Result Set:
 `{resultSet: {columns, rowCount}, rows, statistics{rowCount, elapsedMs, truncated}, sql}`. The route
 fails closed: 503 without a write root, 404 for an unknown or not-visible Dataset, 422 for a bad spec.
 The public embed, the `report` Job and the Measure-alert probe compile through `MeasureCompiler` too.
+
+**Chart Markers (BI-INSIGHTS-1 I-2, 2026-11-24).** A `line`, `bar`, `area` or `combo` Widget may carry
+`options.markers` (`MARKER_VIZ_TYPES` in `inspecto/viz/chart-markers.ts`): reference lines (`constant`,
+`target`, `average`, `percentile` with `p` 1–99) and bands (`band` with `from` / `to` / `tone`, or `rag` = the
+bound KPI's red, amber and green zones). `resolveMarkers` turns them into lines and bands with their words at
+render time; the Chart.js overlay `chartMarkersPlugin` (`chart-markers.plugin.ts`, decision D-BI9) widens the
+value axis `y` to every marker, shades bands behind the data and draws lines over it, each labelled. The
+statistics read the values on `y` as drawn: every series, a Combo's bars only while its lines sit on the
+right axis, the category totals per stack when stacked (a Combo's bars and lines are two stacks, as Chart.js
+draws them); a percentile is a whole number, by DuckDB's `quantile_cont` rule. A `target` line
+takes its own `value`, else the bound KPI's target, else `options.kpi.target`; the KPI is
+`options.kpi.kpiId`, read from `/components/kpi/{id}` only when a marker needs it, and its bands follow the
+server's `KpiDefinition.rag` rule. A marker that cannot be placed is dropped, never drawn at a guess.
+Colours come from `CHART_TONE` and `CHART_MARKER_LINE` only, and the canvas text alternative lists every
+marker. The Widget editor's cog dialog adds and removes them (`chart-markers-editor.component.ts`) and
+offers the KPI picker on those four types.
 
 **Dashboards.** A Dashboard config holds `tiles: [{widgetId, span}]`, an optional `filter`,
 `exposedFields` for the quick-filter chips, a viewer header (`description`, `asOf`, `illustrative`)
@@ -164,3 +207,12 @@ there; its relation is validated when it is read, by
 - Every row read is a page with `truncated`; a consumer that counts must say so.
 - A blank Dashboard header value is not written, so clearing a field removes the key.
 - Only three time grains (`day`, `week`, `month`) cross the wire.
+- *Compare with* is not offered on a table, and the public share viewer does not forward it (it forwards only
+  `tableSort`); a time bucket is the wall-clock `DATE_TRUNC` the grain already uses (DuckDB's session zone for a
+  `TIMESTAMPTZ`, the host's).
+- A comparison grouped by a withheld (`masked:withheld`) key shows equal `average`/`previous` values for rows sharing
+  that key: it tells which rows share a key, never the key (open question for the masking owner). `average` is the
+  mean over every result row before the row limit, not only the rows shown.
+- Chart Markers are drawn on screen only: the Report PDF (`WidgetChartRenderer`) does not draw them yet
+  (`REPORT-CHART-MARKERS-1` on the board). On a public share a KPI-bound marker draws only when the KPI
+  definition is readable; otherwise a `target` line falls back to the Widget's own target and `rag` draws nothing.

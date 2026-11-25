@@ -47,6 +47,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
 | `LEGAL-HOLD-SCOPE-1` | P3 | feature | A legal hold does not yet protect a Pipeline's data partitions, and holds have no screen. | — |
 | `BI-INSIGHTS-1` | P2 | feature | Advanced insights on business data in Widgets and Dashboards, authored and tuned as Insight Profiles. | — |
+| `REPORT-CHART-MARKERS-1` | P3 | feature | the Report PDF does not draw Chart Markers (filed 2026-11-24, BI-INSIGHTS-1 I-2). | — |
 | `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` | P3 | defect | A multi-file Consignment re-planned after a failover can write a second, differently named output. | operator |
 | — | P2 | feature | Postgres multi-user | operator |
 | `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` | P3 | chore | Drop the window_self_join workaround once a fixed DuckDB driver is pinned. | — |

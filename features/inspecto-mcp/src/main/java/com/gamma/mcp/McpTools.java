@@ -375,11 +375,81 @@ final class McpTools {
                             body("The run request, as POST /pipelines/authored/{id}/run takes it.", false)),
                     a -> new Call("POST", "/pipelines/authored/" + seg(a.get("pipeline")) + "/run", bodyOf(a)), true));
 
-    /** Every tool: AK-1's reads, then AK-2b's. */
+    // ── AK-2d: operations tools (plan §4.6, §6.2 lane C) ─────────────────────────────────────────
+
+    /** {@code operate_run}'s actions → the run route each replays (every one in {@code AgentGate.ACTIONS}). */
+    static final Map<String, String> RUN_ACTIONS = Map.of(
+            "trigger", "trigger", "pause", "pause", "resume", "resume", "reprocess", "reprocess",
+            "replay-rejects", "replay-rejects", "retry-now", "retries/retry-now", "cancel-retries", "retries/cancel",
+            "drain", "drain");
+
+    private static final String HELD_FOR_A_MACHINE = " Signed in as a person, it runs at once within that person's own rights "
+            + "(needs canOperateRuns); as an unattended machine agent it is held as a Pending Action for a person to approve.";
+
+    static final List<Tool> OPERATIONS_TOOLS = List.of(
+            new Tool("list_runs", "List runs",
+                    "Every ingest run (Pipeline) of this Space with its state: last result, paused, schedule.",
+                    List.of(), get("/runs")),
+            new Tool("get_run_status", "Get a manual run's status",
+                    "One manual run by the run id a trigger returned: its state, timings and result.",
+                    List.of(id("runId", "The run id a trigger returned.")),
+                    a -> new Call("GET", "/runs/runs/" + seg(a.get("runId")), null)),
+            new Tool("get_run_batches", "Get a run's batches",
+                    "The batches of one ingest run: what each processed, failed or parked — where to look before a reprocess.",
+                    List.of(id("run", "The run (Pipeline) name.")),
+                    a -> new Call("GET", "/runs/" + seg(a.get("run")) + "/batches", null)),
+            new Tool("operate_run", "Operate a run",
+                    "Trigger, pause, resume, reprocess a batch, replay rejected rows, retry now, cancel retries, or drain an "
+                            + "ingest run." + HELD_FOR_A_MACHINE + " Diagnose first (get_run_batches, list_job_runs).",
+                    List.of(id("run", "The run (Pipeline) name."),
+                            new Arg("action", Kind.ENUM, true, "What to do.", List.copyOf(new java.util.TreeSet<>(RUN_ACTIONS.keySet()))),
+                            body("The action's own request body, when it takes one (reprocess: {batchId}).", false),
+                            text("reason", "Why — on the audit row, and shown to the approver when it is held.")),
+                    McpTools::operateRun, true),
+            new Tool("trigger_job", "Trigger a Job",
+                    "Run a Job once, now." + HELD_FOR_A_MACHINE,
+                    List.of(id("job", "The Job id."), text("reason", "Why — shown to the approver when it is held.")),
+                    a -> withReason(new Call("POST", "/jobs/" + seg(a.get("job")) + "/trigger", McpRoutes.jsonBytes(Map.of())), a),
+                    true),
+            new Tool("replay_job_run", "Replay a Job Run",
+                    "Run a past Job Run again with the same inputs." + HELD_FOR_A_MACHINE,
+                    List.of(id("runId", "The Job Run id."), text("reason", "Why — shown to the approver when it is held.")),
+                    a -> withReason(new Call("POST", "/jobs/runs/" + seg(a.get("runId")) + "/replay", McpRoutes.jsonBytes(Map.of())), a),
+                    true),
+            new Tool("list_pending_actions", "List Pending Actions",
+                    "The Pending Actions of this Space (a machine agent's held run actions), newest first; optionally only "
+                            + "those in one status (pending, approved, declined, withdrawn, expired, stale, failed).",
+                    List.of(text("status", "Only Pending Actions in this status.")),
+                    a -> new Call("GET", "/pending-actions" + query(a, "status", "status"), null)),
+            new Tool("get_pending_action", "Get a Pending Action",
+                    "One Pending Action: the action, the machine that asked, its status and outcome.",
+                    List.of(id("action", "The Pending Action id (pa-…).")),
+                    a -> new Call("GET", "/pending-actions/" + seg(a.get("action")), null)),
+            new Tool("withdraw_action", "Withdraw a Pending Action",
+                    "Take back a Pending Action this machine asked for, while it is still waiting. Only the one who asked may.",
+                    List.of(id("action", "The Pending Action id (pa-…).")),
+                    a -> new Call("POST", "/pending-actions/" + seg(a.get("action")) + "/withdraw", McpRoutes.jsonBytes(Map.of())),
+                    true));
+
+    private static Call operateRun(Map<String, Object> a) {
+        String route = RUN_ACTIONS.get((String) a.get("action"));
+        return withReason(new Call("POST", "/runs/" + seg(a.get("run")) + "/" + route, bodyOf(a)), a);
+    }
+
+    /** The call with the {@code reason} argument carried as {@code X-Change-Reason}, checked as {@link #proposeChange} checks it. */
+    private static Call withReason(Call c, Map<String, Object> a) {
+        if (!(a.get("reason") instanceof String reason)) return c;
+        if (reason.length() > 500) throw new BadArgs("'reason' is at most 500 characters");
+        if (reason.indexOf('\r') >= 0 || reason.indexOf('\n') >= 0) throw new BadArgs("'reason' is one line");
+        return new Call(c.method(), c.path(), c.body(), Map.of("X-Change-Reason", reason));
+    }
+
+    /** Every tool: AK-1's reads, then AK-2b's, then AK-2d's. */
     static final List<Tool> ALL_TOOLS;
     static {
         List<Tool> all = new ArrayList<>(TOOLS);
         all.addAll(WRITE_TOOLS);
+        all.addAll(OPERATIONS_TOOLS);
         ALL_TOOLS = List.copyOf(all);
     }
 

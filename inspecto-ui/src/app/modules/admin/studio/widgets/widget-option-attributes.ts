@@ -1,5 +1,7 @@
 import { AttributeSpec } from 'app/inspecto/component-model';
 import { CHART_PALETTES } from 'app/inspecto/theme/chart-tokens';
+import { COMPARE_VIZ_TYPES } from 'app/inspecto/viz/compare';
+import { MARKER_VIZ_TYPES } from 'app/inspecto/viz/chart-markers';
 
 /**
  * The widget **advanced-options** attribute set (the cog dialog) — every knob is always visible but
@@ -279,6 +281,26 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
         min: 0,
         group: 'Right axis format',
     },
+    // BI-INSIGHTS-1 I-1 (line, bar, area, KPI): a comparison the server computes in the Widget's own query.
+    {
+        key: 'compareKind',
+        label: 'Compare with',
+        type: 'select',
+        tier: 'required',
+        required: false,
+        default: '',
+        help:
+            'Draws the compared value as a dashed series and states the change and % in words. Previous period and ' +
+            'last year need a date on the x axis grouped by day, week or month; Target uses the target above (a ' +
+            'KPI tile bound to a KPI: its own target); a period with nothing to compare with shows no change, never 0.',
+        options: [
+            { value: '', label: 'Nothing' },
+            { value: 'previous', label: 'Previous period' },
+            { value: 'lastYear', label: 'Same period last year' },
+            { value: 'target', label: 'Target' },
+            { value: 'average', label: 'Average' },
+        ],
+    },
     // Gauge: the scale the arc spans (`options.gauge`); a blank end keeps its default (0 / 100) and writes nothing.
     { key: 'gaugeMin', label: 'Gauge: minimum', type: 'number', tier: 'required', required: false, placeholder: '0' },
     { key: 'gaugeMax', label: 'Gauge: maximum', type: 'number', tier: 'required', required: false, placeholder: '100' },
@@ -337,6 +359,16 @@ export const WIDGET_OPTION_ATTRIBUTES: AttributeSpec[] = [
             { value: 'max', label: 'Largest value per category' },
         ],
     },
+    // BI-INSIGHTS-1 I-2: the KPI definition a Chart Marker reads (a target line with no value of its own, the RAG bands).
+    {
+        key: 'kpiId',
+        label: 'KPI for chart markers',
+        type: 'autocomplete',
+        tier: 'required',
+        required: false,
+        placeholder: 'A saved KPI — its target and bands',
+        help: "A Target line with no value of its own draws at this KPI's target; a KPI status bands marker draws its red, amber and green bands.",
+    },
     // UIE-6: optional readable column carrying the link instead of the id; the id column is then hidden (still queried).
     {
         key: 'rowLinkLabelField',
@@ -370,5 +402,7 @@ export const WIDGET_OPTION_VIZ_TYPES: Record<string, string | readonly string[]>
     categoryOrderField: CATEGORY_ORDER_VIZ_TYPES,
     categoryOrderDir: CATEGORY_ORDER_VIZ_TYPES,
     categoryOrderAgg: CATEGORY_ORDER_VIZ_TYPES,
+    compareKind: COMPARE_VIZ_TYPES,
+    kpiId: MARKER_VIZ_TYPES,
 };
 // ── end per-Visualization-Type options ──────────────────────────────────────────────────────────────────────

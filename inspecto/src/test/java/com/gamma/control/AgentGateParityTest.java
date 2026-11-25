@@ -99,6 +99,21 @@ class AgentGateParityTest {
     }
 
     @Test
+    void theActionBucketIsExactlyTheNamedOperationalRoutes() {
+        Map<String, String> m = manifest();
+        Set<String> actions = new TreeSet<>();
+        for (String key : m.keySet()) if (bucket(key) == AgentGate.Bucket.ACTION) actions.add(key);
+        assertEquals(new TreeSet<>(AgentGate.ACTIONS), actions, "AK-2d: the operational actions of plan §4.6");
+        for (String key : AgentGate.ACTIONS) {
+            assertEquals(Roles.CAN_OPERATE_RUNS, m.get(key), "an action is a run operation: " + key);
+            assertFalse(PendingChanges.REPLAYABLE.contains(key), key + " reaches the config hold — it belongs in HELD");
+        }
+        assertEquals(AgentGate.Bucket.REFUSED, bucket("POST /pending-actions/([^/]+)/approve"));
+        assertEquals(AgentGate.Bucket.REFUSED, bucket("POST /pending-actions/([^/]+)/decline"));
+        assertEquals(AgentGate.Bucket.ALLOWED, bucket("POST /pending-actions/([^/]+)/withdraw"));
+    }
+
+    @Test
     void theNeverListIsRefusedOnEveryMethodIncludingReads() {
         Map<String, String> m = manifest();
         for (String n : AgentGate.NEVER) assertTrue(m.containsKey(n), "NEVER names a route the manifest does not list: " + n);

@@ -124,8 +124,8 @@ final class BiRoutes implements RouteModule {
             String with = boundText;
             MeasureCompiler.Compiled over = MeasureCompiler.compile(overBound(probe));
             // The WITH carries no placeholders (the query text is rendered), so the Measure's parameters stay in order.
-            sql = new MeasureCompiler.Compiled(with + over.sql(), over.params());
-            echoSql = with + MeasureCompiler.render(overBound(spec));
+            sql = new MeasureCompiler.Compiled(MeasureCompiler.withPrefix(with, over.sql()), over.params());
+            echoSql = MeasureCompiler.withPrefix(with, MeasureCompiler.render(overBound(spec)));
             List<Finding> boundFindings = SqlGuard.check(sql.sql());
             if (!boundFindings.isEmpty())
                 return ApiContext.respondJson(ex, 422, Map.of(
@@ -147,6 +147,9 @@ final class BiRoutes implements RouteModule {
             for (MeasureCompiler.Measure m : spec.measures()) grantable.remove(m.id().toLowerCase(Locale.ROOT));
             for (MeasureCompiler.Ratio rt : spec.ratios()) grantable.remove(rt.id().toLowerCase(Locale.ROOT));
             QueryExecutor.Result shown = masking.apply(raw, boundText == null ? spec.groupBy() : null, boundText, boundQuery, grantable);
+            // BI-INSIGHTS-1 I-1: the comparison columns are marked, after masking (which keeps a marked column's mark).
+            shown = new QueryExecutor.Result(ResultSetDescriptor.markCompare(shown.columns(), MeasureCompiler.compareColumns(spec)),
+                    shown.rows(), shown.rowCount(), shown.truncated(), shown.elapsedMs());
             return response(shown, echoSql, masking.describe());
         } catch (SQLException e) {
             throw masking.scrub(ServerFaults.datasetRead("BI query failed", spec.dataset(), dataset, e, api));
@@ -230,6 +233,14 @@ final class BiRoutes implements RouteModule {
             col.put("type", c.type());
             col.put("role", c.role());
             col.put("cardinality", c.cardinality());
+            if (c.overlay() != null) {   // absent for every ordinary column: a body without a comparison stays byte-identical
+                Map<String, Object> o = new LinkedHashMap<>();
+                o.put("overlay", c.overlay().overlay());
+                o.put("kind", c.overlay().kind());
+                o.put("of", c.overlay().of());
+                o.put("part", c.overlay().part());
+                col.put("overlay", o);
+            }
             columns.add(col);
         }
         Map<String, Object> resultSet = new LinkedHashMap<>();

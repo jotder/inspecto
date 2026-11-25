@@ -1,9 +1,11 @@
 import {
     ChangeDetectionStrategy,
     Component,
+    Injector,
     Type,
     computed,
     effect,
+    inject,
     input,
     isDevMode,
     output,
@@ -38,8 +40,11 @@ import {
     waterfallSteps,
     waterfallTones,
 } from './waterfall-chart';
-import { comboAltText, comboChartData, comboSeriesFormat, comboUsesSecondaryAxis } from './combo-chart';
-import { KpiRange } from 'app/inspecto/api/kpis.service';
+import { comboAltText, comboChartData, comboSeriesFormat, comboUsesSecondaryAxis, isLineSeries } from './combo-chart';
+import { COMPARE_LABEL, CompareCell, CompareKind, compareText } from './compare';
+import { KpiDefinition, KpiRange } from 'app/inspecto/api/kpis.service';
+import { ComponentsService } from 'app/inspecto/api/components.service';
+import { MARKER_VIZ_TYPES, needsKpi, ResolvedMarker, resolveMarkers } from './chart-markers';
 import { ChannelId, VizPlugin, VizProps, VizRenderOptions, VizSeries } from './viz-types';
 
 /** componentKey → Angular component, for plugins that render via the escape hatch (`render.kind:'component'`).
@@ -105,8 +110,12 @@ const COMPONENT_BY_KEY: Record<string, Type<unknown>> = {
                         [data]="data"
                         [options]="chartJsOptions()"
                         [ariaLabel]="chartAriaLabel()"
+                        [markers]="markers()"
                         (elementClick)="onElementClick($event)"
                     />
+                    @if (compareNote(); as n) {
+                        <p class="text-secondary mt-1 text-xs" data-testid="compare-note">{{ n }}</p>
+                    }
                 }
             }
             @case ('aggrid') {
@@ -248,7 +257,56 @@ export class VizRenderComponent {
         return r.kind === 'component' ? (COMPONENT_BY_KEY[r.componentKey] ?? this.loadedComponent()) : null;
     });
 
+    private readonly injector = inject(Injector);
+
+    /** The bound KPI's definition (`options.kpi.kpiId`) when a Chart Marker reads it (a target line with no value of
+     *  its own, or the RAG bands); `null` until read, and on a failed read (those markers then fall back / drop). */
+    private readonly markerKpi = signal<KpiDefinition | null>(null);
+
+    /** Whether this Widget's type draws Chart Markers. */
+    private readonly marksSupported = computed(() => MARKER_VIZ_TYPES.includes(this.plugin().meta.type));
+
+    /** The id of the KPI the markers need, or '' — a stable string, so the read effect re-runs only when it changes. */
+    private readonly markerKpiId = computed(() => {
+        const o = this.renderOptions();
+        return this.marksSupported() && needsKpi(o?.markers) ? (o?.kpi?.kpiId ?? '') : '';
+    });
+
+    /**
+     * BI-INSIGHTS-1 I-2: the Widget's Chart Markers, resolved to lines and bands. The statistics read the values on the
+     * value axis `y` as drawn: every series, a Combo's bars only while its lines sit on the right axis, and the
+     * category totals when the series are stacked — per stack, as Chart.js stacks them: a Combo's bars and lines
+     * on the same axis are two stacks (its stack key falls back to the dataset type), never one sum.
+     */
+    readonly markers = computed<ResolvedMarker[]>(() => {
+        const o = this.renderOptions();
+        if (!this.marksSupported() || !o?.markers?.length) return [];
+        const p = this.sortedProps();
+        const combo = this.plugin().meta.type === 'combo';
+        const onY = combo && comboUsesSecondaryAxis(p, o) ? p.series.filter((s) => !isLineSeries(s)) : p.series;
+        const stacks = combo ? [onY.filter((s) => !isLineSeries(s)), onY.filter(isLineSeries)] : [onY];
+        const totals = (group: VizSeries[]) =>
+            group.length ? p.labels.map((_, i) => group.reduce((sum, s) => sum + (Number(s.data[i]) || 0), 0)) : [];
+        const values = o.stacked ? stacks.flatMap(totals) : onY.flatMap((s) => s.data);
+        return resolveMarkers(o.markers, { values, target: o.kpi?.target, kpi: this.markerKpi(), format: o.format });
+    });
+
     constructor() {
+        // A Chart Marker bound to the Widget's KPI reads its definition (target, direction, bands) — one read in
+        // flight, cancelled when the id changes. A failed read leaves the KPI-only markers undrawn, never guessed.
+        effect((onCleanup) => {
+            const id = this.markerKpiId();
+            this.markerKpi.set(null);
+            if (!id) return;
+            const read = this.injector
+                .get(ComponentsService)
+                .get('kpi', id)
+                .subscribe({
+                    next: (c) => this.markerKpi.set(c.content as unknown as KpiDefinition),
+                    error: () => this.markerKpi.set(null),
+                });
+            onCleanup(() => read.unsubscribe());
+        });
         // Resolve a registered async loader when the plugin needs one (keeps MapLibre/G6 out of eager bundles).
         // The stale-key guard drops a resolution that lands after the plugin has already changed.
         effect(() => {
@@ -292,8 +350,40 @@ export class VizRenderComponent {
         return {
             ...p,
             labels: order.map((i) => p.labels[i]),
-            series: p.series.map((s): VizSeries => ({ ...s, data: order.map((i) => s.data[i]) })),
+            series: p.series.map(
+                (s): VizSeries => ({
+                    ...s,
+                    data: order.map((i) => s.data[i]),
+                    // I-1: the change at each point moves with its point
+                    ...(Array.isArray(s['compare'])
+                        ? { compare: order.map((i) => (s['compare'] as CompareCell[])[i]) }
+                        : {}),
+                }),
+            ),
         };
+    });
+
+    /** I-1: the comparison kind the Widget asked for, when its rows carry one. */
+    private readonly compareKind = computed<CompareKind | null>(() => this.renderOptions()?.compare?.kind ?? null);
+
+    /**
+     * I-1: "Latest (2026-04): ▲ Up 100.0 % (+7) vs previous period" — the change at the last category of each measured
+     * series, in words under the chart, so the delta and % are read without hovering. One line per series, at most three.
+     */
+    readonly compareNote = computed<string | null>(() => {
+        const kind = this.compareKind();
+        if (!kind) return null;
+        const p = this.sortedProps();
+        const last = p.labels.length - 1;
+        if (last < 0) return null;
+        const measured = p.series.filter((s) => Array.isArray(s['compare']));
+        if (!measured.length) return null;
+        const at = fullDateLabel(p.labels[last]) ?? categoryLabel(p.labels[last]);
+        const lines = measured.slice(0, 3).map((s) => {
+            const text = compareText((s['compare'] as CompareCell[])[last], kind, this.renderOptions()?.format);
+            return measured.length > 1 ? `${categoryLabel(seriesLabel(s.label))}: ${text}` : text;
+        });
+        return `Latest (${at}): ${lines.join(' · ')}`;
     });
 
     /** The Waterfall's steps (running totals, opening and closing bars) — empty for every other type. */
@@ -396,16 +486,34 @@ export class VizRenderComponent {
             };
         }
         const colors = colorsFor(p.series.map((s) => s.label));
+        const kind = this.compareKind();
         return {
             labels: axisLabels,
-            datasets: p.series.map((s, i) => ({
-                label: categoryLabel(seriesLabel(s.label)),
-                data: s.data,
-                backgroundColor: colors[i],
-                borderColor: colors[i],
-                fill: (s['fill'] as boolean) ?? false,
-                stack: this.renderOptions()?.stacked ? 'stack' : undefined,
-            })),
+            datasets: p.series.map((s, i) => {
+                // I-1: a compared series shares its measure's colour, dashed (a line) or hollow (a bar), and is named
+                // by what it is — never told apart by colour alone.
+                const of = s['compareOf'] as string | undefined;
+                if (of != null)
+                    return {
+                        label: `${categoryLabel(seriesLabel(of))} · ${kind ? COMPARE_LABEL[kind] : 'compared'}`,
+                        data: s.data,
+                        backgroundColor: 'transparent',
+                        borderColor: colors[i],
+                        borderDash: [6, 4],
+                        borderWidth: 2,
+                        fill: false,
+                        compare: true,
+                    };
+                return {
+                    label: categoryLabel(seriesLabel(s.label)),
+                    data: s.data,
+                    backgroundColor: colors[i],
+                    borderColor: colors[i],
+                    fill: (s['fill'] as boolean) ?? false,
+                    stack: this.renderOptions()?.stacked ? 'stack' : undefined,
+                    ...(Array.isArray(s['compare']) ? { compareCells: s['compare'] } : {}),
+                };
+            }),
         };
     });
 
@@ -463,6 +571,12 @@ export class VizRenderComponent {
                           const f = type === 'combo' ? comboSeriesFormat(ctx.dataset.type === 'line', opts) : fmt;
                           const value = n == null ? '' : formatNumber(n, f);
                           return name ? `${name}: ${value}` : value;
+                      },
+                      // I-1: under a measured point, its change vs the compared value in words.
+                      afterLabel: (ctx: { dataset: { compareCells?: CompareCell[] }; dataIndex: number }) => {
+                          const kind = this.compareKind();
+                          const cell = ctx.dataset.compareCells?.[ctx.dataIndex];
+                          return kind && cell ? compareText(cell, kind, fmt) : '';
                       },
                   },
               };
@@ -627,6 +741,7 @@ export class VizRenderComponent {
             ? {
                   value: this.props().value ?? 0,
                   compare: this.props().compare,
+                  compareKind: this.renderOptions()?.compare?.kind,
                   format: this.renderOptions()?.format,
                   target: this.renderOptions()?.kpi?.target,
                   better: this.renderOptions()?.kpi?.better ?? 'higher',

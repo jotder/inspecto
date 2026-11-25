@@ -231,6 +231,24 @@ public final class Roles {
     public static final Set<String> AGENT_NEVER_CAPABILITIES =
             Set.of(CAN_APPROVE_CHANGES, CAN_APPROVE_LINK_EXPANSIONS, CAN_REVEAL_LINK_ENTITIES);
 
+    /**
+     * What a machine AGENT ({@link Subject#machine()} and {@link Subject#agent()}: a client listed in
+     * {@code -Dauth.oidc.agentMachineClients}, AGENT-KIT-1 AK-2c, D-AK4) may keep beyond {@link #MACHINE_CAPABILITIES}, when
+     * its roles grant them: authoring the kinds an agent proposes, working Incidents, operating runs. Useful only because
+     * every config write of an agent is held as a Pending Change and every action of a machine agent as a Pending Action;
+     * never an {@link #AGENT_NEVER_CAPABILITIES} one, {@code canAdminister} or access configuration.
+     */
+    public static final Set<String> AGENT_MACHINE_CAPABILITIES =
+            Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_WORK_INCIDENTS, CAN_OPERATE_RUNS);
+
+    /** What a machine Subject may keep: {@link #MACHINE_CAPABILITIES}, plus {@link #AGENT_MACHINE_CAPABILITIES} for an agent. */
+    private static Set<String> machineKeeps(Subject subject) {
+        if (!subject.agent()) return MACHINE_CAPABILITIES;
+        Set<String> keeps = new LinkedHashSet<>(MACHINE_CAPABILITIES);
+        keeps.addAll(AGENT_MACHINE_CAPABILITIES);
+        return Set.copyOf(keeps);
+    }
+
     /** The capability vocabulary = exactly what the route gates demand ({@link CapabilityManifest},
      *  R4) — the 422 validation set for authored roles and Access-Catalog action nodes. */
     public static final Set<String> KNOWN_CAPABILITIES = Set.copyOf(CapabilityManifest.capabilities());
@@ -388,7 +406,8 @@ public final class Roles {
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
                     "this Space does not admit the client '" + client + "' (roles.toon identity.machineClients)");
         Set<String> kept = new LinkedHashSet<>(subject.capabilities());
-        kept.retainAll(MACHINE_CAPABILITIES);
+        kept.retainAll(machineKeeps(subject));
+        kept.removeAll(AGENT_NEVER_CAPABILITIES);
         return new Subject(subject.id(), Set.copyOf(kept), subject.dataScopes(), subject.attributes(), subject.email(),
                 subject.displayName(), subject.machineSub(), subject.agentClient());
     }

@@ -15,6 +15,8 @@
   "asOfAggregations": [ "recency" ],
   "window": { "keys": [ "field", "asOf", "days" ], "maxDays": 3660 },
   "ratio": { "idSeparator": "_per_" },
+  "compare": { "kinds": [ "previous", "lastYear", "target", "average" ],
+               "suffixes": { "cmp": "__cmp", "delta": "__delta", "pct": "__pct" } },
   "windowed": {
     "asOf": "2026-06-30",
     "field": "day",

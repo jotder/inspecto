@@ -29,6 +29,7 @@ export * from './config.service';
 export * from './assist.service';
 export * from './agent.service';
 export * from './approvals.service';
+export * from './pending-actions.service';
 export * from './pending-changes.service';
 export * from './action-requests.service';
 export * from './regulatory-reports.service';

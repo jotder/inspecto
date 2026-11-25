@@ -128,6 +128,7 @@ export function biQueryBody(spec: QuerySpec, cols: ColumnMeta[] = []): BiQueryBo
     if (spec.orderBy?.length) body.orderBy = spec.orderBy;
     if (spec.limit != null) body.limit = spec.limit;
     if (spec.queryId) body.query = spec.queryId;
+    if (spec.compare) body.compare = spec.compare; // BI-INSIGHTS-1 I-1: computed in the same server statement
     return body;
 }
 
