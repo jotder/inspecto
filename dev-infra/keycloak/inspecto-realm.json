@@ -143,9 +143,48 @@
           }
         }
       ]
+    },
+    {
+      "clientId": "ops-bot",
+      "name": "Machine agent client (Agent Kit golden tasks, dev)",
+      "description": "DEV FIXTURE. Machine agent for the golden suites: list it in -Dauth.oidc.clients and -Dauth.oidc.agentMachineClients. Service account holds realm role operations. Secret written here on purpose.",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "dev-only-ops-bot",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "redirectUris": [],
+      "webOrigins": [],
+      "defaultClientScopes": [
+        "basic",
+        "roles"
+      ],
+      "protocolMappers": [
+        {
+          "name": "inspecto-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "inspecto_spa",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
+      ]
     }
   ],
   "users": [
+    {
+      "username": "service-account-ops-bot",
+      "enabled": true,
+      "serviceAccountClientId": "ops-bot",
+      "realmRoles": [
+        "operations"
+      ]
+    },
     {
       "username": "kc-business",
       "enabled": true,

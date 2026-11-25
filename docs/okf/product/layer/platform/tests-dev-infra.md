@@ -157,7 +157,9 @@ starts `quay.io/keycloak/keycloak:26.8.1` in `start-dev` mode on **<http://local
 `inspecto_spa` (redirect URIs and web origins for the SPA dev/demo ports 4200, 4204, 8080, 8090, 8095-8098,
 18080; an audience mapper; the `basic` scope), the seeded role names, and four **test users**:
 `kc-business`, `kc-developer`, `kc-admin` (realm roles) and `kc-operator` (the `operations` **client** role, so a
-pass proves the realm + client role union).
+pass proves the realm + client role union). Two agent clients for the Agent Kit golden runs: `claude-code` (public,
+PKCE) and the machine client `ops-bot` (client credentials, secret `dev-only-ops-bot`, service account with realm role
+`operations`; `module/mcp/tests-agent-golden.md`).
 
 ⛔ **DEV FIXTURE.** The test users' passwords (`dev-only-<role>`, e.g. `dev-only-operator`) are written in the realm
 file on purpose, the console admin is `admin` / `admin` (bootstrap variables in the compose file), the client has

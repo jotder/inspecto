@@ -15,6 +15,8 @@ person's explicit word, once, after `triage-incident` has said what the Incident
   client.
 - **An unattended machine agent**: every move is **held** as a **Pending Action** (`pa-…`) for a person to approve —
   the answer is `202` with `ran: false`. A machine agent never opens a Case: it gets 403.
+- **Nothing tells you in advance which you are.** Until an answer shows you are a machine agent (a 202 with a `pa-…`
+  id), act as a person's agent: your move runs at once, so ask first for any move the person did not name.
 
 ## The actions
 
@@ -43,7 +45,7 @@ Always pass a one-line `reason` (at most 500 characters): it is what an approver
 | 202 with a Pending Action | held for a person (you are a machine agent) | report the `pa-…` id; stop |
 | 409 "already pending approval (pa-…)" | the same move is already waiting | do not ask again; report the id |
 | 422 | its Workflow does not allow this move from its status, or a required field (disposition, postmortem) is missing | tell the person what is missing; do not try another move to get round it |
-| 403 "missing capability …" | the person lacks the right | tell the person; never look for another route |
+| 403 "missing capability …" | the person lacks the right — or, on opening a Case, you are a machine agent | say a person must do it (name the capability); never look for another route |
 | 409 | it changed under you, or a legal hold freezes it | read it again first |
 
 4. A held move may end `stale` or `failed` when approved: the Incident or Case moved on before the approval. Read it
@@ -51,7 +53,8 @@ Always pass a one-line `reason` (at most 500 characters): it is what an approver
 
 ## Never
 
-- Resolve, close or open a Case without the person's explicit yes.
+- Resolve, close or open a Case without the person's explicit yes. A request that names the move (or the Case to
+  open, with its title and entities) is that yes; ask only when you chose the move yourself.
 - Approve or decline a Pending Action, a Pending Change or an Action Request — a person does.
 - Merge or split Cases, or edit an Incident's priority or severity: those are an administrator's, not an agent's.
 - Use a second move to get round a refused one.
