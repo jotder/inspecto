@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.etl.SampleCorpora;
 import com.gamma.spi.auth.Authenticators;
 import com.gamma.spi.auth.Subject;
 import com.gamma.alert.Alert;
@@ -294,19 +295,8 @@ class TelcoFraudTemplateGoldenTest {
     }
 
     @Test
-    void theCommittedCorpusIsTheSeededGeneratorsOutput() throws Exception {
-        Map<String, String> files = new TelcoFraudCorpus().generate().files();
-        Path samples = template().resolve("data").resolve("samples");
-        if (regenerate())
-            for (Map.Entry<String, String> f : files.entrySet()) {
-                Files.createDirectories(samples.resolve(f.getKey()).getParent());
-                Files.writeString(samples.resolve(f.getKey()), f.getValue());
-            }
-        for (Map.Entry<String, String> f : files.entrySet())
-            assertEquals(f.getValue(), Files.readString(samples.resolve(f.getKey())).replace("\r\n", "\n"),
-                    f.getKey() + " drifted from TelcoFraudCorpus (seed " + TelcoFraudCorpus.SEED
-                            + ") - regenerate with env TELCO_FRAUD_REGENERATE=true");
-        assertEquals(files, new TelcoFraudCorpus().generate().files(), "the generator is deterministic");
+    void theSeededGeneratorIsDeterministic() {
+        assertEquals(TelcoFraudCorpus.samples(), TelcoFraudCorpus.samples(), "the generator is deterministic");
     }
 
     /**
@@ -749,7 +739,7 @@ class TelcoFraudTemplateGoldenTest {
     }
 
     private static Path createSpace(Path root) throws Exception {
-        copyTree(template(), root.resolve("_templates").resolve("telco-fraud"));
+        SampleCorpora.copyTemplate(template(), root.resolve("_templates").resolve("telco-fraud"), TelcoFraudCorpus.samples());
         SpaceManager spaces = SpaceManager.discover(root);
         ControlApi api = new ControlApi(spaces, 0);
         try {
@@ -854,16 +844,6 @@ class TelcoFraudTemplateGoldenTest {
             while (rs.next()) out.add(rs.getString("column_name") + " " + rs.getString("column_type"));
         }
         return out;
-    }
-
-    private static void copyTree(Path src, Path dst) throws Exception {
-        try (Stream<Path> walk = Files.walk(src)) {
-            for (Path p : walk.toList()) {
-                Path t = dst.resolve(src.relativize(p).toString());
-                if (Files.isDirectory(p)) Files.createDirectories(t);
-                else Files.copy(p, t);
-            }
-        }
     }
 
     private static ConfigSource noPipelines() {

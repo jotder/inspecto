@@ -1,6 +1,7 @@
 package com.gamma.job;
 
 import com.gamma.etl.ConsignmentEventBus;
+import com.gamma.etl.SampleCorpora;
 import com.gamma.recon.ReconRunJob;
 import com.gamma.recon.ReconBreaks;
 import com.gamma.recon.ReconStateStore;
@@ -11,11 +12,9 @@ import com.gamma.util.Scheduler;
 import com.gamma.pipeline.SpaceConfigRoot;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
@@ -42,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p>The corpus is loaded straight into the Pipelines' stores ({@code data/<feed>/database}) rather than ingested
  * through the eight Pipelines — the Pipelines' own shape is covered by {@code RepoSpacesConfigValidationTest}.
- * Regenerate the committed samples with {@code -Dtelcora.regenerate=true}.
+ * The samples are built from {@link TelcoRaCorpus} on every run; none is read from the Template.
  */
 class TelcoRaGoldenTest {
 
@@ -50,11 +49,6 @@ class TelcoRaGoldenTest {
     private static final TelcoRaCorpus CORPUS = TelcoRaCorpus.generate();
     /** Rated calls under the duplicate PLAN_B DATA tariff row: a property of the fixed seed, pinned. */
     private static final long AMBIGUOUS = 12;
-
-    @BeforeAll
-    static void regenerateOnAsk() throws Exception {
-        if (Boolean.getBoolean("telcora.regenerate")) CORPUS.writeTo(TEMPLATE.resolve("data").resolve("samples"));
-    }
 
     /** {@code SpaceConfigRoot.current()} prefers a registered Space over {@code -Dassist.write.root}; in the shared
      *  {@code inspecto} test JVM an earlier class may have left one registered, which silently re-points this test. */
@@ -70,18 +64,8 @@ class TelcoRaGoldenTest {
     }
 
     @Test
-    void theCommittedSamplesAreExactlyTheGeneratorsOutput() throws Exception {
-        Path samples = TEMPLATE.resolve("data").resolve("samples");
-        Set<String> committed;
-        try (Stream<Path> s = Files.walk(samples)) {
-            committed = s.filter(Files::isRegularFile).map(p -> samples.relativize(p).toString().replace('\\', '/'))
-                    .collect(Collectors.toCollection(TreeSet::new));
-        }
-        assertEquals(new TreeSet<>(CORPUS.files.keySet()), committed, "the sample file set");
-        for (Map.Entry<String, String> f : CORPUS.files.entrySet())
-            assertEquals(f.getValue(), Files.readString(samples.resolve(f.getKey()), StandardCharsets.UTF_8),
-                    f.getKey() + " drifted from the fixed-seed generator — regenerate with -Dtelcora.regenerate=true");
-        assertEquals(CORPUS.files, TelcoRaCorpus.generate().files, "the generator is deterministic");
+    void theSeededGeneratorIsDeterministic() {
+        assertEquals(TelcoRaCorpus.generate().files, TelcoRaCorpus.generate().files, "the generator is deterministic");
     }
 
     @Test
@@ -285,8 +269,8 @@ class TelcoRaGoldenTest {
     @Test
     void theTemplateIngestsEvaluatesAndAlertsEndToEnd(@TempDir Path root) throws Exception {
         com.gamma.etl.EditionFeatures.overrideForTest(Set.of(com.gamma.etl.EditionFeatures.ALERT_DISPATCH));
-        copyTree(TEMPLATE, root.resolve("_templates").resolve("telco-ra"));
-        Path samples = TEMPLATE.resolve("data").resolve("samples");
+        SampleCorpora.copyTemplate(TEMPLATE, root.resolve("_templates").resolve("telco-ra"), CORPUS.files);
+        Path samples = root.resolve("_templates").resolve("telco-ra").resolve("data").resolve("samples");
         try (com.gamma.service.SpaceManager spaces = com.gamma.service.SpaceManager.discover(root)) {
             com.gamma.service.SpaceContext space = spaces.createFromTemplate(
                     com.gamma.service.SpaceId.of("ra"), null, null, "telco-ra");

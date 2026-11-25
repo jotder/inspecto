@@ -1,6 +1,7 @@
 package com.gamma.job;
 
 import com.gamma.alert.AlertRule;
+import com.gamma.etl.SampleCorpora;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.SpaceConfigRoot;
@@ -78,7 +79,8 @@ class TelcoComposedSpaceGoldenTest {
     @Test
     void theComposedSpaceIngestsOneUsageFeedAndEveryAppFindsExactlyItsOwn(@TempDir Path root) throws Exception {
         Path templates = Files.createDirectories(root.resolve("_templates"));
-        for (String part : PARTS) copyTree(TEMPLATES.resolve(part), templates.resolve(part));
+        Map<String, Map<String, String>> samples = Map.of("telco-ra", TelcoRaCorpus.samples(), "telco-fraud", com.gamma.control.TelcoFraudCorpus.samples());
+        for (String part : PARTS) SampleCorpora.copyTemplate(TEMPLATES.resolve(part), templates.resolve(part), samples.getOrDefault(part, Map.of()));
         Path plan = root.resolve("plan.json");
         node("tools/assemble.mjs", "--product", "telco", "--edition", "standard", "--out", plan.toString());
         String out = node("tools/compose-space.mjs", "--plan", plan.toString(), "--templates", templates.toString());
@@ -110,8 +112,8 @@ class TelcoComposedSpaceGoldenTest {
             Path usage = composed.resolve("data/samples/telecom_usage/TELECOM_USAGE_20260703.csv");
             long records = Files.readAllLines(usage).size() - 1;
             long mo = Files.readAllLines(usage).stream().skip(1).filter(l -> l.split(",", -1)[2].equals("MO")).count();
-            long raRecords = Files.readAllLines(TEMPLATES.resolve("telco-ra/data/samples/switch_xdr/SWITCH_XDR_20260703.csv")).size() - 1;
-            long fmRecords = Files.readAllLines(TEMPLATES.resolve("telco-fraud/data/samples/cdr/CDR_20260701.csv")).size() - 1;
+            long raRecords = TelcoRaCorpus.samples().get("switch_xdr/SWITCH_XDR_20260703.csv").lines().count() - 1;
+            long fmRecords = com.gamma.control.TelcoFraudCorpus.samples().get("cdr/CDR_20260701.csv").lines().count() - 1;
             assertEquals(raRecords + fmRecords, records, "the one feed is the union of RA's and FM's usage samples");
             assertEquals(mo, count(data, "switch_xdr"), "RA's switch store holds every originated record");
             assertEquals(records, count(data, "cdr"), () -> "FM's store holds every record: " + listing(data));
@@ -298,16 +300,6 @@ class TelcoComposedSpaceGoldenTest {
 
     private static String glob(Path data, String store) {
         return data.resolve(store).toString().replace('\\', '/') + "/**/*.parquet";
-    }
-
-    private static void copyTree(Path from, Path to) throws Exception {
-        try (Stream<Path> s = Files.walk(from)) {
-            for (Path p : s.toList()) {
-                Path target = to.resolve(from.relativize(p).toString());
-                if (Files.isDirectory(p)) Files.createDirectories(target);
-                else Files.copy(p, target, StandardCopyOption.REPLACE_EXISTING);
-            }
-        }
     }
 
     private static JobRun await(Supplier<JobRun> s) throws Exception {

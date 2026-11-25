@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.etl.SampleCorpora;
 import com.gamma.spi.auth.Authenticators;
 import com.gamma.spi.auth.Subject;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -68,7 +69,7 @@ class PaymentFraudDashboardTest {
     void everyDashboardTileRendersThePlantedValuesAfterTheGoldenRun(@TempDir Path root) throws Exception {
         Path template = Path.of("..", "..", "spaces", "_templates", "payment-fraud").toAbsolutePath().normalize();
         assertTrue(Files.isDirectory(template), "the shipped template is missing: " + template);
-        copyTree(template, root.resolve("_templates").resolve("payment-fraud"));
+        SampleCorpora.copyTemplate(template, root.resolve("_templates").resolve("payment-fraud"), com.gamma.pack.PaymentFraudCorpus.files());
         SpaceManager spaces = SpaceManager.discover(root);
         ControlApi api = new ControlApi(spaces, 0);
         try {
@@ -236,15 +237,5 @@ class PaymentFraudDashboardTest {
         HttpResponse<String> r = HttpClient.newHttpClient().send(b.build(), HttpResponse.BodyHandlers.ofString());
         assertEquals(200, r.statusCode(), url + " -> " + r.body());
         return r.body();
-    }
-
-    private static void copyTree(Path src, Path dst) throws Exception {
-        try (Stream<Path> walk = Files.walk(src)) {
-            for (Path p : walk.toList()) {
-                Path t = dst.resolve(src.relativize(p).toString());
-                if (Files.isDirectory(p)) Files.createDirectories(t);
-                else Files.copy(p, t);
-            }
-        }
     }
 }

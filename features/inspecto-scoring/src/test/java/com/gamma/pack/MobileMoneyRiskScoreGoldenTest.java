@@ -3,6 +3,7 @@ package com.gamma.pack;
 import com.gamma.alert.AlertRule;
 import com.gamma.etl.ConsignmentEventBus;
 import com.gamma.etl.PipelineConfig;
+import com.gamma.etl.SampleCorpora;
 import com.gamma.inspector.CollectorProcessor;
 import com.gamma.job.JobConfig;
 import com.gamma.job.JobRun;
@@ -92,13 +93,7 @@ class MobileMoneyRiskScoreGoldenTest {
 
     private static Path copyTemplate(Path tmp) throws Exception {
         Path space = tmp.resolve("spaces").resolve("mobile-money");
-        try (Stream<Path> w = Files.walk(TEMPLATE)) {
-            for (Path p : w.toList()) {
-                Path to = space.resolve(TEMPLATE.relativize(p).toString());
-                if (Files.isDirectory(p)) Files.createDirectories(to);
-                else Files.copy(p, to);
-            }
-        }
+        SampleCorpora.copyTemplate(TEMPLATE, space, com.gamma.job.MobileMoneyCorpus.samples());
         return space;
     }
 

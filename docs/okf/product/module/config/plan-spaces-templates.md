@@ -117,8 +117,8 @@ parked in the plan's §4 (needs real feeds).
     different line that sorts first. The test pins each one's exact loss.
   - Split by Dataset: **17 leakage rows** in `ra_leakage` and **17 data-quality rows** in `ra_data_quality`.
 
-  - It also checks that leakage amounts are never NULL, that they are DECIMAL, and that the committed samples
-    are byte-identical to the generator (`-Dtelcora.regenerate=true`).
+  - It also checks that leakage amounts are never NULL, that they are DECIMAL, and that the generator is deterministic
+    (the golden tests build the samples from `TelcoRaCorpus` on every run; none is read from the Template, `SPACES-CONSOLIDATION-1` P2.3).
   - **End to end (2026-10-04).** `theTemplateIngestsEvaluatesAndAlertsEndToEnd` creates a Space from the template,
     drops each feed's CSV in `data/inbox/<feed>`, ingests it through the template's own 8 Pipelines
     (`CollectorService.runPipeline`), runs the Jobs (the `on_signal` chain included), evaluates the Alert Rules and
@@ -302,7 +302,7 @@ placeholder day no run replaces; a flat `seed.parquet` would be refused by the i
 reader auto-detects the `window_date=` folders, so the Schema carries `window_date` (as the last column). A test regenerates them from each Job's SQL and fails when a seed's Schema drifts. ⚠ The Alert Rules
 are Standard+: a Basic build refuses the whole template at `POST /spaces`, though the gallery still lists it.
 
-**Golden corpus**: synthetic, from a fixed-seed generator (`inspecto/src/test/java/com/gamma/control/TelcoFraudCorpus.java`,
+**Golden corpus**: synthetic, from a fixed-seed generator (`platform/inspecto-etl/src/test/java/com/gamma/control/TelcoFraudCorpus.java`,
 seed `20260930`; fictional numbering — home country code `999`, foreign callers `287` / `289`) committed under
 `data/samples/`, with planted offenders (one JUST above each threshold) and planted look-alikes (one exactly AT each
 threshold, plus flash-call OTP, a registered PBX line, a business traveller, a corporate multi-line document,

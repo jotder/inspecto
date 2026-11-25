@@ -28,7 +28,13 @@ import java.util.function.Predicate;
  * {@code tariff} (with effective dates), {@code balance_ledger} (prepaid roll-forward), {@code ic_rates} and
  * {@code ic_statement} (interconnect settlement).
  */
-final class TelcoRaCorpus {
+public final class TelcoRaCorpus {
+
+    /** The fixed-seed sample files of the Template (relative path under {@code data/samples} to content): what the repository
+     *  used to commit. Public so tests in other modules build the same corpus ({@code SPACES-CONSOLIDATION-1} P2.3). */
+    public static java.util.Map<String, String> samples() {
+        return generate().files;
+    }
 
     static final long SEED = 20260930L;
     static final int XDRS = 600;
