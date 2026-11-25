@@ -94,6 +94,19 @@ needs only W3 and can start now.
 
 ### W2 — `propose_change` for the kinds already held
 
+> **Built 2026-11-25**, in three steps as specified, with these differences found at build. (1) `decision-rule`,
+> `notification-rule` and, on the operator's word, `notification-channel` (the secret read-back defect does not reach a
+> Channel; see step 1 below). (2) `CHANGE_ROUTES` is `kind → operation → route`; `requirement-kpi` creates only,
+> `pipeline-restore` restores only (a `version` argument); two read tools were added so an agent never guesses —
+> `list_requirements` and `list_pipeline_versions` — as W1 added one. (3) `kind: entity-list` with operations
+> `members`, `retire`, `attributes`; the operator granted `canManageIncidents` and `canManageExclusionCategories` to the
+> machine agent set **globally** (D-AK9 Signed line), so a machine's new Case and Investigation attach are held as
+> Pending Actions (they were refused) and golden task an-06 now expects the hold. Steps 1 and 2 add no capability to
+> the machine set (every route is `canAuthorWorkbench`). Proof: `ControlApiMcpProposeKindsTest` (real HTTP per kind),
+> `McpToolRoutesTest.everyProposeChangeRouteReachesTheHold` and `aKindRefusesAnOperationItDoesNotOffer`,
+> `AgentGateParityTest` (the machine set pinned; no write either new right gates runs at once). Golden tasks dev-10,
+> dev-11, an-07; their live runs are W4's. Spec: `spec-mcp.md` § Write tools.
+
 - **Goal.** An agent proposes every config kind whose route already reaches the hold, so the analytics builder (AK-2
   plan §1.2) can deliver a Decision Rule, a notification and a KPI, not only the six kinds of phase 1.
 - **Today.** `McpTools.CHANGE_ROUTES` maps six kinds (Pipeline, Expectation, Alert Rule, Job, Widget, Dashboard).
@@ -372,7 +385,13 @@ under it are the decision.
   edit is held as a Pending Action. Task W11.
 - **D-AK9 — all four groups:** Decision Rule; Notification Rule (Notification Channel once
   `PENDING-CHANGE-SECRET-READBACK-1` is fixed — added at build on 2026-11-25, as that defect does not reach a Channel); Requirement KPI and Pipeline restore; **and Entity List edits** (W2
-  step 3). Each widens what a machine agent may propose; every machine write stays held.
+  step 3). Each widens what a machine agent may propose; every machine write stays held. **Step 3, signed at build
+  (operator, 2026-11-25): `canManageIncidents` and `canManageExclusionCategories` are granted to the machine agent set
+  globally, not per route**, knowing that a machine agent then also asks (held) for a new Case from entities and an
+  Investigation attach, and **reads** what the two rights read — the Entity Identity reads and a `restricted` Entity
+  List's members in Screening hits, the Dossier and the Grow preview. That read is an **explicit, operator-accepted
+  exception to "an agent never reveals"**; `AGENT_NEVER_CAPABILITIES` is unchanged, and the set still applies only to
+  clients in `-Dauth.oidc.agentMachineClients`.
 - **D-AK10 — as recommended:** group A for every agent; B, D and E once masking is proven per route; C for a
   person's agent only.
 - **D-AK11 — as recommended:** evaluate and the Job backlog are actions; materialize, compact, baseline and scheduler

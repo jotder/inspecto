@@ -76,6 +76,14 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- W2 step 3: the Entity List edits propose_change replays (POST /entity-lists/{id}/members|retire,
+             PUT …/attributes), so the held-proposal test meets the real routes, not the absent-module stub. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-entity-list</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-etl</artifactId>

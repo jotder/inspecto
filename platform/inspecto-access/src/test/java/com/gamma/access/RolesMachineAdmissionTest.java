@@ -43,10 +43,14 @@ class RolesMachineAdmissionTest {
         Roles.write(root, Map.of(), List.of(), List.of("ops-bot"));
         Set<String> granted = Set.of(Roles.CAN_OPEN_INBOUND_INVESTIGATION, Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_AUTHOR_ALERT_RULES,
                 Roles.CAN_WORK_INCIDENTS, Roles.CAN_OPERATE_RUNS, Roles.CAN_APPROVE_CHANGES, Roles.CAN_REVEAL_LINK_ENTITIES,
-                Roles.CAN_ADMINISTER, Roles.CAN_CONFIGURE_ACCESS, Roles.CAN_MANAGE_INCIDENTS);
+                Roles.CAN_ADMINISTER, Roles.CAN_CONFIGURE_ACCESS, Roles.CAN_MANAGE_INCIDENTS,
+                Roles.CAN_MANAGE_EXCLUSION_CATEGORIES);
         Subject agent = new Subject("client:ops-bot", granted, null, Map.of(), null, null, "svc-ops", "ops-bot");
+        // canManageIncidents and canManageExclusionCategories are kept since the operator's decision of 2026-11-25 (AK-2
+        // widening W2 step 3, D-AK9 Entity List edits, granted globally); approve, reveal, administer and access are not
         assertEquals(Set.of(Roles.CAN_OPEN_INBOUND_INVESTIGATION, Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_AUTHOR_ALERT_RULES,
-                Roles.CAN_WORK_INCIDENTS, Roles.CAN_OPERATE_RUNS), Roles.admitMachine(root, agent).capabilities());
+                Roles.CAN_WORK_INCIDENTS, Roles.CAN_OPERATE_RUNS, Roles.CAN_MANAGE_INCIDENTS,
+                Roles.CAN_MANAGE_EXCLUSION_CATEGORIES), Roles.admitMachine(root, agent).capabilities());
         assertEquals("ops-bot", Roles.admitMachine(root, agent).agentClient(), "still an agent");
         Subject plain = new Subject("client:ops-bot", granted, null, Map.of(), null, null, "svc-ops", null);
         assertEquals(Set.of(Roles.CAN_OPEN_INBOUND_INVESTIGATION), Roles.admitMachine(root, plain).capabilities(),

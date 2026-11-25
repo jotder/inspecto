@@ -29,6 +29,8 @@ class RolesImpliedCapabilityTest {
     void theNewRightIsInTheVocabularyAndAMachineAgentMayKeepIt() {
         assertTrue(Roles.KNOWN_CAPABILITIES.contains(Roles.CAN_DRAFT_INVESTIGATIONS), "an authored role may grant it");
         assertTrue(Roles.AGENT_MACHINE_CAPABILITIES.contains(Roles.CAN_DRAFT_INVESTIGATIONS));
-        assertFalse(Roles.AGENT_MACHINE_CAPABILITIES.contains(Roles.CAN_MANAGE_INCIDENTS));
+        // operator 2026-11-25 (AK-2 widening W2 step 3, D-AK9 Entity List edits, granted globally): a machine agent keeps
+        // canManageIncidents too — every write of it stays held (AgentGateParityTest)
+        assertTrue(Roles.AGENT_MACHINE_CAPABILITIES.contains(Roles.CAN_MANAGE_INCIDENTS));
     }
 }

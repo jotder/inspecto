@@ -194,6 +194,28 @@ kind whose route is not on `PendingChanges.REPLAYABLE`. An update or delete need
 `-32602` before any replay. The answer is the route's own: for an agent, always the **202 Pending Change** (the
 identity-keyed hold), carrying `agentClient` and `mcpTool: propose_change`.
 
+**Entity List edits (W2 step 3, D-AK9 as signed).** `propose_change` `kind: entity-list`, `id` = the list, operation
+`members` (`POST /entity-lists/{id}/members`, `{add?, remove?, addRanges?, removeRanges?, expiresAt?}`), `retire`
+(`POST …/retire`) or `attributes` (`PUT …/attributes`, `{ownerKind?, autoApply?, visibility?}`); the route reads its
+own `reason` from the body, so the tool copies its `reason` argument there when the content has none. All three are
+on `REPLAYABLE`, and an agent's member change is held whatever its shape (the 24-hour fast path is a person's). The
+analyst skills `work-cases` (§ Entity Lists) and `triage-incident` describe them, not `safe-config-change`.
+
+**The machine agent set widened (operator, 2026-11-25).** `members` and `retire` need `canManageIncidents`,
+`attributes` `canManageExclusionCategories`. The operator chose to grant both to `Roles.AGENT_MACHINE_CAPABILITIES`
+**globally**, not per route, knowing what else they open to a machine agent listed in
+`-Dauth.oidc.agentMachineClients` (and only to such a client):
+- **Writes — every one held.** A new Case from entities and an Investigation attach become Pending Actions; the
+  findings-spec component writes and the three Entity List edits become Pending Changes; every other non-GET route
+  either right gates stays refused to agents (`AgentGateParityTest` pins the set and asserts no route either right
+  gates sits in `ALLOWED`, which runs at once).
+- **Reads — an operator-accepted exception to "an agent never reveals".** `canManageExclusionCategories` is also the
+  right that shows a holder a `restricted` Entity List's members (`EntityListFacts.MANAGE_CATEGORIES`: Screening hits,
+  the Dossier's `excludeBy`, the Grow preview's counts), and `canManageIncidents` opens `GET /inv/entity-identities`.
+  A machine agent whose roles grant them now sees those. This is a deliberate exception, recorded in the plan's D-AK9
+  **Signed** line; `AGENT_NEVER_CAPABILITIES` (approve, approve an expand, `canRevealLinkEntities`) is unchanged, and
+  a masked Link Analysis key stays masked.
+
 **The endpoint's refusal list** (`McpTools.REFUSED`): a replay whose method and path look like the never-list
 (`…/approve|decline|decision|reveal|retry|mark-failed`, `/promotion/apply`, `/apps` and `/access` writes) is refused
 403 before it is dispatched, whoever asks — beside the host's agent gate. `McpToolRoutesTest` asserts no router can
@@ -215,7 +237,10 @@ another person's approval applies it, its update and delete are held, the same t
 agent's proposal is held; a kind outside the allowlist is `-32602` and records no Pending Change. Mutant: a kind mapped
 to `POST /decision-rules/{id}/simulate` (not on `REPLAYABLE`) turned the allowlist test, the W10 person's-agent test and
 the real-HTTP test red; in step 2, `requirement-kpi` mapped to `POST /requirements/{id}/deliver` did the same.
-`McpToolRoutesTest.aKindRefusesAnOperationItDoesNotOffer` pins the per-kind operations.
+`McpToolRoutesTest.aKindRefusesAnOperationItDoesNotOffer` pins the per-kind operations. Step 3:
+`ControlApiMcpProposeKindsTest.anEntityListEditIsHeldEveryWay` (members, attributes and retire held then applied, the
+direct call held, a machine agent's members and attributes held); removing `canManageIncidents` from the machine set
+turned it, `AgentGateParityTest` and `ControlApiAgentCaseActionsTest.aMachinesNewCaseFromEntitiesIsHeldNotRun` red.
 
 **A replay that fails** with anything but an `ApiException` answers the tool `isError` with HTTP 500 and the exception's
 class name plus the correlation id, and is **logged at ERROR with its stack under that correlation id**
@@ -283,7 +308,8 @@ Per §7.3 and D-UE5 (signed: both modes, delegated first).
   that is not a listed machine client, is the SPA client, or is set without `auth.oidc.clients`) is a Subject that is
   **both** `machine()` and `agent()`: id `client:<client>`, `agentClient` = the client id. At admission it keeps
   `Roles.MACHINE_CAPABILITIES` plus `Roles.AGENT_MACHINE_CAPABILITIES` (`canAuthorWorkbench`, `canAuthorAlertRules`,
-  `canWorkIncidents`, `canOperateRuns`) where its roles grant them, never an `AGENT_NEVER_CAPABILITIES` one; an
+  `canWorkIncidents`, `canOperateRuns`, `canDraftInvestigations`, and since W2 step 3 `canManageIncidents` and
+  `canManageExclusionCategories` — § Entity List edits) where its roles grant them, never an `AGENT_NEVER_CAPABILITIES` one; an
   unlisted machine keeps `canOpenInboundInvestigation` only, as before. Being an agent, every config write it makes
   is held as a Pending Change, the agent gate applies, and it never approves; it may not run a Pipeline
   (`AgentGate.PERSON_ONLY`, D-AK2). The Pending Change records `authorMachine` (the token's `sub`), and
@@ -425,8 +451,10 @@ hold above apply unchanged.
 - **A person's agent** takes them at once, within the person's rights, audited with `agent_client`; the object's own
   history records the person for an ack, assign, resolve or transition (`actorOf`: the Subject, never a body `actor`).
 - **A machine agent's** are held as Pending Actions, approved by the change approvers and replayed as the machine — a
-  comment it asked for is authored `client:<id>`. It never opens a Case: `canManageIncidents` is not in
-  `Roles.AGENT_MACHINE_CAPABILITIES`, so the hold's capability check answers 403 and leaves no record. A comment is
+  comment it asked for is authored `client:<id>`. Its new Case from entities is held the same way: until W2 step 3 it
+  was refused (403, no record) because `canManageIncidents` was not in `Roles.AGENT_MACHINE_CAPABILITIES`; the
+  operator granted it on 2026-11-25 (§ Entity List edits), and `ControlApiAgentCaseActionsTest.
+  aMachinesNewCaseFromEntitiesIsHeldNotRun` pins the hold. A comment is
   exempt from a capability, so a machine's hold on it needs `canWorkIncidents` (`AgentGate.MACHINE_HOLD_CAPABILITY`):
   otherwise a machine with no right could queue comments on any id (phase-3 security review, plan §6.5).
 - **A Brief** files at most a `pending` Action Request, whose makers are the asking person and the Brief's agent
@@ -468,8 +496,11 @@ only when a lead adds it as a member. Promote, reveal and expand decisions stay 
   (`POST /inv/investigations/{id}/drafts`, `…/drafts/{d}/ops|undo|discard|rebase`); promote stays
   `canManageIncidents`. `Roles.holds` makes `canManageIncidents` imply it, and every capability check
   (`ApiContext.requireCapability`, `requireCapabilityIn`) goes through `holds`, so no person lost a right and no role
-  table changed. `AGENT_MACHINE_CAPABILITIES` keeps it; because admission strips `canManageIncidents` first, a
-  machine's role must grant `canDraftInvestigations` by name. An implied grant yields to an Access profile that
+  table changed. `AGENT_MACHINE_CAPABILITIES` keeps it; until W2 step 3 admission stripped `canManageIncidents`, so a
+  machine's role had to grant `canDraftInvestigations` by name — since then a machine agent keeps `canManageIncidents`
+  too, and its attach of an Investigation to a Case is held as a Pending Action
+  (`ControlApiAgentLinkAnalysisTest.aMachinesAttachIsHeldAndItNeverStartsAGraphRunOrPromotes`); promote stays refused
+  to every agent. An implied grant yields to an Access profile that
   denies `canDraftInvestigations` by name (`ApiContext.impliedButDenied`, phase-3b review): the authenticator strips
   only granted capabilities, so the deny is asked for at the check. In the Link Analysis product set, the Access
   catalogue (`linkgraph.draft`) and the LA app's Access page.

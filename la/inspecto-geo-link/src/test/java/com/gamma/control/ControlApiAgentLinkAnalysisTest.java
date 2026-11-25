@@ -36,7 +36,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * runs Link Analysis queries — masked, as it never reveals — and works in a Draft at once, but never promotes it or edits
  * the Investigation directly; a machine agent that a lead added as a member has its Draft writes held as Pending Actions
  * that run as the machine once a change approver approves them; a machine that is no member gets nothing from an
- * approval; a machine never attaches an Investigation to a Case, starts a graph run or promotes, and leaves no record.
+ * approval; a machine's attach of an Investigation to a Case is held too (W2 step 3, operator 2026-11-25), and it never
+ * starts a graph run or promotes, leaving no record.
  */
 class ControlApiAgentLinkAnalysisTest {
 
@@ -215,16 +216,24 @@ class ControlApiAgentLinkAnalysisTest {
         }
     }
 
+    /**
+     * Until AK-2 widening W2 step 3 a machine agent never kept {@code canManageIncidents} and was refused an attach. The
+     * operator's decision of 2026-11-25 (W2 step 3, D-AK9 Entity List edits, granted globally) lets it keep the right, so
+     * its attach is now HELD as a Pending Action; a graph run and a promote stay refused, with no record.
+     */
     @Test
-    void aMachineNeverAttachesStartsAGraphRunOrPromotesAndLeavesNoRecord(@TempDir Path cfg, @TempDir Path root) throws Exception {
+    void aMachinesAttachIsHeldAndItNeverStartsAGraphRunOrPromotes(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root, "none")) {
             investigation(c, "inv-a", true);
-            assertEquals(403, send(c, "PUT", "/inv/investigations/inv-a/case", "{\"caseRef\":\"CASE-1\"}", BOT).statusCode(),
-                    "attach needs canManageIncidents, which a machine agent never keeps");
             assertEquals(403, send(c, "POST", "/inv/graph/runs", "{}", BOT).statusCode(), "nor canRunLinkGraphAnalysis");
             assertEquals(403, send(c, "POST", "/inv/investigations/inv-a/drafts/d-1/promote", "{}", BOT).statusCode(),
                     "promote is refused to every agent");
             assertEquals(0, pendingActions(c), "refused before the hold: no record");
+
+            JsonNode held = data(send(c, "PUT", "/inv/investigations/inv-a/case", "{\"caseRef\":\"CASE-1\"}", BOT), 202);
+            assertEquals("PUT /inv/investigations/inv-a/case", held.at("/pendingAction/action").asText(), held.toString());
+            assertEquals("pending", held.at("/pendingAction/status").asText(), held.toString());
+            assertEquals(1, pendingActions(c), "the attach waits for a person");
         }
     }
 }

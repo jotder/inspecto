@@ -270,7 +270,11 @@ final class McpTools {
             // id = the delivered kpi Requirement; content may name the KPI's own id
             Map.entry("requirement-kpi", Map.of("create", "POST /requirements/{id}/kpi")),
             // id = the Pipeline; a restore is a save of a kept version, held like one
-            Map.entry("pipeline-restore", Map.of("restore", "POST /pipelines/{id}/history/{version}/restore")));
+            Map.entry("pipeline-restore", Map.of("restore", "POST /pipelines/{id}/history/{version}/restore")),
+            // W2 step 3 (D-AK9, operator 2026-11-25): id = the Entity List. members and retire need canManageIncidents,
+            // attributes canManageExclusionCategories — both in the machine agent set since that decision; all held
+            Map.entry("entity-list", Map.of("members", "POST /entity-lists/{id}/members",
+                    "retire", "POST /entity-lists/{id}/retire", "attributes", "PUT /entity-lists/{id}/attributes")));
 
     private static Map.Entry<String, Map<String, String>> crud(String kind, String create, String update, String delete) {
         Map<String, String> ops = new LinkedHashMap<>();
@@ -281,7 +285,7 @@ final class McpTools {
     }
 
     /** Every operation some kind offers — the {@code operation} enum; {@link #CHANGE_ROUTES} says which kind takes which. */
-    static final List<String> OPERATIONS = List.of("create", "update", "delete", "restore");
+    static final List<String> OPERATIONS = List.of("create", "update", "delete", "restore", "members", "retire", "attributes");
 
     /** The operations {@code kind} offers, in {@link #OPERATIONS} order. */
     static List<String> operations(String kind) {
@@ -330,6 +334,11 @@ final class McpTools {
         String path = template.substring(sp + 1).replace("{id}", id == null ? "" : seg(id))
                 .replace("{version}", version == null ? "" : String.valueOf(version));
         if ("restore".equals(op)) content = Map.of();   // the route's POST body, read by nobody
+        // an Entity List edit records its reason on the list's own fact, from the body: the tool's reason serves there too
+        if ("entity-list".equals(kind) && !content.containsKey("reason") && a.get("reason") instanceof String r) {
+            content = new LinkedHashMap<>(content);
+            content.put("reason", r);
+        }
         Map<String, String> headers = new LinkedHashMap<>();
         if (a.get("reason") instanceof String reason) {
             // the route's own limit (PendingChanges.MAX_REASON), and one line, as the approver reads it. Carried under the
@@ -365,13 +374,15 @@ final class McpTools {
                     "Propose creating, updating or deleting a Pipeline, Expectation, Alert Rule, Job, Widget, Dashboard, "
                             + "Decision Rule, Notification Rule or Notification Channel; creating the KPI of a delivered kpi Requirement "
                             + "(requirement-kpi, create only); or restoring a kept version of a Pipeline (pipeline-restore, "
-                            + "restore only). The change is NOT applied: it becomes a Pending Change that another person must "
-                            + "approve. 'content' is the kind's own write body (for a Pipeline, its graph). Validate and dry-run first.",
+                            + "restore only); or an Entity List edit (entity-list: members, retire or attributes). The change "
+                            + "is NOT applied: it becomes a Pending Change that another person must approve. 'content' is the "
+                            + "kind's own write body (for a Pipeline, its graph). Validate and dry-run first.",
                     List.of(new Arg("kind", Kind.ENUM, true, "What to change.", List.copyOf(new java.util.TreeSet<>(CHANGE_ROUTES.keySet()))),
                             new Arg("operation", Kind.ENUM, true, "create, update or delete; restore for a pipeline-restore "
-                                    + "(the only one it takes); create for a requirement-kpi (the only one it takes).", OPERATIONS),
+                                    + "(the only one it takes); create for a requirement-kpi (the only one it takes); members, "
+                                    + "retire or attributes for an entity-list (the only ones it takes).", OPERATIONS),
                             new Arg("id", Kind.ID, false, "The target id (required to update, delete or restore, to create a "
-                                    + "Pipeline, and for a requirement-kpi: the Requirement's id)."),
+                                    + "Pipeline, for a requirement-kpi: the Requirement's id, for an entity-list: the list's id)."),
                             new Arg("version", Kind.INT, false, "The kept version to restore (pipeline-restore only; "
                                     + "GET /pipelines/{id}/history lists them)."),
                             new Arg("content", Kind.OBJECT, false, "The proposed content (not for a delete or a restore)."),
@@ -537,7 +548,7 @@ final class McpTools {
                             McpRoutes.jsonBytes(Map.of())), a), true),
             new Tool("open_case_from_entities", "Open a Case from entities",
                     "Open a Case over the entities (and existing Incidents) an investigation found. Needs "
-                            + "canManageIncidents, so only a person's agent can — an unattended machine agent never may.",
+                            + "canManageIncidents; an unattended machine agent's request is held as a Pending Action.",
                     List.of(body("{title, description?, entities: [{id, dataset, label} or {objectId}]} — at most the "
                             + "server's entity cap.", true),
                             text("reason", "Why — on the audit row.")),

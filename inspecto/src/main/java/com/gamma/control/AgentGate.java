@@ -50,7 +50,8 @@ final class AgentGate {
      * The case actions (plan §4.6, analyst rows, AK-2e, operator 2026-11-25: the §4.6 list, no record edits): comment on
      * an Incident or Case, build an Incident Brief, ack, assign, resolve or transition one, ack or resolve an Alert, open
      * a Case from entities. Each is still gated by its own route — {@code canWorkIncidents}, {@code canManageIncidents}
-     * for a new Case (which a machine agent never keeps), the comment route's collaboration exemption.
+     * for a new Case (a machine agent keeps it since W2 step 3, operator 2026-11-25; its request is held), the comment
+     * route's collaboration exemption.
      */
     static final Set<String> CASE_ACTIONS = Set.of(
             "POST /objects/([^/]+)/comments", "POST /incidents/([^/]+)/briefs",

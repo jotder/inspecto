@@ -43,6 +43,8 @@ class ControlApiMcpProposeKindsTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     /** AGENT = dev-1 (pipeline-developer) through agent client claude-code; BOT = the machine agent ops-bot; CHECKER approves. */
     private static final String AGENT = "Bearer agent", BOT = "Bearer bot", CHECKER = "Bearer checker";
+    /** LEAD_AGENT = lead-1, who holds the admin role (so canManageIncidents and canManageExclusionCategories), through claude-code. */
+    private static final String LEAD_AGENT = "Bearer lead-agent";
     private final HttpClient client = HttpClient.newHttpClient();
 
     private record Ctx(CollectorService svc, ControlApi api, int port, Path root) implements AutoCloseable {
@@ -76,6 +78,14 @@ class ControlApiMcpProposeKindsTest {
                     Set<String> caps = new LinkedHashSet<>(admin.capabilities());
                     caps.retainAll(keeps);
                     return Optional.of(new Subject("client:ops-bot", caps, null, Map.of(), null, null, "svc-ops", "ops-bot"));
+                }
+                case LEAD_AGENT -> {
+                    // what OidcAuthenticator leaves an agent of a person: the person's grants minus the never-list
+                    Roles.Def def = Roles.effective(ex).get("admin");
+                    ComponentAccess.heldRoles(ex, Set.of("admin"));
+                    Set<String> caps = new LinkedHashSet<>(def.capabilities());
+                    caps.removeAll(Roles.AGENT_NEVER_CAPABILITIES);
+                    return Optional.of(new Subject("lead-1", caps, def.dataScopes(), Map.of(), null, null, null, "claude-code"));
                 }
                 case CHECKER -> {
                     Roles.Def def = Roles.effective(ex).get("admin");
@@ -311,6 +321,72 @@ class ControlApiMcpProposeKindsTest {
         } finally {
             if (priorRoots == null) System.clearProperty("assist.safety.roots");
             else System.setProperty("assist.safety.roots", priorRoots);
+        }
+    }
+
+    // ── W2 step 3: Entity List edits (members, retire, attributes) ─────────────────────────────
+
+    private void list(Ctx c, String id, String purpose) throws Exception {
+        HttpResponse<String> r = rest(c, "POST", "/entity-lists", Map.of("id", id, "title", "List " + id, "purpose", purpose,
+                "entityType", "msisdn", "reason", "set up for W2"), CHECKER);
+        assertEquals(201, r.statusCode(), r.body());
+    }
+
+    private JsonNode entityList(Ctx c, String id) throws Exception {
+        HttpResponse<String> r = rest(c, "GET", "/entity-lists/" + id, null, CHECKER);
+        assertEquals(200, r.statusCode(), r.body());
+        return JSON.readTree(r.body()).get("data");
+    }
+
+    private static Map<String, Object> listEdit(String op, String id, Map<String, Object> content) {
+        return args("entity-list", op, id, content);
+    }
+
+    @Test
+    void anEntityListEditIsHeldEveryWay(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            list(c, "wl", "watch");
+            list(c, "staff", "exclusion");
+            list(c, "direct_wl", "watch");
+            list(c, "bot_wl", "watch");
+            list(c, "bot_staff", "exclusion");
+            Map<String, Object> add = Map.of("add", List.of("+15550001"));
+
+            // members: held (an agent's change never takes the person's 24 h fast path), then applied by another person
+            String pc = heldId(propose(c.port, LEAD_AGENT, listEdit("members", "wl", add)));
+            assertEquals(0, entityList(c, "wl").get("size").asInt(), "nothing is live before approval");
+            approve(c, pc);
+            assertEquals(1, entityList(c, "wl").get("size").asInt(), "another person's approval adds the member");
+
+            // attributes (canManageExclusionCategories): held, then applied
+            pc = heldId(propose(c.port, LEAD_AGENT, listEdit("attributes", "staff", Map.of("ownerKind", "admin"))));
+            assertEquals("analyst", entityList(c, "staff").get("ownerKind").asText(), "nothing is live before approval");
+            approve(c, pc);
+            assertEquals("admin", entityList(c, "staff").get("ownerKind").asText(), "another person's approval applies it");
+
+            // retire: held, the tool's reason carried into the body the route reads
+            JsonNode retire = propose(c.port, LEAD_AGENT, listEdit("retire", "wl", Map.of()));
+            pc = heldId(retire);
+            assertFalse(entityList(c, "wl").get("retired").asBoolean(), "a held retire retires nothing");
+            approve(c, pc);
+            assertTrue(entityList(c, "wl").get("retired").asBoolean(), "another person's approval retires it");
+
+            // the same token's direct call is held the same way
+            HttpResponse<String> direct = rest(c, "POST", "/entity-lists/direct_wl/members",
+                    Map.of("add", List.of("+15550002"), "reason", "sent directly"), LEAD_AGENT);
+            assertEquals(202, direct.statusCode(), direct.body());
+            assertEquals(0, entityList(c, "direct_wl").get("size").asInt(), "the direct call changed nothing");
+
+            // a machine agent (canManageIncidents and canManageExclusionCategories since W2 step 3): held, every edit
+            for (Map.Entry<String, Map<String, Object>> e : Map.of(
+                    "members", listEdit("members", "bot_wl", add),
+                    "attributes", listEdit("attributes", "bot_staff", Map.of("ownerKind", "admin"))).entrySet()) {
+                JsonNode byBot = propose(c.port, BOT, e.getValue());
+                heldId(byBot);
+                assertEquals("ops-bot", byBot.at("/structuredContent/data/pendingChange/agentClient").asText(), e.getKey());
+            }
+            assertEquals(0, entityList(c, "bot_wl").get("size").asInt(), "a machine agent's proposal changed nothing");
+            assertEquals("analyst", entityList(c, "bot_staff").get("ownerKind").asText());
         }
     }
 

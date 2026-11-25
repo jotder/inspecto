@@ -144,8 +144,20 @@ class AgentGateParityTest {
         Set<String> exemptActions = new TreeSet<>();
         for (String key : AgentGate.ACTIONS) if (String.valueOf(m.get(key)).startsWith("exempt:")) exemptActions.add(key);
         assertEquals(exemptActions, new TreeSet<>(AgentGate.MACHINE_HOLD_CAPABILITY.keySet()));
-        // a new Case needs canManageIncidents, which a machine agent never keeps (operator 2026-11-25): people only
-        assertFalse(Roles.AGENT_MACHINE_CAPABILITIES.contains(Roles.CAN_MANAGE_INCIDENTS));
+        // Until W2 step 3 a machine agent never kept canManageIncidents ("a new Case: people only"). The operator's
+        // decision of 2026-11-25 (W2 step 3, D-AK9 Entity List edits, granted globally) gives it canManageIncidents and
+        // canManageExclusionCategories; the set is pinned so any further widening is a deliberate edit here too.
+        assertEquals(new TreeSet<>(Set.of(Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_AUTHOR_ALERT_RULES, Roles.CAN_WORK_INCIDENTS,
+                        Roles.CAN_OPERATE_RUNS, Roles.CAN_DRAFT_INVESTIGATIONS, Roles.CAN_MANAGE_INCIDENTS,
+                        Roles.CAN_MANAGE_EXCLUSION_CATEGORIES)),
+                new TreeSet<>(Roles.AGENT_MACHINE_CAPABILITIES));
+        // ...and every write those two rights open is held for a machine: none sits in ALLOWED, which runs at once
+        for (Map.Entry<String, String> e : m.entrySet()) {
+            boolean write = !e.getKey().startsWith("GET ");
+            if (write && (Roles.CAN_MANAGE_INCIDENTS.equals(e.getValue())
+                    || Roles.CAN_MANAGE_EXCLUSION_CATEGORIES.equals(e.getValue())))
+                assertNotEquals(AgentGate.Bucket.ALLOWED, bucket(e.getKey()), e.getKey() + " would run at once for a machine");
+        }
         assertEquals(AgentGate.Bucket.REFUSED, bucket("POST /pending-actions/([^/]+)/approve"));
         assertEquals(AgentGate.Bucket.REFUSED, bucket("POST /pending-actions/([^/]+)/decline"));
         assertEquals(AgentGate.Bucket.ALLOWED, bucket("POST /pending-actions/([^/]+)/withdraw"));
