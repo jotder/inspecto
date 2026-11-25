@@ -373,8 +373,9 @@ config only.
   Approve and Decline for a holder of `canApproveChanges`.
 - **Agent Skills and golden tasks:** `diagnose-failed-run` (read only) and `operate-runs` (act after diagnosis; ask
   before a drain or reprocess; report a `pa-…` id when held); the operations suite `agent-kit/golden/operations.json`
-  (eight tasks: diagnose without acting, resume, re-run, drain asks first, a machine's resume held, a machine never
-  self-approves, and since W1 a quarantined file found and released, a machine's release held), graded by `tools/run-agent-golden.mjs`'s `agent-action`, `no-agent-action` and `pending-action`
+  (ten tasks: diagnose without acting, resume, re-run, drain asks first, a machine's resume held, a machine never
+  self-approves, since W1 a quarantined file found and released, a machine's release held, and since W9 two Space
+  health audits, § Read-only Agent Skills (W9)), graded by `tools/run-agent-golden.mjs`'s `agent-action`, `no-agent-action` and `pending-action`
   checks. Its live run is open, as for the developer suite's other clients.
 - **Tests:** `ControlApiPendingActionsTest` (real HTTP: a person's agent pauses and resumes at once and its row
   names the agent client, a business user's agent is 403; a machine's pause is 202 and nothing ran, a second one
@@ -511,6 +512,30 @@ route's 403 through the tool, as on the direct call.
   `ControlApiAnomalyScoreTest` and `ControlApiPredictionReadTest` (an agent Subject narrowed as `OidcAuthenticator`
   narrows it reads the masked token over seeded scores). `McpRoutesManifestParityTest` is unchanged: the tools add no
   route to the module.
+
+## Read-only Agent Skills (W9)
+
+Built 2026-11-25 (widening plan §3 W9). Two Agent Skills that only read; no tool, route or gate change.
+
+- **`review-pending-change`** — for the person who approves: reads a Pending Change (`get_pending_change`,
+  `diff_pending_change`) or a Pending Action (`get_pending_action`), traces what it touches (`describe_dataset`,
+  `get_lineage`, `list_alert_rules`, `list_expectations`, `get_pipeline`, `list_runs`, `get_run_batches`), checks it
+  with `query_dataset` and writes a brief: what changes, what it touches, what the data says, what to check. It never
+  approves or declines, even when asked; the gate refuses it anyway. **Gap:** no MCP Tool lists Widgets or Dashboards,
+  so the skill tells the approver which Dashboards it could not check.
+- **`audit-space-health`** — one report per Space: `health`, `get_space_integrity` (files changed outside the server,
+  broken links, duplicates, activation holds), `get_space_origin` and `preview_template_upgrade`, `list_datasets`,
+  `get_dataset_storage` and `dataset_freshness`, and Pending Changes and Actions waiting long or expired. A 403 on a
+  read is reported as "not checked", never worked around. Accepting a hand edit or applying an upgrade stays a person's.
+- **Golden tasks.** The reviewer is in `developer.json` (`dev-08-review-brief`, `dev-09-review-never-approves`): it
+  reviews the Expectation Pending Change `dev-01` left, so it needs that suite's Space, data and ground truth (3 rows
+  fail), and the approver it acts for is a second person of the developer role. The audit is in `operations.json`
+  (`ops-09-audit-health`, `ops-10-audit-reads-only`): a hand edit of the import Pipeline's file and the pending
+  proposal `dev-07` left must appear in the report, and a request to tidy up changes nothing. Both pairs are read-only
+  (`no-pending-change`, `no-agent-action`, `no-never-list-attempt`, `no-direct-write`); the new grade check
+  `tool-called` (`tools/run-agent-golden.mjs`) asserts the agent's own answered call of a tool (`diff_pending_change`,
+  `get_space_integrity`, `get_dataset_storage`). The machine-run (scheduled) audit has no golden task yet. Their live
+  run is part of W4, not of W9.
 
 ## Security review (2026-11-20)
 

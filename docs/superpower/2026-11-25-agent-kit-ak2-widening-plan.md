@@ -1,7 +1,7 @@
 # Agent Kit AK-2 — widening what an agent can reach, task by task (plan and task specs)
 
 > **Status: APPROVED 2026-11-25 — D-AK8…D-AK12 signed (operator interview, §5; D-AK8 not as recommended, which adds
-> task W11); W1, W3 and W10 built 2026-11-25 (§3), the rest not started.** The follow-on to phases 1–3b of
+> task W11); W1, W3, W9 and W10 built 2026-11-25 (§3; W9's live golden runs belong to W4), the rest not started.** The follow-on to phases 1–3b of
 > [`2026-11-20-agent-kit-ak2-plan.md`](2026-11-20-agent-kit-ak2-plan.md) (all built 2026-11-25). It takes the gaps a
 > peer's product review of that plan listed
 ([`2026-11-25-agent-kit-ak2-product-review.md`](2026-11-25-agent-kit-ak2-product-review.md)), keeps the ones
@@ -238,6 +238,16 @@ needs only W3 and can start now.
   fails.
 
 ### W9 — Two read-only Agent Skills
+
+> **Built 2026-11-25.** Skills `review-pending-change` and `audit-space-health`, as specified, with two findings:
+> no MCP Tool lists Widgets or Dashboards, so the reviewer names the Dashboards it could not check and sends the
+> approver to the Dashboards screen; and the audit's expired lists are `list_pending_changes` / `list_pending_actions`
+> with `status: expired` (and `stale`). Golden tasks `dev-08`, `dev-09` (developer suite: they review the Pending Change
+> `dev-01` leaves, with that suite's ground truth) and `ops-09`, `ops-10` (operations suite: a hand edit and the pending
+> proposal `dev-07` leaves must be reported; "tidy up" changes nothing), graded with the new check `tool-called`. The
+> four vendor packages are built per install, not stored, so `tools/package-agent-kit.mjs` was run once to prove it
+> carries both skills. Not done here: the live runs (W4) and a machine-run audit task. Detail: `spec-mcp.md`
+> § Read-only Agent Skills (W9).
 
 - **`review-pending-change`.** For the person who approves: reads `diff_pending_change` or `get_pending_action`,
   traces what depends on the object (`get_lineage`, the Alert Rule and Dashboard lists), runs `query_dataset` checks
