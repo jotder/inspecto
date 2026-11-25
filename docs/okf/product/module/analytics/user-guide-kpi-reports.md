@@ -69,4 +69,8 @@ distinct from the analytical **Dashboards** authored in the [Studio](../../layer
   applied: dashboard filters, palette, `sort` / `categoryOrder` options. A PDF still needs `scope: dataset` (the table
   page). Tests: `ReportPdfChartsTest` (reads the PDF's page images back and measures the bars), `ReportJobMaskingTest`
   (a chart over a classified key).
+* **A chart page draws the Widget's markers and overlays (2026-11-25, `REPORT-CHART-MARKERS-1`).** Target, average,
+  percentile and constant lines, bands, the bound KPI's red / amber / green zones, the forecast band and the ringed
+  unusual values print as they show on the Dashboard, each named in words; the forecast caption (or why there is no
+  forecast) is listed under the chart.
 * This pane is the **Business lens's home route** (`LENS_HOME.business = 'kpi-reports'`).

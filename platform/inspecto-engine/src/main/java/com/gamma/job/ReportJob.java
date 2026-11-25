@@ -15,6 +15,7 @@ import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.pipeline.XlsxWorkbook;
 import com.gamma.query.DatasetRelation;
+import com.gamma.query.ChartOverlays;
 import com.gamma.query.MeasureCompiler;
 import com.gamma.query.QueryExecutor;
 import com.gamma.util.SqlIdent;
@@ -67,6 +68,7 @@ import java.util.Set;
 final class ReportJob implements Job {
 
     private static final Logger events = LoggerFactory.getLogger("inspecto.events");
+    private static final Logger log = LoggerFactory.getLogger(ReportJob.class);
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
@@ -280,7 +282,7 @@ final class ReportJob implements Job {
         if (!groupBy.isEmpty()) body.put("groupBy", groupBy);
         int limit = datasetLimit();
         body.put("limit", limit);
-        return query(body, measures.isEmpty() && groupBy.isEmpty(), false, limit, "scope dataset");
+        return query(body, measures.isEmpty() && groupBy.isEmpty(), false, limit, "scope dataset", null);
     }
 
     /**
@@ -288,8 +290,8 @@ final class ReportJob implements Job {
      * (REPORT-PDF-CHARTS-1) — masked for leaving the platform. {@code raw} = a {@code SELECT *} with no aggregation;
      * {@code chart} = a Widget's query, whose cosmetic category ordering is first prepared the way the dashboard's is.
      */
-    private QueryExecutor.Result query(Map<String, Object> body, boolean raw, boolean chart, int limit, String what)
-            throws Exception {
+    private QueryExecutor.Result query(Map<String, Object> body, boolean raw, boolean chart, int limit, String what,
+                                       java.util.function.Consumer<List<Map<String, Object>>> overlays) throws Exception {
         // Space-scoped — see SpaceConfigRoot (MATERIALIZE-SPACE-ROOT-1).
         Path writeRoot = SpaceConfigRoot.requireCurrent(what);
         String datasetId = String.valueOf(body.get("dataset"));
@@ -297,6 +299,8 @@ final class ReportJob implements Job {
         MeasureCompiler.Spec parsed = raw
                 ? null   // raw export: SELECT * over the dataset (no aggregation)
                 : MeasureCompiler.parse(body, 10_000, 100_000);
+        // REPORT-CHART-MARKERS-1: a Widget's overlay, parsed (and refused) before any statement runs, as /bi/query does
+        ChartOverlays.Request overlay = chart && parsed != null ? ChartOverlays.parse(body.get("overlay"), parsed) : null;
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         Map<String, Object> dataset = store.get("dataset", datasetId)
                 .map(ComponentRegistry.Component::content)
@@ -327,12 +331,27 @@ final class ReportJob implements Job {
         Set<String> aliased = new LinkedHashSet<>(aliasedColumns);
         aliased.addAll(masked.aliasedColumns());
         aliasedColumns = List.copyOf(aliased);
-        return masked.result();
+        if (overlay == null) return masked.result();
+        // BI-INSIGHTS-1 I-11 / I-7 (D-BI7): forecast band and anomaly scores from the masked rows above — the same
+        // computation /bi/query runs for the dashboard, under the same cap, no second statement
+        ChartOverlays.Outcome o = ChartOverlays.apply(overlay, spec, masked.result());
+        if (overlays != null) overlays.accept(o.summary());
+        return o.result();
     }
+
+    /** A Widget's chart rows and the overlay summary ({@code ChartOverlays.Outcome#summary()}; empty without an overlay). */
+    record ChartRows(QueryExecutor.Result result, List<Map<String, Object>> overlays) {}
 
     /** The rows a Widget's chart page draws: its own query, ordered and masked as for a non-revealing dashboard viewer. */
     QueryExecutor.Result chartRows(ReportWidget w) throws Exception {
-        return query(w.body(), false, true, ReportWidget.MAX_ROWS, "widgets");
+        return chart(w).result();
+    }
+
+    /** {@link #chartRows} with the overlay summary the caption words. */
+    ChartRows chart(ReportWidget w) throws Exception {
+        List<List<Map<String, Object>>> summary = new ArrayList<>();
+        QueryExecutor.Result r = query(w.body(), false, true, ReportWidget.MAX_ROWS, "widgets", summary::add);
+        return new ChartRows(r, summary.isEmpty() ? List.of() : summary.get(0));
     }
 
     /** The Widget ids {@code widgets:} lists (REPORT-PDF-CHARTS-1), in page order. */
@@ -347,8 +366,27 @@ final class ReportJob implements Job {
                 .map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new IllegalArgumentException("unknown widget '" + id + "'"));
         ReportWidget w = ReportWidget.of(id, content);
-        QueryExecutor.Result r = chartRows(w);
-        return WidgetChartRenderer.render(w, r.rows(), r.truncated());
+        ChartRows c = chart(w);
+        return WidgetChartRenderer.render(w, c.result().rows(), c.result().truncated(), c.overlays(), boundKpi(writeRoot, w));
+    }
+
+    /**
+     * REPORT-CHART-MARKERS-1: the KPI definition a Widget's Chart Markers read ({@code options.kpi.kpiId}) — only when a
+     * marker needs it (the SPA's {@code needsKpi}); {@code null} when none is bound or it cannot be read, so a RAG marker
+     * draws nothing and a target line falls back to the Widget's own target, as on screen after a failed read.
+     */
+    static Map<?, ?> boundKpi(Path writeRoot, ReportWidget w) {
+        if (!(w.options().get("kpi") instanceof Map<?, ?> k) || k.get("kpiId") == null) return null;
+        if (!(w.options().get("markers") instanceof List<?> markers) || markers.stream().noneMatch(m -> m instanceof Map<?, ?> mm
+                && ("rag".equals(mm.get("kind")) || ("target".equals(mm.get("kind")) && ChartMarkers.finite(mm.get("value")) == null))))
+            return null;
+        try {
+            return new ComponentStore(writeRoot.resolve("registry")).get("kpi", String.valueOf(k.get("kpiId")).trim())
+                    .map(ComponentRegistry.Component::content).orElse(null);
+        } catch (RuntimeException unreadable) {
+            log.warn("report: KPI '{}' bound to widget '{}' could not be read: {}", k.get("kpiId"), w.id(), unreadable.toString());
+            return null;
+        }
     }
 
     /** The configured row cap (default 10,000), as the request carries it. */
