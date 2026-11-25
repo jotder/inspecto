@@ -326,7 +326,7 @@ and a security review of what it added.
 | **AK-2b** write tools — **built 2026-11-20** ([spec-mcp.md § Write tools](../okf/product/module/mcp/spec-mcp.md#write-tools-ak-2b); the Keycloak end-to-end run is left to AK-4) | 1 | the §4.4 tools, the endpoint refusal list, the manifest category, tool definitions and the `openapi.fragment.json` | end to end on a Standard install with Keycloak: validate → dry-run → propose → a second person approves → the change is live; `propose_action` → approve → sent |
 | **AK-2c** machines — **built 2026-11-25** (§6.2 lane A; [spec-mcp.md § Identity](../okf/product/module/mcp/spec-mcp.md#identity)) | 2 | `auth.oidc.agentMachineClients` and the agent capability set | a machine in the set proposes and is held; one outside it keeps one capability; an approval attempt is 403 |
 | **AK-2d** operational actions — **gate and Pending Actions built 2026-11-25** (§6.2 lane B; [spec-mcp.md § Pending Actions](../okf/product/module/mcp/spec-mcp.md#pending-actions-ak-2d)); tools, Skills, screen, golden suite and Handbook how-to built 2026-11-25 (lane C); live operations golden run open | 2 | the operations rows of §4.6, the held-action record per D-AK6, the operations MCP Tools and Skills | a person's agent re-runs a failed run and reprocesses at once, within the person's rights, audited with `agentClient` (D-AK5 as signed); a machine's resume is held as a Pending Action |
-| **AK-2e** case actions | 3 | the analyst rows of §4.6, the analyst MCP Tools and Skills | a person's agent comments, assigns and resolves at once, within the person's rights (D-AK5 as signed); a machine's resolve is held as a Pending Action; an agent never approves an Action Request |
+| **AK-2e** case actions — **built 2026-11-25** (§6.4; [spec-mcp.md § Case actions](../okf/product/module/mcp/spec-mcp.md#case-actions-ak-2e)); live analyst golden run open | 3 | the analyst rows of §4.6, the analyst MCP Tools and Skills | a person's agent comments, assigns and resolves at once, within the person's rights (D-AK5 as signed); a machine's resolve is held as a Pending Action; an agent never approves an Action Request |
 | close, per phase | 1–3 | security review of what the phase added, hub `module/mcp` spec and guides, the role's Handbook how-to | review at confidence ≥ 8 finds nothing |
 
 AK-2a ships before any write tool (spec-mcp.md "Deferred to AK-2": a verified agent client must be on the row before an
@@ -471,6 +471,54 @@ already true before phase 2; agents only widen who can do it.
   runs.
 - `POST /bundle/export` (read-shaped) and `POST /action-requests` (held for approval by its own design) stay open to a
   machine agent, as to a person's agent in phase 1.
+
+### 6.4 Phase 3 build (operator, 2026-11-25: "take on phase 3")
+
+Three operator answers on 2026-11-25: the agent takes **exactly the §4.6 analyst list** (comment, Brief, ack, assign,
+resolve, transition; Alert ack and resolve; a Case from entities), not the Incident record edits (findings,
+postmortem, category, impact, RCA, links, attachments); **a machine agent never opens a Case** (`canManageIncidents`
+stays out of `AGENT_MACHINE_CAPABILITIES`); and `CASE-TRANSITION-FOUR-EYES-1` **stays a board row**, as phase 2's
+product gaps did. One lane, because phase 2 built the machinery:
+
+| Delivers | Proof |
+|---|---|
+| `AgentGate.CASE_ACTIONS` joins `RUN_ACTIONS` in the action bucket; the refusal text names run and Case actions; Pending Action wording (glossary, screen, OpenAPI) covers both | `AgentGateParityTest` pins the nine routes and each one's gate; `ControlApiAgentCaseActionsTest`: a person's agent comments, accepts and assigns at once (row names the agent client), a business user's agent 403; a machine's Case transition and comment held, approved, run as the machine; a machine's new Case 403 with no record |
+| MCP Tools `add_comment`, `build_incident_brief`, `work_incident_or_case`, `work_alert`, `open_case_from_entities` | `McpToolRoutesTest` pins every tool to a case route and every case route to a tool |
+| Agent Skills `triage-incident`, `work-cases`; analyst golden suite (six tasks); the grader's `ACTION_PATH` covers case routes; Handbook how-to *Let an AI agent work Incidents and Cases*; hub docs | `check-agent-kit`, grader tests |
+
+### 6.5 Phase 3 security review (2026-11-25)
+
+Reviewed on the phase 3 lane: `AgentGate.CASE_ACTIONS`, the hold on those routes, the analyst MCP Tools, and the
+routes they reach (`ObjectRoutes`, `IncidentBriefRoutes`, `AlertRoutes`, `CaseRoutes`). The question, as for phase 2:
+can an agent act on an Incident, Case or Alert beyond its rights, past the hold or past four eyes?
+
+**Holds.**
+- Only the nine §4.6 routes moved; the Incident record edits, merge, split, the `canAdminister` PATCH and the Case
+  Rule evaluate stay refused to every agent (`AgentGateParityTest` pins the list and each route's gate).
+- Each route keeps its own gate, checked before the hold: a machine needs `canWorkIncidents`, and never holds
+  `canManageIncidents`, so it never opens a Case and leaves no record trying.
+- An object outside the caller's data scope: the hold runs before the route's scope guard, so a machine's request on
+  an invisible id is held (202) exactly as one on an absent id — no existence oracle. Approved, it replays as the
+  machine and the scope guard answers 404: `failed`, nothing changed.
+- The object's history records the Subject for ack, assign, resolve and transition (`actorOf` ignores a body
+  `actor` when there is a Subject), and a comment's author is the Subject — the machine (`client:<id>`) when a held one
+  is approved.
+- A Brief files at most a `pending` Action Request; its makers (the asking Subject and the Brief's agent identity) are
+  both refused at decide time, and an agent never decides one. A machine's Brief with a proposal therefore passes two
+  people: the Pending Action approver, then the Action Request approver.
+- The approver sees the whole request (the comment text, the Workflow move, a Brief's proposal) before deciding
+  (§6.3), and Approve waits until it has loaded.
+
+**Filed.** `CASE-FROM-ENTITIES-ACTOR-1` (P3 defect): `POST /cases/from-entities` records the body's free-text
+`actor` on the new Case's member links (and on a rollback's discard), while the Case's owner is the Subject. Any caller
+holding `canManageIncidents` can attribute those links to someone else; the audit log names the real caller. Already
+true before phase 3, the same family as `RUN-TRIGGER-ACTOR-SPOOF-1`.
+
+**Accepted.**
+- A comment needs no capability (the `collaboration` exemption), so a machine agent may ask to comment on anything it
+  can see; every one is held and read by an approver.
+- A held request on an object the machine may not see fills the approvers' queue with an action that can only fail.
+  It needs `canWorkIncidents` first, as every case action does.
 
 ## 7. Risks
 

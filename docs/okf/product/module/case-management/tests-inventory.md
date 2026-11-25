@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.case-management`](../../../../../product-map/module/case-management.toon).
 
-25 test class(es): 16 unit, 9 real-HTTP control-plane, 0 IT.
+26 test class(es): 16 unit, 10 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -29,6 +29,7 @@ mvn -o test -pl features/inspecto-case-management -Dtest=BypassBoxCaseRuleTest,P
 | `PerEntityAlertCaseRuleTest` | `com.gamma.alert` | unit | `features/inspecto-case-management/src/test/java/com/gamma/alert/PerEntityAlertCaseRuleTest.java` | ASSURE-PER-ENTITY-ALERTS-1 against the REAL object engine and a Case Rule: an existing Case Rule groups the |
 | `CaseRuleEvaluateRunInAServiceTest` | `com.gamma.control` | unit | `features/inspecto-case-management/src/test/java/com/gamma/control/CaseRuleEvaluateRunInAServiceTest.java` | {@code caserule.evaluate} (contributed by this module through {@code ServiceLoader}) RUN inside a real |
 | `CaseRuleUnmodelledKeysTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-case-management/src/test/java/com/gamma/control/CaseRuleUnmodelledKeysTest.java` | {@code MODULE-REORG-P4-2} for the Case Rule writer (moved from {@code OpsWritersUnmodelledKeysTest}, MODULE-REORG-P7): an |
+| `ControlApiAgentCaseActionsTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-case-management/src/test/java/com/gamma/control/ControlApiAgentCaseActionsTest.java` | Case actions over real HTTP (AGENT-KIT-1 AK-2e, plan §4.6 analyst rows, D-AK5 and D-AK6 as signed; operator |
 | `ControlApiCaseFromEntitiesTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-case-management/src/test/java/com/gamma/control/ControlApiCaseFromEntitiesTest.java` | {@code POST /cases/from-entities} over real HTTP (LA-CASE-CREATE-IN-PLACE-1, operator decision 2026-09-23: |
 | `ControlApiCaseGroupTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-case-management/src/test/java/com/gamma/control/ControlApiCaseGroupTest.java` | Case group management over real HTTP (GLOSSARY §9): {@code POST /objects/{id}/merge}, |
 | `ControlApiCaseRuleTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-case-management/src/test/java/com/gamma/control/ControlApiCaseRuleTest.java` | Rule-raised cases + case analytics over real HTTP (C5/C4): {@code /cases/rules} CRUD behind the |

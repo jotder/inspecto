@@ -21,7 +21,7 @@ import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime } from 'app/inspecto/grid';
 
 /**
- * The **Pending Actions** tab of the Pending Changes screen (AGENT-KIT-1 AK-2d): the operational actions an unattended
+ * The **Pending Actions** tab of the Pending Changes screen (AGENT-KIT-1 AK-2d, AK-2e): the run and Case actions an unattended
  * machine agent asked for — re-run, resume, reprocess, drain… — held for a person. A change approver approves one (it
  * then runs as that machine) or declines it; four eyes. The machine withdraws its own through the API, never here.
  */

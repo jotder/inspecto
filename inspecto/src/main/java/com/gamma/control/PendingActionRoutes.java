@@ -132,7 +132,7 @@ final class PendingActionRoutes implements RouteModule {
             // Checked BEFORE anything is dispatched: a record naming any route but an action can never run.
             if (!PendingActions.actionRoute(rec))
                 throw new ApiException(409, ErrorCodes.CONFLICT, "pending action '" + id + "' names a request ("
-                        + rec.get("route") + ") that is not an operational action — nothing was dispatched");
+                        + rec.get("route") + ") that is not an action route — nothing was dispatched");
             Map<String, Object> request = (Map<String, Object>) rec.get("request");
             Path rolesRoot = Roles.configRoot(ex) != null ? Roles.configRoot(ex) : root;
             Subject machine = PendingChanges.authorNow(rec, rolesRoot);   // the machine as it stands now, filtered

@@ -32,6 +32,7 @@ machine agent capability set is **AK-2c** (phase 2, 2026-11-25, [Identity](#iden
 - [The agent gate (AK-2a)](#the-agent-gate-ak-2a) — held writes, default deny, the never-list.
 - [Write tools (AK-2b)](#write-tools-ak-2b) — validate, dry-run, propose, withdraw, Ship reads, run.
 - [Pending Actions (AK-2d)](#pending-actions-ak-2d) — a machine agent's run actions, held for a person.
+- [Case actions (AK-2e)](#case-actions-ak-2e) — an agent works Incidents, Cases and Alerts; a machine's are held.
 - [Deferred](#deferred)
 
 ## Placement
@@ -300,7 +301,8 @@ agent token calling a route directly is treated the same.
      (D-AK2: a delegated person only, never a machine), and `/pending-actions/{id}/withdraw`;
   3. **actions** (**AK-2d**, 2026-11-25) — `AgentGate.ACTIONS`, the operational routes of plan §4.6: `POST
      /runs/{id}/trigger|pause|resume|reprocess|replay-rejects|drain`, `…/retries/retry-now|cancel`,
-     `POST /jobs/{id}/trigger`, `POST /jobs/runs/{id}/replay`, each still gated `canOperateRuns`. A **person's**
+     `POST /jobs/{id}/trigger`, `POST /jobs/runs/{id}/replay`, each still gated `canOperateRuns` (`AgentGate.RUN_ACTIONS`);
+     and since **AK-2e** the case actions (`AgentGate.CASE_ACTIONS`, [Case actions](#case-actions-ak-2e)). A **person's**
      agent takes them at once, within the person's rights (D-AK5 as signed), audited with `agent_client`. A
      **machine** agent's are held **before the handler** as a [Pending Action](#pending-actions-ak-2d);
   4. **refused (403)** — everything else: every route that only calls `holdRefusing*` (bundle import, onboarding
@@ -375,6 +377,42 @@ config only.
   409, the machine's approve 403, the list, another person's approval runs it, a second approve 409; withdraw by the
   machine only; a declined action never runs; a record naming a non-action route is not replayable),
   `AgentGateParityTest.theActionBucketIsExactlyTheNamedOperationalRoutes`.
+
+## Case actions (AK-2e)
+
+Phase 3, the Incident and Case analyst (plan §1.1, §4.6 analyst rows, §6.4). The operator's answers of 2026-11-25:
+exactly the §4.6 list (no Incident record edits), a new Case for people only, and `CASE-TRANSITION-FOUR-EYES-1` left a
+board row. No new machinery: the routes join the action bucket, so the gate and the [Pending Action](#pending-actions-ak-2d)
+hold above apply unchanged.
+
+- **The routes** (`AgentGate.CASE_ACTIONS`), each still on its own gate: `POST /objects/{id}/comments` (the
+  `collaboration` exemption — anyone who can see the object), `POST /incidents/{id}/briefs`,
+  `POST /objects/{id}/ack|assign|resolve|transition`, `POST /alerts/{id}/ack|resolve` (`canWorkIncidents`), and
+  `POST /cases/from-entities` (`canManageIncidents`). `AgentGateParityTest` pins the list and each route's gate.
+- **A person's agent** takes them at once, within the person's rights, audited with `agent_client`; the object's own
+  history records the person for an ack, assign, resolve or transition (`actorOf`: the Subject, never a body `actor`).
+- **A machine agent's** are held as Pending Actions, approved by the change approvers and replayed as the machine — a
+  comment it asked for is authored `client:<id>`. It never opens a Case: `canManageIncidents` is not in
+  `Roles.AGENT_MACHINE_CAPABILITIES`, so the hold's capability check answers 403 and leaves no record.
+- **A Brief** files at most a `pending` Action Request, whose makers are the asking person and the Brief's agent
+  identity; its own four-eyes decide gate refuses both, and an agent never decides one (the never-list).
+- **Analyst MCP Tools** (`McpTools.CASE_TOOLS`, all `write: true`): `add_comment`, `build_incident_brief`,
+  `work_incident_or_case` (`action` one of `ack`, `assign`, `resolve`, `transition` → `POST /objects/{id}/…`),
+  `work_alert` (`ack`, `resolve`) and `open_case_from_entities`, each with a one-line `reason`. The reads were
+  already there (`list_incidents`, `get_incident`, `get_incident_briefs`, `list_alerts`).
+  `McpToolRoutesTest.everyCaseToolReplaysACaseActionAndEveryCaseActionHasATool` pins tools to routes both ways.
+- **Agent Skills and golden tasks:** `triage-incident` (read, Brief, comment, accept, assign — never close) and
+  `work-cases` (Workflow moves, resolve, Alerts, open a Case — always on the person's yes); the analyst suite
+  `agent-kit/golden/analyst.json` (six tasks: read without acting, Brief and comment, accept and assign, resolve a
+  Case, a machine's resolve held, a machine never opens a Case). `ACTION_PATH` in `tools/run-agent-golden.mjs` covers
+  the case routes. Its live run is open.
+- **The screen:** unchanged — the *Pending Actions* tab lists case actions too, its detail showing the comment text or
+  Workflow move it will run.
+- **Tests:** `ControlApiAgentCaseActionsTest` (`inspecto-case-management`, real HTTP: a person's agent comments on,
+  accepts and assigns an Incident at once and its row names the agent client, a business user's agent is 403 and
+  nothing is held; a machine's Case transition is 202 and nothing changed, its approve 403, the detail shows the
+  move, another person's approval runs it; a machine's comment is held and on approval is the machine's; a machine's
+  new Case is 403 with no record), `AgentGateParityTest`, `McpToolRoutesTest`.
 
 ## Security review (2026-11-20)
 

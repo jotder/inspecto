@@ -15,7 +15,8 @@ export type PendingActionStatus =
     | 'invalid';
 
 /**
- * A **Pending Action** — an operational action (a run's trigger, pause, resume, reprocess, drain…) an unattended
+ * A **Pending Action** — an action on a run (trigger, pause, resume, reprocess, drain…) or on an Incident, Case or Alert (comment, ack,
+ * assign, resolve, transition…) an unattended
  * machine agent asked for, held for a person to approve (`GET /pending-actions`). ⛔ Not a Pending Change: that
  * holds config.
  */

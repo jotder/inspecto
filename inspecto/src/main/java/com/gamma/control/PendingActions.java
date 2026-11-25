@@ -35,7 +35,8 @@ import java.util.regex.Pattern;
 
 /**
  * The <b>Pending Action</b> (AGENT-KIT-1 AK-2d, D-AK6, plan {@code 2026-11-20-agent-kit-ak2-plan.md} §6.2 lane B): an
- * operational action a <b>machine</b> agent asked for — a run's trigger, pause, resume, reprocess, drain, … (the
+ * action a <b>machine</b> agent asked for — a run's trigger, pause, resume, reprocess, drain, …, or an Incident's or Case's
+ * comment, Brief, ack, assign, resolve or transition (AK-2e) (the
  * {@link AgentGate.Bucket#ACTION} routes) — held for a person to approve. A person's agent takes those actions at once,
  * within the person's rights (D-AK5); only a machine's are held. The Pending Change machinery, under its own term (a
  * Pending Change stays config only):
