@@ -320,8 +320,9 @@ already exists there, and Q2/Q4 answer the questions an RA or finance lead asks 
   nothing passes Chart.js's option resolver: `afterDataLimits` widens `y` to every marker, bands are shaded behind the
   data, lines drawn over it with their words. Colours from `CHART_TONE` / `CHART_MARKER_LINE` only; the canvas text
   alternative lists every marker (WCAG 1.1.1, 1.4.1).
-- **Deliberately deferred**: the Report PDF (`WidgetChartRenderer`, Java2D) does not draw markers — it already prints a
-  plain snapshot without palette or sort — filed as `REPORT-CHART-MARKERS-1`. Decimation of many markers on long series
+- **Deliberately deferred**: the Report PDF (`WidgetChartRenderer`, Java2D) did not draw markers — filed as
+  `REPORT-CHART-MARKERS-1`, **closed 2026-11-25**: `ChartMarkers` is the contract-tested Java twin
+  (`contracts/chart-markers.contract.json`); see the hub § 4 *Report PDF parity*. Decimation of many markers on long series
   (§10) was not needed: markers are a handful of lines, not series.
 
 ### 11.3 P0 I-14 model output Datasets — as built (2026-11-24)
@@ -362,7 +363,8 @@ already exists there, and Q2/Q4 answer the questions an RA or finance lead asks 
   a forecast label is a gap, never 0. Past 20 series the summary is one refusal per Measure and overlay. Drawn
   through the Chart Markers plugin (D-BI9) as two new resolved kinds — `interval` (filled band + dashed point
   forecast) and `points` (rings) — not as extra Chart.js datasets, so the band is one drawing path with I-2.
-- **Deliberately deferred**: the Report PDF (added to `REPORT-CHART-MARKERS-1`) and the public share viewer (it
+- **Deliberately deferred**: the Report PDF (added to `REPORT-CHART-MARKERS-1`, closed 2026-11-25: the `report` Job
+  sends `overlay` and draws both) and the public share viewer (it
   forwards only `tableSort`) do not ask for overlays; the method is fixed (Holt-Winters, default weights — no
   per-Widget tuning before Insight Profiles, P3); `SeasonalBaseline` has no week-of-year or month slot, so a week /
   month series is scored against all its other buckets; the baseline is the visible range, not a trailing window.

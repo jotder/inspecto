@@ -169,6 +169,23 @@ without a new query; captions say what the forecast is, how it tested, how many 
 is none. The cog dialog offers *Forecast band*, its width (80 / 90 / 95 %), *Anomaly markers* and the starting
 sensitivity. The suffixes are pinned by `contracts/measure-grammar.contract.json` (`overlay`).
 
+**Report PDF parity (`REPORT-CHART-MARKERS-1`, 2026-11-25).** A `report` Job's chart page (`WidgetChartRenderer`,
+Java2D) draws a bar or line Widget's Chart Markers and its forecast band and anomaly markers with the screen's meaning.
+`ChartMarkers` (`platform/inspecto-engine`, `com.gamma.job`) is the server twin of `resolveMarkers`, `kpiBands`,
+`resolveOverlays` and `overlayNote`; both sides are held to one committed file,
+`contracts/chart-markers.contract.json` (`ChartMarkersContractTest`, `chart-markers.contract.spec.ts`), so the same
+markers give the same lines, bands and words. The statistics read every drawn value, or the category totals when
+`stacked`, as on screen. The bound KPI (`options.kpi.kpiId`) is read from the Space's registry only when a marker
+needs it; an unreadable KPI leaves `rag` undrawn and the target on the Widget's own, as after a failed read on screen.
+`ReportWidget` asks for `overlay` exactly as `buildXyQuery` does (a line or bar whose x channel picked a grain), and
+`ReportJob` runs the same `ChartOverlays.apply` over its own masked rows, so masking is unchanged and fewer than two
+seasons gives the reason, not a band. Bands shade behind the data and lines draw over it in the status tones, each
+labelled in words (a line's words at its right end, moved apart when two lines sit close); the overlays' words and
+the caption are listed under the chart. A stacked or sorted chart draws no overlay and says so. Differences kept on
+purpose: the words use the screen's default number wording (grouped, at most two decimals) whatever `options.format`
+says, and a date label reads as the query returns it (`2026-10-21`), not the screen's long date. The KPI tile draws no
+markers, as on screen (`MARKER_VIZ_TYPES`).
+
 **Insight-aware Show-Me (BI-INSIGHTS-1 I-20, 2026-11-25).** While a Widget is built, `suggestOverlays()`
 (`inspecto/viz/show-me.ts`) offers, above the preview, a forecast band when the server detected a seasonal cycle
 over two seasons ("Weekly seasonal pattern found over 112 days of history"), anomaly markers when a point passes the
@@ -246,11 +263,9 @@ there; its relation is validated when it is read, by
 - A comparison grouped by a withheld (`masked:withheld`) key shows equal `average`/`previous` values for rows sharing
   that key: it tells which rows share a key, never the key (open question for the masking owner). `average` is the
   mean over every result row before the row limit, not only the rows shown.
-- Chart Markers are drawn on screen only: the Report PDF (`WidgetChartRenderer`) does not draw them yet
-  (`REPORT-CHART-MARKERS-1` on the board). On a public share a KPI-bound marker draws only when the KPI
+- On a public share a KPI-bound marker draws only when the KPI
   definition is readable; otherwise a `target` line falls back to the Widget's own target and `rag` draws nothing.
-- The forecast band and anomaly markers (I-11, I-7) are drawn on screen only: the Report PDF does not ask for them
-  (`REPORT-CHART-MARKERS-1`), and the public share viewer does not forward `overlay` (it forwards only
+- The public share viewer does not forward `overlay` (it forwards only
   `tableSort`). The anomaly baseline is the result's own buckets, so a narrower date range changes the scores; a
   week or month grain has no seasonal slot in `SeasonalBaseline` (weekday / hour only) and is scored against every
   other bucket. A stacked or value-sorted chart draws neither (a band follows each series' own values in time order)
