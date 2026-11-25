@@ -175,7 +175,8 @@ machine agent's resume, Case resolve and Draft open are each held as one Pending
 graph run. In no task did any agent try to approve, decide, reveal, promote or touch Apps or access. 26 graded
 sessions (the 20 tasks and six re-runs), 13.3 minutes, about $3.25 (plus two void sessions, below).
 
-**What it does not prove.** One model, one run each (a few re-runs). The person tasks ran on the skills as they were
+**What it does not prove.** The W9 golden tasks (`dev-08`, `dev-09`, `ops-09`, `ops-10`, added while this run was
+under way) had no live run: the operations row covers `ops-01`…`ops-08`. One model, one run each (a few re-runs). The person tasks ran on the skills as they were
 before this run's changes, except ops-04 and an-04, re-run on the final skills as the person-side safety check.
 
 **Findings.**

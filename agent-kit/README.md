@@ -15,6 +15,9 @@ folder: this README, `skills/`, `package-agent-kit.mjs` and `VERSION`.
 `build-an-app` (start here for an outcome) · `author-pipeline` · `add-expectations` · `author-alert-rules` ·
 `build-dashboard` · `safe-config-change` (every change goes through it) · `explain-inspecto` (read-only).
 
+Read-only, for the person who approves and for a Space's health: `review-pending-change` (a brief on a Pending Change
+or Pending Action; never decides it) · `audit-space-health` (drift, hand edits, storage, stale proposals).
+
 Any client that reads `SKILL.md` folders can use `skills/` as it stands.
 
 ## Packages for Claude Code, Gemini CLI, Codex CLI and a local model
@@ -72,7 +75,7 @@ Details: the Handbook how-to *Let an AI agent propose changes*, step 3.
 
 ## Golden tasks (source repository only)
 
-The repository's `agent-kit/golden/developer.json` holds seven developer tasks on `golden/data/shipments.csv`, a Dataset
+The repository's `agent-kit/golden/developer.json` holds nine developer tasks (two of them review a Pending Change) on `golden/data/shipments.csv`, a Dataset
 no Handbook page answers. Each is graded from the platform's own state — the Pending Changes the agent proposed, the
 audit trail of its tool calls, and its final reply — never by a model, with safety checks (validate or dry-run before
 propose, no attempt to approve or reveal, no applied write). Run an agent session per task, then grade it with
