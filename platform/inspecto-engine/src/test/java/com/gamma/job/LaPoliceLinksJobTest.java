@@ -3,6 +3,7 @@ package com.gamma.job;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gamma.etl.ConsignmentEventBus;
+import com.gamma.etl.LaCorpus;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.inspector.CollectorProcessor;
 import com.gamma.util.DuckDbUtil;
@@ -61,13 +62,7 @@ class LaPoliceLinksJobTest {
     static void runThePipelinesAndJobs() throws Exception {
         truth = new ObjectMapper().readTree(ROOT.resolve("tools/la-police-ground-truth.json").toFile());
         Path space = tmp.resolve("spaces").resolve("la-police");
-        try (Stream<Path> w = Files.walk(TEMPLATE)) {
-            for (Path p : w.toList()) {
-                Path to = space.resolve(TEMPLATE.relativize(p).toString());
-                if (Files.isDirectory(p)) Files.createDirectories(to);
-                else Files.copy(p, to);
-            }
-        }
+        LaCorpus.install(TEMPLATE, space);
         for (String feed : FEEDS) {
             PipelineConfig pc = PipelineConfig.load(space.resolve("config/police/" + feed + "_pipeline.toon").toString());
             CollectorProcessor.run(pc);
@@ -85,7 +80,7 @@ class LaPoliceLinksJobTest {
     void everyFeedLandsEveryRow() throws Exception {
         for (String feed : FEEDS) {
             long csv;
-            try (Stream<String> lines = Files.lines(TEMPLATE.resolve("data/inbox/" + feed + "/" + feed.toUpperCase() + "_20261031.csv"))) {
+            try (Stream<String> lines = Files.lines(LaCorpus.data(TEMPLATE).resolve("inbox/" + feed + "/" + feed.toUpperCase() + "_20261031.csv"))) {
                 csv = lines.count() - 1;
             }
             long landed = ((Number) rows("SELECT count(*) AS n FROM " + parquet(feed + "/database")).get(0).get("n")).longValue();

@@ -2,6 +2,7 @@ package com.gamma.control;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gamma.etl.LaCorpus;
 import com.gamma.etl.PipelineConfigBatchTest;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewDefinition;
@@ -38,7 +39,7 @@ class ControlApiLaShowcaseGeoSceneTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final Path TPL = Path.of("..", "..", "spaces", "_templates", "la-showcase");
-    private static final Path INBOX = TPL.resolve("data").resolve("inbox");
+    private static final Path INBOX = LaCorpus.data(TPL).resolve("inbox");
     private static final Path VIEWS = TPL.resolve("config").resolve("registry").resolve("geo-map-views");
     private final HttpClient client = HttpClient.newHttpClient();
 
@@ -159,7 +160,7 @@ class ControlApiLaShowcaseGeoSceneTest {
             for (String f : List.of("TRANSFERS_20260901.csv", "TRANSFERS_20260902.csv", "TRANSFERS_20260903.csv", "TRANSFERS_20260904.csv",
                     "TRANSFERS_20260906.csv")) {
                 Path p = Files.exists(INBOX.resolve("mule_transfers").resolve(f)) ? INBOX.resolve("mule_transfers").resolve(f)
-                        : TPL.resolve("data").resolve("staged").resolve("mule_transfers").resolve(f);
+                        : LaCorpus.data(TPL).resolve("staged").resolve("mule_transfers").resolve(f);
                 List<String> lines = Files.readAllLines(p);
                 for (String l : lines.subList(1, lines.size())) {
                     String[] c = l.split(",", -1);

@@ -1,5 +1,6 @@
 package com.gamma.pack;
 
+import com.gamma.etl.LaCorpus;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.inspector.CollectorProcessor;
 import com.gamma.job.JobConfig;
@@ -12,11 +13,9 @@ import com.gamma.risk.RiskScoreModel;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -56,13 +55,7 @@ class LaShowcaseRiskScoreGoldenTest {
 
     private static Path copyTemplate(Path tmp) throws Exception {
         Path space = tmp.resolve("spaces").resolve("la-showcase");
-        try (Stream<Path> w = Files.walk(TEMPLATE)) {
-            for (Path p : w.toList()) {
-                Path to = space.resolve(TEMPLATE.relativize(p).toString());
-                if (Files.isDirectory(p)) Files.createDirectories(to);
-                else Files.copy(p, to);
-            }
-        }
+        LaCorpus.install(TEMPLATE, space);
         return space;
     }
 }
