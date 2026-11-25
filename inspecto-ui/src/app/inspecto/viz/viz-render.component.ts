@@ -245,8 +245,9 @@ export class VizRenderComponent {
             !!this.renderOptions()?.overlay?.anomaly &&
             !!this.overlaySummary()?.length,
     );
-    /** The caption lines: the forecast, its tested accuracy, the flagged count — or why there is none. */
+    /** A band follows each series' own values in time order: a stacked or value-sorted chart has neither. */
     private readonly overlaysHidden = computed(() => !!this.renderOptions()?.stacked || !!this.renderOptions()?.sort);
+    /** The caption lines: the forecast, its tested accuracy, the flagged count — or why there is none. */
     readonly overlayLines = computed<string[]>(() => {
         if (!this.overlaysSupported()) return [];
         if (this.overlaysHidden() && this.overlaySummary()?.length)
