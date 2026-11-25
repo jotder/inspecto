@@ -268,3 +268,8 @@ write_csv("inbox/agent_master", "AGENT_MASTER_20261014.csv",
           ["agent_id", "agent_name", "region", "opened_date", "float_limit"],
           [[a, f"Agent Shop {i:02d}", REGION[i % 5], (datetime(2021, 1, 1) + timedelta(days=rng_m.randint(0, 1500))).strftime("%Y-%m-%d"),
             f"{rng_m.choice([50000, 100000, 250000]):.2f}"] for i, a in enumerate(AGENTS, 1)])
+
+# The staged/ folder explains itself (this file was committed with the corpus until SPACES-CONSOLIDATION-1 P3b; the corpus is generated now).
+STAGED_README = 'STAGED files - NOT ingested. Copy WALLET_TXN_20261015.csv (the clean next day) OR WALLET_TXN_20261017.csv (a gap day: 20261016 is missing) from data/staged/wallet_txn into data/inbox/wallet_txn; the next poll ingests it, then the next mm_links run (every 10 minutes) and index build (five minutes later) pick it up. Trigger the Jobs by hand as manager to skip the wait.\n'
+(ROOT / "staged").mkdir(parents=True, exist_ok=True)
+(ROOT / "staged" / "README.txt").write_bytes(STAGED_README.encode("utf-8"))

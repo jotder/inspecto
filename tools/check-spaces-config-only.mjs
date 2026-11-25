@@ -11,8 +11,9 @@
  * `data/<sink>/` (never in inbox, staged, samples, duckdb or audit; a marker is a `.<name>-output` file), up to 16 KiB each
  * and 256 KiB per Space or Template). That is the design `.gitignore` always had ("data/samples is the one committed exception"), now enforced.
  *
- * Everything else tracked today is a RATCHET, not an exemption: `tools/spaces-config-only.baseline.json` lists each folder
- * that still holds some (the generated Link Analysis corpora), with its file and byte count and why. The guard fails when
+ * Anything else tracked is a RATCHET, not an exemption: `tools/spaces-config-only.baseline.json` lists each folder that still
+ * holds some, with its file and byte count and why (empty since P3b, when the generated Link Analysis corpora left). The
+ * guard fails when
  *   - NEW      a tracked data file lies outside every baseline folder (data is entering the repository);
  *   - GROWN    a baseline folder holds more files or bytes than recorded;
  *   - SHRUNK   it holds fewer — lower the baseline in the same change, so the debt can only go down;

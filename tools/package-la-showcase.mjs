@@ -34,14 +34,41 @@
 //   --out          output directory (default: the repository root)
 
 import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stampIndexBuildOwner } from './seed-la-showcase.mjs';
+import { GENERATORS, seed } from './seed-space-data.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const TEMPLATES = 'spaces/_templates';
+
+/** SPACES-CONSOLIDATION-1 P3b: a Template's corpus is no longer committed, so the data download is built from its own
+ *  generator (tools/seed-space-data.mjs) into a scratch folder: {root, files: ['data/inbox/<feed>/<file>', ...]}, or null. */
+const generated = new Map();
+function generatedData(tpl) {
+  if (!GENERATORS[tpl]) return null;
+  if (!generated.has(tpl)) {
+    const root = mkdtempSync(join(tmpdir(), `la-gen-${tpl}-`));
+    seed(tpl, join(root, 'data'));
+    const files = [];
+    (function walk(d) {
+      for (const e of readdirSync(d, { withFileTypes: true })) {
+        const p = join(d, e.name);
+        if (e.isDirectory()) walk(p); else files.push(relative(root, p).split(sep).join('/'));
+      }
+    })(join(root, 'data'));
+    generated.set(tpl, { root, files });
+  }
+  return generated.get(tpl);
+}
+process.on('exit', () => { for (const g of generated.values()) rmSync(g.root, { recursive: true, force: true }); });
+const generatedBytes = (tpl, rel) => {
+  const g = rel.startsWith('data/') && generatedData(tpl);
+  return g && g.files.includes(rel) ? readFileSync(join(g.root, rel)) : null;
+};
 const INDUSTRIES = 'spaces/_industries';
 
 function git(args, opts = {}) {
@@ -275,15 +302,24 @@ function main() {
   const opts = parseArgs(process.argv.slice(2));
   const version = opts.version || reactorVersion();
   const minProduct = opts.minProduct || version.split(/[-+]/)[0];
-  const listed = (dir) => git(['ls-tree', '-r', '--name-only', 'HEAD', `${dir}/`], { encoding: 'utf8' })
+  const tracked = (dir) => git(['ls-tree', '-r', '--name-only', 'HEAD', `${dir}/`], { encoding: 'utf8' })
     .split('\n').filter(Boolean).map((p) => p.slice(dir.length + 1));
+  // a Template's committed files plus its generated data/ (P3b)
+  const listed = (dir) => {
+    const files = tracked(dir);
+    const g = dir.startsWith(`${TEMPLATES}/`) ? generatedData(dir.slice(TEMPLATES.length + 1)) : null;
+    return g ? [...new Set([...files, ...g.files])] : files;
+  };
   const recipePath = `${INDUSTRIES}/${opts.id}.toon`;
   let files, show, templateToon;
   if (git(['ls-tree', '--name-only', 'HEAD', recipePath], { encoding: 'utf8' }).trim()) {
     // An industry Space: compose it from the use-case templates its recipe names.
     const recipe = git(['show', `HEAD:${recipePath}`], { encoding: 'utf8' });
     const byTemplate = recipeUseCases(recipe).map((tpl) => ({ tpl, files: listed(`${TEMPLATES}/${tpl}`) }));
-    const blob = (t, rel) => git(['rev-parse', `HEAD:${TEMPLATES}/${t}/${rel}`], { encoding: 'utf8' }).trim();
+    const blob = (t, rel) => {
+      const bytes = generatedBytes(t, rel);
+      return bytes ? createHash('sha1').update(bytes).digest('hex') : git(['rev-parse', `HEAD:${TEMPLATES}/${t}/${rel}`], { encoding: 'utf8' }).trim();
+    };
     const owner = composeSources(byTemplate, (rel, a, b) => blob(a, rel) === blob(b, rel));
     files = [...owner.keys()];
     templateToon = recipe;
@@ -292,7 +328,7 @@ function main() {
     // user id and role name (mergeDemoUsers, mergeRoles).
     const text = (t, rel) => git(['show', `HEAD:${TEMPLATES}/${t}/${rel}`], { encoding: 'utf8' });
     show = (rel) => {
-      if (!isJoined(rel)) return git(['show', `HEAD:${TEMPLATES}/${owner.get(rel)}/${rel}`]);
+      if (!isJoined(rel)) return generatedBytes(owner.get(rel), rel) ?? git(['show', `HEAD:${TEMPLATES}/${owner.get(rel)}/${rel}`]);
       const from = owner.get(rel);
       if (from.length === 1) return git(['show', `HEAD:${TEMPLATES}/${from[0]}/${rel}`]);
       const texts = from.map((t) => text(t, rel));
@@ -303,7 +339,7 @@ function main() {
     const tplDir = `${TEMPLATES}/${opts.id}`;
     files = listed(tplDir);
     if (!files.includes('template.toon')) throw new Error(`no committed ${tplDir}/template.toon or ${recipePath} - not a Space template`);
-    show = (rel) => git(['show', `HEAD:${tplDir}/${rel}`]);
+    show = (rel) => generatedBytes(opts.id, rel) ?? git(['show', `HEAD:${tplDir}/${rel}`]);
     templateToon = show('template.toon').toString('utf8');
   }
   const p = plan(opts.id, files);

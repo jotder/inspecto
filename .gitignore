@@ -93,6 +93,10 @@
 /spaces/*/config/audit/
 # The Link Analysis index (parquet, written by the engine) sits in a Space's config folder but is data (SPACES-CONSOLIDATION-1, D-SC9).
 /spaces/*/config/la-index/
+# A Space Template's generated corpus (inbox/ and staged/) is produced on implementation by its generator, never committed
+# (tools/seed-space-data.mjs, SPACES-CONSOLIDATION-1 P3b); a Template's data/samples and sink seeds stay tracked.
+/spaces/_templates/*/data/inbox/
+/spaces/_templates/*/data/staged/
 # Maker-checker (ASSURE-MAKER-CHECKER-1): Pending Changes are runtime proposals, and a Space's Pending Change key
 # lives OUTSIDE its config tree in the sibling <space>/config.secrets/ — neither is ever committed.
 /spaces/*/config/pending-changes/

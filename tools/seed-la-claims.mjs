@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stampIndexBuildOwner } from './seed-la-showcase.mjs';
+import { seedData } from './space-data.mjs';
 
 export const INV = 'ring-case';
 export const DATASET = 'claims_links_dataset';
@@ -211,7 +212,7 @@ export function scaffold(spacesRoot, templatesDir = path.join(here, '..', 'space
   if (!fs.existsSync(base)) {
     for (const sub of ['config', 'data', 'audit', 'duckdb']) fs.mkdirSync(path.join(base, sub), { recursive: true });
     copy(path.join(templatesDir, SPACE, 'config'), path.join(base, 'config'), SPACE);
-    copy(path.join(templatesDir, SPACE, 'data'), path.join(base, 'data'), null);
+    seedData(SPACE, path.join(base, 'data'), templatesDir);
     fs.writeFileSync(path.join(base, 'space.toon'), `display_name: Claims\ndescription: Scaffolded from the ${SPACE} Space Template\ncreated_at: ${new Date().toISOString()}\nadmission: closed\n`);
     made.push(SPACE);
   }
