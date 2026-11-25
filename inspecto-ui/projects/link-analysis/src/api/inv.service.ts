@@ -530,8 +530,9 @@ export interface WorkingSetSummary {
 }
 
 export interface InvestigationStepResult {
-    /** D-U7: `pending` = a sensitive expand was HELD for four-eyes approval — nothing ran, no step, no delta. */
-    status?: 'pending';
+    /** D-U7: `pending` = a sensitive expand was HELD for four-eyes approval — nothing ran, no step, no delta.
+     *  `no_op` = an expand found no new entity, link, or hub, so no step was recorded. */
+    status?: 'pending' | 'no_op';
     pending?: { id: string; sensitivity?: { exceeded?: string[] } };
     step: number;
     op: InvestigationOpName | 'undo';

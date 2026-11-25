@@ -9,6 +9,12 @@
             <button mat-icon-button (click)="load()" matTooltip="Refresh" aria-label="Refresh">
                 <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
             </button>
+            @if (!unavailable() && lens.canAuthorWorkbench()) {
+                <button mat-flat-button color="primary" (click)="create()">
+                    <mat-icon svgIcon="heroicons_outline:plus"></mat-icon>
+                    <span class="ml-2">New collector</span>
+                </button>
+            }
         </ng-container>
     </inspecto-page-header>
 

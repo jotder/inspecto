@@ -857,10 +857,10 @@ public final class AlertService {
         lastFired.remove(cooldownKey);   // not merely ignored - the next breach must fire at once
         String message = String.format(Locale.ROOT,
                 rule.eventDateColumn() != null
-                        ? "CLEARED: dataset %s holds events as of %ds ago, within its %s event-date freshness limit"
+                        ? "CLEARED: Dataset %s holds events as of %ds ago, within its %s event-date freshness limit"
                         : rule.indexLag()
-                        ? "CLEARED: dataset %s has no File waiting for the Link Analysis index (last checked wait %ds, limit %s)"
-                        : "CLEARED: dataset %s published %ds ago, within its %s freshness limit",
+                        ? "CLEARED: Dataset %s has no File waiting for the Link Analysis index (last checked wait %ds, limit %s)"
+                        : "CLEARED: Dataset %s published %ds ago, within its %s freshness limit",
                 textScope(rule, scope), ageMs / 1000, rule.maximumAge());
         log.info("[ALERT-CLEARED] {}", message);
         Event cleared = Event.builder(EventType.ALERT_CLEARED)

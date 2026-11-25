@@ -44,6 +44,14 @@ class McpToolRoutesTest {
                     calls.add(t.router().route(t.validate(new LinkedHashMap<>(Map.of("run", "orders", "action", action)))));
                 continue;
             }
+            if (t.name().equals("work_incident_or_case") || t.name().equals("work_alert")) {   // AK-2e: every move
+                for (String action : t.name().equals("work_alert") ? McpTools.ALERT_MOVES : McpTools.CASE_MOVES) {
+                    Map<String, Object> a = sample(t);
+                    a.put("action", action);
+                    calls.add(t.router().route(t.validate(a)));
+                }
+                continue;
+            }
             if (!t.name().equals("propose_change")) {
                 calls.add(t.router().route(t.validate(sample(t))));
                 continue;
@@ -105,6 +113,24 @@ class McpToolRoutesTest {
                     "an operations tool replays a canOperateRuns route: " + route);
         }
         assertEquals(8, McpTools.RUN_ACTIONS.size(), "the eight run actions of plan §4.6");
+    }
+
+    /** The host's case action routes ({@code AgentGate.CASE_ACTIONS}, pinned there by {@code AgentGateParityTest}). */
+    private static final List<String> CASE_ACTION_ROUTES = List.of(
+            "/objects/[^/]+/comments", "/incidents/[^/]+/briefs", "/objects/[^/]+/ack", "/objects/[^/]+/assign",
+            "/objects/[^/]+/resolve", "/objects/[^/]+/transition", "/alerts/[^/]+/ack", "/alerts/[^/]+/resolve",
+            "/cases/from-entities");
+
+    @Test
+    void everyCaseToolReplaysACaseActionAndEveryCaseActionHasATool() {
+        java.util.Set<String> reached = new java.util.TreeSet<>();
+        for (McpTools.Tool t : McpTools.CASE_TOOLS) assertTrue(t.write(), t.name() + " acts, so it is a write tool");
+        for (McpTools.Call c : everyCall())
+            if ("POST".equals(c.method()))
+                for (String route : CASE_ACTION_ROUTES) if (c.path().matches(route)) reached.add(route);
+        assertEquals(new java.util.TreeSet<>(CASE_ACTION_ROUTES), reached, "AK-2e: a tool for every case action of plan §4.6");
+        assertEquals(List.of("add_comment", "build_incident_brief", "work_incident_or_case", "work_alert",
+                "open_case_from_entities"), McpTools.CASE_TOOLS.stream().map(McpTools.Tool::name).toList());
     }
 
     @Test

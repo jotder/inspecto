@@ -12,6 +12,7 @@ import {
     RunsService,
     CollectorView,
     CollectorsService,
+    LensService,
 } from 'app/inspecto/api';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { ToastrService } from 'ngx-toastr';
@@ -21,6 +22,7 @@ import { DataTableComponent } from 'app/inspecto/data-table';
 import { InspectoRowAction } from 'app/inspecto/grid';
 import { fmtBytes, fmtInt } from 'app/inspecto/format';
 import { CHART_SERIES } from 'app/inspecto/theme/chart-tokens';
+import { CollectorCreateDialog, CollectorCreateResult } from './collector-create.dialog';
 import { CollectorDetailDialog } from './collector-detail.dialog';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
@@ -54,6 +56,7 @@ interface MetricCard {
     encapsulation: ViewEncapsulation.None,
 })
 export class CollectorsComponent implements OnInit {
+    protected readonly lens = inject(LensService);
     private api = inject(CollectorsService);
     private metricsApi = inject(AcquisitionMetricsService);
     private runs = inject(RunsService);
@@ -204,5 +207,19 @@ export class CollectorsComponent implements OnInit {
             width: '680px',
             maxHeight: '85vh',
         });
+    }
+
+    create(): void {
+        if (!this.lens.canAuthorWorkbench()) return;
+        this.dialog
+            .open<CollectorCreateDialog, unknown, CollectorCreateResult>(CollectorCreateDialog, {
+                width: '720px',
+                maxWidth: '95vw',
+                disableClose: true,
+            })
+            .afterClosed()
+            .subscribe((res) => {
+                if (res?.created) this.load();
+            });
     }
 }

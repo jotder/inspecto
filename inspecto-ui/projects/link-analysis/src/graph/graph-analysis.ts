@@ -295,7 +295,7 @@ export const compareCanonicalV1 = (a: { id: string; label: string }, b: { id: st
 
 function scored(g: G6GraphData, score: Map<string, number>): NodeScore[] {
     return g.nodes
-        .map((n) => ({ id: n.id, label: n.data.label, score: score.get(n.id) ?? 0 }))
+        .map((n) => ({ id: n.id, label: n.data.hoverLabel ?? n.data.label, score: score.get(n.id) ?? 0 }))
         .sort((a, b) => b.score - a.score || compareCanonicalV1(a, b));
 }
 

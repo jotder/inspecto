@@ -310,6 +310,11 @@ public final class CapabilityManifest {
             new Entry("POST", "/jobs/([^/]+)/reschedule", Roles.CAN_AUTHOR_WORKBENCH),
             new Entry("POST", "/jobs/([^/]+)/trigger", Roles.CAN_OPERATE_RUNS),
             new Entry("POST", "/jobs/runs/([^/]+)/replay", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/jobs/([^/]+)/backlog/drain", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/jobs/([^/]+)/backlog/pause", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/jobs/([^/]+)/backlog/resume", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/jobs/([^/]+)/backlog/days/([^/]+)/run", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/jobs/([^/]+)/backlog/days/([^/]+)/give-up", Roles.CAN_OPERATE_RUNS),
             // NavRoutes
             new Entry("PUT", "/nav/menus", Roles.CAN_CURATE_MENUS),
             // NotificationRoutes
@@ -382,6 +387,7 @@ public final class CapabilityManifest {
             // *_flow.toon authoring writes (POST/PUT authored, /nodes, /edges) retired. DELETE + the
             // ad-hoc trigger stay for grandfathered flows.
             new Entry("PUT", "/pipelines/([^/]+)/graph", Roles.CAN_AUTHOR_WORKBENCH),
+            new Entry("POST", "/pipelines/([^/]+)/split-job-pipeline", Roles.CAN_AUTHOR_WORKBENCH),
             // PipelineBundleRoutes — TRANSFER-ARCH-1: the selective-bundle import writes config
             // (the export half is a read and carries no gate, like /bundle/export).
             new Entry("POST", "/pipelines/import", Roles.CAN_AUTHOR_WORKBENCH),
@@ -497,6 +503,7 @@ public final class CapabilityManifest {
             new Entry("POST", "/runs/([^/]+)/replay-rejects", Roles.CAN_OPERATE_RUNS),
             new Entry("POST", "/runs/([^/]+)/retries/retry-now", Roles.CAN_OPERATE_RUNS),
             new Entry("POST", "/runs/([^/]+)/retries/cancel", Roles.CAN_OPERATE_RUNS),
+            new Entry("POST", "/runs/([^/]+)/quarantine/release", Roles.CAN_OPERATE_RUNS),
             new Entry("POST", "/runs/([^/]+)/drain", Roles.CAN_OPERATE_RUNS),
             new Entry("POST", "/trigger", Roles.CAN_OPERATE_RUNS),
             // SettingsRoutes
@@ -601,6 +608,7 @@ public final class CapabilityManifest {
             new Exemption("POST", "/components/transform/describe", "read-shaped", "describes a draft's derived shape"),
             new Exemption("POST", "/components/sql/ast", "read-shaped", "parses author SQL into DuckDB's read-only tree; nothing binds or executes"),
             new Exemption("POST", "/validate", "read-shaped", "validates a config draft, writes nothing"),
+            new Exemption("POST", "/pipelines/([^/]+)/graph/validate", "read-shaped", "validates a pipeline graph draft, writes nothing"),
             new Exemption("POST", "/config/preview/parsing", "read-shaped", "previews parsing of a draft"),
             new Exemption("POST", "/config/preview/schema", "read-shaped", "previews a derived schema"),
             new Exemption("POST", "/config/suggest/schema", "read-shaped", "suggests a schema from a sample"),

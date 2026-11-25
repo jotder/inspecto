@@ -148,6 +148,12 @@
                         <mat-icon svgIcon="heroicons_outline:clock"></mat-icon>
                         <span>History&hellip;</span>
                     </button>
+                    @if (hasOutputStore()) {
+                        <button mat-menu-item (click)="splitIntoJobPipeline()">
+                            <mat-icon svgIcon="heroicons_outline:scissors"></mat-icon>
+                            <span>Split into Job Pipeline&hellip;</span>
+                        </button>
+                    }
                     <button mat-menu-item (click)="saveAsTemplate()">
                         <mat-icon svgIcon="heroicons_outline:document-duplicate"></mat-icon>
                         <span>Save as template&hellip;</span>
@@ -772,8 +778,10 @@
                                             [enrichmentHost]="dn.type === 'enrichment' ? enrichmentHost() : undefined"
                                             [sampleRows]="sampleThread()?.parsedRows()"
                                             [readOnly]="!canAuthor()"
+                                            [hasReferenceEdge]="hasReferenceEdge(dn.id)"
                                             (applied)="onDefinitionApplied($event)"
                                             (dirtyChange)="definitionDirty.set($event)"
+                                            (addAnotherLookup)="addAnotherLookup(dn.id)"
                                         />
                                     }
                                 </inspecto-definition-drawer>

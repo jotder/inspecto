@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-484 test class(es): 195 unit, 289 real-HTTP control-plane, 0 IT.
+487 test class(es): 195 unit, 292 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -84,6 +84,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiAuditTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAuditTest.java` | Integration tests for the security audit trail emitted centrally from {@link ControlApi#dispatch}: |
 | `ControlApiAuthSessionV1Test` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAuthSessionV1Test.java` | Real-HTTP tests for the W6d backend-mediated session routes ({@code /auth/*}): code exchange sets |
 | `ControlApiAuthV1Test` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiAuthV1Test.java` | Real-HTTP tests for W6's AuthN/AuthZ gate in {@link ControlApi#dispatch}. The core ships no |
+| `ControlApiBacklogSplitGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBacklogSplitGateTest.java` | Real-HTTP gate tests for the Job backlog routes ({@code POST /jobs/{id}/backlog/drain\|pause\|resume}, |
 | `ControlApiBasicProfileGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBasicProfileGateTest.java` | {@code BASIC-ELT-PROFILE-1} Gate over real HTTP: every Basic entry point ({@link BasicProfile.Entry}) is driven on a Basic and |
 | `ControlApiBiCompareTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBiCompareTest.java` | BI-INSIGHTS-1 I-1 over real HTTP and DuckDB, under an ARMED authenticator: {@code POST /bi/query} with {@code compare} |
 | `ControlApiBiMaskingReviewTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiBiMaskingReviewTest.java` | BI-QUERY-MASKING-1 security review (2026-10-23; {@code docs/archived-documents/plans-archive/bi-query-masking-design.md} section 12): one test per |
@@ -257,6 +258,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiProblemFilesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiProblemFilesTest.java` | Real-HTTP tests for {@code GET /status/problem-files} — the cross-pipeline, file-grain companion to |
 | `ControlApiProvenanceTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiProvenanceTest.java` | The data-plane provenance query routes (T22) over real HTTP: param validation and the default-off gate. |
 | `ControlApiPublicationTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiPublicationTest.java` | ASSURE-BI-PUBLICATION-1 (operator 2026-09-29): the per-Space publication destination allowlist, and the |
+| `ControlApiQuarantineReleaseTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiQuarantineReleaseTest.java` | {@code GET /runs/{name}/quarantine} metadata enrichment and |
 | `ControlApiQueryRunAccessTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiQueryRunAccessTest.java` | {@code POST /queries/{id}/run} honours component access (R3) under an ARMED authenticator: a query |
 | `ControlApiQueryRunV1Test` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiQueryRunV1Test.java` | Real-HTTP + real-DuckDB tests for W4 query execution ({@code POST /queries/{id}/run}): a persisted |
 | `ControlApiRateLimitTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRateLimitTest.java` | Real-HTTP tests for the per-subject token-bucket throttle on the expensive routes |
@@ -326,6 +328,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ImportCapabilityGuardTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ImportCapabilityGuardTest.java` | {@link ImportCapabilityGuard} is COMPLETE against {@link CapabilityManifest}: for every writable kind, every declared |
 | `ImportRowFilterHugeExponentTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ImportRowFilterHugeExponentTest.java` | A decimal filter value with a huge exponent is refused before {@code BigDecimal.toPlainString} expands it into |
 | `IndexBuildOwnerRunAuthorityTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/IndexBuildOwnerRunAuthorityTest.java` | T5 residuals (a)+(b): the RUN path refuses an la.index.build Job whose owner is not its last editor, unless that |
+| `JobGraphRoutesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/JobGraphRoutesTest.java` | Backend routes for JOB-GRAPH-1: |
 | `JobWritersTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/JobWritersTest.java` | ASSURE-XLSX-ATTACHMENTS-1 re-verification finding 2: <b>every route that can write a {@code job} passes |
 | `KpiCompletenessWidgetTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/KpiCompletenessWidgetTest.java` | The completeness tile (§8-D, operator 2026-10-09: Signals behind a Dataset). The shipped {@code telco-ra} Space |
 | `KpiSnapshotJobTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/KpiSnapshotJobTest.java` | {@code kpi.snapshot} (`BI-INSIGHTS-1` P0, I-3) run by a real JobService: it is registered through ServiceLoader, |

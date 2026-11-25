@@ -319,6 +319,28 @@ describe('PipelineCollectionDefinitionComponent', () => {
         expect(fixture.componentInstance.dirty).toBe(false);
     });
 
+    /**
+     * PIPELINE-INBOX-FIELD-1: the Pipeline editor's Collector pane exposes `dirs.poll` as the
+     * Inbox folder field, seeded from `node.config.poll` and written back on Apply.
+     */
+    it('renders and round-trips the Inbox folder (dirs.poll) field', async () => {
+        const fixture = await create({
+            id: 'acq',
+            type: 'acquisition',
+            config: { poll: 'data/inbox/orders' },
+        });
+        const row = (fixture.nativeElement as HTMLElement).querySelector('.sf-row[data-key="poll"]');
+        expect(row).not.toBeNull();
+        expect(row!.textContent).toContain('Inbox folder');
+        expect(form(fixture).form.getRawValue()['poll']).toBe('data/inbox/orders');
+
+        form(fixture).form.patchValue({ poll: 'data/inbox/orders_v2' });
+        pane(fixture).submit();
+
+        const config = fixture.componentInstance.applied!.config as Record<string, unknown>;
+        expect(config['poll']).toBe('data/inbox/orders_v2');
+    });
+
     it('has no a11y violations', async () => {
         const fixture = await create({ id: 'acq', type: 'acquisition' });
         await expectNoA11yViolations(fixture.nativeElement);

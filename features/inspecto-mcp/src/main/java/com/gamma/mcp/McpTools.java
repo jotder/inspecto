@@ -417,7 +417,7 @@ final class McpTools {
                     a -> withReason(new Call("POST", "/jobs/runs/" + seg(a.get("runId")) + "/replay", McpRoutes.jsonBytes(Map.of())), a),
                     true),
             new Tool("list_pending_actions", "List Pending Actions",
-                    "The Pending Actions of this Space (a machine agent's held run actions), newest first; optionally only "
+                    "The Pending Actions of this Space (a machine agent's held run and Case actions), newest first; optionally only "
                             + "those in one status (pending, approved, declined, withdrawn, expired, stale, failed).",
                     List.of(text("status", "Only Pending Actions in this status.")),
                     a -> new Call("GET", "/pending-actions" + query(a, "status", "status"), null)),
@@ -436,6 +436,55 @@ final class McpTools {
         return withReason(new Call("POST", "/runs/" + seg(a.get("run")) + "/" + route, bodyOf(a)), a);
     }
 
+    /** {@code work_incident_or_case}'s actions → the route tail each replays (every one in {@code AgentGate.CASE_ACTIONS}). */
+    static final List<String> CASE_MOVES = List.of("ack", "assign", "resolve", "transition");
+
+    /** {@code work_alert}'s actions → the route tail each replays. */
+    static final List<String> ALERT_MOVES = List.of("ack", "resolve");
+
+    private static final String CASE_HELD_FOR_A_MACHINE = " Signed in as a person, it runs at once within that person's own "
+            + "rights; as an unattended machine agent it is held as a Pending Action for a person to approve.";
+
+    /** AK-2e: the Incident and Case analyst's actions (plan §4.6 analyst rows, operator 2026-11-25). */
+    static final List<Tool> CASE_TOOLS = List.of(
+            new Tool("add_comment", "Comment on an Incident or Case",
+                    "Add a comment to an Incident's or Case's thread, as the one signed in." + CASE_HELD_FOR_A_MACHINE,
+                    List.of(id("id", "The Incident or Case id."), new Arg("comment", Kind.TEXT, true, "The comment."),
+                            text("reason", "Why — shown to the approver when it is held.")),
+                    a -> withReason(new Call("POST", "/objects/" + seg(a.get("id")) + "/comments",
+                            McpRoutes.jsonBytes(Map.of("body", a.get("comment")))), a), true),
+            new Tool("build_incident_brief", "Build an Incident Brief",
+                    "Investigate an Incident: build and save a Brief (its evidence, similar Incidents, value at risk), and "
+                            + "optionally file its proposed next step as a pending Action Request — which a person other "
+                            + "than the one who asked must approve. Needs canWorkIncidents." + CASE_HELD_FOR_A_MACHINE,
+                    List.of(id("incident", "The Incident id."),
+                            body("Optional: {\"propose\": {connection, method, payloadTemplate, reason}} to file the next step.", false),
+                            text("reason", "Why — shown to the approver when it is held.")),
+                    a -> withReason(new Call("POST", "/incidents/" + seg(a.get("incident")) + "/briefs", bodyOf(a)), a), true),
+            new Tool("work_incident_or_case", "Work an Incident or Case",
+                    "Acknowledge, assign, resolve or move an Incident or Case through its Workflow. Needs canWorkIncidents."
+                            + CASE_HELD_FOR_A_MACHINE + " Read it first (get_incident).",
+                    List.of(id("id", "The Incident or Case id."),
+                            new Arg("action", Kind.ENUM, true, "What to do.", CASE_MOVES),
+                            body("The action's body: assign {assignee}; resolve {disposition} (an Incident needs one); "
+                                    + "transition {action} or {status}, with {disposition} for an Incident's resolve.", false),
+                            text("reason", "Why — on the audit row, and shown to the approver when it is held.")),
+                    a -> withReason(new Call("POST", "/objects/" + seg(a.get("id")) + "/" + a.get("action"), bodyOf(a)), a),
+                    true),
+            new Tool("work_alert", "Acknowledge or resolve an Alert",
+                    "Acknowledge or resolve one fired Alert. Needs canWorkIncidents." + CASE_HELD_FOR_A_MACHINE,
+                    List.of(id("alert", "The Alert id."), new Arg("action", Kind.ENUM, true, "What to do.", ALERT_MOVES),
+                            text("reason", "Why — on the audit row, and shown to the approver when it is held.")),
+                    a -> withReason(new Call("POST", "/alerts/" + seg(a.get("alert")) + "/" + a.get("action"),
+                            McpRoutes.jsonBytes(Map.of())), a), true),
+            new Tool("open_case_from_entities", "Open a Case from entities",
+                    "Open a Case over the entities (and existing Incidents) an investigation found. Needs "
+                            + "canManageIncidents, so only a person's agent can — an unattended machine agent never may.",
+                    List.of(body("{title, description?, entities: [{id, dataset, label} or {objectId}]} — at most the "
+                            + "server's entity cap.", true),
+                            text("reason", "Why — on the audit row.")),
+                    a -> withReason(new Call("POST", "/cases/from-entities", bodyOf(a)), a), true));
+
     /** The call with the {@code reason} argument carried as {@code X-Change-Reason}, checked as {@link #proposeChange} checks it. */
     private static Call withReason(Call c, Map<String, Object> a) {
         if (!(a.get("reason") instanceof String reason)) return c;
@@ -444,12 +493,13 @@ final class McpTools {
         return new Call(c.method(), c.path(), c.body(), Map.of("X-Change-Reason", reason));
     }
 
-    /** Every tool: AK-1's reads, then AK-2b's, then AK-2d's. */
+    /** Every tool: AK-1's reads, then AK-2b's, then AK-2d's, then AK-2e's. */
     static final List<Tool> ALL_TOOLS;
     static {
         List<Tool> all = new ArrayList<>(TOOLS);
         all.addAll(WRITE_TOOLS);
         all.addAll(OPERATIONS_TOOLS);
+        all.addAll(CASE_TOOLS);
         ALL_TOOLS = List.copyOf(all);
     }
 

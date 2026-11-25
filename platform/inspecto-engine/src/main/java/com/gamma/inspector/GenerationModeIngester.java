@@ -59,6 +59,7 @@ final class GenerationModeIngester {
                     String stem = ConsignmentIngestStrategy.memberStem(cfg, m.file());
                     MemberAudit collided = ConsignmentIngestStrategy.claimOutputStem(stems, m, stem, cfg, mStart);
                     if (collided != null) { memberAudits.add(collided); continue; }
+                    stem = ConsignmentIngestStrategy.nonCollidingBaseName(stem, batch, cfg, databaseDir(batch, cfg));
                     // lineageName: the ENTRY name for an unpack-expanded archive member, the plain
                     // filename otherwise — the temp name is workspace bookkeeping, never DATA.
                     try (DuckDbRecordSink sink = new DuckDbRecordSink(

@@ -50,7 +50,7 @@ const LANDED_END = '2026-09-30 23:59:59';
 const wallets = feed('wallet');
 const wallet = Object.fromEntries(wallets.map((w) => [w.wallet_id, w]));
 const byMsisdn = Object.fromEntries(wallets.map((w) => [w.msisdn, w]));
-const txns = feed('wallet_txn');
+const txns = feed('mfs_wallet_txn');
 const landed = txns.filter((t) => t.txn_at <= LANDED_END);
 const sims = feed('sim_event');
 const logins = feed('device_login');
@@ -71,7 +71,7 @@ for (const l of logins) {
 test('generator twice = the committed bytes; seven feeds; under 12 MB', { skip: !python }, () => {
   const before = snapshot();
   const feeds = new Set(Object.keys(before).filter((k) => k.includes('/data/')).map((k) => k.split('/').at(-2)));
-  assert.deepEqual([...feeds].sort(), ['agent', 'agent_commission', 'device_login', 'merchant', 'sim_event', 'wallet', 'wallet_txn']);
+  assert.deepEqual([...feeds].sort(), ['agent', 'agent_commission', 'device_login', 'merchant', 'mfs_wallet_txn', 'sim_event', 'wallet']);
   assert.ok(files().reduce((n, f) => n + statSync(f).size, 0) < 12_000_000, 'the corpus is under 12 MB');
   for (let i = 0; i < 2; i++) {
     assert.equal(spawnSync(python, [join(ROOT, 'tools', 'gen-la-mfs-data.py')], { encoding: 'utf8' }).status, 0);
@@ -85,15 +85,15 @@ test('the corpus: 8 000 wallets, 300 agents, 400 merchants, October 2026 staged,
   assert.equal(feed('wallet', '/inbox').length, c.wallet_landed);
   assert.equal(feed('agent').length, 300);
   assert.equal(feed('merchant').length, 400);
-  assert.equal(feed('wallet_txn', '/inbox').length, c.wallet_txn_landed);
+  assert.equal(feed('mfs_wallet_txn', '/inbox').length, c.wallet_txn_landed);
   assert.equal(feed('sim_event', '/inbox').length, c.sim_event_landed);
   assert.equal(feed('device_login', '/inbox').length, c.device_login_landed);
   assert.equal(feed('agent_commission', '/inbox').length, c.agent_commission_landed);
-  for (const f of ['wallet_txn', 'sim_event', 'device_login', 'agent_commission'])
+  for (const f of ['mfs_wallet_txn', 'sim_event', 'device_login', 'agent_commission'])
     assert.equal(files().filter((p) => p.replaceAll('\\', '/').includes(`/inbox/${f}/`)).length, 12, `twelve monthly ${f} files`);
   assert.ok(feed('wallet', '/staged').every((w) => w.opened_at.startsWith('2026-10')), 'the staged wallets are October openings');
-  assert.ok(feed('wallet_txn', '/staged').every((t) => t.txn_at.startsWith('2026-10')));
-  assert.ok(feed('wallet_txn', '/inbox').every((t) => t.txn_at <= LANDED_END));
+  assert.ok(feed('mfs_wallet_txn', '/staged').every((t) => t.txn_at.startsWith('2026-10')));
+  assert.ok(feed('mfs_wallet_txn', '/inbox').every((t) => t.txn_at <= LANDED_END));
   assert.ok(wallets.every((w) => /^9997\d{7}$/.test(w.msisdn)), '+999 MSISDNs');
   assert.equal(new Set(wallets.map((w) => w.msisdn)).size, wallets.length);
   assert.equal(new Set(txns.map((t) => t.txn_id)).size, txns.length);

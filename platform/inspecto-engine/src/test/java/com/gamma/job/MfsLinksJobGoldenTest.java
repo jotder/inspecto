@@ -47,7 +47,7 @@ class MfsLinksJobGoldenTest {
 
     private static final Path REPO = Path.of("..", "..").toAbsolutePath().normalize();
     private static final Path TEMPLATE = REPO.resolve("spaces/_templates/la-mfs");
-    private static final List<String> FEEDS = List.of("agent", "merchant", "wallet", "wallet_txn", "sim_event", "device_login", "agent_commission");
+    private static final List<String> FEEDS = List.of("agent", "merchant", "wallet", "mfs_wallet_txn", "sim_event", "device_login", "agent_commission");
     // the link Job, its derived screens and the Advanced tier's counts Job (both derived Jobs fire on mfs_links' produced signal)
     private static final List<String> JOBS = List.of("mfs_links", "mfs_screen_links", "mfs_swap_drain_counts");
 
@@ -194,8 +194,8 @@ class MfsLinksJobGoldenTest {
             }
             assertEquals(csv, count("SELECT count(*) FROM " + parquet(feed + "/database", "/**/*.parquet")), feed);
         }
-        assertEquals(truth.get("counts").get("wallet_txn_landed").asLong(), count("SELECT count(*) FROM " + parquet("wallet_txn/database", "/**/*.parquet")));
-        assertEquals(0, count("SELECT count(*) FROM " + parquet("wallet_txn/database", "/**/*.parquet") + " WHERE CAST(txn_at AS DATE) >= DATE '2026-10-01'"));
+        assertEquals(truth.get("counts").get("wallet_txn_landed").asLong(), count("SELECT count(*) FROM " + parquet("mfs_wallet_txn/database", "/**/*.parquet")));
+        assertEquals(0, count("SELECT count(*) FROM " + parquet("mfs_wallet_txn/database", "/**/*.parquet") + " WHERE CAST(txn_at AS DATE) >= DATE '2026-10-01'"));
         assertEquals(0, count("SELECT count(*) FROM " + parquet("wallet/database", "/**/*.parquet") + " WHERE CAST(opened_at AS DATE) >= DATE '2026-10-01'"));
         assertEquals(0, count("SELECT count(*) FROM " + parquet("sim_event/database", "/**/*.parquet") + " WHERE CAST(event_at AS DATE) >= DATE '2026-10-01'"));
     }

@@ -468,6 +468,13 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
     no time matches nothing, no error). `duplicates: refuse` (default) stops the run when the Reference has two rows
     for one key **and** one date; `first` / `last` with `order_by` keep one. `normalize` applies to the key.
   - `matched_key` is `key@from`. Save refuses `asof` without `key`, `from` or `at`, with `to`, and `at` on any other match.
+- **`match: fuzzy` (since 2026-11-24, `LOOKUP-1` P4)** — scores each Reference key against the input using string similarity and returns the best match(es) at or above `threshold` (0 to 1, default `0.85`):
+  - `method`: `jaro_winkler` (default), `jaro`, `levenshtein`, or `token_jaccard`.
+  - `block_prefix`: require the first N characters (after `normalize`) to match exactly before scoring.
+  - `block`: column(s) present on both the rows and the Reference that must match exactly before scoring.
+  - `top_k`: maximum number of matching Reference rows returned per input value, highest score first (default `1`).
+  - `details`: supports `match_score` alongside `matched_key` and `match_kind`.
+  - Save refuses `method`, `threshold`, `block`, `block_prefix`, and `top_k` on any other `match` mode. Both the batch engine (`RowShaper`) and the point engine (`PointLookup` / `POST /lookups/test` and the Lookups UI with block inputs and top-k candidates) support `fuzzy`.
 - **Hit and miss counts (since 2026-11-23, `LOOKUP-1` P1g)** — a keyed join's Step Receipt carries, per `on` column,
   `lookup.<column>.hit` (found a Reference row) and `lookup.<column>.miss` (had a value, found none) in `diag.counts`;
   a NULL value counts as neither. A rising miss count is the sign a Reference has gone stale.

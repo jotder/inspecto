@@ -15,7 +15,8 @@ export type PendingActionStatus =
     | 'invalid';
 
 /**
- * A **Pending Action** — an operational action (a run's trigger, pause, resume, reprocess, drain…) an unattended
+ * A **Pending Action** — an action on a run (trigger, pause, resume, reprocess, drain…) or on an Incident, Case or Alert (comment, ack,
+ * assign, resolve, transition…) an unattended
  * machine agent asked for, held for a person to approve (`GET /pending-actions`). ⛔ Not a Pending Change: that
  * holds config.
  */
@@ -38,6 +39,8 @@ export interface PendingAction {
     decisionReason?: string | null;
     /** The route's status when an approved action ran. */
     appliedStatus?: number;
+    /** What an approval replays — only on `GET /pending-actions/{id}`, never in the list. */
+    request?: { method: string; path: string; body: string };
 }
 
 /** The outcome of a decision: the closed action, and for an approval the route's own answer. */
@@ -60,6 +63,10 @@ export class PendingActionsService {
             apiUrl('/pending-actions'),
             { params: toParams({ status }) },
         );
+    }
+
+    get(id: string): Observable<PendingAction> {
+        return this.http.get<PendingAction>(apiUrl(`/pending-actions/${encodeURIComponent(id)}`));
     }
 
     approve(id: string, reason?: string): Observable<PendingActionDecision> {

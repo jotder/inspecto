@@ -144,10 +144,21 @@ public final class PipelineProjection {
             }
             // consumer edges: store node → each node that reads it at rest
             for (PipelineNode n : g.nodes()) {
-                Object src = n.cfg(PipelineStores.CONFIG_SOURCE_STORE);
-                if (src != null && !src.toString().isBlank()) {
-                    stores.add(src.toString());
-                    edges.add(storeEdge(storeId(src.toString()), qualify(g.name(), n.id()), "consumes", true));
+                String src = PipelineStores.sourceStoreOf(n);
+                if (src != null) {
+                    stores.add(src);
+                    edges.add(storeEdge(storeId(src), qualify(g.name(), n.id()), "consumes", true));
+                }
+                // JG4: reference edges from Reference Dataset store → transform.join node
+                if (BuiltinNodeType.TRANSFORM_JOIN.type().equals(n.type())) {
+                    String ref = refStoreOf(n.cfg("reference"));
+                    if (ref != null) {
+                        stores.add(ref);
+                        Map<String, Object> refEdge = storeEdge(storeId(ref), qualify(g.name(), n.id()),
+                                PipelineRel.REFERENCE, true);
+                        refEdge.put("kind", PipelineRel.REFERENCE);
+                        edges.add(refEdge);
+                    }
                 }
             }
         }
@@ -181,6 +192,15 @@ public final class PipelineProjection {
 
     private static String storeId(String store) {
         return "store:" + store;
+    }
+
+    private static String refStoreOf(Object rawRef) {
+        if (rawRef == null) return null;
+        String s = rawRef.toString().trim();
+        if (s.startsWith("reference/")) s = s.substring("reference/".length());
+        else if (s.startsWith("references/")) s = s.substring("references/".length());
+        else return null;
+        return s.isBlank() ? null : s;
     }
 
     private static Map<String, Object> storeEdge(String from, String to, String rel, boolean restsOnDisk) {

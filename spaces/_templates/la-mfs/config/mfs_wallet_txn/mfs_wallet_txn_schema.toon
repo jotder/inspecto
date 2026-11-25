@@ -10,7 +10,7 @@ raw:
     txn_at,"5",TIMESTAMP
     device_id,"6",VARCHAR
 mapping:
-  canonicalName: wallet_txn
+  canonicalName: mfs_wallet_txn
   rawName: WALLET_TXN
   fields[7]:
     - name: txn_id

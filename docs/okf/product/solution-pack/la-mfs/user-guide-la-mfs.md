@@ -27,7 +27,7 @@ appears. Amounts have no currency. Wallet anti-money-laundering (structuring, mu
 | `agent` | 300 | an agent (a shop that cashes customers in and out and registers wallets): name, `area`, the `super_agent_id` it reports to, its `float_account` |
 | `merchant` | 400 | a merchant that takes wallet payments: name, `category`, `opened_at`, the bank account it settles to (`settlement_account`) |
 | `wallet` | 7 908 | a wallet: `msisdn`, `kyc_level` (1 to 3), `opened_at`, and the agent that registered it (`registered_by_agent`, blank for about a third, who registered in the app) |
-| `wallet_txn` | about 101 000 (one file a month) | a transaction: `type` (`cash_in` agent to wallet, `cash_out` wallet to agent, `p2p`, `merchant_pay`, and `settlement`, a merchant's sweep to its bank account), `amount`, `txn_at`, and the handset that approved it (`device_id`, blank for a cash-in, which the agent's till starts) |
+| `mfs_wallet_txn` | about 101 000 (one file a month) | a transaction: `type` (`cash_in` agent to wallet, `cash_out` wallet to agent, `p2p`, `merchant_pay`, and `settlement`, a merchant's sweep to its bank account), `amount`, `txn_at`, and the handset that approved it (`device_id`, blank for a cash-in, which the agent's till starts) |
 | `sim_event` | about 1 150 (one file a month) | a SIM swap or port-out on a wallet's number: `event_at`, `channel` (`store` or `call_centre`) and the `staff_login` that did it |
 | `device_login` | about 69 000 (one file a month) | the first time in a day a wallet's app was used on a handset (`login_at`) |
 | `agent_commission` | 3 600 (one file a month) | an agent's month: cash-ins and cash-outs handled, and the commission earned (0.40 a transaction up to 50, 0.80 up to 200, 1.50 above) |

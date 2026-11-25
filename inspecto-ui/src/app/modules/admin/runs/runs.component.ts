@@ -31,6 +31,7 @@ import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { DataTableComponent } from 'app/inspecto/data-table';
 import { InspectoRowAction } from 'app/inspecto/grid';
 import { RunDetailComponent } from 'app/modules/admin/run-detail/run-detail.component';
+import { RunsBacklogComponent } from './runs-backlog.component';
 import { ReprocessDialog } from './reprocess.dialog';
 import { AiExplainComponent } from 'app/inspecto/ai-assist/ai-explain.component';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
@@ -55,6 +56,7 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
         DataTableComponent,
         InspectoSplitDirective,
         RunDetailComponent,
+        RunsBacklogComponent,
     ],
     templateUrl: './runs.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -73,6 +75,7 @@ export class RunsComponent implements OnInit {
 
     readonly runs = signal<RunView[]>([]);
     readonly loading = signal(false);
+    readonly activeTab = signal<'runs' | 'backlog'>('runs');
     autoRefresh = true;
     private dialogOpen = false;
 

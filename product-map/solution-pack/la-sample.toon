@@ -1,6 +1,6 @@
 id: solution-pack.la-sample
 kind: solution-pack
-title: Link Analysis sample (invented data)
+title: Sample (invented data)
 template: la-sample
 billable: false
 status: ga

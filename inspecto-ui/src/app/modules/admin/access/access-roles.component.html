@@ -2,8 +2,9 @@
     <div class="flex flex-wrap items-start gap-4">
         <p class="text-secondary max-w-3xl">
             What each role grants — capabilities and data scopes, enforced server-side on every authenticated request.
-            Role <strong>assignment</strong> happens in your identity provider; only the definitions live here. A
-            struck-through capability is granted by the role but denied by its Access Profile (the effective grant).
+            Role <strong>assignment</strong> happens in your identity provider; only the definitions live here. In a
+            closed Space, defining a role here also admits holders of that role to this Space. A struck-through
+            capability is granted by the role but denied by its Access Profile (the effective grant).
         </p>
         <span class="flex-1"></span>
         @if (product()) {

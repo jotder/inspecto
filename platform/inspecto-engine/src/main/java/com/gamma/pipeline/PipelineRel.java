@@ -51,6 +51,9 @@ public final class PipelineRel {
     /** A sequence gap was detected (acquisition → its {@code gap} CONTROL node). */
     public static final String GAP = "gap";
 
+    /** A side-input Reference Dataset edge into a {@code transform.join} node (JOB-GRAPH-1 JG2/JG4). */
+    public static final String REFERENCE = "reference";
+
     /**
      * Prefix of a reject outlet, e.g. {@code reject:dropped} or a contributed Step's {@code reject:bad_score}
      * (S2-3). A Step rejects rows by emitting them to a {@code reject:<reason>} relation it declares in

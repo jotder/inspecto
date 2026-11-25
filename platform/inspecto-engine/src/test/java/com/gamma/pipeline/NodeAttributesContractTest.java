@@ -82,14 +82,14 @@ class NodeAttributesContractTest {
         assertTrue(acq.contains("duplicate_check"));        // marker dedup (P5-a fold)
         assertTrue(acq.contains("markers_dir"));
         assertEquals(
-                Stream.of(NodeAttributes.COLLECTOR, NodeAttributes.MARKER_DEDUP, NodeAttributes.UNPACK,
-                                NodeAttributes.TRIGGER)
+                Stream.of(NodeAttributes.INBOX, NodeAttributes.COLLECTOR, NodeAttributes.MARKER_DEDUP,
+                                NodeAttributes.UNPACK, NodeAttributes.TRIGGER)
                         .flatMap(List::stream).map(NodeAttribute::key).toList(),
                 acq);
-        // …and the marker + trigger keys are NOT in the collector-block table itself — folding them in
-        // would give Onboarding's Collection stage fields it would write to a block nothing reads them in.
+        // …and the inbox, marker, and trigger keys are NOT in the collector-block table itself — folding them in
+        // would give Onboarding's Collection stage / Add data fields it would write to a block nothing reads them in.
         assertTrue(NodeAttributes.COLLECTOR.stream().map(NodeAttribute::key)
-                .noneMatch(k -> k.equals("duplicate_check") || k.equals("markers_dir")
+                .noneMatch(k -> k.equals("poll") || k.equals("duplicate_check") || k.equals("markers_dir")
                         || k.startsWith("trigger__")));
 
         // Neither removed node publishes anything — transform.dedup.marker is read-compat only now.

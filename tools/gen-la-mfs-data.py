@@ -571,7 +571,7 @@ for m in MONTHS:
     ym, box = m.strftime("%Y%m"), "staged" if m > LANDED_END else "inbox"
     nxt = (m.replace(day=28) + timedelta(days=4)).replace(day=1)
     within = lambda t: m <= t.date() < nxt   # noqa: E731
-    write(f"{box}/wallet_txn/WALLET_TXN_{ym}.csv", ["txn_id", "from_id", "to_id", "type", "amount", "txn_at", "device_id"],
+    write(f"{box}/mfs_wallet_txn/WALLET_TXN_{ym}.csv", ["txn_id", "from_id", "to_id", "type", "amount", "txn_at", "device_id"],
           [[i, f, to, typ, f"{amt:.2f}", ts(t), dev] for i, f, to, typ, amt, t, dev in txns if within(t)])
     write(f"{box}/sim_event/SIM_EVENT_{ym}.csv", ["msisdn", "event", "event_at", "channel", "staff_login"],
           [[e[0], e[1], ts(e[2]), e[3], e[4]] for e in sim_events if within(e[2])])

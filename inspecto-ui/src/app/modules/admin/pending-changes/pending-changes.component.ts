@@ -71,7 +71,7 @@ export class PendingChangesComponent implements OnInit {
     protected readonly lens = inject(LensService);
     private readonly session = inject(SessionService);
 
-    /** Which inbox shows: config changes, or a machine agent's held run actions (AGENT-KIT-1 AK-2d). */
+    /** Which inbox shows: config changes, or a machine agent's held run and Case actions (AGENT-KIT-1 AK-2d, AK-2e). */
     readonly view = signal<'changes' | 'actions'>('changes');
     readonly tabs: SectionTab[] = [
         { id: 'changes', label: 'Pending Changes' },

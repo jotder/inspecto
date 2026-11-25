@@ -1146,7 +1146,7 @@ describe('LinkAnalysisInvestigationComponent - Seed returns to the Working Set (
         );
         expect(el.querySelector('[data-testid="degree-blocked"]')?.textContent).toContain('Degree 4 reached');
         expect(el.querySelector('[aria-label="Degree results"]')?.textContent).toContain(
-            'Degree 1: 3 new entities, 4 links added. The read stopped at its budget of 2,000 rows',
+            'Degree 1: Added 3 new entities and 4 links. The read stopped at its budget of 2,000 rows',
         );
         await expectNoA11yViolations(el);
     });

@@ -58,6 +58,7 @@ class ControlApiExchangeOwningSpaceAuthzTest {
         if (machine) role = role.substring("machine:".length());
         Roles.Def def = Roles.effective(ex).get(role);
         Set<String> caps = def == null ? Set.of() : def.capabilities();
+        com.gamma.access.ComponentAccess.heldRoles(ex, Set.of(role));
         return Optional.of(machine ? new Subject("client:fraudpro", caps, null, Map.of(), null, null, "svc-uuid")
                 : new Subject("user-" + role, caps));
     };
@@ -202,6 +203,29 @@ class ControlApiExchangeOwningSpaceAuthzTest {
             String refresh = "{\"item\":\"tax_receipts\",\"owner\":\"opco\"}";
             assertEquals(403, send(c.port, "POST", "/exchange/refresh", refresh, "steward").statusCode());
             assertNotEquals(403, send(c.port, "POST", "/exchange/refresh", refresh, "financier").statusCode());
+        }
+    }
+
+    @Test
+    void closedOwningSpaceRefusesUnadmittedCallerEvenWithBuiltInCapability(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            String grantId = arrange(c);
+            // Close opco on disk and reopen: a built-in role (power) grants canOfferDatasets/canApproveShares
+            // in Roles.effective, yet opco's own roles.toon does not define it, so SpaceAdmission refuses it.
+            Path spaceToon = c.spaces().space(SpaceId.of("opco")).orElseThrow().root().base().resolve("space.toon");
+            java.nio.file.Files.writeString(spaceToon, "display_name: opco\nadmission: closed\ncreated_by: creator-1\n");
+        }
+        try (Ctx c = open(root)) {
+            Authenticators.forTest(PER_SPACE_ROLES);
+            assertEquals(404, send(c.port, "POST", "/exchange/offers",
+                    "{\"kind\":\"dataset\",\"item\":\"ledger\",\"owner\":\"opco\"}", "power").statusCode(),
+                    "built-in power role is not admitted to closed opco");
+            assertEquals(403, send(c.port, "POST", "/exchange/signal-offers",
+                    "{\"owner\":\"opco\",\"signalType\":\"fraud_alert\",\"payloadKey\":\"acct\"}", "power").statusCode(),
+                    "signal-offers keeps its 403 non-oracle refusal for an unadmitted caller");
+            assertEquals(200, send(c.port, "POST", "/exchange/offers",
+                    "{\"kind\":\"dataset\",\"item\":\"ledger\",\"owner\":\"opco\"}", "financier").statusCode(),
+                    "financier is defined in opco's roles.toon, so SpaceAdmission admits it");
         }
     }
 

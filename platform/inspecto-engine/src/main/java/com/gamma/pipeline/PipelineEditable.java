@@ -340,7 +340,7 @@ public final class PipelineEditable {
      * reads it. The marker-dedup four joined 2026-08-04's fingerprint fold in P5-a.
      */
     private static final Set<String> ACQ_FOREIGN_KEYS = Set.of(
-            "poll", "trigger", "file_pattern", "unpack",
+            "poll", "trigger", "file_pattern", "unpack", "source_store",
             "duplicate_check", "marker_extension", "retention_days", "markers_dir");
 
     /**
@@ -609,6 +609,7 @@ public final class PipelineEditable {
                 if (!NOT_ACQ_OWNED.contains(e.getKey())) c.put(e.getKey(), e.getValue());
             // connection is carried on use: ("connection/<name>"), never mirrored in config
             c.remove("connection");
+            putIfPresent(c, PipelineStores.CONFIG_SOURCE_STORE, n.cfg(PipelineStores.CONFIG_SOURCE_STORE));
             putIfPresent(c, "poll", dirs.get("poll"));
             putIfPresent(c, "trigger", raw.get("trigger"));
             putIfPresent(c, "file_pattern", processing.get("file_pattern"));
@@ -935,9 +936,11 @@ public final class PipelineEditable {
         // graph still takes the byte-for-byte legacy path above.
         // (…and only while there is still a chain to write: emptying the canvas of transforms leaves
         // no sequence to preserve, so that returns to the legacy path and the key goes.)
+        boolean isJobPipeline = acq != null && "dataset".equals(acq.cfg("connector"))
+                && parser == null && mapNodes.isEmpty();
         boolean authoredSteps = existing.get("steps") instanceof List<?> l && !l.isEmpty()
                 && !chain.isEmpty();
-        boolean legacyShaped = isLegacyShaped(chain) && !authoredSteps;
+        boolean legacyShaped = isLegacyShaped(chain) && !authoredSteps && !isJobPipeline;
         PipelineNode recordDedup   = legacyShaped ? first(chain, PipelineConfig.Step.DEDUP)     : null;
         PipelineNode routeNode     = legacyShaped ? first(chain, PipelineConfig.Step.ROUTE)     : null;
         PipelineNode summarizeNode = legacyShaped ? first(chain, PipelineConfig.Step.SUMMARIZE) : null;
@@ -951,14 +954,17 @@ public final class PipelineEditable {
         if (strict) {
             if (acq == null) refusals.add(new PipelineCompileException.Refusal(NO_ACQUISITION, null,
                     "an active pipeline needs an acquisition node"));
-            if (parser == null) refusals.add(new PipelineCompileException.Refusal(NO_PARSER, null,
+            if (!isJobPipeline && parser == null) refusals.add(new PipelineCompileException.Refusal(NO_PARSER, null,
                     "an active pipeline needs a parser node"));
+            if (isJobPipeline && (acq.cfg("dataset") == null || acq.cfg("dataset").toString().isBlank()))
+                refusals.add(new PipelineCompileException.Refusal(NO_ACQUISITION, acq.id(),
+                        "a Job Pipeline needs an input dataset"));
             if (primarySink == null || primarySink.cfg("database") == null)
                 refusals.add(new PipelineCompileException.Refusal(NO_PERSISTENT_SINK, null,
                         "an active pipeline needs a persistent sink with a database dir"));
             final PipelineNode p = parser;
             boolean grammarBound = p != null && p.use() != null && p.use().startsWith(GRAMMAR_REF_PREFIX);
-            if (p != null && !grammarBound && p.cfg("parsing") == null
+            if (!isJobPipeline && p != null && !grammarBound && p.cfg("parsing") == null
                     && PARSER_OWNED.stream().noneMatch(k -> p.cfg(k) != null))
                 refusals.add(new PipelineCompileException.Refusal(PARSER_NO_SCHEMA, p.id(),
                         "the parser names no Grammar / parsing: block / schema_file / schemas / segments"));
@@ -1233,8 +1239,16 @@ public final class PipelineEditable {
         if (quarantineSink != null) replaceOrRemove(dirs, "quarantine", quarantineSink.cfg("dir"));
         if (outputStoreSink != null && outputStoreSink.cfg(PipelineStores.CONFIG_STORE) != null)
             out.put("output_store", outputStoreSink.cfg(PipelineStores.CONFIG_STORE));
+        else if (isJobPipeline && primarySink != null && primarySink.cfg(PipelineStores.CONFIG_STORE) != null) {
+            String sinkStore = primarySink.cfg(PipelineStores.CONFIG_STORE).toString();
+            if (!sinkStore.equals(g.name()) || existing.containsKey("output_store"))
+                out.put("output_store", sinkStore);
+            else
+                out.remove("output_store");
+        }
 
         if (collector.isEmpty()) out.remove(colKey);
+        if (isJobPipeline && processing.isEmpty()) out.remove("processing");
         // A file with no output: block must not gain an empty one — getOrNew created the section
         // speculatively, and an unconfigured sink writes nothing into it (fixture round-trip gate).
         if (output.isEmpty()) out.remove("output");

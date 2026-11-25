@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-401 route(s) registered; 399 in the OpenAPI contract, 2 not.
+410 route(s) registered; 399 in the OpenAPI contract, 11 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -421,8 +421,17 @@ Registered in code, **missing from the OpenAPI contract**:
 
 | Method | Path | Capability | Registered in |
 |---|---|---|---|
+| POST | `/jobs/([^/]+)/backlog/days/([^/]+)/give-up` | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
+| POST | `/jobs/([^/]+)/backlog/days/([^/]+)/run` | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
+| POST | `/jobs/([^/]+)/backlog/drain` | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
+| POST | `/jobs/([^/]+)/backlog/pause` | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
+| POST | `/jobs/([^/]+)/backlog/resume` | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
+| GET | `/jobs/backlog` | — | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
 | GET | `/parsers/asn1/decoders` | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
 | POST | `/parsers/asn1/validate` | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
+| POST | `/pipelines/([^/]+)/graph/validate` | — | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java` |
+| POST | `/pipelines/([^/]+)/split-job-pipeline` | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java` |
+| POST | `/runs/([^/]+)/quarantine/release` | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java` |
 
 In the OpenAPI contract, **registered by no module's `api.<method>("…")` call** (may be served by another mechanism):
 

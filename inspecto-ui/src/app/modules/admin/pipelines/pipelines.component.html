@@ -62,6 +62,13 @@
                                 }
                             </mat-select>
                         </mat-form-field>
+                        <inspecto-option-picker
+                            class="w-52"
+                            label="By Dataset"
+                            [options]="combinedDatasetPickerOptions()"
+                            [ngModel]="combinedDataset() ?? ''"
+                            (ngModelChange)="setCombinedDataset($event)"
+                        />
                         <span class="text-secondary text-xs">
                             {{ combinedSelected().length || c.pipelines.length }} of {{ c.pipelines.length }} shown
                             @if (c.links.length) {
@@ -120,7 +127,11 @@
                 </div>
 
                 <section class="bg-card rounded-2xl p-5 shadow" aria-label="Pipeline topology">
-                    <inspecto-graph-view [data]="combinedG6()" (nodeClick)="onNodeClick($event)"></inspecto-graph-view>
+                    <inspecto-graph-view
+                        [data]="combinedG6()"
+                        (nodeClick)="onNodeClick($event)"
+                        (nodeDblClick)="onTopologyNodeDblClick($event)"
+                    ></inspecto-graph-view>
                 </section>
 
                 @if (selectedNode(); as n) {
@@ -235,6 +246,27 @@
         </dl>
         @if (n.description) {
             <p class="text-secondary mt-3 text-sm">{{ n.description }}</p>
+        }
+        @if (n.category === 'STORE' && n.store) {
+            <div class="mt-4 flex flex-wrap gap-2">
+                <button mat-stroked-button type="button" (click)="createJobPipelineFromStore(n.store!)">
+                    <mat-icon class="icon-size-4 mr-1" svgIcon="heroicons_outline:plus"></mat-icon>
+                    New Job Pipeline from here
+                </button>
+                @if (combined()?.pipelines?.length) {
+                    <button mat-stroked-button type="button" [matMenuTriggerFor]="joinIntoMenu">
+                        <mat-icon class="icon-size-4 mr-1" svgIcon="heroicons_outline:link"></mat-icon>
+                        Join into&hellip;
+                    </button>
+                    <mat-menu #joinIntoMenu="matMenu">
+                        @for (p of combined()!.pipelines; track p.name) {
+                            <button mat-menu-item (click)="joinStoreIntoPipeline(n.store!, p.name)">
+                                <span>{{ p.name }}</span>
+                            </button>
+                        }
+                    </mat-menu>
+                }
+            </div>
         }
     </section>
 </ng-template>

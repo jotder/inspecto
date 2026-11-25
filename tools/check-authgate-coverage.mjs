@@ -85,7 +85,9 @@
 // ⬇ 41 → 40 on 2026-10-08: armed tests landed with the module reorganisation (e.g. `ControlApiAlertAckTest` arms the new Alert ack/resolve routes);
 // the guard printed "improved … lower BASELINE_UNCOVERED". Operator-approved in chat.
 // ⬇ 40 → 38 on 2026-10-19: the guard printed "improved"; the analyst upload status reads and delete ship armed (`ControlApiAnalystUploadTest`).
-const BASELINE_UNCOVERED = 38;
+// ⬇ 38 → 37 on 2026-11-25: the Job backlog and split-job-pipeline routes (landed ungated-in-test) ship armed in
+// `ControlApiBacklogSplitGateTest`, with one more previously uncovered route now matched.
+const BASELINE_UNCOVERED = 37;
 
 // Usage:  node tools/check-authgate-coverage.mjs           # report + exit 1 on a ratchet regression
 //         node tools/check-authgate-coverage.mjs --list    # also print every uncovered route

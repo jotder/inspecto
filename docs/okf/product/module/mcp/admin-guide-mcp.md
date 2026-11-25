@@ -74,14 +74,16 @@ location = /.well-known/oauth-protected-resource { proxy_pass http://inspecto:80
 - **Operate runs** (trigger, pause, resume, reprocess, replay rejects, retry, drain; trigger a Job, replay a Job
   Run) **at once**, within the person's own rights — the same as the person pressing the button, with the agent
   client on the audit row.
+- **Work Incidents and Cases** (comment, build an Incident Brief, accept, ack, assign, resolve or move one through its
+  Workflow; ack or resolve an Alert; open a Case from entities) **at once**, within the person's own rights.
 - **Nothing else:** every other write is refused (`403`, "an agent client may not call …"), and an agent never
   approves, declines, reveals, promotes, or changes Apps or access.
 
 A **machine agent** (`auth.oidc.agentMachineClients`) follows the same rules with its client as the actor
-(`client:<id>`): it proposes and is held, and it never runs a Pipeline, approves or administers. Its run actions
+(`client:<id>`): it proposes and is held, and it never runs a Pipeline, approves or administers. Its run and Case actions
 are **held too**, as **Pending Actions**: a change approver (`canApproveChanges`, not the machine) approves or
 declines each one under `/pending-actions`, and an approved one runs as the
-machine. Give it a role in
+machine. It never opens a Case (that needs `canManageIncidents`, which it never keeps). Give it a role in
 the Space that grants only what it should author or operate; it never keeps more than the four capabilities above.
 
 Every audit row of an agent's request names the person as the actor and the agent client as `agent_client`;

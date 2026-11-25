@@ -162,3 +162,17 @@ export function confirmApproveExpansion(
         { title: 'Approve this expand?', confirmText: 'Approve', destructive: false },
     );
 }
+
+/** Ask before denying from Settings ▸ Oversight so a single click cannot discard a held request. */
+export function confirmDenyExpansion(
+    confirm: InspectoConfirmService,
+    requester: string,
+    reason?: string,
+): Promise<boolean> {
+    return confirm.confirmDestructive(
+        `Deny ${requester}’s expand request?` +
+            (reason ? `\n\nReason: ${reason}` : '') +
+            '\n\nNothing is read and the request is closed as denied.',
+        { title: 'Deny this expand?', confirmText: 'Deny', destructive: true },
+    );
+}

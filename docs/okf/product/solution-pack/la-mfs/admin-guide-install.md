@@ -58,7 +58,7 @@ On start-up the seven Pipelines land the twelve months in `data/inbox`; the `mfs
 every 5 minutes, so the last load is never missed), and each time it finishes the `mfs_screen_links` Job runs. Within a
 minute or two:
 
-- `inspecto-la-data/la-mfs/data/<feed>/database/` holds Parquet files for `agent`, `merchant`, `wallet`, `wallet_txn`,
+- `inspecto-la-data/la-mfs/data/<feed>/database/` holds Parquet files for `agent`, `merchant`, `wallet`, `mfs_wallet_txn`,
   `sim_event`, `device_login` and `agent_commission`, and nothing is under any `<feed>/quarantine` or `<feed>/errors`.
 - `inspecto-la-data/la-mfs/data/mfs_links/` holds the link Dataset (about 47 000 rows, seven kinds);
   `mfs_screen_links/` holds the three fraud screens the saved views read.
@@ -71,7 +71,7 @@ The Space folder holds only configuration; all runtime state (`data/`, `audit/`,
 ## New data arrives (October 2026)
 
 Copy every file of `inspecto-la-data/la-mfs/data/staged/<feed>/` into `inspecto-la-data/la-mfs/data/inbox/<feed>/`
-(`wallet`, `wallet_txn`, `sim_event`, `device_login`, `agent_commission`). The Pipelines land them and the Jobs rebuild
+(`wallet`, `mfs_wallet_txn`, `sim_event`, `device_login`, `agent_commission`). The Pipelines land them and the Jobs rebuild
 the links. October brings 92 new wallets and another month of transactions, SIM events, logins and commissions. There is
 no new takeover, split deposit or colluding merchant: the planted stories stay as they are.
 
@@ -153,14 +153,14 @@ This use case also ships inside the industry Space *Telecom* (`la-telecom`), bes
 
 Every Dataset says what its id columns hold: *Wallet*, *Agent*, *Merchant*, *Staff login* and *Settlement account*.
 *Subscriber number*, *Device* and *Telecom entity* are declared exactly as `la-telco-ra` declares them, so the two
-packs merge. `wallet_txn_dataset` and the link Datasets mix wallets, agents and merchants in one column, so their
+packs merge. `mfs_wallet_txn_dataset` and the link Datasets mix wallets, agents and merchants in one column, so their
 ends hold *Telecom entity*.
 
 Each Dataset of events has its own Mapping:
 
 | Dataset | Mapping |
 |---|---|
-| `wallet_txn_dataset` | Telecom entity → Telecom entity (kind `type`, when `txn_at`, measure `amount`) |
+| `mfs_wallet_txn_dataset` | Telecom entity → Telecom entity (kind `type`, when `txn_at`, measure `amount`) |
 | `sim_event_dataset` | Staff login → Subscriber number (kind `event`, when `event_at`) |
 | `wallet_dataset` | Agent → Wallet (when `opened_at`) |
 | `device_login_dataset` | Wallet → Device (when `login_at`) |

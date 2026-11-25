@@ -16,6 +16,10 @@ export interface Space {
     createdAt: string;
     /** The Space lock's counts (LC-4), only when the caller may read that Space's `/integrity`. */
     integrity?: SpaceIntegritySummary;
+    /** Space admission (`closed` when only creator, administrators, and Space-role holders are admitted). */
+    admission?: string;
+    /** Subject id of the signed-in person who created a closed Space. */
+    createdBy?: string;
     /** Where the Space lives on disk (SPACE-LOCATIONS-1 D8): sent only to a caller who may administer Spaces. */
     location?: SpaceLocation;
 }

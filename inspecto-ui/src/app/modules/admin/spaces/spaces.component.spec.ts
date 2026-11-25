@@ -245,4 +245,18 @@ describe('SpacesComponent', () => {
         await fixture.componentInstance.detach(LOCATED[0]);
         expect(detach).not.toHaveBeenCalled();
     });
+
+    it('SPACE-ADMISSION-FOLLOWUPS-1 (2): marks closed Spaces with a Closed badge and admission hint', async () => {
+        const list: Space[] = [
+            { ...SPACES[0], admission: 'closed', createdBy: 'admin-1' },
+            SPACES[1],
+        ];
+        const fixture = create(true, list, true);
+        const el = fixture.nativeElement as HTMLElement;
+        const badges = el.querySelectorAll('[data-testid="space-closed"]');
+        expect(badges.length).toBe(1);
+        expect(badges[0].textContent).toContain('Closed');
+        expect(badges[0].textContent).toContain('Settings, Access, Roles');
+        await expectNoA11yViolations(el);
+    });
 });

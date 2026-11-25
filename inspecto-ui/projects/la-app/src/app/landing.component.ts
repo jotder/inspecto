@@ -80,7 +80,10 @@ const card = (n: ProductNavEntry) => ({ path: n.path, label: n.label, icon: area
                                 </section>
                             }
                         } @else {
-                            <ng-container *ngTemplateOutlet="cards; context: { $implicit: nav() }"></ng-container>
+                            <section class="flex flex-col gap-3" aria-labelledby="la-landing-areas-title">
+                                <h2 id="la-landing-areas-title" class="m-0 text-lg font-semibold">Areas</h2>
+                                <ng-container *ngTemplateOutlet="cards; context: { $implicit: nav() }"></ng-container>
+                            </section>
                         }
                         <!-- LA-FULL-CYCLE-TEST-1 presentability: compact tiles that fill the row by the page's own width, so
                              at 1440x860 the six Inspecto LA areas sit in one row under My work instead of a half-shown
@@ -94,7 +97,7 @@ const card = (n: ProductNavEntry) => ({ path: n.path, label: n.label, icon: area
                                     <li>
                                         <a
                                             [routerLink]="'/' + item.path"
-                                            class="bg-card flex h-full flex-col gap-1 rounded-lg border p-3 no-underline"
+                                            class="bg-card hover:bg-hover flex h-full flex-col gap-1.5 rounded-lg border p-4 no-underline"
                                         >
                                             <span class="flex items-center gap-2">
                                                 <mat-icon class="icon-size-5 shrink-0" [svgIcon]="item.icon"></mat-icon>
@@ -106,6 +109,16 @@ const card = (n: ProductNavEntry) => ({ path: n.path, label: n.label, icon: area
                                 }
                             </ul>
                         </ng-template>
+                        <div
+                            class="text-secondary mt-auto flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-xs"
+                            data-testid="la-landing-footer"
+                        >
+                            <span>Press <kbd class="rounded border px-1 py-0.5 font-mono">?</kbd> for keyboard shortcuts</span>
+                            <div class="flex flex-wrap items-center gap-3">
+                                <a routerLink="/add-data">Add data</a>
+                                <a routerLink="/settings">Settings</a>
+                            </div>
+                        </div>
                     </div>
                 </section>
             }

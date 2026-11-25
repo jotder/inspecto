@@ -364,9 +364,11 @@ export class PipelineEditorGraphComponent implements AfterViewInit, OnChanges, O
                     lineDash: (d) =>
                         (d.data as { derived?: boolean }).derived
                             ? [1, 4]
-                            : (d.data as { simulated?: boolean }).simulated
-                              ? [4, 3]
-                              : [],
+                            : (d.data as { reference?: boolean }).reference
+                              ? [5, 4]
+                              : (d.data as { simulated?: boolean }).simulated
+                                ? [4, 3]
+                                : [],
                     strokeOpacity: (d) => ((d.data as { derived?: boolean }).derived ? 0.55 : 1),
                     labelText: (d) => (d.data as { kind: string }).kind,
                     labelFill: fg,

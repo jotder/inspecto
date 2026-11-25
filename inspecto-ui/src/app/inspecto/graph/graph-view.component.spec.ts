@@ -30,6 +30,7 @@ import {
     demotePositiveTabindex,
     graphSummaryLabel,
     edgeLabelsHiddenByDensity,
+    edgeLabelText,
     layoutConfig,
     graphSignature,
     stableKey,
@@ -1183,5 +1184,13 @@ describe('opt-in pointer model (Link Analysis, 2026-10-15)', () => {
         expect(c.nodeDblClick).toBeDefined();
         expect(c.selectionChange).toBeDefined();
         fixture.destroy();
+    });
+
+    it('LA-EXEC-DEMO-POLISH-1 item 1: edgeLabelText includes transfer amount and count on links', () => {
+        expect(edgeLabelText({ kind: 'transfer', count: 1, total: 5000 })).toBe('transfer · 5,000');
+        expect(edgeLabelText({ kind: 'transfer · 3', count: 3, total: 12500.5 })).toBe('transfer · 3 · 12,500.5');
+        expect(edgeLabelText({ kind: 'transfer', count: 4 })).toBe('transfer · 4');
+        expect(edgeLabelText({ kind: 'transfer · 2', count: 2 })).toBe('transfer · 2');
+        expect(edgeLabelText({ kind: 'transfer' })).toBe('transfer');
     });
 });

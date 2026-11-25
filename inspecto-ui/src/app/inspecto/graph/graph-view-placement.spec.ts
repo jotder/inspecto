@@ -289,7 +289,17 @@ describe('labels clear of the start tabs on the 17-node fixture (LA-EXEC-DEMO-PO
         const sides = labelSidesClearOfStartTabs([node('a', 0, 0, true), node('b', 0, 40, true)]);
         expect(sides.get('a')).toBe('right'); // not top: its own tab is there; beside it, a little low, clears both tabs
         expect(sides.has('b')).toBe(false);
-        // no start entity drawn: nothing moves
+        // no start entity drawn: nothing moves when labels are clear
         expect(labelSidesClearOfStartTabs([node('a', 0, 0), node('b', 0, 40)]).size).toBe(0);
+    });
+
+    it('LA-EXEC-DEMO-POLISH-1 item 2: moves overlapping masked alias labels on a tight star onto clear sides', () => {
+        const a: LabelledNode = { id: 'a', x: 0, y: 0, w: NODE, h: NODE, start: false, label: 'masked:052…' };
+        const b: LabelledNode = { id: 'b', x: 45, y: 0, w: NODE, h: NODE, start: false, label: 'masked:613a…' };
+        const sides = labelSidesClearOfStartTabs([a, b]);
+        expect(sides.get('b')).toBe('top');
+        const boxA = nodeLabelBox(a, sides.get('a') ?? 'bottom');
+        const boxB = nodeLabelBox(b, sides.get('b') ?? 'bottom');
+        expect(boxesOverlap(boxA, boxB)).toBe(false);
     });
 });

@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, ViewEncapsulation, computed, effect, inject, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    ViewChild,
+    ViewEncapsulation,
+    computed,
+    effect,
+    inject,
+    signal,
+} from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NgTemplateOutlet } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
@@ -12,6 +21,8 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { PipelineCombined, PipelineNode, PipelinesService, IconMap, IconMapService } from 'app/inspecto/api';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
+import { InspectoOptionPickerComponent, PickerOption } from 'app/inspecto/components/option-picker.component';
+import { FormsModule } from '@angular/forms';
 import { TransferMenuComponent } from 'app/inspecto/transfer';
 import { GraphViewComponent } from 'app/inspecto/graph/graph-view.component';
 import { G6GraphData } from 'app/inspecto/graph/catalog-graph';
@@ -62,6 +73,8 @@ export type PipelinesViewMode = 'view' | 'editor' | 'topology';
         MatTooltipModule,
         GraphViewComponent,
         InspectoEmptyStateComponent,
+        InspectoOptionPickerComponent,
+        FormsModule,
         PipelineEditorComponent,
         TransferMenuComponent,
     ],
@@ -108,9 +121,13 @@ export class PipelinesComponent {
     readonly combined = signal<PipelineCombined | null>(null);
     readonly combinedLoading = signal(false);
     readonly combinedUnavailable = signal(false);
+    @ViewChild(PipelineEditorComponent) private editor?: PipelineEditorComponent;
+
     /** Which pipelines are shown (empty ⇒ all) + the multiselect's search box. */
     readonly combinedSelected = signal<string[]>([]);
     readonly combinedSearch = signal('');
+    /** JG4: Open by Dataset — focus Topology on everything around one Dataset. */
+    readonly combinedDataset = signal<string | null>(null);
     /** Guards the lazy first load so re-entering Topology does not refetch. */
     private loaded = false;
 
@@ -133,6 +150,20 @@ export class PipelinesComponent {
             (this.combined()?.pipelines ?? []).map((p) => p.name),
         ),
     );
+
+    /** Dataset/store names available for JG4 "Open by Dataset" filtering. */
+    readonly combinedDatasetOptions = computed<string[]>(() =>
+        (this.combined()?.nodes ?? [])
+            .filter((n) => n.category === 'STORE' && !!n.store)
+            .map((n) => n.store!)
+            .sort((a, b) => a.localeCompare(b)),
+    );
+
+    /** The same choices for the option picker, "All datasets" (no filter) first. */
+    readonly combinedDatasetPickerOptions = computed<PickerOption[]>(() => [
+        { value: '', label: 'All datasets' },
+        ...this.combinedDatasetOptions().map((ds) => ({ value: ds, label: ds })),
+    ]);
 
     /** Every pipeline in the topology as transfer references — what the export/import menu offers. */
     readonly transferItems = computed(() =>
@@ -187,11 +218,58 @@ export class PipelinesComponent {
         this.selectedNode.set(this.combined()?.nodes.find((n) => n.id === id) ?? null);
     }
 
+    /** JG4: double-click a Pipeline node in Topology to open it in the Editor. */
+    onTopologyNodeDblClick(id: string): void {
+        const node = this.combined()?.nodes.find((n) => n.id === id);
+        if (!node?.pipeline) return;
+        this.mode.set('editor');
+        this.editor?.openPipelineById(node.pipeline);
+    }
+
+    /** JG4: filter Topology to everything around a chosen Dataset (producer, data/reference consumers, outputs). */
+    setCombinedDataset(ds: string | null): void {
+        this.combinedDataset.set(ds || null);
+        const c = this.combined();
+        if (!c) return;
+        if (!ds) {
+            this.combinedSelected.set(c.pipelines.map((p) => p.name));
+            return;
+        }
+        const storeNodeId = `store:${ds}`;
+        const nodePipeline = new Map<string, string>();
+        for (const n of c.nodes) if (n.pipeline) nodePipeline.set(n.id, n.pipeline);
+        const picked = new Set<string>();
+        for (const e of c.edges) {
+            if (e.from === storeNodeId) {
+                const p = nodePipeline.get(e.to);
+                if (p) picked.add(p);
+            }
+            if (e.to === storeNodeId) {
+                const p = nodePipeline.get(e.from);
+                if (p) picked.add(p);
+            }
+        }
+        this.combinedSelected.set(picked.size ? [...picked] : c.pipelines.map((p) => p.name));
+    }
+
+    /** JG4: create a new Job Pipeline in place from a store node (`connector: dataset`). */
+    createJobPipelineFromStore(store: string): void {
+        this.mode.set('editor');
+        this.editor?.createJobPipelineFromStore(store);
+    }
+
+    /** JG4: append a `transform.join` referencing `store` into an existing Pipeline and open it in the Editor. */
+    joinStoreIntoPipeline(store: string, targetPipeline: string): void {
+        this.mode.set('editor');
+        this.editor?.joinStoreIntoPipeline(store, targetPipeline);
+    }
+
     onCombinedSearch(e: Event): void {
         this.combinedSearch.set((e.target as HTMLInputElement).value);
     }
 
     setCombinedSelected(names: string[]): void {
+        this.combinedDataset.set(null);
         this.combinedSelected.set(names);
     }
 

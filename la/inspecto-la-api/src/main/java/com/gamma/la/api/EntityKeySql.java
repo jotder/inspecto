@@ -43,8 +43,9 @@ final class EntityKeySql {
     /**
      * The characters whose full case mapping in {@code Locale.ROOT} (what {@link EntityTypes#normalise} applies) is not their simple
      * one-character mapping (what DuckDB's {@code upper} / {@code lower} apply), to the full mapping: 102 for upper case (sharp s,
-     * the ligatures, Greek with ypogegrammeni, ...), one for lower case (dotted capital I). Read from the running JDK, so the SQL
-     * follows the Java side's Unicode version (LA-INDEX-SPELLINGS-1 review; the shared parity fixture holds both to it).
+     * the ligatures, Greek with ypogegrammeni, ...), one for lower case (dotted capital I), plus the 55 Unicode case pairs newer
+     * than DuckDB 2.0.0.0's case tables (LA-ENTITY-KEY-NEW-CASE-PAIRS-1). Read from the running JDK, so the SQL follows the Java
+     * side's Unicode version (LA-INDEX-SPELLINGS-1 review; the shared parity fixture holds both to it).
      */
     private static final Map<String, String> UPPER_FOLDS = folds(true), LOWER_FOLDS = folds(false);
 
@@ -55,9 +56,26 @@ final class EntityKeySql {
             String s = new String(Character.toChars(cp));
             String full = upper ? s.toUpperCase(Locale.ROOT) : s.toLowerCase(Locale.ROOT);
             String simple = new String(Character.toChars(upper ? Character.toUpperCase(cp) : Character.toLowerCase(cp)));
-            if (!full.equals(simple)) out.put(s, full);
+            if (!full.equals(simple) || (!full.equals(s) && isDuckDbUncased(cp))) out.put(s, full);
         }
         return Map.copyOf(out);
+    }
+
+    /** Code points from Unicode case pairs newer than DuckDB 2.0.0.0's case tables, left as written by DuckDB {@code upper}/{@code lower}. */
+    private static boolean isDuckDbUncased(int cp) {
+        return switch (cp) {
+            case 0x019B, 0xA7DC, // ƛ / Ƛ
+                 0x0264, 0xA7CB, // ɤ / Ɤ
+                 0x1C89, 0x1C8A, // Cyrillic Tje
+                 0xA7CC, 0xA7CD, // S with diagonal stroke
+                 0xA7CE, 0xA7CF, // Pharyngeal voiced fricative
+                 0xA7D2, 0xA7D3, // Double thorn
+                 0xA7D4, 0xA7D5, // Double wynn
+                 0xA7DA, 0xA7DB  // Lambda
+                    -> true;
+            default -> (cp >= 0x10D50 && cp <= 0x10D65) || (cp >= 0x10D70 && cp <= 0x10D85) // Garay
+                    || (cp >= 0x16EA0 && cp <= 0x16EB8) || (cp >= 0x16EBB && cp <= 0x16ED3); // Beria Erfe
+        };
     }
 
     /** {@code expr} with each {@code folds} character replaced by its mapping; the chain runs only on a value holding one of them. */
