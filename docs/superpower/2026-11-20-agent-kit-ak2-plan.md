@@ -335,6 +335,11 @@ agent can author anything). Size: phase 1 about 3 weeks, as the parent plan says
 2 weeks each, plus their Skills. Prompts, subscriptions, progress
 notifications and the tasks extension stay deferred to AK-3 / AK-4.
 
+**What follows phases 1–3b** (proposed 2026-11-25, D-AK8…D-AK12 open): ten task specs, W1–W10, in
+[`2026-11-25-agent-kit-ak2-widening-plan.md`](2026-11-25-agent-kit-ak2-widening-plan.md) — the routes and kinds an
+agent still cannot reach, and the live golden runs still owed. `QUARANTINE-RELEASE-1` (§1.1, §6.2) shipped as a
+route on 2026-11-25; an agent reaches it with W1.
+
 ### 6.1 Phase 1 close as built (2026-11-24)
 
 - **AK-3, developer Agent Skills** — `agent-kit/skills/<name>/SKILL.md`, seven: `build-an-app` (orchestrator: plan,
