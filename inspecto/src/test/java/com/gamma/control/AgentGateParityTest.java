@@ -121,6 +121,10 @@ class AgentGateParityTest {
                 "POST /alerts/([^/]+)/ack", Roles.CAN_WORK_INCIDENTS,
                 "POST /alerts/([^/]+)/resolve", Roles.CAN_WORK_INCIDENTS,
                 "POST /cases/from-entities", Roles.CAN_MANAGE_INCIDENTS)), caseGates);
+        // every action the manifest exempts needs a named right before a machine may queue it (phase-3 security review)
+        Set<String> exemptActions = new TreeSet<>();
+        for (String key : AgentGate.ACTIONS) if (String.valueOf(m.get(key)).startsWith("exempt:")) exemptActions.add(key);
+        assertEquals(exemptActions, new TreeSet<>(AgentGate.MACHINE_HOLD_CAPABILITY.keySet()));
         // a new Case needs canManageIncidents, which a machine agent never keeps (operator 2026-11-25): people only
         assertFalse(Roles.AGENT_MACHINE_CAPABILITIES.contains(Roles.CAN_MANAGE_INCIDENTS));
         assertEquals(AgentGate.Bucket.REFUSED, bucket("POST /pending-actions/([^/]+)/approve"));

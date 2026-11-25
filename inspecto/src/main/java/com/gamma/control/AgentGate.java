@@ -56,6 +56,14 @@ final class AgentGate {
             "POST /objects/([^/]+)/transition", "POST /alerts/([^/]+)/ack", "POST /alerts/([^/]+)/resolve",
             "POST /cases/from-entities");
 
+    /**
+     * The capability a machine agent's hold needs on an action route the manifest exempts (phase-3 security review): a
+     * comment is open to anyone who can see the object, but the hold runs before the route's scope guard, so without
+     * this a machine holding no right at all could fill the approvers' queue with comments on any id.
+     */
+    static final Map<String, String> MACHINE_HOLD_CAPABILITY = Map.of(
+            "POST /objects/([^/]+)/comments", Roles.CAN_WORK_INCIDENTS);
+
     /** Every action route: {@link #RUN_ACTIONS} and {@link #CASE_ACTIONS}. */
     static final Set<String> ACTIONS;
     static {

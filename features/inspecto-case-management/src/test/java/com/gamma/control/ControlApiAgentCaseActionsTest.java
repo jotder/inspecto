@@ -44,7 +44,7 @@ class ControlApiAgentCaseActionsTest {
     private static final ObjectMapper JSON = new ObjectMapper();
     /** AGENT = analyst-1 (power) through agent client claude-code; BOT = machine agent triage-bot (power role). */
     private static final String AGENT = "Bearer agent", VIEWER_AGENT = "Bearer viewer-agent", BOT = "Bearer bot",
-            CHECKER = "Bearer checker", ADMIN = "Bearer admin";
+            CHECKER = "Bearer checker", ADMIN = "Bearer admin", WEAK_BOT = "Bearer weak-bot";
     private final HttpClient client = HttpClient.newHttpClient();
 
     private record Ctx(CollectorService svc, ControlApi api, int port, Path root) implements AutoCloseable {
@@ -58,14 +58,14 @@ class ControlApiAgentCaseActionsTest {
     void arm() {
         Authenticators.forTest(ex -> {
             String h = String.valueOf(ex.getRequestHeaders().getFirst("Authorization"));
-            String role = VIEWER_AGENT.equals(h) ? "business" : AGENT.equals(h) || BOT.equals(h) ? "power" : "super";
+            String role = VIEWER_AGENT.equals(h) || WEAK_BOT.equals(h) ? "business" : AGENT.equals(h) || BOT.equals(h) ? "power" : "super";
             ComponentAccess.heldRoles(ex, Set.of(role));
             Set<String> caps = new HashSet<>(Roles.SEED.get(role).capabilities());
-            caps.removeAll(AGENT.equals(h) || VIEWER_AGENT.equals(h) || BOT.equals(h) ? Roles.AGENT_NEVER_CAPABILITIES : Set.of());
+            caps.removeAll(AGENT.equals(h) || VIEWER_AGENT.equals(h) || BOT.equals(h) || WEAK_BOT.equals(h) ? Roles.AGENT_NEVER_CAPABILITIES : Set.of());
             return switch (h) {
                 case AGENT -> Optional.of(new Subject("analyst-1", caps, null, Map.of(), null, null, null, "claude-code"));
                 case VIEWER_AGENT -> Optional.of(new Subject("viewer-1", caps, null, Map.of(), null, null, null, "claude-code"));
-                case BOT -> Optional.of(new Subject("client:triage-bot", caps, null, Map.of(), null, null, "svc-triage", "triage-bot"));
+                case BOT, WEAK_BOT -> Optional.of(new Subject("client:triage-bot", caps, null, Map.of(), null, null, "svc-triage", "triage-bot"));
                 case CHECKER -> Optional.of(new Subject("checker-1", caps));
                 case ADMIN -> Optional.of(new Subject("admin-1", caps));
                 default -> Optional.empty();
@@ -174,6 +174,19 @@ class ControlApiAgentCaseActionsTest {
             JsonNode comments = data(send(c, "GET", "/objects/" + id + "/comments", null, ADMIN), 200);
             assertEquals(1, comments.size(), comments.toString());
             assertEquals("client:triage-bot", comments.get(0).get("author").asText(), "the replay runs as the machine");
+        }
+    }
+
+    @Test
+    void aMachineWithNoRightCannotQueueCommentsOnAnyId(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            // a comment needs no capability, but the hold runs before the scope guard: a machine without canWorkIncidents
+            // must not fill the approvers' queue (phase-3 security review)
+            for (String id : List.of(open(c, ObjectType.INCIDENT, "late feed"), "no-such-object")) {
+                HttpResponse<String> r = send(c, "POST", "/objects/" + id + "/comments", "{\"body\":\"x\"}", WEAK_BOT);
+                assertEquals(403, r.statusCode(), r.body());
+            }
+            assertEquals(0, data(send(c, "GET", "/pending-actions", null, CHECKER), 200).get("total").asInt(), "no record");
         }
     }
 

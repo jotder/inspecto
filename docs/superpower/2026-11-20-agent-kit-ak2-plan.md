@@ -496,7 +496,10 @@ can an agent act on an Incident, Case or Alert beyond its rights, past the hold 
 - Only the nine §4.6 routes moved; the Incident record edits, merge, split, the `canAdminister` PATCH and the Case
   Rule evaluate stay refused to every agent (`AgentGateParityTest` pins the list and each route's gate).
 - Each route keeps its own gate, checked before the hold: a machine needs `canWorkIncidents`, and never holds
-  `canManageIncidents`, so it never opens a Case and leaves no record trying.
+  `canManageIncidents`, so it never opens a Case and leaves no record trying. **Fixed in this review:** the comment
+  route has no capability (the `collaboration` exemption), so a machine holding no right at all could queue comments
+  on any id; a machine's hold on it now needs `canWorkIncidents` (`AgentGate.MACHINE_HOLD_CAPABILITY`, pinned by
+  `AgentGateParityTest` for every exempt action; `ControlApiAgentCaseActionsTest` proves 403 and no record).
 - An object outside the caller's data scope: the hold runs before the route's scope guard, so a machine's request on
   an invisible id is held (202) exactly as one on an absent id — no existence oracle. Approved, it replays as the
   machine and the scope guard answers 404: `failed`, nothing changed.
@@ -504,8 +507,8 @@ can an agent act on an Incident, Case or Alert beyond its rights, past the hold 
   `actor` when there is a Subject), and a comment's author is the Subject — the machine (`client:<id>`) when a held one
   is approved.
 - A Brief files at most a `pending` Action Request; its makers (the asking Subject and the Brief's agent identity) are
-  both refused at decide time, and an agent never decides one. A machine's Brief with a proposal therefore passes two
-  people: the Pending Action approver, then the Action Request approver.
+  both refused at decide time, and an agent never decides one. A machine's Brief with a proposal is held as a Pending
+  Action first, so nothing is filed until a person approves; the Action Request then waits for its own approval.
 - The approver sees the whole request (the comment text, the Workflow move, a Brief's proposal) before deciding
   (§6.3), and Approve waits until it has loaded.
 
@@ -515,10 +518,11 @@ holding `canManageIncidents` can attribute those links to someone else; the audi
 true before phase 3, the same family as `RUN-TRIGGER-ACTOR-SPOOF-1`.
 
 **Accepted.**
-- A comment needs no capability (the `collaboration` exemption), so a machine agent may ask to comment on anything it
-  can see; every one is held and read by an approver.
-- A held request on an object the machine may not see fills the approvers' queue with an action that can only fail.
-  It needs `canWorkIncidents` first, as every case action does.
+- A held request on an object the machine may not see (or one that does not exist) fills the approvers' queue with
+  an action that can only fail. It needs `canWorkIncidents` first, as every case action now does.
+- The person who approves a machine's Brief (the Pending Action) is not a maker of the Action Request it files, so the
+  same person may approve both. Each approval is a person reading the request; enforcing two different people would
+  be a change to Action Request four-eyes, not to the agent gate.
 
 ## 7. Risks
 

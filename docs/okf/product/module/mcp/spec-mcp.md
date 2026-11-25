@@ -393,7 +393,9 @@ hold above apply unchanged.
   history records the person for an ack, assign, resolve or transition (`actorOf`: the Subject, never a body `actor`).
 - **A machine agent's** are held as Pending Actions, approved by the change approvers and replayed as the machine — a
   comment it asked for is authored `client:<id>`. It never opens a Case: `canManageIncidents` is not in
-  `Roles.AGENT_MACHINE_CAPABILITIES`, so the hold's capability check answers 403 and leaves no record.
+  `Roles.AGENT_MACHINE_CAPABILITIES`, so the hold's capability check answers 403 and leaves no record. A comment is
+  exempt from a capability, so a machine's hold on it needs `canWorkIncidents` (`AgentGate.MACHINE_HOLD_CAPABILITY`):
+  otherwise a machine with no right could queue comments on any id (phase-3 security review, plan §6.5).
 - **A Brief** files at most a `pending` Action Request, whose makers are the asking person and the Brief's agent
   identity; its own four-eyes decide gate refuses both, and an agent never decides one (the never-list).
 - **Analyst MCP Tools** (`McpTools.CASE_TOOLS`, all `write: true`): `add_comment`, `build_incident_brief`,
@@ -412,7 +414,8 @@ hold above apply unchanged.
   accepts and assigns an Incident at once and its row names the agent client, a business user's agent is 403 and
   nothing is held; a machine's Case transition is 202 and nothing changed, its approve 403, the detail shows the
   move, another person's approval runs it; a machine's comment is held and on approval is the machine's; a machine's
-  new Case is 403 with no record), `AgentGateParityTest`, `McpToolRoutesTest`.
+  new Case is 403 with no record; a machine without `canWorkIncidents` cannot queue a comment), `AgentGateParityTest`,
+  `McpToolRoutesTest`.
 
 ## Security review (2026-11-20)
 

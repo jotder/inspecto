@@ -87,6 +87,8 @@ final class PendingActions {
         // so a machine that may not operate runs gets the same 403 it would get without the hold, and no record
         // (verification, lane B: a capability-less machine filled the approvers' queue).
         String capability = com.gamma.access.CapabilityManifest.capabilityFor(method, path);
+        // An exempt route (a comment) still needs a right before a machine may queue it (phase-3 security review).
+        if (capability == null) capability = AgentGate.MACHINE_HOLD_CAPABILITY.get(method + " " + pattern);
         if (capability != null) ApiContext.requireCapability(ex, capability);
         propose(api, ex, s, method, pattern, path);
     }
