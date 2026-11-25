@@ -19,6 +19,7 @@ import java.util.Map;
 import com.gamma.consignment.EventTimeBounds;
 
 import static com.gamma.inspector.ConsignmentIngestStrategy.memberStem;
+import static com.gamma.inspector.ConsignmentIngestStrategy.nonCollidingBaseName;
 import static com.gamma.inspector.ConsignmentIngestStrategy.databaseDir;
 import static com.gamma.inspector.ConsignmentIngestStrategy.dropTable;
 import static com.gamma.inspector.ConsignmentIngestStrategy.msg;
@@ -192,7 +193,7 @@ final class NativeCsvStreamingEngine {
         LocalDateTime mStart = LocalDateTime.now();
         String dbDir = databaseDir(batch, cfg);
         List<String> partCols = partitionColumns(schema);
-        String baseName = memberStem(cfg, m.file());
+        String baseName = nonCollidingBaseName(memberStem(cfg, m.file()), batch, cfg, dbDir);
         IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                 FileNames.safe(cfg, m.file().getName()), 1, 1);
 
@@ -238,7 +239,7 @@ final class NativeCsvStreamingEngine {
         LocalDateTime mStart = LocalDateTime.now();
         String dbDir = databaseDir(batch, cfg);
         List<String> partCols = partitionColumns(schema);
-        String baseName = memberStem(cfg, m.file());
+        String baseName = nonCollidingBaseName(memberStem(cfg, m.file()), batch, cfg, dbDir);
         IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                 FileNames.safe(cfg, m.file().getName()), 1, 1);
 

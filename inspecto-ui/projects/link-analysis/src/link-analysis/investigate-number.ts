@@ -712,7 +712,7 @@ export function degreeOutcomeMessage(o: DegreeOutcome): string {
     // A one-hop line names no degree, so two of them ("every entity" twice) would read as one line repeated (F-10).
     const notes = [o.oneHop && o.step != null ? `step ${o.step}` : '', o.range ?? ''].filter(Boolean).join(', ');
     const parts = [
-        `${o.override || o.oneHop ? head : `Degree ${o.degree}`}${notes ? ` (${notes})` : ''}: ${plural(o.admitted, 'new entity', 'new entities')}, ${plural(o.linksAdded, 'link')} added.`,
+        `${o.override || o.oneHop ? head : `Degree ${o.degree}`}${notes ? ` (${notes})` : ''}: Added ${plural(o.admitted, 'new entity', 'new entities')} and ${plural(o.linksAdded, 'link')}.`,
     ];
     if (o.truncated)
         parts.push(
@@ -720,9 +720,8 @@ export function degreeOutcomeMessage(o: DegreeOutcome): string {
         );
     if (o.fanOutCapped > 0)
         parts.push(
-            // presentability 2: one plain sentence, what was added before what was left out
-            `Only the ${o.maxFanOut ? `${o.maxFanOut} ` : ''}strongest links of each entity were added; ` +
-                `${plural(o.fanOutCapped, 'weaker link was', 'weaker links were')} left out.`,
+            // LA-EXEC-DEMO-POLISH-1 item 5: active, concise phrasing without repeating "were added"
+            `Kept the ${o.maxFanOut ? `${o.maxFanOut} ` : ''}strongest links per entity (${plural(o.fanOutCapped, 'weaker link', 'weaker links')} omitted).`,
         );
     if (o.hubsFlagged) {
         const how = o.hubDegreeSource ? HUB_SOURCE[o.hubDegreeSource] : '';

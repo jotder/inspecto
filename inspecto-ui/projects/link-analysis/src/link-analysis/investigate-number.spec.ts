@@ -304,7 +304,7 @@ describe('investigate-number - next degree', () => {
             workingSet: { entities: 2, links: 1, excluded: 0, hash: '' },
         } as InvestigationStepResult;
         expect(degreeOutcomeMessage(degreeOutcome(1, step, {}, '30 days to 29 Sep 2026'))).toBe(
-            'Degree 1 (30 days to 29 Sep 2026): 1 new entity, 1 link added. 1 high-connectivity number shown but not ' +
+            'Degree 1 (30 days to 29 Sep 2026): Added 1 new entity and 1 link. 1 high-connectivity number shown but not ' +
                 'expanded. 2 high-connectivity numbers of the frontier not expanded from.',
         );
     });
@@ -339,11 +339,11 @@ describe('investigate-number - next degree', () => {
             hubsHeld: 0,
         });
         expect(degreeOutcomeMessage(o)).toBe(
-            'Degree 2: 2 new entities, 5 links added. The read stopped at its budget of 2,000 rows — some ' +
-                'neighbours are missing. Only the 50 strongest links of each entity were added; 12 weaker links were left out.',
+            'Degree 2: Added 2 new entities and 5 links. The read stopped at its budget of 2,000 rows — some ' +
+                'neighbours are missing. Kept the 50 strongest links per entity (12 weaker links omitted).',
         );
         expect(degreeOutcomeMessage({ ...o, admitted: 1, linksAdded: 1, truncated: false, fanOutCapped: 0 })).toBe(
-            'Degree 2: 1 new entity, 1 link added.',
+            'Degree 2: Added 1 new entity and 1 link.',
         );
         // LA-EXEC-DEMO-POLISH-1: the recorded one-hop line of the mule case, each sentence closed by its full stop
         expect(
@@ -358,8 +358,8 @@ describe('investigate-number - next degree', () => {
                 fanOutCapped: 8,
             }),
         ).toBe(
-            'Expand one hop from every entity (step 2): 6 new entities, 7 links added. Only the 5 strongest links of ' +
-                'each entity were added; 8 weaker links were left out.',
+            'Expand one hop from every entity (step 2): Added 6 new entities and 7 links. Kept the 5 strongest links per ' +
+                'entity (8 weaker links omitted).',
         );
     });
 });
@@ -577,8 +577,8 @@ describe('investigate-number - walk-through 6 fixes', () => {
         ] as never;
         const out = degreeOutcomesFromLog(entries, set);
         expect(out.map(degreeOutcomeMessage)).toEqual([
-            'Degree 1 (30 days to 29 Sep 2026): 2 new entities, 2 links added.',
-            'Degree 2 (all available data): 1 new entity, 1 link added. The read stopped at its budget — some neighbours are missing.',
+            'Degree 1 (30 days to 29 Sep 2026): Added 2 new entities and 2 links.',
+            'Degree 2 (all available data): Added 1 new entity and 1 link. The read stopped at its budget — some neighbours are missing.',
         ]);
         expect(out[0].budget).toBe(5000);
     });
@@ -602,8 +602,8 @@ describe('investigate-number - walk-through 6 fixes', () => {
         const lines = degreeOutcomesFromLog(entries, set).map(degreeOutcomeMessage);
         expect(new Set(lines).size).toBe(2); // never one line repeated
         expect(lines).toEqual([
-            'Expand one hop from every entity (step 2): 6 new entities, 7 links added.',
-            'Expand one hop from every entity (step 9): 6 new entities, 7 links added.',
+            'Expand one hop from every entity (step 2): Added 6 new entities and 7 links.',
+            'Expand one hop from every entity (step 9): Added 6 new entities and 7 links.',
         ]);
     });
 
@@ -634,7 +634,7 @@ describe('investigate-number - walk-through 6 fixes', () => {
         expect(o.hubsFlagged).toBe(1);
         const live = degreeOutcomeMessage({ ...o, hubsFlagged: 1, hubDegreeSource: 'index', fanOutCapped: 4 });
         expect(degreeOutcomeMessage(o)).toBe(live);
-        expect(degreeOutcomeMessage(o)).toContain('weaker links were');
+        expect(degreeOutcomeMessage(o)).toContain('weaker links omitted');
         expect(degreeOutcomeMessage(o)).toContain('high-connectivity number');
     });
 

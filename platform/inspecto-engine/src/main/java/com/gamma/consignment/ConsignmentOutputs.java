@@ -323,6 +323,14 @@ public final class ConsignmentOutputs {
                 case "year"  -> year = value;
                 case "month" -> month = value;
                 case "day"   -> day = value;
+                case "ref_day", "dt", "record_day" -> {
+                    if (value.length() == 10 && value.charAt(4) == '-' && value.charAt(7) == '-') {
+                        try {
+                            java.time.LocalDate.parse(value);
+                            return value;
+                        } catch (java.time.format.DateTimeParseException ignored) { }
+                    }
+                }
                 default      -> { }
             }
         }

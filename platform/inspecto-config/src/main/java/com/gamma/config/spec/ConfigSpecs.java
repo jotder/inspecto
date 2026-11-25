@@ -114,7 +114,16 @@ public final class ConfigSpecs {
                 FieldSpec.of("reference.order_by", "Reference order-by column", FieldType.STRING,
                         "upsert/scd2 only: when one batch delivers a key more than once, the row with the greatest "
                                 + "value here wins (deletes included; a tie goes to the delete). Absent = arbitrary."),
-                FieldSpec.required("dirs.poll", "Poll directory", FieldType.FILEPATH,
+                FieldSpec.enumField("reference.versions", "Reference version granularity",
+                        List.of("none", "daily"), "none",
+                        "DATED-REFERENCE-RUNS-1: 'daily' keeps one Reference version per business day."),
+                FieldSpec.of("reference.day_from", "Reference day source", FieldType.STRING,
+                        "Where a daily Reference file's business day comes from: 'file_name' (default) or 'column' / <column_name>."),
+                FieldSpec.of("reference.day_column", "Reference day column", FieldType.STRING,
+                        "Column holding the business day when reference.day_from is 'column'."),
+                FieldSpec.withDefault("reference.keep_days", "Reference history days", FieldType.INT, 0,
+                        "Days of daily Reference versions to retain (0 = unlimited)."),
+                FieldSpec.of("dirs.poll", "Poll directory", FieldType.FILEPATH,
                         "Directory watched for incoming files. All managed dirs must live outside it."),
                 FieldSpec.required("dirs.database", "Output database directory", FieldType.FILEPATH,
                         "Root of the Stage-1 partitioned output."),
@@ -512,6 +521,13 @@ public final class ConfigSpecs {
                 // The parser refuses this combination too (that is what makes the guarantee hold for a
                 // hand-edited file), but a load-time throw would surface as a config that silently vanished
                 // from the read surface. Catching it here turns it into a 422 at the moment of authoring.
+                new CrossFieldRule(
+                        "poll-required-for-non-dataset",
+                        "Missing required field 'dirs.poll' (only connector: dataset Job Pipelines may omit dirs.poll).",
+                        Severity.ERROR,
+                        List.of("dirs.poll"),
+                        raw -> "dataset".equalsIgnoreCase(str(raw, "collector.connector"))
+                                || !str(raw, "dirs.poll").isBlank()),
                 new CrossFieldRule(
                         "template-cannot-be-active",
                         "template: true and active: true contradict — a template is a non-runnable authoring "

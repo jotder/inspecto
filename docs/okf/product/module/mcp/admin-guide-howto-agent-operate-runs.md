@@ -82,3 +82,4 @@ Action with status `pending`; once approved, its status is `approved` and the ru
 
 - [Let an AI agent propose changes](admin-guide-howto-agent-propose-changes.md)
 - [Call the Control API with a machine client](../oidc/admin-guide-howto-machine-client.md)
+- [Let an AI agent work Incidents and Cases](admin-guide-howto-agent-work-incidents.md)

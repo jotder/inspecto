@@ -168,6 +168,19 @@ export function linkStyleCount(
                         </li>
                     }
                 </ul>
+                @if (startCount()) {
+                    <!-- LA-EXEC-DEMO-POLISH-1 item 6: explain the "start" tab drawn on seed entities -->
+                    <div class="mt-1 flex items-center gap-2 border-t pt-1" data-testid="legend-start">
+                        <span
+                            class="rounded px-1 text-[0.625rem] font-semibold leading-tight"
+                            style="background: var(--gamma-text-secondary); color: var(--gamma-bg-card)"
+                            aria-hidden="true"
+                            >start</span
+                        >
+                        <span>Start entity</span>
+                        <span class="text-secondary ml-auto tabular-nums">{{ startCount() }}</span>
+                    </div>
+                }
                 @if (highConnectivity()) {
                     <!-- supernode suppression: the canvas rings each flagged entity with a wide halo -->
                     <div class="mt-1 flex items-center gap-2 border-t pt-1" data-testid="legend-hubs">
@@ -321,6 +334,8 @@ export class LinkAnalysisLegendComponent {
     /** A link-kind chip was pressed: the host toggles that kind's links on the canvas. */
     readonly edgeKindToggle = output<string>();
     readonly hint = input('');
+    /** How many drawn start entities carry the "start" tab; 0 hides the legend row. */
+    readonly startCount = input(0);
     /** How many drawn entities an Investigation flagged high connectivity; 0 hides the legend row. */
     readonly highConnectivity = input(0);
     /** How many drawn Working Set entities no expand has followed yet; 0 hides the legend row. */

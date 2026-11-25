@@ -1110,9 +1110,11 @@ export class InvestigationSessionStore {
                     draft ? this.inv.appendDraftOp(id, draft, op) : this.inv.appendInvestigationOp(id, op),
                 );
                 this.lastStep.set(step);
-                this.noteHubs(step);
-                if (!redo) this.clearRedo();
-                await this.refresh(id);
+                if (step.status !== 'no_op') {
+                    this.noteHubs(step);
+                    if (!redo) this.clearRedo();
+                    await this.refresh(id);
+                }
             },
             message,
         );
@@ -1134,8 +1136,8 @@ export class InvestigationSessionStore {
                 const rest = u.at(-1)!.slice(1);
                 return rest.length ? [...u.slice(0, -1), rest] : u.slice(0, -1);
             });
-            // held for a second person's approval: stop there, as the first walk did; the rest waits for the next Redo
-            if (step?.status === 'pending') return true;
+            // held for a second person's approval or no-op: stop there; no step was recorded
+            if (step?.status === 'pending' || step?.status === 'no_op') return true;
             if (step) made.push(step.step);
         }
         this.redone = made;

@@ -93,6 +93,20 @@
                                 @if (isCurrent(s)) {
                                     <inspecto-status-badge value="ACTIVE" label="Active"></inspecto-status-badge>
                                 }
+                                @if (s.admission === 'closed') {
+                                    <span
+                                        class="inline-flex"
+                                        tabindex="0"
+                                        data-testid="space-closed"
+                                        matTooltip="Closed Space: only its creator, administrators, and holders of roles defined in this Space's Settings › Access › Roles are admitted. Open or close in space.toon and restart."
+                                    >
+                                        <inspecto-chip variant="soft" tone="neutral">Closed</inspecto-chip>
+                                        <span class="sr-only"
+                                            >Closed Space: admit people in Settings, Access, Roles; open or close in
+                                            space.toon and restart.</span
+                                        >
+                                    </span>
+                                }
                                 <!-- LC-4: the Space lock's findings; nothing while it computes or is off -->
                                 @if (integrityOf(s); as i) {
                                     <span

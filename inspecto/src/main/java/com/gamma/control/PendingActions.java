@@ -35,7 +35,8 @@ import java.util.regex.Pattern;
 
 /**
  * The <b>Pending Action</b> (AGENT-KIT-1 AK-2d, D-AK6, plan {@code 2026-11-20-agent-kit-ak2-plan.md} §6.2 lane B): an
- * operational action a <b>machine</b> agent asked for — a run's trigger, pause, resume, reprocess, drain, … (the
+ * action a <b>machine</b> agent asked for — a run's trigger, pause, resume, reprocess, drain, …, or an Incident's or Case's
+ * comment, Brief, ack, assign, resolve or transition (AK-2e) (the
  * {@link AgentGate.Bucket#ACTION} routes) — held for a person to approve. A person's agent takes those actions at once,
  * within the person's rights (D-AK5); only a machine's are held. The Pending Change machinery, under its own term (a
  * Pending Change stays config only):
@@ -86,6 +87,8 @@ final class PendingActions {
         // so a machine that may not operate runs gets the same 403 it would get without the hold, and no record
         // (verification, lane B: a capability-less machine filled the approvers' queue).
         String capability = com.gamma.access.CapabilityManifest.capabilityFor(method, path);
+        // An exempt route (a comment) still needs a right before a machine may queue it (phase-3 security review).
+        if (capability == null) capability = AgentGate.MACHINE_HOLD_CAPABILITY.get(method + " " + pattern);
         if (capability != null) ApiContext.requireCapability(ex, capability);
         propose(api, ex, s, method, pattern, path);
     }

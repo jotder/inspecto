@@ -45,6 +45,8 @@ import {
     LensService,
     apiErrorMessage,
     datasetManualHint,
+    heldChange,
+    heldMessage,
 } from 'app/inspecto/api';
 import {
     type AttributeSpec,
@@ -89,6 +91,7 @@ import { PipelineHistoryDialog } from './pipeline-history.dialog';
 import type { PipelineHistoryRestore, PipelineSettings } from 'app/inspecto/api/pipelines.service';
 import { PipelineTemplateDialog, PipelineTemplateResultData } from './pipeline-template.dialog';
 import { RunToHereDialog } from './run-to-here.dialog';
+import { SplitJobPipelineDialogComponent } from './split-job-pipeline.dialog';
 import { ViewPreviewDialog } from './view-preview.dialog';
 import {
     PipelineFinding,
@@ -958,6 +961,91 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         this.select(sel);
     }
 
+    /** JG4: open a registered Pipeline tab by id from Topology double-click. */
+    openPipelineById(id: string): void {
+        if (!this.openIds().includes(id)) {
+            this.openIds.update((ids) => [...ids, id]);
+        }
+        void this.activateTab(id);
+    }
+
+    /** JG4: create a new Job Pipeline draft in place from a Topology store node. */
+    createJobPipelineFromStore(store: string): void {
+        if (!this.canAuthor()) return;
+        const base = `${store}_job`.toLowerCase().replace(/[^a-z0-9_]/g, '_');
+        let id = base;
+        let i = 2;
+        const existing = new Set([...this.flows().map((f) => f.name), ...this.openIds()]);
+        while (existing.has(id)) id = `${base}_${i++}`;
+        const draft: AuthoredPipeline = {
+            name: id,
+            active: false,
+            nodes: [
+                { id: 'acq', type: 'acquisition', name: store, config: { connector: 'dataset', dataset: store } },
+                {
+                    id: 'sink',
+                    type: 'sink.persistent',
+                    name: id,
+                    config: { store: id, database: `database/${id}` },
+                },
+            ],
+            edges: [{ from: 'acq', rel: 'data', to: 'sink' }],
+        };
+        this.cachedModels.set(id, draft);
+        this.dirtyIds.update((s) => new Set(s).add(id));
+        this.historyBaselines.set(id, JSON.stringify(draft));
+        this.openIds.update((ids) => [...ids, id]);
+        void this.activateTab(id);
+    }
+
+    /** JG4: append a `transform.join` referencing `store` into an existing Pipeline and open it. */
+    joinStoreIntoPipeline(store: string, targetPipeline: string): void {
+        if (!this.canAuthor()) return;
+        this.openPipelineById(targetPipeline);
+        this.api.pipelineGraphRawTagged(targetPipeline).subscribe({
+            next: ({ pipeline }: { pipeline: AuthoredPipeline; etag: string | null }) => {
+                const refNodeId = `acq__ref_${store}`;
+                const joinId = uniqueNodeId(pipeline, 'transform.join');
+                const sink = pipeline.nodes.find((n: AuthoredNode) => n.type === 'sink.persistent');
+                const sinkEdge = sink
+                    ? pipeline.edges.find((e) => e.to === sink.id && e.rel === 'data')
+                    : undefined;
+                const nodes: AuthoredNode[] = [...pipeline.nodes];
+                if (!nodes.some((n) => n.id === refNodeId)) {
+                    nodes.push({
+                        id: refNodeId,
+                        type: 'acquisition',
+                        name: store,
+                        config: { connector: 'dataset', dataset: store },
+                    });
+                }
+                nodes.push({
+                    id: joinId,
+                    type: 'transform.join',
+                    config: { reference: `reference/${store}` },
+                });
+                let edges = [...pipeline.edges];
+                if (sink && sinkEdge) {
+                    edges = edges.filter((e) => !(e.from === sinkEdge.from && e.to === sink.id && e.rel === 'data'));
+                    edges.push({ from: sinkEdge.from, rel: 'data', to: joinId });
+                    edges.push({ from: joinId, rel: 'data', to: sink.id });
+                }
+                edges.push({ from: refNodeId, rel: 'reference', to: joinId });
+                const updated: AuthoredPipeline = { ...pipeline, nodes, edges };
+                this.cachedModels.set(targetPipeline, updated);
+                this.dirtyIds.update((s) => new Set(s).add(targetPipeline));
+                this.historyBaselines.set(targetPipeline, JSON.stringify(pipeline));
+                if (this.selectedId() === targetPipeline) {
+                    this.model.set(updated);
+                    this.dirty.set(true);
+                    const joinNode = updated.nodes.find((n) => n.id === joinId);
+                    if (joinNode) this.selectNewNode(joinNode);
+                }
+            },
+            error: (err: unknown) => this.toast.error(apiErrorMessage(err, `Could not open '${targetPipeline}'.`)),
+        });
+    }
+
     /** Search-and-choose the open set. Returns the FULL desired set, so unticking closes a tab. */
     openPipelines(): void {
         this.dialog
@@ -1643,8 +1731,14 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
                 ? this.api.savePipelineGraph(id, m, { ifMatch: this.draftIfMatch })
                 : this.api.savePipelineGraph(id, m);
         save$.subscribe({
-            next: () => {
+            next: (res) => {
                 this.saving.set(false);
+                const held = heldChange(res);
+                if (held) {
+                    // Held by an approval policy (202): nothing was written, so keep dirty, baseline and draft state intact.
+                    this.toast.info(heldMessage(held));
+                    return;
+                }
                 this.dirty.set(false);
                 // The stack SURVIVES a save (undoing past it re-arms dirty against this new baseline).
                 this.stampBaseline(id, m);
@@ -2884,7 +2978,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         if (!this.canAuthor() || !this.model()) return; // read-only (Business lens or View mode): palette drag can't mutate
         if (this.claimParseSlot(e.type)) return;
         const node = this.insertNode(e.type);
-        this.canvas?.addNode(node.id, node.id, this.visualKind(e.type), e.x, e.y);
+        this.canvas?.addNode(node.id, node.name || node.id, this.visualKind(node.type), e.x, e.y);
         this.selectNewNode(node);
     }
 
@@ -2893,7 +2987,7 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         if (!this.canAuthor() || !this.model()) return; // read-only (Business lens or View mode): palette click can't mutate
         if (this.claimParseSlot(type)) return;
         const node = this.insertNode(type);
-        this.canvas?.addNodeAtCenter(node.id, node.id, this.visualKind(type));
+        this.canvas?.addNodeAtCenter(node.id, node.name || node.id, this.visualKind(node.type));
         this.selectNewNode(node);
     }
 
@@ -2943,11 +3037,59 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     }
 
     private insertNode(type: string): AuthoredNode {
-        const id = uniqueNodeId(this.model(), type);
-        const node: AuthoredNode = { id, type };
+        const isDataset = type === 'acquisition.dataset';
+        const actualType = isDataset ? 'acquisition' : type;
+        const id = uniqueNodeId(this.model(), actualType);
+        const node: AuthoredNode = isDataset
+            ? { id, type: actualType, name: 'Dataset', config: { connector: 'dataset' } }
+            : { id, type: actualType };
         this.captureUndo();
         this.model.update((m) => (m ? this.addAfterSelection(m, node) : m));
         return node;
+    }
+
+    /** JG2: whether `nodeId` has an incoming `reference` edge. */
+    hasReferenceEdge(nodeId: string): boolean {
+        return (this.model()?.edges ?? []).some((e) => e.to === nodeId && e.rel === 'reference');
+    }
+
+    /** JG3: whether the open pipeline has a Stage-2 `output_store` branch that can be split into a Job Pipeline. */
+    readonly hasOutputStore = computed(() => (this.model()?.nodes ?? []).some((n) => n.id === 'output_store'));
+
+    /** JG2: insert another `transform.join` node directly after `joinId`, wired `joinId → newJoin → downstream`. */
+    addAnotherLookup(joinId: string): void {
+        const m = this.model();
+        const anchor = m?.nodes.find((n) => n.id === joinId);
+        if (!m || !anchor || !this.canAuthor()) return;
+        this.selectedNode.set(anchor);
+        const node = this.insertNode('transform.join');
+        this.canvas?.addNodeAtCenter(node.id, node.id, this.visualKind(node.type));
+        this.selectNewNode(node);
+    }
+
+    /** JG3: preview and apply splitting an onboarding `steps:` + `output_store:` Pipeline into a Job Pipeline. */
+    splitIntoJobPipeline(): void {
+        const id = this.selectedId();
+        if (!id || !this.canAuthor()) return;
+        this.api.splitJobPipeline(id, { preview: true }).subscribe({
+            next: (preview) => {
+                this.dialog
+                    .open(SplitJobPipelineDialogComponent, { width: '760px', data: preview })
+                    .afterClosed()
+                    .subscribe((confirmed) => {
+                        if (!confirmed) return;
+                        this.api.splitJobPipeline(id, { preview: false }).subscribe({
+                            next: (res) => {
+                                this.toast.success(`Split into Job Pipeline '${res.jobPipeline.name}'.`);
+                                this.cachedModels.delete(id);
+                                this.openPipelineById(res.jobPipeline.name);
+                            },
+                            error: (err: unknown) => this.toast.error(apiErrorMessage(err, 'Could not split pipeline.')),
+                        });
+                    });
+            },
+            error: (err: unknown) => this.toast.error(apiErrorMessage(err, 'Could not preview split.')),
+        });
     }
 
     /**
@@ -3160,10 +3302,52 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         else this.validate();
     }
 
-    /** Walk the pipeline for activation-blocking issues; opens the findings panel. */
+    /** Walk the pipeline for activation-blocking issues; opens the findings panel and runs server validation. */
     validate(): PipelineFinding[] {
         const f = this.refreshFindings();
         this.bottomTab.set('validation');
+        const m = this.model();
+        const id = this.selectedId();
+        if (m && id && typeof this.api.validatePipelineGraph === 'function') {
+            this.api.validatePipelineGraph(id, m).subscribe({
+                next: (res) => {
+                    if (this.selectedId() !== id) return;
+                    const serverFindings: PipelineFinding[] = [
+                        ...(res.refusals ?? []).map((r) => ({
+                            severity: 'error' as const,
+                            nodeId: r.nodeId,
+                            message: r.message,
+                            code: r.code,
+                        })),
+                        ...(res.findings ?? []).map((sf) => ({
+                            severity: (sf.severity === 'WARNING'
+                                ? 'warning'
+                                : sf.severity === 'INFO'
+                                  ? 'info'
+                                  : 'error') as PipelineFinding['severity'],
+                            message: sf.fieldPath ? `${sf.fieldPath}: ${sf.message}` : sf.message,
+                            code: sf.code,
+                            guidance: sf.guidance,
+                        })),
+                    ];
+                    const current = this.refreshFindings();
+                    const seen = new Set(current.map((x) => `${x.code ?? ''}:${x.message}`));
+                    const merged = [...current];
+                    for (const sf of serverFindings) {
+                        const key = `${sf.code ?? ''}:${sf.message}`;
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            merged.push(sf);
+                        }
+                    }
+                    this.findings.set(merged);
+                },
+                error: (err) => {
+                    if (this.selectedId() !== id) return;
+                    if (!this.showRefusals(err)) this.onWriteError(err, 'Validation failed');
+                },
+            });
+        }
         return f;
     }
 
@@ -3365,8 +3549,13 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     private setActive(id: string, updated: AuthoredPipeline, ok: string, goingLive: boolean): void {
         this.activating.set(true);
         this.api.savePipelineGraph(id, updated).subscribe({
-            next: () => {
+            next: (res) => {
                 this.activating.set(false);
+                const held = heldChange(res);
+                if (held) {
+                    this.toast.info(heldMessage(held));
+                    return;
+                }
                 this.model.set(updated);
                 this.dirty.set(false);
                 this.stampBaseline(id, updated); // this write IS a save — same baseline rule
@@ -3477,18 +3666,41 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
     private addEdge(from: string, to: string, rel: string, opts: { skipCanvas?: boolean } = {}): void {
         const m = this.model();
         if (!m) return;
+        const src = m.nodes.find((n) => n.id === from);
+        const dst = m.nodes.find((n) => n.id === to);
+        // JG2: wiring a Reference Dataset node onto a `transform.join` binds it via a `reference` edge.
+        let effectiveRel = rel;
+        if (
+            src?.type === 'acquisition' &&
+            src.config?.['connector'] === 'dataset' &&
+            dst?.type === 'transform.join' &&
+            (rel === 'reference' || m.edges.some((e) => e.to === to && e.rel === 'data'))
+        ) {
+            effectiveRel = 'reference';
+        }
         // Check the target's `accepts` before building the edge, not at save (gap 3). The message is the
         // server's own reason, so the answer here and the 422 there say the same thing.
-        const refusal = edgeRefusal(m, from, to, rel, this.typeRules());
+        const refusal = edgeRefusal(m, from, to, effectiveRel, this.typeRules());
         if (refusal) {
             this.toast.warning(refusal);
             return;
         }
-        const next = addEdgeToModel(m, from, to, rel);
+        let next = addEdgeToModel(m, from, to, effectiveRel);
         if (!next) return; // duplicate — no-op
+        if (effectiveRel === 'reference' && src && dst) {
+            const rawDs = String(src.config?.['dataset'] ?? src.name ?? src.id).trim().replace(/^datasets\//, '');
+            if (rawDs) {
+                const updatedDst: AuthoredNode = {
+                    ...dst,
+                    config: { ...(dst.config ?? {}), reference: `reference/${rawDs}` },
+                };
+                next = applyNodePatchInModel(next, updatedDst);
+                if (this.definitionNode()?.id === updatedDst.id) this.definitionNode.set(updatedDst);
+            }
+        }
         this.captureUndo();
         this.model.set(next);
-        if (!opts.skipCanvas) this.canvas?.addEdge(encodeEdgeId(from, to, rel), from, to, rel);
+        if (!opts.skipCanvas) this.canvas?.addEdge(encodeEdgeId(from, to, effectiveRel), from, to, effectiveRel);
         this.dirty.set(true);
     }
 
@@ -3512,7 +3724,18 @@ export class PipelineEditorComponent implements OnInit, OnDestroy {
         const p = decodeEdgeId(g6EdgeId);
         if (m && p) {
             this.captureUndo();
-            this.model.set(removeEdgeFromModel(m, p.from, p.to, p.rel));
+            let next = removeEdgeFromModel(m, p.from, p.to, p.rel);
+            if (p.rel === 'reference') {
+                const dst = next.nodes.find((n) => n.id === p.to);
+                if (dst?.type === 'transform.join' && dst.config && 'reference' in dst.config) {
+                    const cfg = { ...dst.config };
+                    delete cfg['reference'];
+                    const updatedDst: AuthoredNode = { ...dst, config: cfg };
+                    next = applyNodePatchInModel(next, updatedDst);
+                    if (this.definitionNode()?.id === updatedDst.id) this.definitionNode.set(updatedDst);
+                }
+            }
+            this.model.set(next);
             this.dirty.set(true);
         }
         this.canvas?.removeElement(g6EdgeId);

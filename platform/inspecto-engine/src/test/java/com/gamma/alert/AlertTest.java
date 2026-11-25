@@ -60,9 +60,13 @@ class AlertTest {
     @Test
     void ledgerAndFreshnessRulesGetReadableTitlesToo() {
         AlertRule ledger = new AlertRule("r-crit", "failed_batches", "gte", 1, "20b", "CRITICAL", null);
-        assertEquals("Failed batches on MINI_ETL is at least 1", Alert.title(ledger, "MINI_ETL"));
-        assertEquals("CRITICAL: Failed batches on MINI_ETL is 2, at or above the threshold of 1 "
-                + "(over the last 20 batches)", Alert.of(ledger, "MINI_ETL", 2, 0L).message());
+        assertEquals("Failed Consignments on MINI_ETL is at least 1", Alert.title(ledger, "MINI_ETL"));
+        assertEquals("CRITICAL: Failed Consignments on MINI_ETL is 2, at or above the threshold of 1 "
+                + "(over the last 20 Consignments)", Alert.of(ledger, "MINI_ETL", 2, 0L).message());
+
+        AlertRule singleBatch = new AlertRule("r-one", "failed_batches", "gte", 1, "1b", "WARNING", null);
+        assertEquals("WARNING: Failed Consignments on MINI_ETL is 1, at or above the threshold of 1 "
+                + "(over the last 1 Consignment)", Alert.of(singleBatch, "MINI_ETL", 1, 0L).message());
 
         AlertRule fresh = new AlertRule("sales-stale", null, null, 0, null, "WARNING", null,
                 "sales_ds", null, null, "6h");
@@ -80,10 +84,30 @@ class AlertTest {
                 Alert.title(new AlertRule("err", "error_rate", "gt", 0.05, "1h", "WARNING", null), "EVENTS"));
 
         assertEquals("Error rate", Alert.metricLabel("error_rate"));
-        assertEquals("Failed batches", Alert.metricLabel("failed_batches"));
+        assertEquals("Failed Consignments", Alert.metricLabel("failed_batches"));
         assertEquals("Rejected files", Alert.metricLabel("rejected_files"));
         assertEquals("Average duration (ms)", Alert.metricLabel("duration_ms"));
         assertEquals("Total input rows", Alert.metricLabel("total_input_rows"), "an unmapped id reads as words");
+    }
+
+    @Test
+    void valueMeasureIdsAreSaidInWordsAndTheMachineIdIsKept() {
+        AlertRule vm = new AlertRule("vm-rule", null, "gte", 1, null, "WARNING", null,
+                null, null, null, null, "inv-7", null, null,
+                null, 0, null, Map.of("name", "passThrough", "last", "7d"));
+        Alert a = Alert.of(vm, "inv-7", 3, 0L);
+        assertEquals("Entities breaching Pass-through in inv-7 is at least 1", Alert.title(vm, "inv-7"));
+        assertEquals("WARNING: Entities breaching Pass-through in inv-7 is 3, at or above the threshold of 1 "
+                + "(over the whole Dataset, window: last 7d, UTC)", a.message());
+        assertEquals("entities breaching passThrough", a.metric(), "the machine metric stays the stored id");
+
+        assertEquals("Pass-through", Alert.valueMeasureLabel("passThrough"));
+        assertEquals("Velocity", Alert.valueMeasureLabel("velocity"));
+        assertEquals("Time to withdrawal", Alert.valueMeasureLabel("timeToCashOut"));
+        assertEquals("Withdrawal concentration", Alert.valueMeasureLabel("cashOutConcentration"));
+        assertEquals("Structuring", Alert.valueMeasureLabel("structuring"));
+        assertEquals("Benefit transfer", Alert.valueMeasureLabel("benefitTransfer"));
+        assertEquals("Custom measure", Alert.valueMeasureLabel("customMeasure"));
     }
 
     @Test
@@ -98,7 +122,7 @@ class AlertTest {
         AlertRule fresh = new AlertRule("sales-stale", null, null, 0, null, "WARNING", null,
                 "sales_ds", null, null, "6h");
         Alert stale = Alert.of(fresh, "sales_ds", "Daily sales", 7200, 0L);
-        assertEquals("WARNING: dataset Daily sales has not published for 2 h (freshness limit 6h)", stale.message());
+        assertEquals("WARNING: Dataset Daily sales has not published for 2 h (freshness limit 6h)", stale.message());
         assertEquals("sales_ds", stale.pipeline());
         assertEquals("16 min", Alert.duration(978.514));
         assertEquals("2 h 10 min", Alert.duration(7800));

@@ -230,19 +230,21 @@ import { ADD_DATA_LINK_ANALYSIS } from './add-data-link-analysis';
             ></inspecto-import-filter-edit>
 
             <div class="flex flex-col gap-3 border-t pt-3" data-testid="keep-up-to-date">
-                <inspecto-dataset-feed
-                    [datasetId]="dataset().id"
-                    [snapshot]="snapshot()"
-                    [offerKeep]="!snapshot() && !access.automationLock()"
-                    [busy]="busy()"
-                    [locked]="locked()"
-                    (importWaiting)="runNow()"
-                ></inspecto-dataset-feed>
-                <inspecto-dataset-storage
-                    [datasetId]="dataset().id"
-                    [busy]="busy()"
-                    [locked]="locked()"
-                ></inspecto-dataset-storage>
+                @if (access.canUpload()) {
+                    <inspecto-dataset-feed
+                        [datasetId]="dataset().id"
+                        [snapshot]="snapshot()"
+                        [offerKeep]="!snapshot() && !access.automationLock()"
+                        [busy]="busy()"
+                        [locked]="locked()"
+                        (importWaiting)="runNow()"
+                    ></inspecto-dataset-feed>
+                    <inspecto-dataset-storage
+                        [datasetId]="dataset().id"
+                        [busy]="busy()"
+                        [locked]="locked()"
+                    ></inspecto-dataset-storage>
+                }
                 @if (access.automationLock(); as why) {
                     <inspecto-locked-action label="Keep this up to date" [reason]="why"></inspecto-locked-action>
                 } @else if (editorRoute() && access.canAuthor()) {

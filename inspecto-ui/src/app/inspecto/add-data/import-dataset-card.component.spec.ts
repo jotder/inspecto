@@ -49,6 +49,7 @@ interface Opts {
     edition?: string;
     authMode?: 'none' | 'oidc';
     features?: Record<string, boolean>;
+    canUpload?: boolean;
     canAuthor?: boolean;
     editorRoute?: string | null;
     kind?: 'stream' | 'reference';
@@ -72,7 +73,7 @@ function create(o: Opts = {}) {
             {
                 provide: LensService,
                 useValue: {
-                    canUploadData: signal(true),
+                    canUploadData: signal(o.canUpload ?? true),
                     canAuthorWorkbench: signal(o.canAuthor ?? true),
                     canBuildLinkIndex: signal(true),
                     // Keep this up to date hosts the shared Collector surface, which reads the edition's locks
@@ -657,5 +658,12 @@ describe('ImportDatasetCardComponent - the Dataset card of an import (UC-06, UC-
                 (f) => f.label,
             ),
         ).toEqual(['Kept up to date']);
+    });
+
+    it('SPACE-ADMISSION-FOLLOWUPS-1 (1): hides Feed and Storage panels when the caller lacks canUploadData', () => {
+        const { el } = create({ edition: 'standard', authMode: 'oidc', canUpload: false });
+        expect(el.querySelector('inspecto-dataset-feed')).toBeNull();
+        expect(el.querySelector('inspecto-dataset-storage')).toBeNull();
+        expect(http.match((r) => r.url.endsWith('/feed') || r.url.endsWith('/storage'))).toEqual([]);
     });
 });

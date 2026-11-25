@@ -103,11 +103,49 @@ class AgentGateParityTest {
         Map<String, String> m = manifest();
         Set<String> actions = new TreeSet<>();
         for (String key : m.keySet()) if (bucket(key) == AgentGate.Bucket.ACTION) actions.add(key);
-        assertEquals(new TreeSet<>(AgentGate.ACTIONS), actions, "AK-2d: the operational actions of plan §4.6");
-        for (String key : AgentGate.ACTIONS) {
-            assertEquals(Roles.CAN_OPERATE_RUNS, m.get(key), "an action is a run operation: " + key);
+        assertEquals(new TreeSet<>(AgentGate.ACTIONS), actions, "the run (AK-2d) and case (AK-2e) actions of plan §4.6");
+        for (String key : AgentGate.ACTIONS)
             assertFalse(PendingChanges.REPLAYABLE.contains(key), key + " reaches the config hold — it belongs in HELD");
-        }
+        for (String key : AgentGate.RUN_ACTIONS)
+            assertEquals(Roles.CAN_OPERATE_RUNS, m.get(key), "a run action is a run operation: " + key);
+        // AK-2e (operator 2026-11-25): the §4.6 analyst rows exactly — each on its own route's gate, none an admin's
+        Map<String, String> caseGates = new java.util.TreeMap<>();
+        for (String key : AgentGate.CASE_ACTIONS) caseGates.put(key, m.get(key));
+        assertEquals(new java.util.TreeMap<>(Map.of(
+                "POST /objects/([^/]+)/comments", "exempt:collaboration",
+                "POST /incidents/([^/]+)/briefs", Roles.CAN_WORK_INCIDENTS,
+                "POST /objects/([^/]+)/ack", Roles.CAN_WORK_INCIDENTS,
+                "POST /objects/([^/]+)/assign", Roles.CAN_WORK_INCIDENTS,
+                "POST /objects/([^/]+)/resolve", Roles.CAN_WORK_INCIDENTS,
+                "POST /objects/([^/]+)/transition", Roles.CAN_WORK_INCIDENTS,
+                "POST /alerts/([^/]+)/ack", Roles.CAN_WORK_INCIDENTS,
+                "POST /alerts/([^/]+)/resolve", Roles.CAN_WORK_INCIDENTS,
+                "POST /cases/from-entities", Roles.CAN_MANAGE_INCIDENTS)), caseGates);
+        // AK-2f (operator 2026-11-25): Drafts, attach to a Case, graph runs — never promote or a direct Investigation edit
+        Map<String, String> laGates = new java.util.TreeMap<>();
+        for (String key : AgentGate.LA_ACTIONS) laGates.put(key, m.get(key));
+        assertEquals(new java.util.TreeMap<>(Map.of(
+                "POST /inv/investigations/([^/]+)/drafts", Roles.CAN_DRAFT_INVESTIGATIONS,
+                "POST /inv/investigations/([^/]+)/drafts/([^/]+)/ops", Roles.CAN_DRAFT_INVESTIGATIONS,
+                "POST /inv/investigations/([^/]+)/drafts/([^/]+)/undo", Roles.CAN_DRAFT_INVESTIGATIONS,
+                "POST /inv/investigations/([^/]+)/drafts/([^/]+)/discard", Roles.CAN_DRAFT_INVESTIGATIONS,
+                "POST /inv/investigations/([^/]+)/drafts/([^/]+)/rebase", Roles.CAN_DRAFT_INVESTIGATIONS,
+                "PUT /inv/investigations/([^/]+)/case", Roles.CAN_MANAGE_INCIDENTS,
+                "POST /inv/graph/runs", Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,
+                "POST /inv/graph/runs/([^/]+)/cancel", "exempt:self-service")), laGates);
+        for (String refused : java.util.List.of("POST /inv/investigations/([^/]+)/drafts/([^/]+)/promote",
+                "POST /inv/investigations/([^/]+)/ops", "POST /inv/investigations/([^/]+)/undo",
+                "POST /inv/investigations/([^/]+)/reveal", "POST /inv/investigations/([^/]+)/members",
+                "POST /inv/investigations/([^/]+)/pending/([^/]+)/approve", "POST /inv/investigations/([^/]+)/pending/([^/]+)/deny"))
+            assertEquals(AgentGate.Bucket.REFUSED, bucket(refused), refused);
+        // the machine set keeps the Draft right, never the right to promote it
+        assertTrue(Roles.AGENT_MACHINE_CAPABILITIES.contains(Roles.CAN_DRAFT_INVESTIGATIONS));
+        // every action the manifest exempts needs a named right before a machine may queue it (phase-3 security review)
+        Set<String> exemptActions = new TreeSet<>();
+        for (String key : AgentGate.ACTIONS) if (String.valueOf(m.get(key)).startsWith("exempt:")) exemptActions.add(key);
+        assertEquals(exemptActions, new TreeSet<>(AgentGate.MACHINE_HOLD_CAPABILITY.keySet()));
+        // a new Case needs canManageIncidents, which a machine agent never keeps (operator 2026-11-25): people only
+        assertFalse(Roles.AGENT_MACHINE_CAPABILITIES.contains(Roles.CAN_MANAGE_INCIDENTS));
         assertEquals(AgentGate.Bucket.REFUSED, bucket("POST /pending-actions/([^/]+)/approve"));
         assertEquals(AgentGate.Bucket.REFUSED, bucket("POST /pending-actions/([^/]+)/decline"));
         assertEquals(AgentGate.Bucket.ALLOWED, bucket("POST /pending-actions/([^/]+)/withdraw"));

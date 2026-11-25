@@ -123,9 +123,25 @@ public interface ApiContext extends WriteRootProvider {
             // capability is stamped — an event claiming "privileged by X" on an edition that checks
             // nothing would tell an auditor something false.
             attr(ex, ATTR_CAPABILITY, capability);
-            if (!s.capabilities().contains(capability))
+            if (!Roles.holds(s.capabilities(), capability)   // AK-2f: an implied capability counts …
+                    || impliedButDenied(s.capabilities(), capability,
+                            () -> com.gamma.access.AccessGrants.deniedCapabilities(ex, heldRoles(attr(ex, ComponentAccess.ATTR_HELD_ROLES)))))
                 throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "missing capability '" + capability + "'");
         }
+    }
+
+    /**
+     * … unless the caller's Access profile denies it by name (phase-3b review): the authenticator strips a denied grant, but
+     * an implied one ({@code canManageIncidents} → {@code canDraftInvestigations}) is never in the Subject to strip, so the
+     * deny is asked for here — only when the capability is held by implication, so a plain grant costs no lookup.
+     */
+    private static boolean impliedButDenied(java.util.Set<String> held, String capability,
+                                            java.util.function.Supplier<java.util.Set<String>> denied) {
+        return !held.contains(capability) && denied.get().contains(capability);
+    }
+
+    private static java.util.Collection<String> heldRoles(Object attr) {
+        return attr instanceof java.util.Collection<?> c ? c.stream().map(String::valueOf).toList() : java.util.List.of();
     }
 
     /** SEC-7(b): declare the capability set applicable to the single resource this response carries —
@@ -223,6 +239,7 @@ public interface ApiContext extends WriteRootProvider {
         if (!(attr(ex, ATTR_SUBJECT) instanceof Subject bound)) return;
         attr(ex, ATTR_CAPABILITY, capability);
         Subject there = null;
+        Object heldThere = null;
         Authenticator a = Authenticators.active().orElse(null);
         if (configRoot != null && a != null) {
             Object priorRoot = attr(ex, Roles.ATTR_CONFIG_ROOT);
@@ -230,6 +247,7 @@ public interface ApiContext extends WriteRootProvider {
             try {
                 Roles.configRoot(ex, configRoot);
                 there = a.authenticate(ex).orElse(null);
+                heldThere = attr(ex, ComponentAccess.ATTR_HELD_ROLES);   // the owning Space's roles, for an implied grant's deny
                 // OIDC-CC-INTEGRATION-ROLE-1: a machine is judged by the OWNING Space too (its machineClients, allowlist)
                 if (there != null && there.machine()) there = Roles.admitMachine(configRoot, there);
             } catch (ApiException refused) {
@@ -239,7 +257,10 @@ public interface ApiContext extends WriteRootProvider {
                 attr(ex, ComponentAccess.ATTR_HELD_ROLES, priorHeld);
             }
         }
-        if (there == null || !there.id().equals(bound.id()) || !there.capabilities().contains(capability))
+        Object rolesThere = heldThere;
+        if (there == null || !there.id().equals(bound.id()) || !Roles.holds(there.capabilities(), capability)
+                || impliedButDenied(there.capabilities(), capability,
+                        () -> com.gamma.access.AccessGrants.deniedCapabilities(configRoot, heldRoles(rolesThere))))
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED,
                     "missing capability '" + capability + "' in the owning space");
     }

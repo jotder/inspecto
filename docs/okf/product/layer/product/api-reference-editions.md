@@ -75,18 +75,18 @@ everything in Standard. ✅ in the edition · — not in it. An item marked — 
 | Link Analysis police showcase | ✅ | ✅ | ✅ |
 | Link Analysis procurement fraud showcase | ✅ | ✅ | ✅ |
 | Link Analysis provider billing fraud showcase | ✅ | ✅ | ✅ |
-| Link Analysis sample (invented data) | ✅ | ✅ | ✅ |
 | Link Analysis telecom revenue assurance showcase | ✅ | ✅ | ✅ |
 | Link Analysis trade showcase | ✅ | ✅ | ✅ |
 | Link Analysis utility showcase | ✅ | ✅ | ✅ |
 | Mobile money | — | ✅ | ✅ |
-| Mobile Money | ✅ | ✅ | ✅ |
+| Mobile money network | ✅ | ✅ | ✅ |
 | Order-to-cash assurance | — | ✅ | ✅ |
 | Orders starter | ✅ | ✅ | ✅ |
 | Other Examples | ✅ | ✅ | ✅ |
 | Other Examples (feature off) | — | — | — |
 | Partner settlement | — | ✅ | ✅ |
 | Payment fraud starter | — | ✅ | ✅ |
+| Sample (invented data) | ✅ | ✅ | ✅ |
 | Telecom bypass (SIM-box) | — | ✅ | ✅ |
 | Telecom fraud | — | ✅ | ✅ |
 | Telecom re-rating (tariff validation) | — | ✅ | ✅ |

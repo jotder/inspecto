@@ -157,4 +157,49 @@ describe('Find something interesting - the readings (LA-ONBOARD-1 phase 7, UC-12
         expect(none.empty).toBe('A and B are not linked on this graph. Try Expand from one of them.');
         expect(route(G, 'V1', 'V1', T).empty).toBe('Choose two different accounts on the graph.');
     });
+
+    it('uses revealed hoverLabel in Quick-question readings while keeping aliases in values', () => {
+        const revealed: G6GraphData = {
+            nodes: [
+                node('BIG', { label: 'masked:0001', hoverLabel: 'ACCT-BIG', spellings: ['masked:0001'] }),
+                node('A', { label: 'masked:0002', hoverLabel: 'ACCT-A', spellings: ['masked:0002'] }),
+                node('B', { label: 'masked:0003', hoverLabel: 'ACCT-B', spellings: ['masked:0003'] }),
+                node('C', { label: 'masked:0004', hoverLabel: 'ACCT-C', spellings: ['masked:0004'] }),
+                node('D', { label: 'masked:0005', hoverLabel: 'ACCT-D', spellings: ['masked:0005'] }),
+                node('E', { label: 'masked:0006', hoverLabel: 'ACCT-E', spellings: ['masked:0006'] }),
+            ],
+            edges: ['A', 'B', 'C', 'D', 'E'].map((x) => edge(x, 'BIG')).concat([edge('A', 'B'), edge('B', 'BIG')]),
+        };
+        const b = busiest(revealed, T);
+        expect(b.rows[0].title).toBe('ACCT-BIG');
+        expect(b.rows[0].reading).toContain('ACCT-BIG');
+        expect(b.rows[0].values).toEqual(['masked:0001']);
+        const g = groups(revealed, T);
+        expect(g.rows[0].reading).toContain('ACCT-');
+        expect(g.rows[0].reading).not.toContain('masked:');
+        const r = route(revealed, 'A', 'BIG', T);
+        expect(r.rows[0].reading).toContain('ACCT-A');
+        expect(r.rows[0].reading).toContain('ACCT-BIG');
+    });
+
+    it('surfaces the Busiest nodes exclusion offer even when the busiest other entity ranks below the five rows shown', () => {
+        const starts = ['S1', 'S2', 'S3', 'S4', 'S5'];
+        const leaves = (p: string, n: number) => Array.from({ length: n }, (_, i) => `${p}${i}`);
+        const g: G6GraphData = {
+            nodes: [
+                ...starts,
+                'X',
+                ...starts.flatMap((s) => leaves(s + '-', 10)),
+                ...leaves('x', 6),
+            ].map((id) => node(id)),
+            edges: [
+                ...starts.flatMap((s) => leaves(s + '-', 10).map((l) => edge(s, l))),
+                ...leaves('x', 6).map((l) => edge('X', l)),
+            ],
+        };
+        const r = busiest(g, T, 5, new Set(starts));
+        expect(r.rows.map((x) => x.title)).toEqual(starts);
+        expect(r.hint?.text).toBe('X has 6 transfers. Add it to an exclusion list?');
+        expect(r.hint?.row.values).toEqual(['X']);
+    });
 });

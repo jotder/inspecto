@@ -34,7 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `p
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `LA-FULL-CYCLE-RESIDUALS-1` | P3 | chore | Eight items the LA full-cycle plan left on purpose, plus two environment gaps its drive found. | — |
+| `LA-FULL-CYCLE-RESIDUALS-1` | P3 | chore | Items 6 (shared Preview Spaces re-bake & admin roster conflict) and 8a (la-guide-02-create-space.png live browser screenshot) remain afte… | — |
 | `LA-TRAINING-SERIES-1` | P3 | feature | An Inspecto LA user training video series of 41 episodes. | operator |
 | `LA-CASE-VIDEOS-2` | P3 | feature | Re-specify and re-record the twenty industry case films to the training-series standard. | operator |
-| `LA-EXEC-DEMO-POLISH-1` | P3 | chore | Polish left by the third executive review of Inspecto LA, plus transfer amounts drawn on the links. | — |

@@ -21,7 +21,7 @@ import { DataTableComponent } from 'app/inspecto/data-table';
 import { fmtDateTime } from 'app/inspecto/grid';
 
 /**
- * The **Pending Actions** tab of the Pending Changes screen (AGENT-KIT-1 AK-2d): the operational actions an unattended
+ * The **Pending Actions** tab of the Pending Changes screen (AGENT-KIT-1 AK-2d, AK-2e): the run and Case actions an unattended
  * machine agent asked for — re-run, resume, reprocess, drain… — held for a person. A change approver approves one (it
  * then runs as that machine) or declines it; four eyes. The machine withdraws its own through the API, never here.
  */
@@ -57,8 +57,10 @@ export class PendingActionsPanelComponent implements OnInit {
     readonly decideError = signal<string | null>(null);
     readonly reason = new FormControl('', { nonNullable: true, validators: [Validators.maxLength(500)] });
 
-    /** Approve / Decline show only for an approver, and only on an action still waiting. */
-    readonly canDecide = computed(() => this.lens.canApproveChanges() && this.selected()?.status === 'pending');
+    /** Approve / Decline show only for an approver, on an action still waiting, once its whole request is on screen. */
+    readonly canDecide = computed(
+        () => this.lens.canApproveChanges() && this.selected()?.status === 'pending' && !!this.selected()?.request,
+    );
 
     readonly columnDefs: ColDef<PendingAction>[] = [
         {
@@ -108,7 +110,15 @@ export class PendingActionsPanelComponent implements OnInit {
     open(row: Record<string, unknown>): void {
         this.decideError.set(null);
         this.reason.reset('');
-        this.selected.set(row as unknown as PendingAction);
+        const a = row as unknown as PendingAction;
+        this.selected.set(a);
+        // the list row carries no request: read the whole one, so the approver sees what an approval replays
+        this.api.get(a.id).subscribe({
+            next: (full) => {
+                if (this.selected()?.id === full.id) this.selected.set(full);
+            },
+            error: (err) => this.decideError.set(apiErrorMessage(err, 'The request of this action could not be read')),
+        });
     }
 
     close(): void {

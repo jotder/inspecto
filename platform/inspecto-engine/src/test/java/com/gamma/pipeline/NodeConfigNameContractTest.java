@@ -64,7 +64,9 @@ class NodeConfigNameContractTest {
                 new Contract("transform.filter", "filter_target_column", "filter_target_column", 4,
                         c -> c.csv().filterTargetColumn(), 4),
 
-                // ── acquisition — the shared COLLECTOR_ATTRIBUTES table ─────────────────────────
+                // ── acquisition — inbox folder (dirs.poll) + shared COLLECTOR_ATTRIBUTES table ──
+                new Contract("acquisition", "poll", "poll", "custom/inbox",
+                        c -> c.dirs().poll(), "custom/inbox"),
                 new Contract("acquisition", "include", "include", List.of("glob:**/*.dat"),
                         c -> c.collector().includes(), List.of("glob:**/*.dat")),
                 new Contract("acquisition", "exclude", "exclude", List.of("*.tmp"),

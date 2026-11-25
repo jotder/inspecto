@@ -146,6 +146,14 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
             + "pipeline VARCHAR, step VARCHAR, consignment_id VARCHAR, recorded_at VARCHAR, mapping VARCHAR, "
             + "fingerprint VARCHAR, length INTEGER, shape VARCHAR, n BIGINT)";
 
+    /** DATED-REFERENCE-RUNS-1 D-DR5 — per-Job, per-day work ledger over {@code consignment_outputs}. */
+    private static final String JOB_PROGRESS = "job_day_progress";
+    private static final String CREATE_JOB_PROGRESS = "CREATE TABLE IF NOT EXISTS " + JOB_PROGRESS + " ("
+            + "job_name VARCHAR, record_day VARCHAR, consignment_id VARCHAR, input_path VARCHAR, "
+            + "reference_versions VARCHAR, status VARCHAR, stale BOOLEAN DEFAULT FALSE, "
+            + "stale_reason VARCHAR, run_id VARCHAR, updated_at VARCHAR, "
+            + "UNIQUE (job_name, record_day, input_path))";
+
     /** {@code recorded_at}'s fixed-width UTC form: its text order IS its time order, so retention compares text on
      *  every backend ({@code Instant.toString()} varies its fraction digits, so its text order is not). */
     private static final java.time.format.DateTimeFormatter RECORDED_AT =
@@ -162,6 +170,9 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
                 try (Statement st = conn.createStatement()) {
                     st.execute(CREATE_STEPS);
                     st.execute(CREATE_MISSES);
+                    st.execute(CREATE_JOB_PROGRESS);
+                    st.execute("CREATE INDEX IF NOT EXISTS job_day_progress_by_job ON " + JOB_PROGRESS
+                            + " (job_name, record_day)");
                     st.execute("CREATE INDEX IF NOT EXISTS consignment_steps_by_consignment ON " + STEPS
                             + " (consignment_id)");
                     st.execute(CREATE);
@@ -1087,6 +1098,223 @@ public final class DbConsignmentOutputStore implements AutoCloseable, com.gamma.
         } catch (IllegalArgumentException e) {
             log.warn("unknown consignment-output state '{}' — treating as LIVE", raw);
             return ConsignmentOutput.State.LIVE;
+        }
+    }
+
+    public record DayPendingSummary(String recordDay, long pendingFiles, long pendingRows,
+                                    String firstArrivedAt, String lastArrivedAt) {}
+
+    public record JobDayStatus(String jobName, String recordDay, long files, long rows,
+                               String status, boolean stale, String staleReason,
+                               String referenceVersions, String runId, String updatedAt) {}
+
+    /** Sentinel {@code record_day} value for rows with no usable event time (D-DR3). */
+    public static final String UNKNOWN_DAY = "__unknown__";
+
+    /**
+     * Work ledger query ({@code DATED-REFERENCE-RUNS-1} §3.4):
+     * {@code pending(Job, D) = registry files of inputStream with record_day = D and readable state MINUS files this Job already enriched for D}.
+     */
+    public List<DayPendingSummary> pendingDaysForJob(String jobName, String inputStream) {
+        if (jobName == null || jobName.isBlank() || inputStream == null || inputStream.isBlank()) return List.of();
+        String sql = "SELECT COALESCE(o.record_day, '" + UNKNOWN_DAY + "') AS rday, "
+                + "COUNT(DISTINCT o.path) AS pending_files, "
+                + "CAST(COALESCE(SUM(o.row_count), 0) AS BIGINT) AS pending_rows, "
+                + "MIN(o.written_at) AS first_arrived_at, "
+                + "MAX(o.written_at) AS last_arrived_at "
+                + "FROM " + T + " o "
+                + "LEFT JOIN " + JOB_PROGRESS + " p "
+                + "  ON p.job_name = ? AND p.record_day = COALESCE(o.record_day, '" + UNKNOWN_DAY + "') AND p.input_path = o.path "
+                + "WHERE (o.table_name = ? OR o.producer = ?) "
+                + "  AND coalesce(o.state, 'LIVE') IN " + READABLE + " "
+                + "  AND (p.input_path IS NULL OR p.status IN ('WAITING', 'STALE')) "
+                + "GROUP BY rday "
+                + "ORDER BY rday ASC";
+        try {
+            return src.with(conn -> {
+                List<DayPendingSummary> out = new ArrayList<>();
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, jobName);
+                    ps.setString(2, inputStream);
+                    ps.setString(3, inputStream);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            out.add(new DayPendingSummary(
+                                    rs.getString("rday"),
+                                    rs.getLong("pending_files"),
+                                    rs.getLong("pending_rows"),
+                                    rs.getString("first_arrived_at"),
+                                    rs.getString("last_arrived_at")));
+                        }
+                    }
+                }
+                return out;
+            });
+        } catch (SQLException e) {
+            log.warn("Could not query pendingDaysForJob({}, {}): {}", jobName, inputStream, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /** Readable input file paths for {@code (jobName, inputStream, recordDay)} not yet enriched. */
+    public List<String> pendingPathsForDay(String jobName, String inputStream, String recordDay) {
+        if (jobName == null || inputStream == null) return List.of();
+        String dayKey = (recordDay == null || recordDay.isBlank()) ? UNKNOWN_DAY : recordDay;
+        String sql = "SELECT DISTINCT o.path FROM " + T + " o "
+                + "LEFT JOIN " + JOB_PROGRESS + " p "
+                + "  ON p.job_name = ? AND p.record_day = COALESCE(o.record_day, ?) AND p.input_path = o.path "
+                + "WHERE (o.table_name = ? OR o.producer = ?) "
+                + "  AND COALESCE(o.record_day, ?) = ? "
+                + "  AND coalesce(o.state, 'LIVE') IN " + READABLE + " "
+                + "  AND (p.input_path IS NULL OR p.status IN ('WAITING', 'STALE')) "
+                + "ORDER BY o.path";
+        try {
+            return src.with(conn -> {
+                List<String> out = new ArrayList<>();
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, jobName);
+                    ps.setString(2, UNKNOWN_DAY);
+                    ps.setString(3, inputStream);
+                    ps.setString(4, inputStream);
+                    ps.setString(5, UNKNOWN_DAY);
+                    ps.setString(6, dayKey);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) out.add(rs.getString(1));
+                    }
+                }
+                return out;
+            });
+        } catch (SQLException e) {
+            log.warn("Could not query pendingPathsForDay({}, {}): {}", jobName, dayKey, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /** Record or update per-Job, per-day progress for {@code inputPaths}. */
+    public synchronized void recordJobDayProgress(String jobName, String recordDay, List<String> inputPaths,
+                                                  String consignmentId, String referenceVersions,
+                                                  String status, boolean stale, String staleReason, String runId) {
+        if (jobName == null || inputPaths == null || inputPaths.isEmpty()) return;
+        String dayKey = (recordDay == null || recordDay.isBlank()) ? UNKNOWN_DAY : recordDay;
+        String now = RECORDED_AT.format(java.time.Instant.now());
+        String sql = "INSERT INTO " + JOB_PROGRESS + " "
+                + "(job_name, record_day, consignment_id, input_path, reference_versions, status, stale, stale_reason, run_id, updated_at) "
+                + "VALUES (?,?,?,?,?,?,?,?,?,?) "
+                + "ON CONFLICT (job_name, record_day, input_path) DO UPDATE SET "
+                + "consignment_id = excluded.consignment_id, "
+                + "reference_versions = COALESCE(excluded.reference_versions, " + JOB_PROGRESS + ".reference_versions), "
+                + "status = excluded.status, stale = excluded.stale, stale_reason = excluded.stale_reason, "
+                + "run_id = COALESCE(excluded.run_id, " + JOB_PROGRESS + ".run_id), "
+                + "updated_at = excluded.updated_at";
+        try {
+            src.run(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    for (String path : inputPaths) {
+                        ps.setString(1, jobName);
+                        ps.setString(2, dayKey);
+                        ps.setString(3, consignmentId);
+                        ps.setString(4, path);
+                        ps.setString(5, referenceVersions);
+                        ps.setString(6, status);
+                        ps.setBoolean(7, stale);
+                        ps.setString(8, staleReason);
+                        ps.setString(9, runId);
+                        ps.setString(10, now);
+                        ps.addBatch();
+                    }
+                    ps.executeBatch();
+                }
+            });
+        } catch (SQLException e) {
+            log.warn("Could not record job_day_progress for {} {}: {}", jobName, dayKey, e.getMessage());
+        }
+    }
+
+    /** Mark all progress rows for {@code (jobName, recordDay)} as {@code STALE} so the reconcile loop re-runs that day. */
+    public synchronized int markJobDayStale(String jobName, String recordDay, String reason) {
+        if (jobName == null || recordDay == null) return 0;
+        String now = RECORDED_AT.format(java.time.Instant.now());
+        try {
+            return src.with(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement("UPDATE " + JOB_PROGRESS
+                        + " SET status = 'STALE', stale = TRUE, stale_reason = ?, updated_at = ? "
+                        + "WHERE job_name = ? AND record_day = ?")) {
+                    ps.setString(1, reason);
+                    ps.setString(2, now);
+                    ps.setString(3, jobName);
+                    ps.setString(4, recordDay);
+                    return ps.executeUpdate();
+                }
+            });
+        } catch (SQLException e) {
+            log.warn("Could not markJobDayStale({}, {}): {}", jobName, recordDay, e.getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Mark enriched days for {@code recordDay} as stale when a Reference version changes ({@code DATED-REFERENCE-RUNS-1} P3).
+     * When {@code setStaleStatus} is true (opt-in {@code rerun_on_reference_change}), status moves to {@code STALE}
+     * so the reconcile loop re-runs that day; otherwise {@code stale = TRUE} is recorded for visibility only.
+     */
+    public synchronized int markReferenceChanged(String jobName, String recordDay, String reason, boolean triggerRerun) {
+        if (jobName == null || recordDay == null) return 0;
+        String now = RECORDED_AT.format(java.time.Instant.now());
+        String sql = triggerRerun
+                ? "UPDATE " + JOB_PROGRESS + " SET status = 'STALE', stale = TRUE, stale_reason = ?, updated_at = ? "
+                  + "WHERE job_name = ? AND record_day = ? AND status = 'ENRICHED'"
+                : "UPDATE " + JOB_PROGRESS + " SET stale = TRUE, stale_reason = ?, updated_at = ? "
+                  + "WHERE job_name = ? AND record_day = ? AND status = 'ENRICHED'";
+        try {
+            return src.with(conn -> {
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, reason);
+                    ps.setString(2, now);
+                    ps.setString(3, jobName);
+                    ps.setString(4, recordDay);
+                    return ps.executeUpdate();
+                }
+            });
+        } catch (SQLException e) {
+            log.warn("Could not markReferenceChanged({}, {}): {}", jobName, recordDay, e.getMessage());
+            return 0;
+        }
+    }
+
+    /** Per-day progress summary for one Job (P4 Backlog screen). */
+    public List<JobDayStatus> jobDayStatuses(String jobName) {
+        if (jobName == null || jobName.isBlank()) return List.of();
+        String sql = "SELECT job_name, record_day, COUNT(DISTINCT input_path) AS files, "
+                + "MAX(status) AS status, BOOL_OR(stale) AS stale, MAX(stale_reason) AS stale_reason, "
+                + "MAX(reference_versions) AS reference_versions, MAX(run_id) AS run_id, MAX(updated_at) AS updated_at "
+                + "FROM " + JOB_PROGRESS + " WHERE job_name = ? "
+                + "GROUP BY job_name, record_day ORDER BY record_day ASC";
+        try {
+            return src.with(conn -> {
+                List<JobDayStatus> out = new ArrayList<>();
+                try (PreparedStatement ps = conn.prepareStatement(sql)) {
+                    ps.setString(1, jobName);
+                    try (ResultSet rs = ps.executeQuery()) {
+                        while (rs.next()) {
+                            out.add(new JobDayStatus(
+                                    rs.getString("job_name"),
+                                    rs.getString("record_day"),
+                                    rs.getLong("files"),
+                                    0L,
+                                    rs.getString("status"),
+                                    rs.getBoolean("stale"),
+                                    rs.getString("stale_reason"),
+                                    rs.getString("reference_versions"),
+                                    rs.getString("run_id"),
+                                    rs.getString("updated_at")));
+                        }
+                    }
+                }
+                return out;
+            });
+        } catch (SQLException e) {
+            log.warn("Could not query jobDayStatuses({}): {}", jobName, e.getMessage());
+            return List.of();
         }
     }
 

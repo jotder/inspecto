@@ -22,7 +22,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 /** The never-list as an agent would hit it (AK-2 plan §4.1): approving, deciding, revealing, promoting ... */
-export const NEVER = /\/(approve|decline|decision|reveal)\b|\/promotion\/apply/;
+export const NEVER = /\/(approve|decline|decision|reveal|deny)\b|\/promotion\/apply|\/drafts\/[^/"]+\/promote\b/;
 /** ... and any write to Apps or Access. A row carries method and path as separate attributes, so both are looked for. */
 const WRITE_METHOD = /\b(POST|PUT|PATCH|DELETE)\b/;
 const APPS_ACCESS = /\/(apps|access)(\/|\b)/;
@@ -47,8 +47,9 @@ const toolOf = (row) => row.mcpTool ?? row.attributes?.mcpTool ?? row.attrs?.mcp
 const timeOf = (row) => row.timestamp ?? row.ts ?? row.time ?? row.createdAt ?? '';
 const pathOf = (row) => (s(row).match(/"http_path"\s*:\s*"([^"]+)"/) || [])[1] ?? null;
 const methodOf = (row) => (s(row).match(/"http_method"\s*:\s*"([A-Z]+)"/) || [])[1] ?? null;
-/** The operational action routes (AgentGate.ACTIONS, AK-2d), as an http_path under /api/v1[/spaces/{id}] would carry them. */
-export const ACTION_PATH = /\/(runs\/[^/]+\/(trigger|pause|resume|reprocess|replay-rejects|drain|retries\/(retry-now|cancel))|jobs\/[^/]+\/trigger|jobs\/runs\/[^/]+\/replay)$/;
+/** The action routes (AgentGate.ACTIONS: a run's, AK-2d; an Incident's, Case's or Alert's, AK-2e; a Link Analysis Draft
+ *  write or graph run, AK-2f), as an http_path under /api/v1[/spaces/{id}] would carry them. */
+export const ACTION_PATH = /\/(runs\/[^/]+\/(trigger|pause|resume|reprocess|replay-rejects|drain|retries\/(retry-now|cancel))|jobs\/[^/]+\/trigger|jobs\/runs\/[^/]+\/replay|objects\/[^/]+\/(comments|ack|assign|resolve|transition)|incidents\/[^/]+\/briefs|alerts\/[^/]+\/(ack|resolve)|cases\/from-entities|inv\/investigations\/[^/]+\/drafts(\/[^/]+\/(ops|undo|discard|rebase))?|inv\/graph\/runs(\/[^/]+\/cancel)?)$/;
 
 export function substitute(text, vars) {
     return text.replace(/\{([A-Za-z_]\w*)\}/g, (m, k) => (k in vars ? vars[k] : m));

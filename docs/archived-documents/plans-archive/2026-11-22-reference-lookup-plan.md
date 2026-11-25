@@ -1,6 +1,6 @@
 # Lookup — exact and best-match key resolution over a Reference Dataset
 
-**State:** 🟡 **IN FLIGHT 2026-11-22 — P1a (`match: exact | longest_prefix`) and P1b (the keyed form: several numbers, returned columns, not-found value, exact-only rows, repeated keys) and P1c (`match: range`, `filter`) built; rest of P1 and P2–P4 open.**
+**State:** ✅ **DONE 2026-11-25 — P1–P4 built and archived; truth in [`okf/product/module/elt/user-guide-elt-record-transformer.md`](../../okf/product/module/elt/user-guide-elt-record-transformer.md) §8.7.**
 Board row `LOOKUP-1` [items: module.elt, module.engine]. Hubs on ship: `okf/product/module/elt/` (authoring,
 Step) and `okf/product/module/engine/` (execution, point engine).
 

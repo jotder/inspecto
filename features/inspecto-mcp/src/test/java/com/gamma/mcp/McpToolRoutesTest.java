@@ -44,6 +44,24 @@ class McpToolRoutesTest {
                     calls.add(t.router().route(t.validate(new LinkedHashMap<>(Map.of("run", "orders", "action", action)))));
                 continue;
             }
+            if (t.name().equals("run_link_query") || t.name().equals("work_draft")) {   // AK-2f: every kind and action
+                java.util.Collection<String> values = t.name().equals("run_link_query") ? McpTools.LINK_QUERIES.keySet()
+                        : McpTools.DRAFT_ACTIONS;
+                for (String v : values) {
+                    Map<String, Object> a = sample(t);
+                    a.put(t.name().equals("run_link_query") ? "kind" : "action", v);
+                    calls.add(t.router().route(t.validate(a)));
+                }
+                continue;
+            }
+            if (t.name().equals("work_incident_or_case") || t.name().equals("work_alert")) {   // AK-2e: every move
+                for (String action : t.name().equals("work_alert") ? McpTools.ALERT_MOVES : McpTools.CASE_MOVES) {
+                    Map<String, Object> a = sample(t);
+                    a.put("action", action);
+                    calls.add(t.router().route(t.validate(a)));
+                }
+                continue;
+            }
             if (!t.name().equals("propose_change")) {
                 calls.add(t.router().route(t.validate(sample(t))));
                 continue;
@@ -105,6 +123,53 @@ class McpToolRoutesTest {
                     "an operations tool replays a canOperateRuns route: " + route);
         }
         assertEquals(8, McpTools.RUN_ACTIONS.size(), "the eight run actions of plan §4.6");
+    }
+
+    /** The host's Link Analysis writes ({@code AgentGate.LA_ACTIONS}) and queries ({@code AgentGate.LA_READS}). */
+    private static final List<String> LA_ACTION_ROUTES = List.of(
+            "POST /inv/investigations/[^/]+/drafts", "POST /inv/investigations/[^/]+/drafts/[^/]+/ops",
+            "POST /inv/investigations/[^/]+/drafts/[^/]+/undo", "POST /inv/investigations/[^/]+/drafts/[^/]+/discard",
+            "POST /inv/investigations/[^/]+/drafts/[^/]+/rebase", "PUT /inv/investigations/[^/]+/case",
+            "POST /inv/graph/runs", "POST /inv/graph/runs/[^/]+/cancel");
+
+    @Test
+    void everyLinkAnalysisWriteToolReplaysAnActionAndEveryActionHasATool() {
+        java.util.Set<String> reached = new java.util.TreeSet<>();
+        for (McpTools.Call c : everyCall())
+            for (String route : LA_ACTION_ROUTES) {
+                int sp = route.indexOf(' ');
+                if (c.method().equals(route.substring(0, sp)) && c.path().matches(route.substring(sp + 1))) reached.add(route);
+            }
+        assertEquals(new java.util.TreeSet<>(LA_ACTION_ROUTES), reached, "AK-2f: a tool for every Link Analysis action");
+        for (McpTools.Call c : everyCall())
+            if (c.path().startsWith("/inv/") && !"GET".equals(c.method())) {
+                boolean action = LA_ACTION_ROUTES.stream().anyMatch(r -> c.path().matches(r.substring(r.indexOf(' ') + 1)));
+                boolean query = McpTools.LINK_QUERIES.containsValue(c.path()) || c.path().matches("/inv/presets/[^/]+/run");
+                assertTrue(action || query, "an /inv write a tool makes is a named action or query: " + c.method() + " " + c.path());
+            }
+        for (String line : List.of("POST /inv/investigations/i1/drafts/d1/promote", "POST /inv/investigations/i1/pending/p1/deny",
+                "POST /inv/investigations/i1/reveal")) {
+            int sp = line.indexOf(' ');
+            assertTrue(McpTools.refused(new McpTools.Call(line.substring(0, sp), line.substring(sp + 1), null)), line);
+        }
+    }
+
+    /** The host's case action routes ({@code AgentGate.CASE_ACTIONS}, pinned there by {@code AgentGateParityTest}). */
+    private static final List<String> CASE_ACTION_ROUTES = List.of(
+            "/objects/[^/]+/comments", "/incidents/[^/]+/briefs", "/objects/[^/]+/ack", "/objects/[^/]+/assign",
+            "/objects/[^/]+/resolve", "/objects/[^/]+/transition", "/alerts/[^/]+/ack", "/alerts/[^/]+/resolve",
+            "/cases/from-entities");
+
+    @Test
+    void everyCaseToolReplaysACaseActionAndEveryCaseActionHasATool() {
+        java.util.Set<String> reached = new java.util.TreeSet<>();
+        for (McpTools.Tool t : McpTools.CASE_TOOLS) assertTrue(t.write(), t.name() + " acts, so it is a write tool");
+        for (McpTools.Call c : everyCall())
+            if ("POST".equals(c.method()))
+                for (String route : CASE_ACTION_ROUTES) if (c.path().matches(route)) reached.add(route);
+        assertEquals(new java.util.TreeSet<>(CASE_ACTION_ROUTES), reached, "AK-2e: a tool for every case action of plan §4.6");
+        assertEquals(List.of("add_comment", "build_incident_brief", "work_incident_or_case", "work_alert",
+                "open_case_from_entities"), McpTools.CASE_TOOLS.stream().map(McpTools.Tool::name).toList());
     }
 
     @Test

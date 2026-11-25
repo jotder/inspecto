@@ -135,6 +135,30 @@ public final class Roles {
     public static final String CAN_WORK_INCIDENTS      = "canWorkIncidents";
 
     /**
+     * Working in a Link Analysis <b>Draft</b> — opening one on an Investigation the caller is a member of, adding ops,
+     * undo, discard, rebase ({@code POST /inv/investigations/{id}/drafts…}; AGENT-KIT-1 AK-2f, operator 2026-11-25). Not
+     * promote: a Draft reaches the Investigation only through a holder of {@link #CAN_MANAGE_INCIDENTS}, and the promote
+     * four-eyes. Narrower than {@link #CAN_MANAGE_INCIDENTS} so a machine agent may keep it
+     * ({@link #AGENT_MACHINE_CAPABILITIES}). <b>Implied</b> by {@link #CAN_MANAGE_INCIDENTS} ({@link #holds}), so no
+     * role needs it granted and no person lost a right when the Draft writes moved onto it.
+     */
+    public static final String CAN_DRAFT_INVESTIGATIONS = "canDraftInvestigations";
+
+    /** A capability → the capabilities whose holder holds it too ({@link #holds}). */
+    private static final Map<String, Set<String>> IMPLIED_BY = Map.of(
+            CAN_DRAFT_INVESTIGATIONS, Set.of(CAN_MANAGE_INCIDENTS));
+
+    /**
+     * Whether a Subject holding {@code held} holds {@code capability}: granted, or implied by a granted one
+     * ({@link #CAN_MANAGE_INCIDENTS} implies {@link #CAN_DRAFT_INVESTIGATIONS}). Every capability check goes through it.
+     */
+    public static boolean holds(Set<String> held, String capability) {
+        if (held.contains(capability)) return true;
+        for (String by : IMPLIED_BY.getOrDefault(capability, Set.of())) if (held.contains(by)) return true;
+        return false;
+    }
+
+    /**
      * Revealing a MASKED entity id in a Link Analysis Investigation ({@code POST /inv/investigations/{id}/reveal},
      * LA-19 / D-U6, operator 2026-09-24): per entity, audited. ⛔ Deliberately NOT {@code canManageIncidents} —
      * every Investigation owner holds that, so it would make masking a formality.
@@ -239,7 +263,8 @@ public final class Roles {
      * never an {@link #AGENT_NEVER_CAPABILITIES} one, {@code canAdminister} or access configuration.
      */
     public static final Set<String> AGENT_MACHINE_CAPABILITIES =
-            Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_WORK_INCIDENTS, CAN_OPERATE_RUNS);
+            Set.of(CAN_AUTHOR_WORKBENCH, CAN_AUTHOR_ALERT_RULES, CAN_WORK_INCIDENTS, CAN_OPERATE_RUNS,
+                    CAN_DRAFT_INVESTIGATIONS);   // AK-2f: a Link Analysis Draft, every write held; never promote
 
     /** What a machine Subject may keep: {@link #MACHINE_CAPABILITIES}, plus {@link #AGENT_MACHINE_CAPABILITIES} for an agent. */
     private static Set<String> machineKeeps(Subject subject) {

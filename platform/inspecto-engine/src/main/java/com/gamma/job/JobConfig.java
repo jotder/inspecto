@@ -203,6 +203,8 @@ public record JobConfig(String name, String type, String cron, String onPipeline
                         m.forEach((k, v) -> { if (v != null) params.put(IncrementalSpec.PREFIX + k, v.toString()); });
                     else if (e.getValue() != null) params.put("incremental", e.getValue().toString());
                 }
+                case "schedule" -> flattenNested(ByDaySchedule.SCHEDULE_PREFIX, e.getValue(), params);
+                case "inputs"   -> flattenNested(ByDaySchedule.INPUTS_PREFIX, e.getValue(), params);
                 default -> { if (e.getValue() != null) params.put(e.getKey(), e.getValue().toString()); }
             }
         }
@@ -215,6 +217,7 @@ public record JobConfig(String name, String type, String cron, String onPipeline
             KpiCompletenessJob.effectivePipeline(name, params.get("pipeline"),
                     java.util.Arrays.stream(onPipeline.split(",")).map(String::trim).filter(t -> !t.isEmpty()).toList());
         IncrementalSpec.parse(name, type, params);   // INCREMENTAL-1: a malformed block refuses at save
+        ByDaySchedule.parse(name, params);           // DATED-REFERENCE-RUNS-1: validate schedule/inputs at save
         String deadline = params.get(DEADLINE_SECONDS);
         if (deadline != null && !deadline.isBlank()) JobDeadline.parse(deadline);   // fail closed at load
         return new JobConfig(name, type, cron, onPipeline, enabled, catchUp, params, onSignal, when, args, bind);
@@ -236,12 +239,51 @@ public record JobConfig(String name, String type, String cron, String onPipeline
         if (!args.isEmpty()) m.put("args", new LinkedHashMap<>(args));
         if (!bind.isEmpty()) m.put("bind", new LinkedHashMap<>(bind));
         Map<String, Object> incremental = new LinkedHashMap<>();
+        Map<String, Object> schedule = new LinkedHashMap<>();
+        Map<String, Object> inputs = new LinkedHashMap<>();
         params.forEach((k, v) -> {
             if (k.startsWith(IncrementalSpec.PREFIX)) incremental.put(k.substring(IncrementalSpec.PREFIX.length()), v);
+            else if (k.startsWith(ByDaySchedule.SCHEDULE_PREFIX)) unflattenNested(schedule, k.substring(ByDaySchedule.SCHEDULE_PREFIX.length()), v);
+            else if (k.startsWith(ByDaySchedule.INPUTS_PREFIX)) unflattenNested(inputs, k.substring(ByDaySchedule.INPUTS_PREFIX.length()), v);
             else m.put(k, v);
         });
         if (!incremental.isEmpty()) m.put("incremental", incremental);
+        if (!schedule.isEmpty()) m.put("schedule", schedule);
+        if (!inputs.isEmpty()) m.put("inputs", inputs);
         return m;
+    }
+
+    private static void flattenNested(String prefix, Object raw, Map<String, String> out) {
+        if (raw instanceof Map<?, ?> m) {
+            for (Map.Entry<?, ?> e : m.entrySet()) {
+                if (e.getKey() == null || e.getValue() == null) continue;
+                String key = prefix + e.getKey();
+                if (e.getValue() instanceof Map<?, ?>) flattenNested(key + ".", e.getValue(), out);
+                else out.put(key, e.getValue().toString());
+            }
+        } else if (raw != null) {
+            out.put(prefix.endsWith(".") ? prefix.substring(0, prefix.length() - 1) : prefix, raw.toString());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void unflattenNested(Map<String, Object> root, String key, String value) {
+        int dot = key.indexOf('.');
+        if (dot <= 0) {
+            root.put(key, value);
+            return;
+        }
+        String head = key.substring(0, dot);
+        String tail = key.substring(dot + 1);
+        Object existing = root.get(head);
+        Map<String, Object> child;
+        if (existing instanceof Map<?, ?> m) {
+            child = (Map<String, Object>) m;
+        } else {
+            child = new LinkedHashMap<>();
+            root.put(head, child);
+        }
+        unflattenNested(child, tail, value);
     }
 
     /** Coerce a decoded nested section ({@code args:}/{@code bind:}) into a string-valued map; empty when absent. */

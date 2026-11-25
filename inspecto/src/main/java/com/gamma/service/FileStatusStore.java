@@ -67,6 +67,7 @@ public final class FileStatusStore implements StatusStore {
         if (qd == null || qd.isBlank()) return out;
         Path root = Path.of(qd);
         if (!Files.isDirectory(root)) return out;
+        Map<String, Map<String, String>> latestAudit = latestAuditByFile(cfg);
         try (Stream<Path> w = Files.walk(root)) {
             w.filter(Files::isRegularFile)
                     // processing.refusal: the restricted quarantine is never listed (RefusalQuarantine.DIR, restated)
@@ -76,17 +77,50 @@ public final class FileStatusStore implements StatusStore {
                 // layout: <quarantine>/<relParent>/<reason>/<filename>
                 String reason = rel.getNameCount() >= 2
                         ? rel.getName(rel.getNameCount() - 2).toString() : "unknown";
+                String fileName = p.getFileName().toString();
                 Map<String, String> m = new LinkedHashMap<>();
-                m.put("file", p.getFileName().toString());
+                m.put("file", fileName);
                 m.put("reason", reason);
                 m.put("path", rel.toString().replace('\\', '/'));
                 try { m.put("size_bytes", Long.toString(Files.size(p))); } catch (IOException ignore) {}
+                Map<String, String> audit = latestAudit.get(fileName);
+                if (audit != null) {
+                    String consignmentId = audit.get("consignment_id");
+                    if (consignmentId != null && !consignmentId.isBlank()) {
+                        m.put("consignment_id", consignmentId);
+                    }
+                    String time = audit.get("end_time");
+                    if (time == null || time.isBlank()) time = audit.get("start_time");
+                    if (time != null && !time.isBlank()) {
+                        m.put("quarantined_at", time);
+                    }
+                }
+                if (!m.containsKey("quarantined_at")) {
+                    try {
+                        m.put("quarantined_at", Files.getLastModifiedTime(p).toInstant().toString());
+                    } catch (IOException ignore) {}
+                }
                 out.add(m);
             });
         } catch (IOException e) {
             log.warn("Could not read quarantine dir {}: {}", root, e.getMessage());
         }
         return out;
+    }
+
+    /** Latest status-ledger row per filename (and per {@code origin!filename} for unpacked archive entries). */
+    private Map<String, Map<String, String>> latestAuditByFile(PipelineConfig cfg) {
+        Map<String, Map<String, String>> byFile = new LinkedHashMap<>();
+        for (Map<String, String> r : files(cfg)) {
+            String name = r.get("filename");
+            if (name == null || name.isBlank()) continue;
+            byFile.put(name, r);
+            String origin = r.get("origin");
+            if (origin != null && !origin.isBlank()) {
+                byFile.put(origin + "!" + name, r);
+            }
+        }
+        return byFile;
     }
 
     // ── internals ────────────────────────────────────────────────────────────────

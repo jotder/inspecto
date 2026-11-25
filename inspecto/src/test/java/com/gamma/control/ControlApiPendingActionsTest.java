@@ -168,6 +168,10 @@ class ControlApiPendingActionsTest {
             JsonNode listed = data(send(c, "GET", "/pending-actions?status=pending", null, CHECKER), 200);
             assertEquals(1, listed.get("total").asInt(), listed.toString());
             assertFalse(listed.get("items").get(0).has("request"), "the list carries no raw request");
+            // the approver reads the whole request an approval replays — path, query and body (phase-2 security review)
+            JsonNode one = data(send(c, "GET", "/pending-actions/" + id, null, CHECKER), 200);
+            assertEquals("/runs/" + run + "/pause", one.at("/request/path").asText(), one.toString());
+            assertEquals("{}", one.at("/request/body").asText(), one.toString());
 
             JsonNode approved = data(send(c, "POST", "/pending-actions/" + id + "/approve", "{\"reason\":\"ok\"}", CHECKER), 200);
             assertTrue(approved.get("ran").asBoolean(), approved.toString());

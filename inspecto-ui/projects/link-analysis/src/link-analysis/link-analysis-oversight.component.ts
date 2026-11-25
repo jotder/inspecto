@@ -14,7 +14,7 @@ import { ledgerTime } from '@inspecto/core/add-data/add-data.model';
 import { thresholdWords } from './investigate-number';
 import { RevealedIds, refusal403 } from './investigation-state';
 import { EntityListReasonData, EntityListReasonDialog } from './link-analysis-entity-lists.dialogs';
-import { confirmApproveExpansion, requesterName } from './expansion-decision';
+import { confirmApproveExpansion, confirmDenyExpansion, requesterName } from './expansion-decision';
 
 /** A readable message for a four-eyes / reveal refusal; the server's own reason is always kept. */
 export function oversightErrorMessage(err: unknown, fallback: string): string {
@@ -158,6 +158,8 @@ export class LinkAnalysisOversightComponent {
     readonly workingSet = input<WorkingSet | null>(null);
     /** The aliases this screen already revealed (the host's, shared with the canvas and the node dialog). */
     readonly revealed = input<RevealedIds>({});
+    /** The caller's Investigation role is read-only (reviewer or Case reader): Reveal is lead-only on the server. */
+    readonly readsOnly = input(false);
     /** Reveal these aliases with a reason (the host's store); null = no reveal from here. */
     readonly reveal = input<((tokens: string[], reason: string) => Promise<number>) | null>(null);
     readonly decided = output<void>();
@@ -168,7 +170,7 @@ export class LinkAnalysisOversightComponent {
     private readonly confirm = inject(InspectoConfirmService);
     private readonly session = inject(SessionService);
     readonly canApprove = computed(() => this.lens.canApproveLinkExpansions());
-    readonly canReveal = computed(() => this.lens.canRevealLinkEntities());
+    readonly canReveal = computed(() => !this.readsOnly() && this.lens.canRevealLinkEntities());
 
     readonly requests = computed<PendingExpansion[]>(() => this.log()?.pending ?? []);
     readonly masked = computed(() =>
@@ -194,22 +196,20 @@ export class LinkAnalysisOversightComponent {
     }
 
     async decide(p: PendingExpansion, approve: boolean): Promise<void> {
-        // finding 23: approving runs the expand at once, so it is confirmed first (as on the Investigation tab's line)
-        if (
-            approve &&
-            !(await confirmApproveExpansion(
-                this.confirm,
-                p,
-                requesterName(p, (id) => this.session.subjectName(id)),
-            ))
-        )
-            return;
+        const who = requesterName(p, (id) => this.session.subjectName(id));
+        const denyReason = this.reason().trim() || undefined;
+        // finding 23: approving runs the expand at once; denying closes the request — confirm both here
+        if (approve) {
+            if (!(await confirmApproveExpansion(this.confirm, p, who))) return;
+        } else {
+            if (!(await confirmDenyExpansion(this.confirm, who, denyReason))) return;
+        }
         const id = this.investigationId();
         this.busy.set(true);
         this.error.set('');
         try {
             if (approve) await firstValueFrom(this.inv.approveExpansion(id, p.id));
-            else await firstValueFrom(this.inv.denyExpansion(id, p.id, this.reason().trim() || undefined));
+            else await firstValueFrom(this.inv.denyExpansion(id, p.id, denyReason));
             this.reason.set('');
             this.decided.emit();
         } catch (err) {

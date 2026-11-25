@@ -25,6 +25,7 @@ import { MapSettingsComponent } from 'app/modules/admin/map-settings/map-setting
 import { ModelSettingsComponent } from 'app/modules/admin/model-settings/model-settings.component';
 import { NotificationCenterComponent } from 'app/modules/admin/notification-center/notification-center.component';
 import { EgressSettingsComponent } from './egress.component';
+import { ApprovalPolicySettingsComponent } from './approval-policy.component';
 import { ApproverRosterSettingsComponent } from './approver-roster.component';
 import { ModuleSettingsComponent } from './module-settings.component';
 import { IncidentGovernanceComponent } from './incident-governance.component';
@@ -113,6 +114,13 @@ export class SettingsComponent {
             icon: 'heroicons_outline:user-group',
             description: 'Who may approve Action Requests and Pending Changes.',
             component: ApproverRosterSettingsComponent,
+        },
+        {
+            id: 'approval-policy',
+            title: 'Approval Policy',
+            icon: 'heroicons_outline:shield-check',
+            description: 'Require approval before configuration changes take effect.',
+            component: ApprovalPolicySettingsComponent,
         },
         {
             id: 'modules',

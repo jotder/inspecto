@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-431 test class(es): 431 unit, 0 real-HTTP control-plane, 0 IT.
+434 test class(es): 434 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -140,6 +140,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `MainAppMigrateConfigsArgsTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/MainAppMigrateConfigsArgsTest.java` | 🔴 <b>CONFIG-MIGRATOR-LOSES-MAPPINGS-1 (b)</b> — {@code migrate-configs <config_root> --apply}, the form |
 | `MultiCollectorProcessorTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/MultiCollectorProcessorTest.java` | Tests for {@link MultiCollectorProcessor} — the multi-source orchestrator. <!-- vocab-allow: quoted Javadoc --> |
 | `ObjectStoreIngestTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/ObjectStoreIngestTest.java` | SCALEOUT-OBJSTORE-DATABASE-DIR-1: the ingest lane writes an allow-listed {@code s3://} {@code dirs.database} |
+| `OutputNameOverwriteTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/OutputNameOverwriteTest.java` | {@code OUTPUT-NAME-OVERWRITE-1}: a second file with the same file name (e.g. {@code later/feed.csv} after |
 | `OutputPerMemberEndToEndTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/OutputPerMemberEndToEndTest.java` | {@code processing.output_per_member} end to end through {@link CollectorProcessor#run} over the delimited-CSV |
 | `OutputPerMemberTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/OutputPerMemberTest.java` | INGEST-MULTIFILE-BATCH-REPLAN-DUP-1 stage 2: {@code processing.output_per_member}. On, every member of a batch |
 | `OutputStemCollisionTest` | `com.gamma.inspector` | unit | `platform/inspecto-engine/src/test/java/com/gamma/inspector/OutputStemCollisionTest.java` | INGEST-MULTIFILE-BATCH-REPLAN-DUP-1 stage 1 (operator decision D3, 2026-10-12): two members of ONE batch that |
@@ -191,6 +192,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `ConsignmentProcessParameterTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ConsignmentProcessParameterTest.java` | §14.4 step 3's acceptance criterion, at the layer that actually decides it: <b>"a third-party processor gets |
 | `CryptoLinksJobGoldenTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/CryptoLinksJobGoldenTest.java` | The {@code la-crypto} Space Template (Basic tier) RUN end to end from a verbatim copy: the six Pipelines land the shipped extracts |
 | `DataRootInternalDirsTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/DataRootInternalDirsTest.java` | A data-root walk never touches a live Run's snapshot links ({@code .run-snapshots/}, com.gamma.query.RunSnapshot) or |
+| `DatedReferenceRunsTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/DatedReferenceRunsTest.java` | End-to-end unit and integration tests for {@code DATED-REFERENCE-RUNS-1} (P1–P4): |
 | `DbJobRunStoreTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/DbJobRunStoreTest.java` | {@link DbJobRunStore} (T27): the DuckDB projection of job runs that backs the reporting endpoints. |
 | `DemoRetireSupersededJobShipsDisabledTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/DemoRetireSupersededJobShipsDisabledTest.java` | Pins the committed {@code spaces/demo} {@code retire_superseded} maintenance job — the example the |
 | `DryRunServicesTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/DryRunServicesTest.java` | The dry-run contract for Platform Services (§3.4): mutating services record instead of act — the |
@@ -208,6 +210,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `JobPackStagingTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobPackStagingTest.java` | TOCTOU pin for {@link JobPackManager}'s verify/stage/load sequence: the bytes that are hashed and |
 | `JobPackTrustTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobPackTrustTest.java` | Trust gate T1 (parser-plugins-trust-design.md slice P1, operator D2/D3 2026-09-25): a Job Pack loads |
 | `JobPathContainmentTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobPathContainmentTest.java` | S3 of the path-containment unification: every operator-supplied path field on a job task resolves |
+| `JobPipelineEndToEndTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobPipelineEndToEndTest.java` | <b>JG0 — Job Pipeline end-to-end spike.</b> Confirms that a {@code *_pipeline.toon} with |
 | `JobRunCancelledTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobRunCancelledTest.java` | HA-CANCEL-RESIDUALS-1: a Job Run cooperatively cancelled by a closing host ({@code RunCancelledException}) is |
 | `JobRunDiffTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobRunDiffTest.java` | DUCKLE-C2: facts only, every explanation traces to a listed difference, absent ≠ zero, "not compared" is stated. |
 | `JobRunLedgerAuditSignalTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobRunLedgerAuditSignalTest.java` | {@code JOBRUN-STORE-SWALLOWED-WRITES-1}: a failed append to {@code jobs_runs.csv} loses the durable record |

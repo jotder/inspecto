@@ -244,9 +244,9 @@ export class RunDetailComponent implements OnInit {
      *  hidden in the Business lens (read-only observe, plan §1) — Lineage & details stays available. */
     get auditRowActions(): InspectoRowAction<AuditRow>[] {
         if (this.activeTab !== 'batches' && this.activeTab !== 'quarantine') return [];
-        // Quarantine rows are synthesized off the on-disk layout (file/reason/path/size_bytes) and never
-        // carry a batch id — a quarantined file was rejected before any batch existed — so both
-        // batch-keyed actions hide themselves on rows without one.
+        // Quarantine rows are synthesized off the on-disk layout (enriched with consignment_id /
+        // quarantined_at when the status ledger has a matching entry), so batch-keyed actions hide
+        // themselves on rows without a consignment_id.
         const details: InspectoRowAction<AuditRow> = {
             icon: 'heroicons_outline:rectangle-group',
             hint: 'Lineage & details',
@@ -264,7 +264,18 @@ export class RunDetailComponent implements OnInit {
                 onClick: (r) => this.reprocessRow(r),
             },
         ];
-        if (this.activeTab === 'quarantine') return [...operate, rejects];
+        if (this.activeTab === 'quarantine') {
+            return [
+                ...operate,
+                {
+                    icon: 'heroicons_outline:arrow-uturn-left',
+                    hint: 'Release & reprocess',
+                    visible: (r) => !!r['path'] && !(r['file'] || '').endsWith('_errors.csv'),
+                    onClick: (r) => this.releaseQuarantineRow(r),
+                },
+                rejects,
+            ];
+        }
         // Phase 4 S4 / D-13: draining is a BATCH-tab action, and only on a PARKED row — a quarantined
         // file was rejected before any Consignment existed, and the engine refuses every other state
         // with a 409. Offering it elsewhere would be an affordance that predictably fails.
@@ -435,6 +446,28 @@ export class RunDetailComponent implements OnInit {
                 if (this.activeTab === 'quarantine') this.loadTab();
             },
             error: (e) => this.toastr.error(apiErrorMessage(e, `Reprocess failed for ${id}`)),
+        });
+    }
+
+    async releaseQuarantineRow(r: AuditRow): Promise<void> {
+        if (!this.lens.canOperateRuns()) return; // Business lens: read-only observe
+        const path = (r['path'] || '').trim();
+        const file = (r['file'] || path).trim();
+        if (!path) {
+            this.toastr.warning('No quarantine path on this row');
+            return;
+        }
+        const ok = await this.confirm.confirm(
+            `Release "${file}" from quarantine back into the inbox of "${this.name}" and reprocess it?`,
+            'Release quarantined file',
+        );
+        if (!ok) return;
+        this.api.releaseQuarantined(this.name, path, true).subscribe({
+            next: (res) => {
+                this.toastr.success(`Released "${res.file}" to inbox for reprocessing`);
+                this.loadTab();
+            },
+            error: (e) => this.toastr.error(apiErrorMessage(e, `Release failed for ${file}`)),
         });
     }
 

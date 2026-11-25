@@ -67,21 +67,21 @@ public final class DraftRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         // ⚠ String LITERALS on purpose — CapabilityManifestTest's scanner matches only a literal argument.
-        api.post("/inv/investigations/([^/]+)/drafts", ApiContext.withCapability("canManageIncidents",
+        api.post("/inv/investigations/([^/]+)/drafts", ApiContext.withCapability("canDraftInvestigations",
                 (e, m) -> fork(api, e, m.group(1), api.body(e))));
         api.get("/inv/investigations/([^/]+)/drafts", (e, m) -> list(api, e, m.group(1)));
         api.get("/inv/investigations/([^/]+)/drafts/([^/]+)", (e, m) -> get(api, e, m.group(1), m.group(2)));
         api.get("/inv/investigations/([^/]+)/drafts/([^/]+)/log", (e, m) -> log(api, e, m.group(1), m.group(2)));
         api.get("/inv/investigations/([^/]+)/drafts/([^/]+)/working-set", (e, m) -> workingSet(api, e, m.group(1), m.group(2)));
         api.get("/inv/investigations/([^/]+)/drafts/([^/]+)/replay", (e, m) -> replay(api, e, m.group(1), m.group(2)));
-        api.post("/inv/investigations/([^/]+)/drafts/([^/]+)/ops", ApiContext.withCapability("canManageIncidents",
+        api.post("/inv/investigations/([^/]+)/drafts/([^/]+)/ops", ApiContext.withCapability("canDraftInvestigations",
                 (e, m) -> ops(api, e, m.group(1), m.group(2), api.body(e))));
-        api.post("/inv/investigations/([^/]+)/drafts/([^/]+)/undo", ApiContext.withCapability("canManageIncidents",
+        api.post("/inv/investigations/([^/]+)/drafts/([^/]+)/undo", ApiContext.withCapability("canDraftInvestigations",
                 (e, m) -> undo(api, e, m.group(1), m.group(2), api.body(e))));
-        api.post("/inv/investigations/([^/]+)/drafts/([^/]+)/discard", ApiContext.withCapability("canManageIncidents",
+        api.post("/inv/investigations/([^/]+)/drafts/([^/]+)/discard", ApiContext.withCapability("canDraftInvestigations",
                 (e, m) -> discard(api, e, m.group(1), m.group(2))));
         api.get("/inv/investigations/([^/]+)/drafts/([^/]+)/conflicts", (e, m) -> conflicts(api, e, m.group(1), m.group(2)));
-        api.post("/inv/investigations/([^/]+)/drafts/([^/]+)/rebase", ApiContext.withCapability("canManageIncidents",
+        api.post("/inv/investigations/([^/]+)/drafts/([^/]+)/rebase", ApiContext.withCapability("canDraftInvestigations",
                 (e, m) -> rebase(api, e, m.group(1), m.group(2), api.body(e))));
         api.post("/inv/investigations/([^/]+)/drafts/([^/]+)/promote", ApiContext.withCapability("canManageIncidents",
                 (e, m) -> promote(api, e, m.group(1), m.group(2), api.body(e))));

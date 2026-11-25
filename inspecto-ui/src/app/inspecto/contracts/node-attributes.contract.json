@@ -1,5 +1,13 @@
 {
   "acquisition" : [ {
+    "key" : "poll",
+    "label" : "Inbox folder",
+    "type" : "string",
+    "tier" : "required",
+    "required" : false,
+    "help" : "Local folder the pipeline polls or stages remote files into (dirs.poll). Relative paths resolve under this Space's data directory.",
+    "placeholder" : "data/inbox/<pipeline>"
+  }, {
     "key" : "connection",
     "label" : "Connection",
     "type" : "autocomplete",
@@ -1726,6 +1734,9 @@
     }, {
       "value" : "asof",
       "label" : "As of (latest effective at the row's time)"
+    }, {
+      "value" : "fuzzy",
+      "label" : "Fuzzy (similarity threshold)"
     } ],
     "help" : "Exact: every key equal. Longest prefix: the last key matches the Reference row whose key is its longest prefix (e.g. phone number to operator). Range: the row whose From – To contains the value (e.g. the rate valid on the call date)."
   }, {
@@ -1837,6 +1848,59 @@
     "max" : 1.0,
     "help" : "Stop the run when more than this share (0 to 1) of a column's values find no Reference row — a stale or wrong Reference. The failed Step raises the Incident. Empty = never stop.",
     "placeholder" : "0.1"
+  }, {
+    "key" : "method",
+    "label" : "Similarity method",
+    "type" : "select",
+    "tier" : "optional",
+    "default" : "jaro_winkler",
+    "options" : [ {
+      "value" : "jaro_winkler",
+      "label" : "Jaro-Winkler (names, short text)"
+    }, {
+      "value" : "jaro",
+      "label" : "Jaro"
+    }, {
+      "value" : "levenshtein",
+      "label" : "Levenshtein (edit distance)"
+    }, {
+      "value" : "token_jaccard",
+      "label" : "Token Jaccard (shared words)"
+    } ],
+    "help" : "Fuzzy: the string similarity metric used to score each Reference key."
+  }, {
+    "key" : "threshold",
+    "label" : "Similarity threshold",
+    "type" : "number",
+    "tier" : "optional",
+    "default" : "0.85",
+    "min" : 0.0,
+    "max" : 1.0,
+    "help" : "Fuzzy: minimum similarity score (0 to 1) required to accept a match.",
+    "placeholder" : "0.85"
+  }, {
+    "key" : "block_prefix",
+    "label" : "Blocking prefix length",
+    "type" : "number",
+    "tier" : "optional",
+    "min" : 1.0,
+    "help" : "Fuzzy: require the first N characters (after normalize) to match exactly before scoring.",
+    "placeholder" : "1"
+  }, {
+    "key" : "block",
+    "label" : "Blocking column(s)",
+    "type" : "list",
+    "tier" : "optional",
+    "help" : "Fuzzy: column(s) present on both the rows and the Reference that must match exactly before scoring.",
+    "placeholder" : "country"
+  }, {
+    "key" : "top_k",
+    "label" : "Top matches",
+    "type" : "number",
+    "tier" : "optional",
+    "default" : "1",
+    "min" : 1.0,
+    "help" : "Fuzzy: maximum number of matching Reference rows returned per input value, highest score first."
   } ],
   "transform.sql" : [ {
     "key" : "sql",

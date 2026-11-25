@@ -82,6 +82,10 @@ export const laAppRoutes: Route[] = [
                 loadComponent: () => import('./entity-lists.page').then((m) => m.EntityListsPageComponent),
             },
             {
+                path: 'approvals',
+                loadComponent: () => import('./approvals.page').then((m) => m.ApprovalsPageComponent),
+            },
+            {
                 // The console's Alerts page, reused whole; *Open Investigation* stays inside this app. Inspecto LA's Alerts
                 // area, and Case Management's in Inspecto Telco (the first App to declare a page owns it).
                 path: 'alerts',

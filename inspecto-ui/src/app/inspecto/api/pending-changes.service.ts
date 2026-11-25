@@ -136,4 +136,12 @@ export class PendingChangesService {
     policy(): Observable<ApprovalPolicy> {
         return this.http.get<ApprovalPolicy>(apiUrl('/settings/approval'));
     }
+
+    /** Replace the Space's per-kind approval policy (`PUT /settings/approval`, `canAdminister`). */
+    savePolicy(body: {
+        approval: Record<string, Partial<ApprovalRule>>;
+        expiresAfterHours?: number;
+    }): Observable<ApprovalPolicy> {
+        return this.http.put<ApprovalPolicy>(apiUrl('/settings/approval'), body);
+    }
 }

@@ -35,9 +35,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `AUTHORING-REDESIGN-1` | P3 | feature | Only letter (d) of the authoring redesign is left; no CREATE MACRO exists in any main source. | demand |
-| `DATED-REFERENCE-RUNS-1` | P2 | feature | Each record joins the Reference version of its own day, and a Job's backlog drains itself: daily Reference versions, version_by on the jo… | — |
-| `JOB-GRAPH-1` | P2 | feature | A Job's chain becomes its own Pipeline: store inputs, Reference side inputs drawn as edges into their joins, a persistent output Dataset,… | — |
-| `OUTPUT-STORE-SINK-NOT-DRAWN-1` | P3 | defect | The Pipeline editor draws a steps: + output_store: Pipeline as one line ending in the landed store: the joined rows appear to go to cdr_e… | — |
 | `ADD-DATA-DUPLICATE-CHECK-UI-1` | P3 | feature | Add data cannot set a Basic import's duplicate check (duplicate.mode, on_change); only the Pipelines editor's Collector stage can (filed… | operator |
 | `PIPELINE-EDITOR-OUTPUT-LOAD-1` | P3 | feature | The Pipeline editor cannot set output.load / output.period_column (filed 2026-11-20, BASIC-ELT-PROFILE-1 O6 close). | operator |
 | `BASIC-ELT-DUPLICATES-1` | P3 | chore | Basic and ELT duplications Phase 0 found and the build left (filed 2026-11-20, BASIC-ELT-PROFILE-1 close). | — |
@@ -55,6 +52,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `UI-ZONELESS-1` | P3 | chore | the app runs Zone.js on purpose; going zoneless needs a component-by-component audit first (filed 2026-11-15, so the code's pointer has a… | demand |
 | `UI-PICKER-OPTIONS-1` | P3 | feature | <inspecto-option-picker> gains nested options (a parent that opens to its children), a disabled option with its reason, and a per-picker… | demand |
 | `UI-SCHEMA-FORM-EDITOR-1` | P3 | feature | Move <inspecto-schema-form>'s in-row editor onto pen-field, which first needs several new pen-field features. | demand |
+| `UI-TOKENS-RUNS-BACKLOG-1` | P3 | defect | npm run lint:tokens (the UI workflow's design-system guard) flags four hand-rolled status fills (bg-amber-1…, bg-green-1…, bg-red-1…, bg-… | — |
 | `UI-BUNDLE-BUDGETS-RED-1` | P3 | defect | The la-app and gamma bundle checks fail on master (seen 2026-11-19). | — |
 | `PACK-SALES-MARKETING-1` | P3 | feature | A Sales & Marketing BI pack: sales, commissions, marketing and churn analytics. | operator |
 | `USER-HANDBOOK-1` | P2 | feature | The Handbook: users learn to build, ship and manage an App from the console's Help, organised by lifecycle for three tracks. | — |

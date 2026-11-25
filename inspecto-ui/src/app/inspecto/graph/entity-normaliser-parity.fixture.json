@@ -185,6 +185,16 @@
       "normaliser": "default",
       "input": "\u0130STANBUL",
       "expected": "i\u0307stanbul"
+    },
+    {
+      "normaliser": "upper-trim",
+      "input": "\u0264-\u019b",
+      "expected": "\ua7cb-\ua7dc"
+    },
+    {
+      "normaliser": "default",
+      "input": "\ua7cb-\ua7dc",
+      "expected": "\u0264-\u019b"
     }
   ]
 }

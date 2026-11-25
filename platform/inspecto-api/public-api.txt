@@ -13,6 +13,7 @@ com.gamma.access.Roles | public static Map<String, Def> effective(HttpExchange)
 com.gamma.access.Roles | public static Map<String, Def> effective(Path)
 com.gamma.access.Roles | public static Map<String, Def> validate(Object)
 com.gamma.access.Roles | public static Subject admitMachine(Path, Subject)
+com.gamma.access.Roles | public static boolean holds(Set<String>, String)
 com.gamma.access.Roles | public static final Map<String, Def> SEED
 com.gamma.access.Roles | public static final Set<String> AGENT_MACHINE_CAPABILITIES
 com.gamma.access.Roles | public static final Set<String> AGENT_NEVER_CAPABILITIES
@@ -28,6 +29,7 @@ com.gamma.access.Roles | public static final String CAN_AUTHOR_WORKBENCH
 com.gamma.access.Roles | public static final String CAN_BUILD_LINK_INDEX
 com.gamma.access.Roles | public static final String CAN_CONFIGURE_ACCESS
 com.gamma.access.Roles | public static final String CAN_CURATE_MENUS
+com.gamma.access.Roles | public static final String CAN_DRAFT_INVESTIGATIONS
 com.gamma.access.Roles | public static final String CAN_MANAGE_EXCLUSION_CATEGORIES
 com.gamma.access.Roles | public static final String CAN_MANAGE_INCIDENTS
 com.gamma.access.Roles | public static final String CAN_OFFER_DATASETS
@@ -598,8 +600,11 @@ com.gamma.consignment.DbConsignmentOutputStore | public List<ConsignmentOutput> 
 com.gamma.consignment.DbConsignmentOutputStore | public List<ConsignmentOutput> outputs(String, int)
 com.gamma.consignment.DbConsignmentOutputStore | public List<ConsignmentSource> sourcesForPaths(String, java.util.Collection<String>)
 com.gamma.consignment.DbConsignmentOutputStore | public List<DailyVolume> dailyVolume(String, String, String)
+com.gamma.consignment.DbConsignmentOutputStore | public List<DayPendingSummary> pendingDaysForJob(String, String)
+com.gamma.consignment.DbConsignmentOutputStore | public List<JobDayStatus> jobDayStatuses(String)
 com.gamma.consignment.DbConsignmentOutputStore | public List<ProducerHighWater> producerHighWater(String)
 com.gamma.consignment.DbConsignmentOutputStore | public List<String> browseTables()
+com.gamma.consignment.DbConsignmentOutputStore | public List<String> pendingPathsForDay(String, String, String)
 com.gamma.consignment.DbConsignmentOutputStore | public List<String> unreadablePaths()
 com.gamma.consignment.DbConsignmentOutputStore | public List<com.gamma.pipeline.exec.LookupMissSample.Entry> lookupMisses(String, String, String)
 com.gamma.consignment.DbConsignmentOutputStore | public List<com.gamma.pipeline.exec.StepReceipt> steps(String)
@@ -619,13 +624,19 @@ com.gamma.consignment.DbConsignmentOutputStore | public int supersedeOtherRevisi
 com.gamma.consignment.DbConsignmentOutputStore | public long outputCount(String)
 com.gamma.consignment.DbConsignmentOutputStore | public long stepCount(String)
 com.gamma.consignment.DbConsignmentOutputStore | public static DbConsignmentOutputStore open(String) throws SQLException
+com.gamma.consignment.DbConsignmentOutputStore | public static final String UNKNOWN_DAY
 com.gamma.consignment.DbConsignmentOutputStore | public static final int DEFAULT_STEPS_RETENTION_DAYS
+com.gamma.consignment.DbConsignmentOutputStore | public synchronized int markJobDayStale(String, String, String)
+com.gamma.consignment.DbConsignmentOutputStore | public synchronized int markReferenceChanged(String, String, String, boolean)
+com.gamma.consignment.DbConsignmentOutputStore | public synchronized void recordJobDayProgress(String, String, List<String>, String, String, String, boolean, String, String)
 com.gamma.consignment.DbConsignmentOutputStore | public void close()
 com.gamma.consignment.DbConsignmentOutputStore | public void maintenance()
 com.gamma.consignment.DbConsignmentOutputStore | public void record(List<ConsignmentOutput>)
 com.gamma.consignment.DbConsignmentOutputStore | public void recordLookupMisses(String, String, String, List<com.gamma.pipeline.exec.LookupMissSample.Entry>)
 com.gamma.consignment.DbConsignmentOutputStore | public void recordSteps(List<com.gamma.pipeline.exec.StepReceipt>)
 com.gamma.consignment.DbConsignmentOutputStore.DailyVolume | public record DailyVolume(String recordDay, long files, long rows)
+com.gamma.consignment.DbConsignmentOutputStore.DayPendingSummary | public record DayPendingSummary(String recordDay, long pendingFiles, long pendingRows, String firstArrivedAt, String lastArrivedAt)
+com.gamma.consignment.DbConsignmentOutputStore.JobDayStatus | public record JobDayStatus(String jobName, String recordDay, long files, long rows, String status, boolean stale, String staleReason, String referenceVersions, String runId, String updatedAt)
 com.gamma.consignment.DbDedupLedger | public DbDedupLedger(Connection) throws SQLException
 com.gamma.consignment.DbDedupLedger | public DbDedupLedger(ConnectionSource) throws SQLException
 com.gamma.consignment.DbDedupLedger | public DbDedupLedger(String) throws SQLException
@@ -831,6 +842,7 @@ com.gamma.enrich.EnrichmentConfig.Triggers | public static Triggers none()
 com.gamma.enrich.ReferenceReader | public final class ReferenceReader
 com.gamma.enrich.ReferenceReader | public static EnrichmentConfig.Reference parse(String)
 com.gamma.enrich.ReferenceReader | public static String sqlFor(EnrichmentConfig.Reference, List<PipelineConfig>)
+com.gamma.enrich.ReferenceReader | public static String sqlForDay(EnrichmentConfig.Reference, List<PipelineConfig>, String, String)
 com.gamma.etl.ConsignmentEvent | public ConsignmentEvent(String, String, String, List<String>, long, long, int)
 com.gamma.etl.ConsignmentEvent | public ConsignmentEvent(String, String, String, List<String>, long, long, int, String, String, long, boolean)
 com.gamma.etl.ConsignmentEvent | public record ConsignmentEvent(String pipeline, String consignmentId, String status, List<String> partitions, long outputRows, long durationMs, int rejectedCount, String error, String offendingFile, long errorRows, boolean dryRun, List<String> outputFiles)
@@ -885,6 +897,7 @@ com.gamma.etl.PipelineConfig | public Webhook webhook()
 com.gamma.etl.PipelineConfig | public Xlsx xlsx()
 com.gamma.etl.PipelineConfig | public boolean active()
 com.gamma.etl.PipelineConfig | public boolean hasExplicitSteps()
+com.gamma.etl.PipelineConfig | public boolean isJobPipeline()
 com.gamma.etl.PipelineConfig | public boolean outputPerMember()
 com.gamma.etl.PipelineConfig | public boolean producesReference()
 com.gamma.etl.PipelineConfig | public boolean rejectsAllOrNothing()
@@ -928,6 +941,10 @@ com.gamma.etl.PipelineConfig.CsvSettings.Rejects | public static boolean isLegal
 com.gamma.etl.PipelineConfig.CsvSettings.Rejects | public static final Rejects DEFAULTS
 com.gamma.etl.PipelineConfig.CsvSettings.Rejects | public static final String DEFAULT_SCAN
 com.gamma.etl.PipelineConfig.CsvSettings.Rejects | public static final String DEFAULT_TABLE
+com.gamma.etl.PipelineConfig.DayFrom | constant COLUMN
+com.gamma.etl.PipelineConfig.DayFrom | constant FILE_NAME
+com.gamma.etl.PipelineConfig.DayFrom | public enum DayFrom
+com.gamma.etl.PipelineConfig.DayFrom | public static DayFrom from(String)
 com.gamma.etl.PipelineConfig.Dedup | public Dedup(List<String>, String)
 com.gamma.etl.PipelineConfig.Dedup | public record Dedup(List<String> keys, String orderBy, String scope)
 com.gamma.etl.PipelineConfig.Dirs | public record Dirs(String poll, String database, String backup, String temp, String errors, String quarantine, String markers, String logDir, String statusFilePath, String batchesFilePath, String lineageFilePath, String manifestsDir, String commitLogPath, String unpackFilePath)
@@ -999,8 +1016,10 @@ com.gamma.etl.PipelineConfig.Produces | constant STREAM
 com.gamma.etl.PipelineConfig.Produces | public enum Produces
 com.gamma.etl.PipelineConfig.Produces | public static Produces from(String)
 com.gamma.etl.PipelineConfig.Profile | public record Profile(List<String> columns)
+com.gamma.etl.PipelineConfig.Reference | public Reference(List<String>, Load, int, Delete, String)
+com.gamma.etl.PipelineConfig.Reference | public boolean isDaily()
 com.gamma.etl.PipelineConfig.Reference | public boolean refreshEnabled()
-com.gamma.etl.PipelineConfig.Reference | public record Reference(List<String> key, Load load, int refreshSeconds, Delete delete, String orderBy)
+com.gamma.etl.PipelineConfig.Reference | public record Reference(List<String> key, Load load, int refreshSeconds, Delete delete, String orderBy, Versions versions, DayFrom dayFrom, String dayColumn, int keepDays)
 com.gamma.etl.PipelineConfig.Reference | public static final Reference DEFAULT
 com.gamma.etl.PipelineConfig.Reference.Delete | public record Delete(String column, List<String> values)
 com.gamma.etl.PipelineConfig.Refusal | public record Refusal(boolean restricted, Integer retentionDays, boolean cardScan, List<String> scanExempt)
@@ -1057,6 +1076,10 @@ com.gamma.etl.PipelineConfig.Summarize | public record Summarize(List<String> gr
 com.gamma.etl.PipelineConfig.TextRegex | public record TextRegex(String recordSplit, String pattern, List<String> groupNames)
 com.gamma.etl.PipelineConfig.Unpack | public record Unpack(boolean enabled, int maxEntries, long maxEntryBytes, long maxTotalBytes, double maxRatio, int depth, int threads, List<String> dataExtensions)
 com.gamma.etl.PipelineConfig.Unpack | public static Unpack defaults()
+com.gamma.etl.PipelineConfig.Versions | constant DAILY
+com.gamma.etl.PipelineConfig.Versions | constant NONE
+com.gamma.etl.PipelineConfig.Versions | public enum Versions
+com.gamma.etl.PipelineConfig.Versions | public static Versions from(String)
 com.gamma.etl.PipelineConfig.Webhook | public record Webhook(String connection, int batchSize, Retry retry)
 com.gamma.etl.PipelineConfig.Webhook | public static Webhook fromMap(Map<?, ?>)
 com.gamma.etl.PipelineConfig.Webhook | public static final List<String> KEYS
@@ -1306,6 +1329,7 @@ com.gamma.job.JobResult | public static JobResult cancelled(String, long)
 com.gamma.job.JobResult | public static JobResult failed(String, long)
 com.gamma.job.JobResult | public static JobResult ok(String, long)
 com.gamma.job.JobResult | public static JobResult skipped(String)
+com.gamma.job.JobService | public DayReconciler dayReconciler()
 com.gamma.job.JobService | public JobService(List<JobConfig>, ConsignmentEventBus, Scheduler, ReportRunner, String)
 com.gamma.job.JobService | public JobService(List<JobConfig>, ConsignmentEventBus, Scheduler, ReportRunner, String, DbJobRunStore)
 com.gamma.job.JobService | public JobService(List<JobConfig>, ConsignmentEventBus, Scheduler, ReportRunner, String, DbJobRunStore, PipelineStore, String)
@@ -2111,6 +2135,7 @@ com.gamma.pipeline.PipelineRel | public static final String DROPPED
 com.gamma.pipeline.PipelineRel | public static final String DUPLICATE
 com.gamma.pipeline.PipelineRel | public static final String GAP
 com.gamma.pipeline.PipelineRel | public static final String INVALID
+com.gamma.pipeline.PipelineRel | public static final String REFERENCE
 com.gamma.pipeline.PipelineRel | public static final String REJECT_PREFIX
 com.gamma.pipeline.PipelineRel | public static final String ROUTE_PREFIX
 com.gamma.pipeline.PipelineRel | public static final String UNMATCHED
@@ -2127,6 +2152,7 @@ com.gamma.pipeline.PipelineStores | public static List<Link> superimpose(Collect
 com.gamma.pipeline.PipelineStores | public static List<Produced> producedStores(PipelineGraph)
 com.gamma.pipeline.PipelineStores | public static Set<String> consumed(PipelineGraph)
 com.gamma.pipeline.PipelineStores | public static Set<String> produced(PipelineGraph)
+com.gamma.pipeline.PipelineStores | public static String sourceStoreOf(PipelineNode)
 com.gamma.pipeline.PipelineStores | public static final String CONFIG_SOURCE_STORE
 com.gamma.pipeline.PipelineStores | public static final String CONFIG_STORE
 com.gamma.pipeline.PipelineStores.Link | public record Link(String producer, String store, String consumer)
@@ -2372,6 +2398,7 @@ com.gamma.pipeline.exec.RowShaper | public static SimilaritySql.Method joinFuzzy
 com.gamma.pipeline.exec.RowShaper | public static double joinFuzzyThreshold(Object)
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_CONFIG_KEYS
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_DUPLICATES
+com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_IF_VERSION_MISSING
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_KEYED_KEYS
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_LOOKUP_KEYS
 com.gamma.pipeline.exec.RowShaper | public static final List<String> JOIN_MATCHES
@@ -2399,6 +2426,7 @@ com.gamma.pipeline.exec.RowShaper.ReferenceResolver | ReferenceResolver NONE
 com.gamma.pipeline.exec.RowShaper.ReferenceResolver | String resolve(Connection, String) throws SQLException
 com.gamma.pipeline.exec.RowShaper.ReferenceResolver | default List<java.nio.file.Path> readDirs(String)
 com.gamma.pipeline.exec.RowShaper.ReferenceResolver | default List<java.nio.file.Path> readFiles(String)
+com.gamma.pipeline.exec.RowShaper.ReferenceResolver | default String resolveForDay(Connection, String, String, String) throws SQLException
 com.gamma.pipeline.exec.RowShaper.ReferenceResolver | public interface ReferenceResolver
 com.gamma.pipeline.exec.RowShaper.Relation | public record Relation(String rel, String table)
 com.gamma.pipeline.exec.SourceStoreReader | public final class SourceStoreReader
@@ -2607,6 +2635,7 @@ com.gamma.service.CollectorService | public Optional<MultiCollectorProcessor.Run
 com.gamma.service.CollectorService | public Optional<Path> pathFor(String)
 com.gamma.service.CollectorService | public Optional<PipelineConfig> configFor(String)
 com.gamma.service.CollectorService | public Optional<PipelineRun> pipelineRunById(String)
+com.gamma.service.CollectorService | public Optional<QuarantineReleaseOutcome> releaseQuarantined(String, String, boolean) throws IOException
 com.gamma.service.CollectorService | public Optional<String> pipelineForSourceId(String)
 com.gamma.service.CollectorService | public Optional<String> triggerRunAsync(String)
 com.gamma.service.CollectorService | public Optional<String> triggerRunAsync(String, String)
@@ -2673,6 +2702,13 @@ com.gamma.service.CollectorService.PreRun | public static final PreRun GO
 com.gamma.service.CollectorService.PreRun | public static final PreRun SKIP
 com.gamma.service.CollectorService.PreRunStep | PreRun run(CollectorService, String, boolean)
 com.gamma.service.CollectorService.PreRunStep | public interface PreRunStep
+com.gamma.service.CollectorService.QuarantineReleaseOutcome | public record QuarantineReleaseOutcome(QuarantineReleaseStatus status, String file, String destination, String runId, String detail)
+com.gamma.service.CollectorService.QuarantineReleaseStatus | constant BUSY
+com.gamma.service.CollectorService.QuarantineReleaseStatus | constant CONFLICT
+com.gamma.service.CollectorService.QuarantineReleaseStatus | constant NOT_FOUND
+com.gamma.service.CollectorService.QuarantineReleaseStatus | constant PATH_JAIL_VIOLATION
+com.gamma.service.CollectorService.QuarantineReleaseStatus | constant RELEASED
+com.gamma.service.CollectorService.QuarantineReleaseStatus | public enum QuarantineReleaseStatus
 com.gamma.service.DbStatusStore | public ConnectionSource browseSource()
 com.gamma.service.DbStatusStore | public DbStatusStore(Connection)
 com.gamma.service.DbStatusStore | public DbStatusStore(ConnectionSource)

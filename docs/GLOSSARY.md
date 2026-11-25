@@ -146,6 +146,8 @@ auth-free core a Capability is derived from the active Lens (honor-system previe
 signals are re-derived from the subject's Role grants and no pane changes. Panes gate on a Capability,
 never on Lens identity. *(Added 2026-07-03.)*
 
+**Draft work grant** *(capability `canDraftInvestigations`; added 2026-11-25, `AGENT-KIT-1` AK-2f)* — The **Capability** to work in a Link Analysis **Draft**: open one on an **Investigation** the caller is a member of, add ops, undo, discard, rebase — never **promote** it, which stays `canManageIncidents` (and its four-eyes). **Implied** by `canManageIncidents`, so no person needs it granted; it exists so an unattended **machine agent** may keep it (every one of its Draft writes held as a **Pending Action**), and its Space role must grant it by name. ⛔ Not *Manage Incidents and Cases*: it opens no Incident, Case or Investigation and edits no Investigation directly.
+
 **Inbound Investigation grant** *(capability `canOpenInboundInvestigation`; added 2026-11-01, `OIDC-CC-INTEGRATION-ROLE-1`)* — The integration **Capability**: opening a Link Analysis **Investigation** from an external system's record (`POST /inv/inbound/investigations`) and nothing else; the caller reads the Investigations it leads through the Investigation's own member rule. Seeded to the role `integration` (and `super`). It is the only capability a **machine Subject** (a client-credentials token, `Subject.machine()`) keeps: every other grant is dropped at authentication, and a machine is admitted only in a Space whose `roles.toon` lists its client in `identity.machineClients`. ⛔ Not `canManageIncidents`, which opens every other Investigation write; never "integration role" for the capability (the role is `integration`, the capability is this).
 
 **Access Catalog** — The canonical tree of gateable surface: menu groups → panes → functionalities
@@ -698,7 +700,18 @@ compaction) remain the Phase-2 backlog.
 value. Transforms call it per field or as a Step; it is held per run or warm across runs and refreshed when
 the Reference Dataset changes. ⛔ never "cache" or "record cache" as the entity name — the cache is how a Lookup
 is held, not what it is. Not the inline `transform.lookup` code map. *(Proposed 2026-11-22,
-`superpower/2026-11-22-reference-lookup-plan.md`.)*
+`archived-documents/plans-archive/2026-11-22-reference-lookup-plan.md`.)*
+
+**Event day** — The calendar day of a record's event time, in its Pipeline's declared zone (`DATED-REFERENCE-RUNS-1`).
+
+**Reference version (dated)** — The Reference table valid for one business day (`reference.versions: daily`,
+`DATED-REFERENCE-RUNS-1`).
+
+**Work ledger** — Per Job, the days with input not yet processed; derived from the Consignment output registry
+(`consignment_outputs` MINUS `job_day_progress`, `DATED-REFERENCE-RUNS-1`).
+
+**Waiting** — A Run state: work exists for a day but its inputs are not ready; ends at the deadline
+(`DATED-REFERENCE-RUNS-1`).
 
 **Matrix** — The **intended user-facing name** for a summary / cube / roll-up data asset. It **is a Derived
 Table** (so it lives inside the **Dataset** umbrella) — "Matrix" is the label the Catalog and Studio are meant
@@ -1060,7 +1073,7 @@ RBAC data scopes, and despite its name it is not the *type of a Case*.
 
 **Snapshot** *(Link Analysis; `SnapshotStore`, `POST /inv/snapshots`)* — The **frozen content of one analysis as it stood when the analyst saved it**, optionally attached to a **Case**. Evidence, unlike a saved **View**, which only re-projects live data and so is not evidence. A Snapshot is an Instance with no Type. ⛔ Not the DuckDB or storage-level *snapshot* (a consistent read; see §6-B, where "generation pinning" is also banned), and not a **Dossier** (the custody-hashed report built from an Investigation's log, which may cite Snapshots as exhibits).
 
-**Saved view** *(Link Analysis; Component kind `link-analysis-view`, `LA-STUDIO-UI-REORG-1`, 2026-10-27)* — A **named graph an analyst keeps**: the query or start it was drawn from, its display state and the Entity Lists it uses. Opening it re-reads live data, so it is a starting point, not evidence. UI words: **File ▸ Save view** (save over the open one), **Save view as…** (a new name) and **File ▸ Open…** (the *Saved views* tab). The data-plane **View** (§6-B) is a different thing; say *saved view* in Link Analysis. ⛔ Not *case* or *Save as a case* (a **Case** is the Incident-management record), and ⛔ not a **Snapshot** (frozen evidence: **File ▸ Save this analysis**).
+**Saved view** *(Link Analysis; Component kind `link-analysis-view`, `LA-STUDIO-UI-REORG-1`, 2026-10-27)* — A **named graph an analyst keeps**: the query or start it was drawn from, its display state and the Entity Lists it uses. Opening it re-reads live data, so it is a starting point, not evidence. UI words: **File ▸ Save view** (save over the open one), **Save view as…** (a new name) and **File ▸ Open…** (the *Saved views* tab). The data-plane **View** (§6-B) is a different thing; say *saved view* in Link Analysis. ⛔ Not *case* or *Save as a case* (a **Case** is the Incident-management record), and ⛔ not a **Snapshot** (frozen evidence: **File ▸ Save snapshot…**).
 
 **Canvas mode** *(Link Analysis Studio; second toolbar, `LA-STUDIO-UI-REORG-1` §5.2, 2026-10-27)* — **What a drag on the canvas does**; exactly one is active: **Pan** (the default, `Esc` returns to it; Shift+drag still draws a lasso), **Lasso** (`L`, a drag selects), **Fisheye** (`F`, drag the magnifying lens over the graph) and **Link filter** (drag a lens; only the links inside it show). Display preferences such as snap lines and hover activate are not Canvas modes (they live under Display). ⛔ Not *lens* — a **Lens** (§1-A) is a persona-scoped view of the console, and the old "Lenses & selection" label is retired.
 
@@ -1111,15 +1124,16 @@ built: [`okf/product/module/config/spec-config-safety.md`](okf/product/module/co
 Request" — that word means a commercial CR. ⛔ Not an agent approval: the `/agent/approvals` inbox governs
 what the assistant may do, not whether a human's config change lands.
 
-**Pending Action** — An operational action — a run's trigger, pause, resume, reprocess, rejects replay, retry,
-drain; a Job's trigger or a Job Run's replay — that an unattended **machine agent** asked for, held for a person to
+**Pending Action** — An action on a run — a run's trigger, pause, resume, reprocess, rejects replay, retry, drain;
+a Job's trigger or a Job Run's replay — or on an **Incident**, **Case** or **Alert** — a comment, an Incident
+Brief, ack, assign, resolve, a Workflow transition — that an unattended **machine agent** asked for, held for a person to
 approve before it runs: the recorded request, the machine that asked, a reason, created / expires-at. It is
 **approved** by the change approvers (`canApproveChanges`, four-eyes) and then runs as that machine, or it is
-**declined**, **withdrawn** by the machine, or **expires**; one the run moved past (the route answers 409) is
-closed as **stale**. A person's own AI agent takes these actions at once, within that person's rights, so only a
-machine's are ever held. *(Added 2026-11-25, `AGENT-KIT-1` AK-2d, operator decision D-AK6; as built:
+**declined**, **withdrawn** by the machine, or **expires**; one the run or Case moved past (the route answers 409) is
+closed as **stale**, and one its route refuses otherwise (an illegal Workflow move) as **failed**. A person's own AI agent takes these actions at once, within that person's rights, so only a
+machine's are ever held. *(Added 2026-11-25, `AGENT-KIT-1` AK-2d, operator decision D-AK6; case actions AK-2e the same day; as built:
 [`okf/product/module/mcp/spec-mcp.md`](okf/product/module/mcp/spec-mcp.md).)* ⛔ Not a **Pending Change**: that holds
-a config change; this holds an action on a run. ⛔ Not an **Action Request**: that holds an outbound call.
+a config change; this holds an action on a run or a Case. ⛔ Not an **Action Request**: that holds an outbound call.
 
 **Action Request** — An outbound API call raised from an **Incident** or **Case** (by a person, or by a Decision
 Rule's `invoke-api` consequence) and held for a second person's approval before it is sent: the target

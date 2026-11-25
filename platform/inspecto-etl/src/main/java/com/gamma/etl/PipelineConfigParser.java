@@ -177,18 +177,20 @@ final class PipelineConfigParser {
         Map<String, Object> trig = mapAt(raw, "trigger");
         if (trig != null) b.trigger = trig;
 
+        boolean datasetConnector = isDatasetConnector(raw);
+
         // ── dirs ──────────────────────────────────────────────────────────────
         // Every dirs.* value resolves under the Space directory (DATA-DIRS-RESOLVE-AGAINST-CWD-1) — a copy,
         // so the decoded map the editor round-trips keeps what was authored.
         Map<String, Object> dirs = dataPaths(ToonHelper.requireSection(raw, "dirs"), configDir, "dirs.");
-        b.pollDir       = require(dirs, "poll");
+        b.pollDir       = datasetConnector ? (String) dirs.get("poll") : require(dirs, "poll");
         b.databaseDir   = require(dirs, "database");
         b.backupDir     = (String) dirs.get("backup");
         b.tempDir       = (String) dirs.get("temp");
         b.errorsDir     = opt(dirs, "errors",
-                                  b.pollDir + "/errors");
+                                  b.pollDir != null ? b.pollDir + "/errors" : null);
         b.quarantineDir = opt(dirs, "quarantine",
-                                  b.pollDir + "/quarantine");
+                                  b.pollDir != null ? b.pollDir + "/quarantine" : null);
         b.markersDir    = (String) dirs.get("markers");
         b.logDir        = (String) dirs.get("log_dir");
 
@@ -221,10 +223,13 @@ final class PipelineConfigParser {
             b.commitLogPath = statusParent.resolve(b.pipelineName + "_commits.log").toString();
         }
 
-        validateDirs(sourceLabel, b.pollDir, dirs);
+        if (b.pollDir != null) validateDirs(sourceLabel, b.pollDir, dirs);
 
         // ── processing ────────────────────────────────────────────────────────
-        Map<String, Object> proc = ToonHelper.requireSection(raw, "processing");
+        Map<String, Object> procRaw = castMapAt(raw, "processing");
+        Map<String, Object> proc = datasetConnector && procRaw == null
+                ? Map.of()
+                : ToonHelper.requireSection(raw, "processing");
         // Default = the host's logical cores (2026-09-14): batches are the parallelism unit and the
         // per-batch DuckDB threads auto-divide the cores (duckdb_threads=0), so this saturates a box
         // without oversubscribing it. The old fixed 4 left a 12-thread laptop at ~45 % CPU.
@@ -408,7 +413,28 @@ final class PipelineConfigParser {
                     throw new IllegalArgumentException("Config error in " + sourceLabel
                             + ": reference column '" + c + "' is not declared in the pipeline schema "
                             + declaredColumns);
-            b.reference = new Reference(key, load, refreshSeconds, delete, orderBy);
+            PipelineConfig.Versions versions = PipelineConfig.Versions.from(opt(refBlock, "versions", null));
+            String rawDayFrom = trimToNull(refBlock.get("day_from"));
+            PipelineConfig.DayFrom dayFrom = PipelineConfig.DayFrom.from(rawDayFrom);
+            String dayColumn = trimToNull(refBlock.get("day_column"));
+            if (dayFrom == PipelineConfig.DayFrom.COLUMN && dayColumn == null) {
+                if (rawDayFrom != null && !"column".equalsIgnoreCase(rawDayFrom)) {
+                    dayColumn = rawDayFrom;
+                } else {
+                    throw new IllegalArgumentException("Config error in " + sourceLabel
+                            + ": reference.day_from 'column' requires reference.day_column");
+                }
+            }
+            if (dayColumn != null && !declaredColumns.isEmpty() && !declaredColumns.contains(dayColumn))
+                throw new IllegalArgumentException("Config error in " + sourceLabel
+                        + ": reference.day_column '" + dayColumn + "' is not declared in the pipeline schema "
+                        + declaredColumns);
+            int keepDays = toInt(refBlock.getOrDefault("keep_days", 0));
+            if (keepDays < 0)
+                throw new IllegalArgumentException("Config error in " + sourceLabel
+                        + ": reference.keep_days must be >= 0, got: " + keepDays);
+            b.reference = new Reference(key, load, refreshSeconds, delete, orderBy,
+                    versions, dayFrom, dayColumn, keepDays);
         }
 
         // O6: the column a period replaces by is a stored (mapped) column, checked like reference.key
@@ -783,7 +809,7 @@ final class PipelineConfigParser {
             // pipeline without any schema still fails fast (clear error, formerly an NPE here).
             String schemaPath = (String) proc.get("schema_file");
             if (schemaPath == null || schemaPath.isBlank()) {
-                if (b.active)
+                if (b.active && !isDatasetConnector(raw))
                     throw new IllegalArgumentException("Config error in " + sourceLabel
                             + ": active: true but no schema is configured (processing.schema_file, "
                             + "processing.schemas[], or a plugin ingester) — keep a draft inactive "
@@ -1555,6 +1581,12 @@ final class PipelineConfigParser {
     }
 
     // ── tiny helpers ──────────────────────────────────────────────────────────
+
+    private static boolean isDatasetConnector(Map<String, Object> raw) {
+        Map<String, Object> col = castMapAt(raw, "collector");
+        if (col == null) col = castMapAt(raw, "source");
+        return col != null && "dataset".equalsIgnoreCase(String.valueOf(col.getOrDefault("connector", "")).trim());
+    }
 
     private static String require(Map<String, Object> m, String key) {
         Object v = m.get(key);

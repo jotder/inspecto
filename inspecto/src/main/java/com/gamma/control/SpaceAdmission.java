@@ -34,7 +34,7 @@ import java.util.Set;
  * {@code admission} key - every Space made before this rule, made without sign-in or placed on disk - is open: any
  * signed-in person reads it, as before.
  */
-final class SpaceAdmission {
+public final class SpaceAdmission {
 
     private SpaceAdmission() {}
 
@@ -61,7 +61,7 @@ final class SpaceAdmission {
      * the caller's grants are resolved again under THAT Space's role table, as {@link ApiContext#requireCapabilityIn}
      * does, and the request's own bound-Space attributes are put back.
      */
-    static boolean admits(HttpExchange ex, SpaceContext ctx) {
+    public static boolean admits(HttpExchange ex, SpaceContext ctx) {
         if (!ctx.manifest().closed()) return true;
         if (!(ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject bound)) return true;   // no sign-in
         if (bound.id().equals(ctx.manifest().createdBy())) return true;

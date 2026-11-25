@@ -36,6 +36,8 @@ export interface FoundResult {
     rows: FoundRow[];
     /** Why there is nothing to show; '' when there are rows. */
     empty: string;
+    /** Busiest-other exclusion offer when that entity ranks past the `limit` rows shown. */
+    hint?: { text: string; row: FoundRow; what: string };
 }
 
 const fmt = (n: number): string => n.toLocaleString('en');
@@ -68,7 +70,7 @@ export function busiest(
             rows: [],
             empty: `No ${t.node} on this graph has a ${t.link} yet.`,
         };
-    const rows = ranked.map((s, i): FoundRow => {
+    const toRow = (s: (typeof all)[number], i: number): FoundRow => {
         const node = byId.get(s.id)!;
         const edgeIds = g.edges.filter((e) => e.source === s.id || e.target === s.id).map((e) => e.id);
         return {
@@ -83,19 +85,28 @@ export function busiest(
             values: valuesOf([node]),
             what: i === 0 ? `${s.label}, the busiest ${t.node}` : `${s.label}, one of the busiest ${t.nodes}`,
         };
-    });
+    };
+    const rows = ranked.map(toRow);
     // The hint (UC-10): a top entity far busier than the next is usually a hub to leave out, not a lead. A start entity
     // is busy by construction (the graph was drawn round it), so it is neither offered nor counted as "the next". Both
-    // come from the WHOLE ranking: with several start entities on top, "the next" may lie past the rows shown.
+    // come from the WHOLE ranking: with several start entities on top, "the next" (and even "top") may lie past the rows shown.
     const others = all.filter((s) => !startIds.has(s.id));
     const [top, next] = others;
     const at = top ? ranked.indexOf(top) : -1;
-    if (at >= 0 && top.score >= 5 && (!next || top.score >= 2 * next.score))
-        rows[at].hint = `${top.label} has ${count(top.score, t.link, t.links)}. Add it to an exclusion list?`;
+    let hint: FoundResult['hint'];
+    if (top && top.score >= 5 && (!next || top.score >= 2 * next.score)) {
+        const text = `${top.label} has ${count(top.score, t.link, t.links)}. Add it to an exclusion list?`;
+        if (at >= 0) rows[at].hint = text;
+        else {
+            const row = toRow(top, all.indexOf(top));
+            hint = { text, row, what: row.what };
+        }
+    }
     return {
         heading: `The ${count(rows.length, `busiest ${t.node}`, `busiest ${t.nodes}`)} on this graph`,
         rows,
         empty: '',
+        ...(hint ? { hint } : {}),
     };
 }
 
@@ -146,7 +157,7 @@ export function groups(g: G6GraphData, t: PackTerms, timeAttr = '', limit = 5): 
                     `Group ${i + 1}: ${count(m.length, t.node, t.nodes)}, ${count(edges.length, t.link, t.links)} among them` +
                     (days !== null ? ` within ${count(days, 'day', 'days')}` : '') +
                     ` (${someValues(
-                        nodes.map((n) => n.data.label),
+                        nodes.map((n) => n.data.hoverLabel ?? n.data.label),
                         3,
                     )}).`,
                 nodeIds: m,
@@ -165,7 +176,10 @@ export function groups(g: G6GraphData, t: PackTerms, timeAttr = '', limit = 5): 
  */
 export function route(g: G6GraphData, from: string, to: string, t: PackTerms): FoundResult {
     const nodeOf = new Map(g.nodes.map((n) => [n.id, n]));
-    const label = (id: string) => nodeOf.get(id)?.data.label ?? id;
+    const label = (id: string) => {
+        const d = nodeOf.get(id)?.data;
+        return d?.hoverLabel ?? d?.label ?? id;
+    };
     const heading = `How ${label(from)} reaches ${label(to)}`;
     if (!nodeOf.has(from) || !nodeOf.has(to) || from === to)
         return { heading, rows: [], empty: `Choose two different ${t.nodes} on the graph.` };

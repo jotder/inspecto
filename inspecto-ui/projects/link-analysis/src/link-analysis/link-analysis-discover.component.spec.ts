@@ -149,4 +149,25 @@ describe('LinkAnalysisDiscoverComponent - Find something interesting (LA-ONBOARD
         expect(el.textContent).toContain('Draw a graph first');
         expect(el.querySelector('[data-testid="la-discover-busiest"]')).toBeNull();
     });
+
+    it('renders the exclusion offer below the five rows when the busiest other entity ranks past top 5', () => {
+        const starts = ['S1', 'S2', 'S3', 'S4', 'S5'];
+        const leaves = (p: string, count: number) => Array.from({ length: count }, (_, i) => `${p}${i}`);
+        const g: G6GraphData = {
+            nodes: [...starts, 'X', ...starts.flatMap((s) => leaves(s + '-', 10)), ...leaves('x', 6)].map(n),
+            edges: [
+                ...starts.flatMap((s) => leaves(s + '-', 10).map((l) => e(s, l))),
+                ...leaves('x', 6).map((l) => e('X', l)),
+            ],
+        };
+        const { el, host, fixture, click } = mount();
+        host.graph.set(g);
+        host.startIds.set(starts);
+        fixture.detectChanges();
+        click('[data-testid="la-discover-busiest"]');
+        const hint = el.querySelector('[data-testid="la-discover-hint"]');
+        expect(hint?.textContent).toContain('X has 6 transfers. Add it to an exclusion list?');
+        (hint?.querySelector('button') as HTMLButtonElement).click();
+        expect(host.added[0]).toMatchObject({ purpose: 'exclusion', row: { values: ['X'] } });
+    });
 });

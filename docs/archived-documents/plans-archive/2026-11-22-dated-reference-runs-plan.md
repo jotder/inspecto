@@ -1,8 +1,8 @@
 # Dated Reference runs — each record joins the Reference version of its own day, and the backlog drains itself
 
-**State:** 🟡 **PROPOSED 2026-11-22 — direction agreed with the operator; D-DR1…D-DR9 open; nothing built.**
+**State:** ✅ **DONE 2026-11-25 — P1–P4 (`dbb720aae`, `9663e7297`) and P5/JG4 (`fea9792af`) built; archived.**
 Board row `DATED-REFERENCE-RUNS-1` [items: module.elt, module.engine, layer.product]. Builds on
-[`2026-11-22-reference-lookup-plan.md`](2026-11-22-reference-lookup-plan.md) (`LOOKUP-1`: the keyed Reference join,
+[`2026-11-22-reference-lookup-plan.md`](../archived-documents/plans-archive/2026-11-22-reference-lookup-plan.md) (`LOOKUP-1`: the keyed Reference join,
 P1a–P1c built) and replaces that plan's P2 items "as-of each row's event time" and "version used in lineage".
 
 ## 1. The problem

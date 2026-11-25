@@ -118,6 +118,14 @@ export const ACCESS_ACTION_NODES: Record<string, AccessNode[]> = {
             label: 'Run graph analysis on the server (above the browser cap)',
         },
         {
+            // AGENT-KIT-1 AK-2f: a Draft's writes (open, ops, undo, discard, rebase), never its promote. Implied by
+            // canManageIncidents on the server, so a person never needs it granted; it exists for a machine agent's role.
+            id: 'linkgraph.draft',
+            kind: 'action',
+            capability: 'canDraftInvestigations',
+            label: 'Work in Investigation Drafts (promoting one needs Manage Incidents and Cases)',
+        },
+        {
             // The Investigation oversight panel: denying it hides Reveal; the server gates the route on it.
             id: 'linkgraph.reveal',
             kind: 'action',
