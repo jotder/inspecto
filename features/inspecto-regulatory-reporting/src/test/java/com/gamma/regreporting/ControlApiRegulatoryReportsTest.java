@@ -45,7 +45,7 @@ class ControlApiRegulatoryReportsTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
     private static final String AUTHOR = "Bearer author", ANALYST2 = "Bearer analyst2", CHECKER = "Bearer checker",
-            CHECKER2 = "Bearer checker2", DEV = "Bearer dev", SCOPED = "Bearer scoped";
+            CHECKER2 = "Bearer checker2", DEV = "Bearer dev", SCOPED = "Bearer scoped", AGENT = "Bearer agent";
     private final HttpClient client = HttpClient.newHttpClient();
 
     @TempDir
@@ -68,6 +68,14 @@ class ControlApiRegulatoryReportsTest {
         System.setProperty("assist.safety.roots", tmp.toString());
         Authenticators.forTest(ex -> {
             String auth = String.valueOf(ex.getRequestHeaders().getFirst("Authorization"));
+            if (AGENT.equals(auth)) {   // the author through an MCP agent client, narrowed as OidcAuthenticator narrows it
+                Roles.Def def = Roles.effective(ex).get("operations");
+                ComponentAccess.heldRoles(ex, Set.of("operations"));
+                Set<String> kept = new java.util.HashSet<>(def.capabilities());
+                kept.removeAll(Roles.AGENT_NEVER_CAPABILITIES);
+                return Optional.of(new Subject("author-1", Set.copyOf(kept), def.dataScopes(), Map.of(), null, null, null,
+                        "claude-code"));
+            }
             if (SCOPED.equals(auth))
                 return Optional.of(new Subject("scoped-1", Roles.effective(ex).get("operations").capabilities(), Set.of("billing")));
             String[] who = switch (auth) {
@@ -429,6 +437,37 @@ class ControlApiRegulatoryReportsTest {
             JsonNode d = data(send(c, "GET", "/regulatory-reports/" + id, null, CHECKER), 200);
             assertTrue(d.get("sourceChanged").asBoolean(), d.toString());
             assertFalse(d.get("content").asText().contains("late.pdf"), "the pinned content is never re-rendered");
+        }
+    }
+
+    /**
+     * AGENT-GET-DATA-READS-1 (D-AK13): "GET /regulatory-reports" and "GET /regulatory-reports/([^/]+)" are agent data
+     * routes. An agent reads the report with the Case's key masked, stamped; with every stamp a no-op the agent gets 500
+     * with no report while a person still reads it. Falsified: removing either stamp in {@code RegulatoryReportRoutes}.
+     */
+    @Test
+    void anAgentsReportReadsAreProvenMaskedOrWithheld() throws Exception {
+        try (Ctx c = open(true)) {
+            String raw = "255712345678";
+            String kase = seedCase(c, Map.of("key.msisdn", raw), Map.of());
+            String id = data(send(c, "POST", "/regulatory-reports", draftBody(kase), AUTHOR), 200).get("id").asText();
+            for (String path : List.of("/regulatory-reports", "/regulatory-reports/" + id)) {
+                HttpResponse<String> agent = send(c, "GET", path, null, AGENT);
+                assertEquals(200, agent.statusCode(), path + ": " + agent.body());
+                assertFalse(agent.body().contains(raw), agent.body());
+            }
+            com.gamma.util.AnswerMasking.ignoreStampsForTest(true);
+            try {
+                for (String path : List.of("/regulatory-reports", "/regulatory-reports/" + id)) {
+                    HttpResponse<String> r = send(c, "GET", path, null, AGENT);
+                    assertEquals(500, r.statusCode(), path + ": " + r.body());
+                    assertTrue(r.body().contains(com.gamma.control.ControlApi.MASKING_NOT_PROVEN), r.body());
+                    assertFalse(r.body().contains(raw) || r.body().contains(id), r.body());
+                    assertEquals(200, send(c, "GET", path, null, AUTHOR).statusCode(), "a person is unchanged: " + path);
+                }
+            } finally {
+                com.gamma.util.AnswerMasking.ignoreStampsForTest(false);
+            }
         }
     }
 

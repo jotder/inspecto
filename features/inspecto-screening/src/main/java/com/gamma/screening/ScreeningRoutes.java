@@ -120,6 +120,8 @@ public final class ScreeningRoutes implements RouteModule {
         List<Map<String, Object>> out = new ArrayList<>();
         Set<String> hidden = hiddenLists(ex, root);
         for (Map<String, Object> rec : page.hits()) out.add(shown(rec, hidden));
+        // W6 S0 (D-AK13): a hit's subject and entry are masked at write; a restricted list's entry is withheld above
+        com.gamma.util.AnswerMasking.applied("screening hits (masked at write)", hidden.size());
         String next = page.next() == null ? null : com.gamma.control.Cursor.encode(List.of(page.next()));
         ApiContext.pagination(ex, cursor, next, limit, page.total());
         Map<String, Object> body = new LinkedHashMap<>();
@@ -145,7 +147,9 @@ public final class ScreeningRoutes implements RouteModule {
         Path root = WriteGates.requireWriteRoot(api, "screening hits");
         Map<String, Object> rec = ScreeningHits.read(root, id);
         if (rec == null) throw notFound(id);
-        return shown(rec, hiddenLists(ex, root));
+        Set<String> hidden = hiddenLists(ex, root);
+        com.gamma.util.AnswerMasking.applied("screening hit (masked at write)", hidden.size());   // W6 S0 (D-AK13)
+        return shown(rec, hidden);
     }
 
     /**

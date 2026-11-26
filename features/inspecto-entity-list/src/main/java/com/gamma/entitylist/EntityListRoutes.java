@@ -194,7 +194,10 @@ public final class EntityListRoutes implements RouteModule {
         if (l == null) throw notFound(id, rawAt != null ? " at seq " + atSeq : "");
         // GE-8: restricted as of that seq OR now - a list restricted later never shows its members through an old seq
         EntityRegistry.EntityList now = current(facts, id);
-        return render(root, log, facts, l, atSeq, hidden(ex, l) || hidden(ex, now));
+        boolean hide = hidden(ex, l) || hidden(ex, now);
+        // W6 S0 (D-AK13): members are tokenised when the list is masked, withheld when restricted from this caller
+        com.gamma.util.AnswerMasking.applied("entity list " + id, hide || masked(root, l) ? 1 : 0);
+        return render(root, log, facts, l, atSeq, hide);
     }
 
     private Object match(ApiContext api, HttpExchange ex, String id, Map<String, Object> body) throws IOException {

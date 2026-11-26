@@ -27,13 +27,28 @@ its weight in the agent budget. As built in S0:
 |---|---|
 | `POST /db/query` (the `query_dataset` MCP Tool) | 1 |
 | The Link Analysis reads (`AgentGate.LA_READS`) less `AgentGate.LA_READS_WITHOUT_VALUES` — 16 routes: projection, neighbours, neighbour preview, multi, recursive paths, reference rows, expand preview, case history, Entity resolve and suggest, deep-link resolve, preset run, Dataset query, branching and temporal patterns, Investigation replay | 1 |
+| The 28 GET reads of masked values (`AgentGate.VALUE_GETS`, operator 2026-11-26, `AGENT-GET-DATA-READS-1`): Dataset rows, `/db/table`, a KPI value; Risk Score, Risk Score list, Anomaly Score, prediction; an Entity List; screening hits; regulatory reports; the Link Analysis GETs — Dataset discover, Entity and Entity Type profiles and summary, entity identities, value measures, a graph run, an Investigation's log, Working Set, comparison, dossier and bundle, a Draft's log and Working Set, the public Investigation link | 1 |
 
 Not on the list, because they answer no Dataset value: the overlap profile (names and counts) and the two dossier
 verifications (verdicts and hashes). `AgentDataRoutesParityTest` makes every agent-allowed write route either a data
 route or one named with its reason, so a new allowed route is classified before it ships. `POST /lookups/test` stays
-refused to agents (`AGENT-LOOKUP-PREVIEW-1`). ⚠ GET routes (all allowed to agents) are outside this list, unstamped and
-outside the agent budget — for example `GET /db/table` (paged rows) and the Entity profile and summary reads; the
-design's scope is the POST data reads. Open as `AGENT-GET-DATA-READS-1`.
+refused to agents (`AGENT-LOOKUP-PREVIEW-1`).
+
+**Every GET route is classified** in `inspecto/src/test/resources/agent-get-routes.tsv` (pattern, class, reason), and
+`AgentDataRoutesParityTest` fails when a `.get("…")` registration in the source is missing from it. The classes:
+
+- **`data`** (28) — answers a masked value: on `VALUE_GETS`, stamped, weighted 1, each proven over real HTTP.
+- **`raw`** (9) — answers Dataset, Reference or file values with no masking step, so it can never prove its answer:
+  **refused to agents** (`AgentGate.RAW_GETS`, with the reason the agent is told) — a view's rows
+  (`VIEW-DATA-UNMASKED-1` for people), a connection sample, a Job artifact's bytes, a run's rejected rows, `/export`,
+  the recon state and promoted Breaks, stored Insights, the screening reveal. A person's call is unchanged.
+- **`stored`** (43) — event, audit, Incident and Case, note, notification and run-record reads that may echo keys other
+  features wrote: still open to agents, outside the seam, open as `AGENT-STORED-RECORD-READS-1`.
+- **`none`** (205) — config, names, counts, statuses: no Dataset value (the graph run list among them: run metadata,
+  no result).
+
+⚠ The scan reads literal `.get("…")` registrations; ControlApi's bare health, readiness and contract routes and the MCP
+OAuth metadata route (a constant) are not scanned and answer no value.
 
 ## The masked-answer stamp (D-AK13, D-AK14)
 
@@ -47,7 +62,12 @@ Masking stays at the compute site, where the lineage is known. What is shared is
   masking. As built: `BiResultMasking.apply` (`/db/query`; set before its early return, so a Space with masking mode
   `none` or a revealing caller stamps zero), the `ExplorationMasking` and `EntityMasking` constructors (every factory of
   the Link Analysis maskings), `EntityProfileRoutes.resolveKey`, `InvestigationInboundRoutes.typed`,
-  `EntityProfiles.suggest`, `CaseHistory` (after its masking decision) and `PatternRoutes.refusal` (an empty answer).
+  `EntityProfiles.suggest`, `CaseHistory` (after its masking decision) and `PatternRoutes.refusal` (an empty answer);
+  for the GET reads also `EntityKeyMasking.put` (a score's or prediction's key; its evidence was masked at write),
+  `RiskScoreRoutes.list`, `EntityListRoutes.one`, `ScreeningRoutes` hits and hit, `RegulatoryReportRoutes` list and one
+  (`ObjectReadMasking`), `KpiRoutes.value` (after `vetMeasure`), `/db/table`'s keyless operational-store branch, the
+  entity identities renderer and `EntityProfiles.typeProfile`. ⚠ An entity identity assertion's free-text `reason` and
+  `actor` are returned as written, as the stored-record reads are.
 - **Fail closed.** A 2xx answer from an unstamped scope is replaced by **500 `masking not proven - the answer is
   withheld`** (`ControlApi.MASKING_NOT_PROVEN`) before any byte is written: for a returned body in `provenMasked`; for a
   body a handler writes itself in the response writers (`ApiContext.respondJson|Text|Binary` call
@@ -99,9 +119,10 @@ the direct refusal is audited as `access.denied`. A weighted call spends its who
 
 | Test | Proves | Falsified by (2026-11-26) |
 |---|---|---|
-| `ControlApiAgentDataSeamTest` (`features/inspecto-mcp`) | `/db/query` on both doors: an agent's answer masked and stamped; with every stamp a no-op (`AnswerMasking.ignoreStampsForTest`) 500 on both doors with no row, a person unchanged; a `none` Space answers raw; the budget 429 on each door, per client, the person's own burst of 20 untouched; no request value in any audit row or log line, the `mcp.tool.called` row present | removing the seam check; the direct or the replay charge; keying the rate limit or the budget by the person's id; the `BiResultMasking` stamp |
+| `ControlApiAgentDataSeamTest` (`features/inspecto-mcp`) | `/db/query` on both doors: an agent's answer masked and stamped; with every stamp a no-op (`AnswerMasking.ignoreStampsForTest`) 500 on both doors with no row, a person unchanged; a `none` Space answers raw; the budget 429 on each door, per client, the person's own burst of 20 untouched; no request value in any audit row or log line, the `mcp.tool.called` row present; the GET Dataset rows, `/db/table` and KPI value proven the same way | removing the seam check; the direct or the replay charge; keying the rate limit or the budget by the person's id; the `BiResultMasking` stamp |
 | `ControlApiAgentLinkAnalysisSeamTest` (`la/inspecto-geo-link`) | each of the 16 Link Analysis data routes answers an agent 200 with no raw id; unstamped, each answers 500 with no value while a person still gets 200; across all 16, no event row or log line written for the agent holds a raw id, and its `link.expanded` row keeps the alias | removing the seam check; the `ExplorationMasking` stamp; `auditedValue` returning the raw key |
-| `AgentDataRoutesParityTest` (`inspecto`) | every data route agent-allowed and weighted; every allowed write route classified; every data route has its proving test; weight and key for agents only | — |
+| `AgentDataRoutesParityTest` (`inspecto`) | every data route agent-allowed and weighted; every allowed write route classified; every GET route in the source classified in `agent-get-routes.tsv`, `data` = `VALUE_GETS`, `raw` = `RAW_GETS` refused to agents and unchanged for people; every data route has its proving test; weight and key for agents only | — |
+| `ControlApiRiskScoreTest`, `ControlApiRiskScoreListTest` (`features/inspecto-scoring`), `ControlApiAnomalyScoreTest`, `ControlApiPredictionReadTest`, `ControlApiEntityListTest`, `ControlApiScreeningTest`, `ControlApiRegulatoryReportsTest` | each module's value GETs: an agent's answer 200 and masked; unstamped, 500 with no value while a person still gets 200; the screening reveal refused to an agent | removing any one stamp: `EntityKeyMasking.put`, `RiskScoreRoutes.list`, `EntityListRoutes.one`, either `ScreeningRoutes` stamp, either `RegulatoryReportRoutes` stamp, `KpiRoutes.value`, the identities renderer, `EntityProfiles.typeProfile`; refusing no raw GET (`AgentDataRoutesParityTest`) |
 | `AnswerMaskingTest` (`inspecto-util`), `RateLimiterBudgetTest#theAgentBudgetSpendsByWeightAllOrNothing` | scope nesting, other-thread stamps unseen, 2xx-only refusal; weighted all-or-nothing spend, default burst 60 | — |
 
 ## References

@@ -107,13 +107,16 @@ class ControlApiAgentDataSeamTest {
         DuckDbUtil.loadDriver();
         File db = DuckDbUtil.tempDbFile("s0seam_seed_");
         try (Connection conn = DuckDbUtil.openConnection(db); Statement st = conn.createStatement()) {
-            st.execute("COPY (SELECT * FROM (VALUES ('" + A + "','EU',10.0),('" + B + "','US',7.0)) t(msisdn,region,amount)) TO '"
-                    + parquet + "' (FORMAT PARQUET)");
+            st.execute("COPY (SELECT *, current_date AS seen_on FROM (VALUES ('" + A + "','EU',10.0),('" + B + "','US',7.0)) "
+                    + "t(msisdn,region,amount)) TO '" + parquet + "' (FORMAT PARQUET)");
         } finally {
             DuckDbUtil.deleteTempDb(db);
         }
         new ComponentStore(config.resolve("registry")).write("dataset", "calls_ds", Map.of("physicalRef", "calls",
                 "columns", List.of(Map.of("name", "msisdn", "classification", "MSISDN"), Map.of("name", "region"))));
+        new ComponentStore(config.resolve("registry")).write("kpi", "callers", Map.of("dataset", "calls_ds",
+                "measure", "countDistinct(msisdn)", "timeField", "seen_on", "grain", "month", "comparison", "previous",
+                "direction", "up"));
         if (laSettings != null) Files.writeString(config.resolve("link-analysis.toon"), laSettings);
         SpaceManager spaces = SpaceManager.discover(root);
         ControlApi api = new ControlApi(spaces, 0);
@@ -189,6 +192,39 @@ class ControlApiAgentDataSeamTest {
             HttpResponse<String> person = query(c, PERSON, "SELECT msisdn, region FROM calls");
             assertEquals(200, person.statusCode(), "a person's request does not pass the seam: " + person.body());
             assertTrue(person.body().contains("masked:"), "and is masked as before: " + person.body());
+        }
+    }
+
+    private HttpResponse<String> get(Ctx c, String auth, String path) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1/spaces/s1" + path))
+                .header("Authorization", auth).GET().build(), BodyHandlers.ofString());
+    }
+
+    /**
+     * AGENT-GET-DATA-READS-1 (D-AK13): the masked value GETs of this fixture, each an agent data route:
+     * "GET /datasets/([^/]+)/rows" and "GET /db/table" (masked by BiResultMasking.apply), and
+     * "GET /kpis/([^/]+)/value" (a Measure vetted, stamped in KpiRoutes). An agent's answer is stamped and holds no raw
+     * key; with every stamp a no-op the agent gets 500 with no row while a person still gets the answer. Falsified:
+     * removing the KpiRoutes stamp.
+     */
+    @Test
+    void anAgentsValueGetsAreProvenMaskedOrWithheld(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, null)) {
+            List<String> paths = List.of("/datasets/calls_ds/rows", "/db/table?name=calls", "/kpis/callers/value");
+            for (String path : paths) {
+                HttpResponse<String> agent = get(c, AGENT, path);
+                assertEquals(200, agent.statusCode(), path + ": " + agent.body());
+                assertNoRaw(path, agent.body());
+            }
+            AnswerMasking.ignoreStampsForTest(true);
+            for (String path : paths) {
+                HttpResponse<String> agent = get(c, AGENT, path);
+                assertEquals(500, agent.statusCode(), path + ": " + agent.body());
+                assertTrue(agent.body().contains(ControlApi.MASKING_NOT_PROVEN), agent.body());
+                assertNoRaw(path + " unstamped", agent.body());
+                assertFalse(agent.body().contains("masked:") || agent.body().contains("EU"), "no row leaves: " + agent.body());
+                assertEquals(200, get(c, PERSON, path).statusCode(), "a person is unchanged: " + path);
+            }
         }
     }
 

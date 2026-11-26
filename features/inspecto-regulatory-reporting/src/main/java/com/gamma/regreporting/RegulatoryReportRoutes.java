@@ -219,6 +219,8 @@ public final class RegulatoryReportRoutes implements RouteModule {
                 }
             }
         }
+        // W6 S0 (D-AK13): every item passed shown() (ObjectReadMasking); stamped here so an empty list is proven too
+        com.gamma.util.AnswerMasking.applied("regulatory reports", 1);
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("items", items);
         out.put("total", total);
@@ -254,6 +256,7 @@ public final class RegulatoryReportRoutes implements RouteModule {
             }
             if (RegulatoryReports.PENDING.equals(rec.get("status"))) view.put("approverCheck", approverCheck(root, rec));
         }
+        com.gamma.util.AnswerMasking.applied("regulatory report " + id, 1);   // W6 S0 (D-AK13): masked by shown() (ObjectReadMasking)
         return shown(api, ex, view);
     }
 

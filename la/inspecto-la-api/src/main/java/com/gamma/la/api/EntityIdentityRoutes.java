@@ -458,6 +458,8 @@ public final class EntityIdentityRoutes implements RouteModule {
             this.log = log;
             this.assertions = EntityRegistry.assertions(facts.facts(), atSeq);
             this.mode = LinkAnalysisSettings.forRoot(root).effectiveMaskingMode();
+            // W6 (D-AK13): every key below is passed through the Space's masking mode by render()
+            com.gamma.util.AnswerMasking.applied("entity identities (" + mode + ")", "none".equals(mode) ? 0 : 1);
         }
 
         Map<String, Object> group(EntityRegistry.Group g) throws IOException {

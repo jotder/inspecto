@@ -24,6 +24,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 import static com.gamma.control.ControlApiDatasetDiscoverTest.A;
+import static com.gamma.control.ControlApiDatasetDiscoverTest.B;
 import static com.gamma.control.ControlApiDatasetDiscoverTest.RAW;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -46,7 +47,8 @@ class ControlApiAgentLinkAnalysisSeamTest {
         CaseTeamObjectEngine.HISTORY = java.util.List.of(Map.of("kind", "case", "id", "CASE-1", "title", "ring around +" + A,
                 "status", "OPEN", "createdAt", 2L, "matchedOn", "member", "via", "INC-1"));
         Set<String> person = Set.of("canManageIncidents", "canRunLinkGraphAnalysis", "canWorkIncidents",
-                "canDraftInvestigations");
+                "canDraftInvestigations", "canShareInvestigation");
+        System.setProperty("la.embed.enabled", "true");   // the public embed link read
         Authenticators.forTest(ex -> {
             String h = String.valueOf(ex.getRequestHeaders().getFirst("Authorization"));
             Set<String> agentCaps = new HashSet<>(person);
@@ -63,6 +65,7 @@ class ControlApiAgentLinkAnalysisSeamTest {
     @AfterEach
     void disarm() {
         AnswerMasking.ignoreStampsForTest(false);
+        System.clearProperty("la.embed.enabled");
         CaseTeamObjectEngine.CASES = null;
         CaseTeamObjectEngine.HISTORY = null;
         CaseTeamObjectEngine.ASKED.clear();
@@ -103,6 +106,60 @@ class ControlApiAgentLinkAnalysisSeamTest {
         return p;
     }
 
+    private static final String WINDOWS = "aFrom=2026-10-01T00:00:00Z&aTo=2026-10-03T00:00:00Z"
+            + "&bFrom=2026-10-03T00:00:00Z&bTo=2026-10-06T00:00:00Z";
+
+    /**
+     * Route key (as {@code AgentGate} lists it, {@code GET <pattern>}) → the concrete path that drives it to a 200 answer.
+     * {@code draftId}, {@code runId} and {@code token}: the Draft, graph run and embed link {@link #setUpGetReads} made.
+     */
+    private static Map<String, String> getProbes(String alias, String draftId, String runId, String token) {
+        Map<String, String> p = new LinkedHashMap<>();
+        p.put("GET /inv/datasets/([^/]+)/discover", "/inv/datasets/pays_ds/discover");
+        p.put("GET /inv/entities/([^/]+)/([^/]+)/profile", "/inv/entities/msisdn/" + alias + "/profile");
+        p.put("GET /inv/entities/([^/]+)/([^/]+)/summary", "/inv/entities/msisdn/" + alias + "/summary?dataset=pays_ds");
+        p.put("GET /inv/entity-identities", "/inv/entity-identities");
+        p.put("GET /inv/entity-identities/group", "/inv/entity-identities/group?key=msisdn:" + A);
+        p.put("GET /inv/entity-types/([^/]+)/profile", "/inv/entity-types/msisdn/profile");
+        p.put("GET /inv/graph/runs/([^/]+)", "/inv/graph/runs/" + runId);
+        p.put("GET /inv/investigations/([^/]+)/compare", "/inv/investigations/inv-s0/compare?" + WINDOWS);
+        p.put("GET /inv/investigations/([^/]+)/dossier", "/inv/investigations/inv-s0/dossier");
+        p.put("GET /inv/investigations/([^/]+)/dossier/bundle", "/inv/investigations/inv-s0/dossier/bundle");
+        p.put("GET /inv/investigations/([^/]+)/drafts/([^/]+)/log", "/inv/investigations/inv-s0/drafts/" + draftId + "/log");
+        p.put("GET /inv/investigations/([^/]+)/drafts/([^/]+)/working-set",
+                "/inv/investigations/inv-s0/drafts/" + draftId + "/working-set");
+        p.put("GET /inv/investigations/([^/]+)/log", "/inv/investigations/inv-s0/log");
+        p.put("GET /inv/investigations/([^/]+)/working-set", "/inv/investigations/inv-s0/working-set");
+        p.put("GET /inv/value-measures", "/inv/value-measures?dataset=pays_ds&sourceCol=caller&targetCol=callee"
+                + "&linkKindCol=link_kind&name=structuring&valueCol=amount&timeCol=ts&from=2026-09-30&to=2026-10-10");
+        p.put("GET /public/investigations/([^/]+)", "/public/investigations/" + token);
+        return p;
+    }
+
+    private HttpResponse<String> get(ControlApiDatasetDiscoverTest.Ctx c, String path, String auth) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port() + "/api/v1" + path))
+                .header("Authorization", auth).GET().build(), BodyHandlers.ofString());
+    }
+
+    /** The state the GET reads need, made as the person: an Entity identity, a Draft, a completed graph run, an embed link. */
+    private Map<String, String> setUpGetReads(ControlApiDatasetDiscoverTest.Ctx c) throws Exception {
+        com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
+        HttpResponse<String> identity = send(c, "/inv/entity-identities",
+                "{\"a\":\"msisdn:" + A + "\",\"b\":\"msisdn:" + B + "\",\"reason\":\"same SIM in the KYC file\"}", PERSON);
+        assertEquals(201, identity.statusCode(), identity.body());
+        HttpResponse<String> draft = send(c, "/inv/investigations/inv-s0/drafts", "{}", PERSON);
+        assertEquals(201, draft.statusCode(), draft.body());
+        String draftId = json.readTree(draft.body()).at("/data/draftId").asText();
+        HttpResponse<String> run = send(c, "/inv/graph/runs",
+                "{\"investigationId\":\"inv-s0\",\"algorithm\":\"connectedComponents\"}", PERSON);
+        assertTrue(run.statusCode() == 200 || run.statusCode() == 202, run.body());
+        String runId = json.readTree(run.body()).at("/data/runId").asText();
+        HttpResponse<String> embed = send(c, "/inv/investigations/inv-s0/embeds", "{\"label\":\"s0\"}", PERSON);
+        assertEquals(200, embed.statusCode(), embed.body());
+        String token = json.readTree(embed.body()).at("/data/token").asText();
+        return getProbes(alias(c), draftId, runId, token);
+    }
+
     private HttpResponse<String> send(ControlApiDatasetDiscoverTest.Ctx c, String path, String body, String auth) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port() + "/api/v1" + path))
                 .header("Content-Type", "application/json").header("Authorization", auth)
@@ -126,7 +183,7 @@ class ControlApiAgentLinkAnalysisSeamTest {
         ControlApiDatasetDiscoverTest.Ctx c = ControlApiDatasetDiscoverTest.open(cfg, root, "masking_mode: typed\n");
         // the Investigation the replay probe reads, owned by the person whose agent asks
         HttpResponse<String> created = send(c, "/inv/investigations", "{\"id\":\"inv-s0\",\"purpose\":\"Referral S0\","
-                + COLS + "}", PERSON);
+                + COLS + ",\"timeCol\":\"ts\"}", PERSON);
         assertEquals(200, created.statusCode(), created.body());
         assertEquals(200, send(c, "/inv/investigations/inv-s0/ops", "{\"op\":\"seed\",\"ids\":[\"" + A + "\"]}", PERSON).statusCode());
         return c;
@@ -137,6 +194,32 @@ class ControlApiAgentLinkAnalysisSeamTest {
         Set<String> la = new TreeSet<>();
         for (String r : AgentGate.DATA_ROUTES.keySet()) if (r.startsWith("POST /inv/")) la.add(r);
         assertEquals(la, new TreeSet<>(probes().keySet()), "one probe per Link Analysis agent data route");
+        Set<String> gets = new TreeSet<>();
+        for (String r : AgentGate.DATA_ROUTES.keySet())
+            if (r.startsWith("GET /inv/") || r.startsWith("GET /public/investigations/")) gets.add(r);
+        assertEquals(gets, new TreeSet<>(getProbes("masked:0000000000000000", "draft", "run", "token").keySet()), "one GET probe per Link Analysis agent data route");
+    }
+
+    @Test
+    void anAgentsLinkAnalysisGetIsStampedAndMaskedAndAnUnstampedOneIsWithheld(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (ControlApiDatasetDiscoverTest.Ctx c = open(cfg, root)) {
+            Map<String, String> probes = setUpGetReads(c);
+            for (Map.Entry<String, String> p : probes.entrySet()) {
+                HttpResponse<String> agent = get(c, p.getValue(), AGENT);
+                assertEquals(200, agent.statusCode(), p.getKey() + " as the agent: " + agent.body());
+                assertNoRaw(p.getKey() + " as the agent", agent.body());
+            }
+            AnswerMasking.ignoreStampsForTest(true);   // every masking step's stamp is now a no-op: the seam must hold
+            for (Map.Entry<String, String> p : probes.entrySet()) {
+                HttpResponse<String> agent = get(c, p.getValue(), AGENT);
+                assertEquals(500, agent.statusCode(), p.getKey() + " unstamped, as the agent: " + agent.body());
+                assertTrue(agent.body().contains(ControlApi.MASKING_NOT_PROVEN), agent.body());
+                assertNoRaw(p.getKey() + " unstamped", agent.body());
+                assertFalse(agent.body().contains("masked:"), "no row at all leaves: " + agent.body());
+                HttpResponse<String> person = get(c, p.getValue(), PERSON);
+                assertEquals(200, person.statusCode(), p.getKey() + " as the person, unchanged: " + person.body());
+            }
+        }
     }
 
     @Test

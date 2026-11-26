@@ -184,14 +184,52 @@ final class AgentGate {
      * in the agent budget (1 = a page read). For an agent, on every door, the host (a) charges the weight to the agent budget
      * keyed by agent client and subject, and (b) answers 500 {@code masking not proven} instead of a 2xx answer no masking
      * step stamped ({@code com.gamma.util.AnswerMasking}). S0 lists {@code POST /db/query} and the Link Analysis reads that
-     * answer entity ids or rows; groups B, D, E and {@code /lookups/test} join one change each. ⚠ GET routes (all allowed to
-     * agents) are not covered by this list.
+     * answer entity ids or rows, and the masked value GETs ({@link #VALUE_GETS}); groups B, D, E and {@code /lookups/test} join
+     * one change each.
      */
     static final Map<String, Integer> DATA_ROUTES;
+
+    /**
+     * The GET routes on {@link #DATA_ROUTES} (AGENT-GET-DATA-READS-1, operator 2026-11-26): every GET whose answer carries
+     * a value read from a Dataset or Reference and that masks it (BiResultMasking, the Link Analysis maskings,
+     * EntityKeyMasking, the Entity List and screening tokens, ObjectReadMasking). The ones that cannot are on
+     * {@link #RAW_GETS}; the stored-record GETs (events, audit, Incidents and Cases, notes) wait on their own change.
+     */
+    static final Set<String> VALUE_GETS = Set.of(
+            "GET /anomaly-scores/([^/]+)/([^/]+)",
+            "GET /datasets/([^/]+)/rows",
+            "GET /db/table",
+            "GET /entity-lists/([^/]+)",
+            "GET /inv/datasets/([^/]+)/discover",
+            "GET /inv/entities/([^/]+)/([^/]+)/profile",
+            "GET /inv/entities/([^/]+)/([^/]+)/summary",
+            "GET /inv/entity-identities",
+            "GET /inv/entity-identities/group",
+            "GET /inv/entity-types/([^/]+)/profile",
+            "GET /inv/graph/runs/([^/]+)",
+            "GET /inv/investigations/([^/]+)/compare",
+            "GET /inv/investigations/([^/]+)/dossier",
+            "GET /inv/investigations/([^/]+)/dossier/bundle",
+            "GET /inv/investigations/([^/]+)/drafts/([^/]+)/log",
+            "GET /inv/investigations/([^/]+)/drafts/([^/]+)/working-set",
+            "GET /inv/investigations/([^/]+)/log",
+            "GET /inv/investigations/([^/]+)/working-set",
+            "GET /inv/value-measures",
+            "GET /kpis/([^/]+)/value",
+            "GET /predictions/([^/]+)/([^/]+)/([^/]+)",
+            "GET /public/investigations/([^/]+)",
+            "GET /regulatory-reports",
+            "GET /regulatory-reports/([^/]+)",
+            "GET /risk-score-lists/([^/]+)",
+            "GET /risk-scores/([^/]+)/([^/]+)",
+            "GET /screening/hits",
+            "GET /screening/hits/([^/]+)");
+
     static {
         Map<String, Integer> m = new HashMap<>();
         m.put("POST /db/query", 1);
         for (String r : LA_READS) if (!LA_READS_WITHOUT_VALUES.contains(r)) m.put(r, 1);
+        for (String r : VALUE_GETS) m.put(r, 1);
         DATA_ROUTES = Map.copyOf(m);
     }
 
@@ -230,6 +268,23 @@ final class AgentGate {
     static String agentBudgetKey(Subject subject) {
         return subject == null || !subject.agent() ? null : "agent:" + subject.agentClient() + ":" + subject.id();
     }
+
+    /**
+     * GET routes refused to every agent (AGENT-GET-DATA-READS-1, operator 2026-11-26): each answers values read from a
+     * Dataset, a Reference or a raw file with no masking step, so it can never prove its answer masked (D-AK13). The
+     * reason is the one an agent is told. A person's call is unchanged; {@code GET /views/{id}/data} is also a people
+     * defect ({@code VIEW-DATA-UNMASKED-1}).
+     */
+    static final Map<String, String> RAW_GETS = Map.of(
+            "GET /views/([^/]+)/data", "it answers a view's rows unmasked",
+            "GET /connections/([^/]+)/sample", "it answers a remote file's rows unmasked",
+            "GET /jobs/([^/]+)/runs/([^/]+)/artifacts/([^/]+)/content", "it answers a Job artifact's raw bytes",
+            "GET /runs/([^/]+)/errors", "it answers rejected input rows unmasked",
+            "GET /export", "it answers the Space's config and state files, Break keys and Entity List facts included",
+            "GET /recon/promoted", "it answers Break match keys unmasked",
+            "GET /recon/([^/]+)/state", "it answers recorded Breaks with their key and side values unmasked",
+            "GET /insights", "it answers stored Insight rows it cannot prove masked at read",
+            "GET /screening/hits/([^/]+)/reveal", "it answers a screened subject's raw name and entry");
 
     /** {@link #ALLOWED} routes a machine agent may not call (D-AK2: never a run for a machine; D-AK10: nor the Space tests). */
     static final Set<String> PERSON_ONLY = Set.of("POST /pipelines/authored/([^/]+)/run", "POST /tests/run");
@@ -301,6 +356,7 @@ final class AgentGate {
     /** The bucket of the route registered as {@code method pattern} (pattern without {@code ^…$}). */
     static Bucket bucket(String method, String pattern) {
         if (never(method, pattern)) return Bucket.REFUSED;
+        if (RAW_GETS.containsKey("GET " + pattern) && ("GET".equals(method) || "HEAD".equals(method))) return Bucket.REFUSED;
         if ("GET".equals(method) || "HEAD".equals(method)) return Bucket.ALLOWED;
         String key = method + " " + pattern;
         if (PendingChanges.REPLAYABLE.contains(key) && !NOT_HELD.contains(key)) return Bucket.HELD;
@@ -321,6 +377,9 @@ final class AgentGate {
         if (b == Bucket.ALLOWED && posture(subject) == Posture.MACHINE && PERSON_ONLY.contains(method + " " + pattern))
             return "an agent machine client may not run a Pipeline or the Space tests — a delegated person may";
         if (b != Bucket.REFUSED) return null;
+        String raw = RAW_GETS.get("GET " + pattern);
+        if (raw != null && ("GET".equals(method) || "HEAD".equals(method)))
+            return "an agent client may not call GET " + pattern + ": " + raw + " - sign in without the agent client";
         return never(method, pattern)
                 ? "an agent client never approves, reveals, promotes, or changes Apps or access — a person must"
                 : "an agent client may not call " + method + " " + pattern + " — an agent proposes config changes (held "

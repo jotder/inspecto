@@ -42,6 +42,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `DB-QUERY-STORE-SHARING-1` | P3 | chore | verify: may a /db/query store read reach a shared-away Dataset? | — |
 | `RECON-STATE-READS-UNMASKED-1` | P3 | defect | The recon state reads return recorded Break keys raw, and two skip the Reconciliation's sharing (filed 2026-11-26, RECON-READ-UNGATED-1 f… | — |
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
-| `AGENT-GET-DATA-READS-1` | P2 | defect | GET routes are all allowed to agents and sit outside the W6 S0 seam: no masked-answer stamp and no agent budget. | operator |
+| `AGENT-STORED-RECORD-READS-1` | P2 | defect | 43 GET routes answer stored records that can echo entity keys or row values other features wrote into them, and sit outside the agent dat… | operator |
+| `VIEW-DATA-UNMASKED-1` | P2 | defect | GET /views/{id}/data answers a view's rows with no masking and no capability check, to people as well as agents | — |
 | `MACHINE-CLIENT-CONSOLE-1` | P3 | feature | a Space's admitted machine clients (identity.machineClients) and attribute claims are set only through PUT /access/roles; the Roles scree… | — |
 | `AUDIT-ACTION-VERBS-1` | P3 | defect | A run's quarantine release, drain, retry-now and retry cancel, and a Job Run replay, are audited as pipeline.created / job.created (categ… | — |

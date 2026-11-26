@@ -49,11 +49,42 @@ class ControlApiRiskScoreListTest {
         if ("Bearer analyst".equals(auth)) return Optional.of(new Subject("ana", CAPS));
         if ("Bearer fraud".equals(auth)) return Optional.of(new Subject("fay", CAPS, Set.of("fraud")));
         if ("Bearer nocap".equals(auth)) return Optional.of(new Subject("nc", Set.of("canAuthorWorkbench")));
+        if ("Bearer agent".equals(auth)) {   // the analyst through an MCP agent client, narrowed as OidcAuthenticator narrows it
+            Set<String> kept = new java.util.HashSet<>(CAPS);
+            kept.removeAll(com.gamma.access.Roles.AGENT_NEVER_CAPABILITIES);
+            return Optional.of(new Subject("ana", Set.copyOf(kept), null, java.util.Map.of(), null, null, null, "claude-code"));
+        }
         return Optional.empty();
     };
 
     @AfterEach
     void tearDown() { Authenticators.forTest(null); }
+
+    /**
+     * AGENT-GET-DATA-READS-1 (D-AK13): "GET /risk-score-lists/([^/]+)" is an agent data route. An agent's list is stamped
+     * (each key masked by putEntityKey) and holds no raw key; with every stamp a no-op the agent gets 500 with no row
+     * while a person still gets the list. Falsified: removing the stamp in {@code RiskScoreRoutes.list}.
+     */
+    @Test
+    void anAgentsScoreListIsProvenMaskedOrWithheld(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            score(c, "subs", model(null));
+            String path = "/spaces/s1/risk-score-lists/subs";
+            HttpResponse<String> agent = send(c.port, "GET", path, null, "agent");
+            assertEquals(200, agent.statusCode(), agent.body());
+            assertFalse(agent.body().contains("\"m1\""), "keys masked for an agent: " + agent.body());
+            com.gamma.util.AnswerMasking.ignoreStampsForTest(true);
+            try {
+                HttpResponse<String> withheld = send(c.port, "GET", path, null, "agent");
+                assertEquals(500, withheld.statusCode(), withheld.body());
+                assertTrue(withheld.body().contains(com.gamma.control.ControlApi.MASKING_NOT_PROVEN), withheld.body());
+                assertFalse(withheld.body().contains("masked:") || withheld.body().contains("\"m1\""), withheld.body());
+                assertEquals(200, send(c.port, "GET", path, null, "analyst").statusCode(), "a person is unchanged");
+            } finally {
+                com.gamma.util.AnswerMasking.ignoreStampsForTest(false);
+            }
+        }
+    }
 
     private record Ctx(SpaceManager spaces, ControlApi api, int port, Path config, Path data) implements AutoCloseable {
         public void close() { api.close(); spaces.close(); }

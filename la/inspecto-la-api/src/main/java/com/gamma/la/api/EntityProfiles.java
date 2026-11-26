@@ -258,6 +258,8 @@ final class EntityProfiles {
         masking.put("mode", f.maskMode);
         masking.put("masked", f.masked());
         out.put("masking", masking);
+        // W6 (D-AK13): the sections above show the type's keys as f.masked() decides
+        com.gamma.util.AnswerMasking.applied("entity type " + f.type.id(), f.masked() ? 1 : 0);
         return out;
     }
 
