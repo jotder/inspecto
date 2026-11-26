@@ -30,10 +30,11 @@ import java.util.function.Supplier;
  *
  * <ul>
  *   <li><b>Runs as the rule's owner</b>, as {@code kpi.snapshot} runs as its author ({@link PostgresPublishJobType#canView}
- *       / {@link PostgresPublishJobType#canRead}): a KPI or Dataset the owner may not view reads as UNKNOWN — nothing
- *       fires. A rule carries its owner's id, not their roles, so a KPI shared to the owner only through a role is not
- *       readable here (fail closed); share it, and its Dataset, to the owner. With no authenticator (Basic) the sharing
- *       envelope is not enforced, as everywhere.</li>
+ *       / {@link PostgresPublishJobType#canRead}), with the roles stamped on the rule at save ({@link #OWNER_ROLES},
+ *       as a Job's {@code updatedByRoles}) re-resolved against the role table as it is NOW. {@link #accessRefusal} is the
+ *       sweep's re-check (`BI-INSIGHTS-1` loose ends A): a rule whose owner may no longer view the KPI or read its
+ *       Dataset is skipped with one Incident. With no authenticator (Basic) the sharing envelope is not enforced, as
+ *       everywhere.</li>
  *   <li><b>Never reveals</b>: a Measure returning raw values of a masked column is refused ({@link BiResultMasking#vetMeasure},
  *       no reveal), as the KPI History Job refuses it.</li>
  *   <li>Computed at query time (D-BI7): nothing is stored.</li>
@@ -43,6 +44,87 @@ public final class KpiAlertProbe {
     private static final Logger LOG = LoggerFactory.getLogger(KpiAlertProbe.class);
 
     private KpiAlertProbe() {}
+
+    /**
+     * The rule key holding its saver's roles (comma-separated), SERVER-STAMPED by the Alert Rule routes
+     * ({@link #stampRoles}); any value a client sends is dropped ({@link #stripRoles}).
+     */
+    public static final String OWNER_ROLES = "ownerRoles";
+
+    /** {@code body} without a client-supplied {@link #OWNER_ROLES}. */
+    static Map<String, Object> stripRoles(Map<String, Object> body) {
+        if (body == null || !body.containsKey(OWNER_ROLES)) return body;
+        Map<String, Object> out = new java.util.LinkedHashMap<>(body);
+        out.remove(OWNER_ROLES);
+        return out;
+    }
+
+    /**
+     * A raw {@code alert-rule} component write ({@code /components/alert-rule}, version restore): the client's
+     * {@link #OWNER_ROLES} dropped, and for a KPI rule {@link #rolesFor} stamped.
+     */
+    static Map<String, Object> stampContent(com.sun.net.httpserver.HttpExchange ex, Map<String, Object> content,
+                                            Map<String, Object> stored) {
+        Map<String, Object> out = new java.util.LinkedHashMap<>(stripRoles(content));
+        java.util.Collection<String> roles = out.get("kpi") == null ? null : rolesFor(ex, out.get("owner"), stored);
+        if (roles != null) out.put(OWNER_ROLES, String.join(",", new java.util.TreeSet<>(roles)));
+        return out;
+    }
+
+    /** {@link #stripRoles} on a rule file's map, flat or wrapped in {@code alert:}; the same instance when nothing was there. */
+    @SuppressWarnings("unchecked")
+    static Map<String, Object> stripDeep(Map<String, Object> doc) {
+        if (doc.get("alert") instanceof Map<?, ?> inner && inner.containsKey(OWNER_ROLES)) {
+            Map<String, Object> out = new java.util.LinkedHashMap<>(doc);
+            out.put("alert", stripRoles((Map<String, Object>) inner));
+            return out;
+        }
+        return stripRoles(doc);
+    }
+
+    /**
+     * The roles a save may stamp on a rule owned by {@code owner}: the saver's held roles only when the saver IS the owner;
+     * otherwise the stored rule's stamp, kept only while its owner is unchanged; else none (fail closed).
+     */
+    static java.util.Collection<String> rolesFor(com.sun.net.httpserver.HttpExchange ex, Object owner, Map<String, Object> stored) {
+        var subject = com.gamma.spi.http.ApiContext.subject(ex);
+        if (subject.isPresent() && owner != null && subject.get().id().equals(String.valueOf(owner)))
+            return com.gamma.access.ComponentAccess.heldRoles(ex);
+        if (stored != null && stored.get(OWNER_ROLES) != null && java.util.Objects.equals(stored.get("owner"), owner))
+            return java.util.List.of(String.valueOf(stored.get(OWNER_ROLES)).split(","));
+        return null;
+    }
+
+    /** {@code rule} with {@code roles} stamped as {@link #OWNER_ROLES} (a KPI rule only; nothing when {@code roles} is null). */
+    static AlertRule stampRoles(AlertRule rule, java.util.Collection<String> roles) {
+        if (!rule.isKpiRule() || roles == null) return rule;
+        Map<String, Object> m = new java.util.LinkedHashMap<>(rule.toMap());
+        m.put(OWNER_ROLES, String.join(",", new java.util.TreeSet<>(roles)));
+        return AlertRule.fromMap(m);
+    }
+
+    /**
+     * The sweep's owner re-check: why {@code rule}'s owner (with its stamped roles, as the role table grants them now)
+     * may no longer view the KPI or read its Dataset, else {@code null}. Only access is judged here — a KPI that cannot
+     * be computed still reads as UNKNOWN through {@link #of}.
+     */
+    public static Function<AlertRule, String> accessRefusal(Supplier<Path> writeRoot) {
+        return rule -> {
+            Path wr = writeRoot.get();
+            if (wr == null) return null;
+            ComponentStore store = new ComponentStore(wr.resolve("registry"));
+            PostgresPublishJobType.Author author = author(rule, wr);
+            Map<String, Object> content = store.get(KpiRoutes.TYPE, rule.kpi()).map(ComponentRegistry.Component::content).orElse(null);
+            if (content == null || !PostgresPublishJobType.canView(author, content))
+                return "its owner '" + rule.owner() + "' may no longer view kpi '" + rule.kpi() + "' (or it was deleted)";
+            Object ds = content.get("dataset");
+            Map<String, Object> dataset = ds == null ? null
+                    : store.get("dataset", String.valueOf(ds)).map(ComponentRegistry.Component::content).orElse(null);
+            if (dataset == null || !PostgresPublishJobType.canRead(author, store, dataset))
+                return "its owner '" + rule.owner() + "' may no longer read dataset '" + ds + "' of kpi '" + rule.kpi() + "'";
+            return null;
+        };
+    }
 
     /** The sweep's probe over one Space's roots (each resolved per call, as the Dataset measure probe's are). */
     public static Function<AlertRule, OptionalDouble> of(Supplier<Path> writeRoot, Supplier<Path> dataRoot) {
@@ -102,7 +184,7 @@ public final class KpiAlertProbe {
     /** The KPI and its Dataset as the rule's owner may read them; {@link SecurityException} otherwise. */
     private static Resolved resolve(Path writeRoot, AlertRule rule) {
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
-        PostgresPublishJobType.Author author = author(rule.owner());
+        PostgresPublishJobType.Author author = author(rule, writeRoot);
         Map<String, Object> content = store.get(KpiRoutes.TYPE, rule.kpi()).map(ComponentRegistry.Component::content).orElse(null);
         if (content == null || !PostgresPublishJobType.canView(author, content))
             throw new SecurityException("kpi '" + rule.kpi() + "' does not exist or the rule's owner '" + rule.owner()
@@ -117,10 +199,20 @@ public final class KpiAlertProbe {
         return new Resolved(kpi, dataset);
     }
 
-    /** The rule's owner as a run author: their id and no roles; OPEN when no authenticator is active. */
-    static PostgresPublishJobType.Author author(String owner) {
+    /**
+     * The rule's owner as a run author: their id and the roles stamped at save ({@link #OWNER_ROLES}), with the
+     * capabilities those roles grant under the role table as it is NOW; OPEN when no authenticator is active. A rule
+     * saved before the stamp has no roles (fail closed: only what is shared to the owner by id).
+     */
+    static PostgresPublishJobType.Author author(AlertRule rule, Path writeRoot) {
         if (Authenticators.active().isEmpty()) return PostgresPublishJobType.Author.OPEN;
-        return new PostgresPublishJobType.Author(owner, Set.of(), Set.of(), false);
+        java.util.List<String> roles = new java.util.ArrayList<>();
+        Object stamped = rule.extra().get(OWNER_ROLES);
+        if (stamped != null)
+            for (String r : String.valueOf(stamped).split(","))
+                if (!r.isBlank()) roles.add(r.trim().toLowerCase(java.util.Locale.ROOT));
+        return new PostgresPublishJobType.Author(rule.owner(), Set.copyOf(roles),
+                Set.copyOf(JobAuthority.capabilitiesNow(roles, writeRoot)), false);
     }
 
     /**

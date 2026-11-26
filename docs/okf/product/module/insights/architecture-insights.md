@@ -13,7 +13,7 @@ code: [features/inspecto-insights, platform/inspecto-analytics, inspecto]
 
 > **Level 3 module page.** Layer: Add-on. Offering: every edition, Basic included — add-on `businessInsights` (status
 > `built`, module `insights`) in `offerings/basic.toon` (D-BI2; D-BI13, operator 2026-11-26, reverses D-BI3's
-> Standard-and-above placement; a default-reactor module). Plan: `docs/superpower/2026-11-18-business-insights-plan.md` §11.8 (Explain), §11.9 (Insight scan) and §11.15 (access and editions).
+> Standard-and-above placement; a default-reactor module). Plan: `docs/superpower/2026-11-18-business-insights-plan.md` §11.8 (Explain), §11.9 (Insight scan) and §11.16 (access and editions).
 
 ## 1. What it is
 
@@ -83,8 +83,14 @@ dimensions from column roles* fills Dimensions from the Dataset's `dimension` co
 `temporal` one). *Preview on history* posts the unsaved content to `POST /insights/preview` and draws the per-period
 counts as bars, the sentence "you would have seen N Insights in the last P periods" and the top Insights; nothing is
 saved. The selected Profile's feed reads `GET /insights?profile=` (band as a status badge with its word, slice,
-period, score, sentence) with **Useful / Not useful / Expected** buttons for every viewer; a 404 is the empty state that points to an `insight.scan` Job. No "Run scan now" shortcut: the
-Jobs screen runs the Job. Each Insight also offers **Open a Case** (`POST /cases/from-entities`, the Insight as the
+period, score, sentence) with **Useful / Not useful / Expected** buttons for every
+viewer; a 404 is the empty state that points to an `insight.scan` Job. *This run / Every run*
+(`run=latest|all`) and a band filter (`band=`) are applied by the server. **Run scan now** finds the `insight.scan` Job
+whose `profile` names the Profile (each listed one read by `GET /jobs/{name}`), triggers it (canOperateRuns), follows
+the run and reloads the feed; with none it offers **Create a scan Job…** (`POST /jobs`, `insight_scan_<profile>`, no
+schedule, after a confirmation, canAuthorWorkbench). The **Insight Feed** Visualization Type (`insight-feed`, bound to a
+Profile as a view-bound Widget, offered when `insights` is installed) lists a Profile's latest ten Insights on a
+Dashboard; a Report PDF refuses it in words, as every type it cannot draw (plan §11.15). Each Insight also offers **Open a Case** (`POST /cases/from-entities`, the Insight as the
 member `insight:<id>` of Dataset `insights_<profile>`, reused on a second Case) and **Request action…** (an https
 Connection and a reason, then that Case and `POST /action-requests` from it, with `caseId` and the evidence as the
 payload). Both carry the evidence (sentence, type, slice as stored, period,

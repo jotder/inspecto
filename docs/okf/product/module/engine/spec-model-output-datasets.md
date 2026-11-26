@@ -39,8 +39,9 @@ writes them (`com.gamma.alert.ScoreDatasets.register`, called by each Job Type).
 
 ## Rules (operator, 2026-11-24)
 
-- **Readable only by who may read the model and every Dataset it reads**, a Mapping input with its base
-  (`com.gamma.pipeline.SharingEnvelope`, the rule KPI History uses too): an unshared component is open, so the shared
+- **Readable only by who may read the model and every Dataset it reads**, a Mapping input with its base,
+  recursively through Mappings (`com.gamma.pipeline.SharingEnvelope.of(store, …)`, the rule KPI History uses too;
+  operator 2026-11-26): an unshared component is open, so the shared
   ones' `owner` / `shares` apply. A Dataset this code registered is re-enveloped each run.
 - **Any refusal narrows.** When the outputs cannot be registered as they are now (sources shared differently, an
   untraceable key, a failure), the system Datasets an earlier run registered are narrowed to `shares: []`, owned by

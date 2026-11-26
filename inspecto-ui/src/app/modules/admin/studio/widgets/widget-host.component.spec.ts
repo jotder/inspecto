@@ -8,6 +8,9 @@ import { Router } from '@angular/router';
 import { GammaConfigService } from '@gamma/services/config';
 import { registerBuiltinViz } from 'app/inspecto/viz/plugins';
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
+import { ShowMeService } from 'app/inspecto/viz/show-me.service';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
+import { ToastrService } from 'ngx-toastr';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { Widget } from './widget-types';
 import { WidgetsService } from './widgets.service';
@@ -591,5 +594,81 @@ describe('WidgetHostComponent', () => {
         fixture.detectChanges();
         expect(fixture.nativeElement.querySelector('[data-testid="kpi-alert-me"]')).toBeNull();
         expect(fixture.componentInstance.alertKpi()).toBe('');
+    });
+
+    // ── BI-INSIGHTS-1 I-20 on Dashboards: Show-Me from the tile's menu, applied only on a click ──
+    function showMeTile(opts: { author?: boolean; confirm?: boolean } = {}) {
+        const save = vi.fn((w: Widget) => of(w));
+        const suggest = vi.fn(async () => [
+            {
+                id: 'compare-lastYear' as const,
+                text: 'Over a year of history (60 points).',
+                action: 'Compare with the same period last year',
+                options: { compare: { kind: 'lastYear' as const } },
+            },
+        ]);
+        const confirm = vi.fn(async () => opts.confirm ?? true);
+        const fixture = create([
+            { provide: WidgetsService, useValue: { save } },
+            { provide: DatasetsService, useValue: {} },
+            {
+                provide: DatasetResultService,
+                useValue: {
+                    run: () => Promise.resolve({ ok: true, rows: [{ day: '2026-01-01', sum_duration_s: 1 }] }),
+                },
+            },
+            { provide: ShowMeService, useValue: { suggest } },
+            { provide: InspectoConfirmService, useValue: { confirm } },
+            { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn() } },
+            {
+                provide: LensService,
+                useValue: { canAuthorWorkbench: () => opts.author ?? true, canAuthorAlertRules: () => false },
+            },
+        ]);
+        fixture.componentRef.setInput('widget', {
+            ...WIDGET,
+            vizType: 'line',
+            controls: { x: [{ field: 'day', grain: 'day' }], y: [{ field: 'duration_s', agg: 'sum' }] },
+        });
+        fixture.componentRef.setInput('dataset', DS);
+        fixture.componentRef.setInput('showMe', true);
+        fixture.detectChanges();
+        return { fixture, save, suggest, confirm };
+    }
+
+    it('a Dashboard line tile offers Show-Me from the shared service, applied only on a click', async () => {
+        const { fixture, save, suggest, confirm } = showMeTile();
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(fixture.componentInstance.showMeOffered()).toBe(true);
+        expect(suggest).not.toHaveBeenCalled(); // nothing read until the menu opens
+        fixture.componentInstance.loadSuggestions();
+        await fixture.whenStable();
+        expect(suggest).toHaveBeenCalledWith(expect.objectContaining({ datasetId: 'cdr_sample', sourceName: 'cdr' }));
+        const s = fixture.componentInstance.suggestions()![0];
+        expect(save).not.toHaveBeenCalled();
+        await fixture.componentInstance.applySuggestion(s);
+        expect(confirm).toHaveBeenCalled();
+        expect(save).toHaveBeenCalledWith(expect.objectContaining({ options: { compare: { kind: 'lastYear' } } }), {
+            update: true,
+        });
+        expect(fixture.componentInstance.resolvedWidget()?.options).toEqual({ compare: { kind: 'lastYear' } });
+    });
+
+    it('saves nothing when the confirmation is declined', async () => {
+        const { fixture, save } = showMeTile({ confirm: false });
+        await fixture.whenStable();
+        fixture.componentInstance.loadSuggestions();
+        await fixture.whenStable();
+        await fixture.componentInstance.applySuggestion(fixture.componentInstance.suggestions()![0]);
+        expect(save).not.toHaveBeenCalled();
+    });
+
+    it('no Show-Me for a reader who may not save the Widget, nor off a Dashboard', async () => {
+        const { fixture } = showMeTile({ author: false });
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(fixture.componentInstance.showMeOffered()).toBe(false);
+        expect(fixture.nativeElement.querySelector('[data-testid="tile-show-me"]')).toBeNull();
     });
 });

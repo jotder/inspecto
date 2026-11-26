@@ -937,6 +937,8 @@ final class ComponentRoutes implements RouteModule {
             // the same AlertRoutes.parse (AlertRule.fromMap, the Investigation-rule refusal, the `by` Schema check),
             // over the content as the store will persist it (name = id).
             if ("alert-rule".equals(type)) {
+                ComponentRegistry.Component storedRule = existing(store, type, id);
+                content = KpiAlertProbe.stampContent(ex, content, storedRule == null ? null : storedRule.content());   // ownerRoles: server-stamped
                 Map<String, Object> stamped = new LinkedHashMap<>(content);
                 stamped.put("name", id);
                 AlertRoutes.parse(api, stamped);

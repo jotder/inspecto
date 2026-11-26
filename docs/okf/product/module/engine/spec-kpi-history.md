@@ -49,7 +49,10 @@ file atomically (`ScoreOutputDirs.swapIn`, under the snapshot-swap lock). Engine
 - **A system Dataset** (`origin: system`, tag `kpi-history`), registered by the Job **regardless of a Dataset approval
   policy** (D-BI11, operator 2026-11-24). Its `owner` / `shares` admit only who may read **both** the KPI and its
   Dataset: an unshared one is open, so the other's envelope applies; two shared differently refuse the run (an
-  envelope cannot state an intersection). The envelope is re-applied before every write.
+  envelope cannot state an intersection). When the Dataset is a Mapping (`origin: mapping`), its `basedOn` base joins
+  the envelope, recursively through Mappings (`SharingEnvelope.of(store, …)`, operator 2026-11-26); a base shared
+  differently refuses the run, and a base that does not resolve refuses it too. The envelope is re-applied before
+  every write.
 - **Reserved prefix.** A Dataset or sink naming a `kpi_history_` store is refused at save
   (`KpiSnapshotJobType.requireNotReserved`, run from `ComponentRoutes.validateKind`), except the history Dataset itself
   (`id = physicalRef = kpi_history_<kpi>`) over a saved KPI. A Dataset of that id that reads anything else is never

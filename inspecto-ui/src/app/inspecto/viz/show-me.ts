@@ -4,6 +4,7 @@ import { ChannelValue, ControlValues, FieldRole, VizField, VizFit, VizPlugin, Vi
 import { anomalyThreshold, OVERLAY_SUFFIX, OVERLAY_VIZ_TYPES, OverlaySummary } from './chart-overlays';
 import { MARKER_VIZ_TYPES, MarkerKpi } from './chart-markers';
 import { formatNumber } from './number-format';
+import { COMPARE_LABEL, COMPARE_VIZ_TYPES, CompareKind } from './compare';
 
 /**
  * "Show Me" — rank the registered plugins for a field set (à la Tableau/Superset), and auto-assign fields to
@@ -139,7 +140,7 @@ function takeNext(roles: FieldRole[], pools: Record<FieldRole, VizField[]>, used
 /** One overlay Show-Me offers for the Widget being built. `options` is the Widget's options with it added; nothing is
  *  applied until the user clicks (a suggestion is only a suggestion). */
 export interface OverlaySuggestion<O extends VizRenderOptions = VizRenderOptions> {
-    id: 'forecast' | 'anomaly' | 'target' | 'rag';
+    id: 'forecast' | 'anomaly' | 'target' | 'rag' | 'compare-previous' | 'compare-lastYear';
     text: string;
     action: string;
     options: O;
@@ -154,6 +155,49 @@ export interface OverlaySuggestionInput<O extends VizRenderOptions = VizRenderOp
     probe?: readonly OverlaySummary[] | null;
     probeRows?: readonly Record<string, unknown>[];
     kpi?: MarkerKpi | null;
+    /** The Widget's result rows (or the probe's: the same statement), read for the compare rule; default `probeRows`. */
+    rows?: readonly Record<string, unknown>[];
+}
+
+/** A year back, less a week's slack, so a weekly series whose buckets do not land on the same weekday still counts. */
+const YEAR_MS = 358 * 86_400_000;
+
+/** The distinct, valid bucket times of the date axis, ascending. */
+function bucketTimes(rows: readonly Record<string, unknown>[], field: string): number[] {
+    const out = new Set<number>();
+    for (const r of rows) {
+        const v = r[field];
+        const t =
+            v instanceof Date
+                ? v.getTime()
+                : typeof v === 'string' || typeof v === 'number'
+                  ? Date.parse(String(v))
+                  : NaN;
+        if (Number.isFinite(t)) out.add(t);
+    }
+    return [...out].sort((a, b) => a - b);
+}
+
+/**
+ * BI-INSIGHTS-1 I-1 in Show-Me: which comparisons the series has the history for. Only a line / bar / area over a grained
+ * date with no break-down (`series`) and no comparison on yet (the cases `overlayEligible` allows). The rule:
+ * - **same period last year** — the first bucket is at least a year (less a week) before the last, so the last bucket
+ *   has a year-ago bucket to compare with;
+ * - **previous period** — otherwise, when there are at least 3 buckets (a change between the last two reads as a trend
+ *   only with one more before it).
+ * At most one is offered: last year when the history allows it, since it removes the season the previous period keeps.
+ */
+export function compareSuggestion(
+    vizType: string,
+    controls: ControlValues,
+    options: VizRenderOptions,
+    rows: readonly Record<string, unknown>[],
+): CompareKind | null {
+    if (!(COMPARE_VIZ_TYPES as readonly string[]).includes(vizType) || options.compare?.kind) return null;
+    if (!overlayEligible(vizType, controls, options) || controls['series']?.length) return null;
+    const times = bucketTimes(rows, controls['x']![0].field);
+    if (times.length >= 2 && times[times.length - 1] - times[0] >= YEAR_MS) return 'lastYear';
+    return times.length >= 3 ? 'previous' : null;
 }
 
 /** The cycle a detected period names at a grain, in words — or `null` when it names none (no "seasonal" claim then). */
@@ -188,6 +232,19 @@ export function overlayEligible(vizType: string, controls: ControlValues, option
 export function suggestOverlays<O extends VizRenderOptions>(input: OverlaySuggestionInput<O>): OverlaySuggestion<O>[] {
     const { vizType, controls, options, probe, probeRows = [], kpi } = input;
     const out: OverlaySuggestion<O>[] = [];
+    const compare = compareSuggestion(vizType, controls, options, input.rows ?? probeRows);
+    if (compare) {
+        const n = bucketTimes(input.rows ?? probeRows, controls['x']![0].field).length;
+        out.push({
+            id: compare === 'lastYear' ? 'compare-lastYear' : 'compare-previous',
+            text:
+                compare === 'lastYear'
+                    ? `Over a year of history (${formatNumber(n)} points): each point can be read against the same period last year.`
+                    : `${formatNumber(n)} points of history: the latest can be read against the period before.`,
+            action: `Compare with the ${COMPARE_LABEL[compare]}`,
+            options: { ...options, compare: { kind: compare } },
+        });
+    }
     if (overlayEligible(vizType, controls, options)) {
         const grain = controls['x']![0].grain!;
         const seasonal = (probe ?? []).find(

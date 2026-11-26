@@ -171,6 +171,121 @@ final class AgentGate {
         ALLOWED = Set.copyOf(all);
     }
 
+    /**
+     * The {@link #LA_READS} that answer no Dataset value (names, counts, verdicts), so they need no stamp: the overlap
+     * profile (column names and counts) and the two dossier verifications (verdicts, hashes, entry keys of the sealed file).
+     */
+    static final Set<String> LA_READS_WITHOUT_VALUES = Set.of("POST /inv/schema/overlap-profile",
+            "POST /inv/investigations/([^/]+)/dossier/verify", "POST /inv/investigations/([^/]+)/dossier/bundle/verify");
+
+    /**
+     * The agent data routes (widening plan W6, design {@code 2026-11-26-agent-data-answers-masking-design.md} §3.1, D-AK13,
+     * D-AK17): the {@link #ALLOWED} routes whose answer carries values read from a Dataset or Reference, each with its weight
+     * in the agent budget (1 = a page read). For an agent, on every door, the host (a) charges the weight to the agent budget
+     * keyed by agent client and subject, and (b) answers 500 {@code masking not proven} instead of a 2xx answer no masking
+     * step stamped ({@code com.gamma.util.AnswerMasking}). S0 lists {@code POST /db/query} and the Link Analysis reads that
+     * answer entity ids or rows, and the masked value GETs ({@link #VALUE_GETS}); groups B, D, E and {@code /lookups/test} join
+     * one change each.
+     */
+    static final Map<String, Integer> DATA_ROUTES;
+
+    /**
+     * The GET routes on {@link #DATA_ROUTES} (AGENT-GET-DATA-READS-1, operator 2026-11-26): every GET whose answer carries
+     * a value read from a Dataset or Reference and that masks it (BiResultMasking, the Link Analysis maskings,
+     * EntityKeyMasking, the Entity List and screening tokens, ObjectReadMasking). The ones that cannot are on
+     * {@link #RAW_GETS}; the stored-record GETs (events, audit, Incidents and Cases, notes) wait on their own change.
+     */
+    static final Set<String> VALUE_GETS = Set.of(
+            "GET /anomaly-scores/([^/]+)/([^/]+)",
+            "GET /datasets/([^/]+)/rows",
+            "GET /db/table",
+            "GET /entity-lists/([^/]+)",
+            "GET /inv/datasets/([^/]+)/discover",
+            "GET /inv/entities/([^/]+)/([^/]+)/profile",
+            "GET /inv/entities/([^/]+)/([^/]+)/summary",
+            "GET /inv/entity-identities",
+            "GET /inv/entity-identities/group",
+            "GET /inv/entity-types/([^/]+)/profile",
+            "GET /inv/graph/runs/([^/]+)",
+            "GET /inv/investigations/([^/]+)/compare",
+            "GET /inv/investigations/([^/]+)/dossier",
+            "GET /inv/investigations/([^/]+)/dossier/bundle",
+            "GET /inv/investigations/([^/]+)/drafts/([^/]+)/log",
+            "GET /inv/investigations/([^/]+)/drafts/([^/]+)/working-set",
+            "GET /inv/investigations/([^/]+)/log",
+            "GET /inv/investigations/([^/]+)/working-set",
+            "GET /inv/value-measures",
+            "GET /kpis/([^/]+)/value",
+            "GET /predictions/([^/]+)/([^/]+)/([^/]+)",
+            "GET /public/investigations/([^/]+)",
+            "GET /regulatory-reports",
+            "GET /regulatory-reports/([^/]+)",
+            "GET /risk-score-lists/([^/]+)",
+            "GET /risk-scores/([^/]+)/([^/]+)",
+            "GET /screening/hits",
+            "GET /screening/hits/([^/]+)");
+
+    static {
+        Map<String, Integer> m = new HashMap<>();
+        m.put("POST /db/query", 1);
+        for (String r : LA_READS) if (!LA_READS_WITHOUT_VALUES.contains(r)) m.put(r, 1);
+        for (String r : VALUE_GETS) m.put(r, 1);
+        DATA_ROUTES = Map.copyOf(m);
+    }
+
+    /** The weight of the heaviest {@link #DATA_ROUTES} entry: the smallest agent burst that can ever pay every route. */
+    static int heaviestDataWeight() {
+        return heaviest(DATA_ROUTES);
+    }
+
+    static int heaviest(Map<String, Integer> routes) {
+        return routes.values().stream().mapToInt(Integer::intValue).max().orElse(1);
+    }
+
+    /**
+     * Why an agent burst of {@code burst} is refused, or {@code null}: a burst below a route's weight could never pay that
+     * route, so it would answer 429 for ever ({@code PUT /system/link-analysis/limits} answers 422 instead).
+     */
+    static String burstProblem(double burst, Map<String, Integer> routes) {
+        int heaviest = heaviest(routes);
+        if (burst >= heaviest) return null;
+        String route = routes.entrySet().stream().filter(e -> e.getValue() == heaviest).map(Map.Entry::getKey).sorted()
+                .findFirst().orElse("");
+        return "rate.agent_burst " + (burst == Math.rint(burst) ? String.valueOf((long) burst) : String.valueOf(burst))
+                + " is below the weight " + heaviest + " of the agent data route " + route
+                + ": an agent could never call it - set at least " + heaviest;
+    }
+
+    /** The weight {@code subject} pays for the route registered as {@code method pattern}: 0 when it is no agent or no data route. */
+    static int agentDataWeight(Subject subject, String method, String pattern) {
+        if (subject == null || !subject.agent()) return 0;
+        Integer w = DATA_ROUTES.get(method + " " + pattern);
+        return w == null ? 0 : w;
+    }
+
+    /** The agent budget key (D-AK17): per agent client AND subject, so a person's agent never spends the person's own budget
+     *  and two agent clients of one person never share. {@code null} for a caller no agent client acts for. */
+    static String agentBudgetKey(Subject subject) {
+        return subject == null || !subject.agent() ? null : "agent:" + subject.agentClient() + ":" + subject.id();
+    }
+
+    /**
+     * GET routes refused to every agent (AGENT-GET-DATA-READS-1, operator 2026-11-26): each answers values read from a
+     * Dataset, a Reference or a raw file with no masking step, so it can never prove its answer masked (D-AK13). The
+     * reason is the one an agent is told. A person's call is unchanged; {@code GET /views/{id}/data} is also a people
+     * defect ({@code VIEW-DATA-UNMASKED-1}).
+     */
+    static final Map<String, String> RAW_GETS = Map.of(
+            "GET /views/([^/]+)/data", "it answers a view's rows unmasked",
+            "GET /connections/([^/]+)/sample", "it answers a remote file's rows unmasked",
+            "GET /jobs/([^/]+)/runs/([^/]+)/artifacts/([^/]+)/content", "it answers a Job artifact's raw bytes",
+            "GET /runs/([^/]+)/errors", "it answers rejected input rows unmasked",
+            "GET /export", "it answers the Space's config and state files, Break keys and Entity List facts included",
+            "GET /recon/promoted", "it answers Break match keys unmasked",
+            "GET /recon/([^/]+)/state", "it answers recorded Breaks with their key and side values unmasked",
+            "GET /insights", "it answers stored Insight rows it cannot prove masked at read",
+            "GET /screening/hits/([^/]+)/reveal", "it answers a screened subject's raw name and entry");
+
     /** {@link #ALLOWED} routes a machine agent may not call (D-AK2: never a run for a machine; D-AK10: nor the Space tests). */
     static final Set<String> PERSON_ONLY = Set.of("POST /pipelines/authored/([^/]+)/run", "POST /tests/run");
 
@@ -241,6 +356,7 @@ final class AgentGate {
     /** The bucket of the route registered as {@code method pattern} (pattern without {@code ^…$}). */
     static Bucket bucket(String method, String pattern) {
         if (never(method, pattern)) return Bucket.REFUSED;
+        if (RAW_GETS.containsKey("GET " + pattern) && ("GET".equals(method) || "HEAD".equals(method))) return Bucket.REFUSED;
         if ("GET".equals(method) || "HEAD".equals(method)) return Bucket.ALLOWED;
         String key = method + " " + pattern;
         if (PendingChanges.REPLAYABLE.contains(key) && !NOT_HELD.contains(key)) return Bucket.HELD;
@@ -261,6 +377,9 @@ final class AgentGate {
         if (b == Bucket.ALLOWED && posture(subject) == Posture.MACHINE && PERSON_ONLY.contains(method + " " + pattern))
             return "an agent machine client may not run a Pipeline or the Space tests — a delegated person may";
         if (b != Bucket.REFUSED) return null;
+        String raw = RAW_GETS.get("GET " + pattern);
+        if (raw != null && ("GET".equals(method) || "HEAD".equals(method)))
+            return "an agent client may not call GET " + pattern + ": " + raw + " - sign in without the agent client";
         return never(method, pattern)
                 ? "an agent client never approves, reveals, promotes, or changes Apps or access — a person must"
                 : "an agent client may not call " + method + " " + pattern + " — an agent proposes config changes (held "

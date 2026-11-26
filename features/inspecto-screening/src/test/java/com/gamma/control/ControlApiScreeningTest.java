@@ -40,6 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class ControlApiScreeningTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
+    private static final String AGENT = "Bearer agent";
     private static final String OPS = "Bearer ops", OPS2 = "Bearer ops2", ADM = "Bearer adm", DEV = "Bearer dev", NONE = "Bearer none";
     private final HttpClient client = HttpClient.newHttpClient();
     private String inheritedWriteRoot;
@@ -51,6 +52,14 @@ class ControlApiScreeningTest {
         Authenticators.forTest(ex -> {
             String h = String.valueOf(ex.getRequestHeaders().getFirst("Authorization"));
             if (NONE.equals(h)) return Optional.of(new Subject("nobody", Set.of()));
+            if (AGENT.equals(h)) {   // the operations person through an MCP agent client, narrowed as OidcAuthenticator narrows it
+                Roles.Def def = Roles.effective(ex).get("operations");
+                ComponentAccess.heldRoles(ex, Set.of("operations"));
+                Set<String> kept = new java.util.HashSet<>(def.capabilities());
+                kept.removeAll(Roles.AGENT_NEVER_CAPABILITIES);
+                return Optional.of(new Subject("ops-1", Set.copyOf(kept), def.dataScopes(), java.util.Map.of(), null, null, null,
+                        "claude-code"));
+            }
             String[] who = switch (h) {
                 case OPS -> new String[] {"ops-1", "operations"};
                 case ADM -> new String[] {"adm-1", "admin"};
@@ -340,6 +349,43 @@ class ControlApiScreeningTest {
             assertEquals("vladimir putin", data(send(port, "GET", "/spaces/acme/screening/hits/" + id, null, ADM), 200)
                     .get("entry").asText(), "admin holds the grants");
             assertTrue(open.startsWith("sh-"));
+        });
+    }
+
+    /**
+     * AGENT-GET-DATA-READS-1 (D-AK13): "GET /screening/hits" and "GET /screening/hits/([^/]+)" are agent data routes, and
+     * "GET /screening/hits/([^/]+)/reveal" is refused to agents. An agent's hits are stamped (masked at write, a restricted
+     * list's entry withheld); with every stamp a no-op the agent gets 500 with no hit while a person still reads them.
+     * Falsified: removing either stamp in {@code ScreeningRoutes}.
+     */
+    @Test
+    void anAgentsHitReadsAreProvenMaskedOrWithheldAndRevealIsRefused(@TempDir Path spaces) throws Exception {
+        Path cfg = space(spaces, "acme");
+        String rawKey = "447700900123";   // the Job's key column is stored raw: an MSISDN here
+        String id = ScreeningLists.seedHit(cfg, rawKey, "masked:0123456789abcdef", "sanctions", "osama bin laden", 0.97);
+        withSpaces(spaces, port -> {
+            for (String path : List.of("/spaces/acme/screening/hits", "/spaces/acme/screening/hits/" + id)) {
+                HttpResponse<String> agent = send(port, "GET", path, null, AGENT);
+                assertEquals(200, agent.statusCode(), path);
+                assertFalse(agent.body().contains(rawKey), "the subject key leaves masked for an agent: " + agent.body());
+                assertTrue(agent.body().contains("\"subjectKeyMasked\":true"), agent.body());
+                assertTrue(send(port, "GET", path, null, OPS).body().contains(rawKey), "a person's read is unchanged: " + path);
+            }
+            HttpResponse<String> reveal = send(port, "GET", "/spaces/acme/screening/hits/" + id + "/reveal", null, AGENT);
+            assertEquals(403, reveal.statusCode(), reveal.body());
+            assertFalse(reveal.body().contains("osama"), reveal.body());
+            com.gamma.util.AnswerMasking.ignoreStampsForTest(true);
+            try {
+                for (String path : List.of("/spaces/acme/screening/hits", "/spaces/acme/screening/hits/" + id)) {
+                    HttpResponse<String> r = send(port, "GET", path, null, AGENT);
+                    assertEquals(500, r.statusCode(), path + ": " + r.body());
+                    assertTrue(r.body().contains(com.gamma.control.ControlApi.MASKING_NOT_PROVEN), r.body());
+                    assertFalse(r.body().contains("osama") || r.body().contains("masked:") || r.body().contains(rawKey), r.body());
+                    assertEquals(200, send(port, "GET", path, null, OPS).statusCode(), "a person is unchanged: " + path);
+                }
+            } finally {
+                com.gamma.util.AnswerMasking.ignoreStampsForTest(false);
+            }
         });
     }
 

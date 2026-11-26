@@ -225,4 +225,25 @@ class InsightScanJobTest {
         assertNotEquals("SUCCESS", run.status());
         assertTrue(run.message().contains("saved Job only"), run.message());
     }
+
+    @Test
+    void aProfileOverAMappingWhoseBaseIsSharedToFewerReadersIsRefused() throws Exception {
+        Map<String, Object> shared = new LinkedHashMap<>(Map.of("owner", "ann", "shares", List.of("bob")));
+        Map<String, Object> narrower = new LinkedHashMap<>(Map.of("owner", "ann", "shares", List.of()));
+        Map<String, Object> base = new LinkedHashMap<>(dataset("sales"));
+        base.putAll(narrower);
+        store.write("dataset", "sales", base);
+        Map<String, Object> mapping = new LinkedHashMap<>(Map.of("origin", "mapping", "basedOn", "sales"));
+        mapping.putAll(shared);
+        Map<String, Object> profile = new LinkedHashMap<>(shared);
+
+        SecurityException refused = assertThrows(SecurityException.class,
+                () -> InsightScanJobType.envelope(store, profile, mapping));
+        assertTrue(refused.getMessage().contains("refused"), refused.getMessage());
+
+        base.putAll(shared);
+        store.write("dataset", "sales", base);
+        assertEquals(shared, InsightScanJobType.envelope(store, profile, mapping),
+                "the same sharing on the Profile, the Mapping and its base is accepted");
+    }
 }

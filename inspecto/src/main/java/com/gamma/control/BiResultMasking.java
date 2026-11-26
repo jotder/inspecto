@@ -459,6 +459,9 @@ final class BiResultMasking {
      */
     QueryExecutor.Result apply(QueryExecutor.Result r, List<String> dimensions, String sqlText, String boundQuery,
                                Set<String> grantable) {
+        // AGENT-KIT-1 W6 S0 (D-AK13): the masking step ran over this answer - set before the early return, so a Space whose
+        // mode is none (or a caller who may reveal) is stamped with zero masked (D-AK14)
+        com.gamma.util.AnswerMasking.applied(basis, engaged() ? masked.size() : 0);
         if (!engaged()) return r;
         Set<String> bareNames = null;
         if (boundQuery != null) {

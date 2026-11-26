@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-492 test class(es): 195 unit, 297 real-HTTP control-plane, 0 IT.
+493 test class(es): 196 unit, 297 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -30,6 +30,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `AbsentModuleRoutesTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AbsentModuleRoutesTest.java` | MODULE-REORG-1 P3b: the known-modules copy the processor ships, and the stub surface read from it. The 503 bodies and |
 | `AccessGrantsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AccessGrantsTest.java` | RBAC R2 grant resolution ({@link AccessGrants}): nearest-ancestor inheritance over the Access |
 | `ActivationHoldsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ActivationHoldsTest.java` | SE-1b (D-SE12): the activation check's decision for each opt-in, from the lock's facts of one object. |
+| `AgentDataRoutesParityTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AgentDataRoutesParityTest.java` | {@link AgentGate#DATA_ROUTES} against the routes an agent may call (AGENT-KIT-1 W6 S0, design §6 "seam parity"): every |
 | `AgentGateParityTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AgentGateParityTest.java` | The agent gate's three buckets against the capability manifest (AGENT-KIT-1 AK-2a, plan §4.1, §7 "a write route that |
 | `AgentRoutesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/AgentRoutesTest.java` | Integration tests for the AGT-5 (P0) {@code /agent/*} routes over real HTTP, against a fake {@link IntelligenceAgent}. |
 | `AlertRoutesWindowGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/AlertRoutesWindowGateTest.java` | PA-9b: the save gates of a windowed Alert Rule ({@link AlertRoutes#requireWindow}), each 422 paired with the accepted |

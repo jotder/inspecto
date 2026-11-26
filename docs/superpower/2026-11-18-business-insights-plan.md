@@ -197,7 +197,7 @@ The **Insight Profile editor** (Studio, beside Query Library and Viz Library):
    business calendar event. Precision per Profile is shown in the editor; the Assistant may *suggest* a new
    threshold as a draft — never applied by itself.
 7. **Who may do what (D-BI4, narrowed 2026-11-26).** Builders author Profiles and whoever may save a Profile tunes it
-   (owner tuning within Builder bounds was dropped, §11.15); anyone who can view reads Insights, explains and gives
+   (owner tuning within Builder bounds was dropped, §11.16); anyone who can view reads Insights, explains and gives
    feedback, and Business users read Insights, give feedback and arm Alert Rules they are allowed to.
 
 ## 8. Architecture
@@ -274,7 +274,7 @@ already exists there, and Q2/Q4 answer the questions an RA or finance lead asks 
 | D-BI1 | Names | ✅ **SIGNED 2026-11-18: (a)** Insight Type / Insight / Insight Profile / Chart Marker / KPI History, added to `GLOSSARY.md` §7 · (b) other names |
 | D-BI2 | Where the scan lives | ✅ **SIGNED 2026-11-18: (a)** new `features/inspecto-insights` add-on; kernel and engine extended for overlays · (b) everything inside engine + analytics |
 | D-BI3 | Edition placement | ✅ **SIGNED 2026-11-18: (a)** overlays and KPI History in Standard BI; Insight Profiles / scan / explain as a "Business Insights" add-on (Standard+); language features with AI Assist; scenarios Advanced · (b) all in one add-on. **Add-on placement superseded by D-BI13** (every edition) |
-| D-BI4 | Who may tune | ✅ **SIGNED 2026-11-24: (a)** Builders author, owners tune within bounds, Business users give feedback · (b) Builders only. **Narrowed 2026-11-26 (operator):** owner tuning within Builder bounds is dropped — whoever may save a Profile tunes it; feedback and Explain for anyone who can view (§11.15) |
+| D-BI4 | Who may tune | ✅ **SIGNED 2026-11-24: (a)** Builders author, owners tune within bounds, Business users give feedback · (b) Builders only. **Narrowed 2026-11-26 (operator):** owner tuning within Builder bounds is dropped — whoever may save a Profile tunes it; feedback and Explain for anyone who can view (§11.16) |
 | D-BI5 | Language features in the first release | ✅ **SIGNED 2026-11-24: (a)** no — templated sentences first, Brief in P4 · (b) yes |
 | D-BI6 | Pilot | ✅ **SIGNED 2026-11-24: (a)** `business-assurance` + `telco-ra` revenue · (b) `mobile-money` transaction value |
 | D-BI7 | Compute placement | ✅ **SIGNED 2026-11-24: (a)** overlays at query time, scans and depth-2 explanations as Jobs · (b) everything precomputed |
@@ -282,7 +282,7 @@ already exists there, and Q2/Q4 answer the questions an RA or finance lead asks 
 | D-BI9 | Chart Markers implementation | ✅ **SIGNED 2026-11-24: (a)** a Chart.js overlay plugin behind the viz contract · (b) custom drawing |
 | D-BI10 | KPI History grain and retention | ✅ **SIGNED 2026-11-24: (a)** the KPI's own grain, 3 years · (b) day only, retention per Space |
 | D-BI11 | KPI History registration under a Dataset approval policy | ✅ **SIGNED 2026-11-24 (operator):** the `kpi.snapshot` Job registers its Dataset as a **system Dataset regardless of the policy** (`origin: system`); the gate is lifted for this Job only |
-| D-BI13 | Edition placement of the Business Insights add-on | ✅ **SIGNED 2026-11-26 (operator interview), reverses D-BI3's add-on placement:** Business Insights ships in **every edition, Basic included** (§11.15) |
+| D-BI13 | Edition placement of the Business Insights add-on | ✅ **SIGNED 2026-11-26 (operator interview), reverses D-BI3's add-on placement:** Business Insights ships in **every edition, Basic included** (§11.16) |
 | D-BI12 | The period still in progress | ✅ **SIGNED 2026-11-24: (a)** stored with `complete = false`, rewritten each run until it closes · (b) closed periods only |
 
 ### 11.1 P0 I-3 KPI History — as designed (2026-11-24)
@@ -394,7 +394,7 @@ Spec: [`okf/product/module/engine/spec-kpi-projection.md`](../okf/product/module
 - **Found in passing and fixed**: `ObjectReadMasking` treated every Alert scope as a Dataset id; a `kpi:` scope made
   `GET /alerts` fail (500). A `kpi:` scope now masks nothing (its text holds no key).
 - **Deliberately deferred**: (the editor's KPI fields and "arm from a Widget" shipped in §11.7); a role-aware
-  owner for rule evaluation (would need roles stamped on the rule, as Jobs stamp `updatedByRoles`).
+  owner for rule evaluation — **closed 2026-11-26, §11.14**.
 
 ### 11.7 P1 leftovers — overlays on a public share, KPI Alert Rules in the UI (2026-11-25)
 
@@ -443,7 +443,7 @@ Spec: [`okf/product/module/engine/spec-kpi-projection.md`](../okf/product/module
   `businessInsights`, Standard and above) is created now rather than in P3; P3's scan and Insight Profiles join it.
   Product Map Items `module.insights` and `addon.businessInsights`.
 - **Route**: `POST /insights/explain`, gated on `canAuthorWorkbench` when built; **since 2026-11-26 open to anyone who
-  may view the Widget's Dataset** (§11.15). Body and response: the module hub
+  may view the Widget's Dataset** (§11.16). Body and response: the module hub
   `okf/product/module/insights/architecture-insights.md` and `openapi-v1.json`.
 - **Kernel** `com.gamma.analytics.drivers`: `Drivers` (contribution, share, Jensen-Shannon surprise, minimal cover —
   largest share first, which is the smallest set for a sum threshold), `ShiftShare` (mix + rate = ΔR exactly; a value
@@ -505,7 +505,7 @@ changepoint **and** drift; one Insights Dataset per Profile.
   `status`, `first_seen`. Deviation from §8: no separate `_latest` store — the latest run is `run_id = max`, which
   `GET /insights` reads; one store keeps one envelope.
 - **Feedback**: `POST /insights/{profile}/{insightId}/feedback` `{status: useful|not_useful|expected, note?}` by anyone
-  who may view the Insights Dataset (D-BI4: Business users give feedback; the `canAuthorWorkbench` gate it shipped with was lifted 2026-11-26, §11.15); kept in `feedback.json` beside the Parquet
+  who may view the Insights Dataset (D-BI4: Business users give feedback; the `canAuthorWorkbench` gate it shipped with was lifted 2026-11-26, §11.16); kept in `feedback.json` beside the Parquet
   (the Dataset reads `*.parquet` only), keyed by type × slice so it outlives the run; the actor is the authenticated
   principal. The next run writes it into `status` and novelty.
 - **Feed**: `GET /insights?profile=&run=latest|all&band=&limit=` — the Profile's Insights the caller may view
@@ -516,7 +516,7 @@ changepoint **and** drift; one Insights Dataset per Profile.
   Nothing is saved.
 - **Signals**: `insight.scan.completed` (counts) and `insight.found` per new Insight (≤ 20 per run, band ≥ elevated)
   for Notification Rules.
-- **Deliberately deferred**: the Profile editor UI and the Insight Feed Visualization Type; the sharing envelope does not yet narrow by a Mapping Dataset's `basedOn` base (as KPI History); depth-2 slices (`BI-EXPLAIN-DEPTH2-1`); I-9, I-10 (built next, §11.10).
+- **Deliberately deferred**: the Profile editor UI and the Insight Feed Visualization Type; depth-2 slices (`BI-EXPLAIN-DEPTH2-1`); I-9, I-10 (built next, §11.10).
 
 ### 11.10 P3 I-9 concentration and I-10 distribution shift — as built (2026-11-26)
 
@@ -563,7 +563,7 @@ changepoint **and** drift; one Insights Dataset per Profile.
 - **Replay**: *Preview on history* posts the unsaved content and `periods` to `POST /insights/preview` → bars per
   period (`<inspecto-chart>`), total and average sentence, top 10 Insights. Nothing saved.
 - **Feed**: `GET /insights?profile=` under the selected Profile — band badge with its word, slice, type, period, score,
-  sentence; Useful / Not useful / Expected (`POST …/feedback`) (open to every viewer since 2026-11-26, §11.15); a
+  sentence; Useful / Not useful / Expected (`POST …/feedback`) (open to every viewer since 2026-11-26, §11.16); a
   404 is the empty state naming the `insight.scan` Job and linking the Jobs screen.
 - **Deferred**: a "Run scan now" shortcut (the Jobs screen runs it); the Insight Feed Visualization Type for
   Dashboards; `run=all` history and band filters in the feed.
@@ -623,7 +623,65 @@ changepoint **and** drift; one Insights Dataset per Profile.
 - **Deferred** (board rows): `{{x}}` in the sentence is interpolated by the Action Request template renderer
   (`ACTION-TEMPLATE-ESCAPE-1`); adding the Insight to an EXISTING Case (`INSIGHT-CASE-EXISTING-1`).
 
-### 11.15 Loose ends B — Explain and feedback for every viewer, Business Insights in Basic — as built (2026-11-26)
+### 11.14 Loose ends A — as built (2026-11-26)
+
+Operator decisions (2026-11-26, the recommended options):
+
+- **A Mapping's base joins the sharing envelope.** `SharingEnvelope.of(store, sources)` adds, for every Mapping
+  source (`origin: mapping`), its `basedOn` base, recursively through Mappings; a base shared differently from the
+  rest refuses in words, a base that does not resolve (or a Mapping loop) refuses too. Callers: KPI History
+  (`KpiSnapshotJobType.envelope`) and model output Datasets (`ScoreDatasets`, which already added one level). Insights
+  (`InsightScanJobType.envelope`, in `features/inspecto-insights`) switched to `of(store, …)` in loose ends B (§11.16),
+  pinned by `InsightScanJobTest.aProfileOverAMappingWhoseBaseIsSharedToFewerReadersIsRefused`.
+- **KPI Alert Rules stamp roles and re-check access at evaluation.** The owner's held roles are stamped as `ownerRoles`
+  when the owner saves (another editor never lends theirs; server-stamped, a client value is dropped at every write
+  door and every raw-file import, via `JobAuthority.stampFiles`); every sweep re-checks that the owner, with those
+  roles, may still view the KPI and read its Dataset; if not, the rule is skipped and ONE Incident names it and why
+  (deduped while active on `kpiRuleAccess`). Spec: `okf/product/module/engine/spec-kpi-projection.md`.
+- Residual: a rule file written straight to disk keeps whatever `ownerRoles` it holds (the same trust as any
+  registry file written outside the routes).
+
+### 11.15 Loose ends C — UI, as built (2026-11-26)
+
+Operator interview 2026-11-26: the five UI loose ends below, all in one lane (`bi-ui-polish`). No new route; one
+engine test.
+
+- **Insight Feed Visualization Type** `insight-feed` (`inspecto/viz/plugins/view.plugins.ts`): a view-bound type
+  (`viewKind: insight-profile`, `viewId` = the Profile id), so the Widget builder offers it with the saved-view picker
+  listing Insight Profiles — only when `/bootstrap` reports `insights`. The tile
+  (`studio/insights/insight-feed-widget.component.ts`, lazy through `registerVizComponent`) reads
+  `GET /insights?profile=&limit=10` as the viewer: band badge with its word, slice, period, sentence, "Latest run … ·
+  n of total · Open the feed". A 404 is the empty state naming the `insight.scan` Job. Read-only (feedback, Cases stay
+  on the Profile screen). **Report PDF**: `ReportWidget.of` already refuses every type it cannot draw in words ("a
+  report PDF draws bar, line and kpi Widgets"), failing the Run with nothing delivered — the Insight Feed gets the same
+  refusal, pinned by `ReportPdfChartsTest.anInsightFeedWidgetIsRefusedInWords`; no backend change.
+- **Run scan now** (`studio/insights/insight-scan-button.component.ts`) beside Edit / Delete: `GET /jobs` lists no
+  parameters, so each `insight.scan` Job is read (`GET /jobs/{name}`) for the one whose `profile` names this Profile;
+  then `POST /jobs/{name}/trigger` (canOperateRuns) and `GET /jobs/runs/{id}` every 2 s for up to 2 min, saying how it
+  ended and reloading the feed. No Job: **Create a scan Job…** asks first, then `POST /jobs`
+  `{name: insight_scan_<profile>, type: insight.scan, enabled, params: {profile}}` (canAuthorWorkbench) — no schedule;
+  the Jobs screen adds one. Each button is disabled with the permission's name otherwise.
+- **Feed history and band filter**: *This run / Every run* (`run=latest|all`) and *Any band / High / Elevated /
+  Normal* (`band=`), applied by the server; *Every run* shows when each Insight was found.
+- **Show-Me on Dashboards**: the builder's probe and KPI read moved into `ShowMeService`
+  (`inspecto/viz/show-me.service.ts`) — the builder, the Dashboard tile and the cog dialog call it and
+  `suggestOverlays()`, so the suggestions are the same everywhere. On a Dashboard tile (line, bar, area, combo over a
+  Dataset, for a user with canAuthorWorkbench) a ✨ *Suggestions for this chart* menu reads the probe when opened;
+  a click asks first ("This saves the Widget, so every Dashboard showing it changes") and saves the Widget. The cog
+  dialog (`WidgetOptionsDialog`) shows the builder's suggestions; taking one sets its field (forecast, anomaly,
+  compare) or adds its marker row (target, bands), kept only on Save. Deviation: Dashboards have no cog dialog of their
+  own (the cog is the builder's), so the tile's menu is the Dashboard surface.
+- **Suggest a compare (I-1)** — `compareSuggestion()` in `show-me.ts`, on the existing `options.compare`: a line / bar
+  / area over a grained date with no break-down, not stacked or value-sorted, with no comparison on. **Same period
+  last year** when the first bucket is at least 358 days (a year less a week) before the last; else **previous
+  period** from 3 buckets. At most one is offered (last year wins: it removes the season the previous period keeps).
+  Read from the probe's rows (the Widget's own statement).
+- **Preview**: driven against a stub API (no backend jar with the add-on was built in the sandbox): the Profile screen
+  created the Job, ran the scan and reloaded the feed; *Every run* + *High* filtered on the server; the Dashboard drew
+  the Insight Feed tile beside a 420-day line whose menu offered last year / forecast / anomaly, and the applied
+  compare was saved and not offered again; the cog dialog listed the builder's suggestions.
+
+### 11.16 Loose ends B — Explain and feedback for every viewer, Business Insights in Basic — as built (2026-11-26)
 
 Operator interview 2026-11-26, three decisions:
 

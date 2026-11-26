@@ -98,6 +98,30 @@ class ControlApiRiskScoreTest {
         }
     }
 
+    /**
+     * AGENT-GET-DATA-READS-1 (D-AK13): "GET /risk-scores/([^/]+)/([^/]+)" is an agent data route. The agent's answer is
+     * stamped by {@code EntityKeyMasking.put}; with every stamp a no-op the agent gets 500 with no key while a person
+     * still gets the score. Falsified: removing the stamp in {@code EntityKeyMasking.put}.
+     */
+    @Test
+    void anAgentsRiskScoreIsProvenMaskedOrWithheld(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            score(c, "subs", model(null));
+            String path = "/spaces/s1/risk-scores/subs/m1";
+            assertEquals(200, send(c.port, "GET", path, null, "agent").statusCode());
+            com.gamma.util.AnswerMasking.ignoreStampsForTest(true);
+            try {
+                HttpResponse<String> agent = send(c.port, "GET", path, null, "agent");
+                assertEquals(500, agent.statusCode(), agent.body());
+                assertTrue(agent.body().contains(ControlApi.MASKING_NOT_PROVEN), agent.body());
+                assertFalse(agent.body().contains("\"m1\"") || agent.body().contains("masked:"), agent.body());
+                assertEquals(200, send(c.port, "GET", path, null, "revealer").statusCode(), "a person is unchanged");
+            } finally {
+                com.gamma.util.AnswerMasking.ignoreStampsForTest(false);
+            }
+        }
+    }
+
     private record Ctx(SpaceManager spaces, ControlApi api, int port, Path config, Path data) implements AutoCloseable {
         public void close() { api.close(); spaces.close(); }
     }

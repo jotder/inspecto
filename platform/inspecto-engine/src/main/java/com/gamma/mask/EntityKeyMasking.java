@@ -13,6 +13,8 @@ public final class EntityKeyMasking {
 
     /** Put {@code entityKey} and {@code keyMasked} into {@code out}. */
     public static void put(Map<String, Object> out, Path writeRoot, String entityKey, boolean reveal) {
+        // W6 S0 (D-AK13): the key's masking is decided here; evidence was masked at write (EvidenceMasker)
+        com.gamma.util.AnswerMasking.applied("entity key (evidence masked at write)", reveal ? 0 : 1);
         out.put("entityKey", reveal ? entityKey : EvidenceMasker.forSpace(writeRoot).tokenFor(entityKey));
         out.put("keyMasked", !reveal);
     }

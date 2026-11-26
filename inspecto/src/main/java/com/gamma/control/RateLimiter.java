@@ -3,6 +3,8 @@ package com.gamma.control;
 import com.gamma.entitystore.LaLimit;
 import com.gamma.entitystore.LaLimitValues;
 import com.gamma.entitystore.LaLimits;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -25,6 +27,8 @@ import java.util.function.LongSupplier;
  * budget — they are the routes an interactive user cannot multiply by the dozen per page view.
  */
 final class RateLimiter {
+
+    private static final Logger LOG = LoggerFactory.getLogger(RateLimiter.class);
 
     /** The original budget: burst 20, then one request every 3 seconds per subject. */
     static RateLimiter standard() { return new RateLimiter(20.0, 1.0 / 3.0); }
@@ -74,6 +78,26 @@ final class RateLimiter {
     static RateLimiter linkAnalysis(LaLimitValues install) {
         return new RateLimiter(tuned(install, LaLimit.RATE_LINK_ANALYSIS_BURST, "control.rateLimit.linkAnalysis.capacity"),
                 tuned(install, LaLimit.RATE_LINK_ANALYSIS_PER_S, "control.rateLimit.linkAnalysis.refillPerSecond"));
+    }
+
+    /** The agent budget (AGENT-KIT-1 W6 S0, D-AK17): one bucket per agent client and subject, charged at both doors (direct
+     *  REST and the MCP replay) with each agent data route's weight ({@code AgentGate.DATA_ROUTES}). Burst 60, then 0.5 per
+     *  second: sixty page reads at once, then one every 2 s, the Link Analysis pace; install limits {@code rate.agent_burst} /
+     *  {@code rate.agent_per_s}, else {@code control.rateLimit.agent.capacity} / {@code .refillPerSecond}. */
+    static RateLimiter agent() {
+        return agent(LaLimits.forSpace(null));
+    }
+
+    /** {@link #agent()} from the install-wide values {@code install}. */
+    static RateLimiter agent(LaLimitValues install) {
+        double burst = tuned(install, LaLimit.RATE_AGENT_BURST, "control.rateLimit.agent.capacity");
+        int heaviest = AgentGate.heaviestDataWeight();
+        if (burst < heaviest) {   // a hand-edited document or a property: PUT refuses it (AgentGate#burstProblem)
+            LOG.warn("rate.agent_burst {} is below the heaviest agent data route's weight {}: the agent budget holds {}", burst,
+                    heaviest, heaviest);
+            burst = heaviest;
+        }
+        return new RateLimiter(burst, tuned(install, LaLimit.RATE_AGENT_PER_S, "control.rateLimit.agent.refillPerSecond"));
     }
 
     /** An install-wide rate: the value stated in the server-wide document, else {@code property} when it is a positive
@@ -139,17 +163,28 @@ final class RateLimiter {
 
     /** Whole seconds (at least 1) until {@code key}'s bucket holds its next token - the {@code Retry-After} of a 429. */
     long retryAfterSeconds(String key) {
+        return retryAfterSeconds(key, 1);
+    }
+
+    /** Whole seconds (at least 1) until {@code key}'s bucket holds {@code weight} tokens - the {@code Retry-After} of a
+     *  weighted 429 (W6 S0): a weight-20 call is told when 20 tokens are back, not when the next one is. */
+    long retryAfterSeconds(String key, int weight) {
         Bucket b = buckets.get(key);
-        return b == null || refillPerSecond <= 0 ? 1 : Math.max(1, b.secondsToNextToken(clock.getAsLong()));
+        return b == null || refillPerSecond <= 0 ? 1 : Math.max(1, b.secondsToTokens(clock.getAsLong(), weight));
     }
 
     /** True when {@code key} has a token to spend (and spends it); false when exhausted. */
     boolean tryConsume(String key) {
+        return tryConsume(key, 1);
+    }
+
+    /** True when {@code key} holds {@code weight} tokens (and spends them all); false, spending none, when it holds fewer. */
+    boolean tryConsume(String key, int weight) {
         long now = clock.getAsLong();
         sweepIfDue(now);
         while (true) {
             Bucket b = buckets.computeIfAbsent(key, k -> new Bucket(capacity, refillPerSecond, now));
-            Boolean r = b.tryConsume(now);
+            Boolean r = b.tryConsume(now, weight);
             if (r != null) return r;
             buckets.remove(key, b);   // evicted under our feet: retry against a fresh (identical, full) bucket
         }
@@ -190,17 +225,17 @@ final class RateLimiter {
         }
 
         /** True/false = spent/exhausted; {@code null} = this bucket was evicted, look up again. */
-        synchronized Boolean tryConsume(long now) {
+        synchronized Boolean tryConsume(long now, int weight) {
             if (evicted) return null;
             refill(now);
-            if (tokens < 1.0) return false;
-            tokens -= 1.0;
+            if (tokens < weight) return false;
+            tokens -= weight;
             return true;
         }
 
-        synchronized long secondsToNextToken(long now) {
+        synchronized long secondsToTokens(long now, int weight) {
             refill(now);
-            return tokens >= 1.0 ? 0 : (long) Math.ceil((1.0 - tokens) / refillPerSecond);
+            return tokens >= weight ? 0 : (long) Math.ceil((weight - tokens) / refillPerSecond);
         }
 
         synchronized boolean evictIfFull(long now) {

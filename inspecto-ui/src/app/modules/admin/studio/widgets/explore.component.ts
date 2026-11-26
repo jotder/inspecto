@@ -19,13 +19,13 @@ import {
     allViz,
     autoAssignChannels,
     getViz,
-    overlayEligible,
     recommend,
     suggestOverlays,
 } from 'app/inspecto/viz';
 import type { OverlaySummary } from 'app/inspecto/viz/chart-overlays';
 import type { KpiDefinition } from 'app/inspecto/api/kpis.service';
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
+import { ShowMeService } from 'app/inspecto/viz/show-me.service';
 import { DatasetRows, DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';
 import { WORKING_SET_VIEW_KIND } from 'app/inspecto/viz/plugins';
@@ -85,6 +85,7 @@ export class ExploreComponent implements OnInit {
     private widgetsApi = inject(WidgetsService);
     private componentsApi = inject(ComponentsService);
     private datasetResult = inject(DatasetResultService);
+    private showMe = inject(ShowMeService);
     private datasetRows = inject(DatasetRowsService);
     private dialog = inject(MatDialog);
     private router = inject(Router);
@@ -191,15 +192,13 @@ export class ExploreComponent implements OnInit {
     );
 
     constructor() {
-        effect((onCleanup) => {
+        effect(() => {
             const id = this.kpiId();
             this.kpiDef.set(null);
             if (!id) return;
-            const read = this.componentsApi.get('kpi', id).subscribe({
-                next: (c) => this.kpiDef.set(c.content as unknown as KpiDefinition),
-                error: () => this.kpiDef.set(null),
+            void this.showMe.kpi({ kpi: { kpiId: id } }).then((k) => {
+                if (this.kpiId() === id) this.kpiDef.set(k);
             });
-            onCleanup(() => read.unsubscribe());
         });
     }
 
@@ -217,7 +216,7 @@ export class ExploreComponent implements OnInit {
     /** The view-bound plugins (geo-map / link-analysis) — offered without a dataset; excluded from Show-Me. The
      *  Working Set Widget is not offered: it is pinned and saved from the Link Analysis Investigation panel (LA-21).
      *  The Link view and Geo map types follow `/bootstrap` (D-LAE2, D-LAE5): `laWidgets` and, for the Geo map, `geoMap` too, so
-     *  Basic does not offer them. ⚠ Cosmetic: the routes behind them stay open on Basic, and a widget already saved still opens. */
+     *  Basic does not offer them. The Insight feed follows `insights` (the Business Insights add-on). ⚠ Cosmetic: the routes behind them stay open on Basic, and a widget already saved still opens. */
     readonly viewPlugins = computed<VizPlugin[]>(() => {
         const f = this.session.features();
         return allViz().filter(
@@ -225,7 +224,8 @@ export class ExploreComponent implements OnInit {
                 !!p.meta.viewKind &&
                 p.meta.viewKind !== WORKING_SET_VIEW_KIND &&
                 (p.meta.viewKind !== 'link-analysis-view' || f['laWidgets'] === true) &&
-                (p.meta.viewKind !== 'geo-map-view' || (f['laWidgets'] === true && f['geoMap'] === true)),
+                (p.meta.viewKind !== 'geo-map-view' || (f['laWidgets'] === true && f['geoMap'] === true)) &&
+                (p.meta.viewKind !== 'insight-profile' || f['insights'] === true),
         );
     });
     readonly viewBound = computed(() => !!this.plugin()?.meta.viewKind);
@@ -425,7 +425,11 @@ export class ExploreComponent implements OnInit {
     openOptions(): void {
         this.dialog
             .open(WidgetOptionsDialog, {
-                data: { options: this.options(), vizType: this.vizType() } satisfies WidgetOptionsData,
+                data: {
+                    options: this.options(),
+                    vizType: this.vizType(),
+                    suggestions: this.suggestions(),
+                } satisfies WidgetOptionsData,
                 width: '480px',
             })
             .afterClosed()
@@ -502,24 +506,21 @@ export class ExploreComponent implements OnInit {
      * while one of them is not on yet; an identical probe is served from the result cache, never re-run.
      */
     private runProbe(plugin: VizPlugin, ds: Dataset, queryId: string | undefined): void {
-        const o = this.options();
         const seq = ++this.probeSeq;
         this.probe.set(null);
-        if (!overlayEligible(this.vizType(), this.controls(), o) || (o.overlay?.forecast && o.overlay?.anomaly)) return;
-        const spec = plugin.buildQuery(this.controls(), {
-            datasetId: ds.id,
-            sourceName: ds.sourceName,
-            filters: null,
-            options: { ...o, overlay: { forecast: {}, anomaly: {} } },
-        });
-        if (!spec.overlay) return; // a plugin that does not ask for overlays
-        if (queryId) spec.queryId = queryId;
-        this.datasetResult
-            .run(spec, this.colMetas())
-            .then((res) => {
+        this.showMe
+            .probe({
+                plugin,
+                controls: this.controls(),
+                options: this.options(),
+                datasetId: ds.id,
+                sourceName: ds.sourceName,
+                queryId,
+                columns: this.colMetas(),
+            })
+            .then((probe) => {
                 // A probe that answers after the Widget moved on describes another chart — drop it.
-                if (seq !== this.probeSeq) return;
-                if (res.ok && res.overlays?.length) this.probe.set({ summary: res.overlays, rows: res.rows });
+                if (seq === this.probeSeq && probe) this.probe.set(probe);
             })
             .catch(() => undefined);
     }

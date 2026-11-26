@@ -1,7 +1,9 @@
 # Agent data answers: masking, enumeration, rate and cost bounds, audit redaction (AGENT-KIT-1 W6 groups B, D, E)
 
 > 🟡 **SIGNED 2026-11-26 — D-AK13…D-AK21 signed in an operator interview (D-AK13, 14, 17, 20, 21 as recommended;
-> D-AK15, 16, 18, 19 not as recommended, §5); the people-facing defects of §8 filed and fixed first; nothing built.**
+> D-AK15, 16, 18, 19 not as recommended, §5); the people-facing defects of §8 filed and fixed first. **S0 built 2026-11-26**
+> (the shared seam, as built: [`spec-agent-data-seam.md`](../okf/product/module/mcp/spec-agent-data-seam.md)); D1, B, E, D2
+> and the lookup change not built.**
 > Unblocks widening plan
 > [`2026-11-25-agent-kit-ak2-widening-plan.md`](2026-11-25-agent-kit-ak2-widening-plan.md) § W6 groups B, D and E (D-AK10:
 > "once masking is proven per route") and board row `AGENT-LOOKUP-PREVIEW-1`. The operator chose on 2026-11-26 to settle
@@ -215,7 +217,7 @@ behaves as the tool, `McpRoutesManifestParityTest`, `McpToolRoutesTest`, `openap
 
 | Change | Work | Estimate |
 |---|---|---|
-| S0 shared seam | `DATA_ROUTES`, stamp, 500 seam, agent budget at both doors, no-body audit test, retrofit `/db/query` and LA reads, parity test | 2–3 days |
+| S0 shared seam ✅ built 2026-11-26 | `DATA_ROUTES`, stamp, 500 seam, agent budget at both doors, no-body audit test, retrofit `/db/query` and LA reads, parity test ([as built](../okf/product/module/mcp/spec-agent-data-seam.md); budget defaults burst 60, 0.5/s chosen in S0) | 2–3 days |
 | D1 | `bi/query`, `queries/run`: masking exists; tests | 1–1.5 days |
 | B | rule-templates (exists, tests), decision simulate without stamp, enrichment Reference masking + path refusal (fixes the people defect too) | 3 days |
 | E | score previews (raw keys, masked echo), screening ≤ 10, name-redaction tests | 2 days |

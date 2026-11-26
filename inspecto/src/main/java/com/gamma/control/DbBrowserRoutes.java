@@ -143,6 +143,8 @@ final class DbBrowserRoutes implements RouteModule {
         if (group.startsWith("ops:")) {
             requireOperationalRead(ex);
             requireUnmaskedOperational(ex, group, false);
+            // W6 S0 (D-AK13): past the check above, a non-revealing caller reads only a keyless operational store
+            com.gamma.util.AnswerMasking.applied(group + " (keyless or revealed)", 0);
             return browseOperational(api, group, name, null, limit, offset);
         }
         if (!STORES_GROUP.equals(group))

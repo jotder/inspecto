@@ -87,6 +87,30 @@ class ControlApiAnomalyScoreTest {
         }
     }
 
+    /**
+     * AGENT-GET-DATA-READS-1 (D-AK13): "GET /anomaly-scores/([^/]+)/([^/]+)" is an agent data route. The agent's answer
+     * is stamped by {@code EntityKeyMasking.put}; with every stamp a no-op the agent gets 500 with no key while a person
+     * still gets the score. Falsified: removing the stamp in {@code EntityKeyMasking.put}.
+     */
+    @Test
+    void anAgentsAnomalyScoreIsProvenMaskedOrWithheld(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, null)) {
+            score(c);
+            String path = "/spaces/s1/anomaly-scores/usage/spike";
+            assertEquals(200, send(c.port, "GET", path, null, "agent").statusCode());
+            com.gamma.util.AnswerMasking.ignoreStampsForTest(true);
+            try {
+                HttpResponse<String> agent = send(c.port, "GET", path, null, "agent");
+                assertEquals(500, agent.statusCode(), agent.body());
+                assertTrue(agent.body().contains(ControlApi.MASKING_NOT_PROVEN), agent.body());
+                assertFalse(agent.body().contains("spike") || agent.body().contains("masked:"), agent.body());
+                assertEquals(200, send(c.port, "GET", path, null, "revealer").statusCode(), "a person is unchanged");
+            } finally {
+                com.gamma.util.AnswerMasking.ignoreStampsForTest(false);
+            }
+        }
+    }
+
     @AfterEach
     void tearDown() { Authenticators.forTest(null); }
 

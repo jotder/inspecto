@@ -102,6 +102,8 @@ final class KpiRoutes implements RouteModule {
         BiResultMasking masking = BiResultMasking.of(writeRoot, store, new ViewStore(writeRoot.resolve("views")), kpi.dataset(),
                 dataset, BiResultMasking.mayReveal(ex));
         masking.vetMeasure(kpi.measure());
+        // W6 S0 (D-AK13): a KPI answers one aggregate; a Measure over a masked key was refused just above
+        com.gamma.util.AnswerMasking.applied(kpi.dataset() + " (measure vetted)", 0);
         boolean wantProjection = "true".equals(ApiContext.query(ex, "projection"));
         KpiEvaluator.Result r;
         KpiEvaluator.Projection projection = null;

@@ -242,6 +242,14 @@ final class TemplateSeedGate {
             }
         }
         if ("alert-rule".equals(type)) {
+            if (body.containsKey(KpiAlertProbe.OWNER_ROLES)) {   // server-stamped: a template never carries it
+                body.remove(KpiAlertProbe.OWNER_ROLES);
+                try {
+                    Files.writeString(c.path(), ConfigCodec.toToon(body));
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            }
             body.put("name", id);
             if (unarmed) AlertRoutes.parseContent(config, dataRoot, body);   // ships unarmed: judged, not refused
             else AlertRoutes.parse(config, dataRoot, body);

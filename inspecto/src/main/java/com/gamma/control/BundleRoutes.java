@@ -586,6 +586,7 @@ final class BundleRoutes implements RouteModule {
             // POST /alerts/rules and /components/alert-rule (fromMap, the Investigation refusal, the `by` Schema
             // check) over the content as stored (name = id); a refusal fails THIS item.
             if ("alert-rule".equals(kind)) {
+                content = KpiAlertProbe.stripRoles(content);   // ownerRoles is server-stamped: a bundle never carries it
                 Map<String, Object> stamped = new LinkedHashMap<>(content);
                 stamped.put("name", id);
                 try {

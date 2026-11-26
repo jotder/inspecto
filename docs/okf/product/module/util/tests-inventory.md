@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.util`](../../../../../product-map/module/util.toon).
 
-31 test class(es): 31 unit, 0 real-HTTP control-plane, 0 IT.
+32 test class(es): 32 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -28,6 +28,7 @@ mvn -o test -pl platform/inspecto-util -Dtest=EntitlementsTest,ModuleBuildIdTest
 | `EntitlementsTest` | `com.gamma.module` | unit | `platform/inspecto-util/src/test/java/com/gamma/module/EntitlementsTest.java` | PRODUCT-ASSEMBLY-1 PA-7a: the entitlement verifier, its narrowing rules, and parity with tools/entitle.mjs. |
 | `ModuleBuildIdTest` | `com.gamma.module` | unit | `platform/inspecto-util/src/test/java/com/gamma/module/ModuleBuildIdTest.java` | MODULE-REORG-1 P3a: the build-id gate, over real (synthetic) jars. An absent or {@code dev} stamp is never a mismatch. |
 | `ModuleManifestsTest` | `com.gamma.module` | unit | `platform/inspecto-util/src/test/java/com/gamma/module/ModuleManifestsTest.java` |  |
+| `AnswerMaskingTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/AnswerMaskingTest.java` | The masked-answer stamp (AGENT-KIT-1 W6 S0): scoped per thread, nested, a no-op outside a scope, refused 2xx when unstamped. |
 | `BoundedHistoryTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/BoundedHistoryTest.java` |  |
 | `CanonicalHashTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/CanonicalHashTest.java` | {@link CanonicalHash} — the §3.4.3 schema-fingerprint hash. The contract that matters: key order must |
 | `ConditionsTest` | `com.gamma.util` | unit | `platform/inspecto-util/src/test/java/com/gamma/util/ConditionsTest.java` | The A2 condition grammar (rbac-abac-plan §4): parse-once predicates over nested attribute maps. |

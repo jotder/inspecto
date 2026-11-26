@@ -183,6 +183,15 @@ class ReportPdfChartsTest {
         assertEquals("Revenue", ReportWidget.of("rev_tile", w).title(), "KPI options without a definition still draw");
     }
 
+    /** BI-INSIGHTS-1: an Insight Feed tile (view-bound, no Dataset) is refused in words, never drawn as an empty page. */
+    @Test
+    void anInsightFeedWidgetIsRefusedInWords() {
+        Map<String, Object> w = new java.util.HashMap<>(Map.of("vizType", "insight-feed", "viewId", "sales_watch"));
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> ReportWidget.of("feed_tile", w));
+        assertTrue(e.getMessage().contains("feed_tile") && e.getMessage().contains("insight-feed")
+                && e.getMessage().contains("a report PDF draws bar, line and kpi Widgets"), e.getMessage());
+    }
+
     /** Review finding 4: a time grain on the series channel is kept, as the SPA's channelGrains keeps it. */
     @Test
     void aGrainOnEitherDimensionChannelIsKept() {

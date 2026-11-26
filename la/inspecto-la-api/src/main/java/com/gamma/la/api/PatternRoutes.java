@@ -467,6 +467,7 @@ public final class PatternRoutes implements RouteModule {
     }
 
     private Map<String, Object> refusal(HttpExchange ex, String datasetId, String why, LaLimitValues lim) {
+        com.gamma.util.AnswerMasking.applied(datasetId + " (no rows answered)", 0);   // AGENT-KIT-1 W6 S0: a refusal carries no value
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("matches", List.of());
         out.put("edges", List.of());
