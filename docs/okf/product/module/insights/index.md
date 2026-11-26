@@ -35,5 +35,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `BI-INSIGHTS-1` | P2 | feature | Advanced insights on business data in Widgets and Dashboards, authored and tuned as Insight Profiles. | — |
-| `BI-EXPLAIN-DEPTH2-1` | P3 | feature | "Explain this change" stops at one dimension (filed 2026-11-25, BI-INSIGHTS-1 P2). | — |
+| `INSIGHT-CASE-EXISTING-1` | P3 | feature | An Insight can only open a NEW Case (filed 2026-11-26, BI-INSIGHTS-1 I-17). | demand |
+| `ACTION-TEMPLATE-ESCAPE-1` | P3 | defect | An Action Request payload cannot carry literal {{…}} text (filed 2026-11-26, BI-INSIGHTS-1 I-17). | — |
 | `INSIGHT-SCAN-WRITER-UNLISTED-1` | P2 | defect | ConfigWriteFunnelTest.everyConfigWriterRepoWideReachesTheHoldOrIsOnTheInventory is red on master: InsightScanJobType#register (writes the… | — |

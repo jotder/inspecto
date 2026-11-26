@@ -1,0 +1,12 @@
+{
+  "name": "parcel_rates_job",
+  "type": "pipeline",
+  "enabled": true,
+  "input_stream": "parcel_scans",
+  "schedule.mode": "by_day",
+  "schedule.quiet": "1m",
+  "schedule.max_hold": "5m",
+  "schedule.order": "oldest_first",
+  "schedule.max_parallel": "1",
+  "inputs.carrier_rates.role": "reference"
+}

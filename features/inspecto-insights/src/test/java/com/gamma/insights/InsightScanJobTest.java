@@ -179,6 +179,46 @@ class InsightScanJobTest {
         }
     }
 
+    private void pairsProfile(String id, Map<String, Object> measure) throws Exception {
+        Map<String, Object> p = new LinkedHashMap<>(store.get(InsightProfile.KIND, "daily").orElseThrow().content());
+        p.put("measure", measure);
+        p.put("pairs", true);
+        store.write(InsightProfile.KIND, id, p);
+    }
+
+    @Test
+    void pairsOfDimensionsAreStoredForTheLastBucketWithClassifiedValuesAsAliases() throws Exception {
+        pairsProfile("paired", Map.of("agg", "sum", "field", "amount"));
+        JobRun run = scan("paired", Map.of());
+        assertEquals("SUCCESS", run.status(), run.message());
+        assertTrue(run.message().contains("1 pair(s) of dimensions explained"), run.message());
+
+        Path dir = data.resolve("insights_paired");
+        String text = Files.readString(dir.resolve(PairExplain.FILE));
+        assertFalse(text.contains(K1) || text.contains(K2), "a classified value is stored only as its alias: " + text);
+        String yesterday = java.time.LocalDate.now().minusDays(1).toString();
+        Map<String, Object> e = PairExplain.read(dir).get(yesterday);
+        assertNotNull(e, "an entry for the last complete day: " + text);
+        assertEquals(java.time.LocalDate.now().minusDays(2).toString(), e.get("previous"));
+        @SuppressWarnings("unchecked") Map<String, Object> pair = ((List<Map<String, Object>>) e.get("drivers")).get(0);
+        assertEquals("region × msisdn", pair.get("dimension"));
+        @SuppressWarnings("unchecked") List<String> cover = (List<String>) pair.get("cover");
+        assertEquals(1, cover.size(), "N on yesterday's msisdn carries the jump: " + pair);
+        assertTrue(cover.get(0).startsWith("N × "), String.valueOf(cover));
+        assertFalse(InsightStore.read(dir).isEmpty(), "the Insights are stored as before");
+    }
+
+    @Test
+    void pairsOverAMaskedMeasureAreRefusedAndNothingIsStored() throws Exception {
+        // numeric, so sum() compiles: only the masking vet can refuse it
+        pairsProfile("leakpairs", Map.of("agg", "sum", "field", "msisdn_n"));
+        JobRun run = scan("leakpairs", Map.of());
+        assertNotEquals("SUCCESS", run.status(), run.message());
+        assertTrue(run.message().contains("msisdn_n") && !run.message().contains("Binder"),
+                "refused by the masking vet, not by a type error: " + run.message());
+        assertFalse(Files.exists(data.resolve("insights_leakpairs").resolve(PairExplain.FILE)), "no pairs stored");
+    }
+
     @Test
     void aRunMayNotPointTheJobAtAnotherProfile() throws Exception {
         JobRun run = scan("daily", Map.of("profile", "other"));
