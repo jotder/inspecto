@@ -27,7 +27,9 @@ proposes a change, instead of proposing and reading the refusal.
 | `POST /rule-templates/{id}/simulate` | `simulate_rule_template` (`template`, `body?`) | 1 | every agent | the template's matching rows over its source Dataset, masked by `BiResultMasking` |
 | `POST /enrichment/preview` | `preview_enrichment` (`body`) | 2 | a person's agent only (`PERSON_ONLY`) | the draft's first 200 enriched rows, **raw** (D-AK22) |
 
-All three are read tools (MCP `readOnlyHint`). Each call spends its weight in the agent budget at both doors (D-AK17), and an
+All three are read tools (MCP `readOnlyHint`). An agent's body to any of them is at most 256 KiB on every door
+(`AgentGate.PREVIEW_MAX_BODY_BYTES`, 413 before the handler reads it — design §4's cost bound; `ControlApi.handle`); a
+person's is not capped. Each call spends its weight in the agent budget at both doors (D-AK17), and an
 answer without a masking stamp is 500 `masking not proven` (D-AK13).
 
 ## Decision Rule simulate (D-AK20)
@@ -45,7 +47,8 @@ Masking already ran (`BiResultMasking.of` / `vetFields` / `vetAdHocSql` / `scrub
 `BiResultMasking.apply` stamps the answer. The hole vets keep refusing a caller value compared with a masked column
 (422); D-AK15 opens no new raw path here. **`RULE-TEMPLATE-SIMULATE-SHARING-1` fixed for everyone:** a source Dataset the
 caller cannot view (`ComponentAccess.canView`) answers 404 with the same text as a missing one, as `/bi/query` and
-`/queries/{id}/run` do. ⚠ A template with no `source` has no masking step, so its answer is never stamped: an agent gets
+`/queries/{id}/run` do. A Rule Template shared away from the caller is 404 too, as a missing one (found by the lane's
+security review: its holes and stored defaults were echoed in `boundTo`). ⚠ A template with no `source` has no masking step, so its answer is never stamped: an agent gets
 500 for it (fail closed); a person is unchanged.
 
 ## The enrichment preview: raw by decision for a builder (D-AK22)
@@ -71,12 +74,12 @@ decided instead (D-AK22, 2026-11-26, replacing §4 for this route): the answer i
 
 | Test | Proves |
 |---|---|
-| `ControlApiAgentSimulatorsTest` (`features/inspecto-mcp`) | on both doors: an agent's Rule Template answer holds the token, never the raw key; with every stamp a no-op each simulator answers an agent 500 with no row while a person still gets 200; an agent's Decision Rule simulate leaves the file byte-identical and a person's still stamps it; each call spends its weight on each door (the enrichment preview 2), 429 with `Retry-After` past the budget, the person's own budget untouched; a shared-away source Dataset is 404 with the missing-Dataset text; the enrichment preview is raw for a builder's agent on both doors, 403 for a machine agent and for an agent without `canAuthorWorkbench` |
+| `ControlApiAgentSimulatorsTest` (`features/inspecto-mcp`) | on both doors: an agent's Rule Template answer holds the token, never the raw key; with every stamp a no-op each simulator answers an agent 500 with no row while a person still gets 200; an agent's Decision Rule simulate leaves the file byte-identical and a person's still stamps it; each call spends its weight on each door (the enrichment preview 2), 429 with `Retry-After` past the budget, the person's own budget untouched; a shared-away source Dataset is 404 with the missing-Dataset text; the enrichment preview is raw for a builder's agent on both doors, 403 for a machine agent on both doors and for an agent without `canAuthorWorkbench`; an agent's body over 256 KiB is 413, a person's is not; a shared-away Rule Template is 404 |
 | `AgentDataRoutesParityTest` (`inspecto`) | the three routes are allowed, weighted data routes with this proof file; `RAW_FOR_BUILDERS` is exactly the enrichment preview, on `DATA_ROUTES` and `PERSON_ONLY` |
 | `AnswerMaskingTest` (`inspecto-util`) | the raw-by-decision stamp proves only a scope opened allowing it; in an ordinary or nested scope the answer still fails closed |
 | `AgentGateParityTest`, `ControlApiMcpWriteToolsTest`, `McpToolRoutesTest` | the routes keep `canAuthorWorkbench`; the enrichment preview is person-only; the three tools are listed read-only and each replays an allowed route |
 
-Falsified 2026-11-26: removing the D-AK20 skip, the Decision Rule stamp, the `canView` filter, the enrichment preview's
+Falsified 2026-11-26: removing the D-AK20 skip, the Decision Rule stamp, either `canView` filter, the body cap, the enrichment preview's
 `PERSON_ONLY` entry, or the `RAW_FOR_BUILDERS` allowance on the host's scope each fails `ControlApiAgentSimulatorsTest`;
 accepting the raw stamp in every scope fails `AnswerMaskingTest`.
 

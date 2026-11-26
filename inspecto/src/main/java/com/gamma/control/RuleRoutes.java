@@ -64,6 +64,7 @@ final class RuleRoutes implements RouteModule {
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
 
         Map<String, Object> config = component(store, TYPE, id)
+                .filter(t -> ComponentAccess.canView(ex, t))   // shared away = absent, as GET /components lists it
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown rule template '" + id + "'"));
         RuleTemplate template = RuleTemplate.from(config);
 

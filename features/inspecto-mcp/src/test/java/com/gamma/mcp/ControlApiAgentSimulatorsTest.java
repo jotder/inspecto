@@ -309,6 +309,9 @@ class ControlApiAgentSimulatorsTest {
             assertEquals(403, bot.statusCode(), bot.body());
             assertTrue(bot.body().contains("nor preview an enrichment"), bot.body());
             assertNoRaw("machine", bot.body());
+            JsonNode botMcp = tool(c, BOT, "preview_enrichment", Map.of("body", body));
+            assertTrue(botMcp.path("isError").asBoolean() && text(botMcp).startsWith("HTTP 403"), "the MCP door too: " + botMcp);
+            assertNoRaw("machine MCP", botMcp.toString());
             HttpResponse<String> reader = post(c, READER, "/enrichment/preview", body);
             assertEquals(403, reader.statusCode(), "no canAuthorWorkbench, today's refusal: " + reader.body());
             assertNoRaw("reader", reader.body());
@@ -321,6 +324,30 @@ class ControlApiAgentSimulatorsTest {
         }
     }
 
+    /** Design §4's cost bound: an agent's simulator body is at most 256 KiB on the direct door too (413); a person's is not capped. */
+    @Test
+    void anAgentsSimulatorBodyIsCappedAt256KiB(@TempDir Path root) throws Exception {
+        // just over the cap: sample rows, then one pad field
+        String big = "{\"sampleRows\":[{\"cost\":9200}],\"pad\":\"" + "x".repeat(256 * 1024) + "\"}";
+        try (Ctx c = open(root)) {
+            HttpResponse<String> agent = chunked(c, AGENT, "/decision-rules/high_cost/simulate", big);
+            assertEquals(413, agent.statusCode(), agent.body());
+            assertEquals(200, chunked(c, PERSON, "/decision-rules/high_cost/simulate", big).statusCode(), "a person is unchanged");
+        }
+    }
+
+    /**
+     * ⚠ Chunked, so the server reads up to the cap + 1 and the few bytes left fit its drain: a declared body refused unread
+     * races the client, which can lose the 413 to a reset (as {@code ControlApiAgentPreviewsTest}).
+     */
+    private HttpResponse<String> chunked(Ctx c, String auth, String path, String body) throws Exception {
+        byte[] bytes = body.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1/spaces/s1" + path))
+                .header("Content-Type", "application/json").header("Authorization", auth)
+                .POST(BodyPublishers.ofInputStream(() -> new java.io.ByteArrayInputStream(bytes))).build(),
+                BodyHandlers.ofString());
+    }
+
     /** RULE-TEMPLATE-SIMULATE-SHARING-1: a source Dataset the caller cannot view is a 404, as a missing one. */
     @Test
     void aRuleTemplateOverASharedAwayDatasetIs404(@TempDir Path root) throws Exception {
@@ -330,6 +357,14 @@ class ControlApiAgentSimulatorsTest {
             assertTrue(other.body().contains("unknown dataset 'calls_ds'"), "the same text as a missing Dataset: " + other.body());
             assertNoRaw("shared away", other.body());
             assertEquals(200, post(c, PERSON, "/rule-templates/big/simulate", Map.of()).statusCode(), "the owner still simulates");
+            // the template itself shared away: 404 as a missing one, so its holes and defaults are not echoed
+            new ComponentStore(c.config.resolve("registry")).write("rule-template", "mine", Map.of("id", "mine", "name", "mine",
+                    "owner", "dev-1", "shares", List.of(), "source", "calls_ds",
+                    "paramSql", "SELECT region FROM calls_ds WHERE amount > :floor",
+                    "params", List.of(Map.of("name", "floor", "field", "amount", "operator", "gt", "value", "0"))));
+            HttpResponse<String> hidden = post(c, OTHER, "/rule-templates/mine/simulate", Map.of());
+            assertEquals(404, hidden.statusCode(), hidden.body());
+            assertTrue(hidden.body().contains("unknown rule template 'mine'"), hidden.body());
         }
     }
 }
