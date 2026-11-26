@@ -116,6 +116,22 @@ class AgentGateParityTest {
         }
     }
 
+    /**
+     * W6 group D, change D1 (signed design D-AK13, D-AK17): the two analytic reads are allowed to every agent — read-shaped
+     * exemptions, none person-only — and each is a weighted data route, so its answer must prove its masking.
+     */
+    @Test
+    void theAnalyticReadsAreAllowedToEveryAgentAsDataRoutes() {
+        Map<String, String> m = manifest();
+        assertEquals(Set.of("POST /bi/query", "POST /queries/([^/]+)/run"), AgentGate.ANALYTIC_READS);
+        for (String key : AgentGate.ANALYTIC_READS) {
+            assertEquals("exempt:read-shaped", m.get(key), key);
+            assertEquals(AgentGate.Bucket.ALLOWED, bucket(key), key);
+            assertFalse(AgentGate.PERSON_ONLY.contains(key), key);
+            assertEquals(1, AgentGate.DATA_ROUTES.get(key), key + " weighs a page read");
+        }
+    }
+
     @Test
     void theActionBucketIsExactlyTheNamedOperationalRoutes() {
         Map<String, String> m = manifest();

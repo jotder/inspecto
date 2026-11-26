@@ -16,7 +16,7 @@ tags: [product-item, module]
 | Slot | Status | Document |
 |---|---|---|
 | plan | missing | |
-| spec | current | [Agent case actions and record edits (AK-2e, W11) — design and as-built](spec-agent-case-actions.md) · [Agent data answers — the shared seam (AGENT-KIT-1 W6 S0) — as-built](spec-agent-data-seam.md) · [Agent posture (MCP-AGENT-POSTURE-1) — design and as-built](spec-agent-posture.md) · [Agent authoring previews (AGENT-KIT-1 W6 group A) — design and as-built](spec-agent-previews.md) · [Agent Space tests (AGENT-KIT-1 W6 group C) — design and as-built](spec-agent-space-tests.md) · [The MCP endpoint (inspecto-mcp) — AK-1 and AK-2 phase 1 design and as-built](spec-mcp.md) |
+| spec | current | [Agent case actions and record edits (AK-2e, W11) — design and as-built](spec-agent-case-actions.md) · [Agent data answers — the shared seam (AGENT-KIT-1 W6 S0, D1) — as-built](spec-agent-data-seam.md) · [Agent posture (MCP-AGENT-POSTURE-1) — design and as-built](spec-agent-posture.md) · [Agent authoring previews (AGENT-KIT-1 W6 group A) — design and as-built](spec-agent-previews.md) · [Agent Space tests (AGENT-KIT-1 W6 group C) — design and as-built](spec-agent-space-tests.md) · [The MCP endpoint (inspecto-mcp) — AK-1 and AK-2 phase 1 design and as-built](spec-mcp.md) |
 | architecture | current | [MCP endpoint (inspecto-mcp)](architecture-mcp.md) |
 | features | missing | |
 | feature-db | current | [MCP endpoint — feature database](feature-db.md) |
@@ -36,6 +36,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 |---|---|---|---|---|
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
 | `AGENT-STORED-RECORD-READS-1` | P2 | defect | 43 GET routes answer stored records that can echo entity keys or row values other features wrote into them, and sit outside the agent dat… | operator |
+| `IDEMPOTENCY-AGENT-REPLAY-1` | P2 | defect | An Idempotency-Key replay is answered before the handler (ControlApi), so the masked-answer stamp check never sees it, and the cache key'… | — |
 | `AGENT-GATEWAY-UNMARKED-1` | P3 | defect | behind an API gateway (-Dauth.oidc.gateway.*) an agent client's token is never marked: | — |
 | `AGENT-LOOKUP-PREVIEW-1` | P3 | feature | let an agent test a lookup (POST /lookups/test) once it is safe: | — |
 | `PENDING-CHANGE-SECRET-READBACK-1` | P3 | defect | a Job's secret parameter can be read back through its Pending Change: | — |

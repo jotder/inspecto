@@ -152,6 +152,16 @@ final class AgentGate {
      * verdicts (counts, a checksum, a named column's min or max), never rows.
      */
     static final Set<String> ALLOWED;
+
+    /**
+     * The analytic reads (widening plan W6 group D, change D1 of the signed design, operator 2026-11-26): a Measure query
+     * ({@code POST /bi/query}, MCP Tool {@code query_measure}) and a saved query's run ({@code POST /queries/{id}/run},
+     * {@code run_saved_query}). Each masks its rows with {@code BiResultMasking} and vets its oracles as for the person
+     * (D-AK15 adds no raw path); each is a {@link #DATA_ROUTES} entry of weight 1, so an unstamped answer is withheld. A
+     * saved query that names no Dataset runs no masking step and so is withheld from an agent (500).
+     */
+    static final Set<String> ANALYTIC_READS = Set.of("POST /bi/query", "POST /queries/([^/]+)/run");
+
     static {
         Set<String> all = new java.util.HashSet<>(Set.of(
                 "POST /mcp",
@@ -168,6 +178,7 @@ final class AgentGate {
                 "POST /tests/run"));
         all.addAll(LA_READS);
         all.addAll(AUTHORING_PREVIEWS);
+        all.addAll(ANALYTIC_READS);
         ALLOWED = Set.copyOf(all);
     }
 
@@ -184,8 +195,8 @@ final class AgentGate {
      * in the agent budget (1 = a page read). For an agent, on every door, the host (a) charges the weight to the agent budget
      * keyed by agent client and subject, and (b) answers 500 {@code masking not proven} instead of a 2xx answer no masking
      * step stamped ({@code com.gamma.util.AnswerMasking}). S0 lists {@code POST /db/query} and the Link Analysis reads that
-     * answer entity ids or rows, and the masked value GETs ({@link #VALUE_GETS}); groups B, D, E and {@code /lookups/test} join
-     * one change each.
+     * answer entity ids or rows, and the masked value GETs ({@link #VALUE_GETS}); D1 adds {@link #ANALYTIC_READS}; groups B,
+     * E, D2 (recon) and {@code /lookups/test} join one change each.
      */
     static final Map<String, Integer> DATA_ROUTES;
 
@@ -228,6 +239,7 @@ final class AgentGate {
     static {
         Map<String, Integer> m = new HashMap<>();
         m.put("POST /db/query", 1);
+        for (String r : ANALYTIC_READS) m.put(r, 1);   // D1: a page read each
         for (String r : LA_READS) if (!LA_READS_WITHOUT_VALUES.contains(r)) m.put(r, 1);
         for (String r : VALUE_GETS) m.put(r, 1);
         DATA_ROUTES = Map.copyOf(m);

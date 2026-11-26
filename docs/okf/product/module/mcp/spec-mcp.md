@@ -362,7 +362,7 @@ agent token calling a route directly is treated the same.
      (D-AK2: a delegated person only, never a machine), and `/pending-actions/{id}/withdraw`; since **W6 group A**
      (2026-11-26) the four authoring previews (`AgentGate.AUTHORING_PREVIEWS`: `/config/preview/parsing|schema`,
      `/config/suggest/schema`, `/components/mapping/validate`), for every agent, body-capped at 256 KiB and naming
-     no config file ([Agent authoring previews](spec-agent-previews.md)); data answers: [S0 seam](spec-agent-data-seam.md);
+     no config file ([Agent authoring previews](spec-agent-previews.md)); data answers: [S0 seam](spec-agent-data-seam.md), D1 adds `/bi/query`, `/queries/{id}/run`, tools `query_measure`, `run_saved_query`;
      since **W6 group C** (2026-11-26) `POST /tests/run`, a delegated person's agent only (`AgentGate.PERSON_ONLY`,
      D-AK10), still gated `canAuthorWorkbench` ([Agent Space tests](spec-agent-space-tests.md));
   3. **actions** (**AK-2d**, 2026-11-25) — `AgentGate.ACTIONS`, the operational routes of plan §4.6: `POST
