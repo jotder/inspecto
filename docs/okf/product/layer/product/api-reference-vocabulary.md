@@ -165,7 +165,7 @@ the console, the API and this Handbook use the same word.
 - **Measure** — A BI aggregation (SUM, AVG, COUNT, …) over a Dataset.
 - **Column Role** — What one Dataset column is, stored as `columns[].role` on the Dataset registry entry: ONE vocabulary for the key that the Studio Dataset editor and materialization seeds already write (`dimension | measure | temporal`) and Link Analysis widens.
 - **Report** — A **scheduled delivery of rendered output**: a Dashboard (or other rendering) exported on a **Trigger** to a channel / recipient list in a chosen format (CSV / PDF / PNG), authored on the *KPI & Reports* page and executed as a **Job**.
-- **Insight Type** — A **template** for one kind of finding about a business **Measure**: `change`, `driver`, `anomaly`, `trend-break`, `forecast`, `target-risk`, `concentration`, `distribution-shift`, `segment-migration`.
+- **Insight Type** — A **template** for one kind of finding about a business **Measure**: `change`, `driver`, `anomaly` (an unusual value now), `trend-break` (the level moved and stayed), `drift` (a steady climb or slide), `forecast`, `target-risk`, `concentration`, `distribution-shift`, `segment-migration`.
 - **Insight** — One computed finding of an **Insight Type** about a Measure, for one slice and one period: value, expected value, delta, impact, a 0–100 score with bands, its explanation parts and the structured query that reproduces it.
 - **Insight Profile** — The authored Component (kind `insight-profile`) that says which Measure or **KPI** to watch, across which dimensions, with which Insight Types switched on and how they are tuned.
 - **Chart Marker** — A visual overlay drawn on a **Widget**: a band (forecast, baseline, target), a point (anomaly), a reference line or an event span.

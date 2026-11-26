@@ -202,7 +202,7 @@ map is `ComponentRegistry` (`platform/inspecto-engine/.../pipeline/ComponentRegi
 | Area | Directories (kind) |
 |---|---|
 | Data-plane parts | `connections` · `grammars` · `schemas` · `mappings` · `transforms` · `sinks` |
-| Studio / BI | `datasets` · `queries` · `preset-queries` · `widgets` · `dashboards` · `kpis` · `findings-specs` |
+| Studio / BI | `datasets` · `queries` · `preset-queries` · `widgets` · `dashboards` · `kpis` · `findings-specs` · `insight-profiles` |
 | Quality and decisions | `expectations` · `alert-rules` · `decision-rules` · `reconciliations` · `rule-templates` · `requirements` · `runbooks` |
 | Investigation | `link-analysis-views` · `geo-map-views` · `pattern-packs` |
 | Models | `risk-scores` · `anomaly-models` · `segmentation-models` · `churn-models` · `forecast-models` |

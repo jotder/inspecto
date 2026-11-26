@@ -108,6 +108,8 @@ class ImportLoaderInventoryTest {
         // LA-ONBOARD-1 phase 2: Add data keeps its drafts and its Pipelines' inboxes under the Space's DATA root
         ALLOWED.put("draft.json", "an Add data draft record under <data root>/_onboard/<draftId>/ - the DATA root, never "
                 + "the config root an import writes");
+        ALLOWED.put("feedback.json", "readers' feedback on Insights (InsightStore, BI-INSIGHTS-1 P3) in "
+                + "<data root>/insights_<profile>/ - the DATA root, never the config root an import writes");
         ALLOWED.put("inbox", "<data root>/inbox/<id>, an Add data Pipeline's poll directory under the DATA root - not config");
         ALLOWED.put("arrivals.jsonl", "an import Dataset's arrivals ledger (DatasetArrivals, LA-ARRIVAL-LEDGER-1) in "
                 + "<data root>/<id>/ - the DATA root, never the config root an import writes");

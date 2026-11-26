@@ -76,6 +76,7 @@ public final class ComponentRegistry {
             Map.entry("segmentation-models", "segmentation-model"), // PREDICTIVE-SEGMENT-RFM-1: Segmentation Models — predict.segment Job
             Map.entry("churn-models", "churn-model"),               // PREDICTIVE-CHURN-DECLARED-1: Churn Models — predict.churn Job
             Map.entry("forecast-models", "forecast-model"),         // PREDICTIVE-FORECAST-1: Forecast Models — predict.forecast Job
+            Map.entry("insight-profiles", "insight-profile"),       // BI-INSIGHTS-1 I-8: Insight Profiles — insight.scan Job
             Map.entry("channels", "channel"),                       // Notification channel destinations — NotificationRoutes
             Map.entry("notification-rules", "notification-rule"),    // Authored notification rules — NotificationRoutes
             Map.entry("findings-specs", "findings-spec"),             // C3/D6: configurable Findings sections — GET /findings/{type}

@@ -4,7 +4,7 @@ import com.gamma.control.testkit.ModuleRoutesParity;
 import org.junit.jupiter.api.Test;
 
 /**
- * The module's {@code module.toon} {@code provides.routes} must list EXACTLY the routes {@link ExplainRoutes} registers —
+ * The module's {@code module.toon} {@code provides.routes} must list EXACTLY the routes {@link ExplainRoutes} and {@link InsightsRoutes} register —
  * both directions. The host stubs the manifest's list with 503 when this module is absent.
  */
 class InsightsAbsentSurfaceParityTest {

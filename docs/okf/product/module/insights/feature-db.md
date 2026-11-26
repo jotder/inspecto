@@ -13,9 +13,14 @@ tags: [feature-db, module]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`module.insights`](../../../../../product-map/module/insights.toon).
 
-2 row(s).
+7 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
+| insight-profile | config kind | insights | standard;advanced;preview | businessInsights | ga | `insight-profile` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
 | insights | feature | insights | standard;advanced;preview | businessInsights | ga | `insights` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
+| insight.scan | job type | insights | standard;advanced;preview | businessInsights | ga | `insight.scan` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
+| "GET /insights" | route | insights | standard;advanced;preview | businessInsights | ga | `"GET /insights"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
+| "POST /insights/([^/]+)/([^/]+)/feedback" | route | insights | standard;advanced;preview | businessInsights | ga | `"POST /insights/([^/]+)/([^/]+)/feedback"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /insights/explain" | route | insights | standard;advanced;preview | businessInsights | ga | `"POST /insights/explain"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
+| "POST /insights/preview" | route | insights | standard;advanced;preview | businessInsights | ga | `"POST /insights/preview"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |

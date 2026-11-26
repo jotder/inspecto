@@ -1,11 +1,11 @@
 ---
 type: Architecture
 title: Business Insights
-description: How "Explain this change" finds the slices that carry a Measure's change (drivers), splits a ratio's change into mix and rate, and lists the Measures that moved with it — through the same gates and masking as POST /bi/query.
+description: How "Explain this change" finds the slices that carry a Measure's change, and how the Insight scan finds what is unusual across an Insight Profile's slices, ranks it and stores it as a Dataset — both through the same gates and masking as POST /bi/query.
 item: module.insights
 audience: internal
 status: current
-verified: 2026-11-25 last-edit
+verified: 2026-11-26 last-edit
 code: [features/inspecto-insights, platform/inspecto-analytics, inspecto]
 ---
 
@@ -13,7 +13,7 @@ code: [features/inspecto-insights, platform/inspecto-analytics, inspecto]
 
 > **Level 3 module page.** Layer: Add-on. Offering: Standard and above — add-on `businessInsights` (status `built`,
 > module `insights`) in `offerings/standard.toon` (D-BI2 / D-BI3, operator 2026-11-25: the module is created in P2,
-> not P3). Plan: `docs/superpower/2026-11-18-business-insights-plan.md` §11.8.
+> not P3). Plan: `docs/superpower/2026-11-18-business-insights-plan.md` §11.8 (Explain) and §11.9 (Insight scan).
 
 ## 1. What it is
 
@@ -71,3 +71,40 @@ The tile action **Explain this change** (light-bulb icon) appears on a Widget ov
 the headline change, per-dimension tables (cover values in bold), the mix / rate bridge on the **waterfall**
 Visualization Type (Before → Mix → Rate → After) and the Moved-with list with its "does not say one causes the
 other" note. The request is built by `inspecto/viz/explain-request.ts` from the Widget's own `/bi/query` body.
+
+## 5. The Insight scan (P3: I-8, Profiles, feed, feedback, replay, calendar)
+
+An **Insight Profile** (component kind `insight-profile`, `registry/insight-profiles/`) names a Measure (sum or
+count — impact is a share of the whole, which only an additive Measure has), its Dataset, date column and grain,
+up to 12 dimensions, the tests, and the knobs: `sensitivity` (q ≤ 0.01 / 0.05 / 0.10), `minImpact`, `minSupport`,
+`maxValues`, `lookback`, `season`, `noveltyRuns`, `maxInsights` and a business `calendar`. The Job **`insight.scan`**
+(parameter `profile`) scans it; `InsightProfileValidator` checks it at save and reserves the store prefix `insights_`.
+
+| Step | Rule |
+|---|---|
+| Read | One statement for the total and one per dimension, through `BiSpecRunner.runAsJob` — the `/bi/query` compiler, `SqlGuard`, sandbox and masking **as a reader who may not reveal**: a Measure over a masked column refuses the run; a classified slice value is stored as its alias. The Job runs as its author (`canView` the Profile, `canRead` the Dataset), as `kpi.snapshot`. A dimension with more than `maxValues` values is skipped and named in the run message |
+| "Now" | The last **complete** bucket; the bucket in progress is never scanned |
+| Insight Types (kernel `com.gamma.analytics.insight`) | **anomaly** (a spike) — robust z of now against the same season slot (`season: auto` = 7 for day, 52 for week, 12 for month; when ≥ 4 hold a value) or every earlier bucket; **trend-break** (a level shift) — largest CUSUM of the mean (σ from first differences), Kolmogorov tail, only when the change is in the last 2 × minSegment buckets; **drift** (a steady climb or slide) — Mann-Kendall with ties, Sen's slope |
+| False discoveries | Benjamini-Hochberg across every slice × test of the run; kept at q ≤ α |
+| Filters | slice support ≥ `minSupport` of the window; \|Δ\| ≥ `minImpact` × the Measure in that bucket; `exclude` calendar days are removed from every series, a finding dated on an `expected` day is dropped (and counted) |
+| Score 0–100 | impact × surprise × novelty (`InsightScore`, bands 40 / 70); novelty = 1 ÷ (1 + times the same type × slice was reported in the last `noveltyRuns` runs), 0 after *not useful* or *expected* feedback |
+| Store | Dataset `insights_<profile>` (system, sharing envelope = Profile ∩ Dataset, as KPI History); one Parquet rewritten atomically per run, 400 days of runs; `feedback.json` beside it |
+| Signals | `insight.scan.completed`; `insight.found` per new elevated or high Insight (≤ 20 a run) for Notification Rules |
+
+**Routes**: `GET /insights?profile=` (read-shaped, like `/bi/query`: whoever may view the Insights Dataset; latest
+run, best first, current feedback laid over `status`); `POST /insights/{profile}/{insightId}/feedback` (status
+useful / not_useful / expected, kept per type × slice); `POST /insights/preview` (an unsaved Profile replayed as of
+each of the last 4–52 buckets, as the caller, nothing saved — "you would have seen N Insights"). Both POSTs are gated
+on `canAuthorWorkbench`.
+
+**Deliberate deferrals**: no Profile editor or Insight Feed Visualization Type yet (UI slice); feedback is
+Builder-gated because no reader-level capability exists — D-BI4 wants Business users to give it (operator
+question); owners tuning within Builder bounds (D-BI4) is not enforced — who may save the Profile tunes it; the
+sharing envelope does not narrow by a Mapping Dataset's `basedOn` base (the same gap as KPI History); no
+separate `_latest` store (the latest run is `max(run_id)` in the one store, so one envelope covers it); the stored
+`query` is the dimension's grouped `/bi/query` body (a masked slice cannot be filtered back by its alias); I-9
+concentration and I-10 distribution shift are not built.
+
+**Gotcha found while building**: a DuckDB `TIMESTAMP` written through a JDBC `Timestamp` is stored in the host zone
+and read back by `epoch_ms` as UTC, so each rewrite shifted every stored run by the host offset. `InsightStore`
+writes timestamps as UTC text (`CAST(? AS TIMESTAMP)`); `InsightScanJobTest` pins it.

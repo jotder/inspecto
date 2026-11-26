@@ -855,19 +855,20 @@ Reports* page and executed as a **Job**. The Dashboard is the *thing delivered*;
 owner 2026-07-07: the earlier "operational report" sense is retired; matches §6-B's Query note and the
 shipped C6 scheduled-export Job.)*
 
-**Insight Type** *(added 2026-11-18, D-BI1, `BI-INSIGHTS-1` — vocabulary only, no code yet)* — A **template** for
-one kind of finding about a business **Measure**: `change`, `driver`, `anomaly`, `trend-break`, `forecast`,
-`target-risk`, `concentration`, `distribution-shift`, `segment-migration`. Type ↔ Instance, as **Visualization
+**Insight Type** *(added 2026-11-18, D-BI1, `BI-INSIGHTS-1`; `anomaly`, `trend-break` and `drift` built 2026-11-26 by
+the `insight.scan` Job)* — A **template** for one kind of finding about a business **Measure**: `change`, `driver`,
+`anomaly` (an unusual value now), `trend-break` (the level moved and stayed), `drift` (a steady climb or slide),
+`forecast`, `target-risk`, `concentration`, `distribution-shift`, `segment-migration`. Type ↔ Instance, as **Visualization
 Type** ↔ **Widget**. ⛔ not an observability finding — that is an **Alert** on a **Metric**.
 
-**Insight** *(added 2026-11-18, D-BI1 — vocabulary only, no code yet)* — One computed finding of an **Insight Type**
+**Insight** *(added 2026-11-18, D-BI1; built 2026-11-26 — rows of the Dataset `insights_<profile>`)* — One computed finding of an **Insight Type**
 about a Measure, for one slice and one period: value, expected value, delta, impact, a 0–100 score with bands,
 its explanation parts and the structured query that reproduces it. Deterministic; a language model may only
 restate it. ⛔ not an **Alert** (an Insight informs; an **Alert Rule** may be armed from one) and ⛔ not an
 **Incident**.
 
-**Insight Profile** *(added 2026-11-18, D-BI1 — vocabulary only, no code yet)* — The authored Component (kind
-`insight-profile`) that says which Measure or **KPI** to watch, across which dimensions, with which Insight Types
+**Insight Profile** *(added 2026-11-18, D-BI1; built 2026-11-26 — a Measure only, a KPI target not yet)* — The
+authored Component (kind `insight-profile`) that says which Measure or **KPI** to watch, across which dimensions, with which Insight Types
 switched on and how they are tuned. What a user defines, previews on history and tunes.
 
 **Chart Marker** *(added 2026-11-18, D-BI1 — vocabulary only, no code yet)* — A visual overlay drawn on a **Widget**:

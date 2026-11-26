@@ -13421,6 +13421,72 @@
         "x-generated" : true
       }
     },
+    "/insights" : {
+      "get" : {
+        "tags" : [
+          "insights"
+        ],
+        "summary" : "List an Insight Profile's Insights",
+        "operationId" : "listInsights",
+        "description" : "BI-INSIGHTS-1 P3 (I-8), Business Insights add-on. Read-shaped like POST /bi/query: whoever may view the Dataset insights_<profile> (404 otherwise, indistinguishable from none). Insights of the latest run (run=all: every run kept, 400 days), best score first, the readers' current feedback laid over status. Slice values are stored as a reader who may not reveal sees them (a classified value is its alias).",
+        "parameters" : [
+          {
+            "name" : "profile",
+            "in" : "query",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "run",
+            "in" : "query",
+            "schema" : {
+              "type" : "string",
+              "enum" : [
+                "latest",
+                "all"
+              ]
+            }
+          },
+          {
+            "name" : "band",
+            "in" : "query",
+            "schema" : {
+              "type" : "string",
+              "enum" : [
+                "normal",
+                "elevated",
+                "high"
+              ]
+            }
+          },
+          {
+            "name" : "limit",
+            "in" : "query",
+            "schema" : {
+              "type" : "integer",
+              "minimum" : 1,
+              "maximum" : 500
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped: data = {profile, runs, latestRun, total, insights[{insight_id, profile_id, run_id, run_at, insight_key, insight_type (anomaly | trend-break | drift), measure, dimension ('*' = the whole Measure), slice_value, period, value, expected, delta, impact, p, q, score, band, explanation{test, statistic, p, q, tests, impact, surprise, novelty, sentence, ...}, query (the /bi/query body that reads the slice's dimension), status (new | useful | not_useful | expected), first_seen, feedback?}]}"
+          },
+          "404" : {
+            "description" : "No such Insight, or the Profile's Insights Dataset is unknown or not visible to the caller."
+          },
+          "422" : {
+            "description" : "A bad body."
+          },
+          "503" : {
+            "description" : "No Space write root, or the Business Insights module is not installed."
+          }
+        }
+      }
+    },
     "/insights/explain" : {
       "post" : {
         "tags" : [ "insights" ],
@@ -13464,6 +13530,132 @@
           },
           "422" : {
             "description" : "A bad body, a non-additive aggregate, no value in one of the two buckets, a Measure the caller sees masked, or a failed statement."
+          },
+          "503" : {
+            "description" : "No Space write root, or the Business Insights module is not installed."
+          }
+        }
+      }
+    },
+    "/insights/preview" : {
+      "post" : {
+        "tags" : [
+          "insights"
+        ],
+        "summary" : "Replay an unsaved Insight Profile over history",
+        "operationId" : "previewInsights",
+        "description" : "BI-INSIGHTS-1 P3 (tuning by replay), gated on canAuthorWorkbench. Runs AS THE CALLER through the gates of POST /bi/query: one fetch of lookback + periods buckets, then the scan as of each of the last periods buckets, novelty carried run to run, no feedback. Nothing is saved. Body: profile (the insight-profile content), periods (4-52, default 12), asOf (a date; default today in the Space's zone).",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [
+                  "profile"
+                ],
+                "properties" : {
+                  "profile" : {
+                    "type" : "object"
+                  },
+                  "periods" : {
+                    "type" : "integer",
+                    "minimum" : 4,
+                    "maximum" : 52
+                  },
+                  "asOf" : {
+                    "type" : "string",
+                    "format" : "date"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped: data = {periods, perPeriod[{period, count}], total, perPeriodAverage, insights[] (top 50 by score, each with asOf), skipped[{dimension, reason}], masking?}"
+          },
+          "403" : {
+            "description" : "The caller lacks canAuthorWorkbench."
+          },
+          "404" : {
+            "description" : "No such Insight, or the Profile's Insights Dataset is unknown or not visible to the caller."
+          },
+          "422" : {
+            "description" : "A bad body."
+          },
+          "503" : {
+            "description" : "No Space write root, or the Business Insights module is not installed."
+          }
+        }
+      }
+    },
+    "/insights/{profile}/{insightId}/feedback" : {
+      "post" : {
+        "tags" : [
+          "insights"
+        ],
+        "summary" : "Give feedback on an Insight",
+        "operationId" : "insightFeedback",
+        "description" : "BI-INSIGHTS-1 P3. Gated on canAuthorWorkbench (no reader-level capability exists yet); the caller must also view the Insights Dataset. The status is recorded for the Insight's type x slice (the latest word wins) with the authenticated actor; the next insight.scan run writes it into status and novelty - not_useful and expected suppress it.",
+        "parameters" : [
+          {
+            "name" : "profile",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "insightId",
+            "in" : "path",
+            "required" : true,
+            "schema" : {
+              "type" : "string"
+            }
+          }
+        ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [
+                  "status"
+                ],
+                "properties" : {
+                  "status" : {
+                    "type" : "string",
+                    "enum" : [
+                      "useful",
+                      "not_useful",
+                      "expected"
+                    ]
+                  },
+                  "note" : {
+                    "type" : "string",
+                    "maxLength" : 500
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped: data = {insight, key, status, actor}"
+          },
+          "403" : {
+            "description" : "The caller lacks canAuthorWorkbench."
+          },
+          "404" : {
+            "description" : "No such Insight, or the Profile's Insights Dataset is unknown or not visible to the caller."
+          },
+          "422" : {
+            "description" : "A bad body."
           },
           "503" : {
             "description" : "No Space write root, or the Business Insights module is not installed."

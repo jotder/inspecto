@@ -6,4 +6,7 @@ bindingTime: boot
 absentMessage: "Business Insights is not installed in this bundle - it is provided by the optional inspecto-insights module (Standard edition and above)."
 provides:
   features[1]: insights
-  routes[1]: "POST /insights/explain"
+  configKinds[1]: insight-profile
+  contracts[2]: JobTypeProvider,ComponentKindValidator
+  jobTypes[1]: insight.scan
+  routes[4]: "POST /insights/explain","GET /insights","POST /insights/preview","POST /insights/([^/]+)/([^/]+)/feedback"

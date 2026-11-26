@@ -85,6 +85,9 @@ public final class ComponentStore {
                     // Forecast Model (PREDICTIVE-FORECAST-1): seasonal-naive / Holt-Winters per series, run by the
                     // predict.forecast Job (com.gamma.predictive.ForecastModel validates it at save; module inspecto-predictive).
                     "forecast-model",
+                    // Insight Profile (BI-INSIGHTS-1 I-8): what the insight.scan Job looks across, ranked and stored as
+                    // insights_<profile> (com.gamma.insights.InsightProfile validates it at save; module inspecto-insights).
+                    "insight-profile",
                     // Notification channel destinations (NotificationRoutes /notifications/channels* admin
                     // CRUD, 2026-07-18): the managed record of where a channel delivers; live delivery still
                     // resolves channels from notify.* JVM flags (ChannelConfig).

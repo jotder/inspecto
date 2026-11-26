@@ -1,0 +1,269 @@
+package com.gamma.insights;
+
+import com.gamma.analytics.insight.FalseDiscovery;
+import com.gamma.analytics.insight.InsightScore;
+import com.gamma.analytics.insight.Surprise;
+import com.gamma.control.BiSpecRunner;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.function.ToIntFunction;
+
+/**
+ * The Insight scan (BI-INSIGHTS-1 I-8, plan §11.9), shared by the {@code insight.scan} Job and the replay preview.
+ * {@link #fetch} reads the Profile's Measure per bucket — the total series and one statement per dimension — through a
+ * {@link Fetcher} (the Job's {@code BiSpecRunner.runAsJob}, the preview's {@code BiSpecRunner.run}); it never builds
+ * SQL. {@link #scan} then tests every slice's series as of one bucket, controls the false-discovery rate across every
+ * test of the run (Benjamini-Hochberg) and ranks what is left by impact × surprise × novelty.
+ */
+final class InsightScan {
+
+    private InsightScan() {}
+
+    static final String TOTAL = "*";
+
+    /** Runs one {@code /bi/query}-shaped body. */
+    @FunctionalInterface
+    interface Fetcher {
+        BiSpecRunner.Run fetch(Map<String, Object> body) throws Exception;
+    }
+
+    /** The buckets read, oldest first, ending with the last COMPLETE bucket before {@code asOf}'s. */
+    record Buckets(String grain, List<LocalDate> starts) {
+        int size() { return starts.size(); }
+        LocalDate start(int i) { return starts.get(i); }
+        LocalDate end(int i) { return step(grain, starts.get(i), 1); }
+        String label(int i) { return "month".equals(grain) ? starts.get(i).toString().substring(0, 7) : starts.get(i).toString(); }
+    }
+
+    static Buckets buckets(String grain, LocalDate asOf, int count) {
+        LocalDate current = switch (grain) {
+            case "week" -> asOf.minusDays(asOf.getDayOfWeek().getValue() - 1);
+            case "month" -> asOf.withDayOfMonth(1);
+            default -> asOf;
+        };
+        List<LocalDate> s = new ArrayList<>();
+        for (int i = count; i >= 1; i--) s.add(step(grain, current, -i));
+        return new Buckets(grain, List.copyOf(s));
+    }
+
+    static LocalDate step(String grain, LocalDate d, int n) {
+        return switch (grain) {
+            case "week" -> d.plusWeeks(n);
+            case "month" -> d.plusMonths(n);
+            default -> d.plusDays(n);
+        };
+    }
+
+    /** One slice's series over the buckets; {@code dimension} {@link #TOTAL} is the whole Measure. */
+    record Series(String dimension, String value, Double[] values) {
+        String key(String type) { return type + "|" + dimension + "|" + value; }
+    }
+
+    /** What {@link #fetch} read: the total, every slice, the dimensions skipped (with why) and each dimension's body. */
+    record Fetched(Buckets buckets, Series total, List<Series> slices, List<Map<String, Object>> skipped,
+                   Map<String, Map<String, Object>> queries, Map<String, Object> masking) {}
+
+    static Fetched fetch(InsightProfile p, Buckets b, Fetcher f) throws Exception {
+        Map<String, Object> masking = null;
+        Map<String, Map<String, Object>> queries = new LinkedHashMap<>();
+        Map<String, Object> totalBody = body(p, List.of(p.field()), b, b.size() + 1);
+        queries.put(TOTAL, totalBody);
+        BiSpecRunner.Run t = f.fetch(totalBody);
+        if (t.masking() != null) masking = t.masking();
+        Series total = new Series(TOTAL, TOTAL, new Double[b.size()]);
+        Map<String, Integer> at = new HashMap<>();
+        for (int i = 0; i < b.size(); i++) at.put(b.label(i), i);
+        for (Map<String, Object> row : t.rows()) {
+            Integer i = at.get(String.valueOf(row.get(p.field())));
+            if (i != null) total.values()[i] = number(row.get(p.measureId()), p.measureId());
+        }
+        List<Series> slices = new ArrayList<>();
+        List<Map<String, Object>> skipped = new ArrayList<>();
+        for (String dim : p.dimensions()) {
+            int limit = (int) Math.min((long) b.size() * p.maxValues(), InsightProfile.MAX_ROWS);
+            Map<String, Object> db = body(p, List.of(dim, p.field()), b, limit);
+            queries.put(dim, db);
+            BiSpecRunner.Run r = f.fetch(db);
+            if (r.masking() != null && masking == null) masking = r.masking();
+            Map<String, Double[]> byValue = new LinkedHashMap<>();
+            for (Map<String, Object> row : r.rows()) {
+                Integer i = at.get(String.valueOf(row.get(p.field())));
+                if (i == null) continue;
+                Object k = row.get(dim);
+                String key = k == null ? "(empty)" : String.valueOf(k);
+                Double[] s = byValue.computeIfAbsent(key, x -> new Double[b.size()]);
+                double v = number(row.get(p.measureId()), p.measureId());
+                s[i] = s[i] == null ? v : s[i] + v;   // two raw keys masked to one alias add up
+            }
+            if (r.truncated() || byValue.size() > p.maxValues()) {
+                skipped.add(Map.of("dimension", dim, "reason", "more than " + p.maxValues()
+                        + " values (maxValues); scan it by a coarser column or raise maxValues"));
+                continue;
+            }
+            for (Map.Entry<String, Double[]> e : byValue.entrySet()) slices.add(new Series(dim, e.getKey(), e.getValue()));
+        }
+        return new Fetched(b, total, slices, skipped, queries, masking);
+    }
+
+    /** A {@code /bi/query} body: the Profile's Measure, filters and condition, grouped, windowed to the buckets. */
+    static Map<String, Object> body(InsightProfile p, List<String> groupBy, Buckets b, int limit) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("dataset", p.dataset());
+        m.put("measures", List.of(p.measureMap()));
+        m.put("groupBy", groupBy);
+        m.put("grains", Map.of(p.field(), p.grain()));
+        if (p.filters() != null) m.put("filters", p.filters());
+        if (p.when() != null) m.put("when", p.when());
+        LocalDate from = b.start(0), to = b.end(b.size() - 1);
+        m.put("window", Map.of("field", p.field(), "asOf", to.minusDays(1).toString(),
+                "days", (int) ChronoUnit.DAYS.between(from, to)));
+        m.put("limit", limit);
+        return m;
+    }
+
+    private static double number(Object v, String id) {
+        if (v == null) return 0;
+        if (v instanceof Number n) return n.doubleValue();
+        throw new SecurityException("the Measure '" + id + "' reaches the scan masked; a scan never stores a masked "
+                + "column's values — refused");
+    }
+
+    // ── the scan ──
+
+    /** One ranked finding. {@code key} = type × slice (what novelty and feedback follow); {@code id} adds the period. */
+    record Insight(String id, String key, String type, String dimension, String value, LocalDate period,
+                   double observed, double expected, double delta, double impact, double p, double q,
+                   double score, String band, Map<String, Object> explanation, Map<String, Object> query, String status) {}
+
+    /** The run's Insights (best first) and what it counted on the way. */
+    record Result(List<Insight> insights, int tests, int belowSupport, int expectedDropped, int suppressed) {}
+
+    /**
+     * Scans the window {@code [from, to)} of the fetched buckets as of its last bucket. {@code reportedBefore} counts how
+     * many recent runs reported a key; {@code feedback} maps a key to the status a reader gave it.
+     */
+    static Result scan(InsightProfile p, Fetched f, int from, int to, ToIntFunction<String> reportedBefore,
+                       Map<String, String> feedback) {
+        Buckets b = f.buckets();
+        int n = to - from;
+        boolean[] excluded = new boolean[n];
+        for (int i = 0; i < n; i++)
+            for (InsightProfile.CalendarEvent e : p.calendar())
+                if ("exclude".equals(e.mode()) && e.covers(b.start(from + i), b.end(from + i))) excluded[i] = true;
+        Double[] total = window(f.total().values(), from, to, excluded);
+        double totalSum = 0;
+        int totalN = 0;
+        for (Double v : total) if (v != null) { totalSum += v; totalN++; }
+        double meanAbs = totalN == 0 ? 0 : Math.abs(totalSum) / totalN;
+
+        record Test(Series s, Surprise.Finding f) {}
+        List<Test> tests = new ArrayList<>();
+        int belowSupport = 0;
+        List<Series> all = new ArrayList<>();
+        all.add(f.total());
+        all.addAll(f.slices());
+        int minSeg = Math.max(3, n / 8);
+        for (Series s : all) {
+            Double[] w = window(s.values(), from, to, excluded);
+            if (s != f.total()) {
+                double sum = 0;
+                for (Double v : w) if (v != null) sum += v;
+                if (totalSum == 0 || Math.abs(sum / totalSum) < p.minSupport()) { belowSupport++; continue; }
+            }
+            for (String type : p.types()) {
+                Surprise.Finding fd = switch (type) {
+                    case Surprise.SPIKE -> Surprise.spike(w, p.season(), 4, unit(p));
+                    case Surprise.CHANGEPOINT -> Surprise.changepoint(w, minSeg, 2 * minSeg, unit(p));
+                    default -> Surprise.drift(w, 8);
+                };
+                if (fd != null && Double.isFinite(fd.p())) tests.add(new Test(s, fd));
+            }
+        }
+        double[] ps = new double[tests.size()];
+        for (int i = 0; i < ps.length; i++) ps[i] = tests.get(i).f().p();
+        double[] qs = FalseDiscovery.adjusted(ps);
+
+        List<Insight> out = new ArrayList<>();
+        int expectedDropped = 0, suppressed = 0;
+        for (int i = 0; i < tests.size(); i++) {
+            if (qs[i] > p.alpha()) continue;
+            Test t = tests.get(i);
+            Surprise.Finding fd = t.f();
+            int atBucket = from + fd.at();
+            boolean expected = false;
+            for (InsightProfile.CalendarEvent e : p.calendar())
+                if ("expected".equals(e.mode()) && e.covers(b.start(atBucket), b.end(atBucket))) expected = true;
+            if (expected) { expectedDropped++; continue; }
+            Double totalAt = total[fd.at()];
+            double denom = totalAt != null && totalAt != 0 ? totalAt : meanAbs;
+            double impact = denom == 0 ? 0 : Math.abs(fd.delta() / denom);
+            if (impact < p.minImpact()) continue;
+            String key = t.s().key(fd.type());
+            String status = feedback.getOrDefault(key, "new");
+            double novelty = ("not_useful".equals(status) || "expected".equals(status)) ? 0
+                    : InsightScore.novelty(reportedBefore.applyAsInt(key));
+            if (novelty == 0) { suppressed++; continue; }
+            InsightScore.Parts sc = InsightScore.of(fd.delta(), denom, qs[i], novelty);
+            LocalDate period = b.start(atBucket);
+            Map<String, Object> ex = new LinkedHashMap<>();
+            ex.put("test", fd.type());
+            ex.put("statistic", fd.statistic());
+            ex.put("p", fd.p());
+            ex.put("q", qs[i]);
+            ex.put("tests", tests.size());
+            ex.putAll(fd.detail());
+            ex.put("impact", sc.impact());
+            ex.put("surprise", sc.surprise());
+            ex.put("novelty", sc.novelty());
+            ex.put("sentence", sentence(p, t.s(), fd, b.label(atBucket)));
+            String id = UUID.nameUUIDFromBytes((p.id() + "|" + key + "|" + period).getBytes(StandardCharsets.UTF_8)).toString();
+            out.add(new Insight(id, key, fd.type(), t.s().dimension(), t.s().value(), period, fd.observed(), fd.expected(),
+                    fd.delta(), impact, fd.p(), qs[i], sc.score(), sc.band(), ex, f.queries().get(t.s().dimension()), status));
+        }
+        out.sort(Comparator.comparingDouble(Insight::score).reversed().thenComparing(Insight::id));
+        if (out.size() > p.maxInsights()) out = new ArrayList<>(out.subList(0, p.maxInsights()));
+        return new Result(out, tests.size(), belowSupport, expectedDropped, suppressed);
+    }
+
+    /** The smallest change that matters: 1 for a count, otherwise the 5 %-of-median floor alone. */
+    private static double unit(InsightProfile p) {
+        return "count".equals(p.agg()) ? 1 : 0;
+    }
+
+    private static Double[] window(Double[] s, int from, int to, boolean[] excluded) {
+        Double[] w = new Double[to - from];
+        for (int i = 0; i < w.length; i++) w[i] = excluded[i] ? null : s[from + i];
+        return w;
+    }
+
+    /** A templated sentence (D-BI5: no language model in the first release). */
+    static String sentence(InsightProfile p, Series s, Surprise.Finding f, String bucket) {
+        String what = p.measureId() + (TOTAL.equals(s.dimension()) ? "" : " for " + s.dimension() + " = " + s.value());
+        return switch (f.type()) {
+            case Surprise.SPIKE -> what + " was " + fmt(f.observed()) + " in " + bucket + ", against a usual "
+                    + fmt(f.expected()) + " (" + pct(f) + ")";
+            case Surprise.CHANGEPOINT -> what + " moved from about " + fmt(f.expected()) + " to about "
+                    + fmt(f.observed()) + " per " + p.grain() + " from " + bucket + " on (" + pct(f) + ")";
+            default -> what + " has been " + (f.delta() >= 0 ? "climbing" : "sliding") + " steadily: from about "
+                    + fmt(f.expected()) + " to about " + fmt(f.observed()) + " per " + p.grain() + " (" + pct(f) + ")";
+        };
+    }
+
+    private static String pct(Surprise.Finding f) {
+        if (f.expected() == 0) return f.delta() >= 0 ? "up from zero" : "down from zero";
+        return String.format(java.util.Locale.ROOT, "%+.1f %%", f.delta() / Math.abs(f.expected()) * 100);
+    }
+
+    private static String fmt(double v) {
+        return Math.abs(v) >= 100 ? String.format(java.util.Locale.ROOT, "%,.0f", v)
+                : String.format(java.util.Locale.ROOT, "%.2f", v);
+    }
+}

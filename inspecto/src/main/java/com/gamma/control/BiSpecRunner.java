@@ -50,6 +50,67 @@ public final class BiSpecRunner {
         }
     }
 
+    /**
+     * Runs {@code spec} for a Job (no request): the same compile, {@link SqlGuard}, sandbox and masking as
+     * {@link #run}, as a reader who may NOT reveal — a Measure over a masked column is refused and a classified grouped
+     * key comes back as its alias, so nothing a Job stores outlives the reader's masking. Who may read the Dataset is
+     * the Job's own check (its author, {@code PostgresPublishJobType.canRead}); {@code dataset} is that cleared content.
+     * A refusal is an {@link IllegalArgumentException} or {@link SecurityException} carrying the reason.
+     */
+    public static Run runAsJob(Path writeRoot, Path dataRoot, String datasetId, Map<String, Object> dataset,
+                               MeasureCompiler.Spec spec) throws IOException, SQLException {
+        if (spec.compare() != null || MeasureCompiler.hiddenOrderColumns(spec).size() > 0)
+            throw new IllegalArgumentException("BiSpecRunner takes no comparison and no hidden order");
+        if (!datasetId.equals(spec.dataset())) throw new IllegalArgumentException("the spec reads another dataset");
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        ViewStore views = new ViewStore(writeRoot.resolve("views"));
+        String relationSql = DatasetRelation.relationSql(dataset, dataRoot, views);
+        BiResultMasking masking = BiResultMasking.of(writeRoot, store, views, datasetId, dataset, false);
+        spec = masking.stripCosmeticOrder(spec, null);
+        MeasureCompiler.Compiled sql = MeasureCompiler.compile(spec.withLimit(spec.limit() + 1));
+        if (!SqlGuard.check(sql.sql()).isEmpty())
+            throw new IllegalArgumentException("compiled BI query failed the SQL safety check");
+        try {
+            masking.vet(spec, true, null);
+        } catch (ApiException refused) {
+            throw new SecurityException(refused.getMessage());
+        }
+        QueryExecutor.Request req = new QueryExecutor.Request(datasetId, relationSql, sql.sql(),
+                spec.limit(), 0, List.of(), List.of(), sql.params());
+        QueryExecutor.Result raw;
+        try {
+            raw = QueryExecutor.run(req);
+        } catch (SQLException e) {
+            // as run(): a database message can quote a stored value of a masked key, and a Job keeps its failure text
+            throw new SQLException("the statement over dataset '" + datasetId + "' failed; the database's message is "
+                    + "withheld because it can quote a masked value", e.getSQLState());
+        }
+        QueryExecutor.Result shown = masking.apply(raw, spec.groupBy(), null, null, grantable(spec));
+        return new Run(shown.rows(), shown.truncated(), masking.describe());
+    }
+
+    /** Parses a {@code /bi/query}-shaped body for a Job, with the Space's row limits. */
+    public static MeasureCompiler.Spec parseForJob(Path writeRoot, Map<String, Object> body) {
+        return MeasureCompiler.parse(body, ListLimitSettings.effectiveRows(writeRoot), ListLimitSettings.MAX_ROWS);
+    }
+
+    /** The Space's effective time zone (what "today" and a bucket mean for a Job). */
+    public static java.time.ZoneId zone(Path writeRoot) {
+        return TimezoneSettings.forRoot(writeRoot).effective();
+    }
+
+    /** The grouped columns a masked alias may stand for: the group keys that are not grained dates or Measures. */
+    private static Set<String> grantable(MeasureCompiler.Spec spec) {
+        Set<String> grained = new HashSet<>();
+        if (spec.grains() != null) for (String g : spec.grains().keySet()) grained.add(g.toLowerCase(Locale.ROOT));
+        Set<String> grantable = new HashSet<>();
+        for (String g : spec.groupBy()) grantable.add(g.toLowerCase(Locale.ROOT));
+        grantable.removeAll(grained);
+        for (MeasureCompiler.Measure m : spec.measures()) grantable.remove(m.id().toLowerCase(Locale.ROOT));
+        for (MeasureCompiler.Ratio rt : spec.ratios()) grantable.remove(rt.id().toLowerCase(Locale.ROOT));
+        return grantable;
+    }
+
     /** Runs {@code spec} (its own limit; one row past it marks {@code truncated}). */
     public static Run run(ApiContext api, HttpExchange ex, MeasureCompiler.Spec spec) throws IOException {
         if (spec.compare() != null || MeasureCompiler.hiddenOrderColumns(spec).size() > 0)
@@ -87,14 +148,7 @@ public final class BiSpecRunner {
                 spec.limit(), 0, List.of(), List.of(), sql.params());
         try {
             QueryExecutor.Result raw = QueryExecutor.run(req);
-            Set<String> grained = new HashSet<>();
-            if (spec.grains() != null) for (String g : spec.grains().keySet()) grained.add(g.toLowerCase(Locale.ROOT));
-            Set<String> grantable = new HashSet<>();
-            for (String g : spec.groupBy()) grantable.add(g.toLowerCase(Locale.ROOT));
-            grantable.removeAll(grained);
-            for (MeasureCompiler.Measure m : spec.measures()) grantable.remove(m.id().toLowerCase(Locale.ROOT));
-            for (MeasureCompiler.Ratio rt : spec.ratios()) grantable.remove(rt.id().toLowerCase(Locale.ROOT));
-            QueryExecutor.Result shown = masking.apply(raw, spec.groupBy(), null, null, grantable);
+            QueryExecutor.Result shown = masking.apply(raw, spec.groupBy(), null, null, grantable(spec));
             return new Run(shown.rows(), shown.truncated(), masking.describe());
         } catch (SQLException e) {
             throw masking.scrub(ServerFaults.datasetRead("BI query failed", datasetId, dataset, e, api));

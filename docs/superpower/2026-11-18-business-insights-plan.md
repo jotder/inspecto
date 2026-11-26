@@ -464,6 +464,59 @@ Spec: [`okf/product/module/engine/spec-kpi-projection.md`](../okf/product/module
   sum ÷ count (it skips NULLs, `count` does not). Preview 2026-11-25: a line Widget over 18 months, the drawer
   named North as 93 % of the last month's jump and `sum_cost` as moving with it (r = 1.00 over 17 changes).
 
+### 11.9 P3 I-8 Insight scan, Profiles, feed, feedback, replay, calendar — as designed (2026-11-26)
+
+Operator 2026-11-26: the whole P3 backend in one lane (UI and I-9 / I-10 later); surprise = robust z **and**
+changepoint **and** drift; one Insights Dataset per Profile.
+
+- **Kernel** `com.gamma.analytics.insight`: `Surprise.spike` (type `anomaly`: robust z of the last complete bucket against the same
+  season slot when ≥ `minPoints` of them hold a value, else every earlier bucket), `Surprise.changepoint` (type `trend-break`: largest
+  CUSUM of the mean, σ = robust spread of first differences ÷ √2, Kolmogorov tail; reported only when the change lies
+  in the last `maxAge` buckets), `Surprise.drift` (type `drift`: Mann-Kendall with ties, Sen's slope), `FalseDiscovery.adjusted`
+  (Benjamini-Hochberg q-values), `InsightScore` (impact × surprise × novelty, 0–100, score-contract bands 40 / 70).
+  Goldens: `InsightStatsGoldenTest`.
+- **Component kind `insight-profile`** (`registry/insight-profiles/`, owned by module `insights`): `dataset`,
+  `measure {agg: sum|count, field}`, `field` (date column), `grain` (day|week|month), `dimensions` (0–12; the total
+  series is always scanned), `filters` / `when` (as `/bi/query`), `types` (⊆ anomaly, trend-break, drift; default all),
+  `sensitivity` (low|normal|high → q ≤ 0.01 / 0.05 / 0.10), `minImpact` (share of the period's Measure, default 0.01),
+  `minSupport` (slice share of the window, default 0.01), `maxValues` (per dimension, default 50, ≤ 200), `lookback`
+  (buckets, 12–120; default 56 / 26 / 24), `season` (auto|none|n; auto = 7 for day, 52 for week, 12 for month — a slot holding fewer than 4 values falls back to every earlier bucket), `noveltyRuns`
+  (default 4), `maxInsights` (per run, default 50, ≤ 200), `calendar` (`{from, to?, label, mode: exclude|expected}`).
+  Validated on save by `InsightProfileValidator` (`ComponentKindValidator`); it also reserves the store prefix
+  `insights_`.
+- **Job `insight.scan`** (parameter `profile`, from the saved Job only): runs as its author (`canView` the Profile,
+  `canRead` its Dataset — as `kpi.snapshot`); a Measure over a masked column is refused (a Job never reveals); grouped
+  slice values come back as the non-revealing reader sees them (aliases), so stored Insights never hold a raw
+  classified value. Statements: one for the total series and one per dimension, each through the new core seam
+  `BiSpecRunner.runAsJob` (same compiler, SqlGuard, sandbox and masking as `/bi/query`, as a caller who may not
+  reveal). "Now" = the last **complete** bucket. `exclude` calendar buckets are dropped from every series (never in a
+  baseline, never reported); a finding dated in an `expected` bucket is dropped and counted.
+- **Ranking**: every (slice × type) test that runs yields a p; BH across all of them in the run; kept when q ≤ α,
+  impact ≥ `minImpact` and the slice's support ≥ `minSupport`; novelty = 1 ÷ (1 + times the same type × slice was
+  reported in the last `noveltyRuns` runs), 0 when a reader marked it *not useful* or *expected*; top `maxInsights`
+  by score.
+- **Storage (D-BI8)**: Dataset `insights_<profile>` (id = physicalRef), a system Dataset with the Profile ∩ Dataset
+  sharing envelope (`SharingEnvelope`, as KPI History; shared differently → refused). One Parquet rewritten atomically
+  per run (`ScoreOutputDirs.claim` / `swapIn`), 400 days of runs kept. Columns: `insight_id`, `profile_id`, `run_id`,
+  `run_at`, `insight_type`, `measure`, `dimension`, `slice_value`, `period`, `value`, `expected`, `delta`, `impact`,
+  `p`, `q`, `score`, `band`, `explanation` (JSON), `query` (JSON `/bi/query` body that reproduces the slice series),
+  `status`, `first_seen`. Deviation from §8: no separate `_latest` store — the latest run is `run_id = max`, which
+  `GET /insights` reads; one store keeps one envelope.
+- **Feedback**: `POST /insights/{profile}/{insightId}/feedback` `{status: useful|not_useful|expected, note?}` by anyone
+  who may view the Insights Dataset (D-BI4: Business users give feedback); kept in `feedback.json` beside the Parquet
+  (the Dataset reads `*.parquet` only), keyed by type × slice so it outlives the run; the actor is the authenticated
+  principal. The next run writes it into `status` and novelty.
+- **Feed**: `GET /insights?profile=&run=latest|all&band=&limit=` — the Profile's Insights the caller may view
+  (404 indistinguishable otherwise), best score first, current feedback laid over `status`.
+- **Replay**: `POST /insights/preview` `{profile: <unsaved content>, periods: 4–52 (default 12)}`, `canAuthorWorkbench`,
+  runs AS THE CALLER through `BiSpecRunner.run`: one fetch of `lookback + periods` buckets, then the scan as of each of
+  the last `periods` buckets with novelty carried run to run → `{perPeriod: [{period, count}], total, insights (top 50)}`.
+  Nothing is saved.
+- **Signals**: `insight.scan.completed` (counts) and `insight.found` per new Insight (≤ 20 per run, band ≥ elevated)
+  for Notification Rules.
+- **Deliberately deferred**: the Profile editor UI and the Insight Feed Visualization Type; D-BI4 owner tuning within
+  Builder bounds (today: who may save the Profile tunes it); the sharing envelope does not yet narrow by a Mapping Dataset's `basedOn` base (as KPI History); depth-2 slices (`BI-EXPLAIN-DEPTH2-1`); I-9, I-10.
+
 ## 12. Board row
 
 Filed 2026-11-18 as **one** row, `BI-INSIGHTS-1` (P2, `BACKLOG.md` §3.6) — the board allows a lane at most one

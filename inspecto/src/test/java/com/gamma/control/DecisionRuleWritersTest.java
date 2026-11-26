@@ -44,6 +44,8 @@ class DecisionRuleWritersTest {
             Map.entry("ScoreDatasets#narrow", FIXED_KIND + " (a model's output datasets)"),
             Map.entry("ScoreDatasets#registerOne", FIXED_KIND + " (a model's output datasets)"),
             Map.entry("KpiSnapshotJobType#register", FIXED_KIND + " (the kpi_history_<kpi> dataset)"),
+            Map.entry("InsightScanJobType#register", FIXED_KIND + " (the insights_<profile> dataset)"),
+            Map.entry("InsightScanJobType#store", "writes the Insights Parquet under the DATA root (InsightStore.write), never a config component"),
             Map.entry("DecisionRoutes#simulate", "re-writes the STORED rule with a lastSimulation stamp only "
                     + "(archive=false) — no body content, the stamps and invoke-api consequences are the stored ones"),
             Map.entry("DecisionRoutes#delete", "deletes; a deleted rule's history is purged with it"),
