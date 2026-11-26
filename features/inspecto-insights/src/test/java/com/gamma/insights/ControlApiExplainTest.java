@@ -106,6 +106,9 @@ class ControlApiExplainTest {
         new ComponentStore(root.resolve("registry")).write("dataset", "sales_ds", Map.of("view", "sales_view", "columns", List.of(
                 Map.of("name", "region"), Map.of("name", "plan"), Map.of("name", "msisdn", "classification", "MSISDN"),
                 Map.of("name", "ts"), Map.of("name", "amount"), Map.of("name", "cost"))));
+        new ComponentStore(root.resolve("registry")).write("dataset", "hidden_ds", Map.of("view", "sales_view",
+                "owner", "someone-else", "shares", List.of(), "columns", List.of(Map.of("name", "region"),
+                        Map.of("name", "ts"), Map.of("name", "amount"))));
         return c;
     }
 
@@ -125,12 +128,17 @@ class ControlApiExplainTest {
     private static final String SUM = "\"measure\":{\"agg\":\"sum\",\"field\":\"amount\"}";
 
     @Test
-    void theRouteIsGatedOnCanAuthorWorkbench(@TempDir Path cfg, @TempDir Path root) throws Exception {
-        try (Ctx c = open(cfg, root)) {
+    void anyoneWhoCanViewTheDatasetMayExplain(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {   // operator 2026-11-26: no capability, the Dataset's visibility decides
             String body = SUM + ",\"dimensions\":[\"region\"]";
             assertEquals(401, explain(c, null, body).statusCode());
-            assertEquals(403, explain(c, "viewer", body).statusCode());
+            assertEquals(200, explain(c, "viewer", body).statusCode());
             assertEquals(200, explain(c, "author", body).statusCode());
+            String hidden = "{\"dataset\":\"hidden_ds\",\"field\":\"ts\",\"grain\":\"month\",\"at\":\"2026-02-20\","
+                    + "\"lookback\":12," + body + "}";
+            HttpResponse<String> r = client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + c.port + "/api/v1" + ROUTE))
+                    .header("Authorization", "Bearer viewer").POST(BodyPublishers.ofString(hidden)).build(), BodyHandlers.ofString());
+            assertEquals(404, r.statusCode(), r.body());
         }
     }
 

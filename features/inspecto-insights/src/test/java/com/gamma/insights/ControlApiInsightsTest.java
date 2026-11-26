@@ -133,12 +133,17 @@ class ControlApiInsightsTest {
     void feedbackIsGatedRecordedAndLaidOverTheFeed(@TempDir Path cfg, @TempDir Path root) throws Exception {
         try (Ctx c = open(cfg, root)) {
             seed(c, "daily", Map.of());
+            seed(c, "secret", Map.of("owner", "someone-else", "shares", List.of()));
             String id = data(send(c, "viewer", "GET", "/insights?profile=daily", null)).get("insights").get(0)
                     .get("insight_id").asText();
             String path = "/insights/daily/" + id + "/feedback", body = "{\"status\":\"not_useful\",\"note\":\"known\"}";
             assertEquals(401, send(c, null, "POST", path, body).statusCode());
-            assertEquals(403, send(c, "viewer", "POST", path, body).statusCode());
-            JsonNode fb = data(send(c, "author", "POST", path, body));
+            String secretId = String.valueOf(InsightStore.read(c.data().resolve("insights_secret")).get(0).get("insight_id"));
+            assertEquals(404, send(c, "viewer", "POST", "/insights/secret/" + secretId + "/feedback", body).statusCode(),
+                    "a Profile whose Insights Dataset the caller cannot view is the 404 of none");
+            JsonNode fb = data(send(c, "viewer", "POST", path, body));   // operator 2026-11-26: any viewer
+            assertEquals("viewer", fb.get("actor").asText());
+            fb = data(send(c, "author", "POST", path, body));
             assertEquals("author", fb.get("actor").asText());
             assertEquals(422, send(c, "author", "POST", path, "{\"status\":\"meh\"}").statusCode());
             assertEquals(404, send(c, "author", "POST", "/insights/daily/no-such/feedback", body).statusCode());

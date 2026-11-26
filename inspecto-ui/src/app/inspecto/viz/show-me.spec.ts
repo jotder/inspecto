@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { isolateViz, registerViz } from './viz-registry';
-import { recommend, autoAssignChannels, suggestOverlays } from './show-me';
+import { recommend, autoAssignChannels, compareSuggestion, suggestOverlays } from './show-me';
 import { BAR_PLUGIN, BUBBLE_PLUGIN, KPI_PLUGIN, BUILTIN_VIZ_PLUGINS, PIE_PLUGIN, TABLE_PLUGIN } from './plugins';
 import { channelMeasureId } from './query-spec';
 import { ControlSpec, VizField, VizPlugin, VizRenderOptions } from './viz-types';
@@ -273,5 +273,51 @@ describe('suggestOverlays (BI-INSIGHTS-1 I-20)', () => {
         const done = { ...options, markers: [{ kind: 'target' as const }, { kind: 'rag' as const }] };
         expect(suggestOverlays({ vizType: 'bar', controls: {}, options: done, kpi })).toEqual([]);
         expect(suggestOverlays({ vizType: 'bar', controls: {}, options: {} })).toEqual([]); // no target, no KPI
+    });
+});
+
+describe('compareSuggestion — Show-Me suggests a compare (BI-INSIGHTS-1 I-1)', () => {
+    const LINE = { x: [{ field: 'day', grain: 'day' as const }], y: [{ field: 'amount', agg: 'sum' as const }] };
+    const days = (from: string, n: number, step = 1) =>
+        Array.from({ length: n }, (_, i) => ({
+            day: new Date(Date.parse(from) + i * step * 86_400_000).toISOString().slice(0, 10),
+            sum_amount: i,
+        }));
+
+    it('a year of history → the same period last year; less → the previous period from 3 buckets', () => {
+        expect(compareSuggestion('line', LINE, {}, days('2025-01-01', 53, 7))).toBe('lastYear');
+        expect(compareSuggestion('bar', LINE, {}, days('2026-01-01', 30))).toBe('previous');
+        expect(compareSuggestion('line', LINE, {}, days('2026-01-01', 2))).toBeNull();
+        expect(compareSuggestion('line', LINE, {}, [])).toBeNull();
+        // 51 weeks: under a year, still the previous period.
+        expect(compareSuggestion('line', LINE, {}, days('2025-01-01', 51, 7))).toBe('previous');
+    });
+
+    it('never with a comparison on, a break-down, a non-date axis or a type compare cannot draw', () => {
+        const rows = days('2025-01-01', 60, 7);
+        expect(compareSuggestion('line', LINE, { compare: { kind: 'average' } }, rows)).toBeNull();
+        expect(compareSuggestion('line', { ...LINE, series: [{ field: 'region' }] }, {}, rows)).toBeNull();
+        expect(
+            compareSuggestion('line', { ...LINE, x: [{ field: 'day', grain: 'auto' as const }] }, {}, rows),
+        ).toBeNull();
+        expect(compareSuggestion('pie', LINE, {}, rows)).toBeNull();
+        expect(compareSuggestion('line', LINE, { stacked: true }, rows)).toBeNull();
+    });
+
+    it('suggestOverlays words it and carries the option, applied only by the caller', () => {
+        const out = suggestOverlays({ vizType: 'line', controls: LINE, options: {}, rows: days('2025-01-01', 60, 7) });
+        expect(out).toHaveLength(1);
+        expect(out[0].id).toBe('compare-lastYear');
+        expect(out[0].action).toBe('Compare with the same period last year');
+        expect(out[0].text).toContain('60 points');
+        expect(out[0].options).toEqual({ compare: { kind: 'lastYear' } });
+        const prev = suggestOverlays({
+            vizType: 'line',
+            controls: LINE,
+            options: {},
+            probeRows: days('2026-01-01', 10),
+        });
+        expect(prev[0].id).toBe('compare-previous');
+        expect(prev[0].action).toBe('Compare with the previous period');
     });
 });

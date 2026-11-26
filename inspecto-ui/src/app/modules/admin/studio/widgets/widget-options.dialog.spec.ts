@@ -8,8 +8,8 @@ import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { WidgetOptions } from './widget-types';
 import { WidgetOptionsData, WidgetOptionsDialog } from './widget-options.dialog';
 
-function create(options: WidgetOptions = {}, vizType?: string) {
-    const data: WidgetOptionsData = { options, vizType };
+function create(options: WidgetOptions = {}, vizType?: string, suggestions?: WidgetOptionsData['suggestions']) {
+    const data: WidgetOptionsData = { options, vizType, suggestions };
     const ref = { close: vi.fn() };
     TestBed.configureTestingModule({
         imports: [WidgetOptionsDialog],
@@ -510,5 +510,30 @@ describe('WidgetOptionsDialog', () => {
             const { fixture } = create({ markers: [{ kind: 'band', from: 1, tone: 'success' }] }, 'area');
             await expectNoA11yViolations(fixture.nativeElement);
         });
+    });
+
+    it('shows Show-Me suggestions; taking one sets its field, kept only on Save (I-20)', async () => {
+        const { fixture, c, ref } = create({}, 'line', [
+            {
+                id: 'compare-previous',
+                text: '10 points of history.',
+                action: 'Compare with the previous period',
+                options: { compare: { kind: 'previous' } },
+            },
+            { id: 'forecast', text: 'Weekly seasonal pattern.', action: 'Add a forecast band', options: {} },
+            { id: 'target', text: 'This Widget has a target of 5.', action: 'Add a target line', options: {} },
+        ]);
+        const list = fixture.nativeElement.querySelector('[data-testid="dialog-suggestions"]');
+        expect(list?.textContent).toContain('Compare with the previous period');
+        await expectNoA11yViolations(fixture.nativeElement);
+        for (const s of [...c.suggestions()]) c.take(s);
+        fixture.detectChanges();
+        expect(c.suggestions()).toEqual([]);
+        expect(ref.close).not.toHaveBeenCalled();
+        c.save();
+        const saved = ref.close.mock.calls[0][0] as WidgetOptions;
+        expect(saved.compare).toEqual({ kind: 'previous' });
+        expect(saved.overlay?.forecast).toBeTruthy();
+        expect(saved.markers).toEqual([expect.objectContaining({ kind: 'target' })]);
     });
 });

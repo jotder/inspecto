@@ -13,7 +13,13 @@ import { TREEMAP_PLUGIN } from './treemap.plugin';
 import { WATERFALL_PLUGIN } from './waterfall.plugin';
 import { COMBO_PLUGIN } from './combo.plugin';
 import { HEATMAP_PLUGIN } from './heatmap.plugin';
-import { GEO_MAP_PLUGIN, LINK_ANALYSIS_PLUGIN, RECONCILIATION_PLUGIN, WORKING_SET_PLUGIN } from './view.plugins';
+import {
+    GEO_MAP_PLUGIN,
+    INSIGHT_FEED_PLUGIN,
+    LINK_ANALYSIS_PLUGIN,
+    RECONCILIATION_PLUGIN,
+    WORKING_SET_PLUGIN,
+} from './view.plugins';
 
 /** The plugin set. KPI + table first (always-available), then the Chart.js standards, then the P3 breadth
  *  additions (bubble, gauge, scatter, funnel, kpi-trend, progress-list, treemap, waterfall, combo, heatmap), then the view-bound investigation plugins (Phase 4). */
@@ -38,6 +44,7 @@ export const BUILTIN_VIZ_PLUGINS: VizPlugin[] = [
     LINK_ANALYSIS_PLUGIN,
     RECONCILIATION_PLUGIN,
     WORKING_SET_PLUGIN,
+    INSIGHT_FEED_PLUGIN,
 ];
 
 /**
@@ -68,6 +75,7 @@ export { COMBO_PLUGIN } from './combo.plugin';
 export { HEATMAP_MAX_CELLS, HEATMAP_PLUGIN } from './heatmap.plugin';
 export {
     GEO_MAP_PLUGIN,
+    INSIGHT_FEED_PLUGIN,
     LINK_ANALYSIS_PLUGIN,
     RECONCILIATION_PLUGIN,
     WORKING_SET_PLUGIN,

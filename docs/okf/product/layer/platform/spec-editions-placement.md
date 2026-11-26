@@ -175,7 +175,7 @@ source for them yet (see `docs/okf/product/layer/platform/spec-module-reorg-deci
 | `case-management` - Case Management | features | optional | `ops` | — | ✅ | ✅ | ✅ |
 | `entity-list` - Entity lists | features | optional | `entity-store` | ✅ | ✅ | ✅ | ✅ |
 | `exchange` - Exchange (publication and ingestion contracts) | features | optional | — | — | ✅ | ✅ | ✅ |
-| `insights` - Business Insights | features | optional | — | — | ✅ | ✅ | ✅ |
+| `insights` - Business Insights | features | optional | — | ✅ | ✅ | ✅ | ✅ |
 | `intelligence` - AI assist and intelligence | features | optional | — | — | — | ✅ | ✅ |
 | `mcp` - MCP endpoint | features | optional | — | — | ✅ | ✅ | ✅ |
 | `observability` - Observability (metrics endpoint + events feed API) | features | optional | — | — | ✅ | ✅ | ✅ |
@@ -211,7 +211,7 @@ source for them yet (see `docs/okf/product/layer/platform/spec-module-reorg-deci
 | actionRequests | `action-requests` | — | built | built | built |
 | aiAssist | `agent` | — | built | built | built |
 | anomalyDetection | `anomaly` | — | built | built | built |
-| businessInsights | `insights` | — | built | built | built |
+| businessInsights | `insights` | built | built | built | built |
 | caseManagement | `case-management` | — | built | built | built |
 | incidents | `ops` | — | built | built | built |
 | integrationDelivery | `notify-channels` | — | built | built | built |
@@ -241,8 +241,8 @@ source for them yet (see `docs/okf/product/layer/platform/spec-module-reorg-deci
 
 | | Basic | Standard | Advanced | Preview |
 |---|:-:|:-:|:-:|:-:|
-| First-party jars (processor + connectors + optional + core thin) | 23 | 44 | 48 | 48 |
+| First-party jars (processor + connectors + optional + core thin) | 24 | 44 | 48 | 48 |
 | of which core thin jars | 16 | 16 | 16 | 16 |
-| Optional modules beyond Basic | 0 | 21 | 25 | 25 |
-| Total on the classpath (+ third-party sidecars) | 23 | 45 | 49 | 49 |
+| Optional modules beyond Basic | 0 | 20 | 24 | 24 |
+| Total on the classpath (+ third-party sidecars) | 24 | 45 | 49 | 49 |
 <!-- offerings-matrix:end -->

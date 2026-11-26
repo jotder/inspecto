@@ -28,8 +28,8 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * "Explain this change" (BI-INSIGHTS-1 P2, D-BI7 depth 1 at query time) — {@code POST /insights/explain}, gated on
- * {@code canAuthorWorkbench}.
+ * "Explain this change" (BI-INSIGHTS-1 P2, D-BI7 depth 1 at query time) — {@code POST /insights/explain}, open to anyone who
+ * may view the Widget's Dataset (operator 2026-11-26; it runs as the caller through {@code /bi/query}'s gates).
  *
  * <p>Body: {@code dataset}, optional {@code filters} / {@code when} (the Widget's own, as {@code /bi/query} reads them),
  * exactly one of {@code measure {agg, field}} or {@code ratio {num, den}}, {@code field} (the date column), {@code grain}
@@ -72,8 +72,7 @@ public final class ExplainRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        api.post("/insights/explain", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> explain(api, e, api.body(e))));
+        api.post("/insights/explain", (e, m) -> explain(api, e, api.body(e)));
     }
 
     /** The two buckets compared and the series window. */

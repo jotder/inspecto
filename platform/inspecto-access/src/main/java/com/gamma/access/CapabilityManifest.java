@@ -269,16 +269,9 @@ public final class CapabilityManifest {
             // Preview: scores one entity and writes nothing; UNSAVED content additionally needs canAuthorWorkbench,
             // checked in the handler (as the Risk Score preview).
             new Entry("POST", "/anomaly-scores/preview", Roles.CAN_WORK_INCIDENTS),
-            // ExplainRoutes (BI-INSIGHTS-1 P2, inspecto-insights) — "Explain this change": drivers, mix vs rate, moved with
-            // it. Reads only what POST /bi/query would show the caller (same dataset visibility and masking beneath the gate).
-            new Entry("POST", "/insights/explain", Roles.CAN_AUTHOR_WORKBENCH),
             // InsightsRoutes (BI-INSIGHTS-1 P3) — replaying an UNSAVED Insight Profile over history is authoring; it runs
             // as the caller through /bi/query's gates and saves nothing.
             new Entry("POST", "/insights/preview", Roles.CAN_AUTHOR_WORKBENCH),
-            // Feedback on an Insight persists a status the next scan acts on (suppresses or keeps it). Gated on authoring
-            // until a reader-level capability exists (D-BI4 wants Business users here — an operator question); the Insights
-            // Dataset's visibility applies beneath the gate.
-            new Entry("POST", "/insights/([^/]+)/([^/]+)/feedback", Roles.CAN_AUTHOR_WORKBENCH),
             // PredictionRoutes (PREDICTIVE-SURFACE-1) — an entity's Customer Segment / Churn Score or a series' forecast,
             // the same read gate as scores (OD-8); the row PDP applies beneath the gate.
             new Entry("GET", "/predictions/([^/]+)/([^/]+)/([^/]+)", Roles.CAN_WORK_INCIDENTS),
@@ -637,6 +630,9 @@ public final class CapabilityManifest {
             new Exemption("POST", "/db/query", "group-gated",
                     "gated IN the handler: canAuthorWorkbench for an operational (ops:*) group — the control-plane DB, the rows the anomaly_scan / suggest_expectations agent tools read; business-store SQL stays open as read-shaped (SqlGuard-checked) because Viewer dashboards read Dataset rows through it. GET /db/table carries the same in-handler gate. Invisible to the route-gating scanners — pinned by ControlApiDbBrowserTest"),
             new Exemption("POST", "/bi/query", "read-shaped", "a Measure query; the body is the query spec"),
+            // BI-INSIGHTS-1 loose ends B (operator 2026-11-26): Explain and feedback are for anyone who can view.
+            new Exemption("POST", "/insights/explain", "read-shaped", "Explain this change (inspecto-insights): runs only /bi/query-shaped statements as the caller, so the Widget's Dataset visibility and masking decide (404 for a Dataset the caller cannot view); persists nothing; standard rate-limit bucket - pinned by ControlApiExplainTest"),
+            new Exemption("POST", "/insights/([^/]+)/([^/]+)/feedback", "self-service", "records the CALLER's own opinion of one Insight (useful / not useful / expected, stamped with the caller as actor) in the Profile's feedback store; a caller who cannot view the insights_<profile> Dataset gets the 404 of an unknown Profile, so no capability could add anything - pinned by ControlApiInsightsTest"),
             // AGENT-KIT-1 AK-1 (2026-11-20): the MCP endpoint of the optional inspecto-mcp module. Every MCP Tool is an
             // in-process replay of an existing route as the caller (ApiContext.replay), so that route's own gates decide;
             // the endpoint itself persists nothing. AK-2 revisits the category when write tools land (spec-mcp.md).

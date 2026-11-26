@@ -14,6 +14,7 @@ import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InsightFeedComponent } from './insight-feed.component';
+import { InsightScanButtonComponent } from './insight-scan-button.component';
 import {
     InsightProfileFormData,
     InsightProfileFormDialog,
@@ -62,6 +63,7 @@ function row(d: ComponentDef): ProfileRow {
         InspectoEmptyStateComponent,
         InspectoSkeletonComponent,
         InsightFeedComponent,
+        InsightScanButtonComponent,
     ],
     template: `
         <div class="flex min-w-0 flex-auto flex-col">
@@ -135,6 +137,13 @@ function row(d: ComponentDef): ProfileRow {
                                     <button mat-stroked-button type="button" (click)="edit(p.id)">Edit</button>
                                     <button mat-stroked-button type="button" (click)="remove(p.id)">Delete</button>
                                 }
+                                <!-- One button per Profile: switching Profile drops a scan being followed for another. -->
+                                @for (id of [p.id]; track id) {
+                                    <app-insight-scan-button
+                                        [profile]="id"
+                                        (finished)="feedReload.set(feedReload() + 1)"
+                                    />
+                                }
                             </div>
                             @if (p.description) {
                                 <p class="text-secondary mt-1 text-sm">{{ p.description }}</p>
@@ -157,6 +166,7 @@ function row(d: ComponentDef): ProfileRow {
                             <app-insight-feed
                                 [profile]="p.id"
                                 [highlight]="p.id === linkedProfile ? linkedInsight : null"
+                                [reload]="feedReload()"
                             />
                         } @else if (profiles().length > 0) {
                             <p class="text-secondary text-sm">Select an Insight Profile to see its Insights.</p>
@@ -185,6 +195,8 @@ export class InsightProfilesComponent implements OnInit {
     linkedProfile: string | null = null;
     linkedInsight: string | null = null;
     readonly missingProfile = signal<string | null>(null);
+    /** Bumped when a scan this page started ends, so the feed loads the new run. */
+    readonly feedReload = signal(0);
     readonly selected = computed(() => this.profiles().find((p) => p.id === this.selectedId()) ?? null);
 
     ngOnInit(): void {

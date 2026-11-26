@@ -65,6 +65,8 @@ an Investigation.
 | The arrivals list, column name checks, duplicate refusal, *Replace the period*, compaction (automatic, and *Compact now*) | ✅ | ✅ | ✅ |
 | A later file's new columns kept as details (*Keep new columns as details*) | ✅ | ✅ | ✅ |
 | Discover, the entity summary, the query builder and preset questions in Inspecto LA | ✅ | ✅ | ✅ |
+| Business Insights: Insight Profiles and their scan, the Insight feed with feedback, *Explain this change* on a chart | ✅ | ✅ | ✅ |
+| Opening a Case or an Action Request from an Insight | — | ✅ | ✅ |
 | A retention policy on an import Dataset (*keep N arrivals*) | — every file is kept, compacted | ✅ | ✅ |
 | *Keep this up to date*: a watched folder or SFTP feed on a schedule | locked | ✅ | ✅ |
 | *Add data* from another database or a remote system | locked | through a Pipeline | through a Pipeline |
@@ -153,6 +155,10 @@ There is no migration; to keep them, move to Standard.
   *Add data* and enrichment on the Dataset page. The retention form is not shown: every file is kept, compacted.
 - **Nothing breaks on load.** A Basic install keeps running the configuration it has. The earlier refusals (PII
   masking, DuckLake, the compliance archive) are unchanged.
+
+**Business Insights (2026-11-26):** now in **every edition, Basic included** (before, Standard and above). Anyone
+who can see a chart may use *Explain this change*, and anyone who can see an Insight feed may mark an Insight
+Useful, Not useful or Expected; authoring an Insight Profile still needs the Builder permission on Standard and up.
 
 **The data layer (2026-11-17):**
 

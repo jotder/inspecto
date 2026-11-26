@@ -120,7 +120,7 @@ class ControlApiExplainDepth2Test {
         try (Ctx c = open(dir)) {
             seed(c, "paired", Map.of(), PairExplainGoldenTest.janFeb());
             assertEquals(401, explain(c, null, ",\"depth\":2").statusCode());
-            assertEquals(403, explain(c, "viewer", ",\"depth\":2").statusCode());
+            assertEquals(200, explain(c, "viewer", ",\"depth\":2").statusCode());
             assertEquals(200, explain(c, "author", ",\"depth\":2").statusCode());
         }
     }

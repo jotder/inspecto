@@ -16,7 +16,7 @@ import { ToastrService } from 'ngx-toastr';
 import { switchMap } from 'rxjs';
 import { ActionRequestsService } from 'app/inspecto/api/action-requests.service';
 import { apiErrorMessage, needsPermission } from 'app/inspecto/api/api-base';
-import { Insight, InsightFeed, InsightFeedback, InsightsService } from 'app/inspecto/api/insights.service';
+import { Insight, InsightBand, InsightFeed, InsightFeedback, InsightsService } from 'app/inspecto/api/insights.service';
 import { LensService } from 'app/inspecto/api/lens.service';
 import { ObjectsService } from 'app/inspecto/api/objects.service';
 import { SessionService } from 'app/inspecto/auth/session.service';
@@ -45,6 +45,18 @@ const FEEDBACK: { status: InsightFeedback; label: string }[] = [
     { status: 'expected', label: 'Expected' },
 ];
 
+const RUNS: { run: 'latest' | 'all'; label: string }[] = [
+    { run: 'latest', label: 'This run' },
+    { run: 'all', label: 'Every run' },
+];
+
+const BANDS: { band: InsightBand | null; label: string }[] = [
+    { band: null, label: 'Any band' },
+    { band: 'high', label: 'High' },
+    { band: 'elevated', label: 'Elevated' },
+    { band: 'normal', label: 'Normal' },
+];
+
 const STATUS_WORDS: Record<string, string> = {
     new: 'New',
     useful: 'Marked useful',
@@ -54,7 +66,7 @@ const STATUS_WORDS: Record<string, string> = {
 
 /**
  * The Insight feed of one Insight Profile (BI-INSIGHTS-1 P3): `GET /insights?profile=`, the latest run, best score
- * first. Feedback needs canAuthorWorkbench on the server, so the buttons are disabled with the reason without it.
+ * first. Feedback is open to anyone who can view the feed (operator 2026-11-26).
  * A 404 means no run has written the Insights Dataset yet (or the reader may not view it) — an empty state, not an error.
  */
 @Component({
@@ -69,6 +81,34 @@ const STATUS_WORDS: Record<string, string> = {
         StatusBadgeComponent,
     ],
     template: `
+        <div class="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2" data-testid="feed-filters">
+            <div class="flex items-center gap-1" role="group" aria-label="Which runs">
+                @for (r of runChoices; track r.run) {
+                    <button
+                        mat-stroked-button
+                        type="button"
+                        [class.bg-hover]="run() === r.run"
+                        [attr.aria-pressed]="run() === r.run"
+                        (click)="run.set(r.run)"
+                    >
+                        {{ r.label }}
+                    </button>
+                }
+            </div>
+            <div class="flex items-center gap-1" role="group" aria-label="Band">
+                @for (b of bandChoices; track b.label) {
+                    <button
+                        mat-stroked-button
+                        type="button"
+                        [class.bg-hover]="bandFilter() === b.band"
+                        [attr.aria-pressed]="bandFilter() === b.band"
+                        (click)="bandFilter.set(b.band)"
+                    >
+                        {{ b.label }}
+                    </button>
+                }
+            </div>
+        </div>
         @if (loading()) {
             <inspecto-skeleton [lines]="3"></inspecto-skeleton>
         } @else if (error(); as e) {
@@ -76,7 +116,13 @@ const STATUS_WORDS: Record<string, string> = {
         } @else if (feed(); as f) {
             @if (f.insights.length === 0) {
                 <p class="text-secondary text-sm">
-                    The latest run{{ f.latestRun ? ' (' + f.latestRun + ')' : '' }} found no Insight.
+                    @if (run() === 'all') {
+                        No kept run found an Insight{{ bandFilter() ? ' in the ' + bandFilter() + ' band' : '' }}.
+                    } @else {
+                        The latest run{{ f.latestRun ? ' (' + f.latestRun + ')' : '' }} found no Insight{{
+                            bandFilter() ? ' in the ' + bandFilter() + ' band' : ''
+                        }}.
+                    }
                 </p>
             } @else {
                 @if (highlight(); as h) {
@@ -87,7 +133,10 @@ const STATUS_WORDS: Record<string, string> = {
                     }
                 }
                 <p class="text-secondary mb-2 text-xs">
-                    Latest run {{ f.latestRun }} · {{ f.insights.length }} of {{ f.total }} Insights, best score first.
+                    {{ run() === 'all' ? 'Every kept run (' + f.runs + ')' : 'Latest run ' + f.latestRun }} ·
+                    {{ f.insights.length }} of {{ f.total }} Insights{{
+                        bandFilter() ? ', ' + bandFilter() + ' band' : ''
+                    }}, best score first.
                 </p>
                 <ul class="flex flex-col gap-3" aria-label="Insights">
                     @for (i of f.insights; track i.insight_id) {
@@ -106,6 +155,11 @@ const STATUS_WORDS: Record<string, string> = {
                                 <inspecto-status-badge [value]="band(i).tone" [label]="band(i).label" />
                                 <span class="text-sm font-semibold">{{ slice(i) }}</span>
                                 <span class="text-secondary text-xs">{{ i.insight_type }} · {{ i.period }}</span>
+                                @if (run() === 'all' && i.run_at) {
+                                    <span class="text-secondary text-xs" data-testid="insight-run"
+                                        >found {{ i.run_at }}</span
+                                    >
+                                }
                                 <span class="text-secondary ml-auto text-xs tabular-nums"
                                     >Score {{ round(i.score) }}</span
                                 >
@@ -117,8 +171,7 @@ const STATUS_WORDS: Record<string, string> = {
                                     <button
                                         mat-stroked-button
                                         type="button"
-                                        [disabled]="!canFeedback() || busy() === i.insight_id"
-                                        [attr.title]="canFeedback() ? null : noFeedbackReason"
+                                        [disabled]="busy() === i.insight_id"
                                         [attr.aria-pressed]="i.status === b.status"
                                         (click)="give(i, b.status)"
                                     >
@@ -170,9 +223,6 @@ const STATUS_WORDS: Record<string, string> = {
                         </li>
                     }
                 </ul>
-                @if (!canFeedback()) {
-                    <p class="text-secondary mt-2 text-xs">{{ noFeedbackReason }}</p>
-                }
                 @if (casesInstalled() && caseBlocked(); as why) {
                     <p class="text-secondary mt-1 text-xs">Open a Case: {{ why }}</p>
                 }
@@ -204,10 +254,15 @@ export class InsightFeedComponent {
     readonly profile = input.required<string>();
     /** The Insight a link points to (`?insight=` on the page): marked and scrolled to; said so when not in this run. */
     readonly highlight = input<string | null>(null);
+    /** Bumped by the page to load again (a scan it started has ended). */
+    readonly reload = input(0);
+    readonly runChoices = RUNS;
+    readonly bandChoices = BANDS;
+    /** "This run" (`run=latest`) or "Every run" (`run=all`), and a band filter — both applied by the server. */
+    readonly run = signal<'latest' | 'all'>('latest');
+    readonly bandFilter = signal<InsightBand | null>(null);
     private injector = inject(Injector);
     readonly feedbackChoices = FEEDBACK;
-    readonly noFeedbackReason = needsPermission('canAuthorWorkbench');
-    readonly canFeedback = this.lens.canAuthorWorkbench;
     readonly loading = signal(true);
     readonly error = signal<string | null>(null);
     readonly feed = signal<InsightFeed | null>(null);
@@ -232,14 +287,17 @@ export class InsightFeedComponent {
     readonly opened = signal<Record<string, Opened>>({});
 
     constructor() {
-        effect(() => this.load(this.profile()));
+        effect(() => {
+            this.reload();
+            this.load(this.profile(), this.run(), this.bandFilter());
+        });
     }
 
-    load(profile: string): void {
+    load(profile: string, run: 'latest' | 'all' = 'latest', band: InsightBand | null = null): void {
         this.loading.set(true);
         this.error.set(null);
         this.feed.set(null);
-        this.api.list(profile).subscribe({
+        this.api.list(profile, { run, band }).subscribe({
             next: (f) => {
                 this.feed.set(f);
                 this.loading.set(false);

@@ -245,3 +245,8 @@ export function bandBadge(band: string | null | undefined): { tone: string; labe
 export function sliceLabel(i: { dimension?: string | null; slice_value?: string | null }): string {
     return !i.dimension || i.dimension === '*' ? 'Whole Measure' : `${i.dimension} = ${i.slice_value ?? '(empty)'}`;
 }
+
+/** The name a new `insight.scan` Job for a Profile gets: `insight_scan_<profile>`, kept to letters, digits and `_`. */
+export function scanJobName(profile: string): string {
+    return 'insight_scan_' + profile.replace(/[^A-Za-z0-9_]+/g, '_');
+}
