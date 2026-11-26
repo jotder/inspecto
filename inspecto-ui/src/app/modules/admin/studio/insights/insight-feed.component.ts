@@ -46,7 +46,9 @@ const STATUS_WORDS: Record<string, string> = {
             <p class="text-warn text-sm" role="alert">{{ e }}</p>
         } @else if (feed(); as f) {
             @if (f.insights.length === 0) {
-                <p class="text-secondary text-sm">The latest run ({{ f.latestRun }}) found no Insight.</p>
+                <p class="text-secondary text-sm">
+                    The latest run{{ f.latestRun ? ' (' + f.latestRun + ')' : '' }} found no Insight.
+                </p>
             } @else {
                 <p class="text-secondary mb-2 text-xs">
                     Latest run {{ f.latestRun }} · {{ f.insights.length }} of {{ f.total }} Insights, best score first.
@@ -58,7 +60,9 @@ const STATUS_WORDS: Record<string, string> = {
                                 <inspecto-status-badge [value]="band(i).tone" [label]="band(i).label" />
                                 <span class="text-sm font-semibold">{{ slice(i) }}</span>
                                 <span class="text-secondary text-xs">{{ i.insight_type }} · {{ i.period }}</span>
-                                <span class="text-secondary ml-auto text-xs tabular-nums">Score {{ i.score }}</span>
+                                <span class="text-secondary ml-auto text-xs tabular-nums"
+                                    >Score {{ round(i.score) }}</span
+                                >
                             </div>
                             <p class="mt-1 text-sm">{{ i.explanation?.sentence || 'No sentence was stored.' }}</p>
                             <div class="mt-2 flex flex-wrap items-center gap-2">
@@ -110,6 +114,7 @@ export class InsightFeedComponent {
     readonly busy = signal<string | null>(null);
     readonly band = (i: Insight) => bandBadge(i.band);
     readonly slice = sliceLabel;
+    readonly round = (n: number) => Math.round(n);
 
     constructor() {
         effect(() => this.load(this.profile()));

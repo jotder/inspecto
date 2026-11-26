@@ -34,7 +34,7 @@ import { seriesColors } from 'app/inspecto/viz/series-colors';
                         <inspecto-status-badge [value]="band(i).tone" [label]="band(i).label" />
                         <span class="ml-2 font-semibold">{{ slice(i) }}</span>
                         <span class="text-secondary text-xs">
-                            · {{ i.insight_type }} · {{ i.period }} · score {{ i.score }}</span
+                            · {{ i.insight_type }} · {{ i.period }} · score {{ round(i.score) }}</span
                         >
                         <p>{{ i.explanation?.sentence }}</p>
                     </li>
@@ -47,6 +47,7 @@ export class InsightPreviewComponent {
     readonly preview = input.required<InsightPreview>();
     readonly band = (i: Insight) => bandBadge(i.band);
     readonly slice = sliceLabel;
+    readonly round = (n: number) => Math.round(n);
 
     readonly summary = computed(() => {
         const p = this.preview();

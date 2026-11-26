@@ -25,6 +25,7 @@ describe('insight-profile-form', () => {
             types: ['anomaly', 'concentration'],
             season: 52,
             filters: [{ field: 'x', op: '=', value: 1 }],
+            note: 'kept',
             calendar: [{ from: '2026-12-25', label: 'Christmas', mode: 'exclude' }],
         };
         const init = insightProfileInitial(stored);
@@ -44,6 +45,7 @@ describe('insight-profile-form', () => {
             calendar: [{ from: '2026-12-25', label: 'Christmas', mode: 'exclude' }],
         });
         expect('maxValues' in out).toBe(false);
+        expect(out['note']).toBe('kept');
     });
 
     it('a count Measure carries no field and a new Profile defaults its types', () => {

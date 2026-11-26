@@ -159,6 +159,26 @@ export function calendarEntries(c: Record<string, unknown>): CalendarEntry[] {
  * The `insight-profile` content to save or replay. Keys the form does not author (`filters`, `when`) are carried over
  * from `stored`; a blank optional field is left out so the server's default applies.
  */
+const AUTHORED = new Set([
+    'id',
+    'dataset',
+    'measure',
+    'field',
+    'grain',
+    'dimensions',
+    'types',
+    'sensitivity',
+    'minImpact',
+    'minSupport',
+    'maxValues',
+    'lookback',
+    'season',
+    'noveltyRuns',
+    'maxInsights',
+    'description',
+    'calendar',
+]);
+
 export function toInsightProfileContent(
     id: string,
     v: Record<string, unknown>,
@@ -166,7 +186,8 @@ export function toInsightProfileContent(
     stored: Record<string, unknown> = {},
 ): Record<string, unknown> {
     const out: Record<string, unknown> = {};
-    for (const k of ['filters', 'when']) if (stored[k] != null) out[k] = stored[k];
+    // Keep every stored key the form does not author (filters, when, notes); the form's keys are rewritten below.
+    for (const [k, val] of Object.entries(stored)) if (!AUTHORED.has(k)) out[k] = val;
     out['id'] = id;
     out['dataset'] = str(v['dataset']);
     const agg = str(v['measureAgg']) ?? 'sum';
