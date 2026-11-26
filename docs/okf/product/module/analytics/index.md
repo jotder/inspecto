@@ -40,4 +40,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `COMPONENT-VALIDATE-ALL-1` | P3 | feature | a dry run (executing preview) for a KPI, Reconciliation, Dataset, Widget or Dashboard: | — |
 | `BUILDER-API-PAPERCUTS-1` | P3 | defect | small gaps that cost an agent calls: | — |
 | `REPORT-DASHBOARD-AUTHORING-1` | P3 | feature | a Report Job cannot filter | — |
+| `RULE-TEMPLATE-SIMULATE-SHARING-1` | P3 | defect | Rule Template simulate skips ComponentAccess.canView on its source Dataset | — |
+| `DECISION-RULE-SIMULATE-WRITES-1` | P3 | defect | Decision Rule simulate writes the rule file | — |
 | `DUCKDB-2-0-1-HAVANA-TZ-1` | P3 | chore | DuckDB 2.0.1's zone data keeps Cuba on UTC−4 from 2026-11-01 to about mid-March 2027; the JDK's tzdata 2026b does not. | — |
