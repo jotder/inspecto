@@ -3933,7 +3933,7 @@
         "tags" : [ "recon" ],
         "summary" : "Inventory the columns of Reconciliation Datasets",
         "operationId" : "postReconColumns",
-        "description" : "Returns each listed Dataset's columns plus the cross-side auto-matches for a Reconciliation's unified column list; body datasets is the list of Dataset ids. No capability gate. 422 when datasets is missing, a Dataset config is unusable or the inventory query fails; 404 for an unknown Dataset; 503 when the control plane is read-only or the query sandbox cannot be opened.",
+        "description" : "Returns each listed Dataset's columns plus the cross-side auto-matches for a Reconciliation's unified column list; body datasets is the list of Dataset ids. No capability gate; every Dataset named must be one the caller may view, else 404 as for an unknown Dataset (RECON-READ-UNGATED-1). 422 when datasets is missing, a Dataset config is unusable or the inventory query fails; 404 for an unknown Dataset; 503 when the control plane is read-only or the query sandbox cannot be opened.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
@@ -3947,7 +3947,7 @@
         "tags" : [ "recon" ],
         "summary" : "One day of the Board: a page of grain rows + the day's exact totals and Break summary",
         "operationId" : "postReconRun",
-        "description" : "Stateless compute over a saved reconciliation (`id`) or an inline draft (`config`), scoped to ONE day (RECON-PERF-1, operator 2026-10-09). The day's comparison is computed once (one grain join; totals, pair summaries and the group count from one aggregate over it) and cached in memory per (spec, day, sample, input-file stamps), so a further page or filter of the same day is a cache read (`statistics.cached`). `totals` and `summary` cover the whole day whatever the page or filter.",
+        "description" : "Stateless compute over a saved reconciliation (`id`) or an inline draft (`config`), scoped to ONE day (RECON-PERF-1, operator 2026-10-09). The day's comparison is computed once (one grain join; totals, pair summaries and the group count from one aggregate over it) and cached in memory per (spec, day, sample, input-file stamps), so a further page or filter of the same day is a cache read (`statistics.cached`). `totals` and `summary` cover the whole day whatever the page or filter. No capability gate; every Dataset named must be one the caller may view, else 404 as for an unknown Dataset (RECON-READ-UNGATED-1). Every side's classified columns come back masked (masked:<alias>) unless the caller holds canRevealLinkEntities; for such a caller a sum over a masked column, or a masked alias sent as a key value, is a 422.",
         "requestBody" : {
           "required" : true,
           "content" : {
@@ -4119,7 +4119,7 @@
         "tags" : [ "recon" ],
         "summary" : "The paged Break sets of one anchor-relative pair",
         "operationId" : "postReconBreaks",
-        "description" : "Stateless compute over a saved reconciliation (`id`) or an inline draft (`config`). Rows always carry the anchor as role `a` and the compared side (`side`: b|c) as role `b`. When the config declares `impact.column` naming a column that is NOT compared, each Break row also carries that column's per-side value as `impact` — summed per key, never compared, so it cannot create or suppress a Break (operator decision 2026-09-25).",
+        "description" : "Stateless compute over a saved reconciliation (`id`) or an inline draft (`config`). Rows always carry the anchor as role `a` and the compared side (`side`: b|c) as role `b`. When the config declares `impact.column` naming a column that is NOT compared, each Break row also carries that column's per-side value as `impact` — summed per key, never compared, so it cannot create or suppress a Break (operator decision 2026-09-25). No capability gate; every Dataset named must be one the caller may view, else 404 as for an unknown Dataset (RECON-READ-UNGATED-1). Every side's classified columns come back masked (masked:<alias>) unless the caller holds canRevealLinkEntities; for such a caller a sum over a masked column, or a masked alias sent as a key value, is a 422.",
         "requestBody" : {
           "required" : true,
           "content" : {
@@ -8524,7 +8524,7 @@
         "tags" : [ "recon" ],
         "summary" : "Raw rows behind one Reconciliation key",
         "operationId" : "postReconRows",
-        "description" : "Returns the raw rows on both compared sides for one key of a saved Reconciliation (id) or an inline config; body key must name every key column, with optional side (b or c), day and limit. No capability gate. 422 when key is missing, side is not b|c or the config or comparison fails; 404 for an unknown Reconciliation or Dataset; 503 when the control plane is read-only or the query sandbox cannot be opened.",
+        "description" : "Returns the raw rows on both compared sides for one key of a saved Reconciliation (id) or an inline config; body key must name every key column, with optional side (b or c), day and limit. No capability gate; every Dataset named must be one the caller may view, else 404 as for an unknown Dataset (RECON-READ-UNGATED-1). Every side's classified columns come back masked (masked:<alias>) unless the caller holds canRevealLinkEntities; for such a caller a sum over a masked column, or a masked alias sent as a key value, is a 422. 422 when key is missing, side is not b|c or the config or comparison fails; 404 for an unknown Reconciliation or Dataset; 503 when the control plane is read-only or the query sandbox cannot be opened.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."

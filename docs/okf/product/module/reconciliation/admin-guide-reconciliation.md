@@ -35,7 +35,9 @@ without it `POST /recon/promote` answers 503 and the Job stays signal-only.
 | promote a Break to an Incident (`POST /recon/promote`) | `canManageIncidents` |
 
 The compute and read routes (`/recon/run`, `/recon/breaks`, `/recon/rows`, `/recon/columns`, the state reads)
-carry no capability of their own ([api-routes](api-routes.md)).
+carry no capability of their own ([api-routes](api-routes.md)). The four compute routes read only Datasets the caller
+may view (any other answers 404, like an absent Dataset), and a caller without `canRevealLinkEntities` sees each
+side's classified columns masked, as in Dashboards ([spec](spec-reconciliation.md#access-and-masking)).
 
 ## Configuration
 

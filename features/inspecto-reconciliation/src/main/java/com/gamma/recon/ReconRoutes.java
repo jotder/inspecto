@@ -6,11 +6,14 @@ import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.control.HostContext;
 import com.gamma.spi.http.RouteModule;
 import com.gamma.control.ServerFaults;
+import com.gamma.access.ComponentAccess;
 import com.gamma.access.WriteGates;
+import com.gamma.control.DatasetCellMasking;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
+import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -61,6 +64,8 @@ public final class ReconRoutes implements RouteModule {
     static volatile int rowCap = 200_000;
     private static final int DEFAULT_BREAKS_LIMIT = 200;
     private static final int MAX_LIMIT = 5_000;
+    /** An identifier-shaped word of a side filter (scanned with its string literals blanked). */
+    private static final java.util.regex.Pattern FILTER_WORD = java.util.regex.Pattern.compile("[A-Za-z_][A-Za-z0-9_]*");
 
     /** MODULE-REORG-1 P7: the feature id /bootstrap reports and a Space may switch off (P2b). */
     @Override
@@ -68,12 +73,14 @@ public final class ReconRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        api.post("/recon/columns", (e, m) -> columns(api, api.body(e)));
-        api.post("/recon/run", (e, m) -> run(api, api.body(e)));
-        api.post("/recon/breaks", (e, m) -> breaks(api, api.body(e)));
+        // RECON-READ-UNGATED-1: the four reads stay read-shaped exemptions like POST /bi/query; what guards them is the
+        // Dataset's own sharing (canView on every side, else the "unknown dataset" 404) and the caller's masking, per side.
+        api.post("/recon/columns", (e, m) -> columns(api, e, api.body(e)));
+        api.post("/recon/run", (e, m) -> run(api, e, api.body(e)));
+        api.post("/recon/breaks", (e, m) -> breaks(api, e, api.body(e)));
         // RECON-CARDINALITY-2: the raw rows behind ONE key — read-shaped like its siblings (recorded so in
         // CapabilityManifest.EXEMPTIONS); fetched on demand when a reader expands a cardinality break.
-        api.post("/recon/rows", (e, m) -> rows(api, api.body(e)));
+        api.post("/recon/rows", (e, m) -> rows(api, e, api.body(e)));
         // Opening an Incident from a Break: gated by `canManageIncidents` (operator, 2026-09-16). The
         // capability was CREATED for this act rather than borrowed from `canOperateRuns` (DecisionRoutes'
         // choice) or `canAuthorWorkbench` — `POST /objects` performs the same act and shares the gate.
@@ -85,20 +92,20 @@ public final class ReconRoutes implements RouteModule {
         api.get("/recon/state", (e, m) -> states(api));
         api.get("/recon/([^/]+)/state", (e, m) -> state(api, ApiContext.name(m)));
         api.post("/recon/([^/]+)/record", ApiContext.withCapability("canOperateRuns",
-                (e, m) -> record(api, ApiContext.name(m), api.body(e))));
+                (e, m) -> record(api, e, ApiContext.name(m), api.body(e))));
         api.post("/recon/([^/]+)/breaks/status", ApiContext.withCapability("canOperateRuns",
                 (e, m) -> breakStatus(api, ApiContext.name(m), api.body(e))));
     }
 
     // ── POST /recon/columns {datasets:[ids]} ────────────────────────────────────────
 
-    private Object columns(ApiContext api, Map<String, Object> body) {
+    private Object columns(ApiContext api, HttpExchange ex, Map<String, Object> body) {
         Path writeRoot = WriteGates.requireWriteRoot(api, "reconciliation");
         List<String> ids = strings(body.get("datasets"));
         if (ids.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "missing 'datasets' (the dataset ids to inventory)");
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
         List<ReconService.Side> sides = ids.stream()
-                .map(id -> new ReconService.Side(id, relationSql(api, store, writeRoot, id), null, null))
+                .map(id -> new ReconService.Side(id, relationSql(api, ex, store, writeRoot, id), null, null))
                 .toList();
         try {
             return ReconService.columns(sides);
@@ -119,8 +126,9 @@ public final class ReconRoutes implements RouteModule {
      * deterministically, and the response says so ({@code sample.sampled}). The day's comparison is computed once
      * and cached ({@link ReconDay.Cache}); a further page or filter of the same day reads the cache.
      */
-    private Object run(ApiContext api, Map<String, Object> body) {
-        ReconDay.Scoped scoped = scoped(api, body);
+    private Object run(ApiContext api, HttpExchange ex, Map<String, Object> body) {
+        Read read = read(api, ex, body);
+        ReconDay.Scoped scoped = read.scoped();
         ReconService.Spec spec = scoped.spec();
         int limit = intOr(body.get("limit"), DEFAULT_PAGE);
         if (limit < 1 || limit > MAX_PAGE)
@@ -175,7 +183,7 @@ public final class ReconRoutes implements RouteModule {
         data.put("availableDays", scoped.availableDays());
         data.put("filter", filter);
         data.put("sample", day.sample());
-        data.put("rows", page.rows());
+        data.put("rows", read.maskKeys(page.rows()));   // after the cache read: the cache holds raw rows
         data.put("page", pageInfo);
         data.put("totals", day.totals());
         data.put("summary", day.summary());
@@ -191,8 +199,9 @@ public final class ReconRoutes implements RouteModule {
      * in {@link ReconDay.Cache} under the input fingerprint + day + every request parameter, so a repeated page or a
      * Board-to-Breaks round trip reads it back; changed data or config is a new key.
      */
-    private Object breaks(ApiContext api, Map<String, Object> body) {
-        ReconDay.Scoped scoped = scoped(api, body);
+    private Object breaks(ApiContext api, HttpExchange ex, Map<String, Object> body) {
+        Read read = read(api, ex, body);
+        ReconDay.Scoped scoped = read.scoped();
         ReconService.Spec spec = scoped.spec();
         int sample = sampleOf(body);
         int limit = clamp(intOr(body.get("limit"), DEFAULT_BREAKS_LIMIT));
@@ -203,10 +212,11 @@ public final class ReconRoutes implements RouteModule {
         int other = "b".equals(side) ? 1 : "c".equals(side) ? 2 : -1;
         if (other < 0) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "side must be b|c, got '" + side + "'");
         Map<String, String> path = pathOf(body.get("path"));
+        read.refuseAliases(path, "path");
         String cacheKey = scoped.fingerprint() == null ? null : "breaks|" + scoped.fingerprint() + "|" + scoped.day() + "|"
                 + sample + "|" + other + "|" + type + "|" + (path == null ? null : new java.util.TreeMap<>(path)) + "|" + limit + "|" + offset;
         Map<String, Object> hit = cacheKey == null ? null : ReconDay.Cache.get(cacheKey);
-        if (hit != null) return hit;
+        if (hit != null) return read.maskBreakSets(hit);
         Map<String, ReconService.BreakSet> sets;
         Map<String, Object> sampleInfo = new LinkedHashMap<>();
         try {
@@ -228,7 +238,7 @@ public final class ReconRoutes implements RouteModule {
         }
         if (!sampleInfo.isEmpty()) data.put("sample", sampleInfo);
         if (cacheKey != null) ReconDay.Cache.put(cacheKey, data);
-        return data;
+        return read.maskBreakSets(data);
     }
 
     /** {@code sample}: 0 (absent) = every key, else 1..{@link #MAX_SAMPLE}; anything else 422. */
@@ -248,11 +258,13 @@ public final class ReconRoutes implements RouteModule {
      * is cached like {@code /recon/breaks}; it is never sampled — one key's rows are already the narrowest read, and
      * a sample would only answer "absent" for a key outside it.
      */
-    private Object rows(ApiContext api, Map<String, Object> body) {
-        ReconDay.Scoped scoped = scoped(api, body);
+    private Object rows(ApiContext api, HttpExchange ex, Map<String, Object> body) {
+        Read read = read(api, ex, body);
+        ReconDay.Scoped scoped = read.scoped();
         ReconService.Spec spec = scoped.spec();
         Map<String, String> key = pathOf(body.get("key"));
         if (key == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'key' — every key column and its value");
+        read.refuseAliases(key, "key");
         int limit = clamp(intOr(body.get("limit"), DEFAULT_BREAKS_LIMIT));
         String side = orDefault(ApiContext.str(body, "side"), "b");
         int other = "b".equals(side) ? 1 : "c".equals(side) ? 2 : -1;
@@ -260,7 +272,7 @@ public final class ReconRoutes implements RouteModule {
         String cacheKey = scoped.fingerprint() == null ? null : "rows|" + scoped.fingerprint() + "|" + scoped.day() + "|"
                 + other + "|" + new java.util.TreeMap<>(key) + "|" + limit;
         Map<String, Object> hit = cacheKey == null ? null : ReconDay.Cache.get(cacheKey);
-        if (hit != null) return hit;
+        if (hit != null) return read.maskRows(hit, other);
         Map<String, ReconService.BreakSet> sets;
         try {
             sets = ReconService.rows(spec, other, key, limit);
@@ -281,7 +293,7 @@ public final class ReconRoutes implements RouteModule {
             data.put(e.getKey(), set);
         }
         if (cacheKey != null) ReconDay.Cache.put(cacheKey, data);
-        return data;
+        return read.maskRows(data, other);
     }
 
     // ── POST /recon/promote {reconciliation, key, type?, column?, runId?} ───────────
@@ -537,14 +549,14 @@ public final class ReconRoutes implements RouteModule {
      * <p>Gates, in order: 503 no write root · 422 unsafe id · 404 unknown reconciliation / dataset · 422
      * unusable config · 403 jail · 422 too many Breaks / failing comparison · 503 sandbox or state unreadable.
      */
-    private Object record(ApiContext api, String rawId, Map<String, Object> body) {
+    private Object record(ApiContext api, HttpExchange ex, String rawId, Map<String, Object> body) {
         Path writeRoot = WriteGates.requireWriteRoot(api, "reconciliation");
         String id = WriteGates.safeName(rawId, "reconciliation id");
         Map<String, Object> req = new LinkedHashMap<>();
         req.put("id", id);
         String requestedDay = body == null ? null : ApiContext.str(body, "day");
         if (requestedDay != null) req.put("day", requestedDay);
-        ReconDay.Scoped scoped = scoped(api, req);
+        ReconDay.Scoped scoped = scoped(api, ex, req);
         ReconService.Spec spec = scoped.spec();
         ReconStateStore store = new ReconStateStore(writeRoot);
         readState(store, id);   // jail + readability BEFORE the comparison runs, not after
@@ -664,7 +676,7 @@ public final class ReconRoutes implements RouteModule {
      * scoped to ONE day ({@code day}, or the latest present — {@link ReconDay}). 404 unknown reconciliation / dataset ·
      * 422 unusable config, bad day, or a Dataset with no temporal column · 503 sandbox unavailable.
      */
-    private ReconDay.Scoped scoped(ApiContext api, Map<String, Object> body) {
+    private ReconDay.Scoped scoped(ApiContext api, HttpExchange ex, Map<String, Object> body) {
         Path writeRoot = WriteGates.requireWriteRoot(api, "reconciliation");
         // RECON-PERF-RESIDUALS-1 (11): ONE registry scan per request - the recon + each side's Dataset were a
         // whole-registry re-parse apiece (~40 ms of a cached page on the demo Space).
@@ -676,16 +688,149 @@ public final class ReconRoutes implements RouteModule {
         } else {
             String id = ApiContext.str(body, "id");
             if (id == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "provide a saved reconciliation 'id' or an inline 'config'");
-            config = component(store, "reconciliation", id)
+            config = component(store, "reconciliation", id).filter(c -> ComponentAccess.canView(ex, c))
                     .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "no reconciliation '" + id + "'"));
         }
+        // RECON-READ-UNGATED-1: every side must be a Dataset this caller may view, checked BEFORE any SQL runs (a resolved
+        // spec is reused across callers, so the resolve below may not consult the lookups at all).
+        for (String dsId : ReconConfigLoader.datasetIds(config)) viewableDataset(ex, store, dsId);
         // Shared spec assembly (identical to the scheduled recon.run Job); relation-SQL resolution stays
         // here so an unknown/unusable dataset keeps its route gate (404/422 via relationSql).
         String day = ApiContext.str(body, "day");
         return compute(api, () -> ReconDay.resolve(config,
-                dsId -> component(store, "dataset", dsId)
-                        .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown dataset '" + dsId + "'")),
-                dsId -> relationSql(api, store, writeRoot, dsId), api.dataRoot(), day));
+                dsId -> viewableDataset(ex, store, dsId),
+                dsId -> relationSql(api, ex, store, writeRoot, dsId), api.dataRoot(), day));
+    }
+
+    /** {@link #scoped} plus how this caller sees each side; a sum over a column hidden from the caller is refused (422). */
+    private Read read(ApiContext api, HttpExchange ex, Map<String, Object> body) {
+        ReconDay.Scoped scoped = scoped(api, ex, body);
+        if (DatasetCellMasking.mayReveal(ex)) return new Read(scoped, List.of());
+        Path writeRoot = WriteGates.requireWriteRoot(api, "reconciliation");
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry")).snapshot();
+        ReconService.Spec spec = scoped.spec();
+        List<DatasetCellMasking> sides = new ArrayList<>();
+        for (int s = 0; s < spec.sides().size(); s++) {
+            String dsId = spec.sides().get(s).datasetId();
+            DatasetCellMasking side = DatasetCellMasking.of(writeRoot, store, dsId, viewableDataset(ex, store, dsId), false);
+            // a sum (a compared one or the carried Break impact) over a hidden column returns its raw values: refused, as
+            // /bi/query refuses it; a count reads none
+            for (ReconService.Measure m : spec.measures())
+                if ("sum".equals(m.agg())) side.refuseValueRead(spec.physical(s, m.name()), "sum over");
+            if (spec.carriedImpact() != null) side.refuseValueRead(spec.physical(s, spec.carriedImpact()), "impact sum over");
+            // a side filter is a predicate over the side's physical columns: on a hidden one it bisects the raw values
+            // (LIKE 'm2%') or prints them in a conversion error, so any word of it naming a hidden column is refused, as
+            // /bi/query refuses a filter (fail closed: with an untraceable lineage every undeclared word counts). The
+            // side's view name is the WHOLE ROW as a struct (cast(__recon_b as varchar) LIKE '%m2%'), so while masking is
+            // in force no internal "__" name may appear at all.
+            String filter = spec.sides().get(s).filter();
+            if (filter != null && side.engaged())
+                for (java.util.regex.Matcher w = FILTER_WORD.matcher(filter.replaceAll("'(?:[^']|'')*'", "''")); w.find(); ) {
+                    if (w.group().startsWith("__"))
+                        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "filter word '" + w.group()
+                                + "' is refused: an internal relation name reads the whole row, masked keys included; the"
+                                + " caller needs canRevealLinkEntities");
+                    side.refuseValueRead(w.group(), "filtering");
+                }
+            sides.add(side);
+        }
+        return new Read(scoped, sides);
+    }
+
+    /**
+     * One recon read as THIS caller sees it (RECON-READ-UNGATED-1): the resolved spec, and per side the masking of that
+     * side's Dataset ({@code sides} empty = the caller may reveal, answers stay raw). Every mask runs on a COPY after the
+     * cache read — {@link ReconDay.Cache} holds the raw answer, shared across callers.
+     */
+    private record Read(ReconDay.Scoped scoped, List<DatasetCellMasking> sides) {
+
+        /** The side that hides unified key column {@code k}, or -1 (a grain key is one value for every side). */
+        private int hidingSide(String k) {
+            for (int s = 0; s < sides.size(); s++)
+                if (sides.get(s).hides(scoped.spec().physical(s, k))) return s;
+            return -1;
+        }
+
+        private boolean anyKeyHidden() {
+            for (String k : scoped.spec().keyColumns()) if (hidingSide(k) >= 0) return true;
+            return false;
+        }
+
+        private Map<String, Object> maskKey(Map<?, ?> key) {
+            Map<String, Object> out = new LinkedHashMap<>();
+            key.forEach((k, v) -> {
+                String col = String.valueOf(k);
+                int s = hidingSide(col);
+                out.put(col, s < 0 ? v : sides.get(s).cell(scoped.spec().physical(s, col), v));
+            });
+            return out;
+        }
+
+        /** Grain or Break rows with each {@code key} as the caller sees it. */
+        List<Map<String, Object>> maskKeys(List<Map<String, Object>> rows) {
+            if (sides.isEmpty() || !anyKeyHidden()) return rows;
+            List<Map<String, Object>> out = new ArrayList<>(rows.size());
+            for (Map<String, Object> r : rows) {
+                Map<String, Object> copy = new LinkedHashMap<>(r);
+                if (r.get("key") instanceof Map<?, ?> key) copy.put("key", maskKey(key));
+                out.add(copy);
+            }
+            return out;
+        }
+
+        /** A {@code /recon/breaks} answer with every set's Break keys masked. */
+        Map<String, Object> maskBreakSets(Map<String, Object> data) {
+            if (sides.isEmpty() || !anyKeyHidden()) return data;
+            Map<String, Object> out = new LinkedHashMap<>(data);
+            data.forEach((type, v) -> {
+                if (v instanceof Map<?, ?> set && set.get("rows") instanceof List<?> rows) {
+                    Map<String, Object> copy = new LinkedHashMap<>(cast(set));
+                    copy.put("rows", maskKeys(castRows(rows)));
+                    out.put(type, copy);
+                }
+            });
+            return out;
+        }
+
+        /** A {@code /recon/rows} answer: side {@code a}'s rows by the anchor's masking, {@code b}'s by side {@code other}'s, the echoed key masked. */
+        Map<String, Object> maskRows(Map<String, Object> data, int other) {
+            if (sides.isEmpty()) return data;
+            Map<String, Object> out = new LinkedHashMap<>(data);
+            if (data.get("key") instanceof Map<?, ?> key) out.put("key", maskKey(key));
+            for (Map.Entry<String, Integer> side : Map.of("a", 0, "b", other).entrySet())
+                if (data.get(side.getKey()) instanceof Map<?, ?> set && set.get("rows") instanceof List<?> rows) {
+                    DatasetCellMasking masking = sides.get(side.getValue());
+                    List<Map<String, Object>> shown = new ArrayList<>();
+                    for (Map<String, Object> r : castRows(rows)) {
+                        Map<String, Object> row = new LinkedHashMap<>();
+                        r.forEach((col, v) -> row.put(col, masking.cell(col, v)));
+                        shown.add(row);
+                    }
+                    Map<String, Object> copy = new LinkedHashMap<>(cast(set));
+                    copy.put("rows", shown);
+                    out.put(side.getKey(), copy);
+                }
+            return out;
+        }
+
+        /**
+         * 422 for a {@code masked:} alias sent as the value of a key column this caller cannot see raw: the comparison
+         * matches raw values, so the alias would silently match nothing (a Board drill-down from a masked key).
+         */
+        void refuseAliases(Map<String, String> values, String what) {
+            if (values == null || sides.isEmpty()) return;
+            values.forEach((k, v) -> {
+                if (v != null && v.startsWith("masked:") && scoped.spec().keyColumns().contains(k) && hidingSide(k) >= 0)
+                    throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, what + " value for key column '" + k
+                            + "' is a masked alias, which matches no raw value; drilling into a masked key needs "
+                            + "canRevealLinkEntities");
+            });
+        }
+
+        @SuppressWarnings("unchecked")
+        private static List<Map<String, Object>> castRows(List<?> rows) {
+            return (List<Map<String, Object>>) rows;
+        }
     }
 
     /** A comparison step, its failures mapped as every recon compute route maps them. */
@@ -704,10 +849,18 @@ public final class ReconRoutes implements RouteModule {
         }
     }
 
-    /** A dataset component's trusted relation SQL — 404 unknown dataset, 422 unusable dataset config. */
-    private static String relationSql(ApiContext api, ComponentStore store, Path writeRoot, String datasetId) {
-        Map<String, Object> dataset = component(store, "dataset", datasetId)
+    /**
+     * A Dataset's content when this caller may view it; else the 404 of an unknown Dataset, word for word, so a shared-away
+     * id is indistinguishable from an absent one (RECON-READ-UNGATED-1).
+     */
+    private static Map<String, Object> viewableDataset(HttpExchange ex, ComponentStore store, String datasetId) {
+        return component(store, "dataset", datasetId).filter(c -> ComponentAccess.canView(ex, c))
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown dataset '" + datasetId + "'"));
+    }
+
+    /** A dataset component's trusted relation SQL — 404 unknown (or not viewable) dataset, 422 unusable dataset config. */
+    private static String relationSql(ApiContext api, HttpExchange ex, ComponentStore store, Path writeRoot, String datasetId) {
+        Map<String, Object> dataset = viewableDataset(ex, store, datasetId);
         try {
             return DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
         } catch (IllegalArgumentException bad) {
