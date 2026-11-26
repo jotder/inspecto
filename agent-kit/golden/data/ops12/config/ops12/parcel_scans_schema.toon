@@ -1,0 +1,25 @@
+partitionKey: SCAN_DATE
+raw:
+  name: PARCEL_SCANS
+  format: CSV
+  fields[4]{name,selector,type}:
+    PARCEL_ID,"0",VARCHAR
+    CARRIER,"1",VARCHAR
+    WEIGHT_KG,"2",DOUBLE
+    SCAN_DATE,"3",DATE
+mapping:
+  canonicalName: parcel_scans
+  rawName: PARCEL_SCANS
+  fields[4]:
+    - name: PARCEL_ID
+      from: PARCEL_ID
+      fn: keep
+    - name: CARRIER
+      from: CARRIER
+      fn: keep
+    - name: WEIGHT_KG
+      from: WEIGHT_KG
+      fn: keep
+    - name: SCAN_DATE
+      from: SCAN_DATE
+      fn: keep

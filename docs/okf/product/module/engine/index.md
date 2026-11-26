@@ -49,6 +49,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` | P3 | chore | Drop the window_self_join workaround once a fixed DuckDB driver is pinned. | — |
 | `DUCKDB-2-0-1-HAVANA-TZ-1` | P3 | chore | DuckDB 2.0.1's zone data keeps Cuba on UTC−4 from 2026-11-01 to about mid-March 2027; the JDK's tzdata 2026b does not. | — |
 | `RUN-TRIGGER-ACTOR-SPOOF-1` | P3 | defect | ?actor= on POST /jobs/{name}/trigger, POST /jobs/runs/{id}/replay and POST /pipelines/authored/{id}/trigger is free text written into the… | — |
-| `GOLDEN-OPS12-FIXTURE-1` | P3 | chore | Golden task ops-12 (a machine gives up waiting on a day) cannot be set up from its suite text: it needs a by-day Job whose day waits on a… | — |
 | `ALERT-RULE-ROW-FILTER-1` | P3 | feature | A Measure Alert Rule (dataset, measure, comparator, threshold) has no row filter, so "alert when more than 5 shipments are undelivered" c… | — |
 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | The shapes the object-store ingest lane still refuses (sinks:, produces: reference, the readers). | operator |
