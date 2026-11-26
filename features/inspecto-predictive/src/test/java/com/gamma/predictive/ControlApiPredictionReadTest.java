@@ -80,6 +80,30 @@ class ControlApiPredictionReadTest {
         }
     }
 
+    /**
+     * AGENT-GET-DATA-READS-1 (D-AK13): "GET /predictions/([^/]+)/([^/]+)/([^/]+)" is an agent data route. The agent's
+     * answer is stamped by {@code EntityKeyMasking.put}; with every stamp a no-op the agent gets 500 with no key while a
+     * person still gets the score. Falsified: removing the stamp in {@code EntityKeyMasking.put}.
+     */
+    @Test
+    void anAgentsPredictionIsProvenMaskedOrWithheld(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, ChurnCorpus::plant)) {
+            churn(c);
+            String path = "/predictions/churn-model/churn/lapsing";
+            assertEquals(200, get(c.port, path, "agent").statusCode());
+            com.gamma.util.AnswerMasking.ignoreStampsForTest(true);
+            try {
+                HttpResponse<String> agent = get(c.port, path, "agent");
+                assertEquals(500, agent.statusCode(), agent.body());
+                assertTrue(agent.body().contains(ControlApi.MASKING_NOT_PROVEN), agent.body());
+                assertFalse(agent.body().contains("lapsing") || agent.body().contains("masked:"), agent.body());
+                assertEquals(200, get(c.port, path, "revealer").statusCode(), "a person is unchanged");
+            } finally {
+                com.gamma.util.AnswerMasking.ignoreStampsForTest(false);
+            }
+        }
+    }
+
     @AfterEach
     void tearDown() { Authenticators.forTest(null); }
 

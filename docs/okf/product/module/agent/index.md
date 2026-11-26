@@ -38,6 +38,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `ASSISTANT-SCREEN-HELP-1` | P3 | feature | The Assistant explains the screen or Widget a user is on | operator |
 | — | P2 | feature | AGT-5 per-tool dry-run seam — BLOCKED-EXTERNAL | — |
 | `AGT-SEGMENT-1` | P3 | chore | the assistant's commercial framing is an unvalidated product read. | — |
-| `AGENT-NOTICE-PLANTED-1` | P3 | feature | No Agent Skill tells the agent to tell the person when text it reads in data (a CSV cell, a comment, a description, a proposal's reason)… | — |
 | `AGENT-ANSWERS-WITHOUT-SERVER-1` | P3 | feature | Asked which sample rows a planned schema rejects (golden task dev-13), the agent loaded no skill, called no tool and worked the answer ou… | — |
 | `DOCS-SKILLS-ALERTS-AGENTIC-1` | P3 | feature | hub-routed agent skills exist for docs lookup, pipeline authoring, incident investigation and case analysis (.claude/skills/) | demand |

@@ -34,5 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `SCREENING-HIT-KEY-RAW-1` | P2 | defect | A screening hit stores and answers the subject key raw: subjectKey is the value of the Screening Job's keyField column (ScreeningHits.rai… | — |
 | `SCREENING-1` | P2 | feature | Confirm the Screening add-on's D6 and D8 builds; D4, D5 and D7 stand with their triggers. | — |
 | `HOWTO-DOC-DRIFT-1` | P3 | chore | internal hub pages that contradict the code, found writing the P3 how-tos: | — |

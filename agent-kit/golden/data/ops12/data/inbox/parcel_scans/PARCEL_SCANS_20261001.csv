@@ -1,0 +1,5 @@
+parcel_id,carrier,weight_kg,scan_date
+P-0001,Bluefin,2.5,2026-10-01
+P-0002,Kestrel,11.0,2026-10-01
+P-0003,Northwind,4.25,2026-10-01
+P-0004,Bluefin,0.8,2026-10-01

@@ -618,7 +618,7 @@ public final class InvRoutes implements RouteModule {
             out.put("offset", offset);
             out.put("limit", limit);
             out.put("hasMore", r.truncated());
-            audit(ex, datasetId, of, rows.size(), r.truncated(), null);
+            audit(ex, datasetId, auditedValue(ex, mask, of), rows.size(), r.truncated(), null);
             return out;
         } catch (SQLException e) {
             throw DatasetReadFault.of("neighbour list failed", datasetId, writeRoot, e);
@@ -1035,7 +1035,7 @@ public final class InvRoutes implements RouteModule {
                 api.dataRoot(), datasetId, relationSql, body, limit, mask);
         ProjectionCache.Hit hit = ProjectionCache.get(cacheKey);
         if (hit != null) {
-            audit(ex, datasetId, neighborsOf, hit.rows(), hit.truncated(), (IndexedRead.Outcome<?>) hit.auditSource());
+            audit(ex, datasetId, auditedValue(ex, mask, neighborsOf), hit.rows(), hit.truncated(), (IndexedRead.Outcome<?>) hit.auditSource());
             if (ProjectionCache.notModified(ex, hit.etag())) return ProjectionCache.respond304(ex, hit.etag());
             ProjectionCache.tag(ex, cacheKey);
             ex.getResponseHeaders().set("Content-Type", EDGES_MEDIA_TYPE);   // PERF-P10-1: set on a success return only
@@ -1056,7 +1056,7 @@ public final class InvRoutes implements RouteModule {
                 out.put("truncated", indexed.result().truncated());
                 out.put("columnTypes", columnTypes(writeRoot, datasetId, List.of(sourceCol, targetCol)));
                 out.put("source", indexed.source());
-                audit(ex, datasetId, neighborsOf, rows.size(), indexed.result().truncated(), indexed);
+                audit(ex, datasetId, auditedValue(ex, mask, neighborsOf), rows.size(), indexed.result().truncated(), indexed);
                 if (!rows.isEmpty()) com.gamma.util.OnboardingCounters.record(com.gamma.util.OnboardingCounters.Event.FIRST_GRAPH);   // OB-13
                 ProjectionCache.READS.increment();
                 if (ProjectionCache.put(cacheKey, out, rows.size(), indexed.result().truncated(), auditCopy(indexed))) ProjectionCache.tag(ex, cacheKey);
@@ -1085,7 +1085,7 @@ public final class InvRoutes implements RouteModule {
             out.put("truncated", r.truncated());
             out.put("columnTypes", columnTypes(writeRoot, datasetId, List.of(sourceCol, targetCol)));
             if (indexed != null) out.put("source", indexed.source());
-            audit(ex, datasetId, neighborsOf, rows.size(), r.truncated(), indexed);
+            audit(ex, datasetId, auditedValue(ex, mask, neighborsOf), rows.size(), r.truncated(), indexed);
             if (!rows.isEmpty()) com.gamma.util.OnboardingCounters.record(com.gamma.util.OnboardingCounters.Event.FIRST_GRAPH);   // OB-13: a graph was drawn
             if (ProjectionCache.put(cacheKey, out, rows.size(), r.truncated(), auditCopy(indexed))) ProjectionCache.tag(ex, cacheKey);
             ex.getResponseHeaders().set("Content-Type", EDGES_MEDIA_TYPE);
@@ -1381,7 +1381,8 @@ public final class InvRoutes implements RouteModule {
             out.put("masking", mask.describe());
             out.put("fences", traversalFences(maxDepth, maxEdges, timeoutSeconds));
             out.put("source", indexed.source());
-            auditTraversal(ex, datasetId, startNode, targetNode, maxDepth, paths.size(), truncated, indexed);
+            auditTraversal(ex, datasetId, auditedValue(ex, mask, startNode), auditedValue(ex, mask, targetNode), maxDepth,
+                    paths.size(), truncated, indexed);
             return out;
         }
 
@@ -1467,7 +1468,8 @@ public final class InvRoutes implements RouteModule {
             out.put("masking", mask.describe());
             out.put("fences", fences);
             out.put("source", indexed.source());
-            auditTraversal(ex, datasetId, startNode, targetNode, maxDepth, paths.size(), truncated, indexed);
+            auditTraversal(ex, datasetId, auditedValue(ex, mask, startNode), auditedValue(ex, mask, targetNode), maxDepth,
+                    paths.size(), truncated, indexed);
             return out;
         } catch (SQLException e) {
             throw DatasetReadFault.of("traversal failed", datasetId, writeRoot, e);
@@ -1544,6 +1546,16 @@ public final class InvRoutes implements RouteModule {
         if (o == null || !o.served()) return o;
         return new IndexedRead.Outcome<>(Boolean.TRUE, o.version(), o.stale(), o.staleReason(), null, o.staleCodes(),
                 o.fingerprintKnown(), null);
+    }
+
+    /**
+     * A caller-named entity as {@code link.expanded} and {@code link.traversed} keep it (AGENT-AUDIT-EXPAND-VALUE-1, D-AK19,
+     * operator 2026-11-26): for an
+     * agent the alias it was answered in, never the raw key {@code mask.in} resolved; for a person the raw key, unchanged.
+     */
+    static String auditedValue(HttpExchange ex, ExplorationMasking mask, String raw) {
+        boolean agent = com.gamma.spi.auth.RequestAttrs.subject(ex).map(com.gamma.spi.auth.Subject::agent).orElse(false);
+        return agent && raw != null ? mask.out(raw) : raw;
     }
 
     static void audit(HttpExchange ex, String datasetId, String neighborsOf, int rows, boolean truncated,

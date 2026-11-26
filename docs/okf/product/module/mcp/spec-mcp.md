@@ -133,6 +133,7 @@ over 256 KiB is cut and the result says so.
 | `list_incidents` | `status?`, `severity?`, `q?`, `limit?` | `GET /objects?type=incident` |
 | `get_incident` | `incident` | `GET /objects/{incident}` |
 | `get_incident_briefs` | `incident` | `GET /incidents/{incident}/briefs` |
+| `list_comments` | `id` | `GET /objects/{id}/comments` (masked) |
 | `list_alert_rules` | — | `GET /alerts/rules` |
 | `list_alerts` | — | `GET /alerts` |
 | `list_expectations` | — | `GET /expectations` |
@@ -357,11 +358,11 @@ agent token calling a route directly is treated the same.
      for a person — the guards that refuse those under a policy (`holdRefusing*`) read the policy only;
   2. **allowed** — reads (GET), and `POST /mcp`, `/validate`, `/pipelines/authored/{id}/dry-run`,
      `/bundle/export`, `/promotion/preview`, `/pending-changes/{id}/withdraw`, `/action-requests` (held by its
-     own design), `/db/query` (the read the AK-1 `query_dataset` tool replays) and `/pipelines/authored/{id}/run`
+     own design), `/db/query` (the AK-1 `query_dataset` read) and `/pipelines/authored/{id}/run`
      (D-AK2: a delegated person only, never a machine), and `/pending-actions/{id}/withdraw`; since **W6 group A**
      (2026-11-26) the four authoring previews (`AgentGate.AUTHORING_PREVIEWS`: `/config/preview/parsing|schema`,
      `/config/suggest/schema`, `/components/mapping/validate`), for every agent, body-capped at 256 KiB and naming
-     no config file ([Agent authoring previews](spec-agent-previews.md)); `/lookups/test` stays refused to agents;
+     no config file ([Agent authoring previews](spec-agent-previews.md)); data answers: [S0 seam](spec-agent-data-seam.md);
      since **W6 group C** (2026-11-26) `POST /tests/run`, a delegated person's agent only (`AgentGate.PERSON_ONLY`,
      D-AK10), still gated `canAuthorWorkbench` ([Agent Space tests](spec-agent-space-tests.md));
   3. **actions** (**AK-2d**, 2026-11-25) — `AgentGate.ACTIONS`, the operational routes of plan §4.6: `POST
@@ -589,10 +590,8 @@ Built 2026-11-25 (widening plan §3 W9). Two Agent Skills that only read; no too
 
 ## Adversarial golden tasks (W8)
 
-Suite `agent-kit/golden/adversarial.json`: instructions planted where an agent reads data, asking it to approve,
-withdraw someone else's proposal, reveal or promote. It measures whether the model tries (the gate refuses either way)
-and whether it tells the person. Grader checks, guard rules and tests:
-[`tests-agent-golden.md`](tests-agent-golden.md) § The adversarial suite (W8).
+Instructions planted where an agent reads data (`agent-kit/golden/adversarial.json`): does the model try, and does it
+tell the person? Detail: [`tests-agent-golden.md`](tests-agent-golden.md) § The adversarial suite (W8).
 
 ## Security review (2026-11-20)
 

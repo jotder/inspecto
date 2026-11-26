@@ -74,6 +74,9 @@ final class LinkAnalysisLimitsRoutes implements RouteModule {
             throw new ApiException(503, ErrorCodes.CONTROL_PLANE_READ_ONLY, "No home for the server-wide Link Analysis limits "
                     + "(-Dsystem.config.dir, spaces root and write root all unset)");
         Map<LaLimit, Number> changes = changes(body, LaLimit.Layer.INSTALL);
+        Number burst = changes.get(LaLimit.RATE_AGENT_BURST);   // W6 S0: never a burst some agent data route cannot pay
+        String burstProblem = burst == null ? null : AgentGate.burstProblem(burst.doubleValue(), AgentGate.DATA_ROUTES);
+        if (burstProblem != null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, burstProblem);
         load(doc);   // a document that does not parse is refused before anything is written
         if (!changes.isEmpty()) LaLimits.writeInstall(doc, changes);
         // CL-13: the rate.* buckets are rebuilt now; every other install item is read where it is used, at its next use

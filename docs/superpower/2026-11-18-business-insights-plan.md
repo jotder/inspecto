@@ -392,7 +392,7 @@ Spec: [`okf/product/module/engine/spec-kpi-projection.md`](../okf/product/module
 - **Found in passing and fixed**: `ObjectReadMasking` treated every Alert scope as a Dataset id; a `kpi:` scope made
   `GET /alerts` fail (500). A `kpi:` scope now masks nothing (its text holds no key).
 - **Deliberately deferred**: (the editor's KPI fields and "arm from a Widget" shipped in §11.7); a role-aware
-  owner for rule evaluation (would need roles stamped on the rule, as Jobs stamp `updatedByRoles`).
+  owner for rule evaluation — **closed 2026-11-26, §11.14**.
 
 ### 11.7 P1 leftovers — overlays on a public share, KPI Alert Rules in the UI (2026-11-25)
 
@@ -515,7 +515,9 @@ changepoint **and** drift; one Insights Dataset per Profile.
 - **Signals**: `insight.scan.completed` (counts) and `insight.found` per new Insight (≤ 20 per run, band ≥ elevated)
   for Notification Rules.
 - **Deliberately deferred**: the Profile editor UI and the Insight Feed Visualization Type; D-BI4 owner tuning within
-  Builder bounds (today: who may save the Profile tunes it); the sharing envelope does not yet narrow by a Mapping Dataset's `basedOn` base (as KPI History); depth-2 slices (`BI-EXPLAIN-DEPTH2-1`); I-9, I-10 (built next, §11.10).
+  Builder bounds (today: who may save the Profile tunes it); the sharing envelope does not yet narrow by a Mapping Dataset's `basedOn` base (the core seam closed it 2026-11-26,
+  §11.14; `InsightScanJobType.envelope` still calls the store-less `SharingEnvelope.of(List)` — the insights lane
+  switches it to `of(store, …)`); depth-2 slices (`BI-EXPLAIN-DEPTH2-1`); I-9, I-10 (built next, §11.10).
 
 ### 11.10 P3 I-9 concentration and I-10 distribution shift — as built (2026-11-26)
 
@@ -567,6 +569,36 @@ changepoint **and** drift; one Insights Dataset per Profile.
 - **Deferred**: a "Run scan now" shortcut (the Jobs screen runs it); the Insight Feed Visualization Type for
   Dashboards; `run=all` history and band filters in the feed.
 
+### 11.12 P3 Explain depth 2 — pairs of dimensions in the Insight scan (`BI-EXPLAIN-DEPTH2-1`) — as built (2026-11-26)
+
+- **Where the pairs are computed (D-BI7)**: an opt-in mode of the existing `insight.scan` Job, not a Job Type of its
+  own. The Profile already names the Dataset, Measure, filters, date column, grain and dimensions a pair needs; the Job
+  already runs as its author, fetches through `BiSpecRunner.runAsJob` and owns a store whose sharing envelope is right.
+  A second Job Type would repeat all of that and add a Job id, a manifest entry and a store with an envelope of its own.
+  No new route and no new Job Type, so the new-route checklist does not apply.
+- **Profile fields**: `pairs` (default `false`; `true` needs at least 2 `dimensions`) and `maxPairValues` (the cap on
+  value pairs per pair of dimensions, 10–1000, default 200, as depth 1's 200 values per dimension).
+- **Statements**: for every pair of the Profile's dimensions (at most 12 → 66), one `/bi/query` body grouped by both
+  columns and the grained date over the last two complete buckets, through `BiSpecRunner.runAsJob` (no SQL built; a
+  Measure over a masked column is refused by the vet before any pair runs; a classified value is stored as its alias).
+  `limit` = 2 × `maxPairValues`; truncated, or more than `maxPairValues` distinct value pairs → that pair is listed in
+  `refused` with the reason in words, never cut.
+- **Statistics**: the depth-1 kernel unchanged — `Drivers.explain` over the value pairs (`"N × DATA-7D"`), cover 0.8,
+  ranked with `Drivers.rank`. Additive Measures only (the Profile admits only sum and count).
+- **Store**: `pairs.json` beside the Insights Parquet in `insights_<profile>/` — not a Parquet, so the Dataset (which
+  reads `insights-*.parquet`) does not change shape. Keyed by the compared bucket; a run rewrites its bucket's entry
+  atomically; entries computed more than 400 days ago are dropped. Readable only through `POST /insights/explain`, and
+  only by a caller who may view the Dataset `insights_<profile>` (the same envelope as the feed).
+- **Read**: `POST /insights/explain` takes `depth` (1 default, or 2). With 2, after the depth-1 answer, it looks for a
+  saved Profile with `pairs: true` over the same Dataset, Measure, date column, grain, filters and condition whose
+  Insights Dataset the caller may view, and returns its entry for the explained bucket as `pairs {profile, computedAt,
+  previous, current, before, after, stale, drivers[], refused[]}`; `stale` is true when the stored totals no longer
+  equal the live depth-1 totals (data restated since the run). None → `pairs: null` and `pairsNote` saying how to get
+  them (save such a Profile with `pairs: true`, run its `insight.scan` after the bucket completes). A ratio with
+  depth 2 is refused in words (422). A Profile the caller may not read is indistinguishable from none.
+- **Not done**: the UI (the explain dialog shows no pairs yet); a revealer still sees aliases in stored pairs (the Job
+  never reveals); depth 3.
+
 ### 11.13 P3 I-17 second half — a Case or an Action Request from an Insight — as built (2026-11-26)
 
 - **No new route.** Each Insight in the feed has **Open a Case** and **Request action…**, both on existing routes.
@@ -591,6 +623,23 @@ changepoint **and** drift; one Insights Dataset per Profile.
   "Raised for a Case from Entity insight:… in Dataset insights_…" (the route's wording is now neutral).
 - **Deferred** (board rows): `{{x}}` in the sentence is interpolated by the Action Request template renderer
   (`ACTION-TEMPLATE-ESCAPE-1`); adding the Insight to an EXISTING Case (`INSIGHT-CASE-EXISTING-1`).
+
+### 11.14 Loose ends A — as built (2026-11-26)
+
+Operator decisions (2026-11-26, the recommended options):
+
+- **A Mapping's base joins the sharing envelope.** `SharingEnvelope.of(store, sources)` adds, for every Mapping
+  source (`origin: mapping`), its `basedOn` base, recursively through Mappings; a base shared differently from the
+  rest refuses in words, a base that does not resolve (or a Mapping loop) refuses too. Callers: KPI History
+  (`KpiSnapshotJobType.envelope`) and model output Datasets (`ScoreDatasets`, which already added one level). Insights
+  (`InsightScanJobType.envelope`, in `features/inspecto-insights`) still calls `of(List)` — its lane switches it.
+- **KPI Alert Rules stamp roles and re-check access at evaluation.** The owner's held roles are stamped as `ownerRoles`
+  when the owner saves (another editor never lends theirs; server-stamped, a client value is dropped at every write
+  door and every raw-file import, via `JobAuthority.stampFiles`); every sweep re-checks that the owner, with those
+  roles, may still view the KPI and read its Dataset; if not, the rule is skipped and ONE Incident names it and why
+  (deduped while active on `kpiRuleAccess`). Spec: `okf/product/module/engine/spec-kpi-projection.md`.
+- Residual: a rule file written straight to disk keeps whatever `ownerRoles` it holds (the same trust as any
+  registry file written outside the routes).
 
 ### 11.15 Loose ends C — UI, as built (2026-11-26)
 

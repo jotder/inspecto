@@ -43,7 +43,11 @@ hold above apply unchanged.
 - **Analyst MCP Tools** (`McpTools.CASE_TOOLS`, all `write: true`): `add_comment`, `build_incident_brief`,
   `work_incident_or_case` (`action` one of `ack`, `assign`, `resolve`, `transition` → `POST /objects/{id}/…`),
   `work_alert` (`ack`, `resolve`) and `open_case_from_entities`, each with a one-line `reason`. The reads were
-  already there (`list_incidents`, `get_incident`, `get_incident_briefs`, `list_alerts`).
+  already there (`list_incidents`, `get_incident`, `get_incident_briefs`, `list_alerts`), and since 2026-11-26
+  `list_comments` (`GET /objects/{id}/comments`): `get_incident` carries no comments, so an agent asked to read a thread
+  could not (AGENT-NOTICE-PLANTED-1). A read, allowed to every agent; the Incident's own classified key in a comment comes back masked (another
+  number typed into a comment is not)
+  (`ControlApiObjectReadMaskingTest.anAgentReadsACommentWithTheKeyMaskedAndARevealerReadsItRaw`).
   `McpToolRoutesTest.everyCaseToolReplaysACaseActionAndEveryCaseActionHasATool` pins tools to routes both ways.
 - **Agent Skills and golden tasks:** `triage-incident` (read, Brief, comment, accept, assign — never close) and
   `work-cases` (Workflow moves, resolve, Alerts, open a Case — always on the person's yes); the analyst suite

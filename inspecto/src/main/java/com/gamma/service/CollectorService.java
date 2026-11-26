@@ -869,6 +869,10 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                     String dd = System.getProperty("data.dir", root.dataDir());
                     return (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd);
                 }));
+        // BI-INSIGHTS-1 loose ends A: each sweep re-checks the KPI rule's owner (roles stamped at save); lost access =
+        // skipped, one Incident.
+        alerting.kpiAccess(com.gamma.control.KpiAlertProbe.accessRefusal(
+                () -> com.gamma.pipeline.SpaceConfigRoot.forSpace(probeSpace)));
         // LA-23: Investigation rules, evaluated by the optional inspecto-geo-link module when it ships (absent it,
         // they are inert). ⚠ The root is resolved the way ControlApi.writeRoot() resolves where the Investigation
         // routes WROTE — this Space's config dir, else -Dassist.write.root as read at construction — and NOT by

@@ -46,6 +46,10 @@ class ControlApiObjectReadMaskingTest {
         String a = ex.getRequestHeaders().getFirst("Authorization");
         if (a == null || !a.startsWith("Bearer ")) return Optional.empty();
         String user = a.substring(7);
+        // A person's agent (agent client claude-code): what an analyst holds, without the never-list capabilities, which
+        // the OIDC authenticator strips from every agent token (Roles.AGENT_NEVER_CAPABILITIES).
+        if ("agent".equals(user)) return Optional.of(new Subject("analyst-1", Set.of("canWorkIncidents", "canManageIncidents"),
+                null, java.util.Map.of(), null, null, null, "claude-code"));
         return Optional.of(new Subject(user, switch (user) {
             case "revealer" -> Set.of("canRevealLinkEntities");
             case "worker" -> Set.of("canWorkIncidents", "canAdminister");
@@ -296,6 +300,23 @@ class ControlApiObjectReadMaskingTest {
             assertEquals(2, JSON.readTree(get(c, "viewer", "/objects?q=" + token).body()).get("data").size());
             String maskedCid = JSON.readTree(get(c, "viewer", "/objects/" + withCid.id()).body()).get("data").get("correlationId").asText();
             assertEquals(ids(JSON.readTree(get(c, "viewer", "/objects?correlationId=" + maskedCid).body()).get("data")).trim(), withCid.id());
+        }
+    }
+
+    /** MCP Tool {@code list_comments} replays exactly {@code GET /objects/{id}/comments} as its caller (pinned in
+     *  McpToolRoutesTest), so this is what the tool answers an agent (AGENT-NOTICE-PLANTED-1): the classified key in a
+     *  comment comes back masked, and the person who may reveal still reads it raw. */
+    @Test
+    void anAgentReadsACommentWithTheKeyMaskedAndARevealerReadsItRaw(@TempDir Path dir, @TempDir Path root) throws Exception {
+        try (Ctx c = open(dir, root, true)) {
+            String id = open(c, ObjectType.INCIDENT).id();
+            assertEquals(200, send(c, "workrev", "POST", "/objects/" + id + "/comments",
+                    "{\"body\":\"called " + RAW + " back\"}").statusCode());
+            var agent = get(c, "agent", "/objects/" + id + "/comments");
+            assertEquals(200, agent.statusCode(), agent.body());
+            assertFalse(agent.body().contains(RAW), agent.body());
+            assertTrue(agent.body().contains("called masked:"), agent.body());
+            assertTrue(get(c, "revealer", "/objects/" + id + "/comments").body().contains("called " + RAW + " back"));
         }
     }
 

@@ -438,6 +438,39 @@ class ControlApiEntityListTest {
 
     // ── capability ─────────────────────────────────────────────────────────────────────────────────────
 
+    /**
+     * AGENT-GET-DATA-READS-1 (D-AK13): "GET /entity-lists/([^/]+)" is an agent data route. An agent reads a masked list's
+     * members as tokens and its answer is stamped; with every stamp a no-op the agent gets 500 with no member while a
+     * person still reads the list. Falsified: removing the stamp in {@code EntityListRoutes.one}.
+     */
+    @Test
+    void anAgentsListReadIsProvenMaskedOrWithheld(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            data(post(c, LISTS, WATCH), 201);
+            data(post(c, "/entity-lists/wl/members", "{\"add\":[\"+447700900123\"],\"reason\":\"r\"}"), 200);
+            Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
+                case "Bearer person" -> Optional.of(new Subject("analyst-1", Set.of("canManageIncidents")));
+                case "Bearer agent" -> Optional.of(new Subject("analyst-1", Set.of("canManageIncidents"), null,
+                        java.util.Map.of(), null, null, null, "claude-code"));
+                default -> Optional.empty();
+            });
+            try {
+                HttpResponse<String> agent = send(c.port, "GET", "/entity-lists/wl", null, "Bearer agent");
+                assertTrue(data(agent, 200).at("/members/0").asText().startsWith("masked:"), agent.body());
+                assertFalse(agent.body().contains("447700900123"), agent.body());
+                com.gamma.util.AnswerMasking.ignoreStampsForTest(true);
+                HttpResponse<String> withheld = send(c.port, "GET", "/entity-lists/wl", null, "Bearer agent");
+                assertEquals(500, withheld.statusCode(), withheld.body());
+                assertTrue(withheld.body().contains(ControlApi.MASKING_NOT_PROVEN), withheld.body());
+                assertFalse(withheld.body().contains("447700900123") || withheld.body().contains("masked:"), withheld.body());
+                status(200, send(c.port, "GET", "/entity-lists/wl", null, "Bearer person"), "a person is unchanged");
+            } finally {
+                com.gamma.util.AnswerMasking.ignoreStampsForTest(false);
+                Authenticators.forTest(null);
+            }
+        }
+    }
+
     @Test
     void writesNeedCanManageIncidentsAndReadsNeedOnlySpaceAccess(@TempDir Path cfg, @TempDir Path root) throws Exception {
         Authenticators.forTest(ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {

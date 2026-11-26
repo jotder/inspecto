@@ -265,6 +265,8 @@ public final class RiskScoreRoutes implements RouteModule {
 
         List<Map<String, Object>> rows = new java.util.ArrayList<>();
         boolean truncated = false;
+        // W6 S0 (D-AK13): each key below is masked by putEntityKey; stamped here so an empty list is proven too
+        com.gamma.util.AnswerMasking.applied(model.scoresDataset() + " (entity keys; evidence masked at write)", 1);
         if (ran) {
             String cols = "\"entity_key\", \"score\", \"high\", \"scored_at\"" + (select.isEmpty() ? "" : ", " + String.join(", ", select));
             QueryExecutor.Result r = QueryExecutor.run(new QueryExecutor.Request("scores", relation,

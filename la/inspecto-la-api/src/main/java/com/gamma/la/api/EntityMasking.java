@@ -94,6 +94,8 @@ final class EntityMasking {
         this.tokenOf = tokenOf;
         this.rawOf = new LinkedHashMap<>();
         tokenOf.forEach((raw, token) -> rawOf.put(token, raw));
+        // AGENT-KIT-1 W6 S0 (D-AK13): every factory decides the answer's masking here - the stamp an agent data route needs
+        com.gamma.util.AnswerMasking.applied(basis, tokenOf.isEmpty() ? 0 : 1);
     }
 
     /** The stricter of two masking modes: {@code none} < {@code typed} < {@code all} (an unknown mode counts as the strictest). */

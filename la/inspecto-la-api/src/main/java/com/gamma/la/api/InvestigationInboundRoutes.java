@@ -224,6 +224,7 @@ public final class InvestigationInboundRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, where + ": the key normalises to nothing under '"
                     + type.normaliser() + "' - it is not an Entity of type '" + type.id() + "'");
         String shown = !masked ? normalised : alias ? key : ExplorationMasking.alias(writeRoot, normalised);
+        com.gamma.util.AnswerMasking.applied("Entity Type " + type.id(), masked ? 1 : 0);   // AGENT-KIT-1 W6 S0 (D-AK13)
         return new TypedEntity(type, normalised, masked, shown);
     }
 

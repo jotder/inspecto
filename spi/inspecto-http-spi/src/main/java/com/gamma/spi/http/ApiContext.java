@@ -459,6 +459,7 @@ public interface ApiContext extends WriteRootProvider {
      *  {@link #HANDLED}. A {@code /api/v1} request gets the {@link Envelope} shaping (legacy bodies are
      *  byte-for-byte unchanged); bodies ≥ {@link #GZIP_MIN_BYTES} are gzipped when the client accepts it. */
     static Object respondJson(HttpExchange ex, int status, Object body) throws IOException {
+        com.gamma.util.AnswerMasking.requireProvenBeforeSend(status);   // AGENT-KIT-1 W6 S0: no unproven 2xx data answer leaves
         Object payload = v1(ex) ? Envelope.shape(ex, status, body) : body;
         byte[] bytes = JSON.writeValueAsBytes(payload);
         // PERF-P10-1: a success keeps a versioned JSON media type its handler set (`application/vnd.…+json`); an error is plain JSON
@@ -514,6 +515,7 @@ public interface ApiContext extends WriteRootProvider {
 
     /** Write {@code text} with an explicit {@code Content-Type} (e.g. {@code text/csv}); returns {@link #HANDLED}. */
     static Object respondText(HttpExchange ex, String text, String contentType) throws IOException {
+        com.gamma.util.AnswerMasking.requireProvenBeforeSend(200);
         byte[] bytes = maybeGzip(ex, text.getBytes(StandardCharsets.UTF_8));
         ex.getResponseHeaders().set("Content-Type", contentType);
         if ("HEAD".equals(ex.getRequestMethod())) { ex.sendResponseHeaders(200, -1); return HANDLED; }
@@ -529,6 +531,7 @@ public interface ApiContext extends WriteRootProvider {
      */
     static Object respondBinary(HttpExchange ex, byte[] bytes, String contentType, String filename)
             throws IOException {
+        com.gamma.util.AnswerMasking.requireProvenBeforeSend(200);
         ex.getResponseHeaders().set("Content-Type", contentType);
         ex.getResponseHeaders().set("Content-Disposition", "attachment; filename=\"" + filename + "\"");
         ex.sendResponseHeaders(200, bytes.length);

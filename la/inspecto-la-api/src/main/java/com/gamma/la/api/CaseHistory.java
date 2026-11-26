@@ -130,6 +130,8 @@ final class CaseHistory {
         Map<String, Object> describe = new LinkedHashMap<>();
         describe.put("mode", mode);
         describe.put("masked", alias || covered);
+        // AGENT-KIT-1 W6 S0 (D-AK13): the masking of this answer is decided (titles are scrubbed below when it masks)
+        com.gamma.util.AnswerMasking.applied("case history, Entity Type " + type, alias || covered ? 1 : 0);
         Map<String, Object> res = new LinkedHashMap<>();
         res.put("entityType", type);
         if (raw == null) {

@@ -43,12 +43,12 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
 | `LEGAL-HOLD-SCOPE-1` | P3 | feature | A legal hold does not yet protect a Pipeline's data partitions, and holds have no screen. | — |
 | `BI-INSIGHTS-1` | P2 | feature | Advanced insights on business data in Widgets and Dashboards, authored and tuned as Insight Profiles. | — |
+| `VIEW-DATA-UNMASKED-1` | P2 | defect | GET /views/{id}/data answers a view's rows with no masking and no capability check, to people as well as agents | — |
 | `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` | P3 | defect | A multi-file Consignment re-planned after a failover can write a second, differently named output. | operator |
 | — | P2 | feature | Postgres multi-user | operator |
 | `ENGINE-ETL-TESTS-RED-1` | P2 | defect | Eight inspecto-etl / inspecto-engine tests fail on master since the 2026-11-25 pushes of OUTPUT-NAME-OVERWRITE-1 (e37f96b1a) and DATED-RE… | — |
 | `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` | P3 | chore | Drop the window_self_join workaround once a fixed DuckDB driver is pinned. | — |
 | `DUCKDB-2-0-1-HAVANA-TZ-1` | P3 | chore | DuckDB 2.0.1's zone data keeps Cuba on UTC−4 from 2026-11-01 to about mid-March 2027; the JDK's tzdata 2026b does not. | — |
 | `RUN-TRIGGER-ACTOR-SPOOF-1` | P3 | defect | ?actor= on POST /jobs/{name}/trigger, POST /jobs/runs/{id}/replay and POST /pipelines/authored/{id}/trigger is free text written into the… | — |
-| `GOLDEN-OPS12-FIXTURE-1` | P3 | chore | Golden task ops-12 (a machine gives up waiting on a day) cannot be set up from its suite text: it needs a by-day Job whose day waits on a… | — |
 | `ALERT-RULE-ROW-FILTER-1` | P3 | feature | A Measure Alert Rule (dataset, measure, comparator, threshold) has no row filter, so "alert when more than 5 shipments are undelivered" c… | — |
 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | The shapes the object-store ingest lane still refuses (sinks:, produces: reference, the readers). | operator |

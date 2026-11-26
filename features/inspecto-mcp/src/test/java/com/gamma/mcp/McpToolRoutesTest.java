@@ -363,6 +363,18 @@ class McpToolRoutesTest {
             assertFalse(c.path().matches("/screening/hits/[^/]+/reveal"), "no tool reveals a Screening Hit: " + c.path());
     }
 
+    /** AGENT-NOTICE-PLANTED-1: list_comments only reads, and replays the one route whose masking
+     *  ControlApiObjectReadMaskingTest proves for an agent token. */
+    @Test
+    void listCommentsReplaysTheObjectsCommentsRoute() {
+        McpTools.Tool t = McpTools.tool("list_comments");
+        assertFalse(t.write());
+        McpTools.Call c = t.router().route(t.validate(new LinkedHashMap<>(Map.of("id", "INCIDENT-1"))));
+        assertEquals("GET", c.method());
+        assertEquals("/objects/INCIDENT-1/comments", c.path());
+        assertNull(c.body());
+    }
+
     @Test
     void theEndpointIsReplayGated() {
         assertEquals("replay-gated", CapabilityManifest.exemptionFor("POST", "/mcp").category());

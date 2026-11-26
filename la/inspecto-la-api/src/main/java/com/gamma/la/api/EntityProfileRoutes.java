@@ -321,6 +321,7 @@ public final class EntityProfileRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the key normalises to nothing under '" + t.normaliser()
                     + "' - it is not an Entity of type '" + t.id() + "'");
         boolean masked = EntityProfiles.maskedUnder(mode, t);
+        com.gamma.util.AnswerMasking.applied("Entity Type " + t.id(), masked ? 1 : 0);   // AGENT-KIT-1 W6 S0 (D-AK13)
         String shown = !masked ? key : alias ? given : ExplorationMasking.alias(writeRoot, key);
         return new Resolved(key, shown, masked);
     }

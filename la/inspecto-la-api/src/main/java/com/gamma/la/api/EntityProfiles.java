@@ -258,6 +258,8 @@ final class EntityProfiles {
         masking.put("mode", f.maskMode);
         masking.put("masked", f.masked());
         out.put("masking", masking);
+        // W6 (D-AK13): the sections above show the type's keys as f.masked() decides
+        com.gamma.util.AnswerMasking.applied("entity type " + f.type.id(), f.masked() ? 1 : 0);
         return out;
     }
 
@@ -1075,6 +1077,8 @@ final class EntityProfiles {
     static Map<String, Object> suggest(Frame f, String prefix, int limit, boolean reveal) {
         Map<String, Object> out = new LinkedHashMap<>();
         boolean hidden = f.masked() && !reveal;
+        // AGENT-KIT-1 W6 S0 (D-AK13): a masked type lists nothing for a caller who may not reveal - the masking decision
+        com.gamma.util.AnswerMasking.applied("Entity Type " + f.type.id(), hidden ? 1 : 0);
         out.put("type", f.type.id());
         out.put("masked", f.masked());
         out.put("revealed", f.masked() && reveal);

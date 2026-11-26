@@ -80,7 +80,17 @@ A KPI rule takes no `dataset`, `measure`, `metric`, `window`, `maximumAge`, `whe
   read its Dataset; its Measure reveals no masked column (`BiResultMasking.vetMeasure`, no reveal — an alert never
   reveals); a `rag` or `probability` rule needs a KPI with a target or bands; a `projection` needs a `count`/`sum` KPI
   on a week, month, quarter or year grain. 422 otherwise.
-- **Sweep** (`KpiAlertProbe.of`, wired in `CollectorService` per Space): the same checks, **as the rule's owner** (as
+- **Roles stamped at save** (operator 2026-11-26): the Alert Rule routes stamp the saver's held roles on a KPI rule as
+  `ownerRoles` (as Jobs stamp `updatedByRoles`) — only when the saver IS the rule's owner; another editor's save keeps
+  the stored stamp while the owner is unchanged, else none (`KpiAlertProbe.rolesFor`). A value the client sends is
+  always dropped: at `/alerts/rules`, `/components/alert-rule`, a bundle item, a Space Template seed, and every
+  raw-file import door (carried `alert-rule` files are re-stamped by `JobAuthority.stampFiles`, as carried Jobs are). The owner is read with those
+  roles, their capabilities taken from the role table as it is NOW (`JobAuthority.capabilitiesNow`).
+- **Sweep re-check** (`KpiAlertProbe.accessRefusal` → `AlertService.kpiAccess`, wired in `CollectorService` per Space):
+  before each evaluation, may the owner (with the stamped roles) still view the KPI and read its Dataset (a Mapping
+  with its base)? If not, the rule is **skipped** — it never fires — and **one** Incident (error) names the rule and
+  why, deduped on the attribute `kpiRuleAccess` while it is active, so later sweeps add none.
+- **Sweep** (`KpiAlertProbe.of`): the same checks, **as the rule's owner** (as
   `kpi.snapshot` runs as its author, `PostgresPublishJobType.canView/canRead`); a refusal or no projection reads as
   unknown — nothing fires, nothing heals — and is logged. `asOf: latest` KPIs follow the newest day in the data.
 - **Alert feed masking**: a `kpi:` scope is not a Dataset id, so `ObjectReadMasking` masks nothing in it (its text holds
@@ -88,8 +98,11 @@ A KPI rule takes no `dataset`, `measure`, `metric`, `window`, `maximumAge`, `whe
 
 ### Limits
 
-- A rule carries its owner's **id, not their roles**: a KPI or Dataset shared to the owner only through a role is not
-  readable by the rule (fail closed, refused at save). Share it to the owner, or leave it unshared.
+- A rule saved before 2026-11-26, or written without an authenticated saver (a Decision Rule consequence carries the
+  stored rule's roles only while its owner is unchanged), has no `ownerRoles`: only what is shared to the owner by id
+  is readable (fail closed). Re-save it to stamp the roles.
+- The roles are those held at save: an identity provider dropping the user from a group is not seen (as a Job's
+  `updatedByRoles`); a change to the role table is.
 - The sweep re-reads a projection on every sweep (a backtest per KPI rule); fine for tens of rules, not thousands.
 - Studio authors these rules: the Alert Rule editor's *Watch: A KPI* kind asks the KPI and *Alert on* (its value,
   its RAG, the projected landing, the projected landing's RAG, the chance of meeting the target), writing `kpi`,

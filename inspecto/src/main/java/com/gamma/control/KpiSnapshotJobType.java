@@ -104,7 +104,7 @@ public final class KpiSnapshotJobType implements JobTypeProvider {
 
             // Registered (or re-enveloped) BEFORE new values are written: a refusal writes nothing, and a narrowed sharing
             // envelope is in force before the values it protects.
-            Map<String, Object> envelope = envelope(kpiContent, dataset);
+            Map<String, Object> envelope = envelope(store, kpiContent, dataset);
             KpiHistory.claim(data, kpiId);   // a store another owner made refuses before anything is registered
             String datasetId = register(store, kpiId, envelope);
             String relationSql = DatasetRelation.relationSql(dataset, data, views);
@@ -128,9 +128,9 @@ public final class KpiSnapshotJobType implements JobTypeProvider {
      * the history's; two shared ones must be shared alike, since an envelope cannot state an intersection — otherwise
      * the run is refused rather than showing one component's readers the other's values.
      */
-    static Map<String, Object> envelope(Map<String, Object> kpi, Map<String, Object> dataset) {
+    static Map<String, Object> envelope(ComponentStore store, Map<String, Object> kpi, Map<String, Object> dataset) {
         try {
-            return com.gamma.pipeline.SharingEnvelope.of(List.of(kpi, dataset));
+            return com.gamma.pipeline.SharingEnvelope.of(store, List.of(kpi, dataset));
         } catch (SecurityException e) {
             throw new SecurityException("the KPI and its Dataset are shared differently; the history would show one's "
                     + "values to the other's readers — share them alike, or leave one unshared — refused");

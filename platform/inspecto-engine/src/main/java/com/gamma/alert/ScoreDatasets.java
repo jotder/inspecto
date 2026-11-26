@@ -64,7 +64,7 @@ public final class ScoreDatasets {
             String refusal = null;
             Map<String, Object> envelope = null;
             try {
-                envelope = SharingEnvelope.of(sources(store, model, inputs));
+                envelope = SharingEnvelope.of(store, sources(store, model, inputs));
             } catch (SecurityException e) {
                 refusal = "the model and the Datasets it reads are shared differently — its output Datasets would show "
                         + "one's values to the other's readers; share them alike";
