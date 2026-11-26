@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.insights`](../../../../../product-map/module/insights.toon).
 
-11 test class(es): 8 unit, 3 real-HTTP control-plane, 0 IT.
+12 test class(es): 9 unit, 3 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -20,11 +20,12 @@ Run the whole module, or chosen classes (commas between classes, never `+`):
 
 ```bash
 mvn -o test -pl features/inspecto-insights
-mvn -o test -pl features/inspecto-insights -Dtest=ControlApiExplainDepth2Test,ControlApiExplainTest
+mvn -o test -pl features/inspecto-insights -Dtest=BusinessAssurancePilotInsightsTest,ControlApiExplainDepth2Test
 ```
 
 | test class | package | kind | file | summary |
 |---|---|---|---|---|
+| `BusinessAssurancePilotInsightsTest` | `com.gamma.insights` | unit | `features/inspecto-insights/src/test/java/com/gamma/insights/BusinessAssurancePilotInsightsTest.java` | INSIGHT-PILOT-STALE-CORPUS-1: the {@code business-assurance} pilot (D-BI6) finds Insights out of the box. Its |
 | `ControlApiExplainDepth2Test` | `com.gamma.insights` | real-HTTP control-plane test | `features/inspecto-insights/src/test/java/com/gamma/insights/ControlApiExplainDepth2Test.java` | {@code POST /insights/explain} with {@code depth: 2} over real HTTP under an ARMED authenticator |
 | `ControlApiExplainTest` | `com.gamma.insights` | real-HTTP control-plane test | `features/inspecto-insights/src/test/java/com/gamma/insights/ControlApiExplainTest.java` | {@code POST /insights/explain} over real HTTP and DuckDB under an ARMED authenticator (BI-INSIGHTS-1 P2): the |
 | `ControlApiInsightsTest` | `com.gamma.insights` | real-HTTP control-plane test | `features/inspecto-insights/src/test/java/com/gamma/insights/ControlApiInsightsTest.java` | The Insight feed, feedback and replay preview over real HTTP under an ARMED authenticator (BI-INSIGHTS-1 P3): the |
