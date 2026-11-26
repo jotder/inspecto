@@ -23,6 +23,7 @@ import { SessionService } from 'app/inspecto/auth/session.service';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
+import { fmtDateTime } from 'app/inspecto/format/format';
 import { bandBadge, sliceLabel } from 'app/inspecto/insights/insight-profile-form';
 import {
     insightActionPayload,
@@ -157,7 +158,7 @@ const STATUS_WORDS: Record<string, string> = {
                                 <span class="text-secondary text-xs">{{ i.insight_type }} · {{ i.period }}</span>
                                 @if (run() === 'all' && i.run_at) {
                                     <span class="text-secondary text-xs" data-testid="insight-run"
-                                        >found {{ i.run_at }}</span
+                                        >found {{ fmtDateTime(i.run_at) }}</span
                                     >
                                 }
                                 <span class="text-secondary ml-auto text-xs tabular-nums"
@@ -269,6 +270,7 @@ export class InsightFeedComponent {
     readonly busy = signal<string | null>(null);
     readonly band = (i: Insight) => bandBadge(i.band);
     readonly slice = sliceLabel;
+    readonly fmtDateTime = fmtDateTime;
     readonly round = (n: number) => Math.round(n);
     readonly hasInsight = (f: InsightFeed, id: string) => f.insights.some((i) => i.insight_id === id);
 

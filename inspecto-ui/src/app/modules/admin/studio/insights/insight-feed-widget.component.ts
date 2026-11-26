@@ -20,6 +20,8 @@ export const INSIGHT_TILE_LIMIT = 10;
     selector: 'app-insight-feed-widget',
     standalone: true,
     changeDetection: ChangeDetectionStrategy.OnPush,
+    // N1: the list scrolls inside the tile rather than running past the card's bottom edge.
+    host: { class: 'block h-full max-h-96 min-h-0 overflow-y-auto' },
     imports: [RouterLink, InspectoEmptyStateComponent, InspectoSkeletonComponent, StatusBadgeComponent],
     template: `
         @if (!viewId()) {
