@@ -138,7 +138,8 @@ class ControlApiInsightsTest {
                     .get("insight_id").asText();
             String path = "/insights/daily/" + id + "/feedback", body = "{\"status\":\"not_useful\",\"note\":\"known\"}";
             assertEquals(401, send(c, null, "POST", path, body).statusCode());
-            assertEquals(404, send(c, "viewer", "POST", "/insights/secret/" + id + "/feedback", body).statusCode(),
+            String secretId = String.valueOf(InsightStore.read(c.data().resolve("insights_secret")).get(0).get("insight_id"));
+            assertEquals(404, send(c, "viewer", "POST", "/insights/secret/" + secretId + "/feedback", body).statusCode(),
                     "a Profile whose Insights Dataset the caller cannot view is the 404 of none");
             JsonNode fb = data(send(c, "viewer", "POST", path, body));   // operator 2026-11-26: any viewer
             assertEquals("viewer", fb.get("actor").asText());
