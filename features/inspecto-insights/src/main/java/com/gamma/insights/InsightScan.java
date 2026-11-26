@@ -316,8 +316,9 @@ final class InsightScan {
 
     /**
      * I-10: the PSI of the last bucket's mix of values against the baseline (every earlier usable bucket summed), tested
-     * against how far each earlier bucket's mix sits from the rest of the baseline (leave-one-out PSI): one-sided robust
-     * z, so only a mix that moved more than buckets usually do is a finding. The KS distance (values ordered by baseline
+     * against how far each earlier bucket's mix sits from the rest of the baseline (leave-one-out PSI): p = the empirical
+     * rank (# references ≥ now + 1) ÷ (references + 1), so only a mix that moved more than buckets usually do is a
+     * finding; z stays in the explanation. The KS distance (values ordered by baseline
      * share) and, for a count Measure, its nominal p are explanation only — they assume independent units, which a sum
      * Measure does not have and a count only approximates.
      */
@@ -337,7 +338,11 @@ final class InsightScan {
         double median = Stats.median(r), smad = Stats.scaledMad(r, median), floor = Stats.robustZFloor(median, 0.01);
         double psi = DistributionShift.psi(base, now);
         double z = Stats.robustZ(psi, median, smad, floor);
-        double p = z > 0 ? Surprise.twoSided(z) / 2 : 1;
+        // PSI across buckets is right-skewed (a small bucket's rare value hits the share floor), so a normal tail of z
+        // would be far too optimistic; the p is the empirical rank of now among the leave-one-out references instead
+        int atLeast = 0;
+        for (double x : r) if (x >= psi) atLeast++;
+        double p = (atLeast + 1.0) / (r.length + 1);
         Integer[] order = new Integer[base.length];
         for (int j = 0; j < order.length; j++) order[j] = j;
         java.util.Arrays.sort(order, Comparator.<Integer>comparingDouble(j -> -base[j]).thenComparing(values::get));

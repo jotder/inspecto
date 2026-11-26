@@ -529,8 +529,13 @@ changepoint **and** drift; one Insights Dataset per Profile.
   dimension type with no `dimensions` is refused at save.
 - **Tests and their p**: *concentration* = the top-3 share (re-ranked per bucket) as a series, `Surprise.spike` of the
   last complete bucket (season slot rule as `anomaly`, ≥ 4 points, 1 share point floor). *distribution-shift* = PSI of
-  the last bucket's value mix against the baseline (every earlier usable bucket summed), one-sided robust z against
-  each earlier bucket's leave-one-out PSI (≥ 4). Both p's join the run's Benjamini-Hochberg pass.
+  the last bucket's value mix against the baseline (every earlier usable bucket summed), p = its empirical rank among
+  each earlier bucket's leave-one-out PSI, (# ≥ now + 1) ÷ (n + 1), n ≥ 4. Not a normal tail of the robust z: PSI is
+  right-skewed across buckets (a rare value in a small bucket hits the share floor), and the verification probe found
+  a normal tail gave P(p < .01) = 0.22 on a stable mix at ~30 units a bucket. The price: the smallest p is 1 ÷ (n + 1)
+  (about .018 for 56 days, .04 for 24 months), so a shift is found only in a long enough lookback. Concentration
+  (a normal tail, as `anomaly`) was calibrated at ≤ .066 for .05. Concentration skips a dimension with 3 values or
+  fewer (the top 3 always hold everything). Both p's join the run's Benjamini-Hochberg pass.
 - **Deviations from §6, with the reason**: (1) **no DuckDB form** — as §11.8, the statistics run in the JVM over the
   masked, already-grouped rows (≤ `maxValues` per bucket), so SQL forms would add a second path with nothing to gain;
   (2) **KS is reported, not tested on**: its p assumes independent units — a sum Measure has none and a count only

@@ -69,6 +69,29 @@ class InsightScanDimensionTest {
     }
 
     @Test
+    void aStableLowVolumeMixHoldsItsFalsePositiveRate() {
+        // null: 6 values, Poisson(5) each per bucket (~30 units), 56 buckets; PSI is skewed there, so a normal tail
+        // of its z gave P(p < .05) well above .05 — the rank p must stay near nominal
+        java.util.Random rnd = new java.util.Random(42);
+        List<String> values = List.of("a", "b", "c", "d", "e", "f");
+        int runs = 1000, hits = 0;
+        for (int run = 0; run < runs; run++) {
+            double[][] parts = new double[56][6];
+            for (double[] row : parts) for (int j = 0; j < 6; j++) row[j] = poisson(rnd, 5);
+            var f = InsightScan.distributionShift(parts, values, true);
+            if (f != null && f.p() < 0.05) hits++;
+        }
+        assertTrue(hits / (double) runs <= 0.07, "false-positive rate " + hits / (double) runs);
+    }
+
+    private static int poisson(java.util.Random r, double lambda) {
+        double l = Math.exp(-lambda), p = 1;
+        int k = 0;
+        do { k++; p *= r.nextDouble(); } while (p > l);
+        return k - 1;
+    }
+
+    @Test
     void theDimensionTypesAreOptInAndNeedADimension() {
         assertEquals(List.of("anomaly", "trend-break", "drift"), InsightProfile.parse("p", profile()).types());
         IllegalArgumentException e = assertThrows(IllegalArgumentException.class, () -> InsightProfile.parse("p",
