@@ -162,7 +162,7 @@ class ControlApiMcpWriteToolsTest {
                 assertFalse(byName.get(w).at("/annotations/readOnlyHint").asBoolean(true), w);
                 assertFalse(byName.get(w).at("/annotations/destructiveHint").asBoolean(true), w);
             }
-            for (String r : List.of("validate_config", "dry_run_pipeline", "preview_config", "list_pending_changes", "get_pending_change",
+            for (String r : List.of("validate_config", "dry_run_pipeline", "preview_config", "run_space_tests", "list_pending_changes", "get_pending_change",
                     "diff_pending_change", "export_bundle", "preview_promotion"))
                 assertTrue(byName.get(r).at("/annotations/readOnlyHint").asBoolean(false), r);
             assertEquals(List.of("alert-rule", "dashboard", "decision-rule", "entity-list", "expectation", "job", "notification-channel", "notification-rule",
@@ -222,6 +222,9 @@ class ControlApiMcpWriteToolsTest {
             assertTrue(text(d).startsWith("HTTP 404"), "the dry-run route answered, not the gate: " + text(d));
             JsonNode run = call(c.port, AGENT, "run_pipeline_now", Map.of("pipeline", "no_such_pipeline"));
             assertFalse(text(run).contains("agent client"), "D-AK2: a delegated person may run: " + text(run));
+            JsonNode tests = call(c.port, AGENT, "run_space_tests", Map.of());   // W6 group C: this Space has no cases
+            assertFalse(tests.get("isError").asBoolean(), "D-AK10: a delegated person may run the Space tests: " + text(tests));
+            assertEquals(0, tests.at("/structuredContent/data/total").asInt(-1), text(tests));
 
             String id = call(c.port, AGENT, "propose_change", board("b2")).at("/structuredContent/data/pendingChange/id").asText();
             JsonNode w = call(c.port, AGENT, "withdraw_change", Map.of("change", id));

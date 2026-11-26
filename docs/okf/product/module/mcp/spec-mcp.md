@@ -172,6 +172,7 @@ is passed on as the replayed route's JSON body, unchanged.
 | `export_bundle` | read | `body` | `POST /bundle/export` |
 | `preview_promotion` | read | `body` | `POST /promotion/preview` (`canAdminister`) |
 | `run_pipeline_now` | write | `pipeline`, `body?` | `POST /pipelines/authored/{pipeline}/run` (`canAuthorWorkbench`; D-AK2: a person, never a machine) |
+| `run_space_tests` | read | `body?` | `POST /tests/run` (`{cases?}`; `canAuthorWorkbench`; W6 group C, D-AK10: a person, never a machine) — [Agent Space tests](spec-agent-space-tests.md) |
 
 **`propose_change` allowlist** (`McpTools.CHANGE_ROUTES`, the builder tutorials' kinds, each route on
 `PendingChanges.REPLAYABLE`): `pipeline` (create and update `PUT /pipelines/{id}/graph`, delete
@@ -320,7 +321,7 @@ Per §7.3 and D-UE5 (signed: both modes, delegated first).
   `canManageExclusionCategories` — § Entity List edits) where its roles grant them, never an `AGENT_NEVER_CAPABILITIES` one; an
   unlisted machine keeps `canOpenInboundInvestigation` only, as before. Being an agent, every config write it makes
   is held as a Pending Change, the agent gate applies, and it never approves; it may not run a Pipeline
-  (`AgentGate.PERSON_ONLY`, D-AK2). The Pending Change records `authorMachine` (the token's `sub`), and
+  (`AgentGate.PERSON_ONLY`, D-AK2) or the Space tests (D-AK10). The Pending Change records `authorMachine` (the token's `sub`), and
   `PendingChanges.authorNow` replays an approved machine change as that machine: re-admitted by the Space (403 when
   the Space no longer names the client) and filtered to what a machine agent keeps, so approval never widens it.
 - **What is built:** the endpoint accepts any Subject the host's `Authenticator` resolves — a person's own
@@ -361,6 +362,8 @@ agent token calling a route directly is treated the same.
      (2026-11-26) the four authoring previews (`AgentGate.AUTHORING_PREVIEWS`: `/config/preview/parsing|schema`,
      `/config/suggest/schema`, `/components/mapping/validate`), for every agent, body-capped at 256 KiB and naming
      no config file ([Agent authoring previews](spec-agent-previews.md)); `/lookups/test` stays refused to agents;
+     since **W6 group C** (2026-11-26) `POST /tests/run`, a delegated person's agent only (`AgentGate.PERSON_ONLY`,
+     D-AK10), still gated `canAuthorWorkbench` ([Agent Space tests](spec-agent-space-tests.md));
   3. **actions** (**AK-2d**, 2026-11-25) — `AgentGate.ACTIONS`, the operational routes of plan §4.6: `POST
      /runs/{id}/trigger|pause|resume|reprocess|replay-rejects|drain`, `…/retries/retry-now|cancel`,
      `…/quarantine/release` (since 2026-11-25, widening plan W1),
@@ -400,8 +403,8 @@ config only.
 
 - **The hold** — `PendingActions.holdIfMachineAction`, called by `ControlApi.routeDispatch` and every
   `ControlApi.replay` right before the handler (after the capability, policy and agent gates, so a machine still needs
-  `canOperateRuns`): a Subject whose `AgentGate.posture` is `MACHINE` (`machine()` and `agent()`; an agent reads the
-  same answer from `get_agent_posture`, [spec-agent-posture.md](spec-agent-posture.md)) calling an `ACTION` route gets **202**
+  `canOperateRuns`): a Subject whose `AgentGate.posture` is `MACHINE`
+  ([posture](spec-agent-posture.md)) calling an `ACTION` route gets **202**
   `{status: pending, ran: false, pendingAction}` and nothing runs. One pending record per action (same method, path,
   query and body; else 409 — the query since W11, whose unlink names its other end there).
 - **The record** — `pending-actions/pa-<UTC stamp>-<6 hex>.json` in the Space's config tree: `action`

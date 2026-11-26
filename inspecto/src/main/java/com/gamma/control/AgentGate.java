@@ -146,7 +146,10 @@ final class AgentGate {
      * reads, taking back its own proposal, an Action Request (held for approval by its own design), {@code POST /db/query}
      * (the read the AK-1 {@code query_dataset} tool replays; SqlGuard and masking run as for the person) and a Pipeline
      * run (D-AK2: a delegated person only — {@link #PERSON_ONLY}); the Link Analysis queries ({@link #LA_READS}, AK-2f);
-     * and the authoring previews ({@link #AUTHORING_PREVIEWS}, W6 group A).
+     * the authoring previews ({@link #AUTHORING_PREVIEWS}, W6 group A); and the Space tests ({@code POST /tests/run}, W6
+     * group C, D-AK10: a delegated person only, as a run): each case runs its Pipeline over the case folder's own files
+     * into a JVM-temp scratch root deleted afterwards, with no batch commit, batch audit, provenance or Signal, and answers
+     * verdicts (counts, a checksum, a named column's min or max), never rows.
      */
     static final Set<String> ALLOWED;
     static {
@@ -161,14 +164,15 @@ final class AgentGate {
                 "POST /pending-actions/([^/]+)/withdraw",
                 "POST /action-requests",
                 "POST /db/query",
-                "POST /pipelines/authored/([^/]+)/run"));
+                "POST /pipelines/authored/([^/]+)/run",
+                "POST /tests/run"));
         all.addAll(LA_READS);
         all.addAll(AUTHORING_PREVIEWS);
         ALLOWED = Set.copyOf(all);
     }
 
-    /** {@link #ALLOWED} routes a machine agent may not call (D-AK2: never a run for a machine). */
-    static final Set<String> PERSON_ONLY = Set.of("POST /pipelines/authored/([^/]+)/run");
+    /** {@link #ALLOWED} routes a machine agent may not call (D-AK2: never a run for a machine; D-AK10: nor the Space tests). */
+    static final Set<String> PERSON_ONLY = Set.of("POST /pipelines/authored/([^/]+)/run", "POST /tests/run");
 
     /** Named never-list routes the capability and suffix rules of {@link #never} do not already cover. */
     static final Set<String> NEVER = Set.of(
@@ -255,7 +259,7 @@ final class AgentGate {
                 ? routeRegex.substring(1, routeRegex.length() - 1) : routeRegex;
         Bucket b = bucket(method, pattern);
         if (b == Bucket.ALLOWED && posture(subject) == Posture.MACHINE && PERSON_ONLY.contains(method + " " + pattern))
-            return "an agent machine client may not run a Pipeline — a delegated person may";
+            return "an agent machine client may not run a Pipeline or the Space tests — a delegated person may";
         if (b != Bucket.REFUSED) return null;
         return never(method, pattern)
                 ? "an agent client never approves, reveals, promotes, or changes Apps or access — a person must"

@@ -1,6 +1,6 @@
 ---
 name: safe-config-change
-description: The one way an agent changes a running Inspecto - validate, preview, dry-run, propose, then wait for another person to approve. Use before ANY create, update or delete of a Pipeline, Expectation, Alert Rule, Job, Widget, Dashboard, Decision Rule, Notification Rule or Notification Channel, the KPI of a delivered Requirement, a Pipeline restore, and whenever a change is refused, held or needs to be taken back.
+description: The one way an agent changes a running Inspecto - validate, preview, dry-run, run the Space tests, propose, then wait for another person to approve. Use before ANY create, update or delete of a Pipeline, Expectation, Alert Rule, Job, Widget, Dashboard, Decision Rule, Notification Rule or Notification Channel, the KPI of a delivered Requirement, a Pipeline restore, and whenever a change is refused, held or needs to be taken back.
 ---
 
 # Change Inspecto safely
@@ -36,12 +36,18 @@ approves it. That person is never you and never the person you act for (four eye
    `{pipeline: <draft graph>, sampleRows: [...]}`. This is also a
    Pipeline graph's validation: the draft is parsed and validated, then executed on a scratch database; nothing is
    written. Read each step's row count; a step that drops every row is a mistake until proven otherwise.
-5. **Propose** with `propose_change`: `kind` (pipeline, expectation, alert-rule, job, widget, dashboard, decision-rule,
+5. **Run the Space tests** with `run_space_tests` when the change touches a Pipeline (no body runs every case; body
+   `{cases: [names]}` runs those). Each case feeds a Pipeline the case's own sample files and compares what lands with
+   what the case expects; nothing is written. The cases test the Pipelines **as they run now**, not your draft: a case
+   that fails before you propose is not yours to explain away — tell the person, and say it in the `reason`. After the
+   change is approved, run them again and report any case that newly fails. A delegated person's agent only: a machine
+   agent is refused (403 "may not run a Pipeline or the Space tests").
+6. **Propose** with `propose_change`: `kind` (pipeline, expectation, alert-rule, job, widget, dashboard, decision-rule,
    notification-rule, notification-channel; requirement-kpi and pipeline-restore, below), `operation` (create, update, delete; a
    requirement-kpi only creates, a pipeline-restore only restores), `id` (required to update or delete, and to create a Pipeline), `content` (not for a
    delete) and a one-line `reason` of at most 500 characters. The reason is what the approver reads first: say what
    changes and why, in the person's terms.
-6. **Report** the Pending Change id (`pc-…`) to the person and that it waits for another person's approval. Offer
+7. **Report** the Pending Change id (`pc-…`) to the person and that it waits for another person's approval. Offer
    `diff_pending_change` so they can see exactly what the approver will see.
 
 ## What the answers mean
@@ -50,6 +56,7 @@ approves it. That person is never you and never the person you act for (four eye
 |---|---|---|
 | 202 with a Pending Change | held for approval — the expected answer for every agent write | report the id; stop |
 | 403 "an agent client may not call …" | the route is closed to agents (uploads, Dataset registration, settings, access, Apps) | ask the person to do that step in the console |
+| 403 "may not run a Pipeline or the Space tests" | a machine agent; only a delegated person's agent runs them | skip the step and say so |
 | 403 "needs sign-in through an agent client" | the token is the console's, not an agent client's | ask the administrator to register an agent client |
 | 403 "missing capability …" | the person you act for lacks the right | tell the person; never look for another route |
 | 422 | the content is refused; the message names the field | fix it, validate or preview again |
@@ -114,5 +121,6 @@ changes their mind or you proposed something wrong — then propose the correcte
 - `validate_config` — the save gate's findings, without saving
 - `preview_config` — a draft's parsing, schema casts or mapping tried on sample data, writing nothing
 - `dry_run_pipeline` — a Pipeline draft run on sample rows, writing nothing
+- `run_space_tests` — the Space's test cases run against its Pipelines as they are, writing nothing
 - `propose_change` — the held write
 - `withdraw_change` — take a proposal back
