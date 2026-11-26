@@ -30,8 +30,10 @@ its weight in the agent budget. As built in S0:
 
 Not on the list, because they answer no Dataset value: the overlap profile (names and counts) and the two dossier
 verifications (verdicts and hashes). `AgentDataRoutesParityTest` makes every agent-allowed write route either a data
-route or one named with its reason, so a new allowed route is classified before it ships. ⚠ GET routes (all allowed to
-agents) are outside this list; the design's scope is the POST data reads.
+route or one named with its reason, so a new allowed route is classified before it ships. `POST /lookups/test` stays
+refused to agents (`AGENT-LOOKUP-PREVIEW-1`). ⚠ GET routes (all allowed to agents) are outside this list, unstamped and
+outside the agent budget — for example `GET /db/table` (paged rows) and the Entity profile and summary reads; the
+design's scope is the POST data reads. Open as `AGENT-GET-DATA-READS-1`.
 
 ## The masked-answer stamp (D-AK13, D-AK14)
 
@@ -80,8 +82,11 @@ and in `replay` (the MCP replay used to skip the rate-limit stage). Past the bud
 ## Cost and audit
 
 - **Cost (D-AK18).** No agent sandbox and no agent row cap: an agent's call runs with exactly a person's limits.
-- **Audit (D-AK19).** No new row. The MCP call keeps its `mcp.tool.called` row; no body value is written to any audit
-  row or log line — now a tested rule. ⚠ Accepted: an agent's direct REST call to a read-shaped route leaves no audit row.
+- **Audit (D-AK19).** No new row. The MCP call keeps its `mcp.tool.called` row. "No body value in an audit row or log
+  line" is tested for `POST /db/query` only. ⚠ It does **not** hold on every data route: `POST /inv/projection/neighbors`
+  writes the expanded key, resolved from its alias, into the `link.expanded` row's `value` (`InvRoutes`, pinned for people
+  by `ControlApiInvProjectionTest`) — open as `AGENT-AUDIT-EXPAND-VALUE-1`, waiting on an operator decision. ⚠ Accepted:
+  an agent's direct REST call to a read-shaped route leaves no audit row.
 
 ## Tests
 
