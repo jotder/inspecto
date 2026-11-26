@@ -41,6 +41,8 @@ export type ComponentType =
     | 'segmentation-model'
     | 'churn-model'
     | 'forecast-model'
+    // An Insight Profile (BI-INSIGHTS-1 P3) — the `insight.scan` Job's `profile` names one.
+    | 'insight-profile'
     // The Case desk's Findings fields (one per ObjectType, id = the lowercased type). Authored ONLY from the
     // Cases pane's Findings-fields dialog, never the Components pane (D8) — and its writes are gated on
     // `canManageIncidents`, not `canAuthorWorkbench` (D1).

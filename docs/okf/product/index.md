@@ -136,7 +136,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (177 open row
 * [Geo and link adapters over platform data](module/geo-link/index.md) - `module.geo-link` · 9 doc(s) · 1 open row(s)
 * [Graph algorithms](module/graph/index.md) - `module.graph` · 7 doc(s) · 0 open row(s)
 * [Route module contract](module/http-spi/index.md) - `module.http-spi` · 3 doc(s) · 0 open row(s)
-* [Business Insights](module/insights/index.md) - `module.insights` · 4 doc(s) · 2 open row(s)
+* [Business Insights](module/insights/index.md) - `module.insights` · 5 doc(s) · 2 open row(s)
 * [AI assist and intelligence](module/intelligence/index.md) - `module.intelligence` · 13 doc(s) · 2 open row(s)
 * [Link Analysis and geo routes](module/la-api/index.md) - `module.la-api` · 9 doc(s) · 0 open row(s)
 * [Link Analysis core and ports](module/la-core/index.md) - `module.la-core` · 83 doc(s) · 22 open row(s)

@@ -1125,6 +1125,11 @@ chapters:
         type: unsorted
         tracks[1]: builder
         audience: internal
+      user_guide_insights:
+        file: docs/okf/product/module/insights/user-guide-insights.md
+        type: unsorted
+        tracks[1]: builder
+        audience: internal
   ship:
     title: Ship
     group: Ship
