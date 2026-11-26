@@ -15,12 +15,18 @@
 //   5 no repo paths a skill never names a repository path (the Kit is for an installed distribution with no source tree).
 //   6 coverage      every Agent Skill is named by at least one golden task (AK-2 widening plan W10). Per-tool coverage is
 //                   not checked yet: the suites check only two tools by name (plan W10 note proposes a write-tool rule).
+//   7 check names   every grade, safety and notice check a task names is one tools/run-agent-golden.mjs grades (CHECKS);
+//                   an unknown name would only fail at grading time, after a paid live run (W8).
+//   8 adversarial   agent-kit/golden/adversarial.json exists, and each of its tasks (any task with `planted`) says where
+//                   the text is planted and what it says, carries the safety checks no-never-list-attempt and
+//                   no-foreign-withdraw and a notice check; a no-unmasked-value check names the values it looks for (W8).
 //
 // Reads tracked files only; no build, no server. Tests: tools/check-agent-kit.test.mjs (negative fixtures).
 
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { CHECKS } from './run-agent-golden.mjs';
 
 const ROOT_DEFAULT = fileURLToPath(new URL('..', import.meta.url));
 const MCP_TOOLS = 'features/inspecto-mcp/src/main/java/com/gamma/mcp/McpTools.java';
@@ -109,10 +115,31 @@ export function checkGolden(json, tools, skills = null) {
         for (const k of ['grade', 'safety']) if (!Array.isArray(t[k]) || t[k].length === 0) out.push(`golden ${id}: no ${k} checks`);
         if (!Array.isArray(t.skills) || t.skills.length === 0) out.push(`golden ${id}: no skills`);
         else if (skills) for (const s of t.skills) if (!skills.has(s)) out.push(`golden ${id}: names skill '${s}', which is not an Agent Skill`);
-        for (const c of [...(t.grade ?? []), ...(t.safety ?? [])]) {
+        for (const c of [...(t.grade ?? []), ...(t.safety ?? []), ...(t.notice ?? [])]) {
             if (c.tool && !tools.has(c.tool)) out.push(`golden ${id}: names tool '${c.tool}', which is not an MCP Tool`);
         }
+        for (const [where, known] of [['grade', CHECKS.grade], ['safety', CHECKS.safety], ['notice', CHECKS.grade]])
+            for (const c of Array.isArray(t[where]) ? t[where] : [])
+                if (!known.includes(c?.check)) out.push(`golden ${id}: ${where} check '${c?.check}' is not one the grader knows`);
+        if (doc.suite === 'adversarial' || t.planted !== undefined) out.push(...checkAdversarial(id, t));
     }
+    return out;
+}
+
+/** W8: an adversarial task names its planted text and carries the checks that measure whether the agent tried. */
+export function checkAdversarial(id, t) {
+    const out = [];
+    const p = t.planted;
+    if (!p || typeof p.where !== 'string' || !p.where || typeof p.text !== 'string' || !p.text)
+        out.push(`golden ${id}: an adversarial task needs planted.where and planted.text`);
+    const safety = (t.safety ?? []).map((c) => c.check);
+    for (const need of ['no-never-list-attempt', 'no-foreign-withdraw'])
+        if (!safety.includes(need)) out.push(`golden ${id}: an adversarial task needs the safety check ${need}`);
+    if (!Array.isArray(t.notice) || t.notice.length === 0)
+        out.push(`golden ${id}: an adversarial task needs a notice check (did it tell the person about the planted text)`);
+    for (const c of t.safety ?? [])
+        if (c.check === 'no-unmasked-value' && (!Array.isArray(c.values) || c.values.length === 0))
+            out.push(`golden ${id}: no-unmasked-value names no values`);
     return out;
 }
 
@@ -146,6 +173,7 @@ export function run(root = ROOT_DEFAULT) {
     }
     const golden = join(root, 'agent-kit/golden/developer.json');
     if (!existsSync(golden)) findings.push('agent-kit/golden/developer.json: missing');
+    if (!existsSync(join(root, 'agent-kit/golden/adversarial.json'))) findings.push('agent-kit/golden/adversarial.json: missing (W8)');
     // every suite in the folder (developer, operations, analyst, link-analysis, and any added later)
     const gdir = join(root, 'agent-kit/golden');
     const suites = {};

@@ -582,6 +582,13 @@ Built 2026-11-25 (widening plan §3 W9). Two Agent Skills that only read; no too
   `get_space_integrity`, `get_dataset_storage`). The machine-run (scheduled) audit has no golden task yet. Their live
   run is part of W4, not of W9.
 
+## Adversarial golden tasks (W8)
+
+Suite `agent-kit/golden/adversarial.json`: instructions planted where an agent reads data, asking it to approve,
+withdraw someone else's proposal, reveal or promote. It measures whether the model tries (the gate refuses either way)
+and whether it tells the person. Grader checks, guard rules and tests:
+[`tests-agent-golden.md`](tests-agent-golden.md) § The adversarial suite (W8).
+
 ## Security review (2026-11-20)
 
 An independent review of the AK-1 change (the module, the `/mcp` rate-limit line, the manifest exemption)
