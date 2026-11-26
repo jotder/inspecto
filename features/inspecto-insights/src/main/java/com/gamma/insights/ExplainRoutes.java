@@ -3,7 +3,11 @@ package com.gamma.insights;
 import com.gamma.analytics.drivers.Drivers;
 import com.gamma.analytics.drivers.MovedWith;
 import com.gamma.analytics.drivers.ShiftShare;
+import com.gamma.access.ComponentAccess;
+import com.gamma.access.WriteGates;
 import com.gamma.control.BiSpecRunner;
+import com.gamma.pipeline.ComponentRegistry;
+import com.gamma.pipeline.ComponentStore;
 import com.gamma.query.MeasureCompiler;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
@@ -11,6 +15,7 @@ import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.http.RouteModule;
 import com.sun.net.httpserver.HttpExchange;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
@@ -46,7 +51,8 @@ import java.util.Set;
  * </ul>
  * Refused in words (422): an aggregate that is not additive (median, distinct count, percentiles, …) — never
  * approximated; a Measure that reaches the caller masked. A dimension with more than {@link #MAX_VALUES} values is
- * refused on its own, in {@code refused[]}. Depth 2 (pairs of dimensions) is not offered here (D-BI7: a Job, P3).
+ * refused on its own, in {@code refused[]}. Depth 2 (pairs of dimensions, {@code depth: 2}) is not computed here (D-BI7):
+ * it reads what the {@code insight.scan} Job stored for a Profile with {@code pairs: true} ({@link PairExplain}).
  */
 public final class ExplainRoutes implements RouteModule {
 
@@ -140,6 +146,13 @@ public final class ExplainRoutes implements RouteModule {
         int lookback = body.get("lookback") instanceof Number n ? n.intValue() : 24;
         if (lookback < MIN_PAIRS || lookback > 60) throw bad("'lookback' must be " + MIN_PAIRS + "-60 buckets");
         Periods p = periods(grain, at, lookback);
+        Object dp = body.get("depth") == null ? 1 : body.get("depth");
+        if (!(dp instanceof Number dn) || (dn.doubleValue() != 1 && dn.doubleValue() != 2))
+            throw bad("'depth' is 1 (each dimension) or 2 (also pairs of dimensions, precomputed by the insight.scan Job)");
+        boolean depth2 = dn.doubleValue() == 2;
+        if (depth2 && hasRatio)
+            throw bad("depth 2 explains a sum or count: pairs of dimensions are precomputed for an Insight Profile's "
+                    + "Measure, and a Profile's Measure is never a ratio. Ask depth 1 for the ratio's mix and rate.");
 
         Map<String, Object> out = new LinkedHashMap<>();
         Map<String, Object> masking = null;
@@ -249,8 +262,70 @@ public final class ExplainRoutes implements RouteModule {
         out.put("movedWith", moved);
         out.put("movedWithNote", "Moved together over the last " + lookback + " " + grain
                 + "s (correlation of the changes). This does not say one causes the other.");
+        if (depth2) pairs(api, ex, body, dataset, targets.get(0), field, grain, p, before, after, out);
         if (masking != null) out.put("masking", masking);
         return out;
+    }
+
+    /**
+     * Depth 2 (BI-EXPLAIN-DEPTH2-1, plan §11.12): the pairs the {@code insight.scan} Job stored for a Profile with
+     * {@code pairs: true} over the same Dataset, Measure, date column, grain, filters and condition, for the explained
+     * bucket — only from a Profile whose Insights Dataset the caller may view (else as if none exists).
+     */
+    private static void pairs(ApiContext api, HttpExchange ex, Map<String, Object> req, String dataset,
+                              Map<String, Object> measure, String field, String grain, Periods p, double before,
+                              double after, Map<String, Object> out) throws IOException {
+        Path writeRoot = WriteGates.requireWriteRoot(api, "Insights");
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        boolean anyProfile = false;
+        for (ComponentRegistry.Component c : store.list(InsightProfile.KIND)) {
+            InsightProfile prof;
+            try {
+                prof = InsightProfile.parse(c.name(), c.content());
+            } catch (IllegalArgumentException invalid) {
+                continue;
+            }
+            if (!prof.pairs() || !prof.dataset().equals(dataset) || !prof.field().equals(field) || !prof.grain().equals(grain)
+                    || !id(measure).equals(prof.measureId()) || !same(prof.filters(), req.get("filters"))
+                    || !same(prof.when(), req.get("when")))
+                continue;
+            Map<String, Object> ds = store.get("dataset", InsightStore.store(prof.id()))
+                    .map(ComponentRegistry.Component::content).orElse(null);
+            if (ds == null || !ComponentAccess.canView(ex, ds)) continue;
+            anyProfile = true;
+            Path dir = api.dataRoot() == null ? null : InsightStore.existing(api.dataRoot(), prof.id());
+            if (dir == null) continue;
+            Map<String, Object> entry;
+            synchronized (InsightStore.lock(dir)) {
+                entry = PairExplain.read(dir).get(p.cur());
+            }
+            if (entry == null || !p.prev().equals(entry.get("previous"))) continue;
+            Map<String, Object> e = new LinkedHashMap<>(entry);
+            e.put("stale", !(close(entry.get("before"), before) && close(entry.get("after"), after)));
+            out.put("pairs", e);
+            return;
+        }
+        out.put("pairs", null);
+        out.put("pairsNote", (anyProfile
+                ? "The insight.scan Job has not stored pairs of dimensions for " + p.cur() + " yet."
+                : "No precomputed pairs of dimensions exist for this Measure, grain and filters.")
+                + " Pairs are computed by the insight.scan Job, not per click: save an Insight Profile over dataset '"
+                + dataset + "' with this Measure, date column '" + field + "', grain '" + grain + "', the same filters"
+                + " and condition, at least two dimensions and pairs: true, then run its insight.scan Job after the"
+                + " bucket completes.");
+    }
+
+    /** The stored total equals the live one (data not restated since the Job ran). */
+    private static boolean close(Object stored, double live) {
+        if (!(stored instanceof Number n)) return false;
+        return Math.abs(n.doubleValue() - live) <= 1e-9 * Math.max(1, Math.abs(live));
+    }
+
+    private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
+
+    /** Filters / conditions compared as JSON trees (key order does not matter). */
+    private static boolean same(Object a, Object b) {
+        return JSON.valueToTree(a).equals(JSON.valueToTree(b));
     }
 
     private static double abs(Object r) {
@@ -322,7 +397,7 @@ public final class ExplainRoutes implements RouteModule {
         return out;
     }
 
-    private static Map<String, Object> dimension(Drivers.Dimension d) {
+    static Map<String, Object> dimension(Drivers.Dimension d) {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("dimension", d.name());
         m.put("explains", d.explains());

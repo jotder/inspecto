@@ -48,8 +48,8 @@ approximated.
 
 ## 3. Decisions and deliberate deferrals
 
-- **D-BI7 as built**: depth 1 is interactive. **Depth 2** (pairs of dimensions) needs the Job the plan puts in P3
-  (`insight.scan`); it is not offered — board row `BI-EXPLAIN-DEPTH2-1`.
+- **D-BI7 as built**: depth 1 is interactive. **Depth 2** (pairs of dimensions, "N × DATA-7D") is computed by the
+  `insight.scan` Job and only read per click — § 6.
 - **One statement per dimension, not one `GROUPING SETS` statement**: the per-dimension statements go through the
   unchanged `/bi/query` masking path (masking applies per grouped column of one plain SELECT); a `GROUPING SETS`
   form would need a new masking path. Cost: up to 13 statements per click, each bounded by its row cap.
@@ -122,3 +122,25 @@ concentration and I-10 distribution shift are not built.
 **Gotcha found while building**: a DuckDB `TIMESTAMP` written through a JDBC `Timestamp` is stored in the host zone
 and read back by `epoch_ms` as UTC, so each rewrite shifted every stored run by the host offset. `InsightStore`
 writes timestamps as UTC text (`CAST(? AS TIMESTAMP)`); `InsightScanJobTest` pins it.
+
+## 6. Explain depth 2 — pairs of dimensions (`BI-EXPLAIN-DEPTH2-1`, 2026-11-26)
+
+- **Computed by the Job, not per click (D-BI7)**: an Insight Profile with `pairs: true` (at least two `dimensions`)
+  makes its `insight.scan` run also explain the last complete bucket's change against the one before by every pair of
+  its dimensions (12 dimensions → 66 statements). A mode of the existing Job, not a Job Type of its own: the Profile
+  already holds the Dataset, Measure, filters and grain, and the Job already runs as its author with the right store.
+- **Statements**: one per pair, grouped by both columns over the two buckets, through `BiSpecRunner.runAsJob` (no SQL
+  built; a Measure over a masked column refuses the run before any pair; a classified value is stored as its alias).
+- **Cap**: `maxPairValues` (10–1000, default 200) value pairs per pair of dimensions; more, or a cut result, puts the
+  pair in `refused` with the reason — never a truncated answer.
+- **Statistics**: `Drivers` over the value pairs (contribution, share, surprise, cover 0.8), ranked — as depth 1.
+  Sum and count only (a Profile admits nothing else).
+- **Store**: `pairs.json` beside the Insights Parquet in `insights_<profile>/`, keyed by the explained bucket, entries
+  kept 400 days. Not a Parquet, so the Dataset `insights_<profile>` keeps its shape.
+- **Read**: `POST /insights/explain` with `depth: 2` returns `pairs` (with `stale` when the stored totals no longer
+  equal the live ones) from a Profile with `pairs: true` over the same Dataset, Measure, date column, grain, filters and
+  condition, only when the caller may view that Profile's Insights Dataset; otherwise `pairs: null` and `pairsNote`
+  saying how to get them — a Profile the caller may not read is indistinguishable from none. A ratio with depth 2 → 422.
+- **Not yet**: the explain dialog does not show pairs; a revealer sees aliases in stored pairs (the Job never reveals).
+- **Tests**: `PairExplainGoldenTest` (hand-computed region × plan), `InsightScanJobTest` (alias, masked-Measure vet),
+  `ControlApiExplainDepth2Test` (401/403/200, read, stale, hidden Profile — falsified by dropping the view check).

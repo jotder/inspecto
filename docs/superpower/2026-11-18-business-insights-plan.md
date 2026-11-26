@@ -567,6 +567,36 @@ changepoint **and** drift; one Insights Dataset per Profile.
 - **Deferred**: a "Run scan now" shortcut (the Jobs screen runs it); the Insight Feed Visualization Type for
   Dashboards; `run=all` history and band filters in the feed.
 
+### 11.12 P3 Explain depth 2 — pairs of dimensions in the Insight scan (`BI-EXPLAIN-DEPTH2-1`) — as built (2026-11-26)
+
+- **Where the pairs are computed (D-BI7)**: an opt-in mode of the existing `insight.scan` Job, not a Job Type of its
+  own. The Profile already names the Dataset, Measure, filters, date column, grain and dimensions a pair needs; the Job
+  already runs as its author, fetches through `BiSpecRunner.runAsJob` and owns a store whose sharing envelope is right.
+  A second Job Type would repeat all of that and add a Job id, a manifest entry and a store with an envelope of its own.
+  No new route and no new Job Type, so the new-route checklist does not apply.
+- **Profile fields**: `pairs` (default `false`; `true` needs at least 2 `dimensions`) and `maxPairValues` (the cap on
+  value pairs per pair of dimensions, 10–1000, default 200, as depth 1's 200 values per dimension).
+- **Statements**: for every pair of the Profile's dimensions (at most 12 → 66), one `/bi/query` body grouped by both
+  columns and the grained date over the last two complete buckets, through `BiSpecRunner.runAsJob` (no SQL built; a
+  Measure over a masked column is refused by the vet before any pair runs; a classified value is stored as its alias).
+  `limit` = 2 × `maxPairValues`; truncated, or more than `maxPairValues` distinct value pairs → that pair is listed in
+  `refused` with the reason in words, never cut.
+- **Statistics**: the depth-1 kernel unchanged — `Drivers.explain` over the value pairs (`"N × DATA-7D"`), cover 0.8,
+  ranked with `Drivers.rank`. Additive Measures only (the Profile admits only sum and count).
+- **Store**: `pairs.json` beside the Insights Parquet in `insights_<profile>/` — not a Parquet, so the Dataset (which
+  reads `insights-*.parquet`) does not change shape. Keyed by the compared bucket; a run rewrites its bucket's entry
+  atomically; entries computed more than 400 days ago are dropped. Readable only through `POST /insights/explain`, and
+  only by a caller who may view the Dataset `insights_<profile>` (the same envelope as the feed).
+- **Read**: `POST /insights/explain` takes `depth` (1 default, or 2). With 2, after the depth-1 answer, it looks for a
+  saved Profile with `pairs: true` over the same Dataset, Measure, date column, grain, filters and condition whose
+  Insights Dataset the caller may view, and returns its entry for the explained bucket as `pairs {profile, computedAt,
+  previous, current, before, after, stale, drivers[], refused[]}`; `stale` is true when the stored totals no longer
+  equal the live depth-1 totals (data restated since the run). None → `pairs: null` and `pairsNote` saying how to get
+  them (save such a Profile with `pairs: true`, run its `insight.scan` after the bucket completes). A ratio with
+  depth 2 is refused in words (422). A Profile the caller may not read is indistinguishable from none.
+- **Not done**: the UI (the explain dialog shows no pairs yet); a revealer still sees aliases in stored pairs (the Job
+  never reveals); depth 3.
+
 ## 12. Board row
 
 Filed 2026-11-18 as **one** row, `BI-INSIGHTS-1` (P2, `BACKLOG.md` §3.6) — the board allows a lane at most one

@@ -110,6 +110,8 @@ class ImportLoaderInventoryTest {
                 + "the config root an import writes");
         ALLOWED.put("feedback.json", "readers' feedback on Insights (InsightStore, BI-INSIGHTS-1 P3) in "
                 + "<data root>/insights_<profile>/ - the DATA root, never the config root an import writes");
+        ALLOWED.put("pairs.json", "pairs of dimensions the insight.scan Job stores (PairExplain, BI-EXPLAIN-DEPTH2-1) in "
+                + "<data root>/insights_<profile>/ - the DATA root, never the config root an import writes");
         ALLOWED.put("inbox", "<data root>/inbox/<id>, an Add data Pipeline's poll directory under the DATA root - not config");
         ALLOWED.put("arrivals.jsonl", "an import Dataset's arrivals ledger (DatasetArrivals, LA-ARRIVAL-LEDGER-1) in "
                 + "<data root>/<id>/ - the DATA root, never the config root an import writes");
