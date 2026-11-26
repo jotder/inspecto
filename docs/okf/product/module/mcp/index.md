@@ -39,3 +39,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `AGENT-LOOKUP-PREVIEW-1` | P3 | feature | let an agent test a lookup (POST /lookups/test) once it is safe: | — |
 | `PENDING-CHANGE-SECRET-READBACK-1` | P3 | defect | a Job's secret parameter can be read back through its Pending Change: | — |
 | `DRYRUN-PREVIEW-UNMASKED-1` | P3 | defect | Pipeline dry-run and test-run previews are not masked: | — |
+| `DRYRUN-SAVE-NODE-MISMATCH-1` | P3 | defect | dry_run_pipeline (POST /pipelines/authored/{id}/dry-run) seeds and runs a graph whose source.dataset node propose_change (PUT /pipelines/… | — |
+| `GOLDEN-OPS12-FIXTURE-1` | P3 | chore | Golden task ops-12 (a machine gives up waiting on a day) cannot be set up from its suite text: it needs a by-day Job whose day waits on a… | — |
+| `AGENT-NOTICE-PLANTED-1` | P3 | feature | No Agent Skill tells the agent to tell the person when text it reads in data (a CSV cell, a comment, a description, a proposal's reason)… | — |
