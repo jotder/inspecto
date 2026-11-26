@@ -1,0 +1,43 @@
+name: carrier_rates
+active: true
+description: "Golden fixture (ops-12): the carriers' daily rate card, a daily Reference (one version per day, the day from the file name CARRIER_RATES_yyyyMMdd.csv). No file is ever delivered, so every scan day of parcel_scans waits for it."
+produces: reference
+reference:
+  load: replace
+  versions: daily
+  day_from: file_name
+
+dirs:
+  poll:       data/inbox/carrier_rates
+  database:   data/carrier_rates/database
+  backup:     data/carrier_rates/backup
+  temp:       data/carrier_rates/temp
+  errors:     data/carrier_rates/errors
+  quarantine: data/carrier_rates/quarantine
+  markers:    data/carrier_rates/markers
+  status_dir: data/carrier_rates/status
+  log_dir:    data/carrier_rates/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: carrier_rates_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+
+collector:
+  discovery: poll
+  connector: local
+  duplicate:
+    mode: checksum
+    algorithm: SHA256
+    on_change: reprocess

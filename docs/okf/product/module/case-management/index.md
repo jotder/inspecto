@@ -34,6 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `INSIGHT-CASE-EXISTING-1` | P3 | feature | An Insight can only open a NEW Case (filed 2026-11-26, BI-INSIGHTS-1 I-17). | demand |
 | `CASE-REASSIGN-CONSOLE-1` | P3 | feature | an existing Case cannot be re-assigned in the console | — |
 | `CASE-TRANSITION-FOUR-EYES-1` | P3 | feature | a Workflow transition on a Case has no guard: | — |
 | `D6-REAL-USER-SESSION-1` | P3 | chore | The D10 think-aloud with a REAL Case-desk lead is still unrun. | external |

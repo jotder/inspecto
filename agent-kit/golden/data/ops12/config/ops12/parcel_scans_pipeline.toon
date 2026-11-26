@@ -1,0 +1,39 @@
+name: parcel_scans
+active: true
+description: "Golden fixture (ops-12): invented parcel scans, one file per scan day (PARCEL_SCANS_yyyyMMdd.csv). Partition = SCAN_DATE, so each batch carries its record day."
+
+dirs:
+  poll:       data/inbox/parcel_scans
+  database:   data/parcel_scans/database
+  backup:     data/parcel_scans/backup
+  temp:       data/parcel_scans/temp
+  errors:     data/parcel_scans/errors
+  quarantine: data/parcel_scans/quarantine
+  markers:    data/parcel_scans/markers
+  status_dir: data/parcel_scans/status
+  log_dir:    data/parcel_scans/logs
+
+output:
+  format: PARQUET
+  compression: snappy
+
+processing:
+  threads: 1
+  file_pattern: "glob:**/*.csv"
+  duplicate_check:
+    enabled: true
+    marker_extension: .processed
+    retention_days: 30
+  schema_file: parcel_scans_schema.toon
+  csv_settings:
+    delimiter: ","
+    has_header: true
+    date_formats[1]: "%Y-%m-%d"
+
+collector:
+  discovery: poll
+  connector: local
+  duplicate:
+    mode: checksum
+    algorithm: SHA256
+    on_change: reprocess

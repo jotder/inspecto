@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.insights`](../../../../../product-map/module/insights.toon).
 
-9 test class(es): 7 unit, 2 real-HTTP control-plane, 0 IT.
+11 test class(es): 8 unit, 3 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -20,11 +20,12 @@ Run the whole module, or chosen classes (commas between classes, never `+`):
 
 ```bash
 mvn -o test -pl features/inspecto-insights
-mvn -o test -pl features/inspecto-insights -Dtest=ControlApiExplainTest,ControlApiInsightsTest
+mvn -o test -pl features/inspecto-insights -Dtest=ControlApiExplainDepth2Test,ControlApiExplainTest
 ```
 
 | test class | package | kind | file | summary |
 |---|---|---|---|---|
+| `ControlApiExplainDepth2Test` | `com.gamma.insights` | real-HTTP control-plane test | `features/inspecto-insights/src/test/java/com/gamma/insights/ControlApiExplainDepth2Test.java` | {@code POST /insights/explain} with {@code depth: 2} over real HTTP under an ARMED authenticator |
 | `ControlApiExplainTest` | `com.gamma.insights` | real-HTTP control-plane test | `features/inspecto-insights/src/test/java/com/gamma/insights/ControlApiExplainTest.java` | {@code POST /insights/explain} over real HTTP and DuckDB under an ARMED authenticator (BI-INSIGHTS-1 P2): the |
 | `ControlApiInsightsTest` | `com.gamma.insights` | real-HTTP control-plane test | `features/inspecto-insights/src/test/java/com/gamma/insights/ControlApiInsightsTest.java` | The Insight feed, feedback and replay preview over real HTTP under an ARMED authenticator (BI-INSIGHTS-1 P3): the |
 | `InsightProfileValidatorTest` | `com.gamma.insights` | unit | `features/inspecto-insights/src/test/java/com/gamma/insights/InsightProfileValidatorTest.java` | The {@code insight-profile} save gates and the reserved {@code insights_} store prefix. |
@@ -34,3 +35,4 @@ mvn -o test -pl features/inspecto-insights -Dtest=ControlApiExplainTest,ControlA
 | `InsightScanJobTypeManifestTest` | `com.gamma.insights` | unit | `features/inspecto-insights/src/test/java/com/gamma/insights/InsightScanJobTypeManifestTest.java` | {@code provides.jobTypes} of this module's manifest equals the Job Types its providers register. |
 | `InsightScanJobTypeTckTest` | `com.gamma.insights` | unit | `features/inspecto-insights/src/test/java/com/gamma/insights/InsightScanJobTypeTckTest.java` | {@link InsightScanJobType} against the platform's JobTypeProvider TCK. |
 | `InsightScanTest` | `com.gamma.insights` | unit | `features/inspecto-insights/src/test/java/com/gamma/insights/InsightScanTest.java` | The I-8 scan over a fake {@link InsightScan.Fetcher} (no DuckDB): what it finds, what false-discovery control keeps |
+| `PairExplainGoldenTest` | `com.gamma.insights` | unit | `features/inspecto-insights/src/test/java/com/gamma/insights/PairExplainGoldenTest.java` | Depth 2 (BI-EXPLAIN-DEPTH2-1) contributions by pairs of dimensions, computed by hand. |

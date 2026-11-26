@@ -78,6 +78,16 @@ export interface ActionRequestDetail extends ActionRequest {
     attemptLog?: ActionAttempt[];
 }
 
+/** Body for `POST /action-requests`: exactly one of `incidentId` / `caseId`; the server renders `{{…}}` in the template. */
+export interface ProposeActionRequest {
+    connection: string;
+    method?: string;
+    payloadTemplate: Record<string, unknown>;
+    incidentId?: string;
+    caseId?: string;
+    reason?: string;
+}
+
 export interface ActionRequestFilter {
     status?: ActionRequestStatus;
     incidentId?: string;
@@ -98,6 +108,11 @@ export class ActionRequestsService {
             apiUrl('/action-requests'),
             { params: toParams({ ...filter }) },
         );
+    }
+
+    /** Propose one from an Incident or a Case (`POST /action-requests`, canWorkIncidents) — it waits as `pending`. */
+    propose(body: ProposeActionRequest): Observable<ActionRequestDetail> {
+        return this.http.post<ActionRequestDetail>(apiUrl('/action-requests'), body);
     }
 
     get(id: string): Observable<ActionRequestDetail> {

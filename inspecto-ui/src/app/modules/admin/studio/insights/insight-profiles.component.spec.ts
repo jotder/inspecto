@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
@@ -49,7 +49,13 @@ const FEED: InsightFeed = {
     ],
 };
 
-function create(opts: { author: boolean; feature?: boolean; feed?: 'ok' | '404' }) {
+function create(opts: {
+    author: boolean;
+    feature?: boolean;
+    feed?: 'ok' | '404';
+    query?: Record<string, string>;
+    profiles?: ComponentDef[];
+}) {
     const feedback = vi.fn(() => of({}));
     const list = vi.fn(() => (opts.feed === '404' ? throwError(() => ({ status: 404 })) : of(FEED)));
     const remove = vi.fn(() => of({}));
@@ -58,7 +64,18 @@ function create(opts: { author: boolean; feature?: boolean; feed?: 'ok' | '404' 
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
-            { provide: ComponentsService, useValue: { list: () => of([PROFILE]), remove, get: () => of(PROFILE) } },
+            ...(opts.query
+                ? [
+                      {
+                          provide: ActivatedRoute,
+                          useValue: { snapshot: { queryParamMap: convertToParamMap(opts.query) } },
+                      },
+                  ]
+                : []),
+            {
+                provide: ComponentsService,
+                useValue: { list: () => of(opts.profiles ?? [PROFILE]), remove, get: () => of(PROFILE) },
+            },
             { provide: InsightsService, useValue: { list, feedback } },
             { provide: SessionService, useValue: { features: signal({ insights: opts.feature ?? true }) } },
             { provide: LensService, useValue: { canAuthorWorkbench: signal(opts.author) } },
@@ -78,6 +95,38 @@ const buttons = (el: HTMLElement, text: string) =>
     Array.from(el.querySelectorAll('button')).filter((b) => b.textContent?.trim() === text);
 
 describe('InsightProfilesComponent', () => {
+    it('a link to a Profile that no longer exists says so and shows the first Profile', () => {
+        const { fixture, el, list } = create({ author: true, query: { profile: 'gone' } });
+        expect(el.querySelector('[data-testid="missing-profile"]')?.textContent).toContain('gone');
+        expect(el.querySelector('h2')?.textContent).toContain('sales');
+        expect(list).toHaveBeenCalledWith('sales');
+        // Picking a Profile clears the notice.
+        el.querySelector<HTMLElement>('[aria-current="true"]')!.click();
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="missing-profile"]')).toBeNull();
+    });
+
+    it('marks the Insight a link names with ?insight=', () => {
+        const { el } = create({ author: true, query: { profile: 'sales', insight: 'i1' } });
+        const card = el.querySelector('[data-testid="insight"]')!;
+        expect(card.getAttribute('aria-current')).toBe('true');
+        expect(card.textContent).toContain('The Insight the link points to');
+    });
+
+    it('says when the linked Insight is not in the latest run', () => {
+        const { el } = create({ author: true, query: { profile: 'sales', insight: 'old' } });
+        expect(el.querySelector('[data-testid="highlight-missing"]')?.textContent).toContain('old');
+        expect(el.querySelector('[data-testid="insight"]')?.getAttribute('aria-current')).toBeNull();
+    });
+
+    it('selects the Profile a link names with ?profile= (I-17 link back from a Case)', () => {
+        const returns: ComponentDef = { ...PROFILE, name: 'returns', ref: 'insight-profile/returns' };
+        const { el, list } = create({ author: true, query: { profile: 'returns' }, profiles: [PROFILE, returns] });
+        expect(el.querySelector('h2')?.textContent).toContain('returns');
+        expect(list).toHaveBeenCalledWith('returns');
+        expect(list).not.toHaveBeenCalledWith('sales');
+    });
+
     it('lists Profiles, shows the first and its Insight feed, and records feedback', async () => {
         const { fixture, el, feedback, list } = create({ author: true });
         expect(el.querySelector('h2')?.textContent).toContain('sales');

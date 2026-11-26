@@ -54,7 +54,8 @@ public final class InsightScanJobType implements JobTypeProvider {
     public JobTypeDescriptor descriptor() {
         return new JobTypeDescriptor(TYPE, "Insight scan",
                 "Scans an Insight Profile's Measure across its dimensions for spikes, level shifts and steady drifts, "
-                        + "ranks them by impact, surprise and novelty, and stores them as the Dataset insights_<profile>.",
+                        + "ranks them by impact, surprise and novelty, and stores them as the Dataset insights_<profile>; "
+                        + "with the Profile's 'pairs' on, also explains the last bucket's change by pairs of dimensions.",
                 List.of(ParameterDecl.required(P_PROFILE, ParamType.STRING, "The Insight Profile to scan")),
                 List.of(COMPLETED, FOUND), List.of(), List.of());
     }
@@ -106,13 +107,17 @@ public final class InsightScanJobType implements JobTypeProvider {
 
             LocalDate asOf = LocalDate.now(BiSpecRunner.zone(writeRoot));
             InsightScan.Buckets b = InsightScan.buckets(p.grain(), asOf, p.lookback());
-            InsightScan.Fetched f = InsightScan.fetch(p, b, body -> BiSpecRunner.runAsJob(writeRoot, data, p.dataset(),
-                    dataset, BiSpecRunner.parseForJob(writeRoot, body)));
+            InsightScan.Fetcher fetcher = body -> BiSpecRunner.runAsJob(writeRoot, data, p.dataset(), dataset,
+                    BiSpecRunner.parseForJob(writeRoot, body));
+            InsightScan.Fetched f = InsightScan.fetch(p, b, fetcher);
             Instant at = Instant.now();
+            // depth 2 (BI-EXPLAIN-DEPTH2-1): after the series fetch, so a masked Measure has already refused the run
+            Map<String, Object> pairs = p.pairs() ? PairExplain.compute(p, b, fetcher, at) : null;
             String runId = at.toEpochMilli() + "-" + UUID.randomUUID().toString().substring(0, 8);
             Out out;
             synchronized (InsightStore.lock(dir)) {
                 out = store(dir, p, f, runId, at);
+                if (pairs != null) PairExplain.write(dir, pairs, at);
             }
 
             Map<String, Object> payload = new LinkedHashMap<>();
@@ -143,6 +148,9 @@ public final class InsightScanJobType implements JobTypeProvider {
                     + out.fresh().size() + " new) from " + out.result().tests() + " test(s) in Dataset '" + datasetId + "'");
             if (out.result().expectedDropped() > 0) msg.append("; ").append(out.result().expectedDropped()).append(" dated on an expected calendar day");
             if (out.result().suppressed() > 0) msg.append("; ").append(out.result().suppressed()).append(" marked not useful or expected");
+            if (pairs != null) msg.append("; ").append(((List<?>) pairs.get("drivers")).size())
+                    .append(" pair(s) of dimensions explained for ").append(pairs.get("current"))
+                    .append(", ").append(((List<?>) pairs.get("refused")).size()).append(" refused");
             for (Map<String, Object> s : f.skipped()) msg.append("; skipped '").append(s.get("dimension")).append("': ").append(s.get("reason"));
             return JobResult.ok(msg.toString(), ms(t0));
         }

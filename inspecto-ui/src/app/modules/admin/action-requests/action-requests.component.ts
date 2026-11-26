@@ -4,7 +4,7 @@ import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
-import { RouterLink } from '@angular/router';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { ColDef, ICellRendererParams } from 'ag-grid-community';
 import { ToastrService } from 'ngx-toastr';
 import {
@@ -59,6 +59,7 @@ export class ActionRequestsComponent implements OnInit {
     private readonly toastr = inject(ToastrService);
     private readonly confirm = inject(InspectoConfirmService);
     protected readonly lens = inject(LensService);
+    private readonly route = inject(ActivatedRoute);
 
     readonly filter = signal<ActionRequestsFilter>('pending');
     readonly requests = signal<ActionRequest[]>([]);
@@ -103,6 +104,9 @@ export class ActionRequestsComponent implements OnInit {
 
     ngOnInit(): void {
         this.load();
+        // A link from another screen (an Insight's "Request action", BI-INSIGHTS-1 I-17) opens one request: `?id=`.
+        const id = this.route.snapshot.queryParamMap.get('id');
+        if (id) this.open({ id });
     }
 
     setFilter(f: ActionRequestsFilter): void {
