@@ -1406,7 +1406,9 @@ public final class ControlApi implements AutoCloseable, HostContext {
      * A refusal (4xx) passes as it is: it carries no rows, and the handler's own scrubbing applies.
      */
     private Object provenMasked(HttpExchange ex, String method, Route r, Matcher m) throws Exception {
-        try (com.gamma.util.AnswerMasking.Scope scope = com.gamma.util.AnswerMasking.open()) {
+        // D-AK22: only a route on AgentGate.RAW_FOR_BUILDERS may prove its answer as deliberately unmasked
+        try (com.gamma.util.AnswerMasking.Scope scope = com.gamma.util.AnswerMasking.open(
+                AgentGate.RAW_FOR_BUILDERS.contains(method + " " + bare(r)))) {
             Object result = r.handler.handle(ex, m);
             if (result != HANDLED && !scope.stamped()) {
                 log.error("agent data route {} {} answered without a masking stamp - withheld (500)", method, bare(r));

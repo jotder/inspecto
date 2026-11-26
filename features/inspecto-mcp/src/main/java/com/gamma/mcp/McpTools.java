@@ -484,7 +484,30 @@ final class McpTools {
                             + "body runs every case. A delegated person's agent only, never a machine (D-AK10). Needs "
                             + "canAuthorWorkbench. Run them after a preview and before propose_change.",
                     List.of(body("The run request, as POST /tests/run takes it: {cases?: [case names]}.", false)),
-                    a -> new Call("POST", "/tests/run", bodyOf(a))));
+                    a -> new Call("POST", "/tests/run", bodyOf(a))),
+            // W6 group B (design 2026-11-26-agent-data-answers-masking-design.md): the simulators, each on
+            // AgentGate.SIMULATORS, so every answer is masked as it is for the person and costs its weight in the budget
+            new Tool("simulate_decision_rule", "Simulate a Decision Rule",
+                    "Evaluate a saved Decision Rule's 'when' tree over sample rows and return how many match "
+                            + "(lastSimulation: matched, total, checkedAt); for an agent nothing is written. Body {sampleRows: "
+                            + "[rows]}. Needs canAuthorWorkbench. Simulate, then propose_change.",
+                    List.of(id("rule", "The Decision Rule name."),
+                            body("The simulate request: {sampleRows: [rows]}.", false)),
+                    a -> new Call("POST", "/decision-rules/" + seg(a.get("rule")) + "/simulate", bodyOf(a))),
+            new Tool("simulate_rule_template", "Simulate a Rule Template",
+                    "Run a saved Rule Template's SQL over its source Dataset with values for its holes and return the "
+                            + "matching rows, masked as for your person; writes nothing. Body {params?: {hole: value}, "
+                            + "limit?}. A hole compared with a masked column is refused (422). Needs canAuthorWorkbench.",
+                    List.of(id("template", "The Rule Template id."),
+                            body("The simulate request, as POST /rule-templates/{id}/simulate takes it.", false)),
+                    a -> new Call("POST", "/rule-templates/" + seg(a.get("template")) + "/simulate", bodyOf(a))),
+            new Tool("preview_enrichment", "Preview an enrichment draft",
+                    "Run an enrichment draft's transform over sample rows joined to its live References and return the "
+                            + "first 200 enriched rows; writes nothing. Body {config, sampleRows}. The answer is NOT masked: "
+                            + "it holds the References' raw values, which you then hold too - select only the columns you "
+                            + "need. A delegated person's agent only, never a machine (D-AK22). Needs canAuthorWorkbench.",
+                    List.of(body("The preview request: {config: the enrichment draft, sampleRows: [rows]}.", true)),
+                    a -> new Call("POST", "/enrichment/preview", bodyOf(a))));
 
     // ── AK-2d: operations tools (plan §4.6, §6.2 lane C) ─────────────────────────────────────────
 

@@ -71,5 +71,32 @@ class AnswerMaskingTest {
             AnswerMasking.applied("ds", 1);
             assertFalse(s.stamped());
         }
+        try (AnswerMasking.Scope s = AnswerMasking.open(true)) {
+            AnswerMasking.unmaskedByDecision("enrichment");
+            assertFalse(s.stamped(), "the raw stamp too");
+        }
+    }
+
+    /** D-AK22: a raw-by-decision stamp proves an answer only in a scope the host opened for such a route. */
+    @Test
+    void aRawByDecisionStampProvesOnlyAScopeOpenedForIt() {
+        try (AnswerMasking.Scope s = AnswerMasking.open()) {
+            AnswerMasking.unmaskedByDecision("enrichment");
+            assertFalse(s.stamped(), "a raw answer on any other data route still fails closed");
+            assertThrows(AnswerMasking.NotProven.class, () -> AnswerMasking.requireProvenBeforeSend(200));
+        }
+        try (AnswerMasking.Scope s = AnswerMasking.open(true)) {
+            AnswerMasking.unmaskedByDecision("enrichment");
+            assertTrue(s.stamped());
+            assertEquals(0, s.maskedColumns());
+            AnswerMasking.requireProvenBeforeSend(200);
+        }
+        try (AnswerMasking.Scope outer = AnswerMasking.open(true)) {
+            try (AnswerMasking.Scope inner = AnswerMasking.open()) {
+                AnswerMasking.unmaskedByDecision("enrichment");
+                assertFalse(inner.stamped(), "a nested ordinary scope does not inherit the allowance");
+            }
+            assertFalse(outer.stamped());
+        }
     }
 }

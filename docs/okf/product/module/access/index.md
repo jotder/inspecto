@@ -38,7 +38,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `SEED-ADMIN-ALERT-RULE-1` | P3 | defect | the seed admin Role cannot create a Space from a template that carries an Alert Rule | — |
 | `APPROVAL-POLICY-PRESET-1` | P3 | feature | a Standard install is not gated by default: | — |
 | `OIDC-SUPER-ROLE-TEST-RED-1` | P3 | defect | OidcAuthenticatorTest.superRoleGrantsAllCapabilities fails on master: the super role now also grants canDraftInvestigations, which the te… | — |
-| `RULE-TEMPLATE-SIMULATE-SHARING-1` | P3 | defect | Rule Template simulate skips ComponentAccess.canView on its source Dataset | — |
 | `DB-QUERY-STORE-SHARING-1` | P3 | chore | verify: may a /db/query store read reach a shared-away Dataset? | — |
 | `RECON-STATE-READS-UNMASKED-1` | P3 | defect | The recon state reads return recorded Break keys raw, and two skip the Reconciliation's sharing (filed 2026-11-26, RECON-READ-UNGATED-1 f… | — |
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |

@@ -16,7 +16,7 @@ tags: [product-item, module]
 | Slot | Status | Document |
 |---|---|---|
 | plan | missing | |
-| spec | current | [Agent case actions and record edits (AK-2e, W11) — design and as-built](spec-agent-case-actions.md) · [Agent data answers — the shared seam (AGENT-KIT-1 W6 S0) — as-built](spec-agent-data-seam.md) · [Agent posture (MCP-AGENT-POSTURE-1) — design and as-built](spec-agent-posture.md) · [Agent authoring previews (AGENT-KIT-1 W6 group A) — design and as-built](spec-agent-previews.md) · [Agent Space tests (AGENT-KIT-1 W6 group C) — design and as-built](spec-agent-space-tests.md) · [The MCP endpoint (inspecto-mcp) — AK-1 and AK-2 phase 1 design and as-built](spec-mcp.md) |
+| spec | current | [Agent case actions and record edits (AK-2e, W11) — design and as-built](spec-agent-case-actions.md) · [Agent data answers — the shared seam (AGENT-KIT-1 W6 S0) — as-built](spec-agent-data-seam.md) · [Agent posture (MCP-AGENT-POSTURE-1) — design and as-built](spec-agent-posture.md) · [Agent authoring previews (AGENT-KIT-1 W6 group A) — design and as-built](spec-agent-previews.md) · [Agent simulators (AGENT-KIT-1 W6 group B) — as-built](spec-agent-simulators.md) · [Agent Space tests (AGENT-KIT-1 W6 group C) — design and as-built](spec-agent-space-tests.md) · [The MCP endpoint (inspecto-mcp) — AK-1 and AK-2 phase 1 design and as-built](spec-mcp.md) |
 | architecture | current | [MCP endpoint (inspecto-mcp)](architecture-mcp.md) |
 | features | missing | |
 | feature-db | current | [MCP endpoint — feature database](feature-db.md) |

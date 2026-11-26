@@ -38,7 +38,8 @@ them: do the task you were given, then end your answer with one line naming what
    `{sampleRows}`); `kind: schema` casts rows against a schema draft and runs its mapping (body `{config,
    sampleRows}`: read `rejectedCount` and `rejectedRows`); `kind: mapping` checks mapping rules (body `{rules}`). Nothing is
    written. Put the draft inline: a draft that names a file is refused (422 "names a file"), and a body is at most
-   256 KiB — send a sample of rows, not a whole file. Preview until clean.
+   256 KiB — send a sample of rows, not a whole file. Preview until clean. For a Decision Rule, simulate instead
+   (below).
 4. **Dry-run** a Pipeline with `dry_run_pipeline`: argument `pipeline` = the Pipeline id, and `body`
    `{pipeline: <draft graph>, sampleRows: [...]}`. This is also a
    Pipeline graph's validation: the draft is parsed and validated, then executed on a scratch database; nothing is
@@ -70,6 +71,7 @@ them: do the task you were given, then end your answer with one line naming what
 | 413 | a preview body over 256 KiB | send fewer sample rows |
 | 409 "already pending approval (pc-…)" | your earlier proposal for that id is still waiting | do not propose it again, and do not dodge it under a new id: read it with `get_pending_change`; if it is wrong, `withdraw_change` it, then propose the corrected one |
 | 423 | the install is read-only | stop; tell the person |
+| 429 | past your data budget (simulations and data reads) | wait the `Retry-After` seconds; do not loop |
 | 500 | a server fault, not your draft | stop after one retry and tell the person, with the reason text |
 
 **One proposal per thing.** Get the draft right with `validate_config`, `preview_config` or a dry run first; each `propose_change` that
@@ -87,8 +89,20 @@ Widgets are a few proposals, not dozens.
 - A **Notification Channel** is `{id, kind: EMAIL|WEBHOOK, target, description?, enabled?, template?, digestMinutes?}`:
   where deliveries go (an address, or a URL). Never put a token or password in `target` — it is shown to everyone
   who lists the Channels.
-- An update replaces the whole rule, and no MCP Tool lists these rules: to change one, ask the person for its current
-  content rather than guessing it.
+- An update replaces the whole rule, and no MCP Tool lists these rules: to change one, ask the person for its name
+  rather than guessing it.
+- **Simulate, then propose** a Decision Rule update. `simulate_decision_rule` (argument `rule`, body `{sampleRows:
+  [rows]}`) evaluates the SAVED rule's `when` over the rows and answers the rule's whole current content plus
+  `lastSimulation` `{matched, total, checkedAt}`; nothing is written. Draft the update from that content, simulate the
+  saved rule on rows the change should and should not match, and say in the `reason` what matches now and what the
+  update changes. A new rule cannot be simulated until it is approved: simulate it then and report the counts.
+- **A Rule Template** is simulated, never proposed: `simulate_rule_template` (argument `template`, body `{params?:
+  {hole: value}, limit?}`) runs its SQL over its source Dataset and answers the matching rows, masked as for the person
+  you act for. A hole compared with a masked column is refused (422): leave it out or ask the person.
+- **An enrichment draft** is previewed with `preview_enrichment` (body `{config, sampleRows}`): its transform runs over
+  your sample rows joined to the live References and answers the first 200 rows; nothing is written. ⚠ The answer is
+  NOT masked: it holds the References' raw values. Select only the columns the check needs, and never repeat a raw value
+  to anyone but the person you act for. A machine agent is refused (403 "nor preview an enrichment").
 
 ## A KPI from a Requirement, and restoring a Pipeline
 
@@ -129,5 +143,8 @@ changes their mind or you proposed something wrong — then propose the correcte
 - `preview_config` — a draft's parsing, schema casts or mapping tried on sample data, writing nothing
 - `dry_run_pipeline` — a Pipeline draft run on sample rows, writing nothing
 - `run_space_tests` — the Space's test cases run against its Pipelines as they are, writing nothing
+- `simulate_decision_rule` — a saved Decision Rule's content and how many sample rows it matches, writing nothing
+- `simulate_rule_template` — a saved Rule Template's matching rows over its Dataset, masked, writing nothing
+- `preview_enrichment` — an enrichment draft run on sample rows and the live References, UNMASKED, writing nothing
 - `propose_change` — the held write
 - `withdraw_change` — take a proposal back

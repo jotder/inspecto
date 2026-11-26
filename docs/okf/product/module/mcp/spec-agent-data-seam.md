@@ -29,6 +29,12 @@ its weight in the agent budget. As built in S0:
 | The Link Analysis reads (`AgentGate.LA_READS`) less `AgentGate.LA_READS_WITHOUT_VALUES` — 16 routes: projection, neighbours, neighbour preview, multi, recursive paths, reference rows, expand preview, case history, Entity resolve and suggest, deep-link resolve, preset run, Dataset query, branching and temporal patterns, Investigation replay | 1 |
 | The 28 GET reads of masked values (`AgentGate.VALUE_GETS`, operator 2026-11-26, `AGENT-GET-DATA-READS-1`): Dataset rows, `/db/table`, a KPI value; Risk Score, Risk Score list, Anomaly Score, prediction; an Entity List; screening hits; regulatory reports; the Link Analysis GETs — Dataset discover, Entity and Entity Type profiles and summary, entity identities, value measures, a graph run, an Investigation's log, Working Set, comparison, dossier and bundle, a Draft's log and Working Set, the public Investigation link | 1 |
 
+Group B added the simulators (`AgentGate.SIMULATORS`, 2026-11-26): `POST /decision-rules/{id}/simulate` and
+`POST /rule-templates/{id}/simulate`, weight 1 each, and `POST /enrichment/preview`, weight 2 — the one route raw by
+operator decision (D-AK22, `AgentGate.RAW_FOR_BUILDERS`): its stamp `AnswerMasking.unmaskedByDecision` proves only a scope
+the host opened for such a route, so a raw answer anywhere else still fails closed —
+[spec-agent-simulators.md](spec-agent-simulators.md).
+
 Not on the list, because they answer no Dataset value: the overlap profile (names and counts) and the two dossier
 verifications (verdicts and hashes). `AgentDataRoutesParityTest` makes every agent-allowed write route either a data
 route or one named with its reason, so a new allowed route is classified before it ships. `POST /lookups/test` stays
