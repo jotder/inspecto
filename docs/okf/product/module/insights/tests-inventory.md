@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.insights`](../../../../../product-map/module/insights.toon).
 
-8 test class(es): 6 unit, 2 real-HTTP control-plane, 0 IT.
+9 test class(es): 7 unit, 2 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -29,6 +29,7 @@ mvn -o test -pl features/inspecto-insights -Dtest=ControlApiExplainTest,ControlA
 | `ControlApiInsightsTest` | `com.gamma.insights` | real-HTTP control-plane test | `features/inspecto-insights/src/test/java/com/gamma/insights/ControlApiInsightsTest.java` | The Insight feed, feedback and replay preview over real HTTP under an ARMED authenticator (BI-INSIGHTS-1 P3): the |
 | `InsightProfileValidatorTest` | `com.gamma.insights` | unit | `features/inspecto-insights/src/test/java/com/gamma/insights/InsightProfileValidatorTest.java` | The {@code insight-profile} save gates and the reserved {@code insights_} store prefix. |
 | `InsightsAbsentSurfaceParityTest` | `com.gamma.insights` | unit | `features/inspecto-insights/src/test/java/com/gamma/insights/InsightsAbsentSurfaceParityTest.java` | The module's {@code module.toon} {@code provides.routes} must list EXACTLY the routes {@link ExplainRoutes} and {@link InsightsRoutes} register — |
+| `InsightScanDimensionTest` | `com.gamma.insights` | unit | `features/inspecto-insights/src/test/java/com/gamma/insights/InsightScanDimensionTest.java` | The I-9 concentration and I-10 distribution-shift Insight Types of the scan, over the same fake fetcher as |
 | `InsightScanJobTest` | `com.gamma.insights` | unit | `features/inspecto-insights/src/test/java/com/gamma/insights/InsightScanJobTest.java` | {@code insight.scan} (BI-INSIGHTS-1 I-8) run by a real JobService over Parquet in DuckDB: registered through |
 | `InsightScanJobTypeManifestTest` | `com.gamma.insights` | unit | `features/inspecto-insights/src/test/java/com/gamma/insights/InsightScanJobTypeManifestTest.java` | {@code provides.jobTypes} of this module's manifest equals the Job Types its providers register. |
 | `InsightScanJobTypeTckTest` | `com.gamma.insights` | unit | `features/inspecto-insights/src/test/java/com/gamma/insights/InsightScanJobTypeTckTest.java` | {@link InsightScanJobType} against the platform's JobTypeProvider TCK. |
