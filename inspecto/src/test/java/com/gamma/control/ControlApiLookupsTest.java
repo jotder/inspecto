@@ -39,7 +39,7 @@ class ControlApiLookupsTest {
     private final HttpClient client = HttpClient.newHttpClient();
 
     private static final Authenticator FAKE = ex -> "Bearer plain".equals(ex.getRequestHeaders().getFirst("Authorization"))
-            ? Optional.of(new Subject("nobody", Set.of())) : Optional.empty();
+            ? Optional.of(new Subject("nobody", Set.of("canAuthorWorkbench"))) : Optional.empty();   // POST /lookups/test's gate
 
     private static final String STEPS = """
             output_store: enriched_calls

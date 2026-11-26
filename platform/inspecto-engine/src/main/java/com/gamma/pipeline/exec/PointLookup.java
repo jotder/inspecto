@@ -185,6 +185,26 @@ public final class PointLookup {
     }
     public String match() { return match; }
 
+    /** {@link #answerSources()}'s marker for the matched-key detail column ({@code matched_key_as}). */
+    public static final String MATCHED_KEY = "(matched key)";
+
+    /**
+     * Where each mapping's answer columns come from, in {@link Answer#mappings()} order: output name to the Reference
+     * column it returns, or {@link #MATCHED_KEY} for the matched-key detail column. Match kind and score are not listed:
+     * they carry no Reference value. For a caller that masks an answer by the Reference's classification
+     * (LOOKUP-TEST-OPEN-READ-1).
+     */
+    public List<Map<String, String>> answerSources() {
+        List<Map<String, String>> out = new ArrayList<>(mappings.size());
+        for (RowShaper.JoinMapping m : mappings) {
+            Map<String, String> s = new LinkedHashMap<>();
+            for (Map.Entry<String, String> c : m.columns().entrySet()) s.put(c.getValue(), c.getKey());
+            if (m.matchedKeyAs() != null) s.put(m.matchedKeyAs(), MATCHED_KEY);
+            out.add(s);
+        }
+        return out;
+    }
+
     /**
      * Build the index of keyed join {@code node}, reading its Reference through {@code references} on a fresh sealed
      * scratch connection that is removed afterwards.
