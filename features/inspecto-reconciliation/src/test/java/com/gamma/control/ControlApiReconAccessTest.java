@@ -324,4 +324,30 @@ class ControlApiReconAccessTest {
             }
         }
     }
+
+    // ── EXPRESSION-GUARD-ESTRING-1: a side filter is a guarded fragment, never SQL ─────────────────
+
+    /**
+     * DuckDB reads {@code E'\'''} as an escape string that is still open, so the rest of the filter used to run as SQL:
+     * {@code /recon/rows} answered every row of side a (the key predicate and LIMIT commented out) after a subquery the
+     * guard denies by keyword. Any signed-in caller who may view the side could send it; now each read is a 422.
+     */
+    @Test
+    void aSideFilterCannotSmuggleSqlWithAnEscapeString(@TempDir Path root) throws Exception {
+        String payload = "E'\\''' || ') IS NULL OR (SELECT count(*) FROM duckdb_settings()) > 0 --'";
+        String filters = ",\"filters\":{\"plain_a_ds\":" + new com.fasterxml.jackson.databind.ObjectMapper()
+                .writeValueAsString(payload) + "}";
+        try (Ctx c = open(root)) {
+            // baseline: a plain filter keeps the key predicate, so one key asked is its one row answered
+            JsonNode base = ok(c, "viewer", "/recon/rows", "{\"config\":{" + PLAIN
+                    + ",\"filters\":{\"plain_a_ds\":\"fee IS NOT NULL\"}},\"key\":{\"msisdn\":\"m2\"}}");
+            assertEquals(1, base.get("a").get("rows").size(), base.toString());
+            for (Map.Entry<String, String> read : reads(PLAIN + filters).entrySet()) {
+                HttpResponse<String> r = post(c, "viewer", read.getKey(), read.getValue());
+                assertEquals(422, r.statusCode(), read.getKey() + " accepted the escape-string filter -> " + r.body());
+                assertFalse(r.body().contains("\"m1\""), read.getKey() + " answered a row the key did not ask for");
+                assertTrue(r.body().contains("illegal character"), read.getKey() + " refused by the guard: " + r.body());
+            }
+        }
+    }
 }

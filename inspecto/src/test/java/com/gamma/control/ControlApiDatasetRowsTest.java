@@ -258,4 +258,21 @@ class ControlApiDatasetRowsTest {
             assertTrue(r.body().contains("getenv"), r.body());
         }
     }
+
+    /**
+     * EXPRESSION-GUARD-ESTRING-1: DuckDB reads {@code E'\'''} as an escape string that is still open, so the rest of
+     * the expression used to run as SQL inside the relation wrap: here a column computed by a subquery the guard
+     * denies by keyword. The guard now refuses the prefixed literal itself.
+     */
+    @Test
+    void aCalculatedExpressionCannotSmuggleSqlWithAnEscapeString(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedMatches(c, List.of(Map.of("name", "leak", "expr", "E'\\''' || ') AS leak, "
+                    + "(SELECT count(*) FROM duckdb_settings()) AS smuggled FROM (SELECT 1 AS one) AS __base) AS __calc --'")));
+            HttpResponse<String> r = get(c.port, "/datasets/matches/rows");
+            assertEquals(422, r.statusCode(), r.body());
+            assertFalse(r.body().contains("smuggled\""), "a smuggled column was served: " + r.body());
+            assertTrue(r.body().contains("illegal character"), "refused by the guard, not by DuckDB: " + r.body());
+        }
+    }
 }

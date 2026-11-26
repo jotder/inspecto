@@ -35,7 +35,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `RECON-CROSS-PERIOD-1` | P3 | feature | a Reconciliation is read one day at a time: | — |
-| `EXPRESSION-GUARD-ESTRING-1` | P1 | defect | ExpressionGuard mis-lexes DuckDB's escape-string literal, so SQL can be smuggled past it (filed 2026-11-26, found by the RECON-READ-UNGAT… | — |
 | `RECON-STATE-READS-UNMASKED-1` | P3 | defect | The recon state reads return recorded Break keys raw, and two skip the Reconciliation's sharing (filed 2026-11-26, RECON-READ-UNGATED-1 f… | — |
 | `PACK-PARTNER-SETTLEMENT-1` | P3 | feature | Partner settlement slices W1…W3 (wholesale, MVNO, roaming) and confirmation of the delegated decisions. | — |
 | `HOWTO-DOC-DRIFT-1` | P3 | chore | internal hub pages that contradict the code, found writing the P3 how-tos: | — |
