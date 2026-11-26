@@ -15,7 +15,9 @@ code: features/inspecto-mcp
 
 An AI agent does an operations support engineer's work: it reads health, runs and freshness, diagnoses a failed run,
 and — once the cause is known — re-runs, resumes, pauses, reprocesses a batch, replays rejected rows, retries or drains a
-run, releases a quarantined file back into its inbox, or triggers or replays a Job. Who the agent is decides what happens:
+run, releases a quarantined file back into its inbox, triggers or replays a Job, evaluates the Expectations or Alert
+Rules again after a fix, or works a by-day Job's backlog (drain, pause, resume, run one day, give up on one day). Who
+the agent is decides what happens:
 
 - **Signed in as a person** (through an agent client): the action runs **at once**, within that person's own rights,
   exactly as if the person had pressed the button. The audit row names the person and the agent client.
@@ -23,7 +25,10 @@ run, releases a quarantined file back into its inbox, or triggers or replays a J
   approves it.
 
 An agent never approves and never takes a backup. It releases a quarantined file only after reading why the file was
-set aside, and asks the person first.
+set aside, and asks the person first. Giving up on a backlog day discards that day's files for good, so the agent asks
+the person first there too. Its tools never force a drain in the quiet period or run a day on the previous Reference;
+a machine agent calling the API directly could ask for either, so before approving a backlog action, open it and read
+its whole request (the query shows there).
 
 ## Before you start
 
@@ -50,7 +55,8 @@ set aside, and asks the person first.
    `agent-kit/skills` folder (the vendor packages carry them already).
 3. **Ask for an outcome**, for example "the shipments data stopped refreshing — find out why", then "resume it".
    The agent reads first (`health`, `list_runs`, `get_run_batches`, `dataset_freshness`) and acts only on a cause a
-   re-run fixes. It asks before it drains or reprocesses.
+   re-run fixes. It asks before it drains, reprocesses or gives up on a backlog day. After a fix, ask "check the
+   expectation again": it evaluates and reports whether it passes now.
 4. **A machine agent's action waits.** It reports a Pending Action id (`pa-…`). On the **Pending Changes** screen,
    open the **Pending Actions** tab: each row names the action (`POST /runs/<run>/resume`), the machine that asked and
    its reason. Approve to run it — it runs as that machine, with every check made again — or decline it.

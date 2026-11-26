@@ -48,9 +48,9 @@ const timeOf = (row) => row.timestamp ?? row.ts ?? row.time ?? row.createdAt ?? 
 const pathOf = (row) => (s(row).match(/"http_path"\s*:\s*"([^"]+)"/) || [])[1] ?? null;
 const methodOf = (row) => (s(row).match(/"http_method"\s*:\s*"([A-Z]+)"/) || [])[1] ?? null;
 /** The action routes (AgentGate.ACTIONS: a run's, AK-2d; an Incident's, Case's or Alert's, AK-2e; a Link Analysis Draft
- *  write or graph run, AK-2f; an RCA skeleton or a correlation link, W11), as an http_path under /api/v1[/spaces/{id}]
- *  would carry them. */
-export const ACTION_PATH = /\/(runs\/[^/]+\/(trigger|pause|resume|reprocess|replay-rejects|drain|retries\/(retry-now|cancel)|quarantine\/release)|jobs\/[^/]+\/trigger|jobs\/runs\/[^/]+\/replay|objects\/[^/]+\/(comments|ack|assign|resolve|transition|rca|links)|incidents\/[^/]+\/briefs|alerts\/[^/]+\/(ack|resolve)|cases\/from-entities|inv\/investigations\/[^/]+\/drafts(\/[^/]+\/(ops|undo|discard|rebase))?|inv\/graph\/runs(\/[^/]+\/cancel)?)$/;
+ *  write or graph run, AK-2f; an RCA skeleton or a correlation link, W11; an evaluation or a Job backlog control, W7),
+ *  as an http_path under /api/v1[/spaces/{id}] would carry them. */
+export const ACTION_PATH = /\/(runs\/[^/]+\/(trigger|pause|resume|reprocess|replay-rejects|drain|retries\/(retry-now|cancel)|quarantine\/release)|jobs\/[^/]+\/trigger|jobs\/runs\/[^/]+\/replay|jobs\/[^/]+\/backlog\/(drain|pause|resume|days\/[^/]+\/(run|give-up))|expectations\/([^/]+\/)?evaluate|alerts\/evaluate|objects\/[^/]+\/(comments|ack|assign|resolve|transition|rca|links)|incidents\/[^/]+\/briefs|alerts\/[^/]+\/(ack|resolve)|cases\/from-entities|inv\/investigations\/[^/]+\/drafts(\/[^/]+\/(ops|undo|discard|rebase))?|inv\/graph\/runs(\/[^/]+\/cancel)?)$/;
 /** The action routes the gate names with PUT, not POST: attaching an Investigation to a Case (AK-2f); an Incident's or
  *  Case's postmortem, category, impact and Findings values (W11). */
 export const PUT_ACTION_PATH = /\/(inv\/investigations\/[^/]+\/case|objects\/[^/]+\/(postmortem|category|impact|findings))$/;

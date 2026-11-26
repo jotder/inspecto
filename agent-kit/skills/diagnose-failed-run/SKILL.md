@@ -25,6 +25,7 @@ changes.
 - `list_incidents` and `get_incident` / `get_incident_briefs` — an Incident may already explain the failure.
 - `get_lineage` on the output Dataset — an upstream Dataset that did not refresh starves this run.
 - `get_pipeline` — what the run does; read only the steps the error names.
+- `get_job_backlog` — a by-day Job whose days pile up: which day waits, and on what (a missing Reference, a deadline).
 
 Sort the cause into one of four:
 
@@ -39,11 +40,12 @@ Sort the cause into one of four:
 
 Tell the person, in their words: what failed, since when, the cause and the evidence (the batch, the error line, the
 Incident), and the one next step you recommend. Only a **transient** cause (a timeout, a source that was briefly
-unavailable, now back) is fixed by a re-run — then use `operate-runs`.
+unavailable, now back) is fixed by a re-run — then use `operate-runs`. Once someone fixed the cause, `operate-runs`
+also checks the data again and clears a backlog that piled up.
 
 ## Never
 
-- Re-run, reprocess or drain while diagnosing — this skill only reads.
+- Re-run, reprocess, drain, evaluate or work a backlog while diagnosing — this skill only reads.
 - Guess a cause the evidence does not show; say what you could not see.
 - Quote masked values back unmasked; a masked value stays masked.
 
@@ -56,3 +58,4 @@ unavailable, now back) is fixed by a re-run — then use `operate-runs`.
 - `dataset_freshness`, `get_lineage` — how stale an output is, and what feeds it
 - `list_incidents`, `get_incident`, `get_incident_briefs` — what was already raised about it
 - `get_pipeline` — what the run does
+- `get_job_backlog` — a by-day Job's waiting days, and why each waits

@@ -50,6 +50,19 @@ class McpToolRoutesTest {
                     calls.add(t.router().route(t.validate(new LinkedHashMap<>(Map.of("kind", kind, "body", Map.of())))));
                 continue;
             }
+            if (t.name().equals("operate_job_backlog")) {   // W7: every backlog action, a day for the per-day ones
+                for (Map.Entry<String, String> e : McpTools.JOB_BACKLOG_ACTIONS.entrySet()) {
+                    Map<String, Object> a = new LinkedHashMap<>(Map.of("job", "nightly", "action", e.getKey()));
+                    if (e.getValue().contains("{day}")) a.put("day", "2026-11-22");
+                    calls.add(t.router().route(t.validate(a)));
+                }
+                continue;
+            }
+            if (t.name().equals("evaluate_expectations")) {   // W7: every enabled one, and one by name
+                calls.add(t.router().route(t.validate(new LinkedHashMap<>())));
+                calls.add(t.router().route(t.validate(new LinkedHashMap<>(Map.of("expectation", "orders_not_null")))));
+                continue;
+            }
             if (t.name().equals("run_link_query") || t.name().equals("work_draft")) {   // AK-2f: every kind and action
                 java.util.Collection<String> values = t.name().equals("run_link_query") ? McpTools.LINK_QUERIES.keySet()
                         : McpTools.DRAFT_ACTIONS;
@@ -192,7 +205,8 @@ class McpToolRoutesTest {
     void everyOperationsToolActionReplaysAnOperationalAction() {
         for (McpTools.Call c : everyCall()) {
             boolean action = c.path().startsWith("/runs/orders/") || c.path().matches("/jobs/[^/]+/trigger")
-                    || c.path().matches("/jobs/runs/[^/]+/replay");
+                    || c.path().matches("/jobs/runs/[^/]+/replay") || c.path().startsWith("/jobs/nightly/backlog/")
+                    || c.path().endsWith("/evaluate");
             if (!"POST".equals(c.method()) || !action) continue;
             String route = c.path();
             assertTrue(CapabilityManifest.ENTRIES.stream().anyMatch(e -> e.method().equals("POST")
@@ -200,6 +214,40 @@ class McpToolRoutesTest {
                     "an operations tool replays a canOperateRuns route: " + route);
         }
         assertEquals(9, McpTools.RUN_ACTIONS.size(), "the eight run actions of plan §4.6 and the quarantine release (W1)");
+    }
+
+    /**
+     * Widening plan W7 (D-AK11 signed 2026-11-25): evaluate and the Job backlog. Every route the three tools replay is an
+     * action route (a person's agent acts at once, a machine's call is held), each backlog action reaches its own route,
+     * a per-day action needs its day, and the one tool that can discard a day says it is destructive.
+     */
+    @Test
+    void theEvaluateAndBacklogToolsReplayTheirActionRoutes() {
+        List<String> got = new ArrayList<>();
+        for (McpTools.Call c : everyCall())
+            if (c.path().startsWith("/jobs/nightly/backlog/") || c.path().endsWith("/evaluate")) got.add(c.method() + " " + c.path());
+        assertEquals(new java.util.TreeSet<>(List.of("POST /expectations/evaluate", "POST /expectations/orders_not_null/evaluate",
+                        "POST /alerts/evaluate", "POST /jobs/nightly/backlog/drain", "POST /jobs/nightly/backlog/pause",
+                        "POST /jobs/nightly/backlog/resume", "POST /jobs/nightly/backlog/days/2026-11-22/run",
+                        "POST /jobs/nightly/backlog/days/2026-11-22/give-up")),
+                new java.util.TreeSet<>(got));
+        for (String line : got) {
+            int sp = line.indexOf(' ');
+            String path = line.substring(sp + 1);
+            String pattern = CapabilityManifest.ENTRIES.stream()
+                    .filter(e -> e.method().equals("POST") && Pattern.matches(e.pattern(), path)).findFirst().orElseThrow().pattern();
+            assertTrue(AgentGateProbe.isAction("POST", pattern), line + " is not in AgentGate.ACTIONS");
+        }
+        McpTools.Tool backlog = McpTools.tool("operate_job_backlog");
+        assertThrows(McpTools.BadArgs.class, () -> backlog.router().route(backlog.validate(
+                new LinkedHashMap<>(Map.of("job", "nightly", "action", "give-up")))), "give-up names its day");
+        assertThrows(McpTools.BadArgs.class, () -> backlog.router().route(backlog.validate(
+                new LinkedHashMap<>(Map.of("job", "nightly", "action", "pause", "day", "2026-11-22")))), "pause takes no day");
+        assertThrows(McpTools.BadArgs.class, () -> backlog.validate(
+                new LinkedHashMap<>(Map.of("job", "nightly", "action", "give-up", "day", "../x"))), "a day is an id, never a path");
+        assertEquals(Boolean.TRUE, ((Map<?, ?>) backlog.definition().get("annotations")).get("destructiveHint"));
+        for (String t : List.of("evaluate_expectations", "evaluate_alerts", "operate_run"))
+            assertEquals(Boolean.FALSE, ((Map<?, ?>) McpTools.tool(t).definition().get("annotations")).get("destructiveHint"), t);
     }
 
     /** The host's Link Analysis writes ({@code AgentGate.LA_ACTIONS}) and queries ({@code AgentGate.LA_READS}). */
