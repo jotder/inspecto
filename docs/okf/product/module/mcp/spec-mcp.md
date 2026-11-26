@@ -119,6 +119,7 @@ over 256 KiB is cut and the result says so.
 | MCP Tool | Arguments | Replays |
 |---|---|---|
 | `edition_and_modules` | — | `GET /modules` |
+| `get_agent_posture` | — | `GET /agent-posture` ([spec-agent-posture.md](spec-agent-posture.md)) |
 | `list_spaces` | — | `GET /spaces` |
 | `list_datasets` | — | `GET /components/dataset` |
 | `describe_dataset` | `dataset` | `GET /components/dataset/{dataset}` |
@@ -402,7 +403,8 @@ config only.
 
 - **The hold** — `PendingActions.holdIfMachineAction`, called by `ControlApi.routeDispatch` and every
   `ControlApi.replay` right before the handler (after the capability, policy and agent gates, so a machine still needs
-  `canOperateRuns`): a Subject that is `machine()` and `agent()` calling an `ACTION` route gets **202**
+  `canOperateRuns`): a Subject whose `AgentGate.posture` is `MACHINE`
+  ([posture](spec-agent-posture.md)) calling an `ACTION` route gets **202**
   `{status: pending, ran: false, pendingAction}` and nothing runs. One pending record per action (same method, path,
   query and body; else 409 — the query since W11, whose unlink names its other end there).
 - **The record** — `pending-actions/pa-<UTC stamp>-<6 hex>.json` in the Space's config tree: `action`

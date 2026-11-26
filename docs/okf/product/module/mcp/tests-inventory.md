@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.mcp`](../../../../../product-map/module/mcp.toon).
 
-6 test class(es): 2 unit, 4 real-HTTP control-plane, 0 IT.
+7 test class(es): 2 unit, 5 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -20,11 +20,12 @@ Run the whole module, or chosen classes (commas between classes, never `+`):
 
 ```bash
 mvn -o test -pl features/inspecto-mcp
-mvn -o test -pl features/inspecto-mcp -Dtest=ControlApiMcpDiscoveryTest,ControlApiMcpProposeKindsTest
+mvn -o test -pl features/inspecto-mcp -Dtest=ControlApiMcpAgentPostureTest,ControlApiMcpDiscoveryTest
 ```
 
 | test class | package | kind | file | summary |
 |---|---|---|---|---|
+| `ControlApiMcpAgentPostureTest` | `com.gamma.mcp` | real-HTTP control-plane test | `features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiMcpAgentPostureTest.java` | {@code MCP-AGENT-POSTURE-1} over real HTTP: an agent learns its posture from the server. {@code get_agent_posture} |
 | `ControlApiMcpDiscoveryTest` | `com.gamma.mcp` | real-HTTP control-plane test | `features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiMcpDiscoveryTest.java` | MCP authorization discovery over real HTTP (AGENT-KIT-1 AK-2a, plan §4.3): {@code GET /.well-known/oauth-protected-resource} |
 | `ControlApiMcpProposeKindsTest` | `com.gamma.mcp` | real-HTTP control-plane test | `features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiMcpProposeKindsTest.java` | AK-2 widening plan W2 over real HTTP ({@code 2026-11-25-agent-kit-ak2-widening-plan.md} §3 W2, D-AK9): every kind that |
 | `ControlApiMcpTest` | `com.gamma.mcp` | real-HTTP control-plane test | `features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiMcpTest.java` | {@code POST /mcp} over real HTTP (AGENT-KIT-1 AK-1): the transport's refusals in order, both protocol eras, that |

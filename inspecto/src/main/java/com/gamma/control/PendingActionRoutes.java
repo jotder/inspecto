@@ -42,6 +42,24 @@ final class PendingActionRoutes implements RouteModule {
                 (e, m) -> decide(api, e, ApiContext.name(m), false, api.body(e))));
         // Author-only, so no capability wrap: the handler's author check is the gate (CapabilityManifest EXEMPTIONS).
         api.post("/pending-actions/([^/]+)/withdraw", (e, m) -> withdraw(api, e, ApiContext.name(m), api.body(e)));
+        // MCP-AGENT-POSTURE-1: an agent asks the server whether its actions run or are held, never guesses it from text.
+        api.get("/agent-posture", (e, m) -> posture(e));
+    }
+
+    /**
+     * {@code GET /agent-posture}: the caller's {@link AgentGate.Posture} — {@code person}, {@code machine}, or {@code none}
+     * when no agent client acts for it — its agent client, and what an action does. Read off {@link AgentGate#posture},
+     * the predicate the machine-action hold itself uses, so the answer cannot drift from what the gate does.
+     */
+    static Map<String, Object> posture(HttpExchange ex) {
+        Subject s = ApiContext.subject(ex).orElse(null);
+        AgentGate.Posture p = AgentGate.posture(s);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("posture", p == null ? "none" : p.id);
+        out.put("agentClient", p == null ? null : s.agentClient());
+        out.put("effect", p == null ? "no agent client acts for this sign-in: the MCP write tools are refused it"
+                : p.effect);
+        return out;
     }
 
     private Object list(ApiContext api, HttpExchange ex) throws IOException {
