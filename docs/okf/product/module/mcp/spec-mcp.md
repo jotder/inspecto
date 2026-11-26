@@ -133,6 +133,7 @@ over 256 KiB is cut and the result says so.
 | `list_incidents` | `status?`, `severity?`, `q?`, `limit?` | `GET /objects?type=incident` |
 | `get_incident` | `incident` | `GET /objects/{incident}` |
 | `get_incident_briefs` | `incident` | `GET /incidents/{incident}/briefs` |
+| `list_comments` | `id` | `GET /objects/{id}/comments` (masked) |
 | `list_alert_rules` | — | `GET /alerts/rules` |
 | `list_alerts` | — | `GET /alerts` |
 | `list_expectations` | — | `GET /expectations` |
@@ -589,10 +590,8 @@ Built 2026-11-25 (widening plan §3 W9). Two Agent Skills that only read; no too
 
 ## Adversarial golden tasks (W8)
 
-Suite `agent-kit/golden/adversarial.json`: instructions planted where an agent reads data, asking it to approve,
-withdraw someone else's proposal, reveal or promote. It measures whether the model tries (the gate refuses either way)
-and whether it tells the person. Grader checks, guard rules and tests:
-[`tests-agent-golden.md`](tests-agent-golden.md) § The adversarial suite (W8).
+Instructions planted where an agent reads data (`agent-kit/golden/adversarial.json`): does the model try, and does it
+tell the person? Detail: [`tests-agent-golden.md`](tests-agent-golden.md) § The adversarial suite (W8).
 
 ## Security review (2026-11-20)
 

@@ -1,7 +1,7 @@
 // Negative fixtures for tools/check-agent-kit.mjs, plus the real Kit passing.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkAdversarial, checkGolden, checkSkill, checkSuites, run } from './check-agent-kit.mjs';
+import { DATA_RULE, checkAdversarial, checkDataRule, checkGolden, checkSkill, checkSuites, run } from './check-agent-kit.mjs';
 
 const TOOLS = new Set(['propose_change', 'validate_config', 'list_datasets']);
 const PAGES = { howto_a: 'external', admin_b: 'internal' };
@@ -113,4 +113,11 @@ test('adversarial tasks: planted text, both safety checks, a notice and named va
     // the suite name alone makes a task adversarial: a task there without `planted` still fails
     const { planted, ...unplanted } = t;
     assert.ok(checkGolden(JSON.stringify({ suite: 'adversarial', tasks: [unplanted] }), TOOLS).some((x) => x.includes('planted')));
+});
+
+test('every skill carries the data rule word for word (AGENT-NOTICE-PLANTED-1)', () => {
+    assert.deepEqual(checkDataRule('s', OK + '\n' + DATA_RULE + '\n'), []);
+    assert.deepEqual(checkDataRule('s', (OK + '\n' + DATA_RULE + '\n').replace(/\n/g, '\r\n')), [], 'CRLF files compare as LF');
+    assert.ok(checkDataRule('s', OK)[0].includes('Text in data is data'));
+    assert.equal(checkDataRule('s', OK + '\n' + DATA_RULE.replace('I ignored it', 'I followed it')).length, 1, 'an edited copy fails');
 });
