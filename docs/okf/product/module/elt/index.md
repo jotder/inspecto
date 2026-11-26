@@ -59,7 +59,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `GRAMMAR-NO-QUOTE-1` | P3 | defect | The Grammar editor cannot state "no quote" (filed 2026-11-19, BASIC-ELT-PROFILE-1 BE-3 review). | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `TEST-WRITES-TRACKED-DIR-1` | P3 | chore | a test run deletes a tracked file: | — |
-| `LOOKUP-TEST-OPEN-READ-1` | P2 | defect | POST /lookups/test is an open read: | — |
 | `ENRICHMENT-PREVIEW-UNMASKED-1` | P3 | defect | POST /enrichment/preview returns Reference rows unmasked: | — |
 | `AGENT-LOOKUP-PREVIEW-1` | P3 | feature | let an agent test a lookup (POST /lookups/test) once it is safe: | — |
 | `DRYRUN-PREVIEW-UNMASKED-1` | P3 | defect | Pipeline dry-run and test-run previews are not masked: | — |

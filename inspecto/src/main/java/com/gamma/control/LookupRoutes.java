@@ -1,9 +1,14 @@
 package com.gamma.control;
 
+import com.gamma.access.ComponentAccess;
 import com.gamma.consignment.ConsignmentOutputStores;
 import com.gamma.consignment.DbConsignmentOutputStore;
+import com.gamma.enrich.ReferenceReader;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.pipeline.BuiltinNodeType;
+import com.gamma.pipeline.ComponentRegistry;
+import com.gamma.pipeline.ComponentStore;
+import com.gamma.pipeline.ViewStore;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineLift;
 import com.gamma.pipeline.PipelineNode;
@@ -14,9 +19,11 @@ import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.http.RouteModule;
+import com.sun.net.httpserver.HttpExchange;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -44,7 +51,9 @@ final class LookupRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.get("/lookups", (e, m) -> list(api));
-        api.post("/lookups/test", (e, m) -> test(api, api.body(e)));
+        // LOOKUP-TEST-OPEN-READ-1: it answers a Reference's own rows (and builds its index), so it is authoring, like
+        // POST /enrichment/preview - never an open read
+        api.post("/lookups/test", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> test(api, e, api.body(e))));
         if (Boolean.getBoolean(PROP_PRELOAD)) {
             Thread t = new Thread(() -> preload(api), "lookup-preload");
             t.setDaemon(true);
@@ -157,11 +166,30 @@ final class LookupRoutes implements RouteModule {
         @Override protected boolean removeEldestEntry(Map.Entry<String, Warm> eldest) { return size() > MAX_WARM; }
     };
 
-    /** For tests: drop every warm index. */
+    /** For tests: drop every warm index, and refill every caller's budgets. */
     static void clearWarm() {
         synchronized (WARM) { WARM.clear(); }
         BUILDING.clear();
         FAILED.clear();
+        calls = RateLimiter.standard();
+        reloads = reloadLimiter();
+    }
+
+    /** Fuzzy {@code candidates} served per answer, at most (D-AK16): the rest are dropped, never listed. */
+    static final int MAX_CANDIDATES = 5;
+
+    /** Every test, per caller: the budget of the other expensive reads ({@code /db/query}), so keys cannot be guessed at speed. */
+    static volatile RateLimiter calls = RateLimiter.standard();
+    /** A {@code refresh: true} test, per caller: burst 3, then one reload every 30 s - each rebuilds an index of up to 256 MiB. */
+    static volatile RateLimiter reloads = reloadLimiter();
+
+    private static RateLimiter reloadLimiter() { return new RateLimiter(3.0, 1.0 / 30.0); }
+
+    /** 429 with {@code Retry-After} when {@code caller}'s {@code bucket} is empty. */
+    private static void charge(HttpExchange ex, RateLimiter bucket, String caller, String what) {
+        if (bucket.tryConsume(caller)) return;
+        ex.getResponseHeaders().set("Retry-After", Long.toString(bucket.retryAfterSeconds(caller)));
+        throw new ApiException(429, ErrorCodes.RATE_LIMITED, "rate limit exceeded for " + what + " - retry later");
     }
 
     /**
@@ -171,9 +199,19 @@ final class LookupRoutes implements RouteModule {
      * kept warm; it is rebuilt when the Step's config changed, its Reference's files changed (the stamp of
      * {@link PointLookup#referenceStamp}; the new index replaces the old in one write), or {@code refresh: true} asks; a
      * Reference whose files the resolver does not declare is not watched ({@code index.watchesReference=false}). 404 for an unknown keyed Step, 422 for a join the point
-     * engine refuses (a duplicate key or overlapping ranges, over the memory cap); {@code at} is the row time for {@code match: asof}. An open read, like the dry run.
+     * engine refuses (a duplicate key or overlapping ranges, over the memory cap); {@code at} is the row time for {@code match: asof}.
+     *
+     * <p>LOOKUP-TEST-OPEN-READ-1: needs {@code canAuthorWorkbench}; 404 (as an unknown Step) when a Dataset over the
+     * Reference's store is not viewable by the caller; the matched key, the mapped columns and at most
+     * {@link #MAX_CANDIDATES} fuzzy candidates are masked as {@code /bi/query} masks them ({@link #masking}); 429 past
+     * the per-caller {@link #calls} budget, or the {@link #reloads} budget for {@code refresh: true}.
      */
-    private static Object test(ApiContext api, Map<String, Object> body) throws Exception {
+    private static Object test(ApiContext api, HttpExchange ex, Map<String, Object> body) throws Exception {
+        String caller = ApiContext.subject(ex).map(com.gamma.spi.auth.Subject::id).orElseGet(() -> {
+            String ip = ApiContext.ip(ex);
+            return ip == null ? "unknown" : ip;
+        });
+        charge(ex, calls, caller, "/lookups/test");
         String pipeline = body == null || body.get("pipeline") == null ? null : body.get("pipeline").toString();
         String step = body == null || body.get("step") == null ? null : body.get("step").toString();
         if (pipeline == null || pipeline.isBlank() || step == null || step.isBlank())
@@ -189,7 +227,8 @@ final class LookupRoutes implements RouteModule {
             }
         }
         PipelineNode node = null;
-        for (PipelineConfig cfg : HostContext.of(api).service().loadedPipelines()) {
+        List<PipelineConfig> loaded = HostContext.of(api).service().loadedPipelines();
+        for (PipelineConfig cfg : loaded) {
             if (!cfg.identity().pipelineName().equals(pipeline)) continue;
             try {
                 for (PipelineNode n : PipelineLift.stageTwo(cfg).nodes())
@@ -200,7 +239,12 @@ final class LookupRoutes implements RouteModule {
         }
         if (node == null)
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no keyed lookup '" + step + "' in pipeline '" + pipeline + "'");
-        Warmed w = warmUp(api, pipeline, node, Boolean.TRUE.equals(body.get("refresh")));
+        Masking mask = masking(api, ex, node, loaded);
+        if (mask == null)   // a Dataset over the Reference is shared away from the caller: as absent as an unknown Step
+            throw new ApiException(404, ErrorCodes.NOT_FOUND, "no keyed lookup '" + step + "' in pipeline '" + pipeline + "'");
+        boolean refresh = Boolean.TRUE.equals(body.get("refresh"));
+        if (refresh) charge(ex, reloads, caller, "a lookup reload (refresh: true)");
+        Warmed w = warmUp(api, pipeline, node, refresh);
         Warm warm = w.warm();
         String reason = w.reason(), stamp = w.stamp();
         String valStr = value == null ? null : value.toString();
@@ -210,25 +254,27 @@ final class LookupRoutes implements RouteModule {
                 ? warm.index().testTopK(valStr, blockValues)
                 : List.of(warm.index().test(valStr, atStr));
         PointLookup.Answer a = answers.getFirst();
+        List<Map<String, String>> sources = warm.index().answerSources();
         Map<String, Object> out = new LinkedHashMap<>();
         out.put("pipeline", pipeline);
         out.put("step", step);
         out.put("match", warm.index().match());
         out.put("compared", a.compared());
         out.put("hit", a.hit());
-        out.put("matchedKey", a.matchedKey());
+        out.put("matchedKey", mask.key(a.matchedKey()));
         out.put("matchKind", a.matchKind());
         if (a.matchScore() != null) out.put("matchScore", a.matchScore());
-        out.put("mappings", toMappingList(a.mappings()));
+        out.put("mappings", toMappingList(a, sources, mask));
         if (isFuzzy) {
             List<Map<String, Object>> candidates = new ArrayList<>();
             for (PointLookup.Answer cand : answers) {
                 if (!cand.hit()) continue;
+                if (candidates.size() >= MAX_CANDIDATES) break;
                 Map<String, Object> c = new LinkedHashMap<>();
-                c.put("matchedKey", cand.matchedKey());
+                c.put("matchedKey", mask.key(cand.matchedKey()));
                 c.put("matchKind", cand.matchKind());
                 c.put("matchScore", cand.matchScore());
-                c.put("mappings", toMappingList(cand.mappings()));
+                c.put("mappings", toMappingList(cand, sources, mask));
                 candidates.add(c);
             }
             out.put("candidates", candidates);
@@ -244,15 +290,96 @@ final class LookupRoutes implements RouteModule {
         return out;
     }
 
-    private static List<Map<String, Object>> toMappingList(List<PointLookup.MappingAnswer> answers) {
-        List<Map<String, Object>> mappings = new ArrayList<>(answers.size());
-        for (PointLookup.MappingAnswer m : answers) {
+    /**
+     * {@code a}'s mappings as the caller may see them: on a hit, each column the Reference supplies (and the matched-key
+     * column) through {@code mask}; on a miss they hold only the Step's configured defaults, which are not Reference data.
+     */
+    private static List<Map<String, Object>> toMappingList(PointLookup.Answer a, List<Map<String, String>> sources,
+                                                           Masking mask) {
+        List<Map<String, Object>> mappings = new ArrayList<>(a.mappings().size());
+        for (int i = 0; i < a.mappings().size(); i++) {
+            PointLookup.MappingAnswer m = a.mappings().get(i);
+            Map<String, String> from = i < sources.size() ? sources.get(i) : Map.of();
+            Map<String, Object> cols = new LinkedHashMap<>();
+            for (Map.Entry<String, String> c : m.columns().entrySet()) {
+                String src = from.get(c.getKey());
+                cols.put(c.getKey(), !a.hit() || src == null ? c.getValue()
+                        : PointLookup.MATCHED_KEY.equals(src) ? mask.key(c.getValue()) : mask.column(src, c.getValue()));
+            }
             Map<String, Object> r = new LinkedHashMap<>();
             r.put("on", m.on());
-            r.put("columns", m.columns());
+            r.put("columns", cols);
             mappings.add(r);
         }
         return mappings;
+    }
+
+    /**
+     * How one caller sees a lookup's Reference values (LOOKUP-TEST-OPEN-READ-1): {@code bi} masks a by-name Reference as
+     * {@code /bi/query} masks a Dataset over its store; {@code null} = raw. A {@code path:} Reference has no
+     * classification (no Dataset or Pipeline schema describes the file), so nothing in it is masked: its readers can
+     * already dry-run a Pipeline over the same file.
+     */
+    private record Masking(BiResultMasking bi, List<String> keyColumns) {
+        Object column(String column, Object value) {
+            return bi == null || value == null ? value : bi.cell(column, value);
+        }
+
+        /** The matched key: masked when a column it is read from ({@code key}, or {@code from} / {@code to}) is hidden. */
+        Object key(Object value) {
+            if (bi == null || value == null) return value;
+            for (String k : keyColumns)   // range and asof keys join two columns: withheld, never one column's alias
+                if (bi.hidesFromCaller(k)) return keyColumns.size() == 1 ? bi.cell(k, value) : BiResultMasking.UNLINKABLE;
+            return value;
+        }
+    }
+
+    /**
+     * The caller's {@link Masking} for keyed join {@code node}, or {@code null} when a registry Dataset over the by-name
+     * Reference's store (its {@code physicalRef}, or {@code sourceName}, naming the producing Pipeline or its Stream) is
+     * not viewable by the caller ({@link ComponentAccess#canView}). The classification is the one {@link BiResultMasking}
+     * reads for a Dataset over that store: the Datasets on it and the producing Pipeline's schema; an untraceable lineage
+     * masks every column (fail closed).
+     */
+    private static Masking masking(ApiContext api, HttpExchange ex, PipelineNode node, List<PipelineConfig> loaded) {
+        List<String> keyColumns = new ArrayList<>();
+        for (String k : List.of("key", "from", "to"))
+            if (node.cfg(k) != null && !node.cfg(k).toString().isBlank()) keyColumns.add(node.cfg(k).toString().trim());
+        String ref = null;
+        try {
+            Object r = node.cfg("reference");
+            com.gamma.enrich.EnrichmentConfig.Reference parsed = r == null ? null : ReferenceReader.parse(r.toString());
+            if (parsed != null && parsed.byName()) ref = parsed.ref();
+        } catch (RuntimeException unparseable) {
+            // the build refuses it (422) before anything is answered
+        }
+        Path writeRoot = api.writeRoot();
+        if (ref == null || writeRoot == null) return new Masking(null, keyColumns);   // no registry, no classification
+        // the stores the Reference is: the producing Pipeline's name and its Stream (PipelineSchemas.producers' rule)
+        java.util.Set<String> stores = new java.util.LinkedHashSet<>();
+        stores.add(ref);
+        for (PipelineConfig p : loaded)
+            if (p.identity().pipelineName().equals(ref) && p.stream() != null) stores.add(p.stream());
+        ComponentStore registry = new ComponentStore(writeRoot.resolve("registry"));
+        for (ComponentRegistry.Component d : registry.list("dataset"))
+            if (readsStore(d.content(), stores) && !ComponentAccess.canView(ex, d.content())) return null;
+        // a Dataset over both stores, so the lineage reads the Datasets on either and the producing Pipeline's schema
+        Map<String, Object> overStore = new LinkedHashMap<>();
+        java.util.Iterator<String> it = stores.iterator();
+        overStore.put("physicalRef", it.next());
+        if (it.hasNext()) overStore.put("sourceName", it.next());
+        return new Masking(BiResultMasking.of(writeRoot, registry, new ViewStore(writeRoot.resolve("views")),
+                "(lookup " + ref + ")", overStore, BiResultMasking.mayReveal(ex)), keyColumns);
+    }
+
+    /** {@code dataset} reads one of {@code stores} directly (its {@code physicalRef} or {@code sourceName}, by its head). */
+    private static boolean readsStore(Map<String, Object> dataset, java.util.Set<String> stores) {
+        for (String s : com.gamma.mask.EvidenceMasker.datasetStores(dataset)) {
+            int slash = s.indexOf('/');
+            String head = slash < 0 ? s : s.substring(0, slash);
+            for (String store : stores) if (store.equalsIgnoreCase(head)) return true;
+        }
+        return false;
     }
 
     private static List<String> blockCols(PipelineNode n) {

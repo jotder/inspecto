@@ -305,7 +305,7 @@ system: the evidence cannot say something the code does not.
 | POST | `/jobs/([^/]+)/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java:177` |
 | POST | `/jobs/packs/rescan` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java:99` |
 | POST | `/jobs/runs/([^/]+)/replay` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java:111` |
-| POST | `/lookups/test` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/LookupRoutes.java:47` |
+| POST | `/lookups/test` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/LookupRoutes.java:56` |
 | POST | `/mcp` | exempt | replay-gated | `features/inspecto-mcp/src/main/java/com/gamma/mcp/McpRoutes.java:68` |
 | PUT | `/nav/menus` | gated | `canCurateMenus` | `inspecto/src/main/java/com/gamma/control/NavRoutes.java:39` |
 | POST | `/notes/([^/]+)/([^/]+)/attachments` | exempt | collaboration | `features/inspecto-ops/src/main/java/com/gamma/opsapi/NoteRoutes.java:59` |
