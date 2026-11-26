@@ -13506,7 +13506,7 @@
         "tags" : [ "insights" ],
         "summary" : "Explain the change of a Measure between one time bucket and the bucket before it",
         "operationId" : "explainChange",
-        "description" : "BI-INSIGHTS-1 P2 (I-4, I-5, I-6), Business Insights add-on. Gated on canAuthorWorkbench. Every statement runs through the gates of POST /bi/query as the caller (dataset visibility, SQL guard, sandbox, masking): a classified dimension value comes back as its alias. Body: dataset, optional filters / when, exactly one of measure {agg, field} or ratio {num, den} (sum or count only - a non-additive aggregate is refused in words), field (date column), grain (day | week | month), at (a date inside the bucket to explain), dimensions (1-12), optional cover (0.5-1, default 0.8), related (0-10 Measures) and lookback (8-60 buckets, default 24). drivers: per dimension the contribution, share of the change and Jensen-Shannon surprise of each value, and the fewest values covering cover x the change; ranked. mixRate (ratio only): the exact shift-share split mix + rate = change. movedWith: correlation of the bucket-to-bucket changes, at least 8 pairs; never a cause. A dimension with more than 200 values is listed in refused. Optional depth (1 default, or 2; BI-EXPLAIN-DEPTH2-1): depth 2 also returns pairs of dimensions precomputed by the insight.scan Job for an Insight Profile with pairs: true over the same dataset, Measure, date column, grain, filters and condition, read only from a Profile whose Insights Dataset the caller may view; none -> pairs null and pairsNote says how to get them. A ratio with depth 2 is refused (422).",
+        "description" : "BI-INSIGHTS-1 P2 (I-4, I-5, I-6), Business Insights add-on. Open to anyone who may view the dataset (no capability; rate-limited). Every statement runs through the gates of POST /bi/query as the caller (dataset visibility, SQL guard, sandbox, masking): a classified dimension value comes back as its alias. Body: dataset, optional filters / when, exactly one of measure {agg, field} or ratio {num, den} (sum or count only - a non-additive aggregate is refused in words), field (date column), grain (day | week | month), at (a date inside the bucket to explain), dimensions (1-12), optional cover (0.5-1, default 0.8), related (0-10 Measures) and lookback (8-60 buckets, default 24). drivers: per dimension the contribution, share of the change and Jensen-Shannon surprise of each value, and the fewest values covering cover x the change; ranked. mixRate (ratio only): the exact shift-share split mix + rate = change. movedWith: correlation of the bucket-to-bucket changes, at least 8 pairs; never a cause. A dimension with more than 200 values is listed in refused. Optional depth (1 default, or 2; BI-EXPLAIN-DEPTH2-1): depth 2 also returns pairs of dimensions precomputed by the insight.scan Job for an Insight Profile with pairs: true over the same dataset, Measure, date column, grain, filters and condition, read only from a Profile whose Insights Dataset the caller may view; none -> pairs null and pairsNote says how to get them. A ratio with depth 2 is refused (422).",
         "requestBody" : {
           "required" : true,
           "content" : {
@@ -13535,9 +13535,6 @@
         "responses" : {
           "200" : {
             "description" : "Envelope-wrapped: data = {measure, kind (additive | ratio), grain, previous, current, before, after, delta, pct, cover, drivers[{dimension, explains, covered, surprise, cover[], elements[{value, before, after, contribution, share, surprise}] (top 20), valueCount}], mixRate[{dimension, before, after, mix, rate, parts[{value, w0, w1, r0, r1, mix, rate}]}] (ratio only), refused[{dimension, reason}], movedWith[{measure, before, after, pairs, r, movedWith, reason?}], movedWithNote, pairs? {profile, computedAt, measure, grain, previous, current, before, after, cover, stale, drivers[] (as drivers, dimension = 'a × b'), refused[]} | null (depth 2 only), pairsNote?, masking?}"
-          },
-          "403" : {
-            "description" : "The caller lacks canAuthorWorkbench."
           },
           "404" : {
             "description" : "The dataset is unknown or not visible to the caller."
@@ -13590,9 +13587,6 @@
           "200" : {
             "description" : "Envelope-wrapped: data = {periods, perPeriod[{period, count}], total, perPeriodAverage, insights[] (top 50 by score, each with asOf), skipped[{dimension, reason}], masking?}"
           },
-          "403" : {
-            "description" : "The caller lacks canAuthorWorkbench."
-          },
           "404" : {
             "description" : "No such Insight, or the Profile's Insights Dataset is unknown or not visible to the caller."
           },
@@ -13612,7 +13606,7 @@
         ],
         "summary" : "Give feedback on an Insight",
         "operationId" : "insightFeedback",
-        "description" : "BI-INSIGHTS-1 P3. Gated on canAuthorWorkbench (no reader-level capability exists yet); the caller must also view the Insights Dataset. The status is recorded for the Insight's type x slice (the latest word wins) with the authenticated actor; the next insight.scan run writes it into status and novelty - not_useful and expected suppress it.",
+        "description" : "BI-INSIGHTS-1 P3. Open to anyone who may view the Insights Dataset (no capability; the caller's own opinion). The status is recorded for the Insight's type x slice (the latest word wins) with the authenticated actor; the next insight.scan run writes it into status and novelty - not_useful and expected suppress it.",
         "parameters" : [
           {
             "name" : "profile",

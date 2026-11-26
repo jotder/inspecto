@@ -1412,6 +1412,9 @@ public final class ControlApi implements AutoCloseable, HostContext {
     private static boolean isRateLimited(String method, String path) {
         return LinkAnalysisRateClasses.isExpensive(method, path)
                 || path.equals("/db/query") || path.equals("/bi/query")
+                // BI-INSIGHTS-1 (D-BI13 loose ends B): Explain runs up to 13 /bi/query statements per call and is open to
+                // every viewer - the standard bucket, not the dashboard's larger one.
+                || (method.equals("POST") && path.equals("/insights/explain"))
                 || path.startsWith("/recon/") || path.startsWith("/agent/")
                 // AGENT-KIT-1 AK-1: every MCP Tool call can run SQL (query_dataset), and its in-process replay skips this stage.
                 || path.equals("/mcp")

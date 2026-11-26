@@ -13,7 +13,7 @@ code: features/inspecto-insights
 
 # Business Insights — screens
 
-Business Insights is an add-on (Standard and above). Without it the screens below say it is not installed. How it
+Business Insights is an add-on, in every edition (Basic included). Without it the screens below say it is not installed. How it
 works underneath: [`architecture-insights.md`](architecture-insights.md).
 
 ## Explain this change
@@ -49,8 +49,7 @@ Select a Profile to see the Insights of its latest run, best score first: the ba
 slice ("region = North" or the whole Measure), the Insight Type, the period, the score and the sentence.
 
 **Useful**, **Not useful** and **Expected** record your word on that Insight's type and slice; the next run applies
-it — Not useful and Expected stop it being reported again. Without the Workbench author permission the buttons are
-disabled and say so.
+it — Not useful and Expected stop it being reported again. Anyone who can see the feed may use them.
 
 **Open a Case** opens a Case holding the Insight's evidence — its sentence, type, slice, period, value, expected
 value and change, score and band, and a link back to this feed. Opening a second Case from the same Insight reuses

@@ -196,8 +196,9 @@ The **Insight Profile editor** (Studio, beside Query Library and Viz Library):
 6. **Feedback closes the loop.** On each Insight: *Useful* / *Not useful* / *Expected (why)*. "Expected" can add a
    business calendar event. Precision per Profile is shown in the editor; the Assistant may *suggest* a new
    threshold as a draft — never applied by itself.
-7. **Who may do what (D-BI4).** Builders author Profiles; owners may tune knobs within bounds the Builder set;
-   Business users read Insights, give feedback and arm Alert Rules they are allowed to.
+7. **Who may do what (D-BI4, narrowed 2026-11-26).** Builders author Profiles and whoever may save a Profile tunes it
+   (owner tuning within Builder bounds was dropped, §11.15); anyone who can view reads Insights, explains and gives
+   feedback, and Business users read Insights, give feedback and arm Alert Rules they are allowed to.
 
 ## 8. Architecture
 
@@ -272,8 +273,8 @@ already exists there, and Q2/Q4 answer the questions an RA or finance lead asks 
 |---|---|---|
 | D-BI1 | Names | ✅ **SIGNED 2026-11-18: (a)** Insight Type / Insight / Insight Profile / Chart Marker / KPI History, added to `GLOSSARY.md` §7 · (b) other names |
 | D-BI2 | Where the scan lives | ✅ **SIGNED 2026-11-18: (a)** new `features/inspecto-insights` add-on; kernel and engine extended for overlays · (b) everything inside engine + analytics |
-| D-BI3 | Edition placement | ✅ **SIGNED 2026-11-18: (a)** overlays and KPI History in Standard BI; Insight Profiles / scan / explain as a "Business Insights" add-on (Standard+); language features with AI Assist; scenarios Advanced · (b) all in one add-on |
-| D-BI4 | Who may tune | ✅ **SIGNED 2026-11-24: (a)** Builders author, owners tune within bounds, Business users give feedback · (b) Builders only |
+| D-BI3 | Edition placement | ✅ **SIGNED 2026-11-18: (a)** overlays and KPI History in Standard BI; Insight Profiles / scan / explain as a "Business Insights" add-on (Standard+); language features with AI Assist; scenarios Advanced · (b) all in one add-on. **Add-on placement superseded by D-BI13** (every edition) |
+| D-BI4 | Who may tune | ✅ **SIGNED 2026-11-24: (a)** Builders author, owners tune within bounds, Business users give feedback · (b) Builders only. **Narrowed 2026-11-26 (operator):** owner tuning within Builder bounds is dropped — whoever may save a Profile tunes it; feedback and Explain for anyone who can view (§11.15) |
 | D-BI5 | Language features in the first release | ✅ **SIGNED 2026-11-24: (a)** no — templated sentences first, Brief in P4 · (b) yes |
 | D-BI6 | Pilot | ✅ **SIGNED 2026-11-24: (a)** `business-assurance` + `telco-ra` revenue · (b) `mobile-money` transaction value |
 | D-BI7 | Compute placement | ✅ **SIGNED 2026-11-24: (a)** overlays at query time, scans and depth-2 explanations as Jobs · (b) everything precomputed |
@@ -281,6 +282,7 @@ already exists there, and Q2/Q4 answer the questions an RA or finance lead asks 
 | D-BI9 | Chart Markers implementation | ✅ **SIGNED 2026-11-24: (a)** a Chart.js overlay plugin behind the viz contract · (b) custom drawing |
 | D-BI10 | KPI History grain and retention | ✅ **SIGNED 2026-11-24: (a)** the KPI's own grain, 3 years · (b) day only, retention per Space |
 | D-BI11 | KPI History registration under a Dataset approval policy | ✅ **SIGNED 2026-11-24 (operator):** the `kpi.snapshot` Job registers its Dataset as a **system Dataset regardless of the policy** (`origin: system`); the gate is lifted for this Job only |
+| D-BI13 | Edition placement of the Business Insights add-on | ✅ **SIGNED 2026-11-26 (operator interview), reverses D-BI3's add-on placement:** Business Insights ships in **every edition, Basic included** (§11.15) |
 | D-BI12 | The period still in progress | ✅ **SIGNED 2026-11-24: (a)** stored with `complete = false`, rewritten each run until it closes · (b) closed periods only |
 
 ### 11.1 P0 I-3 KPI History — as designed (2026-11-24)
@@ -440,8 +442,8 @@ Spec: [`okf/product/module/engine/spec-kpi-projection.md`](../okf/product/module
 - **Module (D-BI2 / D-BI3, operator 2026-11-25)**: `features/inspecto-insights` (module id `insights`, add-on
   `businessInsights`, Standard and above) is created now rather than in P3; P3's scan and Insight Profiles join it.
   Product Map Items `module.insights` and `addon.businessInsights`.
-- **Route**: `POST /insights/explain`, gated on `canAuthorWorkbench` (no viewer-level capability exists; whether a
-  Business-lens reader should get it is an operator question). Body and response: the module hub
+- **Route**: `POST /insights/explain`, gated on `canAuthorWorkbench` when built; **since 2026-11-26 open to anyone who
+  may view the Widget's Dataset** (§11.15). Body and response: the module hub
   `okf/product/module/insights/architecture-insights.md` and `openapi-v1.json`.
 - **Kernel** `com.gamma.analytics.drivers`: `Drivers` (contribution, share, Jensen-Shannon surprise, minimal cover —
   largest share first, which is the smallest set for a sum threshold), `ShiftShare` (mix + rate = ΔR exactly; a value
@@ -503,7 +505,7 @@ changepoint **and** drift; one Insights Dataset per Profile.
   `status`, `first_seen`. Deviation from §8: no separate `_latest` store — the latest run is `run_id = max`, which
   `GET /insights` reads; one store keeps one envelope.
 - **Feedback**: `POST /insights/{profile}/{insightId}/feedback` `{status: useful|not_useful|expected, note?}` by anyone
-  who may view the Insights Dataset (D-BI4: Business users give feedback); kept in `feedback.json` beside the Parquet
+  who may view the Insights Dataset (D-BI4: Business users give feedback; the `canAuthorWorkbench` gate it shipped with was lifted 2026-11-26, §11.15); kept in `feedback.json` beside the Parquet
   (the Dataset reads `*.parquet` only), keyed by type × slice so it outlives the run; the actor is the authenticated
   principal. The next run writes it into `status` and novelty.
 - **Feed**: `GET /insights?profile=&run=latest|all&band=&limit=` — the Profile's Insights the caller may view
@@ -514,8 +516,7 @@ changepoint **and** drift; one Insights Dataset per Profile.
   Nothing is saved.
 - **Signals**: `insight.scan.completed` (counts) and `insight.found` per new Insight (≤ 20 per run, band ≥ elevated)
   for Notification Rules.
-- **Deliberately deferred**: the Profile editor UI and the Insight Feed Visualization Type; D-BI4 owner tuning within
-  Builder bounds (today: who may save the Profile tunes it); the sharing envelope does not yet narrow by a Mapping Dataset's `basedOn` base (as KPI History); depth-2 slices (`BI-EXPLAIN-DEPTH2-1`); I-9, I-10 (built next, §11.10).
+- **Deliberately deferred**: the Profile editor UI and the Insight Feed Visualization Type; the sharing envelope does not yet narrow by a Mapping Dataset's `basedOn` base (as KPI History); depth-2 slices (`BI-EXPLAIN-DEPTH2-1`); I-9, I-10 (built next, §11.10).
 
 ### 11.10 P3 I-9 concentration and I-10 distribution shift — as built (2026-11-26)
 
@@ -562,7 +563,7 @@ changepoint **and** drift; one Insights Dataset per Profile.
 - **Replay**: *Preview on history* posts the unsaved content and `periods` to `POST /insights/preview` → bars per
   period (`<inspecto-chart>`), total and average sentence, top 10 Insights. Nothing saved.
 - **Feed**: `GET /insights?profile=` under the selected Profile — band badge with its word, slice, type, period, score,
-  sentence; Useful / Not useful / Expected (`POST …/feedback`) disabled with the reason without canAuthorWorkbench; a
+  sentence; Useful / Not useful / Expected (`POST …/feedback`) (open to every viewer since 2026-11-26, §11.15); a
   404 is the empty state naming the `insight.scan` Job and linking the Jobs screen.
 - **Deferred**: a "Run scan now" shortcut (the Jobs screen runs it); the Insight Feed Visualization Type for
   Dashboards; `run=all` history and band filters in the feed.
@@ -621,6 +622,33 @@ changepoint **and** drift; one Insights Dataset per Profile.
   "Raised for a Case from Entity insight:… in Dataset insights_…" (the route's wording is now neutral).
 - **Deferred** (board rows): `{{x}}` in the sentence is interpolated by the Action Request template renderer
   (`ACTION-TEMPLATE-ESCAPE-1`); adding the Insight to an EXISTING Case (`INSIGHT-CASE-EXISTING-1`).
+
+### 11.15 Loose ends B — Explain and feedback for every viewer, Business Insights in Basic — as built (2026-11-26)
+
+Operator interview 2026-11-26, three decisions:
+
+- **Explain and feedback for anyone who can view.** `POST /insights/explain` and
+  `POST /insights/{profile}/{insightId}/feedback` no longer demand `canAuthorWorkbench`. Explain is allowed to whoever
+  may view the Widget's Dataset — it runs as the caller through `/bi/query`'s gates, so a Dataset the caller cannot
+  view is the 404 of an unknown one; feedback to whoever may view `insights_<profile>` (else the 404 of an unknown
+  Profile). Authentication still applies (401). Route checklist: both left `CapabilityManifest.ENTRIES` for
+  `EXEMPTIONS` — Explain as `read-shaped` (like `/bi/query`, it persists nothing), feedback as `self-service` (it
+  writes only the caller's own opinion, stamped with the caller as actor, the same category as marking a
+  notification read). Explain runs up to 13 statements per call, so it is now **rate-limited on the standard bucket**
+  (`ControlApi.isRateLimited`), not `/bi/query`'s larger dashboard bucket. `POST /insights/preview` (replay of an
+  unsaved Profile) stays `canAuthorWorkbench`: it is authoring. UI: the tile's *Explain this change* action and the
+  feed's Useful / Not useful / Expected buttons no longer check `canAuthorWorkbench`. Pinned by
+  `ControlApiExplainTest.anyoneWhoCanViewTheDatasetMayExplain`, `ControlApiExplainDepth2Test` and
+  `ControlApiInsightsTest.feedbackIsGatedRecordedAndLaidOverTheFeed` (viewer 200, unviewable 404, anonymous 401).
+- **D-BI13 — Business Insights in every edition, Basic included** (reverses D-BI3's Standard-and-above placement).
+  `features/inspecto-insights` moved into the default reactor (Basic = the default build), `insights` and the
+  `businessInsights` add-on moved from `offerings/standard.toon` to `offerings/basic.toon` (Standard and Advanced
+  inherit it through `includes`), `package.ps1` stages `inspecto-insights.jar` outside the Standard-and-up branch.
+  The module needs only core (processor, engine, analytics, etl — `BiSpecRunner`, the Job service, the Component
+  Store), all in Basic. Opening a Case or an Action Request from an Insight stays where those modules are (Standard
+  and up); the feed hides those actions when `/bootstrap` does not report them.
+- **D-BI4 owner tuning within Builder bounds is dropped**: whoever may save an Insight Profile tunes it. No bounds
+  model will be built; removed from the deferral lists here and in the hub.
 
 ## 12. Board row
 

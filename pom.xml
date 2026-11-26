@@ -77,6 +77,9 @@
         <module>la/inspecto-la-storage</module>
         <module>la/inspecto-la-api</module>
         <module>la/inspecto-geo-link</module>
+        <!-- BI-INSIGHTS-1 D-BI13 (operator 2026-11-26, reverses D-BI3): the Business Insights add-on ships in EVERY edition,
+             Basic included - default reactor. It needs only core (processor, engine, analytics, etl). -->
+        <module>features/inspecto-insights</module>
     </modules>
 
     <!--
@@ -154,8 +157,6 @@
                 <module>features/inspecto-anomaly</module>
                 <!-- PREDICTIVE-SEGMENT-RFM-1: the Predictive Analytics add-on (segmentation-model kind, predict.segment Job); Standard and above (OD-5). -->
                 <module>features/inspecto-predictive</module>
-                <!-- BI-INSIGHTS-1 P2: the Business Insights add-on (POST /insights/explain); Standard and above (D-BI2, D-BI3). -->
-                <module>features/inspecto-insights</module>
                 <!-- PRODUCT-ASSEMBLY-1 PA-9d: the Real-time Detection add-on (windowed and Pattern Alert Rules on each Stream commit); requires ops; Standard and above (D-PA44). -->
                 <module>features/inspecto-realtime</module>
                 <!-- AGENT-KIT-1 AK-1: the MCP endpoint (POST /mcp, read-only MCP Tools); Standard and above, never Basic (D-UE4). -->
@@ -204,8 +205,6 @@
                 <module>features/inspecto-anomaly</module>
                 <!-- PREDICTIVE-SEGMENT-RFM-1: the Predictive Analytics add-on (segmentation-model kind, predict.segment Job); Standard and above (OD-5). -->
                 <module>features/inspecto-predictive</module>
-                <!-- BI-INSIGHTS-1 P2: the Business Insights add-on (POST /insights/explain); Standard and above (D-BI2, D-BI3). -->
-                <module>features/inspecto-insights</module>
                 <!-- PRODUCT-ASSEMBLY-1 PA-9d: the Real-time Detection add-on (windowed and Pattern Alert Rules on each Stream commit); requires ops; Standard and above (D-PA44). -->
                 <module>features/inspecto-realtime</module>
                 <!-- AGENT-KIT-1 AK-1: the MCP endpoint (POST /mcp, read-only MCP Tools); Standard and above, never Basic (D-UE4). -->
@@ -247,8 +246,6 @@
                 <module>features/inspecto-anomaly</module>
                 <!-- PREDICTIVE-SEGMENT-RFM-1: the Predictive Analytics add-on (segmentation-model kind, predict.segment Job); Standard and above (OD-5). -->
                 <module>features/inspecto-predictive</module>
-                <!-- BI-INSIGHTS-1 P2: the Business Insights add-on (POST /insights/explain); Standard and above (D-BI2, D-BI3). -->
-                <module>features/inspecto-insights</module>
                 <!-- PRODUCT-ASSEMBLY-1 PA-9d: the Real-time Detection add-on (windowed and Pattern Alert Rules on each Stream commit); requires ops; Standard and above (D-PA44). -->
                 <module>features/inspecto-realtime</module>
                 <!-- AGENT-KIT-1 AK-1: the MCP endpoint (POST /mcp, read-only MCP Tools); Standard and above, never Basic (D-UE4). -->

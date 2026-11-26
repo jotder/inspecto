@@ -54,7 +54,7 @@ const STATUS_WORDS: Record<string, string> = {
 
 /**
  * The Insight feed of one Insight Profile (BI-INSIGHTS-1 P3): `GET /insights?profile=`, the latest run, best score
- * first. Feedback needs canAuthorWorkbench on the server, so the buttons are disabled with the reason without it.
+ * first. Feedback is open to anyone who can view the feed (operator 2026-11-26).
  * A 404 means no run has written the Insights Dataset yet (or the reader may not view it) — an empty state, not an error.
  */
 @Component({
@@ -117,8 +117,7 @@ const STATUS_WORDS: Record<string, string> = {
                                     <button
                                         mat-stroked-button
                                         type="button"
-                                        [disabled]="!canFeedback() || busy() === i.insight_id"
-                                        [attr.title]="canFeedback() ? null : noFeedbackReason"
+                                        [disabled]="busy() === i.insight_id"
                                         [attr.aria-pressed]="i.status === b.status"
                                         (click)="give(i, b.status)"
                                     >
@@ -170,9 +169,6 @@ const STATUS_WORDS: Record<string, string> = {
                         </li>
                     }
                 </ul>
-                @if (!canFeedback()) {
-                    <p class="text-secondary mt-2 text-xs">{{ noFeedbackReason }}</p>
-                }
                 @if (casesInstalled() && caseBlocked(); as why) {
                     <p class="text-secondary mt-1 text-xs">Open a Case: {{ why }}</p>
                 }
@@ -206,8 +202,6 @@ export class InsightFeedComponent {
     readonly highlight = input<string | null>(null);
     private injector = inject(Injector);
     readonly feedbackChoices = FEEDBACK;
-    readonly noFeedbackReason = needsPermission('canAuthorWorkbench');
-    readonly canFeedback = this.lens.canAuthorWorkbench;
     readonly loading = signal(true);
     readonly error = signal<string | null>(null);
     readonly feed = signal<InsightFeed | null>(null);
