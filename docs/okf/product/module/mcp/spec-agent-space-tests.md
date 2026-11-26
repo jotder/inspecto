@@ -100,4 +100,17 @@ and running them after approval shows what the change broke. The skills say so.
 
 ## Security review
 
-Scoped to what group C adds, by the lane's `verification` subagent before integration (2026-11-26).
+Scoped to what group C adds, by the lane's `verification` subagent before integration (2026-11-26): **PASS**.
+
+- The new entry is the exact key `POST /tests/run`, judged on the route pattern after the `/spaces/{id}` prefix is
+  stripped, on both doors (a direct request and every in-process replay, the MCP tool included), so nothing widens
+  through the prefix and a machine is refused through MCP too. A person's own console token may call the read-only
+  tool through MCP, as it may call the route directly (as `dry_run_pipeline`).
+- The engine is not new to agents: `POST /pipelines/authored/{id}/run` (D-AK2) already runs `PipelineTestRun.run`.
+- "Writes nothing durable" was traced and confirmed; the reviewer's own mutant (the run not re-rooted to scratch)
+  turned the before-and-after test red.
+- Not blocking, stated here: there is no timeout or rate limit on a synchronous run of up to 200 cases; a joined
+  Reference column's min or max and the error text are not masked; `deleteScratch` is best effort, so a Windows file
+  handle can leave a scratch folder in the JVM temp dir (not product state); and `PipelineTestRun` clears the
+  in-memory progress snapshot of the live Pipeline of the same name after each batch, so a real run of it at the same
+  moment loses its progress display (it did so already for the run-to-here preview).

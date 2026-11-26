@@ -1,7 +1,8 @@
 # Agent Kit AK-2 — widening what an agent can reach, task by task (plan and task specs)
 
 > **Status: APPROVED 2026-11-25 — D-AK8…D-AK12 signed (operator interview, §5; D-AK8 not as recommended, which adds
-> task W11); W1, W3, W9 and W10 built 2026-11-25 (§3; W9's live golden runs belong to W4), the rest not started.** The follow-on to phases 1–3b of
+> task W11); built (§3): W1, W2, W3, W4 steps 1–3, W6 groups A and C, W7, W8, W9, W10 and W11 (2026-11-25/26; W9's
+> live golden runs belong to W4); open: W4 from step 4, W5, W6 groups B, D and E.** The follow-on to phases 1–3b of
 > [`2026-11-20-agent-kit-ak2-plan.md`](2026-11-20-agent-kit-ak2-plan.md) (all built 2026-11-25). It takes the gaps a
 > peer's product review of that plan listed
 ([`2026-11-25-agent-kit-ak2-product-review.md`](2026-11-25-agent-kit-ak2-product-review.md)), keeps the ones
