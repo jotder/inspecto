@@ -181,7 +181,22 @@ final class JobAuthority {
         LinkedHashMap<String, byte[]> out = null;
         Map<String, String> carried = carriedTemplateTypes(entries);
         for (Map.Entry<String, byte[]> e : entries.entrySet()) {
-            if (!ImportCapabilityGuard.normalizedPath(e.getKey()).endsWith("_job.toon")) continue;
+            // BI-INSIGHTS-1 loose ends A: a carried Alert Rule never brings its own ownerRoles (server-stamped only).
+            String norm = ImportCapabilityGuard.normalizedPath(e.getKey());
+            if (norm.contains("alert-rule") && norm.endsWith(".toon")) {
+                try {
+                    Map<String, Object> doc = ConfigCodec.toMap(new String(e.getValue(), StandardCharsets.UTF_8));
+                    Map<String, Object> stripped = KpiAlertProbe.stripDeep(doc);
+                    if (stripped != doc) {
+                        if (out == null) out = new LinkedHashMap<>(entries);
+                        out.put(e.getKey(), ConfigCodec.toToon(stripped).getBytes(StandardCharsets.UTF_8));
+                    }
+                } catch (RuntimeException unparseable) {
+                    // the loader skips an unparseable rule too
+                }
+                continue;
+            }
+            if (!norm.endsWith("_job.toon")) continue;
             Map<String, Object> doc;
             try {
                 doc = ConfigCodec.toMap(new String(e.getValue(), StandardCharsets.UTF_8));

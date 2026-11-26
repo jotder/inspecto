@@ -1,6 +1,9 @@
 package com.gamma.pipeline;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.Set;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -14,6 +17,41 @@ import java.util.Objects;
 public final class SharingEnvelope {
 
     private SharingEnvelope() {}
+
+    /**
+     * {@link #of(List)} over {@code sources} plus, for every Mapping Dataset among them ({@code origin: mapping}), its
+     * {@code basedOn} base — recursively through Mappings (`BI-INSIGHTS-1` loose ends A, operator 2026-11-26): a Mapping
+     * reads its base's rows, so the base's readers bound the derived thing too. A base the registry cannot resolve, or a
+     * Mapping chain that loops, refuses (fail closed).
+     *
+     * @throws SecurityException when two sources (bases included) are shared differently, or a base cannot be resolved
+     */
+    public static Map<String, Object> of(ComponentStore store, List<Map<String, Object>> sources) {
+        return of(withBases(store, sources));
+    }
+
+    /** {@code sources} followed by each Mapping's base chain. */
+    static List<Map<String, Object>> withBases(ComponentStore store, List<Map<String, Object>> sources) {
+        List<Map<String, Object>> out = new ArrayList<>(sources);
+        for (Map<String, Object> s : sources) {
+            Set<String> chain = new HashSet<>();
+            Map<String, Object> cur = s;
+            while ("mapping".equals(String.valueOf(cur.get("origin")))) {
+                if (!(cur.get("basedOn") instanceof String base) || base.isBlank() || !chain.add(base))
+                    throw new SecurityException("a Mapping's base cannot be resolved — refused");
+                Map<String, Object> b;
+                try {
+                    b = store.get("dataset", base).map(ComponentRegistry.Component::content).orElse(null);
+                } catch (RuntimeException malformed) {
+                    b = null;
+                }
+                if (b == null) throw new SecurityException("the base Dataset '" + base + "' of a Mapping does not exist — refused");
+                out.add(b);
+                cur = b;
+            }
+        }
+        return out;
+    }
 
     /**
      * @return the derived thing's {@code owner} / {@code shares} (empty = open)

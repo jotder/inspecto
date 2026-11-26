@@ -112,6 +112,32 @@ class KpiAlertRuleTest {
         assertEquals(1, svc.evaluateAll().size(), "a relapse after the heal fires at once");
     }
 
+    /** BI-INSIGHTS-1 loose ends A: an owner who lost access → skipped, ONE Incident naming the rule, none per sweep. */
+    @Test
+    void aRuleWhoseOwnerLostAccessIsSkippedWithOneIncident(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());
+        com.gamma.objects.FakeObjectAccess objects = new com.gamma.objects.FakeObjectAccess();
+        AlertService svc = new AlertService(List.of(rule(Map.of("rag", "amber"))), configs(cfg), emptyStore(),
+                AlertRecords.of(new InMemoryAlertStore(), java.util.Optional.empty()),
+                com.gamma.objects.IncidentAccess.over(() -> objects));
+        svc.kpiProbe(r -> OptionalDouble.of(2));   // RED: fires whenever evaluated
+        AtomicReference<String> refusal = new AtomicReference<>();
+        svc.kpiAccess(r -> refusal.get());
+
+        assertEquals(1, svc.evaluateAll().size(), "fires while the owner may read");
+        long before = objects.opened.size();
+
+        refusal.set("its owner 'alice' may no longer view kpi 'monthly_revenue'");
+        svc.evaluateAll();
+        svc.evaluateAll();
+        List<com.gamma.objects.FakeObjectAccess.Opened> skipped = objects.opened.stream().skip(before)
+                .filter(o -> o.title().contains("skipped")).toList();
+        assertEquals(1, skipped.size(), "one Incident over two sweeps: " + objects.opened);
+        assertTrue(skipped.get(0).title().contains("'revenue-off-track'"), skipped.get(0).title());
+        assertTrue(skipped.get(0).description().contains("may no longer view"), skipped.get(0).description());
+        assertEquals(before + 1, objects.opened.size(), "nothing else opened: the rule was not evaluated");
+    }
+
     @Test
     void aStatusRuleSaysTheStatusInWords(@TempDir Path dir) throws Exception {
         PipelineConfig cfg = PipelineConfig.load(PipelineConfigBatchTest.writePipeline(dir, "").toString());

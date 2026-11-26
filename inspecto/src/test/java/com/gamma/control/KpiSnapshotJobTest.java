@@ -192,11 +192,51 @@ class KpiSnapshotJobTest {
         Map<String, Object> finance = Map.of("owner", "alice", "shares", List.of(Map.of("subjectType", "role", "subjectId", "finance")));
         Map<String, Object> sales = Map.of("owner", "alice", "shares", List.of(Map.of("subjectType", "role", "subjectId", "sales")));
 
-        assertEquals(finance, KpiSnapshotJobType.envelope(finance, open), "a shared KPI over an open Dataset");
-        assertEquals(finance, KpiSnapshotJobType.envelope(Map.of(), finance), "an open KPI over a shared Dataset");
-        assertEquals(finance, KpiSnapshotJobType.envelope(finance, finance), "shared alike");
-        assertEquals(Map.of(), KpiSnapshotJobType.envelope(Map.of(), open), "both open");
-        assertThrows(SecurityException.class, () -> KpiSnapshotJobType.envelope(finance, sales), "shared differently");
+        assertEquals(finance, KpiSnapshotJobType.envelope(store, finance, open), "a shared KPI over an open Dataset");
+        assertEquals(finance, KpiSnapshotJobType.envelope(store, Map.of(), finance), "an open KPI over a shared Dataset");
+        assertEquals(finance, KpiSnapshotJobType.envelope(store, finance, finance), "shared alike");
+        assertEquals(Map.of(), KpiSnapshotJobType.envelope(store, Map.of(), open), "both open");
+        assertThrows(SecurityException.class, () -> KpiSnapshotJobType.envelope(store, finance, sales), "shared differently");
+    }
+
+    /** BI-INSIGHTS-1 loose ends A: a Mapping's base (recursively) joins the envelope. */
+    @Test
+    void aMappingsBaseChainJoinsTheHistoryEnvelope() throws Exception {
+        Map<String, Object> finance = Map.of("owner", "alice", "shares", List.of(Map.of("subjectType", "role", "subjectId", "finance")));
+        Map<String, Object> sales = Map.of("owner", "alice", "shares", List.of(Map.of("subjectType", "role", "subjectId", "sales")));
+        store.write("dataset", "base_sales", Map.of("physicalRef", "orders", "owner", "alice", "shares", sales.get("shares")));
+        store.write("dataset", "base_finance", Map.of("physicalRef", "orders", "owner", "alice", "shares", finance.get("shares")));
+        store.write("dataset", "mid", Map.of("origin", "mapping", "basedOn", "base_sales", "physicalRef", "orders"));
+        Map<String, Object> overSales = Map.of("origin", "mapping", "basedOn", "mid", "physicalRef", "orders");
+        Map<String, Object> overFinance = Map.of("origin", "mapping", "basedOn", "base_finance", "physicalRef", "orders");
+
+        assertThrows(SecurityException.class, () -> KpiSnapshotJobType.envelope(store, finance, overSales),
+                "an open Mapping over a Mapping over a base shared to other readers");
+        assertEquals(finance, KpiSnapshotJobType.envelope(store, finance, overFinance), "base shared alike");
+        assertEquals(sales, KpiSnapshotJobType.envelope(store, Map.of(), overSales), "the base's envelope, two hops down");
+        assertThrows(SecurityException.class, () -> KpiSnapshotJobType.envelope(store, Map.of(),
+                Map.of("origin", "mapping", "basedOn", "missing")), "an unresolvable base refuses");
+    }
+
+    @Test
+    void aSnapshotOverAMappingWhoseBaseIsSharedDifferentlyIsRefused() throws Exception {
+        Map<String, Object> orders = dataset("orders");
+        store.write("dataset", "orders_base", new java.util.LinkedHashMap<>(orders) {{
+            put("owner", "alice"); put("shares", List.of(Map.of("subjectType", "role", "subjectId", "sales")));
+        }});
+        store.write("dataset", "orders_map", new java.util.LinkedHashMap<>(orders) {{
+            put("origin", "mapping"); put("basedOn", "orders_base");
+        }});
+        Map<String, Object> kpi = new java.util.LinkedHashMap<>(store.get("kpi", "revenue").orElseThrow().content());
+        kpi.put("dataset", "orders_map");
+        kpi.put("owner", "alice");
+        kpi.put("shares", List.of(Map.of("subjectType", "role", "subjectId", "finance")));
+        store.write("kpi", "revenue", kpi);
+
+        JobRun run = snapshot("revenue");
+
+        assertNotEquals("SUCCESS", run.status(), run.message());
+        assertEquals(null, dataset("kpi_history_revenue"), "nothing registered");
     }
 
     @Test

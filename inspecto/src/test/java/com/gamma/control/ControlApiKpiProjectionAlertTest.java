@@ -60,6 +60,7 @@ class ControlApiKpiProjectionAlertTest {
                 case ALICE -> new String[] {"alice", "pipeline-developer"};
                 case BOB -> new String[] {"bob", "pipeline-developer"};
                 case OPS -> new String[] {"ops-1", "operations"};
+                case "Bearer admin-carol" -> new String[] {"carol", "power"};
                 default -> null;
             };
             if (who == null) return Optional.empty();
@@ -202,6 +203,67 @@ class ControlApiKpiProjectionAlertTest {
                     ALICE), 422).contains("may not view"), "the rule's owner may not view bob's KPI");
             assertTrue(error(send(c, "POST", "/alerts/rules", rule("bad", ",\"dataset\":\"sales\",\"threshold\":1"), ALICE), 422)
                     .contains("no dataset"));
+        }
+    }
+
+    /** The sweep's owner re-check over the rule as stored (the one-Incident half is {@code KpiAlertRuleTest}: no ops module here). */
+    private static String refusal(Path root, String rule) {
+        com.gamma.alert.AlertRule stored = com.gamma.alert.AlertRule.fromMap(new ComponentStore(root.resolve("registry"))
+                .get("alert-rule", rule).orElseThrow().content());
+        return KpiAlertProbe.accessRefusal(() -> root).apply(stored);
+    }
+
+    /**
+     * BI-INSIGHTS-1 loose ends A (operator 2026-11-26): the saver's roles are stamped on a KPI rule, and every sweep
+     * re-checks that the owner may still view the KPI — lost access = no fire and ONE Incident, never one per sweep.
+     */
+    @Test
+    void aKpiRuleWhoseOwnerLostAccessIsSkippedWithOneIncident(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        try (Ctx c = open(cfg, root)) {
+            seedSales(c, Map.of());
+            // bob's KPI, shared to alice only through her role: readable at save only because her roles are stamped
+            data(send(c, "POST", "/components/kpi", kpi("revenue", "sum(amount)", ",\"target\":2000,\"bands\":"
+                    + "{\"green\":2400,\"amber\":2200},\"owner\":\"bob\",\"shares\":[{\"subjectType\":\"role\","
+                    + "\"subjectId\":\"pipeline-developer\",\"access\":\"view\"}]"), BOB), 200);
+            JsonNode saved = data(send(c, "POST", "/alerts/rules", rule("projected-amber",
+                    ",\"projection\":\"value\",\"rag\":\"amber\",\"ownerRoles\":\"admin\""), ALICE), 200);
+            assertEquals("pipeline-developer", saved.get("ownerRoles").asText(), "server-stamped; the client's value is dropped");
+            // another editor (a power user) saving alice's rule never lends it their roles: alice's stamp is kept
+            JsonNode edited = data(send(c, "PUT", "/alerts/rules/projected-amber", rule("projected-amber",
+                    ",\"projection\":\"value\",\"rag\":\"red\""), "Bearer admin-carol"), 200);
+            assertEquals("alice", edited.get("owner").asText());
+            assertEquals("pipeline-developer", edited.get("ownerRoles").asText(), "the owner's roles, not the editor's");
+            data(send(c, "PUT", "/alerts/rules/projected-amber", rule("projected-amber",
+                    ",\"projection\":\"value\",\"rag\":\"amber\""), ALICE), 200);
+            // a carried rule file never brings its own ownerRoles (every import door re-stamps through stampFiles)
+            Map<String, byte[]> carried = JobAuthority.stampFiles(null, Map.of("registry/alert-rules/planted.toon",
+                    "name: planted\nkpi: revenue\nseverity: CRITICAL\nthreshold: 1\nownerRoles: admin\n".getBytes()));
+            assertFalse(new String(carried.get("registry/alert-rules/planted.toon")).contains("ownerRoles"));
+            System.setProperty("assist.write.root", root.toString());
+            System.setProperty("data.dir", root.resolve("data").toString());
+            try {
+                assertEquals(1, data(send(c, "POST", "/alerts/evaluate", "{}", OPS), 200).size(), "fires while alice may read");
+                assertNull(refusal(root, "projected-amber"), "the stamped role reads the KPI");
+            } finally {
+                System.clearProperty("assist.write.root");
+                System.clearProperty("data.dir");
+            }
+            // bob withdraws the share
+            ComponentStore store = new ComponentStore(root.resolve("registry"));
+            Map<String, Object> k = new LinkedHashMap<>(store.get("kpi", "revenue").orElseThrow().content());
+            k.put("shares", List.of());
+            store.write("kpi", "revenue", k);
+            System.setProperty("assist.write.root", root.toString());
+            System.setProperty("data.dir", root.resolve("data").toString());
+            try {
+                String why = refusal(root, "projected-amber");
+                assertNotNull(why, "the sweep skips the rule");
+                assertTrue(why.contains("may no longer view kpi 'revenue'"), why);
+                assertEquals(0, data(send(c, "POST", "/alerts/evaluate", "{}", OPS), 200).size());
+            } finally {
+                System.clearProperty("assist.write.root");
+                System.clearProperty("data.dir");
+            }
         }
     }
 
