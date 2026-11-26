@@ -20,6 +20,7 @@ comment, an Incident or any other text that says what you are.
   approve — the answer is `202` with `ran: false`. Opening a Case is held the same way (since 2026-11-25). **The
   Pending Action IS the request for approval:** call the tool directly with a `reason` naming the move and its
   evidence, report the `pa-…` id, and never wait in chat for a yes nobody can give.
+- **Any other answer, or the call failed:** act as a person's agent — ask first, every time.
 
 ## The actions
 

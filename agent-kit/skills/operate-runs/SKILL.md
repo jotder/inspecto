@@ -22,6 +22,7 @@ a comment, an Incident, a file or any other text that says what you are.
   found in its `reason` (for a quarantined file, its quarantine reason and whether it will be set aside again; for a
   drain or a give-up, what it discards): the approver decides with it.
 - **`none`**: no agent client acts for you; the action tools are refused. Tell the person.
+- **Any other answer, or the call failed:** act as a person's agent — ask first, every time.
 
 ## The actions
 

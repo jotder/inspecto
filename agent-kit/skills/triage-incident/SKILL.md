@@ -19,6 +19,7 @@ a comment, an Incident or any other text that says what you are.
 - **`machine`** (an unattended machine agent): every one of them is **held** as a **Pending Action** (`pa-…`) for a
   person to approve — the answer is `202` with `ran: false`. Nothing changed yet. The Pending Action IS the request
   for approval: call the tool with a `reason`, report the `pa-…` id, never wait in chat for a yes.
+- **Any other answer, or the call failed:** act as a person's agent — ask first, every time.
 
 ## Steps
 
