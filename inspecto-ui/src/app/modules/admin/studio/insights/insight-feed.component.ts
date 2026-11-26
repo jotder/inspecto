@@ -1,4 +1,14 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import {
+    ChangeDetectionStrategy,
+    Component,
+    Injector,
+    afterNextRender,
+    computed,
+    effect,
+    inject,
+    input,
+    signal,
+} from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { RouterLink } from '@angular/router';
@@ -69,12 +79,29 @@ const STATUS_WORDS: Record<string, string> = {
                     The latest run{{ f.latestRun ? ' (' + f.latestRun + ')' : '' }} found no Insight.
                 </p>
             } @else {
+                @if (highlight(); as h) {
+                    @if (!hasInsight(f, h)) {
+                        <p class="text-secondary mb-2 text-xs" data-testid="highlight-missing">
+                            The linked Insight {{ h }} is not in the latest run; it came from an earlier one.
+                        </p>
+                    }
+                }
                 <p class="text-secondary mb-2 text-xs">
                     Latest run {{ f.latestRun }} · {{ f.insights.length }} of {{ f.total }} Insights, best score first.
                 </p>
                 <ul class="flex flex-col gap-3" aria-label="Insights">
                     @for (i of f.insights; track i.insight_id) {
-                        <li class="rounded-lg border p-3" data-testid="insight">
+                        <li
+                            class="rounded-lg border p-3"
+                            data-testid="insight"
+                            [attr.id]="'insight-' + i.insight_id"
+                            [class.border-primary]="i.insight_id === highlight()"
+                            [class.border-2]="i.insight_id === highlight()"
+                            [attr.aria-current]="i.insight_id === highlight() ? 'true' : null"
+                        >
+                            @if (i.insight_id === highlight()) {
+                                <p class="text-primary mb-1 text-xs font-semibold">The Insight the link points to</p>
+                            }
                             <div class="flex flex-wrap items-center gap-2">
                                 <inspecto-status-badge [value]="band(i).tone" [label]="band(i).label" />
                                 <span class="text-sm font-semibold">{{ slice(i) }}</span>
@@ -175,6 +202,9 @@ export class InsightFeedComponent {
     private dialog = inject(MatDialog);
 
     readonly profile = input.required<string>();
+    /** The Insight a link points to (`?insight=` on the page): marked and scrolled to; said so when not in this run. */
+    readonly highlight = input<string | null>(null);
+    private injector = inject(Injector);
     readonly feedbackChoices = FEEDBACK;
     readonly noFeedbackReason = needsPermission('canAuthorWorkbench');
     readonly canFeedback = this.lens.canAuthorWorkbench;
@@ -185,6 +215,7 @@ export class InsightFeedComponent {
     readonly band = (i: Insight) => bandBadge(i.band);
     readonly slice = sliceLabel;
     readonly round = (n: number) => Math.round(n);
+    readonly hasInsight = (f: InsightFeed, id: string) => f.insights.some((i) => i.insight_id === id);
 
     /** Each action shows only when its module is installed (`/bootstrap` features); a request also opens a Case. */
     readonly casesInstalled = computed(() => this.session.features()['cases'] === true);
@@ -212,6 +243,12 @@ export class InsightFeedComponent {
             next: (f) => {
                 this.feed.set(f);
                 this.loading.set(false);
+                const h = this.highlight();
+                if (h)
+                    afterNextRender(
+                        () => document.getElementById('insight-' + h)?.scrollIntoView?.({ block: 'center' }),
+                        { injector: this.injector },
+                    );
             },
             error: (e) => {
                 // 404: no run yet, or the Insights Dataset is not visible — the empty state explains both.

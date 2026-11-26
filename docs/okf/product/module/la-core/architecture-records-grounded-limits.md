@@ -304,7 +304,7 @@ Part 2 of 6 of [Link Analysis — as-built reference and design records](archite
   title and a checkbox list pre-ticked from the canvas emphasis (filter at ≥ 8). ⛔ *A case CONTAINS its members*: zero
   nodes is refused on screen and by the server.
   - **Object type INCIDENT** (a Case's Contents are Incidents, GLOSSARY §9; a new `ENTITY` type would have to teach merge,
-    split, Case Rules, workflow, FindingsSpec). Titled with the raw spelling, described *Raised from Link Analysis…*. ⚠
+    split, Case Rules, workflow, FindingsSpec). Titled with the raw spelling, described *Raised for a Case from Entity … in Dataset …* (neutral since 2026-11-26: Insights open Cases through the same route). ⚠
     They land in the Incidents inbox.
   - **Identity = `entityKey` + `entityDataset`** (node id, `EntityMember` accepts `^[a-z][a-z0-9_]{0,31}:.+`; Dataset =
     the node's `provenance`, else the projected one). The same pair REUSES the object; an invisible match is not reused

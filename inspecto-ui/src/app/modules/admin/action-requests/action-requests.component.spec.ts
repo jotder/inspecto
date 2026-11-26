@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
-import { provideRouter } from '@angular/router';
+import { ActivatedRoute, convertToParamMap, provideRouter } from '@angular/router';
 import { of, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
@@ -37,7 +37,11 @@ const DETAIL: ActionRequestDetail = {
     egress: { scheme: 'https', host: 'tickets.example.test', port: 443, path: '/api', allowlisted: false },
 };
 
-async function create(overrides: Partial<Record<keyof ActionRequestsService, unknown>> = {}, canApprove = true) {
+async function create(
+    overrides: Partial<Record<keyof ActionRequestsService, unknown>> = {},
+    canApprove = true,
+    query?: Record<string, string>,
+) {
     const toastr = { info: vi.fn(), error: vi.fn(), warning: vi.fn(), success: vi.fn() };
     const api = {
         list: vi.fn(() => of({ items: [REQ], total: 1, truncated: false })),
@@ -53,6 +57,9 @@ async function create(overrides: Partial<Record<keyof ActionRequestsService, unk
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
+            ...(query
+                ? [{ provide: ActivatedRoute, useValue: { snapshot: { queryParamMap: convertToParamMap(query) } } }]
+                : []),
             { provide: ActionRequestsService, useValue: api },
             { provide: ToastrService, useValue: toastr },
             {
@@ -74,6 +81,18 @@ const buttons = (el: HTMLElement): string[] =>
     Array.from(el.querySelectorAll('button')).map((b) => (b.textContent ?? '').trim());
 
 describe('ActionRequestsComponent', () => {
+    it('opens the request a link names with ?id= (I-17 link from an Insight)', async () => {
+        const { fixture, api } = await create({}, true, { id: REQ.id });
+        expect(api.get).toHaveBeenCalledWith(REQ.id);
+        expect(fixture.componentInstance.selected()?.id).toBe(REQ.id);
+    });
+
+    it('opens no request without ?id=', async () => {
+        const { fixture, api } = await create();
+        expect(api.get).not.toHaveBeenCalled();
+        expect(fixture.componentInstance.selected()).toBeNull();
+    });
+
     it('a request stuck in dispatched offers Mark as failed', async () => {
         const { fixture, api } = await create({ get: vi.fn(() => of({ ...DETAIL, status: 'dispatched' })) });
         const c = fixture.componentInstance;

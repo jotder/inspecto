@@ -586,8 +586,11 @@ changepoint **and** drift; one Insights Dataset per Profile.
   work (`canWorkIncidents`, the request). The server enforces both.
 - **After success** the Insight shows "Opened Case <id>" (link to `/cases/<id>`) and the Action Request id (link to
   `/action-requests?id=<id>`; the page now opens the request named by `id`).
-- **Deferred**: a text in the sentence written as `{{x}}` is interpolated by the Action Request template renderer
-  (only the request's own context — case id, origin — is reachable); attaching to an EXISTING Case is not offered.
+- **Links back**: `?insight=` marks that Insight in the feed (scrolled to) or says it is not in the latest run; a
+  `?profile=` that names no Profile says so and shows the first. The Incident minted for the Insight reads
+  "Raised for a Case from Entity insight:… in Dataset insights_…" (the route's wording is now neutral).
+- **Deferred** (board rows): `{{x}}` in the sentence is interpolated by the Action Request template renderer
+  (`ACTION-TEMPLATE-ESCAPE-1`); adding the Insight to an EXISTING Case (`INSIGHT-CASE-EXISTING-1`).
 
 ## 12. Board row
 
