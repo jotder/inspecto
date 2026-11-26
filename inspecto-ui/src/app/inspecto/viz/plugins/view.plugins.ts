@@ -69,3 +69,21 @@ export const WORKING_SET_PLUGIN: VizPlugin = {
     transformProps: NO_PROPS,
     render: { kind: 'component', componentKey: 'working-set' },
 };
+
+/**
+ * BI-INSIGHTS-1: a dashboard tile listing one Insight Profile's latest Insights (`GET /insights?profile=`). The binding
+ * (`viewId`) is the Profile id; the tile reads what the viewer may see of its Insights Dataset.
+ */
+export const INSIGHT_FEED_PLUGIN: VizPlugin = {
+    meta: {
+        type: 'insight-feed',
+        label: 'Insight feed',
+        icon: 'heroicons_outline:light-bulb',
+        fit: {},
+        viewKind: 'insight-profile',
+    },
+    controls: [],
+    buildQuery: NO_QUERY,
+    transformProps: NO_PROPS,
+    render: { kind: 'component', componentKey: 'insight-feed' },
+};

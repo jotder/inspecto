@@ -23,6 +23,7 @@ import { DrillEvent, WidgetHostComponent } from '../widgets/widget-host.componen
     changeDetection: ChangeDetectionStrategy.OnPush,
     host: { class: 'block h-full min-w-0' },
     template: `<app-widget-host
+        [showMe]="true"
         [widget]="widget()"
         [dataset]="dataset()"
         [filter]="filter()"

@@ -3,6 +3,7 @@ import {
     ChangeDetectionStrategy,
     Component,
     ElementRef,
+    Injector,
     computed,
     effect,
     inject,
@@ -35,10 +36,16 @@ import { KpiMode, nextKpiMode } from 'app/inspecto/viz/plugins/kpi.component';
 import { ColumnMeta, ConditionGroup } from 'app/inspecto/query';
 import { ChannelId, VizPlugin, VizProps, getViz } from 'app/inspecto/viz';
 import { DatasetResultService } from 'app/inspecto/viz/dataset-result.service';
+import { ShowMeService } from 'app/inspecto/viz/show-me.service';
+import type { OverlaySuggestion } from 'app/inspecto/viz/show-me';
+import { MARKER_VIZ_TYPES } from 'app/inspecto/viz/chart-markers';
+import { OVERLAY_VIZ_TYPES } from 'app/inspecto/viz/chart-overlays';
+import { ToastrService } from 'ngx-toastr';
+import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { DatasetRowsService } from 'app/inspecto/viz/dataset-rows.service';
 import { formatNumber } from 'app/inspecto/viz/number-format';
 import { VizRenderComponent } from 'app/inspecto/viz/viz-render.component';
-import { Widget, isKpiBound } from './widget-types';
+import { Widget, WidgetOptions, isKpiBound } from './widget-types';
 import { WidgetsService } from './widgets.service';
 import { KpiRange } from 'app/inspecto/api/kpis.service';
 import { Dataset } from '../datasets/dataset-types';
@@ -155,6 +162,42 @@ export interface DrillEvent extends DrillPair {
                         <mat-icon class="icon-size-4" svgIcon="heroicons_outline:light-bulb"></mat-icon>
                     </button>
                 }
+                @if (showMeOffered() && tileState() === 'ready') {
+                    <!-- BI-INSIGHTS-1 I-20: Show-Me on the tile — read on open, applied only on a click (saves the Widget). -->
+                    <button
+                        mat-icon-button
+                        type="button"
+                        [matMenuTriggerFor]="showMeMenu"
+                        (menuOpened)="loadSuggestions()"
+                        matTooltip="Suggestions for this chart"
+                        aria-label="Suggestions for this chart"
+                        data-testid="tile-show-me"
+                    >
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:sparkles"></mat-icon>
+                    </button>
+                    <mat-menu #showMeMenu="matMenu" class="max-w-sm">
+                        @if (suggestions(); as list) {
+                            @for (s of list; track s.id) {
+                                <button
+                                    mat-menu-item
+                                    type="button"
+                                    class="h-auto py-2"
+                                    [attr.data-suggestion]="s.id"
+                                    (click)="applySuggestion(s)"
+                                >
+                                    <span class="flex flex-col">
+                                        <span class="text-sm font-semibold">{{ s.action }}</span>
+                                        <span class="text-secondary text-xs whitespace-normal">{{ s.text }}</span>
+                                    </span>
+                                </button>
+                            } @empty {
+                                <button mat-menu-item type="button" disabled>Nothing to suggest for this chart.</button>
+                            }
+                        } @else {
+                            <button mat-menu-item type="button" disabled>Looking at the data…</button>
+                        }
+                    </mat-menu>
+                }
                 <ng-content select="[tileActions]" />
             </ng-container>
             @if (tileState() === 'ready') {
@@ -264,6 +307,8 @@ export class WidgetHostComponent {
     private lens = inject(LensService);
     private session = inject(SessionService);
     private dialog = inject(MatDialog);
+    /** Show-Me's services are resolved on use: most tiles never open the menu, and hosts need not provide them. */
+    private injector = inject(Injector);
 
     /** Self-fetch mode: only an id (the standalone route). */
     readonly widgetId = input<string | undefined>(undefined);
@@ -281,6 +326,8 @@ export class WidgetHostComponent {
     readonly asOf = input('');
     /** The host Dashboard's picked dates — handed to a KPI-bound Widget, which then reads over them. */
     readonly range = input<KpiRange | null>(null);
+    /** Offer Show-Me on this tile (a Dashboard tile; never the gallery thumbnails). */
+    readonly showMe = input(false);
     /** A category click, resolved to the field it should filter on (drill-down). */
     readonly drill = output<DrillEvent>();
 
@@ -292,7 +339,12 @@ export class WidgetHostComponent {
     private readonly fetchedWidget = signal<Widget | undefined>(undefined);
     private readonly fetchedDataset = signal<Dataset | undefined>(undefined);
 
-    readonly resolvedWidget = computed(() => this.widget() ?? this.fetchedWidget());
+    readonly resolvedWidget = computed(() => {
+        const w = this.widget() ?? this.fetchedWidget();
+        const applied = this.appliedOptions();
+        // Only over the Widget it was applied to: a newer `widget` input (a reload) wins.
+        return w && applied && applied.to === w ? { ...w, options: applied.options } : w;
+    });
     readonly resolvedDataset = computed(() => this.dataset() ?? this.fetchedDataset());
 
     readonly plugin = computed<VizPlugin | null>(() => {
@@ -312,6 +364,22 @@ export class WidgetHostComponent {
         this.lens.canAuthorAlertRules() ? (this.resolvedWidget()?.options?.kpi?.kpiId ?? '') : '',
     );
     readonly props = signal<VizProps>({ labels: [], series: [] });
+    /** Options applied from a Show-Me suggestion on this tile (saved); they win over the input Widget's. */
+    private readonly appliedOptions = signal<{ to: Widget; options: WidgetOptions } | null>(null);
+    /** Show-Me's suggestions, read when its menu opens; null while reading. */
+    readonly suggestions = signal<OverlaySuggestion<WidgetOptions>[] | null>(null);
+    /** A Dataset-bound line / bar / area / combo tile, for a user who may save the Widget. */
+    readonly showMeOffered = computed(() => {
+        const type = this.plugin()?.meta.type ?? '';
+        return (
+            this.showMe() &&
+            this.lens.canAuthorWorkbench() &&
+            !this.viewBound() &&
+            !this.kpiBound() &&
+            !!this.resolvedDataset() &&
+            ((OVERLAY_VIZ_TYPES as readonly string[]).includes(type) || MARKER_VIZ_TYPES.includes(type))
+        );
+    });
     readonly canExport = computed(() => this.plugin()?.render.kind === 'chartjs');
     /** False once a data run fails — a shared-bound dataset that no longer resolves (revoked/expired grant). */
     private readonly runOk = signal(true);
@@ -382,7 +450,11 @@ export class WidgetHostComponent {
             options: widget.options,
         });
         if (widget.queryId) spec.queryId = widget.queryId;
-        const out = explainRequest(biQueryBody(spec, this.colMetas()), dataset.columns ?? [], this.props().labels.at(-1));
+        const out = explainRequest(
+            biQueryBody(spec, this.colMetas()),
+            dataset.columns ?? [],
+            this.props().labels.at(-1),
+        );
         return 'request' in out ? out.request : null;
     });
 
@@ -451,6 +523,51 @@ export class WidgetHostComponent {
                     this.props.set({ labels: [], series: [] });
                     this.resultArrived.set(true);
                 });
+        });
+    }
+
+    /** Read Show-Me's suggestions for this tile (the shared builder code); the menu shows them, nothing is applied. */
+    loadSuggestions(): void {
+        const plugin = this.plugin();
+        const widget = this.resolvedWidget();
+        const dataset = this.resolvedDataset();
+        this.suggestions.set(null);
+        if (!plugin || !widget || !dataset) return this.suggestions.set([]);
+        void this.injector
+            .get(ShowMeService)
+            .suggest<WidgetOptions>({
+                plugin,
+                controls: widget.controls,
+                options: widget.options ?? {},
+                datasetId: dataset.id,
+                sourceName: dataset.sourceName,
+                filters: this.filter(),
+                queryId: widget.queryId,
+                columns: this.colMetas(),
+            })
+            .then((list) => this.suggestions.set(list))
+            .catch(() => this.suggestions.set([]));
+    }
+
+    /** On the user's click: confirm, then save the Widget with the suggestion's options and draw it. */
+    async applySuggestion(s: OverlaySuggestion<WidgetOptions>): Promise<void> {
+        const widget = this.resolvedWidget();
+        if (!widget) return;
+        const toastr = this.injector.get(ToastrService);
+        const ok = await this.injector
+            .get(InspectoConfirmService)
+            .confirm(
+                `${s.action} on the Widget "${widget.name}"? This saves the Widget, so every Dashboard showing it changes.`,
+                s.action + '?',
+            );
+        if (!ok) return;
+        this.widgetsApi.save({ ...widget, options: s.options }, { update: true }).subscribe({
+            next: () => {
+                const source = this.widget() ?? this.fetchedWidget();
+                if (source) this.appliedOptions.set({ to: source, options: s.options });
+                toastr.success(`Widget "${widget.name}" saved`);
+            },
+            error: (e) => toastr.error(apiErrorMessage(e, 'The Widget was not saved.')),
         });
     }
 
