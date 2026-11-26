@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.geo-link`](../../../../../product-map/module/geo-link.toon).
 
-135 test class(es): 19 unit, 116 real-HTTP control-plane, 0 IT.
+136 test class(es): 19 unit, 117 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -20,11 +20,12 @@ Run the whole module, or chosen classes (commas between classes, never `+`):
 
 ```bash
 mvn -o test -pl la/inspecto-geo-link
-mvn -o test -pl la/inspecto-geo-link -Dtest=ControlApiAgentLinkAnalysisTest,ControlApiAnalystUploadTest
+mvn -o test -pl la/inspecto-geo-link -Dtest=ControlApiAgentLinkAnalysisSeamTest,ControlApiAgentLinkAnalysisTest
 ```
 
 | test class | package | kind | file | summary |
 |---|---|---|---|---|
+| `ControlApiAgentLinkAnalysisSeamTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiAgentLinkAnalysisSeamTest.java` | AGENT-KIT-1 W6 S0 (D-AK13) over real HTTP, the Link Analysis reads on {@code AgentGate.DATA_ROUTES}: an agent's call to |
 | `ControlApiAgentLinkAnalysisTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiAgentLinkAnalysisTest.java` | The analyst agent in Link Analysis over real HTTP (AGENT-KIT-1 AK-2f, plan §6.6, operator 2026-11-25): a person's agent |
 | `ControlApiAnalystUploadTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiAnalystUploadTest.java` | LA-ANALYST-UPLOAD-1 (D4, i2-gap 2) - {@code POST /inv/uploads/{collector}} over real HTTP with a REAL Subject on every |
 | `ControlApiBasicEditionLinkAnalysisTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiBasicEditionLinkAnalysisTest.java` | LA-EDITIONS-1 phase 3 (ED-4): the <b>Basic</b> edition is the Link Analysis EXPLORER. The Link Analysis modules are |

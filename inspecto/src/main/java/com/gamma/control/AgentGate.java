@@ -171,6 +171,43 @@ final class AgentGate {
         ALLOWED = Set.copyOf(all);
     }
 
+    /**
+     * The {@link #LA_READS} that answer no Dataset value (names, counts, verdicts), so they need no stamp: the overlap
+     * profile (column names and counts) and the two dossier verifications (verdicts, hashes, entry keys of the sealed file).
+     */
+    static final Set<String> LA_READS_WITHOUT_VALUES = Set.of("POST /inv/schema/overlap-profile",
+            "POST /inv/investigations/([^/]+)/dossier/verify", "POST /inv/investigations/([^/]+)/dossier/bundle/verify");
+
+    /**
+     * The agent data routes (widening plan W6, design {@code 2026-11-26-agent-data-answers-masking-design.md} §3.1, D-AK13,
+     * D-AK17): the {@link #ALLOWED} routes whose answer carries values read from a Dataset or Reference, each with its weight
+     * in the agent budget (1 = a page read). For an agent, on every door, the host (a) charges the weight to the agent budget
+     * keyed by agent client and subject, and (b) answers 500 {@code masking not proven} instead of a 2xx answer no masking
+     * step stamped ({@code com.gamma.util.AnswerMasking}). S0 lists {@code POST /db/query} and the Link Analysis reads that
+     * answer entity ids or rows; groups B, D, E and {@code /lookups/test} join one change each. ⚠ GET routes (all allowed to
+     * agents) are not covered by this list.
+     */
+    static final Map<String, Integer> DATA_ROUTES;
+    static {
+        Map<String, Integer> m = new HashMap<>();
+        m.put("POST /db/query", 1);
+        for (String r : LA_READS) if (!LA_READS_WITHOUT_VALUES.contains(r)) m.put(r, 1);
+        DATA_ROUTES = Map.copyOf(m);
+    }
+
+    /** The weight {@code subject} pays for the route registered as {@code method pattern}: 0 when it is no agent or no data route. */
+    static int agentDataWeight(Subject subject, String method, String pattern) {
+        if (subject == null || !subject.agent()) return 0;
+        Integer w = DATA_ROUTES.get(method + " " + pattern);
+        return w == null ? 0 : w;
+    }
+
+    /** The agent budget key (D-AK17): per agent client AND subject, so a person's agent never spends the person's own budget
+     *  and two agent clients of one person never share. {@code null} for a caller no agent client acts for. */
+    static String agentBudgetKey(Subject subject) {
+        return subject == null || !subject.agent() ? null : "agent:" + subject.agentClient() + ":" + subject.id();
+    }
+
     /** {@link #ALLOWED} routes a machine agent may not call (D-AK2: never a run for a machine; D-AK10: nor the Space tests). */
     static final Set<String> PERSON_ONLY = Set.of("POST /pipelines/authored/([^/]+)/run", "POST /tests/run");
 

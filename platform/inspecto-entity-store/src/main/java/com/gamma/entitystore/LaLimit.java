@@ -367,6 +367,11 @@ public enum LaLimit {
             "Requests one embed link may serve in a burst."),
     RATE_EMBED_PER_S("rate.embed_per_s", Layer.INSTALL, false, "rate", "per_s", 2, 0.01, 1_000,
             "Requests per second one embed link regains after a burst."),
+    /** AGENT-KIT-1 W6 S0 (D-AK17): the agent budget, per agent client and subject, spent by weight on the agent data routes. */
+    RATE_AGENT_BURST("rate.agent_burst", Layer.INSTALL, false, "rate", "count", 60, 1, 6_000,
+            "Weighted data reads (1 for a page read) one AI client may make for one user in a burst."),
+    RATE_AGENT_PER_S("rate.agent_per_s", Layer.INSTALL, false, "rate", "per_s", 0.5, 0.01, 1_000,
+            "Weighted data reads per second one AI client regains for one user after a burst."),
     TRAVERSAL_MEMORY_LIMIT_MB("traversal.memory_limit_mb", Layer.INSTALL, false, "traversal", "mb", 1_024, 64, 1_048_576,
             "Memory one sandboxed traversal query may use."),
     TRAVERSAL_THREADS("traversal.threads", Layer.INSTALL, false, "traversal", "count", 4, 1, 64,

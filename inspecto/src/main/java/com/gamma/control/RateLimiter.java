@@ -76,6 +76,20 @@ final class RateLimiter {
                 tuned(install, LaLimit.RATE_LINK_ANALYSIS_PER_S, "control.rateLimit.linkAnalysis.refillPerSecond"));
     }
 
+    /** The agent budget (AGENT-KIT-1 W6 S0, D-AK17): one bucket per agent client and subject, charged at both doors (direct
+     *  REST and the MCP replay) with each agent data route's weight ({@code AgentGate.DATA_ROUTES}). Burst 60, then 0.5 per
+     *  second: sixty page reads at once, then one every 2 s, the Link Analysis pace; install limits {@code rate.agent_burst} /
+     *  {@code rate.agent_per_s}, else {@code control.rateLimit.agent.capacity} / {@code .refillPerSecond}. */
+    static RateLimiter agent() {
+        return agent(LaLimits.forSpace(null));
+    }
+
+    /** {@link #agent()} from the install-wide values {@code install}. */
+    static RateLimiter agent(LaLimitValues install) {
+        return new RateLimiter(tuned(install, LaLimit.RATE_AGENT_BURST, "control.rateLimit.agent.capacity"),
+                tuned(install, LaLimit.RATE_AGENT_PER_S, "control.rateLimit.agent.refillPerSecond"));
+    }
+
     /** An install-wide rate: the value stated in the server-wide document, else {@code property} when it is a positive
      *  number, else the catalogue default ({@code LA-CONFIG-LIMITS-1}). */
     static double tuned(LaLimitValues install, LaLimit item, String property) {
@@ -145,11 +159,16 @@ final class RateLimiter {
 
     /** True when {@code key} has a token to spend (and spends it); false when exhausted. */
     boolean tryConsume(String key) {
+        return tryConsume(key, 1);
+    }
+
+    /** True when {@code key} holds {@code weight} tokens (and spends them all); false, spending none, when it holds fewer. */
+    boolean tryConsume(String key, int weight) {
         long now = clock.getAsLong();
         sweepIfDue(now);
         while (true) {
             Bucket b = buckets.computeIfAbsent(key, k -> new Bucket(capacity, refillPerSecond, now));
-            Boolean r = b.tryConsume(now);
+            Boolean r = b.tryConsume(now, weight);
             if (r != null) return r;
             buckets.remove(key, b);   // evicted under our feet: retry against a fresh (identical, full) bucket
         }
@@ -190,11 +209,11 @@ final class RateLimiter {
         }
 
         /** True/false = spent/exhausted; {@code null} = this bucket was evicted, look up again. */
-        synchronized Boolean tryConsume(long now) {
+        synchronized Boolean tryConsume(long now, int weight) {
             if (evicted) return null;
             refill(now);
-            if (tokens < 1.0) return false;
-            tokens -= 1.0;
+            if (tokens < weight) return false;
+            tokens -= weight;
             return true;
         }
 

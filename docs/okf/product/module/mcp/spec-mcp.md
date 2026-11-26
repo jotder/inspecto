@@ -357,11 +357,11 @@ agent token calling a route directly is treated the same.
      for a person — the guards that refuse those under a policy (`holdRefusing*`) read the policy only;
   2. **allowed** — reads (GET), and `POST /mcp`, `/validate`, `/pipelines/authored/{id}/dry-run`,
      `/bundle/export`, `/promotion/preview`, `/pending-changes/{id}/withdraw`, `/action-requests` (held by its
-     own design), `/db/query` (the read the AK-1 `query_dataset` tool replays) and `/pipelines/authored/{id}/run`
+     own design), `/db/query` (the AK-1 `query_dataset` read) and `/pipelines/authored/{id}/run`
      (D-AK2: a delegated person only, never a machine), and `/pending-actions/{id}/withdraw`; since **W6 group A**
      (2026-11-26) the four authoring previews (`AgentGate.AUTHORING_PREVIEWS`: `/config/preview/parsing|schema`,
      `/config/suggest/schema`, `/components/mapping/validate`), for every agent, body-capped at 256 KiB and naming
-     no config file ([Agent authoring previews](spec-agent-previews.md)); `/lookups/test` stays refused to agents;
+     no config file ([Agent authoring previews](spec-agent-previews.md)); data answers: [S0 seam](spec-agent-data-seam.md);
      since **W6 group C** (2026-11-26) `POST /tests/run`, a delegated person's agent only (`AgentGate.PERSON_ONLY`,
      D-AK10), still gated `canAuthorWorkbench` ([Agent Space tests](spec-agent-space-tests.md));
   3. **actions** (**AK-2d**, 2026-11-25) — `AgentGate.ACTIONS`, the operational routes of plan §4.6: `POST

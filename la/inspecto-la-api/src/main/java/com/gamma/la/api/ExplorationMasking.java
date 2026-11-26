@@ -86,6 +86,8 @@ final class ExplorationMasking {
         this.mode = mode;
         this.active = active;
         this.basis = basis;
+        // AGENT-KIT-1 W6 S0 (D-AK13): every factory decides the answer's masking here - the stamp an agent data route needs
+        com.gamma.util.AnswerMasking.applied(basis, active ? 1 : 0);
     }
 
     /** The masking in force for a read over {@code dataset}; {@code roles} holds its {@code sourceCol}/{@code targetCol}. */

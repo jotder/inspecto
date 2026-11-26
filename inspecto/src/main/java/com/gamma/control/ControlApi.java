@@ -262,6 +262,9 @@ public final class ControlApi implements AutoCloseable, HostContext {
     private volatile RateLimiter embedLimiter = RateLimiter.embed();
     /** ...and its per-IP bucket, so guessing many tokens from one address is throttled too. */
     private final RateLimiter embedIpLimiter = RateLimiter.callback();
+    /** The agent budget (AGENT-KIT-1 W6 S0, D-AK17): per agent client and subject, weighted, charged on every door by
+     *  {@link #chargeAgentBudget}; install-wide like the Link Analysis bucket. */
+    private volatile RateLimiter agentLimiter = RateLimiter.agent();
 
     /**
      * {@code LA-CONFIG-LIMITS-1} CL-13: rebuilds the Link Analysis and embed buckets from the install-wide {@code rate.*} limits in
@@ -272,11 +275,12 @@ public final class ControlApi implements AutoCloseable, HostContext {
         com.gamma.entitystore.LaLimitValues v = com.gamma.entitystore.LaLimits.forSpace(null);
         linkAnalysisLimiter = linkAnalysisLimiter.retunedTo(RateLimiter.linkAnalysis(v));
         embedLimiter = embedLimiter.retunedTo(RateLimiter.embed(v));
+        agentLimiter = agentLimiter.retunedTo(RateLimiter.agent(v));
     }
 
     /** Test seam: drive every rate-limit bucket from {@code nanos} (deterministic refill in real-HTTP tests). */
     void useRateLimitClock(java.util.function.LongSupplier nanos) {
-        for (RateLimiter l : new RateLimiter[] {rateLimiter, dashboardLimiter, callbackLimiter, pushLimiter, linkAnalysisLimiter, embedLimiter, embedIpLimiter})
+        for (RateLimiter l : new RateLimiter[] {rateLimiter, dashboardLimiter, callbackLimiter, pushLimiter, linkAnalysisLimiter, embedLimiter, embedIpLimiter, agentLimiter})
             l.useClock(nanos);
     }
 
@@ -1177,6 +1181,12 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 AuditTrail.accessDenied(ex, method, path, 403);
                 throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, agentRefused);
             }
+            try {
+                chargeAgentBudget(ex, method, r);   // W6 S0 (D-AK17): an agent's data read spends its own weighted budget
+            } catch (ApiException ae) {
+                AuditTrail.accessDenied(ex, method, path, ae.status);
+                throw ae;
+            }
             requireModuleEnabled(r);   // after authenticate + authorize, so a refused caller learns nothing about the Space
             requireWritable(method, r);   // PA-7b: an expired entitlement past its grace leaves reads only
             if (idempotency(ex, method, path)) return;   // after every gate, before the handler's side effects
@@ -1253,6 +1263,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
                 authorize(rx, method, path);
                 String agentRefused = agentRefusal(rx, method, r);   // every door: a replay as an agent is gated too
                 if (agentRefused != null) throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, agentRefused);
+                chargeAgentBudget(rx, method, r);   // W6 S0 (D-AK17): the MCP replay pays the agent budget too
                 requireModuleEnabled(r);
                 requireWritable(method, r);   // AK-2b: a replayed write on a read-only install is refused as a direct one is
                 Object result;
@@ -1376,10 +1387,54 @@ public final class ControlApi implements AutoCloseable, HostContext {
      * own {@code body()} reads them), and the draft may not name a config file ({@link PathJail#withoutConfigRefs}).
      */
     private Object handle(HttpExchange ex, String method, Route r, Matcher m) throws Exception {
-        if (!(ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject s) || !AgentGate.agentPreview(s, method, bare(r)))
+        Subject s = ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject x ? x : null;
+        if (AgentGate.agentDataWeight(s, method, bare(r)) > 0) return provenMasked(ex, method, r, m);
+        if (s == null || !AgentGate.agentPreview(s, method, bare(r)))
             return r.handler.handle(ex, m);
         rawBody(ex, AgentGate.PREVIEW_MAX_BODY_BYTES);
         return PathJail.withoutConfigRefs(AgentGate.NO_FILE_REFS, () -> r.handler.handle(ex, m));
+    }
+
+    /** The answer an agent data route gives when no masking step stamped it (D-AK13). Names nothing of the request. */
+    public static final String MASKING_NOT_PROVEN = "masking not proven - the answer is withheld";
+
+    /**
+     * An agent's call to an agent data route ({@link AgentGate#DATA_ROUTES}, W6 S0, D-AK13), on every door: the handler runs
+     * inside an {@link com.gamma.util.AnswerMasking} scope, and a 2xx answer no masking step stamped is replaced by 500
+     * {@link #MASKING_NOT_PROVEN} - for a returned body here, before {@link #respond} writes it; for a body the handler writes
+     * itself, in the writer before its headers ({@code AnswerMasking.requireProvenBeforeSend}). Either way no row is sent.
+     * A refusal (4xx) passes as it is: it carries no rows, and the handler's own scrubbing applies.
+     */
+    private Object provenMasked(HttpExchange ex, String method, Route r, Matcher m) throws Exception {
+        try (com.gamma.util.AnswerMasking.Scope scope = com.gamma.util.AnswerMasking.open()) {
+            Object result = r.handler.handle(ex, m);
+            if (result != HANDLED && !scope.stamped()) {
+                log.error("agent data route {} {} answered without a masking stamp - withheld (500)", method, bare(r));
+                throw new ApiException(500, ErrorCodes.INTERNAL, MASKING_NOT_PROVEN);
+            }
+            return result;
+        } catch (com.gamma.util.AnswerMasking.NotProven np) {
+            log.error("agent data route {} {} wrote a 2xx answer without a masking stamp - withheld (500)", method, bare(r));
+            throw new ApiException(500, ErrorCodes.INTERNAL, MASKING_NOT_PROVEN);
+        }
+    }
+
+    /**
+     * Spend an agent's weighted budget for an agent data route (W6 S0, D-AK17): the bucket is keyed by agent client and
+     * subject ({@link AgentGate#agentBudgetKey}) and charged on every door - a direct request and an in-process replay (an
+     * MCP Tool call). A person's request, and an agent's call to any other route, spends nothing here. 429 with
+     * {@code Retry-After} when the bucket holds less than the route's weight.
+     */
+    private void chargeAgentBudget(HttpExchange ex, String method, Route r) {
+        Subject s = ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject x ? x : null;
+        int weight = AgentGate.agentDataWeight(s, method, bare(r));
+        if (weight == 0) return;
+        String key = AgentGate.agentBudgetKey(s);
+        RateLimiter bucket = agentLimiter;
+        if (!bucket.tryConsume(key, weight)) {
+            ex.getResponseHeaders().set("Retry-After", Long.toString(bucket.retryAfterSeconds(key)));
+            throw new ApiException(429, ErrorCodes.RATE_LIMITED, "agent data budget exceeded - retry later");
+        }
     }
 
     /** Route-level PEP (ABAC A3): consult the edition's {@link AccessDecider} — a no-op when none is
@@ -1462,7 +1517,8 @@ public final class ControlApi implements AutoCloseable, HostContext {
             }
             return;
         }
-        String key = ApiContext.subject(ex).map(Subject::id).orElseGet(() -> {
+        // W6 S0 (D-AK17): an agent's calls are keyed by agent client and subject, so they never spend the person's own buckets
+        String key = ApiContext.subject(ex).map(s -> s.agent() ? AgentGate.agentBudgetKey(s) : s.id()).orElseGet(() -> {
             String ip = ApiContext.ip(ex);
             return ip == null ? "unknown" : ip;
         });

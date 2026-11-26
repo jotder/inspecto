@@ -22,6 +22,23 @@ class RateLimiterBudgetTest {
 
     /** The /bi/query bucket keeps burst 120 by default and honours its override (MixedLoadBenchmark raises it so a
      *  fast runner measures load, not the throttle). */
+    /** AGENT-KIT-1 W6 S0 (D-AK17): the agent budget is burst 60 by default, and a weighted call spends its whole weight or nothing. */
+    @Test
+    void theAgentBudgetSpendsByWeightAllOrNothing() {
+        assertEquals(60, burst(RateLimiter.agent()));
+        RateLimiter l = new RateLimiter(10.0, 0.5);
+        l.useClock(() -> 0L);
+        assertTrue(l.tryConsume("k", 5));
+        assertTrue(l.tryConsume("k", 5));
+        assertFalse(l.tryConsume("k", 1), "the burst is spent");
+        RateLimiter m = new RateLimiter(10.0, 0.5);
+        m.useClock(() -> 0L);
+        assertTrue(m.tryConsume("k", 8));
+        assertFalse(m.tryConsume("k", 5), "two tokens left: a weight of 5 is refused");
+        assertTrue(m.tryConsume("k", 2), "and spent none of them");
+        assertFalse(m.tryConsume("k", 1));
+    }
+
     @Test
     void theDashboardBurstIsTunable() {
         assertEquals(120, burst(RateLimiter.dashboard()));

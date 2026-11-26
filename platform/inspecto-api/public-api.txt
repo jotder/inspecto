@@ -760,6 +760,7 @@ com.gamma.control.ControlApi | public java.util.Optional<String> spaceIdOf(Path)
 com.gamma.control.ControlApi | public java.util.Set<String> disabledFeatures()
 com.gamma.control.ControlApi | public java.util.Set<String> registeredFeatures()
 com.gamma.control.ControlApi | public static final String LOCAL_BASE_URL_PROP
+com.gamma.control.ControlApi | public static final String MASKING_NOT_PROVEN
 com.gamma.control.ControlApi | public static void main(String[]) throws Exception
 com.gamma.control.ControlApi | public void close()
 com.gamma.control.ControlApi | public void delete(String, Handler)
