@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } 
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { ActivatedRoute } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage } from 'app/inspecto/api/api-base';
 import { ComponentDef, ComponentsService } from 'app/inspecto/api/components.service';
@@ -108,7 +109,7 @@ function row(d: ComponentDef): ProfileRow {
                                             class="hover:bg-hover w-full rounded-lg px-3 py-2 text-left"
                                             [class.bg-hover]="p.id === selectedId()"
                                             [attr.aria-current]="p.id === selectedId() ? 'true' : null"
-                                            (click)="selectedId.set(p.id)"
+                                            (click)="selectedId.set(p.id); missingProfile.set(null)"
                                         >
                                             <span class="block text-sm font-semibold">{{ p.id }}</span>
                                             <span class="text-secondary block text-xs"
@@ -122,6 +123,11 @@ function row(d: ComponentDef): ProfileRow {
                     </nav>
 
                     <section class="min-w-0 flex-auto">
+                        @if (missingProfile(); as m) {
+                            <p class="text-secondary mb-3 text-sm" role="status" data-testid="missing-profile">
+                                The linked Insight Profile {{ m }} no longer exists.
+                            </p>
+                        }
                         @if (selected(); as p) {
                             <div class="flex flex-wrap items-center gap-2">
                                 <h2 class="text-lg font-semibold">{{ p.id }}</h2>
@@ -148,7 +154,10 @@ function row(d: ComponentDef): ProfileRow {
                                 <dd class="font-mono">insights_{{ p.id }}</dd>
                             </dl>
                             <h3 class="mt-6 mb-2 text-sm font-semibold">Insights</h3>
-                            <app-insight-feed [profile]="p.id" />
+                            <app-insight-feed
+                                [profile]="p.id"
+                                [highlight]="p.id === linkedProfile ? linkedInsight : null"
+                            />
                         } @else if (profiles().length > 0) {
                             <p class="text-secondary text-sm">Select an Insight Profile to see its Insights.</p>
                         }
@@ -165,15 +174,25 @@ export class InsightProfilesComponent implements OnInit {
     private dialog = inject(MatDialog);
     private toastr = inject(ToastrService);
     private confirm = inject(InspectoConfirmService);
+    private route = inject(ActivatedRoute);
 
     readonly enabled = computed(() => this.session.features()['insights'] === true);
     readonly loading = signal(true);
     readonly error = signal<string | null>(null);
     readonly profiles = signal<ProfileRow[]>([]);
     readonly selectedId = signal<string | null>(null);
+    /** From a link back (`?profile=&insight=`, BI-INSIGHTS-1 I-17). */
+    linkedProfile: string | null = null;
+    linkedInsight: string | null = null;
+    readonly missingProfile = signal<string | null>(null);
     readonly selected = computed(() => this.profiles().find((p) => p.id === this.selectedId()) ?? null);
 
     ngOnInit(): void {
+        // A link back from a Case or an Action Request names the Profile (`?profile=`, BI-INSIGHTS-1 I-17).
+        const q = this.route.snapshot.queryParamMap;
+        this.linkedProfile = q.get('profile');
+        this.linkedInsight = q.get('insight');
+        if (this.linkedProfile) this.selectedId.set(this.linkedProfile);
         this.load();
     }
 
@@ -184,6 +203,12 @@ export class InsightProfilesComponent implements OnInit {
         this.api.list('insight-profile').subscribe({
             next: (defs) => {
                 this.profiles.set(defs.map(row));
+                // A linked Profile that no longer exists: say so, and show the first instead of nothing.
+                const id = this.selectedId();
+                if (id && !defs.some((d) => d.name === id)) {
+                    if (id === this.linkedProfile) this.missingProfile.set(id);
+                    this.selectedId.set(null);
+                }
                 if (!this.selectedId() && defs.length) this.selectedId.set(defs[0].name);
                 this.loading.set(false);
             },

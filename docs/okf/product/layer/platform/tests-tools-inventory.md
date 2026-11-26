@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-130 test file(s). Run one, or all:
+131 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -123,6 +123,7 @@ node --test tools/
 | `tools/run-agent-golden.test.mjs` | Tests for tools/run-agent-golden.mjs grading — recorded states, no server. |
 | `tools/run-handbook-checks.test.mjs` | Tests for tools/run-handbook-checks.mjs. Run: node --test tools/run-handbook-checks.test.mjs |
 | `tools/sbom-modules.test.mjs` | Fixtures for tools/sbom-modules.mjs (P3f per-module SBOMs). Run: node --test tools/sbom-modules.test.mjs |
+| `tools/seed-golden-ops12.test.mjs` | Tests for tools/seed-golden-ops12.mjs — the files phase and the backlog reading; no server. |
 | `tools/seed-la-audit.test.mjs` | node --test tools/seed-la-audit.test.mjs  -  request building of the la-audit seed script against a MOCKED fetch (no server). |
 | `tools/seed-la-benefits.test.mjs` | node --test tools/seed-la-benefits.test.mjs  -  request building of the benefits fraud seed script against a MOCKED fetch (no server). |
 | `tools/seed-la-card.test.mjs` | node --test tools/seed-la-card.test.mjs  -  request building of the card fraud seed script against a MOCKED fetch (no server). |

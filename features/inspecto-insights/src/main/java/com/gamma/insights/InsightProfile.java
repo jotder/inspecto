@@ -19,7 +19,8 @@ import java.util.Set;
 public record InsightProfile(String id, String dataset, String agg, String measureField, String field, String grain,
                              List<String> dimensions, Object filters, Object when, List<String> types,
                              double alpha, double minImpact, double minSupport, int maxValues, int lookback,
-                             int season, int noveltyRuns, int maxInsights, List<CalendarEvent> calendar) {
+                             int season, int noveltyRuns, int maxInsights, List<CalendarEvent> calendar,
+                             boolean pairs, int maxPairValues) {
 
     public static final String KIND = "insight-profile";
     public static final String PREFIX = "insights_";
@@ -34,6 +35,8 @@ public record InsightProfile(String id, String dataset, String agg, String measu
     static final int MAX_DIMENSIONS = 12, MAX_VALUES = 200, MIN_LOOKBACK = 12, MAX_LOOKBACK = 120;
     /** The scan's statements share the BI row ceiling ({@code ListLimitSettings.MAX_ROWS}). */
     static final int MAX_ROWS = 10_000;
+    /** Depth 2 (BI-EXPLAIN-DEPTH2-1): the cap on value pairs per pair of dimensions. */
+    static final int MIN_PAIR_VALUES = 10, MAX_PAIR_VALUES = 1000, DEFAULT_PAIR_VALUES = 200;
 
     /** A business calendar day or span: {@code exclude} drops it from every series, {@code expected} drops findings dated in it. */
     public record CalendarEvent(LocalDate from, LocalDate to, String label, String mode) {
@@ -102,6 +105,11 @@ public record InsightProfile(String id, String dataset, String agg, String measu
         else throw bad(id, "'season' must be auto, none or a whole number of buckets 2-366");
         int noveltyRuns = (int) num(id, c, "noveltyRuns", 4, 0, 52);
         int maxInsights = (int) num(id, c, "maxInsights", 50, 1, 200);
+        Object pr = c.get("pairs");
+        if (pr != null && !(pr instanceof Boolean)) throw bad(id, "'pairs' is true or false");
+        boolean pairs = Boolean.TRUE.equals(pr);
+        if (pairs && dims.size() < 2) throw bad(id, "'pairs' explains changes by pairs of dimensions; name at least two in 'dimensions'");
+        int maxPairValues = (int) num(id, c, "maxPairValues", DEFAULT_PAIR_VALUES, MIN_PAIR_VALUES, MAX_PAIR_VALUES);
         List<CalendarEvent> cal = new ArrayList<>();
         if (c.get("calendar") != null) {
             if (!(c.get("calendar") instanceof List<?> l)) throw bad(id, "'calendar' must be a list");
@@ -109,7 +117,7 @@ public record InsightProfile(String id, String dataset, String agg, String measu
         }
         return new InsightProfile(id, dataset, agg, mf, field, grain, List.copyOf(dims), c.get("filters"), c.get("when"),
                 List.copyOf(types), alpha, minImpact, minSupport, maxValues, lookback, season, noveltyRuns, maxInsights,
-                List.copyOf(cal));
+                List.copyOf(cal), pairs, maxPairValues);
     }
 
     private static CalendarEvent event(String id, Object o) {

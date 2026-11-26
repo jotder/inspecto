@@ -395,7 +395,7 @@ public final class CaseOperations {
                 attrs.put(ObjectService.ATTR_ENTITY_KEY, e.entityKey());
                 attrs.put(ObjectService.ATTR_ENTITY_DATASET, e.dataset());
                 OperationalObject minted = svc.open(ObjectType.INCIDENT, e.label(),
-                        "Raised from Link Analysis: Entity " + e.entityKey() + " in Dataset " + e.dataset() + ".",
+                        "Raised for a Case from Entity " + e.entityKey() + " in Dataset " + e.dataset() + ".",
                         null, null, null, null, null, attrs);
                 created.add(minted.id());
                 members.put(minted.id(), minted);

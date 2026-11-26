@@ -1,0 +1,16 @@
+raw:
+  name: CARRIER_RATES
+  format: CSV
+  fields[2]{name,selector,type}:
+    CARRIER,"0",VARCHAR
+    RATE_EUR,"1",DOUBLE
+mapping:
+  canonicalName: carrier_rates
+  rawName: CARRIER_RATES
+  fields[2]:
+    - name: CARRIER
+      from: CARRIER
+      fn: keep
+    - name: RATE_EUR
+      from: RATE_EUR
+      fn: keep
