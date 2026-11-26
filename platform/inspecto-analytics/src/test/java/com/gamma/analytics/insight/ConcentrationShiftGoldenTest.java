@@ -57,6 +57,20 @@ class ConcentrationShiftGoldenTest {
     }
 
     @Test
+    void chiSquareTailAndTheReferenceP() {
+        assertEquals(0.05, DistributionShift.chiSquareTail(3.841459, 1), 1e-6);
+        assertEquals(Math.exp(-1), DistributionShift.chiSquareTail(2, 2), 1e-12, "df 2: Q = e^(−x/2)");
+        assertEquals(0.05, DistributionShift.chiSquareTail(18.307038, 10), 1e-6);
+        double[] refs = {1, 2, 3, 4};
+        // within the references: rank (# ≥ 2.5 = 2, + 1) ÷ 5
+        assertEquals(0.6, DistributionShift.referenceP(2.5, refs), 1e-12);
+        // beyond: m 2.5, v 5/3 → c = 1/3, ν = 7.5; p = Q(3.75, 30/2) < the rank floor 1/5
+        double p = DistributionShift.referenceP(10, refs);
+        assertEquals(DistributionShift.chiSquareTail(30, 7.5), p, 1e-15);
+        assertTrue(p < 1e-3, "a gross shift beats the rank floor: " + p);
+    }
+
+    @Test
     void ksAndTotalVariation() {
         // cumulative base .5, 1; current .25, 1 → D = .25; TVD = (.25 + .25)/2
         double[] base = {50, 50}, cur = {25, 75};

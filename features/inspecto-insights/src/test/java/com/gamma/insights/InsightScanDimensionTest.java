@@ -84,6 +84,18 @@ class InsightScanDimensionTest {
         assertTrue(hits / (double) runs <= 0.07, "false-positive rate " + hits / (double) runs);
     }
 
+    @Test
+    void anObviousShiftSurvivesTheFullProfileAndLowSensitivity() throws Exception {
+        // E from ~20 % to 50 %: with the three series types on (17 tests) and at α .01, a rank-only p (≥ 1/56) lost
+        List<String> all = List.of("anomaly", "trend-break", "drift", "concentration", "distribution-shift");
+        for (String sens : List.of("normal", "low")) {
+            InsightProfile p = InsightProfile.parse("p", profile("types", all, "sensitivity", sens));
+            InsightScan.Result r = scan(p, five(50, 50, 50, 50, 200), Map.of(), k -> 0);
+            assertTrue(r.insights().stream().anyMatch(i -> i.type().equals("distribution-shift")),
+                    sens + ": " + r.insights());
+        }
+    }
+
     private static int poisson(java.util.Random r, double lambda) {
         double l = Math.exp(-lambda), p = 1;
         int k = 0;

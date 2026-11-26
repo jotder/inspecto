@@ -522,18 +522,22 @@ changepoint **and** drift; one Insights Dataset per Profile.
 - **Kernel** `com.gamma.analytics.insight`: `Concentration` (`topShare`, `paretoCount` — fewest parts reaching a
   share, `hhi`, `gini`; negative parts refused, nothing → NaN) and `DistributionShift` (`psi` with shares floored at
   1e-4, `ksStatistic` over a given category order, `ksPValue` — Kolmogorov tail with Stephens' correction,
-  `totalVariation`). Goldens: `ConcentrationShiftGoldenTest`.
+  `totalVariation`, `referenceP`, `chiSquareTail`). Goldens: `ConcentrationShiftGoldenTest`.
 - **Insight Types** `concentration` and `distribution-shift`: per dimension (the slice value stored is `*`), over the
   same fetched rows as the series types — no new statement. **Opt-in**: `types` still defaults to anomaly, trend-break,
   drift, because adding two tests per dimension to every existing Profile would raise the BH bar on its findings; a
   dimension type with no `dimensions` is refused at save.
 - **Tests and their p**: *concentration* = the top-3 share (re-ranked per bucket) as a series, `Surprise.spike` of the
   last complete bucket (season slot rule as `anomaly`, ≥ 4 points, 1 share point floor). *distribution-shift* = PSI of
-  the last bucket's value mix against the baseline (every earlier usable bucket summed), p = its empirical rank among
-  each earlier bucket's leave-one-out PSI, (# ≥ now + 1) ÷ (n + 1), n ≥ 4. Not a normal tail of the robust z: PSI is
+  the last bucket's value mix against the baseline (every earlier usable bucket summed), p from the references = each
+  earlier bucket's leave-one-out PSI, n ≥ 4 (`DistributionShift.referenceP`): within them, the empirical rank
+  (# ≥ now + 1) ÷ (n + 1); beyond the largest, the upper tail of a scaled chi-square c·χ²(ν) matched to their mean and
+  variance (Satterthwaite), never above the rank floor 1 ÷ (n + 1). Not a normal tail of the robust z: PSI is
   right-skewed across buckets (a rare value in a small bucket hits the share floor), and the verification probe found
-  a normal tail gave P(p < .01) = 0.22 on a stable mix at ~30 units a bucket. The price: the smallest p is 1 ÷ (n + 1)
-  (about .018 for 56 days, .04 for 24 months), so a shift is found only in a long enough lookback. Concentration
+  a normal tail gave P(p < .01) = 0.22 on a stable mix at ~30 units a bucket. Not a rank alone either: its floor
+  (.018 for 56 days) lost every obvious shift to Benjamini-Hochberg once the series types ran beside it, and never
+  fired at sensitivity `low`. Pinned by a null test (P(p < .05) ≤ .07 at ~30 units) and a power test (E 20 % → 50 % found
+  with all five types, at normal and low). Concentration
   (a normal tail, as `anomaly`) was calibrated at ≤ .066 for .05. Concentration skips a dimension with 3 values or
   fewer (the top 3 always hold everything). Both p's join the run's Benjamini-Hochberg pass.
 - **Deviations from §6, with the reason**: (1) **no DuckDB form** — as §11.8, the statistics run in the JVM over the
