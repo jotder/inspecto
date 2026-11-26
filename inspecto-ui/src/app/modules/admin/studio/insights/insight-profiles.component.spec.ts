@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ComponentDef, ComponentsService } from 'app/inspecto/api/components.service';
 import { InsightFeed, InsightsService } from 'app/inspecto/api/insights.service';
 import { LensService } from 'app/inspecto/api/lens.service';
+import { JobsService } from 'app/inspecto/api/jobs.service';
 import { SessionService } from 'app/inspecto/auth/session.service';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
@@ -78,7 +79,19 @@ function create(opts: {
             },
             { provide: InsightsService, useValue: { list, feedback } },
             { provide: SessionService, useValue: { features: signal({ insights: opts.feature ?? true }) } },
-            { provide: LensService, useValue: { canAuthorWorkbench: signal(opts.author) } },
+            {
+                provide: LensService,
+                useValue: { canAuthorWorkbench: signal(opts.author), canOperateRuns: signal(opts.author) },
+            },
+            // Run scan now: one insight.scan Job names the Profile.
+            {
+                provide: JobsService,
+                useValue: {
+                    list: () => of([{ name: 'scan_sales', type: 'insight.scan', enabled: true }]),
+                    get: () =>
+                        of({ name: 'scan_sales', type: 'insight.scan', enabled: true, params: { profile: 'sales' } }),
+                },
+            },
             { provide: MatDialog, useValue: { open: vi.fn(() => ({ afterClosed: () => of(undefined) })) } },
             { provide: ToastrService, useValue: { success: vi.fn(), info: vi.fn(), error: vi.fn() } },
             { provide: InspectoConfirmService, useValue: { confirmDestructive: vi.fn(async () => true) } },
@@ -99,7 +112,7 @@ describe('InsightProfilesComponent', () => {
         const { fixture, el, list } = create({ author: true, query: { profile: 'gone' } });
         expect(el.querySelector('[data-testid="missing-profile"]')?.textContent).toContain('gone');
         expect(el.querySelector('h2')?.textContent).toContain('sales');
-        expect(list).toHaveBeenCalledWith('sales');
+        expect(list).toHaveBeenCalledWith('sales', { run: 'latest', band: null });
         // Picking a Profile clears the notice.
         el.querySelector<HTMLElement>('[aria-current="true"]')!.click();
         fixture.detectChanges();
@@ -123,7 +136,7 @@ describe('InsightProfilesComponent', () => {
         const returns: ComponentDef = { ...PROFILE, name: 'returns', ref: 'insight-profile/returns' };
         const { el, list } = create({ author: true, query: { profile: 'returns' }, profiles: [PROFILE, returns] });
         expect(el.querySelector('h2')?.textContent).toContain('returns');
-        expect(list).toHaveBeenCalledWith('returns');
+        expect(list).toHaveBeenCalledWith('returns', { run: 'latest', band: null });
         expect(list).not.toHaveBeenCalledWith('sales');
     });
 
@@ -131,7 +144,7 @@ describe('InsightProfilesComponent', () => {
         const { fixture, el, feedback, list } = create({ author: true });
         expect(el.querySelector('h2')?.textContent).toContain('sales');
         expect(el.textContent).toContain('insights_sales');
-        expect(list).toHaveBeenCalledWith('sales');
+        expect(list).toHaveBeenCalledWith('sales', { run: 'latest', band: null });
         const card = el.querySelector('[data-testid="insight"]')!;
         expect(card.textContent).toContain('region = North');
         expect(card.textContent).toContain('Sales in North were 40% above usual.');

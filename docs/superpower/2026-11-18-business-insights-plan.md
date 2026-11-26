@@ -592,6 +592,46 @@ changepoint **and** drift; one Insights Dataset per Profile.
 - **Deferred** (board rows): `{{x}}` in the sentence is interpolated by the Action Request template renderer
   (`ACTION-TEMPLATE-ESCAPE-1`); adding the Insight to an EXISTING Case (`INSIGHT-CASE-EXISTING-1`).
 
+### 11.15 Loose ends C — UI, as built (2026-11-26)
+
+Operator interview 2026-11-26: the five UI loose ends below, all in one lane (`bi-ui-polish`). No new route; one
+engine test.
+
+- **Insight Feed Visualization Type** `insight-feed` (`inspecto/viz/plugins/view.plugins.ts`): a view-bound type
+  (`viewKind: insight-profile`, `viewId` = the Profile id), so the Widget builder offers it with the saved-view picker
+  listing Insight Profiles — only when `/bootstrap` reports `insights`. The tile
+  (`studio/insights/insight-feed-widget.component.ts`, lazy through `registerVizComponent`) reads
+  `GET /insights?profile=&limit=10` as the viewer: band badge with its word, slice, period, sentence, "Latest run … ·
+  n of total · Open the feed". A 404 is the empty state naming the `insight.scan` Job. Read-only (feedback, Cases stay
+  on the Profile screen). **Report PDF**: `ReportWidget.of` already refuses every type it cannot draw in words ("a
+  report PDF draws bar, line and kpi Widgets"), failing the Run with nothing delivered — the Insight Feed gets the same
+  refusal, pinned by `ReportPdfChartsTest.anInsightFeedWidgetIsRefusedInWords`; no backend change.
+- **Run scan now** (`studio/insights/insight-scan-button.component.ts`) beside Edit / Delete: `GET /jobs` lists no
+  parameters, so each `insight.scan` Job is read (`GET /jobs/{name}`) for the one whose `profile` names this Profile;
+  then `POST /jobs/{name}/trigger` (canOperateRuns) and `GET /jobs/runs/{id}` every 2 s for up to 2 min, saying how it
+  ended and reloading the feed. No Job: **Create a scan Job…** asks first, then `POST /jobs`
+  `{name: insight_scan_<profile>, type: insight.scan, enabled, params: {profile}}` (canAuthorWorkbench) — no schedule;
+  the Jobs screen adds one. Each button is disabled with the permission's name otherwise.
+- **Feed history and band filter**: *This run / Every run* (`run=latest|all`) and *Any band / High / Elevated /
+  Normal* (`band=`), applied by the server; *Every run* shows when each Insight was found.
+- **Show-Me on Dashboards**: the builder's probe and KPI read moved into `ShowMeService`
+  (`inspecto/viz/show-me.service.ts`) — the builder, the Dashboard tile and the cog dialog call it and
+  `suggestOverlays()`, so the suggestions are the same everywhere. On a Dashboard tile (line, bar, area, combo over a
+  Dataset, for a user with canAuthorWorkbench) a ✨ *Suggestions for this chart* menu reads the probe when opened;
+  a click asks first ("This saves the Widget, so every Dashboard showing it changes") and saves the Widget. The cog
+  dialog (`WidgetOptionsDialog`) shows the builder's suggestions; taking one sets its field (forecast, anomaly,
+  compare) or adds its marker row (target, bands), kept only on Save. Deviation: Dashboards have no cog dialog of their
+  own (the cog is the builder's), so the tile's menu is the Dashboard surface.
+- **Suggest a compare (I-1)** — `compareSuggestion()` in `show-me.ts`, on the existing `options.compare`: a line / bar
+  / area over a grained date with no break-down, not stacked or value-sorted, with no comparison on. **Same period
+  last year** when the first bucket is at least 358 days (a year less a week) before the last; else **previous
+  period** from 3 buckets. At most one is offered (last year wins: it removes the season the previous period keeps).
+  Read from the probe's rows (the Widget's own statement).
+- **Preview**: driven against a stub API (no backend jar with the add-on was built in the sandbox): the Profile screen
+  created the Job, ran the scan and reloaded the feed; *Every run* + *High* filtered on the server; the Dashboard drew
+  the Insight Feed tile beside a 420-day line whose menu offered last year / forecast / anomaly, and the applied
+  compare was saved and not offered again; the cog dialog listed the builder's suggestions.
+
 ## 12. Board row
 
 Filed 2026-11-18 as **one** row, `BI-INSIGHTS-1` (P2, `BACKLOG.md` §3.6) — the board allows a lane at most one

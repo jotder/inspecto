@@ -198,7 +198,12 @@ markers, as on screen (`MARKER_VIZ_TYPES`).
 over two seasons ("Weekly seasonal pattern found over 112 days of history"), anomaly markers when a point passes the
 default sensitivity, and the target line or bands of the bound KPI. The signal is the same Widget statement sent once
 more with `overlay: {forecast, anomaly}` — the summary above, no other route. Nothing changes until the user clicks
-*Add …*; *Not now* hides a suggestion. Plan §11.6.
+*Add …*; *Not now* hides a suggestion. Plan §11.6. Since 2026-11-26 (plan §11.15) the probe and KPI read are one
+service (`inspecto/viz/show-me.service.ts`) used by the builder, the **Dashboard tile** (a *Suggestions for this
+chart* menu for a user who may save the Widget; a click asks, then saves the Widget) and the **cog dialog** (taking a
+suggestion sets its field; kept on Save). Show-Me also suggests a **compare** (I-1, `compareSuggestion()`): the same
+period last year when the series spans a year (less a week), else the previous period from 3 buckets — at most one.
+The **Insight Feed** Visualization Type (`insight-feed`) is view-bound to an Insight Profile; see the insights hub §4.
 
 **Dashboards.** A Dashboard config holds `tiles: [{widgetId, span}]`, an optional `filter`,
 `exposedFields` for the quick-filter chips, a viewer header (`description`, `asOf`, `illustrative`)

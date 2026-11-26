@@ -19,6 +19,8 @@ import { HeatmapScale } from 'app/inspecto/viz/heatmap';
 import { NumberFormat } from 'app/inspecto/viz/number-format';
 import { COMPARE_KINDS, CompareKind } from 'app/inspecto/viz/compare';
 import { WidgetOptions } from './widget-types';
+import type { OverlaySuggestion } from 'app/inspecto/viz/show-me';
+import { InspectoAlertComponent } from 'app/inspecto/components/alert.component';
 import { WIDGET_OPTION_ATTRIBUTES, WIDGET_OPTION_VIZ_TYPES } from './widget-option-attributes';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
@@ -29,6 +31,9 @@ import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 export interface WidgetOptionsData {
     options: WidgetOptions;
     vizType?: string;
+    /** BI-INSIGHTS-1 I-20: Show-Me's suggestions for this Widget (`ShowMeService`); each sets its field in the form on a
+     *  click, and nothing is kept until Save. */
+    suggestions?: OverlaySuggestion<WidgetOptions>[];
 }
 
 /**
@@ -39,11 +44,29 @@ export interface WidgetOptionsData {
 @Component({
     selector: 'app-widget-options-dialog',
     standalone: true,
-    imports: [MatDialogModule, MatButtonModule, InspectoSchemaFormComponent, ChartMarkersEditorComponent],
+    imports: [
+        MatDialogModule,
+        MatButtonModule,
+        InspectoAlertComponent,
+        InspectoSchemaFormComponent,
+        ChartMarkersEditorComponent,
+    ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     template: `
         <h2 mat-dialog-title>Advanced options</h2>
         <mat-dialog-content>
+            @if (suggestions().length) {
+                <inspecto-alert class="mb-3 block" variant="info" title="Suggested for this chart">
+                    <ul class="flex flex-col gap-1" data-testid="dialog-suggestions">
+                        @for (s of suggestions(); track s.id) {
+                            <li class="flex flex-wrap items-center gap-2" [attr.data-suggestion]="s.id">
+                                <span>{{ s.text }}</span>
+                                <button mat-stroked-button type="button" (click)="take(s)">{{ s.action }}</button>
+                            </li>
+                        }
+                    </ul>
+                </inspecto-alert>
+            }
             <inspecto-schema-form
                 #sf
                 [specs]="attributes"
@@ -81,7 +104,26 @@ export class WidgetOptionsDialog implements AfterViewInit {
     /** Whether a KPI is chosen right now — a KPI status bands marker says so when it is not. */
     readonly kpiChosen = signal(!!this.data.kpi?.kpiId);
 
+    /** Show-Me's suggestions not yet taken in this dialog. */
+    readonly suggestions = signal<OverlaySuggestion<WidgetOptions>[]>(this.input.suggestions ?? []);
+
     @ViewChild('sf') schemaForm!: InspectoSchemaFormComponent;
+
+    /** Take a suggestion: set its field in the form (or add its marker row). Saved only with the dialog. */
+    take(s: OverlaySuggestion<WidgetOptions>): void {
+        const set = (key: string, value: unknown) => {
+            const c = this.schemaForm.form.get(key);
+            c?.setValue(value);
+            c?.markAsDirty();
+        };
+        if (s.id === 'forecast') set('forecastOn', true);
+        else if (s.id === 'anomaly') set('anomalyOn', true);
+        else if (s.id === 'compare-previous' || s.id === 'compare-lastYear')
+            set('compareKind', s.options.compare?.kind);
+        else if (s.id === 'target' || s.id === 'rag') this.markersEditor?.addKind(s.id);
+        this.schemaForm.form.markAsDirty();
+        this.suggestions.update((all) => all.filter((x) => x.id !== s.id));
+    }
     @ViewChild('markers') markersEditor?: ChartMarkersEditorComponent;
 
     ngAfterViewInit(): void {
