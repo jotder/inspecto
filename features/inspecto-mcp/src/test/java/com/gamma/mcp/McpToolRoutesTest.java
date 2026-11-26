@@ -50,6 +50,11 @@ class McpToolRoutesTest {
                     calls.add(t.router().route(t.validate(new LinkedHashMap<>(Map.of("kind", kind, "body", Map.of())))));
                 continue;
             }
+            if (t.name().equals("preview_score")) {   // W6 group E: both score previews
+                for (String kind : McpTools.SCORE_PREVIEWS.keySet())
+                    calls.add(t.router().route(t.validate(new LinkedHashMap<>(Map.of("kind", kind, "body", Map.of())))));
+                continue;
+            }
             if (t.name().equals("operate_job_backlog")) {   // W7: every backlog action, a day for the per-day ones
                 for (Map.Entry<String, String> e : McpTools.JOB_BACKLOG_ACTIONS.entrySet()) {
                     Map<String, Object> a = new LinkedHashMap<>(Map.of("job", "nightly", "action", e.getKey()));
@@ -361,6 +366,30 @@ class McpToolRoutesTest {
         }
         for (McpTools.Call c : everyCall())
             assertFalse(c.path().matches("/screening/hits/[^/]+/reveal"), "no tool reveals a Screening Hit: " + c.path());
+    }
+
+    /**
+     * W6 group E: preview_score replays each score preview (canWorkIncidents) and check_screening the screening check (an
+     * exemption, read-shaped); both only read, and each route is an agent data route ({@code AgentGate.ANALYST_PREVIEWS}).
+     */
+    @Test
+    void theAnalystPreviewToolsReplayTheirDataRoutes() {
+        McpTools.Tool score = McpTools.tool("preview_score");
+        assertFalse(score.write());
+        for (Map.Entry<String, String> e : McpTools.SCORE_PREVIEWS.entrySet()) {
+            McpTools.Call c = score.router().route(score.validate(new LinkedHashMap<>(Map.of("kind", e.getKey(),
+                    "body", Map.of("model", "m1", "entityKey", "k1")))));
+            assertEquals("POST " + e.getValue(), c.method() + " " + c.path());
+            assertTrue(new String(c.body(), java.nio.charset.StandardCharsets.UTF_8).contains("\"entityKey\":\"k1\""));
+            assertTrue(CapabilityManifest.ENTRIES.stream().anyMatch(m -> m.method().equals("POST")
+                    && m.pattern().equals(e.getValue()) && "canWorkIncidents".equals(m.capability())), e.getValue());
+        }
+        McpTools.Tool check = McpTools.tool("check_screening");
+        assertFalse(check.write());
+        McpTools.Call c = check.router().route(check.validate(new LinkedHashMap<>(Map.of("body", Map.of("lists", List.of("l1"))))));
+        assertEquals("POST /screening/check", c.method() + " " + c.path());
+        assertEquals("read-shaped", CapabilityManifest.exemptionFor("POST", "/screening/check").category());
+        assertThrows(McpTools.BadArgs.class, () -> check.validate(new LinkedHashMap<>()), "the body is required");
     }
 
     /** AGENT-NOTICE-PLANTED-1: list_comments only reads, and replays the one route whose masking

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.mcp`](../../../../../product-map/module/mcp.toon).
 
-8 test class(es): 2 unit, 6 real-HTTP control-plane, 0 IT.
+9 test class(es): 2 unit, 7 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -20,11 +20,12 @@ Run the whole module, or chosen classes (commas between classes, never `+`):
 
 ```bash
 mvn -o test -pl features/inspecto-mcp
-mvn -o test -pl features/inspecto-mcp -Dtest=ControlApiAgentDataSeamTest,ControlApiMcpAgentPostureTest
+mvn -o test -pl features/inspecto-mcp -Dtest=ControlApiAgentAnalystPreviewsTest,ControlApiAgentDataSeamTest
 ```
 
 | test class | package | kind | file | summary |
 |---|---|---|---|---|
+| `ControlApiAgentAnalystPreviewsTest` | `com.gamma.mcp` | real-HTTP control-plane test | `features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentAnalystPreviewsTest.java` | AGENT-KIT-1 W6 group E over real HTTP, on both doors (direct REST and the MCP {@code preview_score} / |
 | `ControlApiAgentDataSeamTest` | `com.gamma.mcp` | real-HTTP control-plane test | `features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentDataSeamTest.java` | AGENT-KIT-1 W6 S0 over real HTTP, {@code POST /db/query} on both doors (direct REST and the MCP {@code query_dataset} |
 | `ControlApiMcpAgentPostureTest` | `com.gamma.mcp` | real-HTTP control-plane test | `features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiMcpAgentPostureTest.java` | {@code MCP-AGENT-POSTURE-1} over real HTTP: an agent learns its posture from the server. {@code get_agent_posture} |
 | `ControlApiMcpDiscoveryTest` | `com.gamma.mcp` | real-HTTP control-plane test | `features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiMcpDiscoveryTest.java` | MCP authorization discovery over real HTTP (AGENT-KIT-1 AK-2a, plan §4.3): {@code GET /.well-known/oauth-protected-resource} |

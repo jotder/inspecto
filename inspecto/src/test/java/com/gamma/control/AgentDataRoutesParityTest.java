@@ -43,7 +43,11 @@ class AgentDataRoutesParityTest {
     /** Each data route → the test file (from the repo root) that proves it over real HTTP, and the text it probes it by. */
     private static final Map<String, String> PROOF_FILE = Map.of(
             "POST /db/query", "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentDataSeamTest.java",
-            "POST /inv/", "la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiAgentLinkAnalysisSeamTest.java");
+            "POST /inv/", "la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiAgentLinkAnalysisSeamTest.java",
+            // W6 group E: each module's own preview proof; both doors, the budget and the audit scan in ControlApiAgentAnalystPreviewsTest
+            "POST /risk-scores/preview", "features/inspecto-scoring/src/test/java/com/gamma/control/ControlApiRiskScoreTest.java",
+            "POST /anomaly-scores/preview", "features/inspecto-anomaly/src/test/java/com/gamma/anomaly/ControlApiAnomalyScoreTest.java",
+            "POST /screening/check", "features/inspecto-screening/src/test/java/com/gamma/control/ControlApiScreeningTest.java");
 
     private static final String MCP_PROOF = "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentDataSeamTest.java";
     private static final String LA_PROOF = "la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiAgentLinkAnalysisSeamTest.java";

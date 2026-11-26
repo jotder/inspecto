@@ -60,6 +60,8 @@ class ControlApiRiskScoreTest {
         if ("Bearer revealer".equals(auth))
             return Optional.of(new Subject("rev", Set.of("canWorkIncidents", "canRevealLinkEntities")));
         if ("Bearer agent".equals(auth)) return Optional.of(agentFor("rev", Set.of("canWorkIncidents", "canRevealLinkEntities")));
+        if ("Bearer agentauthor".equals(auth)) return Optional.of(agentFor("ana", CAPS));
+        if ("Bearer machine".equals(auth)) return Optional.of(new Subject("client:bot", CAPS, null, Map.of(), null, null, "svc", "bot"));
         return Optional.empty();
     };
 
@@ -119,6 +121,71 @@ class ControlApiRiskScoreTest {
             } finally {
                 com.gamma.util.AnswerMasking.ignoreStampsForTest(false);
             }
+        }
+    }
+
+    /**
+     * AGENT-KIT-1 W6 group E (D-AK13, D-AK15): "POST /risk-scores/preview" is an agent data route. The agent sends the raw
+     * key (allowed); the answer names it only as the Space token and carries the PII evidence masked. With every stamp a
+     * no-op the agent gets 500 with no key or evidence while a person still gets the preview. Falsified: removing the
+     * stamp in {@code EntityKeyMasking.put}.
+     */
+    @Test
+    void anAgentsScorePreviewIsProvenMaskedOrWithheld(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            ComponentStore store = new ComponentStore(c.config.resolve("registry"));
+            store.write("dataset", "topups", Map.of("physicalRef", "topups",
+                    "columns", List.of(Map.of("name", "msisdn", "classification", "msisdn"),
+                            Map.of("name", "topup_id", "classification", "PII"), Map.of("name", "status"))));
+            store.write("risk-score", "subs", model(null));
+            String path = "/spaces/s1/risk-scores/preview", body = "{\"model\":\"subs\",\"entityKey\":\"m1\"}";
+            HttpResponse<String> r = send(c.port, "POST", path, body, "agent");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode d = V1Body.of(r.body());
+            assertTrue(d.get("found").asBoolean(), "the raw key an agent sends is scored (D-AK15): " + r.body());
+            assertTrue(d.get("keyMasked").asBoolean());
+            assertEquals(com.gamma.mask.EvidenceMasker.forSpace(c.config).tokenFor("m1"), d.get("entityKey").asText());
+            assertTrue(d.at("/factors/0/evidence/0/topup_id").asText().startsWith("masked:"), r.body());
+            assertFalse(r.body().contains("\"m1\"") || r.body().contains("\"t1\""), "no raw value leaves: " + r.body());
+            com.gamma.util.AnswerMasking.ignoreStampsForTest(true);
+            try {
+                HttpResponse<String> agent = send(c.port, "POST", path, body, "agent");
+                assertEquals(500, agent.statusCode(), agent.body());
+                assertTrue(agent.body().contains(ControlApi.MASKING_NOT_PROVEN), agent.body());
+                assertFalse(agent.body().contains("m1") || agent.body().contains("masked:") || agent.body().contains("t1"),
+                        agent.body());
+                assertEquals(200, send(c.port, "POST", path, body, "revealer").statusCode(), "a person is unchanged");
+            } finally {
+                com.gamma.util.AnswerMasking.ignoreStampsForTest(false);
+            }
+        }
+    }
+
+    /**
+     * D-AK23 (operator 2026-11-26): a DRAFT preview is raw for a builder. A person's agent holding canAuthorWorkbench gets
+     * the same factor values the person gets (a draft's measure or filter over a classified column is not masked:
+     * RISK-SCORE-MEASURE-UNMASKED-1, accepted for builders); a machine agent's draft is 403. Falsified: removing the machine
+     * refusal in {@code RiskScoreRoutes.draftForBuilder}.
+     */
+    @Test
+    void aDraftPreviewIsRawForABuildersAgentAndRefusedToAMachine(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            com.gamma.access.Roles.write(c.config, Map.of(), List.of(), List.of("bot"));   // the Space admits client 'bot'
+            new ComponentStore(c.config.resolve("registry")).write("dataset", "topups", Map.of("physicalRef", "topups",
+                    "columns", List.of(Map.of("name", "msisdn", "classification", "msisdn"), Map.of("name", "status"))));
+            String draft = JSON.writeValueAsString(Map.of("entityKey", "m1", "content", model(null)));
+            HttpResponse<String> person = send(c.port, "POST", "/spaces/s1/risk-scores/preview", draft, "analyst");
+            assertEquals(200, person.statusCode(), person.body());
+            HttpResponse<String> agent = send(c.port, "POST", "/spaces/s1/risk-scores/preview", draft, "agentauthor");
+            assertEquals(200, agent.statusCode(), agent.body());
+            assertEquals(V1Body.of(person.body()).get("factors"), V1Body.of(agent.body()).get("factors"),
+                    "a builder's agent gets the draft's factor values as the person does");
+            assertTrue(V1Body.of(agent.body()).get("keyMasked").asBoolean(), "the key still leaves masked: " + agent.body());
+
+            HttpResponse<String> machine = send(c.port, "POST", "/spaces/s1/risk-scores/preview", draft, "machine");
+            assertEquals(403, machine.statusCode(), machine.body());
+            assertTrue(machine.body().contains("saved model only"), machine.body());
+            assertFalse(machine.body().contains("m1"), machine.body());
         }
     }
 

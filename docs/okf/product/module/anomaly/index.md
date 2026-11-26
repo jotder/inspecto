@@ -34,5 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `RISK-SCORE-MEASURE-UNMASKED-1` | P2 | defect | A Risk Score or Anomaly model's measure and filters can read a classified column's values raw: only evidence is masked. | — |
 | `ANOMALY-SCORE-MEMORY-LIMIT-1` | P3 | chore | Nobody has checked whether a production install gives the anomaly.score bucket query enough DuckDB memory. | — |
 | `ANOMALY-UI-FINDINGS-1` | P3 | chore | Only the live (h) check of the Anomaly Detection UI remains; it needs a person signed in to the IdP. | operator |

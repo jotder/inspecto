@@ -849,7 +849,37 @@ final class McpTools {
                     a -> new Call("GET", "/predictions/" + a.get("kind") + "/" + idSeg(a.get("model")) + "/"
                             + idSeg(a.get("key")), null)));
 
-    /** Every tool: AK-1's reads, then AK-2b's, then AK-2d's, then AK-2e's, then AK-2f's, then W3's. */
+    /** {@code preview_score}'s kinds → the score preview each replays (widening plan W6 group E; {@code AgentGate.ANALYST_PREVIEWS}). */
+    static final Map<String, String> SCORE_PREVIEWS = Map.of("risk", "/risk-scores/preview", "anomaly", "/anomaly-scores/preview");
+
+    /**
+     * W6 group E (design {@code 2026-11-26-agent-data-answers-masking-design.md}, D-AK15…D-AK19): the analyst previews.
+     * Each replays one agent data route: masked as for a person without reveal, weighted in the agent budget, writing
+     * nothing. Open to a person's agent and a machine agent alike; the route's own gate decides.
+     */
+    static final List<Tool> ANALYST_PREVIEW_TOOLS = List.of(
+            new Tool("preview_score", "Preview an entity's score",
+                    "Score one entity now and save nothing: kind risk (a Risk Score with its factors and evidence) or "
+                            + "anomaly (an Anomaly Score with its per-feature explanation). Body {model, entityKey, asOf?}: a "
+                            + "saved model (asOf YYYY-MM-DD, anomaly only), or {content, entityKey}: a draft model, which needs "
+                            + "canAuthorWorkbench, answers its values unmasked and is refused to a machine agent. "
+                            + "Needs canWorkIncidents. You may send the key as you know it; the answer "
+                            + "names it masked (keyMasked: true) and classified evidence comes back masked. Each call spends 5 "
+                            + "of your data budget.",
+                    List.of(new Arg("kind", Kind.ENUM, true, "Which score.", List.copyOf(new java.util.TreeSet<>(SCORE_PREVIEWS.keySet()))),
+                            body("The preview request, as the route takes it (see the description).", true)),
+                    a -> new Call("POST", SCORE_PREVIEWS.get((String) a.get("kind")), bodyOf(a))),
+            new Tool("check_screening", "Screen names against Entity Lists",
+                    "Screen subjects by name or identifier against Entity Lists now, saving nothing. Body {lists: [list "
+                            + "ids], subjects: [{key?, name?, identifier?}], threshold? (0.5-1, default 0.85), maxMatches? "
+                            + "(default 5)}. You get at most 10 matches per subject, each entry as its list shows it (a masked "
+                            + "list's entry is a masked token). A restricted list is refused unless your person may see its "
+                            + "members. The names you send are never written to the audit trail. Each started 10 subjects spend "
+                            + "2 of your data budget; a check costing more than your whole budget is refused.",
+                    List.of(body("The check request, as POST /screening/check takes it (see the description).", true)),
+                    a -> new Call("POST", "/screening/check", bodyOf(a))));
+
+    /** Every tool: AK-1's reads, then AK-2b's, then AK-2d's, then AK-2e's, then AK-2f's, then W3's, then W6 group E's. */
     static final List<Tool> ALL_TOOLS;
     static {
         List<Tool> all = new ArrayList<>(TOOLS);
@@ -858,6 +888,7 @@ final class McpTools {
         all.addAll(CASE_TOOLS);
         all.addAll(LA_TOOLS);
         all.addAll(SPACE_HEALTH_TOOLS);
+        all.addAll(ANALYST_PREVIEW_TOOLS);
         ALL_TOOLS = List.copyOf(all);
     }
 

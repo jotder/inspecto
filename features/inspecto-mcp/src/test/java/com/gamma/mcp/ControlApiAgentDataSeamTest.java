@@ -239,10 +239,10 @@ class ControlApiAgentDataSeamTest {
 
     @Test
     void theAgentBudgetIs429PastItsBoundOnEachDoorPerClientAndSubject(@TempDir Path root) throws Exception {
-        System.setProperty(BUDGET, "3");
+        System.setProperty(BUDGET, "5");   // the heaviest data route weight (a score preview, W6 group E)
         System.setProperty(REFILL, "0.01");   // no refill within the test
         try (Ctx c = open(root, null)) {
-            for (int i = 0; i < 3; i++) assertEquals(200, query(c, AGENT, "SELECT region FROM calls").statusCode(), "direct #" + i);
+            for (int i = 0; i < 5; i++) assertEquals(200, query(c, AGENT, "SELECT region FROM calls").statusCode(), "direct #" + i);
             HttpResponse<String> past = query(c, AGENT, "SELECT region FROM calls");
             assertEquals(429, past.statusCode(), past.body());
             assertTrue(past.body().contains("agent data budget"), past.body());
@@ -251,7 +251,7 @@ class ControlApiAgentDataSeamTest {
             assertTrue(text(sameBudget).startsWith("HTTP 429"), "the MCP door spends the same budget: " + sameBudget);
 
             // another agent client of the same person has its own budget, and the MCP replay spends it
-            for (int i = 0; i < 3; i++) {
+            for (int i = 0; i < 5; i++) {
                 JsonNode ok = tool(c, AGENT2, "SELECT region FROM calls");
                 assertFalse(ok.path("isError").asBoolean(), "MCP #" + i + ": " + ok);
             }

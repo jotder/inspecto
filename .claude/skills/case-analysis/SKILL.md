@@ -35,13 +35,15 @@ check `docs/GLOSSARY.md` before naming anything (Entity List, Expectation, Decis
 | LA investigations | `GET` / `POST /inv/investigations`, `GET /inv/investigations/{investigationId}/log` |
 | Investigation ↔ Case | `GET` / `PUT` / `DELETE /inv/investigations/{investigationId}/case`, `POST /inv/case-history` |
 | Graph algorithms | `GET /inv/graph/algorithms`, `POST` / `GET /inv/graph/runs`, `GET /inv/graph/runs/{runId}` |
-| Risk / anomaly score | `GET /risk-scores/{model}/{entityKey}`, `POST /risk-scores/preview`, `GET /anomaly-scores/{model}/{entityKey}` |
+| Risk / anomaly score | `GET /risk-scores/{model}/{entityKey}`, `POST /risk-scores/preview`, `GET /anomaly-scores/{model}/{entityKey}`, `POST /anomaly-scores/preview` |
 | Entity Lists | `GET /entity-lists`, `GET /entity-lists/{entitylistId}`, `POST /entity-lists/{entitylistId}/match` |
 | Screening | `POST /screening/check`, `GET /screening/hits`, `GET /screening/hits/{hitId}`, `POST /screening/hits/{hitId}/decide` |
 
 Permissions (case-management hub): creating or deleting a Case Rule needs `canAuthorWorkbench`;
 evaluate needs `canAdminister`. `GET /screening/hits/{hitId}/reveal` unmasks data — only on operator
-request. Handlers: `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java`,
+request. An AI agent may call the two score previews and `POST /screening/check` (MCP Tools `preview_score`,
+`check_screening`; AGENT-KIT-1 W6 group E): masked as for a person without reveal, at most 10 screening matches
+per subject, weighted in the agent budget (`module/mcp/spec-agent-data-seam.md`). Handlers: `features/inspecto-case-management/src/main/java/com/gamma/ops/cases/CaseRoutes.java`,
 `la/inspecto-la-api/src/main/java/com/gamma/la/api/InvestigationCaseRoutes.java`.
 
 ## Procedure

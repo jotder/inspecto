@@ -2,8 +2,10 @@
 
 > 🟡 **SIGNED 2026-11-26 — D-AK13…D-AK21 signed in an operator interview (D-AK13, 14, 17, 20, 21 as recommended;
 > D-AK15, 16, 18, 19 not as recommended, §5); the people-facing defects of §8 filed and fixed first. **S0 built 2026-11-26**
-> (the shared seam, as built: [`spec-agent-data-seam.md`](../okf/product/module/mcp/spec-agent-data-seam.md)); D1, B, E, D2
-> and the lookup change not built.**
+> (the shared seam, as built: [`spec-agent-data-seam.md`](../okf/product/module/mcp/spec-agent-data-seam.md)); **E built
+> 2026-11-26** (score previews weight 5, a draft raw for a person's agent and 403 for a machine (D-AK23); screening check weight 2 per started 10 subjects (D-AK24) with at most 10 matches per subject for an agent; MCP
+> Tools `preview_score` and `check_screening`, as built in the same spec § Group E); D1, B, D2 and the lookup change not
+> built.**
 > Unblocks widening plan
 > [`2026-11-25-agent-kit-ak2-widening-plan.md`](2026-11-25-agent-kit-ak2-widening-plan.md) § W6 groups B, D and E (D-AK10:
 > "once masking is proven per route") and board row `AGENT-LOOKUP-PREVIEW-1`. The operator chose on 2026-11-26 to settle
@@ -186,6 +188,8 @@ decision.
 | **D-AK18** | Cost bounds | Agent sandbox 10 s / 512 MB / 1 thread, 500 rows, no index rebuild | **Not as recommended — the same as a person's request** (no agent sandbox, route caps as today). |
 | **D-AK19** | Audit | A new `agent.data.read` row with a keyed digest | **Not as recommended — existing rows only:** `mcp.tool.called` and the route rows, with the redaction rule of §3.6 (screened names never in clear). |
 | **D-AK20** | Decision Rule simulate writes a stamp | For an agent, answer without writing | **As recommended.** |
+| **D-AK23** | (operator, 2026-11-26, from the group E security review) A DRAFT score preview's measures and filters over a classified column answer raw values | — | **As D-AK22 for the enrichment preview:** raw for a person's agent holding `canAuthorWorkbench` (`AgentGate.RAW_FOR_BUILDERS`, `AnswerMasking.unmaskedByDecision`), 403 for a machine agent; a saved model's preview keeps its key and evidence masked for every agent (its own measures: the open part of the people row). People row `RISK-SCORE-MEASURE-UNMASKED-1`, accepted for builders. |
+| **D-AK24** | (operator, 2026-11-26, from the group E security review) One screening check carries up to 1000 guesses for weight 2 | — | **No subject cap:** an agent's check costs `ceil(n/10)*2`, so a 1000-subject check (200) is past the burst and refused by the budget. People keep 1000 and are not charged. |
 | **D-AK21** | Order and split | S0, D1, B, E, D2, `lookups/test`; one change and one security review each | **As recommended**, and the people defects first (§8): the recon fix lands before D2, the lookup fix before the lookup change. |
 
 ## 6. Proof plan

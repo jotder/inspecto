@@ -84,6 +84,14 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- W6 group E: the screening check check_screening replays, so its masking, budget and audit tests meet the real
+             route, not the absent-module stub. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-screening</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-etl</artifactId>

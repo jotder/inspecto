@@ -67,7 +67,8 @@ A regulator or an auditor may read the record later, so it holds only what you c
 
 1. Read it now: `get_incident`. A Workflow move is judged against its status at the moment it runs. Before resolving
    one a score raised, read the score as it stands now (`get_risk_score`, `get_anomaly_score` or `get_prediction`):
-   a disposition should match the latest run, not the one that raised it.
+   a disposition should match the latest run, not the one that raised it. `preview_score` scores it as of today
+   without saving anything, when the latest run is older than the evidence you were given.
 2. `get_agent_posture`. **`person`:** say what you will do and why, in one sentence, and wait for the person's yes —
    every time for `resolve`, `close` and opening a Case. **`machine`:** do not ask; put the move and why in the
    `reason` — the approver's decision is the yes.
@@ -117,6 +118,7 @@ propose it only on the person's explicit word.
 - `get_agent_posture` — `person` or `machine`: whether your moves run at once or are held (call it first)
 - `get_incident`, `list_comments`, `list_incidents`, `list_alerts` — the state before and after
 - `get_risk_score`, `get_anomaly_score`, `get_prediction` — the entity's score now (key masked)
+- `preview_score` — the entity scored as of today, saving nothing (key and evidence masked)
 - `work_incident_or_case` — transition or resolve an Incident or Case
 - `work_alert` — acknowledge or resolve an Alert
 - `edit_incident_or_case_record` — write its postmortem, category, impact, Findings, RCA or correlation links

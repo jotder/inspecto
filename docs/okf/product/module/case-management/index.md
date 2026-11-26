@@ -38,6 +38,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `CASE-REASSIGN-CONSOLE-1` | P3 | feature | an existing Case cannot be re-assigned in the console | — |
 | `CASE-TRANSITION-FOUR-EYES-1` | P3 | feature | a Workflow transition on a Case has no guard: | — |
 | `AGENT-STORED-RECORD-READS-1` | P2 | defect | 43 GET routes answer stored records that can echo entity keys or row values other features wrote into them, and sit outside the agent dat… | operator |
+| `SCREENING-CASE-KEY-RAW-1` | P2 | defect | Confirming a screening hit writes the subject key raw onto the Incident and Case it opens. | — |
 | `D6-REAL-USER-SESSION-1` | P3 | chore | The D10 think-aloud with a REAL Case-desk lead is still unrun. | external |
 | `CASE-FROM-ENTITIES-ACTOR-1` | P3 | defect | POST /cases/from-entities records the body's free-text actor on the new Case's member links (CaseOperations.openCaseFromEntities, and on… | — |
 | `MODULE-REORG-P7-INCIDENTS` | P3 | chore | Delete AlertMigration (and LegacyAlertObjects) in 5.0.0; 4.0.0 ships the migration. | — |

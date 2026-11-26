@@ -35,3 +35,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `RISK-SCORE-JOB-1` | P3 | feature | a saved Risk Score scores nothing until someone creates a risk.score Job for it by hand; | — |
+| `RISK-SCORE-MEASURE-UNMASKED-1` | P2 | defect | A Risk Score or Anomaly model's measure and filters can read a classified column's values raw: only evidence is masked. | — |

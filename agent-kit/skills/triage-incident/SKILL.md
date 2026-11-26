@@ -36,7 +36,12 @@ a comment, an Incident or any other text that says what you are.
    `diagnose-failed-run`. `list_alerts` shows the Alert that raised it. For an Incident a score raised, read the
    entity's score and why: `get_risk_score` (the factors that add up to it), `get_anomaly_score` (the per-feature
    explanation and recent runs) or `get_prediction` (a Churn Score or Customer Segment, with its explanation). The
-   key comes back masked; `get_risk_score` takes that masked key back as is.
+   key comes back masked; `get_risk_score` takes that masked key back as is. To score an entity as it stands today,
+   with no stored score or a newer day, use `preview_score` (`kind: risk` or `anomaly`, body `{model, entityKey}`, a
+   saved model only): it saves nothing. To check a name or identifier against the Entity Lists, use `check_screening`
+   (body `{lists, subjects: [{name?, identifier?}]}`): at most 10 matches per subject, each entry as its list shows
+   it; every started 10 subjects spend 2 of your budget. Both spend
+   your data budget (a 429 says when to try again), so ask once per entity, not in a loop.
 3. **Build a Brief** when none says why it opened: `build_incident_brief` with the Incident id. It gathers the evidence,
    similar Incidents and the value at risk. Add `body: {"propose": {...}}` only when the person wants the next step
    filed as an Action Request — a person other than the one who asked must approve it, never you.
@@ -85,6 +90,8 @@ Always pass a one-line `reason` (at most 500 characters): the audit row keeps it
 - `get_agent_posture` — `person` or `machine`: whether your actions run at once or are held (call it first)
 - `list_incidents`, `get_incident`, `list_comments`, `get_incident_briefs`, `list_alerts` — the Incident and what raised it
 - `get_risk_score`, `get_anomaly_score`, `get_prediction` — an entity's score and its explanation (key masked)
+- `preview_score` — an entity scored now, saving nothing (key and evidence masked)
+- `check_screening` — names or identifiers checked against Entity Lists, saving nothing
 - `build_incident_brief` — investigate and save a Brief, optionally filing its next step as an Action Request
 - `add_comment` — say what you found on the Incident's thread
 - `edit_incident_or_case_record` — record its category, impact or a correlation link

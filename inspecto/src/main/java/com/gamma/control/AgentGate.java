@@ -130,6 +130,31 @@ final class AgentGate {
             "POST /config/suggest/schema", "POST /config/preview/parsing", "POST /config/preview/schema",
             "POST /components/mapping/validate");
 
+    /**
+     * The analyst previews (widening plan W6 group E, design {@code 2026-11-26-agent-data-answers-masking-design.md} §4,
+     * D-AK15…D-AK19 signed 2026-11-26: for every agent, a person's or a machine's) → their weight in the agent budget. A
+     * score preview scores one entity under a saved or draft model and writes nothing; its key leaves as the Space token
+     * and its evidence masked ({@code EntityKeyMasking}, {@code EvidenceMasker}); the raw {@code entityKey} an agent sends
+     * is allowed (D-AK15, an operator-accepted membership oracle). A screening check answers each entry as its list shows
+     * it, at most 10 matches per subject for an agent (D-AK16), and no submitted name reaches an audit row or a log line
+     * (D-AK19). Each route's own gate still decides: {@code canWorkIncidents} for a score preview (a draft model also
+     * {@code canAuthorWorkbench}); a restricted list's check needs a caller who sees its members.
+     */
+    static final Map<String, Integer> ANALYST_PREVIEWS = Map.of(
+            "POST /risk-scores/preview", 5,
+            "POST /anomaly-scores/preview", 5,
+            "POST /screening/check", 2);
+
+    /**
+     * The data routes whose answer is unmasked by operator decision, so their handler proves it with
+     * {@code AnswerMasking.unmaskedByDecision} instead of a masking step: the host opens their scope allowing that stamp, and
+     * no other route's scope accepts it. D-AK23 (operator, 2026-11-26): a DRAFT score preview ({@code content}) answers its
+     * factor and feature values raw to a person or a person's agent holding {@code canAuthorWorkbench}; a machine agent's
+     * draft is refused by the route (403). A saved model's preview keeps its key and evidence masked for every agent. (Lane B adds
+     * {@code POST /enrichment/preview} here under D-AK22.)
+     */
+    static final Set<String> RAW_FOR_BUILDERS = Set.of("POST /risk-scores/preview", "POST /anomaly-scores/preview");
+
     /** An agent's authoring-preview body cap: the MCP endpoint's own 256 KiB, so a direct call gets no more than a tool call. */
     static final int PREVIEW_MAX_BODY_BYTES = 256 * 1024;
 
@@ -146,7 +171,8 @@ final class AgentGate {
      * reads, taking back its own proposal, an Action Request (held for approval by its own design), {@code POST /db/query}
      * (the read the AK-1 {@code query_dataset} tool replays; SqlGuard and masking run as for the person) and a Pipeline
      * run (D-AK2: a delegated person only — {@link #PERSON_ONLY}); the Link Analysis queries ({@link #LA_READS}, AK-2f);
-     * the authoring previews ({@link #AUTHORING_PREVIEWS}, W6 group A); and the Space tests ({@code POST /tests/run}, W6
+     * the authoring previews ({@link #AUTHORING_PREVIEWS}, W6 group A); the analyst previews ({@link #ANALYST_PREVIEWS},
+     * W6 group E: score previews and the screening check, masked, weighted data routes); and the Space tests ({@code POST /tests/run}, W6
      * group C, D-AK10: a delegated person only, as a run): each case runs its Pipeline over the case folder's own files
      * into a JVM-temp scratch root deleted afterwards, with no batch commit, batch audit, provenance or Signal, and answers
      * verdicts (counts, a checksum, a named column's min or max), never rows.
@@ -168,6 +194,7 @@ final class AgentGate {
                 "POST /tests/run"));
         all.addAll(LA_READS);
         all.addAll(AUTHORING_PREVIEWS);
+        all.addAll(ANALYST_PREVIEWS.keySet());
         ALLOWED = Set.copyOf(all);
     }
 
@@ -184,8 +211,8 @@ final class AgentGate {
      * in the agent budget (1 = a page read). For an agent, on every door, the host (a) charges the weight to the agent budget
      * keyed by agent client and subject, and (b) answers 500 {@code masking not proven} instead of a 2xx answer no masking
      * step stamped ({@code com.gamma.util.AnswerMasking}). S0 lists {@code POST /db/query} and the Link Analysis reads that
-     * answer entity ids or rows, and the masked value GETs ({@link #VALUE_GETS}); groups B, D, E and {@code /lookups/test} join
-     * one change each.
+     * answer entity ids or rows, and the masked value GETs ({@link #VALUE_GETS}); group E adds the analyst previews
+     * ({@link #ANALYST_PREVIEWS}, weights 5 and 2); groups B, D and {@code /lookups/test} join one change each.
      */
     static final Map<String, Integer> DATA_ROUTES;
 
@@ -230,6 +257,7 @@ final class AgentGate {
         m.put("POST /db/query", 1);
         for (String r : LA_READS) if (!LA_READS_WITHOUT_VALUES.contains(r)) m.put(r, 1);
         for (String r : VALUE_GETS) m.put(r, 1);
+        m.putAll(ANALYST_PREVIEWS);
         DATA_ROUTES = Map.copyOf(m);
     }
 

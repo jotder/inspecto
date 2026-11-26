@@ -93,11 +93,14 @@ class AgentGateParityTest {
         }
         // the four capability-gated writes the plan allows: an Action Request (held by its own design), the promotion
         // preview (a read behind canAdminister), a run (D-AK2, a person only) and the Space tests (W6 group C, D-AK10,
-        // a person only)
+        // a person only), and the two score previews (W6 group E: reads behind canWorkIncidents, masked data routes)
         assertEquals(Set.of("POST /action-requests", "POST /promotion/preview", "POST /pipelines/authored/([^/]+)/run",
-                        "POST /tests/run"), gatedButAllowed);
+                        "POST /tests/run", "POST /risk-scores/preview", "POST /anomaly-scores/preview"), gatedButAllowed);
         assertEquals(Set.of("POST /pipelines/authored/([^/]+)/run", "POST /tests/run"), AgentGate.PERSON_ONLY);
         assertEquals(Roles.CAN_AUTHOR_WORKBENCH, m.get("POST /tests/run"), "the Space tests keep the route's own gate");
+        for (String p : java.util.List.of("POST /risk-scores/preview", "POST /anomaly-scores/preview"))
+            assertEquals(Roles.CAN_WORK_INCIDENTS, m.get(p), p + " keeps the route's own gate");
+        assertEquals("exempt:read-shaped", m.get("POST /screening/check"), "the screening check is a read-shaped exemption");
     }
 
     /**

@@ -45,5 +45,8 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `AGENT-STORED-RECORD-READS-1` | P2 | defect | 43 GET routes answer stored records that can echo entity keys or row values other features wrote into them, and sit outside the agent dat… | operator |
 | `VIEW-DATA-UNMASKED-1` | P2 | defect | GET /views/{id}/data answers a view's rows with no masking and no capability check, to people as well as agents | — |
 | `SCREENING-HIT-KEY-RAW-1` | P2 | defect | A screening hit stores and answers the subject key raw: subjectKey is the value of the Screening Job's keyField column (ScreeningHits.rai… | — |
+| `SCREENING-CASE-KEY-RAW-1` | P2 | defect | Confirming a screening hit writes the subject key raw onto the Incident and Case it opens. | — |
+| `RISK-SCORE-MEASURE-UNMASKED-1` | P2 | defect | A Risk Score or Anomaly model's measure and filters can read a classified column's values raw: only evidence is masked. | — |
+| `SCREENING-ENTRY-UNMASKED-LIST-1` | P3 | defect | A screening match's entry is the list member in clear on any list the Space does not mask. | operator |
 | `MACHINE-CLIENT-CONSOLE-1` | P3 | feature | a Space's admitted machine clients (identity.machineClients) and attribute claims are set only through PUT /access/roles; the Roles scree… | — |
 | `AUDIT-ACTION-VERBS-1` | P3 | defect | A run's quarantine release, drain, retry-now and retry cancel, and a Job Run replay, are audited as pipeline.created / job.created (categ… | — |

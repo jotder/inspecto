@@ -27,6 +27,7 @@ its weight in the agent budget. As built in S0:
 |---|---|
 | `POST /db/query` (the `query_dataset` MCP Tool) | 1 |
 | The Link Analysis reads (`AgentGate.LA_READS`) less `AgentGate.LA_READS_WITHOUT_VALUES` — 16 routes: projection, neighbours, neighbour preview, multi, recursive paths, reference rows, expand preview, case history, Entity resolve and suggest, deep-link resolve, preset run, Dataset query, branching and temporal patterns, Investigation replay | 1 |
+| The analyst previews (`AgentGate.ANALYST_PREVIEWS`, group E, [below](#group-e-the-analyst-previews)): the two score previews; the screening check | 5; 2 |
 | The 28 GET reads of masked values (`AgentGate.VALUE_GETS`, operator 2026-11-26, `AGENT-GET-DATA-READS-1`): Dataset rows, `/db/table`, a KPI value; Risk Score, Risk Score list, Anomaly Score, prediction; an Entity List; screening hits; regulatory reports; the Link Analysis GETs — Dataset discover, Entity and Entity Type profiles and summary, entity identities, value measures, a graph run, an Investigation's log, Working Set, comparison, dossier and bundle, a Draft's log and Working Set, the public Investigation link | 1 |
 
 Not on the list, because they answer no Dataset value: the overlap profile (names and counts) and the two dossier
@@ -49,6 +50,48 @@ refused to agents (`AGENT-LOOKUP-PREVIEW-1`).
 
 ⚠ The scan reads literal `.get("…")` registrations; ControlApi's bare health, readiness and contract routes and the MCP
 OAuth metadata route (a constant) are not scanned and answer no value.
+
+## Group E: the analyst previews
+
+Change **E** of the signed design (built 2026-11-26): `AgentGate.ANALYST_PREVIEWS`, in `ALLOWED` and `DATA_ROUTES`, for a
+person's agent and a machine agent alike (the design makes neither person-only). Each route's own gate still decides.
+
+| Route | MCP Tool | Weight | Masking (the stamp) | Agent bound |
+|---|---|---|---|---|
+| `POST /risk-scores/preview` | `preview_score` `kind: risk` | 5 | key as the Space token, evidence by `EvidenceMasker` (`EntityKeyMasking.put`) | `canWorkIncidents`; a draft (`content`, also `canAuthorWorkbench`) is **raw** for a person's agent and **403** for a machine agent (D-AK23) |
+| `POST /anomaly-scores/preview` | `preview_score` `kind: anomaly` | 5 | as above | as above |
+| `POST /screening/check` | `check_screening` | 2 | each entry as its list shows it: a masked list's entry is its token (`ScreeningRoutes.check`, stamped with the masked-list count) | weight **2 per started 10 subjects** (`ceil(n/10)*2`, D-AK24: the host charges the first 2, the route the rest through `com.gamma.util.AgentBudget`; a check costing more than the burst is 429) and at most **10 matches per subject** (`AGENT_MAX_MATCHES`, D-AK16) |
+
+- **Raw values in (D-AK15).** An agent may send the raw `entityKey` or a raw name: the operator-accepted membership
+  oracle. The check echoes the subjects the caller sent (its own values); the key of a score preview leaves as the token.
+- **The clamp.** An agent's `maxMatches` above 10 is answered with 10, not refused (a person's 1..20 range and its 422
+  are unchanged; an agent's `0` is refused as a person's). ⚠ This change's choice: the design says "clamped to 10".
+- **Draft score previews (D-AK23, operator 2026-11-26, from the security review).** A draft's factor measure or filter
+  over a classified column (`max(msisdn)`, `msisdn < …`) answers its values raw in `factors[].value` or the anomaly
+  `series` — only evidence is masked. As D-AK22 does for the enrichment preview: a person's agent holding
+  `canAuthorWorkbench` gets the draft raw, stamped `AnswerMasking.unmaskedByDecision` (accepted only on
+  `AgentGate.RAW_FOR_BUILDERS`); a machine agent's draft is 403; a saved model's preview keeps its key and evidence masked for every agent (its own measures are the open part of the people row).
+  ⚠ The draft answer also carries the key stamp (`EntityKeyMasking.put`), so the seam would pass it without the raw
+  stamp; the raw stamp records the decision. People: `RISK-SCORE-MEASURE-UNMASKED-1` (accepted for builders).
+- **Screening weight per subject (D-AK24, operator 2026-11-26).** An agent's check costs `ceil(n/10)*2`: the host
+  charges the route's 2, the check the rest before reading any list (`ScreeningRoutes.chargeAgentSubjects`, through the
+  host's charger in `com.gamma.util.AgentBudget.ATTR`; fails closed without it). A check costing more than the burst
+  (1000 subjects: 200 > 60) is 429. So the match score cannot be hill-climbed a thousand guesses at a time. A person is
+  not charged and keeps 1..1000.
+- **Unmasked lists.** On a list the Space does not mask (masking mode `none`, or an Entity Type not masked), the entry is
+  the member as stored, for an agent as for a person (design §3.3, "entries stay the list's shown form").
+- **Budget.** The heaviest data route now weighs 5, so `PUT /system/link-analysis/limits` answers 422 for a
+  `rate.agent_burst` below 5 and a lower system property is raised to 5.
+- **Audit (D-AK19).** No new row. A direct call leaves none (`/preview` and the read-shaped check are skipped by
+  `AuditTrail.classify`); an MCP call leaves `mcp.tool.called` with the tool name only. No submitted name, identifier,
+  subject key or entity key reaches an audit row or a log line (tested).
+- **Tests.** Masked column and unstamped 500 per route: `ControlApiRiskScoreTest`, `ControlApiAnomalyScoreTest`
+  (`anAgentsScorePreviewIsProvenMaskedOrWithheld`), `ControlApiScreeningTest.anAgentsCheckIsProvenMaskedOrWithheldAndCappedAtTen`
+  (also the 10-match clamp). Both doors, a person's agent and a machine, the weights 5 and 2 with 429 on each door, the
+  person's budget untouched, and the audit and log scan: `ControlApiAgentAnalystPreviewsTest` (`features/inspecto-mcp`;
+  the anomaly preview there meets an unknown model, 404 after its weight is charged — its masked answer is proven over
+  the corpus in its own module).
+  Tool routes: `McpToolRoutesTest.theAnalystPreviewToolsReplayTheirDataRoutes`.
 
 ## The masked-answer stamp (D-AK13, D-AK14)
 
@@ -97,8 +140,8 @@ the direct refusal is audited as `access.denied`. A weighted call spends its who
   choice (the design names no number): sixty page reads at once, then one every 2 s, the Link Analysis pace.
 - **Never a burst a route cannot pay.** `PUT /system/link-analysis/limits` answers 422 for a `rate.agent_burst` below the
   heaviest `DATA_ROUTES` weight (`AgentGate.burstProblem`); a lower value from a hand-edited document or the system
-  property is raised to that weight with a warning (`RateLimiter.agent`). Today every route weighs 1, the setting's
-  minimum, so the 422 is proven by unit test only (`RateLimiterBudgetTest`).
+  property is raised to that weight with a warning (`RateLimiter.agent`). Since group E the heaviest route weighs 5 (a
+  score preview), so a burst of 1–4 is refused (`RateLimiterBudgetTest`).
 - **The other buckets.** The existing per-route buckets (`/db/query` standard, `/mcp`, the Link Analysis bucket) still
   apply to an agent, now keyed by the same `agent:<client>:<subject>` key instead of the person's id. So an agent's call
   is never less limited than before, and never touches the person's buckets. A person's request is unchanged.
