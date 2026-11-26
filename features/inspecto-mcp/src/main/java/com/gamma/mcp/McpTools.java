@@ -461,7 +461,15 @@ final class McpTools {
                             + "it first. Needs canAuthorWorkbench.",
                     List.of(id("pipeline", "The Pipeline id."),
                             body("The run request, as POST /pipelines/authored/{id}/run takes it.", false)),
-                    a -> new Call("POST", "/pipelines/authored/" + seg(a.get("pipeline")) + "/run", bodyOf(a)), true));
+                    a -> new Call("POST", "/pipelines/authored/" + seg(a.get("pipeline")) + "/run", bodyOf(a)), true),
+            new Tool("run_space_tests", "Run the Space tests",
+                    "Run this Space's test cases (the folders under tests/, each a Pipeline fed the case's own sample files "
+                            + "and its expected rows, rejects, checksum or column checks) and return each case's verdict, "
+                            + "expected against actual; writes nothing. Body {cases: [names]} runs those (at most 200); no "
+                            + "body runs every case. A delegated person's agent only, never a machine (D-AK10). Needs "
+                            + "canAuthorWorkbench. Run them after a preview and before propose_change.",
+                    List.of(body("The run request, as POST /tests/run takes it: {cases?: [case names]}.", false)),
+                    a -> new Call("POST", "/tests/run", bodyOf(a))));
 
     // ── AK-2d: operations tools (plan §4.6, §6.2 lane C) ─────────────────────────────────────────
 

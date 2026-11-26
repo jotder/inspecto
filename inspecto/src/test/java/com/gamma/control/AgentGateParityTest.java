@@ -91,11 +91,13 @@ class AgentGateParityTest {
                 assertTrue(Set.of("exempt:read-shaped", "exempt:self-service", "exempt:group-gated", "exempt:replay-gated").contains(where), key + " " + where);
             else gatedButAllowed.add(key);
         }
-        // the three capability-gated writes the plan allows: an Action Request (held by its own design), the promotion
-        // preview (a read behind canAdminister) and a run (D-AK2, a person only)
-        assertEquals(Set.of("POST /action-requests", "POST /promotion/preview", "POST /pipelines/authored/([^/]+)/run"),
-                gatedButAllowed);
-        assertEquals(Set.of("POST /pipelines/authored/([^/]+)/run"), AgentGate.PERSON_ONLY);
+        // the four capability-gated writes the plan allows: an Action Request (held by its own design), the promotion
+        // preview (a read behind canAdminister), a run (D-AK2, a person only) and the Space tests (W6 group C, D-AK10,
+        // a person only)
+        assertEquals(Set.of("POST /action-requests", "POST /promotion/preview", "POST /pipelines/authored/([^/]+)/run",
+                        "POST /tests/run"), gatedButAllowed);
+        assertEquals(Set.of("POST /pipelines/authored/([^/]+)/run", "POST /tests/run"), AgentGate.PERSON_ONLY);
+        assertEquals(Roles.CAN_AUTHOR_WORKBENCH, m.get("POST /tests/run"), "the Space tests keep the route's own gate");
     }
 
     /**

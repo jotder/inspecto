@@ -30,14 +30,15 @@ graph, prove it on sample rows, and propose it (skill `safe-config-change`).
 6. **Propose** with `propose_change` (`kind: pipeline`, `operation: create` or `update`, `id`, `content: <graph>`,
    `reason`). Report the Pending Change id.
 7. **After approval** (the person tells you, or `get_pending_change` shows `approved`), run it once with
-   `run_pipeline_now` if the person wants data now, then check the result with `get_run` and `query_dataset`.
+   `run_pipeline_now` if the person wants data now, then check the result with `get_run` and `query_dataset`. Run
+   `run_space_tests` too, before you propose (to know which cases already fail) and after approval (none may newly fail).
 
 ## What the agent cannot do — say so, do not work around it
 
 - **Upload a file or register a new Dataset**: these routes are closed to an agent token (403). Ask the person to add
   the file in the console (Add data), then build on the Dataset it creates.
 - **Create a Collector or a connection**: an administrator's step.
-- A machine (unattended) agent may not run a Pipeline; only a delegated person's agent may.
+- A machine (unattended) agent may not run a Pipeline or the Space tests; only a delegated person's agent may.
 
 ## Read more
 
@@ -60,3 +61,4 @@ graph, prove it on sample rows, and propose it (skill `safe-config-change`).
 - `get_pending_change` — whether it was approved
 - `run_pipeline_now` — one run, after approval
 - `get_run` — the run's result
+- `run_space_tests` — the Space's test cases, before proposing and after approval
