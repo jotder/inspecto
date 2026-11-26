@@ -858,7 +858,8 @@ shipped C6 scheduled-export Job.)*
 **Insight Type** *(added 2026-11-18, D-BI1, `BI-INSIGHTS-1`; `anomaly`, `trend-break` and `drift` built 2026-11-26 by
 the `insight.scan` Job)* — A **template** for one kind of finding about a business **Measure**: `change`, `driver`,
 `anomaly` (an unusual value now), `trend-break` (the level moved and stayed), `drift` (a steady climb or slide),
-`forecast`, `target-risk`, `concentration`, `distribution-shift`, `segment-migration`. Type ↔ Instance, as **Visualization
+`forecast`, `target-risk`, `concentration` (the top values hold an unusual share of the Measure; built 2026-11-26),
+`distribution-shift` (the mix of a dimension's values moved; built 2026-11-26), `segment-migration`. Type ↔ Instance, as **Visualization
 Type** ↔ **Widget**. ⛔ not an observability finding — that is an **Alert** on a **Metric**.
 
 **Insight** *(added 2026-11-18, D-BI1; built 2026-11-26 — rows of the Dataset `insights_<profile>`)* — One computed finding of an **Insight Type**

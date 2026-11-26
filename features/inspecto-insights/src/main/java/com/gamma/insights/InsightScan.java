@@ -1,5 +1,8 @@
 package com.gamma.insights;
 
+import com.gamma.analytics.Stats;
+import com.gamma.analytics.insight.Concentration;
+import com.gamma.analytics.insight.DistributionShift;
 import com.gamma.analytics.insight.FalseDiscovery;
 import com.gamma.analytics.insight.InsightScore;
 import com.gamma.analytics.insight.Surprise;
@@ -164,7 +167,7 @@ final class InsightScan {
         for (Double v : total) if (v != null) { totalSum += v; totalN++; }
         double meanAbs = totalN == 0 ? 0 : Math.abs(totalSum) / totalN;
 
-        record Test(Series s, Surprise.Finding f) {}
+        record Test(Series s, Surprise.Finding f, double shareMove) {}
         List<Test> tests = new ArrayList<>();
         int belowSupport = 0;
         List<Series> all = new ArrayList<>();
@@ -179,12 +182,31 @@ final class InsightScan {
                 if (totalSum == 0 || Math.abs(sum / totalSum) < p.minSupport()) { belowSupport++; continue; }
             }
             for (String type : p.types()) {
+                if (!InsightProfile.SERIES_TYPES.contains(type)) continue;
                 Surprise.Finding fd = switch (type) {
                     case Surprise.SPIKE -> Surprise.spike(w, p.season(), 4, unit(p));
                     case Surprise.CHANGEPOINT -> Surprise.changepoint(w, minSeg, 2 * minSeg, unit(p));
                     default -> Surprise.drift(w, 8);
                 };
-                if (fd != null && Double.isFinite(fd.p())) tests.add(new Test(s, fd));
+                if (fd != null && Double.isFinite(fd.p())) tests.add(new Test(s, fd, Double.NaN));
+            }
+        }
+        Map<String, List<Series>> byDimension = new LinkedHashMap<>();
+        for (Series s : f.slices()) byDimension.computeIfAbsent(s.dimension(), x -> new ArrayList<>()).add(s);
+        for (Map.Entry<String, List<Series>> e : byDimension.entrySet()) {
+            double[][] parts = parts(e.getValue(), from, to, excluded);
+            if (parts == null) continue;
+            Series whole = new Series(e.getKey(), TOTAL, null);
+            List<String> values = new ArrayList<>();
+            for (Series s : e.getValue()) values.add(s.value());
+            for (String type : p.types()) {
+                Surprise.Finding fd = switch (type) {
+                    case Concentration.TYPE -> concentration(parts, values, p.season());
+                    case DistributionShift.TYPE -> distributionShift(parts, values, "count".equals(p.agg()));
+                    default -> null;
+                };
+                if (fd != null && Double.isFinite(fd.p()))
+                    tests.add(new Test(whole, fd, ((Number) fd.detail().get("shareMoved")).doubleValue()));
             }
         }
         double[] ps = new double[tests.size()];
@@ -202,16 +224,20 @@ final class InsightScan {
             for (InsightProfile.CalendarEvent e : p.calendar())
                 if ("expected".equals(e.mode()) && e.covers(b.start(atBucket), b.end(atBucket))) expected = true;
             if (expected) { expectedDropped++; continue; }
+            // a series test's move is in the Measure's unit, so its impact is a share of the period's total; a dimension
+            // test's move is already a share of the whole (share points for concentration, total variation for a shift)
+            boolean shares = !Double.isNaN(t.shareMove());
             Double totalAt = total[fd.at()];
-            double denom = totalAt != null && totalAt != 0 ? totalAt : meanAbs;
-            double impact = denom == 0 ? 0 : Math.abs(fd.delta() / denom);
+            double denom = shares ? 1 : totalAt != null && totalAt != 0 ? totalAt : meanAbs;
+            double move = shares ? t.shareMove() : fd.delta();
+            double impact = denom == 0 ? 0 : Math.abs(move / denom);
             if (impact < p.minImpact()) continue;
             String key = t.s().key(fd.type());
             String status = feedback.getOrDefault(key, "new");
             double novelty = ("not_useful".equals(status) || "expected".equals(status)) ? 0
                     : InsightScore.novelty(reportedBefore.applyAsInt(key));
             if (novelty == 0) { suppressed++; continue; }
-            InsightScore.Parts sc = InsightScore.of(fd.delta(), denom, qs[i], novelty);
+            InsightScore.Parts sc = InsightScore.of(move, denom, qs[i], novelty);
             LocalDate period = b.start(atBucket);
             Map<String, Object> ex = new LinkedHashMap<>();
             ex.put("test", fd.type());
@@ -233,6 +259,133 @@ final class InsightScan {
         return new Result(out, tests.size(), belowSupport, expectedDropped, suppressed);
     }
 
+    /** How many of a dimension's largest values the concentration test follows. */
+    static final int TOP_N = 3;
+    /** A dimension test needs at least this many earlier usable buckets to know its usual level. */
+    static final int MIN_BASELINE = 4;
+
+    /**
+     * One dimension's window as amounts: {@code [bucket][value]}, a missing cell = 0 (no rows of that value in that
+     * bucket), a bucket that is excluded or sums to 0 = {@code null}. {@code null} for fewer than two values, a negative
+     * amount anywhere (a share of a sum with negative parts is not a share) or no usable last bucket.
+     */
+    static double[][] parts(List<Series> slices, int from, int to, boolean[] excluded) {
+        if (slices.size() < 2) return null;
+        double[][] out = new double[to - from][];
+        for (int i = 0; i < out.length; i++) {
+            if (excluded[i]) continue;
+            double[] row = new double[slices.size()];
+            double sum = 0;
+            for (int j = 0; j < row.length; j++) {
+                Double v = slices.get(j).values()[from + i];
+                row[j] = v == null ? 0 : v;
+                if (row[j] < 0) return null;
+                sum += row[j];
+            }
+            if (sum > 0) out[i] = row;
+        }
+        return out[out.length - 1] == null ? null : out;
+    }
+
+    /**
+     * I-9: the share held by the {@link #TOP_N} largest values (re-ranked in every bucket) as a series, and the robust z
+     * of the last bucket's share against the earlier ones ({@link Surprise#spike}, one share point the smallest change
+     * that matters). Needs more than {@link #TOP_N} values — with fewer, the top always holds everything.
+     */
+    static Surprise.Finding concentration(double[][] parts, List<String> values, int season) {
+        if (values.size() <= TOP_N) return null;
+        Double[] share = new Double[parts.length];
+        for (int i = 0; i < parts.length; i++) if (parts[i] != null) share[i] = Concentration.topShare(parts[i], TOP_N);
+        Surprise.Finding z = Surprise.spike(share, season, MIN_BASELINE, 0.01);
+        if (z == null) return null;
+        double[] now = parts[parts.length - 1], base = baseline(parts);
+        Map<String, Object> d = new LinkedHashMap<>();
+        d.put("topN", TOP_N);
+        d.put("topValues", top(now, values, TOP_N));
+        d.put("topShare", z.observed());
+        d.put("topShareUsual", z.expected());
+        d.put("shareMoved", z.delta());
+        d.put("hhi", Concentration.hhi(now));
+        d.put("hhiBaseline", Concentration.hhi(base));
+        d.put("gini", Concentration.gini(now));
+        d.put("paretoCount", (int) Concentration.paretoCount(now, 0.8));
+        d.put("values", values.size());
+        d.putAll(z.detail());
+        return new Surprise.Finding(Concentration.TYPE, z.observed(), z.expected(), z.statistic(), z.p(), z.at(), d);
+    }
+
+    /**
+     * I-10: the PSI of the last bucket's mix of values against the baseline (every earlier usable bucket summed), tested
+     * against how far each earlier bucket's mix sits from the rest of the baseline (leave-one-out PSI): p = the empirical
+     * rank among the references, or beyond the largest a scaled chi-square tail matched to them, so only a mix that moved more than buckets usually do is a
+     * finding; z stays in the explanation. The KS distance (values ordered by baseline
+     * share) and, for a count Measure, its nominal p are explanation only — they assume independent units, which a sum
+     * Measure does not have and a count only approximates.
+     */
+    static Surprise.Finding distributionShift(double[][] parts, List<String> values, boolean counts) {
+        int last = parts.length - 1;
+        double[] base = baseline(parts), now = parts[last];
+        List<Double> refs = new ArrayList<>();
+        for (int i = 0; i < last; i++) {
+            if (parts[i] == null) continue;
+            double[] rest = new double[base.length];
+            double sum = 0;
+            for (int j = 0; j < rest.length; j++) { rest[j] = Math.max(0, base[j] - parts[i][j]); sum += rest[j]; }
+            if (sum > 0) refs.add(DistributionShift.psi(rest, parts[i]));
+        }
+        if (refs.size() < MIN_BASELINE) return null;
+        double[] r = refs.stream().mapToDouble(Double::doubleValue).toArray();
+        double median = Stats.median(r), smad = Stats.scaledMad(r, median), floor = Stats.robustZFloor(median, 0.01);
+        double psi = DistributionShift.psi(base, now);
+        double z = Stats.robustZ(psi, median, smad, floor);
+        // PSI across buckets is right-skewed (a small bucket's rare value hits the share floor), so a normal tail of z
+        // would be far too optimistic; the p is the empirical rank of now among the leave-one-out references instead
+        // (a rank inside the references, a matched scaled chi-square tail beyond the largest — DistributionShift.referenceP)
+        double p = DistributionShift.referenceP(psi, r);
+        Integer[] order = new Integer[base.length];
+        for (int j = 0; j < order.length; j++) order[j] = j;
+        java.util.Arrays.sort(order, Comparator.<Integer>comparingDouble(j -> -base[j]).thenComparing(values::get));
+        double[] bo = new double[order.length], no = new double[order.length];
+        double bt = 0, nt = 0;
+        for (int j = 0; j < order.length; j++) { bo[j] = base[order[j]]; no[j] = now[order[j]]; bt += bo[j]; nt += no[j]; }
+        int mover = 0;
+        double moverGap = -1;
+        for (int j = 0; j < base.length; j++) {
+            double gap = Math.abs(now[j] / nt - base[j] / bt);
+            if (gap > moverGap) { moverGap = gap; mover = j; }
+        }
+        Map<String, Object> d = new LinkedHashMap<>();
+        d.put("psi", psi);
+        d.put("psiUsual", median);
+        d.put("z", z);
+        d.put("baselinePoints", r.length);
+        d.put("shareMoved", DistributionShift.totalVariation(base, now));
+        double ks = DistributionShift.ksStatistic(bo, no);
+        d.put("ksD", ks);
+        if (counts) d.put("ksNominalP", DistributionShift.ksPValue(ks, bt, nt));
+        d.put("moverValue", values.get(mover));
+        d.put("moverShareBefore", base[mover] / bt);
+        d.put("moverShareNow", now[mover] / nt);
+        d.put("values", values.size());
+        return new Surprise.Finding(DistributionShift.TYPE, psi, median, z, p, last, d);
+    }
+
+    private static double[] baseline(double[][] parts) {
+        double[] b = new double[parts[parts.length - 1].length];
+        for (int i = 0; i < parts.length - 1; i++)
+            if (parts[i] != null) for (int j = 0; j < b.length; j++) b[j] += parts[i][j];
+        return b;
+    }
+
+    private static List<String> top(double[] now, List<String> values, int n) {
+        Integer[] o = new Integer[now.length];
+        for (int j = 0; j < o.length; j++) o[j] = j;
+        java.util.Arrays.sort(o, Comparator.<Integer>comparingDouble(j -> -now[j]).thenComparing(values::get));
+        List<String> out = new ArrayList<>();
+        for (int j = 0; j < Math.min(n, o.length); j++) out.add(values.get(o[j]));
+        return out;
+    }
+
     /** The smallest change that matters: 1 for a count, otherwise the 5 %-of-median floor alone. */
     private static double unit(InsightProfile p) {
         return "count".equals(p.agg()) ? 1 : 0;
@@ -246,6 +399,16 @@ final class InsightScan {
 
     /** A templated sentence (D-BI5: no language model in the first release). */
     static String sentence(InsightProfile p, Series s, Surprise.Finding f, String bucket) {
+        Map<String, Object> d = f.detail();
+        if (Concentration.TYPE.equals(f.type()))
+            return "the top " + d.get("topN") + " " + s.dimension() + " values " + d.get("topValues") + " held "
+                    + share(f.observed()) + " of " + p.measureId() + " in " + bucket + ", against a usual "
+                    + share(f.expected()) + String.format(java.util.Locale.ROOT, " (%+.1f points)", f.delta() * 100);
+        if (DistributionShift.TYPE.equals(f.type()))
+            return "the mix of " + p.measureId() + " across " + s.dimension() + " shifted in " + bucket + ": "
+                    + share((Double) d.get("shareMoved")) + " of it sits on different values than in the baseline (PSI "
+                    + fmt(f.observed()) + ", usually " + fmt(f.expected()) + "); most: " + d.get("moverValue") + " "
+                    + share((Double) d.get("moverShareBefore")) + " → " + share((Double) d.get("moverShareNow"));
         String what = p.measureId() + (TOTAL.equals(s.dimension()) ? "" : " for " + s.dimension() + " = " + s.value());
         return switch (f.type()) {
             case Surprise.SPIKE -> what + " was " + fmt(f.observed()) + " in " + bucket + ", against a usual "
@@ -260,6 +423,10 @@ final class InsightScan {
     private static String pct(Surprise.Finding f) {
         if (f.expected() == 0) return f.delta() >= 0 ? "up from zero" : "down from zero";
         return String.format(java.util.Locale.ROOT, "%+.1f %%", f.delta() / Math.abs(f.expected()) * 100);
+    }
+
+    private static String share(double v) {
+        return String.format(java.util.Locale.ROOT, "%.1f %%", v * 100);
     }
 
     private static String fmt(double v) {
