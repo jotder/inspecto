@@ -92,6 +92,27 @@ states only facts the user's own routes return, and abstains where the facts do 
 | **D-SH2** | Does the Assistant see data rows, or only metadata? | **Metadata and the aggregates the screen already shows** (counts, the Widget's own values, freshness), never raw rows — a raw-row question links to the Query screen. |
 | **D-SH3** | Which model, and offline? | The model the Space's model settings name, as today; a local model for air-gapped installs, with SH-1 working without any model for glossary terms. |
 
+## 7. Brainstorm — the Assistant on top of the Agent Kit (2026-11-26, future item)
+
+Operator question, not yet a decision: how does the Agent Kit differ from an Assistant that helps on every screen, and
+what does that take on top of the Kit? Kept here for a later brainstorm.
+
+- **The difference.** The Agent Kit is *hands for an outside agent* (Claude Code, Gemini CLI, a bot) over MCP: 75
+  tools, the `AgentGate` buckets, held machine actions, no idea of a screen. The Assistant is *a guide inside the
+  product*: it knows the screen, the open object and the filters, explains, and cites the Handbook; this plan gives it
+  no write path.
+- **What the Kit already gives it.** The masked, rights-checked read tools (W3 Space health, W6 previews, Run /
+  Incident / Dataset reads) called in-process as the signed-in user, so no second permission model; the golden-suite
+  grader; W8's adversarial suite, which applies directly (text in on-screen data steering the Assistant).
+- **What it still takes.** (1) the screen context on every screen (§3.1); (2) Handbook retrieval with a citation
+  check instead of the repo docs search; (3) a per-object-kind summariser (Run, Widget, Incident…) fed by the Kit's
+  read tools; (4) golden questions per screen (§5) graded like the Kit suites; (5) the edition and model choice
+  (D-SH1, D-SH3: the Intelligence agent is Advanced-only and the AI modules are opt-in `-Pai`).
+- **Later, if ever.** Actions from the panel would go through the same `AgentGate` buckets (a person's agent within
+  that person's rights; drafts become Pending Changes), so W1–W11 carry over unchanged.
+- **Rough effort.** 3–5 weeks for a read-only Assistant on the tutorial and how-to screens; the first step is to sign
+  D-SH1…D-SH3.
+
 ## References
 
 - Agent roles and phases: [`2026-11-20-agent-kit-ak2-plan.md`](2026-11-20-agent-kit-ak2-plan.md) §1.1.
