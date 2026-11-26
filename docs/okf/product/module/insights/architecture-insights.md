@@ -72,6 +72,20 @@ the headline change, per-dimension tables (cover values in bold), the mix / rate
 Visualization Type (Before → Mix → Rate → After) and the Moved-with list with its "does not say one causes the
 other" note. The request is built by `inspecto/viz/explain-request.ts` from the Widget's own `/bi/query` body.
 
+**Studio ▸ Insight Profiles** (`/studio/insights`, nav entry gated on the `insights` feature; P3 UI, 2026-11-26) lists
+the `insight-profile` components through the generic component routes and edits one in a dialog
+(`studio/insights/insight-profile-form.dialog.ts`; the form model is framework-free in
+`inspecto/insights/insight-profile-form.ts`). Save is `POST` / `PUT /components/insight-profile[/{id}]` with `If-Match`;
+a 422 from `InsightProfileValidator` is shown in its own words. Insight Types are a free list with the known names
+as help, so a type the server adds is authorable before the UI learns it — the server is the gate. *Propose
+dimensions from column roles* fills Dimensions from the Dataset's `dimension` columns (and an empty Date column from a
+`temporal` one). *Preview on history* posts the unsaved content to `POST /insights/preview` and draws the per-period
+counts as bars, the sentence "you would have seen N Insights in the last P periods" and the top Insights; nothing is
+saved. The selected Profile's feed reads `GET /insights?profile=` (band as a status badge with its word, slice,
+period, score, sentence) with **Useful / Not useful / Expected** buttons, disabled with the reason without
+canAuthorWorkbench; a 404 is the empty state that points to an `insight.scan` Job. No "Run scan now" shortcut: the
+Jobs screen runs the Job. User guide: [`user-guide-insights.md`](user-guide-insights.md).
+
 ## 5. The Insight scan (P3: I-8, Profiles, feed, feedback, replay, calendar)
 
 An **Insight Profile** (component kind `insight-profile`, `registry/insight-profiles/`) names a Measure (sum or

@@ -517,6 +517,22 @@ changepoint **and** drift; one Insights Dataset per Profile.
 - **Deliberately deferred**: the Profile editor UI and the Insight Feed Visualization Type; D-BI4 owner tuning within
   Builder bounds (today: who may save the Profile tunes it); the sharing envelope does not yet narrow by a Mapping Dataset's `basedOn` base (as KPI History); depth-2 slices (`BI-EXPLAIN-DEPTH2-1`); I-9, I-10.
 
+### 11.11 P3 Insight Profile editor, replay preview and Insight feed — as built (2026-11-26)
+
+- **Studio ▸ Insight Profiles** (`/studio/insights`, nav `navFeature: insights`): list + detail of `insight-profile`
+  components over the generic component routes; a dialog edits one (schema form + business calendar rows); save is
+  `POST` / `PUT` with `If-Match`, a 422 shown verbatim.
+- **Insight Types** are a free list (known names in the help), so `concentration` / `distribution-shift` (I-9/I-10, a
+  parallel lane) need no UI change; the server's validator is the gate.
+- **Column roles propose** Dimensions (and an empty Date column) from the Dataset's `dimension` / `temporal` columns.
+- **Replay**: *Preview on history* posts the unsaved content and `periods` to `POST /insights/preview` → bars per
+  period (`<inspecto-chart>`), total and average sentence, top 10 Insights. Nothing saved.
+- **Feed**: `GET /insights?profile=` under the selected Profile — band badge with its word, slice, type, period, score,
+  sentence; Useful / Not useful / Expected (`POST …/feedback`) disabled with the reason without canAuthorWorkbench; a
+  404 is the empty state naming the `insight.scan` Job and linking the Jobs screen.
+- **Deferred**: a "Run scan now" shortcut (the Jobs screen runs it); the Insight Feed Visualization Type for
+  Dashboards; `run=all` history and band filters in the feed.
+
 ## 12. Board row
 
 Filed 2026-11-18 as **one** row, `BI-INSIGHTS-1` (P2, `BACKLOG.md` §3.6) — the board allows a lane at most one
