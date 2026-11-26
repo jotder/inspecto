@@ -567,6 +567,31 @@ changepoint **and** drift; one Insights Dataset per Profile.
 - **Deferred**: a "Run scan now" shortcut (the Jobs screen runs it); the Insight Feed Visualization Type for
   Dashboards; `run=all` history and band filters in the feed.
 
+### 11.13 P3 I-17 second half — a Case or an Action Request from an Insight — as built (2026-11-26)
+
+- **No new route.** Each Insight in the feed has **Open a Case** and **Request action…**, both on existing routes.
+  `POST /objects` cannot carry an Insight (it needs ≥1 existing object to link), so the Case is opened by
+  `POST /cases/from-entities` with the Insight as its one member: key `insight:<insight_id>`, Dataset
+  `insights_<profile>`. The member is minted as an Incident the first time and **reused** for a second Case from the
+  same Insight. Case title = the sentence (else type, slice and period); description = every piece of the evidence.
+- **Evidence** (`inspecto/insights/insight-evidence.ts`): sentence, Insight Type, slice **as stored** (an alias
+  stays an alias; nothing looks up a raw value), period, value / expected / delta, score and band, Profile id,
+  Insight id and a link back to the feed (`/studio/insights?profile=…&insight=…`; the page now honours `profile`).
+- **Request action** asks for an https Connection and an optional reason, opens the Case as above, then
+  `POST /action-requests` with `caseId` (the route needs exactly one Incident or Case) and the evidence as the JSON
+  `payloadTemplate` (`insight: {…}`, `case: {{case.id}}`). It waits as `pending` for a second person. If the request is
+  refused after the Case opened, the Case is still shown so a retry does not open a blind second one.
+- **Gates**: each action shows only when `/bootstrap` reports its module (`cases`; `actionRequests` and `cases`);
+  disabled with the reason without the Manage Incidents and Cases permission (`canManageIncidents`, both) or Incident
+  work (`canWorkIncidents`, the request). The server enforces both.
+- **After success** the Insight shows "Opened Case <id>" (link to `/cases/<id>`) and the Action Request id (link to
+  `/action-requests?id=<id>`; the page now opens the request named by `id`).
+- **Links back**: `?insight=` marks that Insight in the feed (scrolled to) or says it is not in the latest run; a
+  `?profile=` that names no Profile says so and shows the first. The Incident minted for the Insight reads
+  "Raised for a Case from Entity insight:… in Dataset insights_…" (the route's wording is now neutral).
+- **Deferred** (board rows): `{{x}}` in the sentence is interpolated by the Action Request template renderer
+  (`ACTION-TEMPLATE-ESCAPE-1`); adding the Insight to an EXISTING Case (`INSIGHT-CASE-EXISTING-1`).
+
 ## 12. Board row
 
 Filed 2026-11-18 as **one** row, `BI-INSIGHTS-1` (P2, `BACKLOG.md` §3.6) — the board allows a lane at most one

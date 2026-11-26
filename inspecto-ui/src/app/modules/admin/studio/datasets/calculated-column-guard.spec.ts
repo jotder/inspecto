@@ -72,6 +72,20 @@ describe('checkCalculatedExpr', () => {
         expect(checkCalculatedExpr('amt & 1')).toMatch(/illegal character/i);
     });
 
+    // EXPRESSION-GUARD-ESTRING-1: DuckDB reads E'…' (and X'…', B'…', N'…', 1e'…') as other literal kinds
+    it('rejects a string literal touching a letter, digit or underscore, as the backend does', () => {
+        for (const expr of ["E'\\''' || ') IS NOT NULL UNION ALL SELECT 1 --'", "e'x'", "X'41'", "1e'x'", "a_'x'"])
+            expect(checkCalculatedExpr(expr), expr).toMatch(/illegal character/i);
+        expect(checkCalculatedExpr("regexp_matches(code, '\\d+')")).toBeNull();
+        expect(checkCalculatedExpr("upper(region)||'-'")).toBeNull();
+    });
+
+    it('rejects a number glued to a word, which DuckDB splits (1e1from = 1e1 FROM)', () => {
+        for (const expr of ['trim(1e1from y)', '0x1F', '1_000'])
+            expect(checkCalculatedExpr(expr), expr).toMatch(/illegal character/i);
+        expect(checkCalculatedExpr('round(amount * 1.5, 2) + col_2')).toBeNull();
+    });
+
     it('rejects unbalanced parentheses', () => {
         expect(checkCalculatedExpr('round(amt * 1.1')).toMatch(/unbalanced/i);
         expect(checkCalculatedExpr('amt)')).toMatch(/unbalanced/i);

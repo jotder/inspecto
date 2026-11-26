@@ -11,7 +11,17 @@ import java.util.regex.Pattern;
  * Design: {@code docs/superpower/calculated-columns-design.md}. Three cooperating rules:
  * <ol>
  *   <li><b>Closed token alphabet</b> — identifiers, numeric literals, single-quoted strings ({@code ''}
- *       escape), arithmetic/comparison/concat operators, parens, commas. Nothing else lexes.</li>
+ *       escape), arithmetic/comparison/concat operators, parens, commas. Nothing else lexes. A string must
+ *       not touch a preceding letter, digit or {@code _} (EXPRESSION-GUARD-ESTRING-1): DuckDB reads
+ *       {@code E'…'} as an escape string ({@code \'} is a quote) and {@code X'…'}/{@code B'…'}/{@code N'…'} as
+ *       other literal kinds, also after a number ({@code 1e'…'}), so a prefixed literal could end somewhere
+ *       other than where this lexer ends it and the rest would run as SQL. Likewise a number must not touch a
+ *       following letter, digit or {@code _}: DuckDB reads {@code 1e1from} as the number {@code 1e1} then the
+ *       keyword {@code FROM} (and {@code 0x1}, {@code 1_000} as numbers), where this lexer would see one word.
+ *       With both refused, no literal form inside the alphabet is read differently ({@code "…"}, {@code $tag$…$tag$},
+ *       {@code U&'…'} and {@code ;} never lex; comments are refused below); a standard string keeps every
+ *       backslash as text in both. {@code ExpressionGuardDuckDbTest} checks the claim against DuckDB's own
+ *       parser.</li>
  *   <li><b>Keyword deny-set</b> — {@code SELECT}/{@code FROM}/… can never appear even as bare
  *       identifiers, which kills scalar-subquery smuggling structurally.</li>
  *   <li><b>Function-call whitelist</b> — an identifier followed by {@code (} must be a named scalar
@@ -43,8 +53,8 @@ public final class ExpressionGuard {
     static final Pattern TOKEN = Pattern.compile(
             "\\s+"                                   // whitespace (skipped)
           + "|[A-Za-z_][A-Za-z0-9_]*"                // identifier / keyword / function name
-          + "|[0-9]+(?:\\.[0-9]+)?"                  // numeric literal
-          + "|'(?:[^']|'')*'"                        // single-quoted string, '' escape only
+          + "|[0-9]+(?:\\.[0-9]+)?(?![A-Za-z0-9_])"  // numeric literal, never glued to a word (1e1from)
+          + "|(?<![A-Za-z0-9_])'(?:[^']|'')*'"       // single-quoted string, '' escape only, never prefixed (E'…')
           + "|\\|\\||!=|<>|>=|<=|[+\\-*/%=<>(),]");  // operators, parens, comma
 
     /** Statement/structure keywords that must never appear, even as bare identifiers (rule 2). */

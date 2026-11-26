@@ -84,7 +84,9 @@ reads Parquet. Two guards, two grains:
 - **`ExpressionGuard`** (`platform/inspecto-engine/src/main/java/com/gamma/query/ExpressionGuard.java`) validates a **fragment** — the
   calculated-column expression spliced inside the trusted relation — with three cooperating rules: a **closed
   token alphabet** (plain identifiers, numeric and single-quoted literals, arithmetic and comparison
-  operators, parens, commas; no semicolons, double quotes, comments, backslashes; 500 chars), a **keyword
+  operators, parens, commas; no semicolons, double quotes, comments, backslashes outside a string; 500 chars;
+  a string never touching a preceding letter, digit or `_`, since DuckDB lexes `E'…'` / `X'…'` / `1e'…'` as other
+  literal kinds — `EXPRESSION-GUARD-ESTRING-1`, detail in `module/processor/spec-queries.md`), a **keyword
   deny-set** for bare identifiers (kills scalar-subquery smuggling), and a **function-call whitelist**
   (`read_parquet(`, `glob(`, UDFs rejected by name; `cast` types themselves whitelisted). Since 2026-07-24 a
   **window function** is legal **only** when immediately followed by a valid `OVER (…)` (`PARTITION BY` /
