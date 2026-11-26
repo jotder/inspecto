@@ -290,6 +290,19 @@ public final class PathJail {
         return resolveAgainst(base, value, field, "a job's relative path now resolves against the Space config root");
     }
 
+    /** Bound (to the refusal's reason) while a caller's draft may name no config file — see {@link #withoutConfigRefs}. */
+    private static final ScopedValue<String> NO_CONFIG_REFS = ScopedValue.newInstance();
+
+    /**
+     * Run {@code op} with every {@link #resolveConfigRef} refused — {@code IllegalArgumentException} naming the field and
+     * {@code why} — before any path is resolved, probed or read (AGENT-KIT-1 W6 group A: an agent's authoring preview
+     * parses a caller-supplied draft, whose {@code schema_file}, {@code grammar}, {@code mapping_file} or profile ref would
+     * otherwise be read from disk). Every config-to-config reference a parse follows resolves through that one method.
+     */
+    public static <T, X extends Throwable> T withoutConfigRefs(String why, ScopedValue.CallableOp<T, X> op) throws X {
+        return ScopedValue.where(NO_CONFIG_REFS, why).call(op);
+    }
+
     /**
      * <b>Resolve a config file's reference to ANOTHER config file</b> — {@code schema_file},
      * {@code schemas[].schema_file}, {@code mapping_file}, {@code grammar}, a {@code segments} value,
@@ -306,6 +319,8 @@ public final class PathJail {
      *                  which keeps the working-directory reading (there is nothing else to resolve against)
      */
     public static Path resolveConfigRef(Path configDir, String value, String field) {
+        if (NO_CONFIG_REFS.isBound())
+            throw new IllegalArgumentException("'" + field + "' names a file: " + NO_CONFIG_REFS.get());
         return resolveAgainst(configDir, value, field, "a relative config reference resolves beside its own config file");
     }
 

@@ -16,7 +16,11 @@ graph, prove it on sample rows, and propose it (skill `safe-config-change`).
 2. **Look at real rows.** `query_dataset` with a small `limit` (for example `SELECT * FROM <dataset> LIMIT 20`). The
    query is read-only and masked columns come back masked; never ask for them unmasked.
 3. **Draft the graph.** Keep the node ids readable; one Step per idea. For a derived Dataset (a join, a daily summary,
-   a pivot), follow the recipe page below rather than guessing Step names.
+   a pivot), follow the recipe page below rather than guessing Step names. When the person gives you a raw sample of a
+   new feed, or the draft maps values, **preview the pieces first** with `preview_config` (skill
+   `safe-config-change`, step 3): parse the sample, read the types the server suggests, check which rows a schema
+   draft rejects, check the mapping rules. Nothing is written; fix the draft until each
+   preview is clean.
 4. **Validate and dry-run in one call** with `dry_run_pipeline`: argument `pipeline` = the Pipeline id (a new one
    too), and `body` `{pipeline: <draft graph>, sampleRows: [<rows from step 2>]}`. The draft graph is parsed and validated before it
    runs, so a refusal (400 or 422) names what to fix. (`validate_config` with `type: pipeline` judges the Pipeline's
@@ -26,14 +30,15 @@ graph, prove it on sample rows, and propose it (skill `safe-config-change`).
 6. **Propose** with `propose_change` (`kind: pipeline`, `operation: create` or `update`, `id`, `content: <graph>`,
    `reason`). Report the Pending Change id.
 7. **After approval** (the person tells you, or `get_pending_change` shows `approved`), run it once with
-   `run_pipeline_now` if the person wants data now, then check the result with `get_run` and `query_dataset`.
+   `run_pipeline_now` if the person wants data now, then check the result with `get_run` and `query_dataset`. Run
+   `run_space_tests` too, before you propose (to know which cases already fail) and after approval (none may newly fail).
 
 ## What the agent cannot do — say so, do not work around it
 
 - **Upload a file or register a new Dataset**: these routes are closed to an agent token (403). Ask the person to add
   the file in the console (Add data), then build on the Dataset it creates.
 - **Create a Collector or a connection**: an administrator's step.
-- A machine (unattended) agent may not run a Pipeline; only a delegated person's agent may.
+- A machine (unattended) agent may not run a Pipeline or the Space tests; only a delegated person's agent may.
 
 ## Read more
 
@@ -49,9 +54,11 @@ graph, prove it on sample rows, and propose it (skill `safe-config-change`).
 - `query_dataset` — read-only SQL on one Dataset, masked
 - `list_pipelines` — the Pipelines of the Space
 - `get_pipeline` — one Pipeline's graph
+- `preview_config` — a sample parsed, a schema suggested or cast, a mapping checked
 - `dry_run_pipeline` — the draft validated and run on sample rows
 - `validate_config` — not for a graph (see step 4)
 - `propose_change` — the held write
 - `get_pending_change` — whether it was approved
 - `run_pipeline_now` — one run, after approval
 - `get_run` — the run's result
+- `run_space_tests` — the Space's test cases, before proposing and after approval

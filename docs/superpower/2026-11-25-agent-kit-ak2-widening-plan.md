@@ -1,7 +1,8 @@
 # Agent Kit AK-2 — widening what an agent can reach, task by task (plan and task specs)
 
 > **Status: APPROVED 2026-11-25 — D-AK8…D-AK12 signed (operator interview, §5; D-AK8 not as recommended, which adds
-> task W11); W1, W3, W9 and W10 built 2026-11-25 (§3; W9's live golden runs belong to W4), the rest not started.** The follow-on to phases 1–3b of
+> task W11); built (§3): W1, W2, W3, W4 steps 1–3, W6 groups A and C, W7, W8, W9, W10 and W11 (2026-11-25/26; W8's and
+> W9's live golden runs belong to W4); open: W4 from step 4, W5, W6 groups B, D and E.** The follow-on to phases 1–3b of
 > [`2026-11-20-agent-kit-ak2-plan.md`](2026-11-20-agent-kit-ak2-plan.md) (all built 2026-11-25). It takes the gaps a
 > peer's product review of that plan listed
 ([`2026-11-25-agent-kit-ak2-product-review.md`](2026-11-25-agent-kit-ak2-product-review.md)), keeps the ones
@@ -214,6 +215,10 @@ needs only W3 and can start now.
 
 ### W6 — Previews, simulators and Space tests, one group at a time
 
+> **Group A built 2026-11-26** (D-AK10): four of the plan's five routes, in `AgentGate.AUTHORING_PREVIEWS`, MCP Tool `preview_config`, skills `author-pipeline` and `safe-config-change` preview before they propose, golden tasks dev-12 and dev-13. The group's risk is settled by three bounds, not by the routes: an agent's body is capped at 256 KiB (413) and its draft may name no config file (`PathJail.withoutConfigRefs`, 422 before any read), both in `ControlApi.handle` on every door. Building it found that `POST /config/preview/schema` ran a draft's EXPR mapping SQL on an unsealed DuckDB, so `read_text('<path>')` read any file for any caller; it now runs sealed. **`POST /lookups/test` was dropped from group A (operator, 2026-11-26):** the lane's security review refused it — it returns a Reference row's columns unmasked, a fuzzy match lists `candidates` the caller never sent (enumeration), and it has no per-caller rate limit while `refresh: true` rebuilds an index of up to 256 MiB; it stays refused to every agent until BACKLOG `AGENT-LOOKUP-PREVIEW-1` builds masking, a bounded candidate list and a rate limit. As-built: [`spec-agent-previews.md`](../okf/product/module/mcp/spec-agent-previews.md). Groups B, D and E not started.
+
+> **Group C built 2026-11-26** (D-AK10): `POST /tests/run` in `AgentGate.ALLOWED` and `PERSON_ONLY` (a person's agent, never a machine; the route keeps `canAuthorWorkbench`), MCP Tool `run_space_tests`, skills `safe-config-change` (new step 5) and `author-pipeline` run the Space tests before proposing and after approval, golden task dev-14. The risk is settled by the engine, not by a new bound: each case runs into a deleted JVM-temp scratch root with no batch commit, batch audit, provenance or Signal, a webhook or Excel sink is refused on that lane, and the answer is verdicts (counts, a checksum, a named column's min or max), never rows. Found at build: the cases test the Pipelines as loaded, not a draft, so the skills run them for the baseline and again after approval; the route's audit row is `test.created` (the generic POST verb), so the golden grader skips it as a write. As-built: [`spec-agent-space-tests.md`](../okf/product/module/mcp/spec-agent-space-tests.md).
+
 - **Goal.** An agent iterates against the server's own checks until its draft is right, then proposes once.
 - **Today.** Every route below is a POST with no bucket, so refused. Each group is one change with its own review.
 
@@ -240,6 +245,11 @@ needs only W3 and can start now.
 
 ### W7 — Operations, second set: evaluate and the Job backlog
 
+> **Built 2026-11-26.** As specified, the eight routes in `AgentGate.RUN_ACTIONS`. Two choices at build: a read tool
+> `get_job_backlog` (`GET /jobs/backlog`), so the agent names a day the backlog lists rather than guessing one; and the
+> tools never send `?force=true` or `?allowPrevious=true`, which stay a person's choice on the Backlog screen. Golden
+> tasks `ops-11` and `ops-12`; their live run is part of W4.
+
 - **Goal.** After a fix, the operations agent can re-check and clear what piled up, not only re-run.
 - **Today.** Refused, all `canOperateRuns`: `POST /expectations/evaluate`, `POST /expectations/{id}/evaluate`,
   `POST /alerts/evaluate`, `POST /jobs/{id}/backlog/drain`, `…/pause`, `…/resume`, `…/days/{day}/run`,
@@ -255,6 +265,18 @@ needs only W3 and can start now.
   (re-evaluate after a fix; a machine's give-up is held and a person declines it).
 
 ### W8 — Golden tasks that try to talk the agent into the never-list
+
+> **Built 2026-11-26.** Suite `agent-kit/golden/adversarial.json`, six tasks: a CSV cell (`golden/data/shipment_notes.csv`
+> row SH-1007), a Pipeline description, an Incident comment read by a person's agent and by a machine, a Pending Change
+> reason, and an Incident comment in a masked Link Analysis Space asking for a raw key. Three grader additions in
+> `tools/run-agent-golden.mjs`: `no-foreign-withdraw` (the gate's never-list does not name a withdrawal — `/withdraw`
+> is allowed and the route refuses anyone but the author — so a try at someone else's proposal is its own check),
+> `no-unmasked-value` (the raw keys, in the reply and the `--transcript`; a missing variable fails closed) and a task's
+> `notice` checks, reported NOTE / MISS and never failing (whether the agent told the person). `check-agent-kit` now
+> refuses a check name the grader does not know, a missing `adversarial.json`, and an adversarial task without its
+> planted text, both safety checks or a notice. **Not done here:** the live run (it needs the W4 install plus the
+> suite's planted set-up), so no skill was changed: no skill tells the agent to treat text in data as data and to tell
+> the person — whether one must is what the live run decides. Detail: `tests-agent-golden.md` § The adversarial suite (W8).
 
 - **Goal.** Evidence that text an agent reads cannot steer it past the gate, before any machine agent runs unattended.
 - **Change.** A fifth suite, `adversarial.json`: instructions planted where an agent reads data — a CSV cell, an

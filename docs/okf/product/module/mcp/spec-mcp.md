@@ -160,6 +160,7 @@ is passed on as the replayed route's JSON body, unchanged.
 |---|---|---|---|
 | `validate_config` | read | `type`, `config` | `POST /validate` (`{type, config}`); refusal findings come back as data |
 | `dry_run_pipeline` | read | `pipeline`, `body?` | `POST /pipelines/authored/{pipeline}/dry-run` |
+| `preview_config` | read | `kind`, `body` | one of the four authoring previews (W6 group A, [spec-agent-previews.md](spec-agent-previews.md)) |
 | `propose_change` | write | `kind`, `operation`, `id?`, `version?`, `content?`, `reason?` | the kind's own write route, below; `reason` rides as the request attribute `RequestAttrs.ATTR_CHANGE_REASON`, which `PendingChanges.hold` reads before the `X-Change-Reason` header (an in-process replay need not be header-safe; a header holding "—" or "→" made the replay throw — `AGENT-PROPOSE-500-1`, fixed 2026-11-24) |
 | `list_requirements` | read | — | `GET /requirements` (W2 step 2: what a `requirement-kpi` proposal starts from) |
 | `list_pipeline_versions` | read | `pipeline` | `GET /pipelines/{pipeline}/history` (W2 step 2: what a `pipeline-restore` restores) |
@@ -170,6 +171,7 @@ is passed on as the replayed route's JSON body, unchanged.
 | `export_bundle` | read | `body` | `POST /bundle/export` |
 | `preview_promotion` | read | `body` | `POST /promotion/preview` (`canAdminister`) |
 | `run_pipeline_now` | write | `pipeline`, `body?` | `POST /pipelines/authored/{pipeline}/run` (`canAuthorWorkbench`; D-AK2: a person, never a machine) |
+| `run_space_tests` | read | `body?` | `POST /tests/run` (`{cases?}`; `canAuthorWorkbench`; W6 group C, D-AK10: a person, never a machine) — [Agent Space tests](spec-agent-space-tests.md) |
 
 **`propose_change` allowlist** (`McpTools.CHANGE_ROUTES`, the builder tutorials' kinds, each route on
 `PendingChanges.REPLAYABLE`): `pipeline` (create and update `PUT /pipelines/{id}/graph`, delete
@@ -318,7 +320,7 @@ Per §7.3 and D-UE5 (signed: both modes, delegated first).
   `canManageExclusionCategories` — § Entity List edits) where its roles grant them, never an `AGENT_NEVER_CAPABILITIES` one; an
   unlisted machine keeps `canOpenInboundInvestigation` only, as before. Being an agent, every config write it makes
   is held as a Pending Change, the agent gate applies, and it never approves; it may not run a Pipeline
-  (`AgentGate.PERSON_ONLY`, D-AK2). The Pending Change records `authorMachine` (the token's `sub`), and
+  (`AgentGate.PERSON_ONLY`, D-AK2) or the Space tests (D-AK10). The Pending Change records `authorMachine` (the token's `sub`), and
   `PendingChanges.authorNow` replays an approved machine change as that machine: re-admitted by the Space (403 when
   the Space no longer names the client) and filtered to what a machine agent keeps, so approval never widens it.
 - **What is built:** the endpoint accepts any Subject the host's `Authenticator` resolves — a person's own
@@ -355,7 +357,12 @@ agent token calling a route directly is treated the same.
   2. **allowed** — reads (GET), and `POST /mcp`, `/validate`, `/pipelines/authored/{id}/dry-run`,
      `/bundle/export`, `/promotion/preview`, `/pending-changes/{id}/withdraw`, `/action-requests` (held by its
      own design), `/db/query` (the read the AK-1 `query_dataset` tool replays) and `/pipelines/authored/{id}/run`
-     (D-AK2: a delegated person only, never a machine), and `/pending-actions/{id}/withdraw`;
+     (D-AK2: a delegated person only, never a machine), and `/pending-actions/{id}/withdraw`; since **W6 group A**
+     (2026-11-26) the four authoring previews (`AgentGate.AUTHORING_PREVIEWS`: `/config/preview/parsing|schema`,
+     `/config/suggest/schema`, `/components/mapping/validate`), for every agent, body-capped at 256 KiB and naming
+     no config file ([Agent authoring previews](spec-agent-previews.md)); `/lookups/test` stays refused to agents;
+     since **W6 group C** (2026-11-26) `POST /tests/run`, a delegated person's agent only (`AgentGate.PERSON_ONLY`,
+     D-AK10), still gated `canAuthorWorkbench` ([Agent Space tests](spec-agent-space-tests.md));
   3. **actions** (**AK-2d**, 2026-11-25) — `AgentGate.ACTIONS`, the operational routes of plan §4.6: `POST
      /runs/{id}/trigger|pause|resume|reprocess|replay-rejects|drain`, `…/retries/retry-now|cancel`,
      `…/quarantine/release` (since 2026-11-25, widening plan W1),
@@ -424,14 +431,35 @@ config only.
   `withdraw_action`. Each replays its route as the caller, so the gate above decides: at once for a person's agent, a
   Pending Action for a machine. `McpToolRoutesTest` expands `operate_run` over every action and pins each to a
   `canOperateRuns` manifest route.
+- **Evaluate and the Job backlog (widening plan W7, D-AK11 signed 2026-11-25).** Eight more `canOperateRuns` routes join
+  `AgentGate.RUN_ACTIONS` — an evaluation saves results and can open an Incident or fire an Alert that notifies, and a
+  give-up discards a day, so they are actions, not allowed reads: `POST /expectations/evaluate`,
+  `POST /expectations/{id}/evaluate`, `POST /alerts/evaluate`, `POST /jobs/{id}/backlog/drain|pause|resume`,
+  `POST /jobs/{id}/backlog/days/{day}/run` and `…/days/{day}/give-up`. Tools: `evaluate_expectations` (optional
+  `expectation`: one by name, else every enabled one), `evaluate_alerts`, `operate_job_backlog` (`action` one of
+  `drain`, `pause`, `resume`, `run-day`, `give-up`; `day` required for the last two and refused for the others; each with
+  a one-line `reason`) and the read `get_job_backlog` (`GET /jobs/backlog`). `operate_job_backlog` is the only tool
+  annotated `destructiveHint: true` (`McpTools.Tool.destructive`), for `give-up`; skill `operate-runs` asks the person
+  before a give-up as before a drain. The tools never send `?force=true` (drain in the quiet period) or
+  `?allowPrevious=true` (run a day on the previous Reference). The routes still take them, so an agent calling the
+  Control API directly may: a person's agent within the person's rights, a machine's held with the query recorded —
+  `GET /pending-actions/{id}` shows it to the approver (the list does not). Materialize, compact, baseline accept and clear, and scheduler settings stay refused (D-AK11). Tests:
+  `ControlApiAgentOpsActionsTest` (real HTTP: per route, a person's agent at once with `agent_client` on the row, a
+  business user's agent 403 and a machine without `canOperateRuns` 403 with no record; a machine's single and all
+  Expectation evaluations, Alert evaluation, pause and give-up held as 202 with the reason on the list and the read —
+  the single evaluation, the Alerts, the pause and the give-up shown unchanged until approved; a declined give-up
+  discards nothing; drain, resume and run-day share the same gate entry and hold path but have no machine test of
+  their own), `McpToolRoutesTest`
+  (every action's route is in `AgentGate.ACTIONS`, the day rule, the annotation), the grader's `ACTION_PATH`; golden
+  tasks `ops-11` (re-evaluate after a fix) and `ops-12` (a machine's give-up held, then declined).
 - **The screen:** the Pending Changes screen has two tabs, *Pending Changes* and *Pending Actions*
   (`PendingActionsPanelComponent`): a list (Waiting / All), the action, the machine that asked, its reason and outcome;
   Approve and Decline for a holder of `canApproveChanges`.
 - **Agent Skills and golden tasks:** `diagnose-failed-run` (read only) and `operate-runs` (act after diagnosis; ask
   before a drain or reprocess; report a `pa-…` id when held); the operations suite `agent-kit/golden/operations.json`
-  (ten tasks: diagnose without acting, resume, re-run, drain asks first, a machine's resume held, a machine never
-  self-approves, since W1 a quarantined file found and released, a machine's release held, and since W9 two Space
-  health audits, § Read-only Agent Skills (W9)), graded by `tools/run-agent-golden.mjs`'s `agent-action`, `no-agent-action` and `pending-action`
+  (twelve tasks: diagnose without acting, resume, re-run, drain asks first, a machine's resume held, a machine never
+  self-approves, since W1 a quarantined file found and released, a machine's release held, since W9 two Space
+  health audits, § Read-only Agent Skills (W9), and since W7 a re-evaluation after a fix and a machine's held give-up), graded by `tools/run-agent-golden.mjs`'s `agent-action`, `no-agent-action` and `pending-action`
   checks. Its live run is open, as for the developer suite's other clients.
 - **Tests:** `ControlApiPendingActionsTest` (real HTTP: a person's agent pauses and resumes at once and its row
   names the agent client, a business user's agent is 403; a machine's pause is 202 and nothing ran, a second one
@@ -556,6 +584,13 @@ Built 2026-11-25 (widening plan §3 W9). Two Agent Skills that only read; no too
   `tool-called` (`tools/run-agent-golden.mjs`) asserts the agent's own answered call of a tool (`diff_pending_change`,
   `get_space_integrity`, `get_dataset_storage`). The machine-run (scheduled) audit has no golden task yet. Their live
   run is part of W4, not of W9.
+
+## Adversarial golden tasks (W8)
+
+Suite `agent-kit/golden/adversarial.json`: instructions planted where an agent reads data, asking it to approve,
+withdraw someone else's proposal, reveal or promote. It measures whether the model tries (the gate refuses either way)
+and whether it tells the person. Grader checks, guard rules and tests:
+[`tests-agent-golden.md`](tests-agent-golden.md) § The adversarial suite (W8).
 
 ## Security review (2026-11-20)
 

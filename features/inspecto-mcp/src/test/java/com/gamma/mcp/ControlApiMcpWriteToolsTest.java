@@ -162,7 +162,7 @@ class ControlApiMcpWriteToolsTest {
                 assertFalse(byName.get(w).at("/annotations/readOnlyHint").asBoolean(true), w);
                 assertFalse(byName.get(w).at("/annotations/destructiveHint").asBoolean(true), w);
             }
-            for (String r : List.of("validate_config", "dry_run_pipeline", "list_pending_changes", "get_pending_change",
+            for (String r : List.of("validate_config", "dry_run_pipeline", "preview_config", "run_space_tests", "list_pending_changes", "get_pending_change",
                     "diff_pending_change", "export_bundle", "preview_promotion"))
                 assertTrue(byName.get(r).at("/annotations/readOnlyHint").asBoolean(false), r);
             assertEquals(List.of("alert-rule", "dashboard", "decision-rule", "entity-list", "expectation", "job", "notification-channel", "notification-rule",
@@ -222,11 +222,37 @@ class ControlApiMcpWriteToolsTest {
             assertTrue(text(d).startsWith("HTTP 404"), "the dry-run route answered, not the gate: " + text(d));
             JsonNode run = call(c.port, AGENT, "run_pipeline_now", Map.of("pipeline", "no_such_pipeline"));
             assertFalse(text(run).contains("agent client"), "D-AK2: a delegated person may run: " + text(run));
+            JsonNode tests = call(c.port, AGENT, "run_space_tests", Map.of());   // W6 group C: this Space has no cases
+            assertFalse(tests.get("isError").asBoolean(), "D-AK10: a delegated person may run the Space tests: " + text(tests));
+            assertEquals(0, tests.at("/structuredContent/data/total").asInt(-1), text(tests));
 
             String id = call(c.port, AGENT, "propose_change", board("b2")).at("/structuredContent/data/pendingChange/id").asText();
             JsonNode w = call(c.port, AGENT, "withdraw_change", Map.of("change", id));
             assertFalse(w.get("isError").asBoolean(), text(w));
             assertEquals("withdrawn", w.at("/structuredContent/data/pendingChange/status").asText());
+        }
+    }
+
+    /**
+     * W6 group A: an agent previews a draft through {@code preview_config} and gets the route's own answer; a draft that
+     * names a file comes back as the route's 422, refused before the read.
+     */
+    @Test
+    void anAgentPreviewsADraftThroughTheToolAndADraftNamingAFileIsRefused(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            Map<String, Object> draft = new LinkedHashMap<>(Map.of("name", "p", "dirs", Map.of("poll", "in", "database", "out"),
+                    "processing", Map.of("threads", 1),
+                    "parsing", Map.of("frontend", "delimited", "delimited", Map.of("delimiter", ",", "has_header", true))));
+            JsonNode r = call(c.port, AGENT, "preview_config", Map.of("kind", "parsing",
+                    "body", Map.of("config", draft, "sample_text", "id,city\n1,london\n2,paris\n")));
+            assertFalse(r.get("isError").asBoolean(), text(r));
+            assertEquals(2, r.at("/structuredContent/data/rowCount").asInt(), text(r));
+
+            draft.put("processing", Map.of("threads", 1, "schema_file", dir.resolve("any.toon").toString()));
+            JsonNode named = call(c.port, AGENT, "preview_config", Map.of("kind", "parsing",
+                    "body", Map.of("config", draft, "sample_text", "id,city\n1,london\n")));
+            assertTrue(named.get("isError").asBoolean(), text(named));
+            assertTrue(text(named).startsWith("HTTP 422") && text(named).contains("names a file"), text(named));
         }
     }
 

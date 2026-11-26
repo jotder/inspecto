@@ -1,6 +1,6 @@
 ---
 name: safe-config-change
-description: The one way an agent changes a running Inspecto - validate, dry-run, propose, then wait for another person to approve. Use before ANY create, update or delete of a Pipeline, Expectation, Alert Rule, Job, Widget, Dashboard, Decision Rule, Notification Rule or Notification Channel, the KPI of a delivered Requirement, a Pipeline restore, and whenever a change is refused, held or needs to be taken back.
+description: The one way an agent changes a running Inspecto - validate, preview, dry-run, run the Space tests, propose, then wait for another person to approve. Use before ANY create, update or delete of a Pipeline, Expectation, Alert Rule, Job, Widget, Dashboard, Decision Rule, Notification Rule or Notification Channel, the KPI of a delivered Requirement, a Pipeline restore, and whenever a change is refused, held or needs to be taken back.
 ---
 
 # Change Inspecto safely
@@ -25,16 +25,29 @@ approves it. That person is never you and never the person you act for (four eye
    the draft. The answer is `{findings, clean}`. Fix every finding whose severity is an error and validate again.
    Never propose a draft that is not clean. A Decision Rule, a Notification Rule or a Notification Channel has no `validate_config` type: its
    own route checks the content before it holds it, so a bad draft comes back as a 422 naming the field.
-3. **Dry-run** a Pipeline with `dry_run_pipeline`: argument `pipeline` = the Pipeline id, and `body`
+3. **Preview** the parts a draft is made of with `preview_config` before you propose, rather than proposing and
+   reading the refusal: `kind: parsing` parses a raw sample with a Pipeline draft's parsing settings (body
+   `{config, sample_text}`); `kind: suggest-schema` gives the types the server infers from parsed rows (body
+   `{sampleRows}`); `kind: schema` casts rows against a schema draft and runs its mapping (body `{config,
+   sampleRows}`: read `rejectedCount` and `rejectedRows`); `kind: mapping` checks mapping rules (body `{rules}`). Nothing is
+   written. Put the draft inline: a draft that names a file is refused (422 "names a file"), and a body is at most
+   256 KiB — send a sample of rows, not a whole file. Preview until clean.
+4. **Dry-run** a Pipeline with `dry_run_pipeline`: argument `pipeline` = the Pipeline id, and `body`
    `{pipeline: <draft graph>, sampleRows: [...]}`. This is also a
    Pipeline graph's validation: the draft is parsed and validated, then executed on a scratch database; nothing is
    written. Read each step's row count; a step that drops every row is a mistake until proven otherwise.
-4. **Propose** with `propose_change`: `kind` (pipeline, expectation, alert-rule, job, widget, dashboard, decision-rule,
+5. **Run the Space tests** with `run_space_tests` when the change touches a Pipeline (no body runs every case; body
+   `{cases: [names]}` runs those). Each case feeds a Pipeline the case's own sample files and compares what lands with
+   what the case expects; nothing is written. The cases test the Pipelines **as they run now**, not your draft: a case
+   that fails before you propose is not yours to explain away — tell the person, and say it in the `reason`. After the
+   change is approved, run them again and report any case that newly fails. A delegated person's agent only: a machine
+   agent is refused (403 "may not run a Pipeline or the Space tests").
+6. **Propose** with `propose_change`: `kind` (pipeline, expectation, alert-rule, job, widget, dashboard, decision-rule,
    notification-rule, notification-channel; requirement-kpi and pipeline-restore, below), `operation` (create, update, delete; a
    requirement-kpi only creates, a pipeline-restore only restores), `id` (required to update or delete, and to create a Pipeline), `content` (not for a
    delete) and a one-line `reason` of at most 500 characters. The reason is what the approver reads first: say what
    changes and why, in the person's terms.
-5. **Report** the Pending Change id (`pc-…`) to the person and that it waits for another person's approval. Offer
+7. **Report** the Pending Change id (`pc-…`) to the person and that it waits for another person's approval. Offer
    `diff_pending_change` so they can see exactly what the approver will see.
 
 ## What the answers mean
@@ -43,14 +56,16 @@ approves it. That person is never you and never the person you act for (four eye
 |---|---|---|
 | 202 with a Pending Change | held for approval — the expected answer for every agent write | report the id; stop |
 | 403 "an agent client may not call …" | the route is closed to agents (uploads, Dataset registration, settings, access, Apps) | ask the person to do that step in the console |
+| 403 "may not run a Pipeline or the Space tests" | a machine agent; only a delegated person's agent runs them | skip the step and say so |
 | 403 "needs sign-in through an agent client" | the token is the console's, not an agent client's | ask the administrator to register an agent client |
 | 403 "missing capability …" | the person you act for lacks the right | tell the person; never look for another route |
-| 422 | the content is refused; the message names the field | fix it, validate again |
+| 422 | the content is refused; the message names the field | fix it, validate or preview again |
+| 413 | a preview body over 256 KiB | send fewer sample rows |
 | 409 "already pending approval (pc-…)" | your earlier proposal for that id is still waiting | do not propose it again, and do not dodge it under a new id: read it with `get_pending_change`; if it is wrong, `withdraw_change` it, then propose the corrected one |
 | 423 | the install is read-only | stop; tell the person |
 | 500 | a server fault, not your draft | stop after one retry and tell the person, with the reason text |
 
-**One proposal per thing.** Get the draft right with `validate_config` (or a dry run) first; each `propose_change` that
+**One proposal per thing.** Get the draft right with `validate_config`, `preview_config` or a dry run first; each `propose_change` that
 is refused costs a round trip, and each one accepted is a Pending Change a person must read. A Dashboard and its
 Widgets are a few proposals, not dozens.
 
@@ -104,6 +119,8 @@ changes their mind or you proposed something wrong — then propose the correcte
 - `get_pending_change` — one proposal, its author and agent client
 - `diff_pending_change` — the diff the approver reads
 - `validate_config` — the save gate's findings, without saving
+- `preview_config` — a draft's parsing, schema casts or mapping tried on sample data, writing nothing
 - `dry_run_pipeline` — a Pipeline draft run on sample rows, writing nothing
+- `run_space_tests` — the Space's test cases run against its Pipelines as they are, writing nothing
 - `propose_change` — the held write
 - `withdraw_change` — take a proposal back
