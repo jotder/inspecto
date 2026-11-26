@@ -186,6 +186,13 @@ export class ChartMarkersEditorComponent implements OnInit {
         this.rows.markAsDirty();
     }
 
+    /** Add a marker of this kind (a Show-Me suggestion taken in the cog dialog), unless one is there already. */
+    addKind(kind: ChartMarkerKind): void {
+        if (this.rows.controls.some((r) => r.value.kind === kind)) return;
+        this.rows.push(this.row({ kind }));
+        this.rows.markAsDirty();
+    }
+
     remove(i: number): void {
         this.rows.removeAt(i);
         this.rows.markAsDirty();

@@ -107,6 +107,15 @@ export interface InsightPreview {
     skipped?: { dimension: string; reason: string }[];
 }
 
+export type InsightBand = 'normal' | 'elevated' | 'high';
+
+/** The feed's filters, all supported by `GET /insights`. */
+export interface InsightFeedQuery {
+    run?: 'latest' | 'all';
+    band?: InsightBand | null;
+    limit?: number;
+}
+
 export type InsightFeedback = 'useful' | 'not_useful' | 'expected';
 
 @Injectable({ providedIn: 'root' })
@@ -117,9 +126,14 @@ export class InsightsService {
         return this.http.post<ExplainResult>(apiUrl('/insights/explain'), body);
     }
 
-    /** The latest run's Insights of one Insight Profile (404 when no run exists yet or the reader may not view it). */
-    list(profile: string): Observable<InsightFeed> {
-        return this.http.get<InsightFeed>(apiUrl('/insights'), { params: { profile } });
+    /** One Insight Profile's Insights, best score first (404 when no run exists yet or the reader may not view it).
+     *  `run`: the latest run (default) or every run kept; `band`: only that band; `limit`: at most this many. */
+    list(profile: string, opts: InsightFeedQuery = {}): Observable<InsightFeed> {
+        const params: Record<string, string> = { profile };
+        if (opts.run === 'all') params['run'] = 'all';
+        if (opts.band) params['band'] = opts.band;
+        if (opts.limit) params['limit'] = String(opts.limit);
+        return this.http.get<InsightFeed>(apiUrl('/insights'), { params });
     }
 
     /** Replay UNSAVED Profile content over the last `periods` buckets (4-52). */

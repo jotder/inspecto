@@ -24,6 +24,12 @@ if (!getVizComponentLoader('reconciliation')) {
         import('../../reconciliation/recon-view-widget.component').then((m) => m.ReconViewWidgetComponent),
     );
 }
+// BI-INSIGHTS-1: the Insight Feed tile.
+if (!getVizComponentLoader('insight-feed')) {
+    registerVizComponent('insight-feed', () =>
+        import('../insights/insight-feed-widget.component').then((m) => m.InsightFeedWidgetComponent),
+    );
+}
 
 /**
  * The `widget` {@link ComponentKind} — the adoption plan's "VizPlugin = first ComponentKind slice" made

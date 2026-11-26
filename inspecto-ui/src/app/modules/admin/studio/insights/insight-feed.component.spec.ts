@@ -44,6 +44,7 @@ interface Opts {
     work?: boolean;
     dialogResult?: { connection: string; reason: string };
     proposeFails?: boolean;
+    list?: ReturnType<typeof vi.fn>;
 }
 
 function create(opts: Opts = {}) {
@@ -58,7 +59,7 @@ function create(opts: Opts = {}) {
         providers: [
             provideNoopAnimations(),
             provideRouter([]),
-            { provide: InsightsService, useValue: { list: () => of(FEED), feedback: vi.fn() } },
+            { provide: InsightsService, useValue: { list: opts.list ?? (() => of(FEED)), feedback: vi.fn() } },
             {
                 provide: SessionService,
                 useValue: { features: signal(opts.features ?? { insights: true, cases: true, actionRequests: true }) },
@@ -174,5 +175,41 @@ describe('InsightFeedComponent — Case / Action Request (I-17)', () => {
         expect(btn('open-case')!.disabled).toBe(true);
         expect(btn('open-case')!.title).toBe('Needs the Manage Incidents and Cases permission.');
         expect(btn('request-action')!.disabled).toBe(true);
+    });
+});
+
+describe('InsightFeedComponent — history and band filters', () => {
+    it('asks the server for this run or every run, and for one band, and words what it shows', async () => {
+        const list = vi.fn(() =>
+            of({ ...FEED, runs: 4, insights: [{ ...FEED.insights[0], run_at: '2026-11-18T06:00Z' }] }),
+        );
+        const { fixture, el } = create({ list });
+        expect(list).toHaveBeenLastCalledWith('sales', { run: 'latest', band: null });
+        const button = (label: string) =>
+            Array.from(el.querySelectorAll<HTMLButtonElement>('[data-testid="feed-filters"] button')).find(
+                (b) => b.textContent?.trim() === label,
+            )!;
+        expect(button('This run').getAttribute('aria-pressed')).toBe('true');
+        expect(el.querySelector('[data-testid="insight-run"]')).toBeNull();
+        button('Every run').click();
+        fixture.detectChanges();
+        expect(list).toHaveBeenLastCalledWith('sales', { run: 'all', band: null });
+        expect(el.textContent).toContain('Every kept run (4)');
+        expect(el.querySelector('[data-testid="insight-run"]')?.textContent).toContain('2026-11-18');
+        button('High').click();
+        fixture.detectChanges();
+        expect(list).toHaveBeenLastCalledWith('sales', { run: 'all', band: 'high' });
+        expect(button('High').getAttribute('aria-pressed')).toBe('true');
+        expect(el.textContent).toContain('high band');
+        await expectNoA11yViolations(el);
+    });
+
+    it('reloads when the page bumps reload (a scan it started has ended)', () => {
+        const list = vi.fn(() => of(FEED));
+        const { fixture } = create({ list });
+        const n = list.mock.calls.length;
+        fixture.componentRef.setInput('reload', 1);
+        fixture.detectChanges();
+        expect(list.mock.calls.length).toBe(n + 1);
     });
 });
