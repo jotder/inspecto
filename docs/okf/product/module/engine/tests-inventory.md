@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-437 test class(es): 437 unit, 0 real-HTTP control-plane, 0 IT.
+438 test class(es): 438 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -434,6 +434,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `DecisionRuleApplierInjectionTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/DecisionRuleApplierInjectionTest.java` | {@code DECISION-RULE-SQL-GUARD-1}: tries to break out of the write statements |
 | `DuckDbColumnTypeTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/DuckDbColumnTypeTest.java` | The DuckDB-type-name → coarse-type mapping and the set-level temporal tie-break |
 | `ExpressionGuardContractTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/ExpressionGuardContractTest.java` | The cross-language contract for a calculated column's expression grammar: every vocabulary |
+| `ExpressionGuardDuckDbTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/ExpressionGuardDuckDbTest.java` | EXPRESSION-GUARD-ESTRING-1: {@link ExpressionGuard} must lex a fragment the way DuckDB 2.0.1.0 does, or text the |
 | `ExpressionGuardTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/ExpressionGuardTest.java` | {@link ExpressionGuard} (DAT-5): the accept set (arithmetic, whitelisted scalar functions, CASE flow, <!-- vocab-allow: quoted Javadoc --> |
 | `KpiDefinitionTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/KpiDefinitionTest.java` | `ASSURE-KPI-DEFINITIONS-1` — the pure half of a KPI: structural validation (fail closed), the RAG band at its |
 | `KpiEvaluatorTest` | `com.gamma.query` | unit | `platform/inspecto-engine/src/test/java/com/gamma/query/KpiEvaluatorTest.java` | `ASSURE-KPI-DEFINITIONS-1` — a KPI evaluated through the real DuckDB sandbox: the window filters on the time field |

@@ -82,6 +82,9 @@ read-shaped exemptions, like `POST /bi/query`: what guards them is the Dataset's
 - **Accepted residuals:** pages and Break lists are ordered by the raw key, so their order follows the raw key's order.
   When one side's Dataset classifies the key and the other's does not, `/recon/rows` shows the unclassified side's raw
   value next to the alias, linking the two; the caller can read that side raw through `/bi/query` anyway.
+- **Not covered yet (`RECON-STATE-READS-UNMASKED-1`):** `GET /recon/state`, `GET /recon/{id}/state`,
+  `GET /recon/promoted` and the answer of `POST /recon/{id}/record` return recorded Break keys raw, and the two state
+  reads do not ask `canView` of the Reconciliation.
 
 ## Limits
 

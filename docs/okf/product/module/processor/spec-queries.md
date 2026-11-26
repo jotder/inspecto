@@ -65,7 +65,19 @@ A calculated column is caller-authored SQL **fragment** text spliced inside the 
 
 * **`ExpressionGuard.check(expr)`** validates with three cooperating rules: (1) a **closed token
   alphabet** (plain identifiers, numeric/single-quoted literals, arithmetic/comparison operators,
-  parens, commas — no semicolons, double quotes, comments, backslashes; 500-char cap); (2) a
+  parens, commas — no semicolons, double quotes, `$`, comments, or a backslash outside a string; 500-char
+  cap). A string literal must not touch a preceding letter, digit or `_` (`EXPRESSION-GUARD-ESTRING-1`,
+  fixed 2026-11-26): DuckDB reads `E'…'` as an escape string where `\'` is a quote, and `X'…'`, `B'…'`,
+  `N'…'` (also `1e'…'`, re-lexed after a number) as other literal kinds, so the guard used to end
+  `E'\'''` where DuckDB kept it open and the rest ran as SQL — through a Reconciliation side filter for
+  any caller who could view the side, and through a calculated column for a Dataset author. A standard
+  string keeps every backslash as text in both lexers (`regexp_matches(c, '\d+')` stays legal). For
+  the same reason a number must not touch a following letter, digit or `_`: DuckDB reads `1e1from` as
+  `1e1 FROM`, so a denied keyword glued to a number used to reach DuckDB unseen (no exploit found, but
+  rule 2 did not hold); `1e3`, `0x1F` and `1_000` are refused, plain `1.5` stays legal.
+  `ExpressionGuardDuckDbTest` splices every accepted fragment of a prefix × escape × tail corpus plus
+  20,000 seeded random fragments into a SELECT and asserts DuckDB's own parse tree
+  (`json_serialize_sql`) is still that one SELECT; (2) a
   **keyword deny-set** for bare identifiers (`select from where … drop create attach copy pragma …`)
   — this kills scalar-subquery smuggling; (3) a **function-call whitelist** (`abs round coalesce
   upper substr cast try_cast …`) — `read_parquet(`, `glob(`, UDFs are rejected by name; `cast` types
