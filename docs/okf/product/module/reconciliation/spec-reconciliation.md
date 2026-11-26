@@ -58,6 +58,31 @@ entries (scope, days, prune, stats). Keys carry the input fingerprint (spec plus
 changed file or config is a new key. No fingerprint (view-backed or virtual Dataset, or more than 50 000 input files
 per side) = not cached. `weigh` is an estimate, measured 1.17x the retained heap on a 200k-key 3-way day (`ReconDayWeighMeasureTest`, `RECON_PERF=1`).
 
+## Access and masking
+
+`RECON-READ-UNGATED-1` (fixed 2026-11-26). `POST /recon/columns`, `/recon/run`, `/recon/breaks` and `/recon/rows` stay
+read-shaped exemptions, like `POST /bi/query`: what guards them is the Dataset's own sharing and the caller's masking.
+
+- **Sharing.** Every side named by the config (`ReconConfigLoader.datasetIds`) must pass `ComponentAccess.canView`
+  before any SQL runs, else the same 404 `unknown dataset '<id>'` as an absent Dataset, so a shared-away id cannot be
+  told from a missing one. A saved Reconciliation read by `id` must be viewable too. The check is explicit, not inside
+  the resolve lookups, because `ReconDay` reuses a resolved spec across callers. `POST /recon/{id}/record` shares the
+  same check.
+- **Masking per side.** For a caller without `canRevealLinkEntities`, each side gets the masking `/bi/query` would apply
+  to its Dataset (`DatasetCellMasking`, the control plane's public facade over `BiResultMasking`). A key column is
+  masked when any side hides its physical column; `/recon/rows` masks each side's raw rows by that side's Dataset and
+  masks the echoed key. A masked cell is the Space alias (`masked:<hex>`), the token every other read shows.
+- **After the cache.** `ReconDay.Cache` holds the raw answer, shared across callers; masking runs on a copy after the
+  cache read, so one caller's raw answer never reaches another.
+- **Refused for a caller who cannot reveal (422):** a `sum` Measure or the carried Break impact over a hidden column (it
+  returns the column's values, as `/bi/query` refuses); a side `filters` expression with any word naming a hidden
+  column (a prefix `LIKE` bisects the raw values, a failed cast prints one; with an untraceable lineage every undeclared
+  word counts; an internal `__` name such as the side view `__recon_b` is refused outright, since it reads the whole row); and a `masked:` alias sent as a `path` or `key` value of a hidden key column (it matches no raw value;
+  the UI shows the reason). A raw key value is accepted (D-AK15).
+- **Accepted residuals:** pages and Break lists are ordered by the raw key, so their order follows the raw key's order.
+  When one side's Dataset classifies the key and the other's does not, `/recon/rows` shows the unclassified side's raw
+  value next to the alias, linking the two; the caller can read that side raw through `/bi/query` anyway.
+
 ## Limits
 
 | Constant | Value | Where |

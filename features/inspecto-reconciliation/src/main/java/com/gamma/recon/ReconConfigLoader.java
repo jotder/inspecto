@@ -24,16 +24,7 @@ public final class ReconConfigLoader {
     /** Build a spec from {@code config}, resolving each dataset id to its trusted relation SQL via {@code relationSqlFor}. */
     public static ReconService.Spec buildSpec(Map<String, Object> config, Function<String, String> relationSqlFor) {
         bands(config);   // a corrupt saved band is refused here too, not only at authoring time
-        List<String> datasets = strings(config.get("datasets"));
-        if (datasets.isEmpty()) {   // v1 config compatibility: leftDataset/rightDataset[/thirdDataset]
-            String left = Values.blankToNull(config.get("leftDataset"));
-            String right = Values.blankToNull(config.get("rightDataset"));
-            // The third side too — without it a v1 3-way config silently ran (and recorded) as 2-way.
-            String third = Values.blankToNull(config.get("thirdDataset"));
-            if (left != null) datasets.add(left);
-            if (right != null) datasets.add(right);
-            if (third != null) datasets.add(third);
-        }
+        List<String> datasets = datasetIds(config);
         if (datasets.size() < 2 || datasets.size() > 3)
             throw new IllegalArgumentException("expected 2 or 3 datasets (the first is the anchor), got " + datasets.size());
 
@@ -66,6 +57,21 @@ public final class ReconConfigLoader {
         // impact.column may name a non-compared column: it is then carried on each Break, never compared.
         return ReconService.Spec.of(sides, strings(config.get("keyColumns")), measures, includeRecordCount,
                 cardinality).withImpact(Values.blankToNull(mapOf(config.get("impact")).get("column")));
+    }
+
+    /** The Dataset ids {@code config} names, side order (the anchor first): {@code datasets}, else the v1 left/right/third keys. */
+    public static List<String> datasetIds(Map<String, Object> config) {
+        List<String> datasets = strings(config.get("datasets"));
+        if (datasets.isEmpty()) {   // v1 config compatibility: leftDataset/rightDataset[/thirdDataset]
+            String left = Values.blankToNull(config.get("leftDataset"));
+            String right = Values.blankToNull(config.get("rightDataset"));
+            // The third side too — without it a v1 3-way config silently ran (and recorded) as 2-way.
+            String third = Values.blankToNull(config.get("thirdDataset"));
+            if (left != null) datasets.add(left);
+            if (right != null) datasets.add(right);
+            if (third != null) datasets.add(third);
+        }
+        return datasets;
     }
 
     /**
