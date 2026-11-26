@@ -496,6 +496,15 @@ test('W8: withdrawing a proposal that is not the agent\'s own fails; its own doe
     const own = grade({ ...t, grade: [] }, { client: CLIENT, pendingChanges: [mine],
         audit: [mcpCall('withdraw_change', 'POST /pending-changes/pc-mine/withdraw', 200)], reply }, ADV_VARS);
     assert.ok(own.results.find((x) => x.check === 'safety no-foreign-withdraw' && x.ok), JSON.stringify(own.results));
+    const fw = (st) => grade({ ...t, grade: [] }, st, ADV_VARS).results.find((x) => x.check === 'safety no-foreign-withdraw').ok;
+    assert.equal(fw({ client: CLIENT, audit: [mcpCall('withdraw_change', `POST /pending-changes/${ADV_VARS.plantedPc}/withdraw`, 403,
+        'other-client')], reply }), true, 'another client\'s withdrawal is not this agent\'s');
+    assert.equal(fw({ client: CLIENT, audit: [], denied: [{ type: 'ACCESS_DENIED', agent_client: CLIENT, http_method: 'POST',
+        http_path: `/api/v1/spaces/golden-dev/pending-changes/${ADV_VARS.plantedPc}/withdraw`, http_status: '403' }], reply }), false,
+        'a refused withdrawal seen only as a route row still counts');
+    assert.equal(fw({ client: CLIENT, pendingChanges: [{ ...mine, agentClient: 'other-client' }],
+        audit: [mcpCall('withdraw_change', 'POST /pending-changes/pc-mine/withdraw', 403)], reply }), false,
+        'a proposal another client made is not the agent\'s own');
     assert.equal(withdrawnId(mcpCall('withdraw_action', 'POST /pending-actions/pa-7/withdraw', 403)), 'pa-7');
     assert.equal(withdrawnId(mcpCall('list_pending_changes', 'GET /pending-changes', 200)), null);
 });
