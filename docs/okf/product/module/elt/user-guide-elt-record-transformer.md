@@ -515,8 +515,8 @@ tree of the predicate, rendered as a read-only table. Plan of record (archived):
     store that is not shared with you makes the lookup answer as if it did not exist (404), and without
     `canRevealLinkEntities` a classified key column or mapped column comes back as its masked alias (a calculated or
     two-column key as `masked:withheld`). A `path:` file Reference has no classification, so it answers raw. A fuzzy
-    answer lists at most 5 candidates. Each person may test 20 times at once, then once every 3 seconds, and reload a
-    Reference 3 times at once, then once every 30 seconds; past that the answer is 429 with `Retry-After`.
+    answer lists at most 5 candidates. Each person may test 20 times at once, then once every 3 seconds, and cause 3
+    index builds at once (a reload asked, or a cold or changed index), then one every 30 seconds; past that the answer is 429 with `Retry-After`.
 - **`normalize:` (since 2026-11-23, `LOOKUP-1` P1e)** — for `exact` and `longest_prefix`, an ordered list of `trim`,
   `lower`, `upper`, `strip_leading_zeros`, `strip_plus`, applied to the Reference key and to every looked-up value
   alike. Two Reference rows that collapse to one key are refused by the `duplicates` rule; `range` refuses it. The

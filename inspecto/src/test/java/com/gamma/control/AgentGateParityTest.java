@@ -102,7 +102,7 @@ class AgentGateParityTest {
 
     /**
      * W6 group A (D-AK10): the four authoring previews are allowed to every agent — read-shaped exemptions, none
-     * person-only. {@code /lookups/test} is not one (unmasked Reference values, no rate limit: operator 2026-11-26).
+     * person-only. {@code /lookups/test} is not one: refused to agents until AGENT-LOOKUP-PREVIEW-1 (operator 2026-11-26).
      */
     @Test
     void theAuthoringPreviewsAreAllowedToEveryAgent() {

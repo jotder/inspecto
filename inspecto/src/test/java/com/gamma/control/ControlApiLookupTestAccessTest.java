@@ -229,6 +229,28 @@ class ControlApiLookupTestAccessTest {
         }
     }
 
+    /** Verification probe: a classified Dataset over the store under any spelling (store/table, case, sourceName) masks too. */
+    @Test
+    void aDatasetOverTheStoreUnderAnotherSpellingStillMasks(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            List<Map<String, Object>> classified = List.of(Map.of("name", "msisdn", "classification", "MSISDN"),
+                    Map.of("name", "owner_msisdn", "classification", "MSISDN"), Map.of("name", "region"));
+            List<Map<String, Object>> spellings = List.of(
+                    Map.of("physicalRef", "region_dim/region_dim", "columns", classified),
+                    Map.of("physicalRef", "REGION_DIM", "columns", classified),
+                    Map.of("sourceName", "region_dim", "sql", "SELECT * FROM region_dim", "columns", classified));
+            for (Map<String, Object> ds : spellings) {
+                new ComponentStore(c.root.resolve("registry")).write("dataset", "regions", ds);
+                HttpResponse<String> r = test(c, AUTHOR, c.exact, KEYS.get(0), "");
+                JsonNode a = ok(r);
+                assertNoRaw(r.body().replace("\"compared\":\"" + KEYS.get(0) + "\"", ""));
+                assertTrue(a.get("matchedKey").asText().startsWith("masked:"), ds + " -> " + a);
+                assertTrue(a.get("mappings").get(0).get("columns").get("ID_owner_msisdn").asText().startsWith("masked:"),
+                        ds + " -> " + a);
+            }
+        }
+    }
+
     @Test
     void aDatasetOverTheReferenceThatTheCallerCannotViewIsAsAbsentAsAnUnknownStep(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, STEPS, Map.of("owner", "someone-else", "shares", List.of()))) {
@@ -273,8 +295,9 @@ class ControlApiLookupTestAccessTest {
     @Test
     void repeatedReloadsAndRepeatedCallsAre429WithRetryAfter(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
+            // every build spends the build budget (burst 3): the cold build, then two asked reloads
             assertEquals("first use", ok(test(c, FULL, c.exact, KEYS.get(0), "")).get("index").get("reloaded").asText());
-            for (int i = 0; i < 3; i++)
+            for (int i = 0; i < 2; i++)
                 assertEquals("reload asked", ok(test(c, FULL, c.exact, KEYS.get(0), ",\"refresh\":true"))
                         .get("index").get("reloaded").asText());
             HttpResponse<String> refused = test(c, FULL, c.exact, KEYS.get(0), ",\"refresh\":true");
@@ -285,7 +308,7 @@ class ControlApiLookupTestAccessTest {
                     .get("index").get("reloaded").asText());
             ok(test(c, FULL, c.exact, KEYS.get(0), ""));
 
-            // every call: the standard burst of 20 per caller (2 plain calls and 4 reload calls, the refused one included, spent above)
+            // every call: the standard burst of 20 per caller (2 plain and 3 reload calls, the refused one included, spent above)
             int answered = 0;
             HttpResponse<String> last = null;
             for (int i = 0; i < 25; i++) {
@@ -294,7 +317,17 @@ class ControlApiLookupTestAccessTest {
                 answered++;
             }
             assertEquals(429, last.statusCode(), last.body());
-            assertEquals(20 - 6, answered, "the burst is 20 calls per caller");
+            assertEquals(20 - 5, answered, "the burst is 20 calls per caller");
+
+            // a cold index is a build too (dropped from the 8-slot cache): AUTHOR spent one build above, so two more
+            // cold plain tests build and the third is refused - only refresh: true being charged would let it through
+            for (int i = 0; i < 2; i++) {
+                LookupRoutes.dropWarmForTest();
+                assertEquals("first use", ok(test(c, AUTHOR, c.exact, KEYS.get(0), "")).get("index").get("reloaded").asText());
+            }
+            LookupRoutes.dropWarmForTest();
+            HttpResponse<String> cold = test(c, AUTHOR, c.exact, KEYS.get(0), "");
+            assertEquals(429, cold.statusCode(), "a cold rebuild spends the build budget: " + cold.body());
         }
     }
 }

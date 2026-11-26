@@ -85,7 +85,7 @@ final class LookupRoutes implements RouteModule {
                 if (!BuiltinNodeType.TRANSFORM_JOIN.type().equals(n.type()) || !keyed(n)) continue;
                 if (built++ >= MAX_WARM) return;
                 try {
-                    warmUp(api, cfg.identity().pipelineName(), n, false);
+                    warmUp(api, cfg.identity().pipelineName(), n, false, () -> {});
                 } catch (RuntimeException refused) {
                     log.warn("lookups: preloading {}/{} refused: {}", cfg.identity().pipelineName(), n.id(),
                             refused.getMessage());
@@ -103,7 +103,8 @@ final class LookupRoutes implements RouteModule {
      *
      * @throws ApiException 422 when the point engine refuses the join
      */
-    private static Warmed warmUp(ApiContext api, String pipeline, PipelineNode node, boolean refresh) {
+    private static Warmed warmUp(ApiContext api, String pipeline, PipelineNode node, boolean refresh,
+                                 Runnable beforeBuild) {
         String key = pipeline + "/" + node.id();
         Map<String, Object> config = new LinkedHashMap<>(node.config());
         Warm warm;
@@ -119,6 +120,7 @@ final class LookupRoutes implements RouteModule {
                 : stamp != null && !stamp.equals(warm.stamp()) ? "reference changed"
                 : null;
         if (reason != null) {
+            beforeBuild.run();   // a 429 here leaves the kept index as it was
             BUILDING.add(key);
             try {
                 warm = new Warm(config, PointLookup.load(node, refs), stamp);
@@ -175,12 +177,17 @@ final class LookupRoutes implements RouteModule {
         reloads = reloadLimiter();
     }
 
+    /** For tests: drop every warm index (as the 8-slot cache evicts), keeping every caller's budgets. */
+    static void dropWarmForTest() {
+        synchronized (WARM) { WARM.clear(); }
+    }
+
     /** Fuzzy {@code candidates} served per answer, at most (D-AK16): the rest are dropped, never listed. */
     static final int MAX_CANDIDATES = 5;
 
     /** Every test, per caller: the budget of the other expensive reads ({@code /db/query}), so keys cannot be guessed at speed. */
     static volatile RateLimiter calls = RateLimiter.standard();
-    /** A {@code refresh: true} test, per caller: burst 3, then one reload every 30 s - each rebuilds an index of up to 256 MiB. */
+    /** A test that builds the index (asked, cold, evicted, changed), per caller: burst 3, then one every 30 s - up to 256 MiB each. */
     static volatile RateLimiter reloads = reloadLimiter();
 
     private static RateLimiter reloadLimiter() { return new RateLimiter(3.0, 1.0 / 30.0); }
@@ -204,7 +211,7 @@ final class LookupRoutes implements RouteModule {
      * <p>LOOKUP-TEST-OPEN-READ-1: needs {@code canAuthorWorkbench}; 404 (as an unknown Step) when a Dataset over the
      * Reference's store is not viewable by the caller; the matched key, the mapped columns and at most
      * {@link #MAX_CANDIDATES} fuzzy candidates are masked as {@code /bi/query} masks them ({@link #masking}); 429 past
-     * the per-caller {@link #calls} budget, or the {@link #reloads} budget for {@code refresh: true}.
+     * the per-caller {@link #calls} budget, or the {@link #reloads} budget for a call that builds the index.
      */
     private static Object test(ApiContext api, HttpExchange ex, Map<String, Object> body) throws Exception {
         String caller = ApiContext.subject(ex).map(com.gamma.spi.auth.Subject::id).orElseGet(() -> {
@@ -243,8 +250,8 @@ final class LookupRoutes implements RouteModule {
         if (mask == null)   // a Dataset over the Reference is shared away from the caller: as absent as an unknown Step
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no keyed lookup '" + step + "' in pipeline '" + pipeline + "'");
         boolean refresh = Boolean.TRUE.equals(body.get("refresh"));
-        if (refresh) charge(ex, reloads, caller, "a lookup reload (refresh: true)");
-        Warmed w = warmUp(api, pipeline, node, refresh);
+        // every build this call causes (asked, cold, evicted, changed) spends the build budget, not only refresh: true
+        Warmed w = warmUp(api, pipeline, node, refresh, () -> charge(ex, reloads, caller, "a lookup index build"));
         Warm warm = w.warm();
         String reason = w.reason(), stamp = w.stamp();
         String valStr = value == null ? null : value.toString();
@@ -320,16 +327,25 @@ final class LookupRoutes implements RouteModule {
      * classification (no Dataset or Pipeline schema describes the file), so nothing in it is masked: its readers can
      * already dry-run a Pipeline over the same file.
      */
-    private record Masking(BiResultMasking bi, List<String> keyColumns) {
+    private record Masking(List<BiResultMasking> bis, List<String> keyColumns) {
+        /** The first masking that hides {@code column}, or {@code null}: strictest wins across the Datasets on the store. */
+        private BiResultMasking hiding(String column) {
+            for (BiResultMasking bi : bis) if (bi.hidesFromCaller(column)) return bi;
+            return null;
+        }
+
         Object column(String column, Object value) {
-            return bi == null || value == null ? value : bi.cell(column, value);
+            BiResultMasking bi = value == null ? null : hiding(column);
+            return bi == null ? value : bi.cell(column, value);
         }
 
         /** The matched key: masked when a column it is read from ({@code key}, or {@code from} / {@code to}) is hidden. */
         Object key(Object value) {
-            if (bi == null || value == null) return value;
-            for (String k : keyColumns)   // range and asof keys join two columns: withheld, never one column's alias
-                if (bi.hidesFromCaller(k)) return keyColumns.size() == 1 ? bi.cell(k, value) : BiResultMasking.UNLINKABLE;
+            if (value == null) return null;
+            for (String k : keyColumns) {   // range and asof keys join two columns: withheld, never one column's alias
+                BiResultMasking bi = hiding(k);
+                if (bi != null) return keyColumns.size() == 1 ? bi.cell(k, value) : BiResultMasking.UNLINKABLE;
+            }
             return value;
         }
     }
@@ -354,22 +370,30 @@ final class LookupRoutes implements RouteModule {
             // the build refuses it (422) before anything is answered
         }
         Path writeRoot = api.writeRoot();
-        if (ref == null || writeRoot == null) return new Masking(null, keyColumns);   // no registry, no classification
+        if (ref == null || writeRoot == null) return new Masking(List.of(), keyColumns);   // no registry, no classification
         // the stores the Reference is: the producing Pipeline's name and its Stream (PipelineSchemas.producers' rule)
         java.util.Set<String> stores = new java.util.LinkedHashSet<>();
         stores.add(ref);
         for (PipelineConfig p : loaded)
             if (p.identity().pipelineName().equals(ref) && p.stream() != null) stores.add(p.stream());
         ComponentStore registry = new ComponentStore(writeRoot.resolve("registry"));
-        for (ComponentRegistry.Component d : registry.list("dataset"))
-            if (readsStore(d.content(), stores) && !ComponentAccess.canView(ex, d.content())) return null;
-        // a Dataset over both stores, so the lineage reads the Datasets on either and the producing Pipeline's schema
+        ViewStore views = new ViewStore(writeRoot.resolve("views"));
+        boolean reveal = BiResultMasking.mayReveal(ex);
+        List<BiResultMasking> bis = new ArrayList<>();
+        // each Dataset on the store masks as a read of it would (its own columns, whatever spelling of the store: a
+        // store/table ref, another case, a sourceName), and the caller must be able to view every one
+        for (ComponentRegistry.Component d : registry.list("dataset")) {
+            if (!readsStore(d.content(), stores)) continue;
+            if (!ComponentAccess.canView(ex, d.content())) return null;
+            bis.add(BiResultMasking.of(writeRoot, registry, views, d.name(), d.content(), reveal));
+        }
+        // ...and a Dataset over both stores, so the lineage also reads the producing Pipeline's schema
         Map<String, Object> overStore = new LinkedHashMap<>();
         java.util.Iterator<String> it = stores.iterator();
         overStore.put("physicalRef", it.next());
         if (it.hasNext()) overStore.put("sourceName", it.next());
-        return new Masking(BiResultMasking.of(writeRoot, registry, new ViewStore(writeRoot.resolve("views")),
-                "(lookup " + ref + ")", overStore, BiResultMasking.mayReveal(ex)), keyColumns);
+        bis.add(BiResultMasking.of(writeRoot, registry, views, "(lookup " + ref + ")", overStore, reveal));
+        return new Masking(bis, keyColumns);
     }
 
     /** {@code dataset} reads one of {@code stores} directly (its {@code physicalRef} or {@code sourceName}, by its head). */
