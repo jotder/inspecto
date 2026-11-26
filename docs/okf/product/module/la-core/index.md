@@ -39,7 +39,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `ADD-DATA-DUPLICATE-CHECK-UI-1` | P3 | feature | Add data cannot set a Basic import's duplicate check (duplicate.mode, on_change); only the Pipelines editor's Collector stage can (filed… | operator |
 | `BASIC-ELT-DUPLICATES-1` | P3 | chore | Basic and ELT duplications Phase 0 found and the build left (filed 2026-11-20, BASIC-ELT-PROFILE-1 close). | — |
 | `WATCH-KEEP-TWO-CONTROLS-1` | P3 | defect | On Standard a watched folder offers two controls for one schedule (filed 2026-11-19, BASIC-ELT-PROFILE-1 U4-Watch review). | — |
-| `AGENT-AUDIT-EXPAND-VALUE-1` | P2 | defect | Design §3.6.2 (D-AK19) says no body value is written to an audit row on any DATA_ROUTES entry and calls it the current behaviour, but POS… | operator |
 | `LA-FULL-CYCLE-RESIDUALS-1` | P3 | chore | Items 6 (shared Preview Spaces re-bake & admin roster conflict) and 8a (la-guide-02-create-space.png live browser screenshot) remain afte… | — |
 | `LA-TRAINING-SERIES-1` | P3 | feature | An Inspecto LA user training video series of 41 episodes. | operator |
 | `LA-CASE-VIDEOS-2` | P3 | feature | Re-specify and re-record the twenty industry case films to the training-series standard. | operator |

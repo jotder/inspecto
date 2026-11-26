@@ -66,15 +66,19 @@ One token bucket per **agent client and subject** (`AgentGate.agentBudgetKey`: `
 a person's agent never spends the person's own budget and two agent clients of one person never share. Each data-route
 call spends its weight at **both doors**: `ControlApi.chargeAgentBudget` runs in `routeDispatch` after the agent gate
 and in `replay` (the MCP replay used to skip the rate-limit stage). Past the budget: **429** `RATE_LIMITED` with
-`Retry-After`; the direct refusal is audited as `access.denied`. A weighted call spends its whole weight or nothing
+`Retry-After`, the seconds until the route's whole weight is back (`RateLimiter.retryAfterSeconds(key, weight)`);
+the direct refusal is audited as `access.denied`. A weighted call spends its whole weight or nothing
 (`RateLimiter.tryConsume(key, weight)`).
 
 - **Install settings.** `rate.agent_burst` (default **60**, range 1–6 000) and `rate.agent_per_s` (default **0.5**,
   0.01–1 000) in the server-wide `la-limits.toon`, next to the Link Analysis `rate.*` items (`LaLimit`), else the
   system properties `control.rateLimit.agent.capacity` / `.refillPerSecond`. `PUT /system/link-analysis/limits` and
   boot re-apply them (`applyInstallRateLimits`); an unchanged budget keeps its buckets. ⚠ The defaults are this change's
-  choice (the design names no number): sixty page reads at once, then one every 2 s, the Link Analysis pace. A burst
-  set below a route's weight refuses that route always — relevant once a weight-20 route joins.
+  choice (the design names no number): sixty page reads at once, then one every 2 s, the Link Analysis pace.
+- **Never a burst a route cannot pay.** `PUT /system/link-analysis/limits` answers 422 for a `rate.agent_burst` below the
+  heaviest `DATA_ROUTES` weight (`AgentGate.burstProblem`); a lower value from a hand-edited document or the system
+  property is raised to that weight with a warning (`RateLimiter.agent`). Today every route weighs 1, the setting's
+  minimum, so the 422 is proven by unit test only (`RateLimiterBudgetTest`).
 - **The other buckets.** The existing per-route buckets (`/db/query` standard, `/mcp`, the Link Analysis bucket) still
   apply to an agent, now keyed by the same `agent:<client>:<subject>` key instead of the person's id. So an agent's call
   is never less limited than before, and never touches the person's buckets. A person's request is unchanged.
@@ -82,18 +86,21 @@ and in `replay` (the MCP replay used to skip the rate-limit stage). Past the bud
 ## Cost and audit
 
 - **Cost (D-AK18).** No agent sandbox and no agent row cap: an agent's call runs with exactly a person's limits.
-- **Audit (D-AK19).** No new row. The MCP call keeps its `mcp.tool.called` row. "No body value in an audit row or log
-  line" is tested for `POST /db/query` only. ⚠ It does **not** hold on every data route: `POST /inv/projection/neighbors`
-  writes the expanded key, resolved from its alias, into the `link.expanded` row's `value` (`InvRoutes`, pinned for people
-  by `ControlApiInvProjectionTest`) — open as `AGENT-AUDIT-EXPAND-VALUE-1`, waiting on an operator decision. ⚠ Accepted:
-  an agent's direct REST call to a read-shaped route leaves no audit row.
+- **Audit (D-AK19).** No new row. The MCP call keeps its `mcp.tool.called` row. No raw value an agent sent or was
+  answered in reaches an audit or event row or a log line, tested on `POST /db/query` and on all 16 Link Analysis data
+  routes. Two rows named a caller's entity in clear: `link.expanded` (`value`, from `/inv/projection/neighbors` in both
+  forms) and `link.traversed` (`startNode`, `targetNode` and the message, from `/inv/traversal/recursive-paths`). For an
+  agent they now keep the **alias** (`InvRoutes.auditedValue`, operator 2026-11-26, `AGENT-AUDIT-EXPAND-VALUE-1`); a
+  person's rows are unchanged and keep the raw key, as `ControlApiInvProjectionTest` pins. In a Space whose masking mode
+  is `none` the alias is the value itself (D-AK14). ⚠ Accepted: an agent's direct REST call to a read-shaped route leaves
+  no audit row.
 
 ## Tests
 
 | Test | Proves | Falsified by (2026-11-26) |
 |---|---|---|
 | `ControlApiAgentDataSeamTest` (`features/inspecto-mcp`) | `/db/query` on both doors: an agent's answer masked and stamped; with every stamp a no-op (`AnswerMasking.ignoreStampsForTest`) 500 on both doors with no row, a person unchanged; a `none` Space answers raw; the budget 429 on each door, per client, the person's own burst of 20 untouched; no request value in any audit row or log line, the `mcp.tool.called` row present | removing the seam check; the direct or the replay charge; keying the rate limit or the budget by the person's id; the `BiResultMasking` stamp |
-| `ControlApiAgentLinkAnalysisSeamTest` (`la/inspecto-geo-link`) | each of the 16 Link Analysis data routes answers an agent 200 with no raw id; unstamped, each answers 500 with no value while a person still gets 200 | removing the seam check; the `ExplorationMasking` stamp |
+| `ControlApiAgentLinkAnalysisSeamTest` (`la/inspecto-geo-link`) | each of the 16 Link Analysis data routes answers an agent 200 with no raw id; unstamped, each answers 500 with no value while a person still gets 200; across all 16, no event row or log line written for the agent holds a raw id, and its `link.expanded` row keeps the alias | removing the seam check; the `ExplorationMasking` stamp; `auditedValue` returning the raw key |
 | `AgentDataRoutesParityTest` (`inspecto`) | every data route agent-allowed and weighted; every allowed write route classified; every data route has its proving test; weight and key for agents only | — |
 | `AnswerMaskingTest` (`inspecto-util`), `RateLimiterBudgetTest#theAgentBudgetSpendsByWeightAllOrNothing` | scope nesting, other-thread stamps unseen, 2xx-only refusal; weighted all-or-nothing spend, default burst 60 | — |
 

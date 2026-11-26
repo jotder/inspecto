@@ -41,7 +41,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `RULE-TEMPLATE-SIMULATE-SHARING-1` | P3 | defect | Rule Template simulate skips ComponentAccess.canView on its source Dataset | — |
 | `DB-QUERY-STORE-SHARING-1` | P3 | chore | verify: may a /db/query store read reach a shared-away Dataset? | — |
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
-| `AGENT-AUDIT-EXPAND-VALUE-1` | P2 | defect | Design §3.6.2 (D-AK19) says no body value is written to an audit row on any DATA_ROUTES entry and calls it the current behaviour, but POS… | operator |
 | `AGENT-GET-DATA-READS-1` | P2 | defect | GET routes are all allowed to agents and sit outside the W6 S0 seam: no masked-answer stamp and no agent budget. | operator |
 | `MACHINE-CLIENT-CONSOLE-1` | P3 | feature | a Space's admitted machine clients (identity.machineClients) and attribute claims are set only through PUT /access/roles; the Roles scree… | — |
 | `AUDIT-ACTION-VERBS-1` | P3 | defect | A run's quarantine release, drain, retry-now and retry cancel, and a Job Run replay, are audited as pipeline.created / job.created (categ… | — |

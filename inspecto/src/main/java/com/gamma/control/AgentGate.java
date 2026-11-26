@@ -195,6 +195,29 @@ final class AgentGate {
         DATA_ROUTES = Map.copyOf(m);
     }
 
+    /** The weight of the heaviest {@link #DATA_ROUTES} entry: the smallest agent burst that can ever pay every route. */
+    static int heaviestDataWeight() {
+        return heaviest(DATA_ROUTES);
+    }
+
+    static int heaviest(Map<String, Integer> routes) {
+        return routes.values().stream().mapToInt(Integer::intValue).max().orElse(1);
+    }
+
+    /**
+     * Why an agent burst of {@code burst} is refused, or {@code null}: a burst below a route's weight could never pay that
+     * route, so it would answer 429 for ever ({@code PUT /system/link-analysis/limits} answers 422 instead).
+     */
+    static String burstProblem(double burst, Map<String, Integer> routes) {
+        int heaviest = heaviest(routes);
+        if (burst >= heaviest) return null;
+        String route = routes.entrySet().stream().filter(e -> e.getValue() == heaviest).map(Map.Entry::getKey).sorted()
+                .findFirst().orElse("");
+        return "rate.agent_burst " + (burst == Math.rint(burst) ? String.valueOf((long) burst) : String.valueOf(burst))
+                + " is below the weight " + heaviest + " of the agent data route " + route
+                + ": an agent could never call it - set at least " + heaviest;
+    }
+
     /** The weight {@code subject} pays for the route registered as {@code method pattern}: 0 when it is no agent or no data route. */
     static int agentDataWeight(Subject subject, String method, String pattern) {
         if (subject == null || !subject.agent()) return 0;

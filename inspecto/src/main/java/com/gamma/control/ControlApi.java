@@ -1432,7 +1432,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         String key = AgentGate.agentBudgetKey(s);
         RateLimiter bucket = agentLimiter;
         if (!bucket.tryConsume(key, weight)) {
-            ex.getResponseHeaders().set("Retry-After", Long.toString(bucket.retryAfterSeconds(key)));
+            ex.getResponseHeaders().set("Retry-After", Long.toString(bucket.retryAfterSeconds(key, weight)));
             throw new ApiException(429, ErrorCodes.RATE_LIMITED, "agent data budget exceeded - retry later");
         }
     }

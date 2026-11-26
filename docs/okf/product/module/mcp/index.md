@@ -35,7 +35,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
-| `AGENT-AUDIT-EXPAND-VALUE-1` | P2 | defect | Design §3.6.2 (D-AK19) says no body value is written to an audit row on any DATA_ROUTES entry and calls it the current behaviour, but POS… | operator |
 | `AGENT-GET-DATA-READS-1` | P2 | defect | GET routes are all allowed to agents and sit outside the W6 S0 seam: no masked-answer stamp and no agent budget. | operator |
 | `AGENT-GATEWAY-UNMARKED-1` | P3 | defect | behind an API gateway (-Dauth.oidc.gateway.*) an agent client's token is never marked: | — |
 | `AGENT-LOOKUP-PREVIEW-1` | P3 | feature | let an agent test a lookup (POST /lookups/test) once it is safe: | — |

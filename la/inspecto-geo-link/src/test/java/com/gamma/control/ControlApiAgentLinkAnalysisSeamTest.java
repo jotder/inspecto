@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class ControlApiAgentLinkAnalysisSeamTest {
 
-    private static final String PERSON = "Bearer person", AGENT = "Bearer agent";
+    private static final String PERSON = "Bearer person", AGENT = "Bearer agent", ADMIN = "Bearer admin";
     private static final String COLS = "\"dataset\":\"pays_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\"";
     private final HttpClient client = HttpClient.newHttpClient();
 
@@ -54,6 +54,7 @@ class ControlApiAgentLinkAnalysisSeamTest {
             return switch (h) {
                 case PERSON -> Optional.of(new Subject("analyst-1", person));
                 case AGENT -> Optional.of(new Subject("analyst-1", agentCaps, null, Map.of(), null, null, null, "claude-code"));
+                case ADMIN -> Optional.of(new Subject("admin-1", Set.of(Roles.CAN_ADMINISTER)));
                 default -> Optional.empty();
             };
         });
@@ -160,5 +161,37 @@ class ControlApiAgentLinkAnalysisSeamTest {
                 assertEquals(200, person.statusCode(), p.getKey() + " as the person, unchanged: " + person.body());
             }
         }
+    }
+
+    /**
+     * D-AK19 §3.6.2 on every Link Analysis data route: no audit row written for the agent's calls holds a raw id it sent or
+     * was answered in (AGENT-AUDIT-EXPAND-VALUE-1: {@code link.expanded} keeps the alias for an agent), and no log line
+     * written during them does either. Several probes send the raw {@code A} (D-AK15 lets an agent send raw values).
+     */
+    @Test
+    void noAgentAuditRowOrLogLineHoldsARawId(@TempDir Path cfg, @TempDir Path root) throws Exception {
+        ch.qos.logback.core.read.ListAppender<ch.qos.logback.classic.spi.ILoggingEvent> logs = new ch.qos.logback.core.read.ListAppender<>();
+        logs.start();
+        ch.qos.logback.classic.Logger rootLogger = (ch.qos.logback.classic.Logger) org.slf4j.LoggerFactory.getLogger(org.slf4j.Logger.ROOT_LOGGER_NAME);
+        java.util.List<com.gamma.audit.Event> events = new java.util.concurrent.CopyOnWriteArrayList<>();
+        java.util.function.Consumer<com.gamma.audit.Event> sub = events::add;
+        String alias;
+        try (ControlApiDatasetDiscoverTest.Ctx c = open(cfg, root)) {
+            alias = alias(c);
+            rootLogger.addAppender(logs);
+            com.gamma.event.EventLog.current().addSubscriber(sub);
+            for (Map.Entry<String, String[]> p : probes(alias).entrySet())
+                assertEquals(200, send(c, p.getValue()[0], p.getValue()[1], AGENT).statusCode(), p.getKey());
+        } finally {
+            com.gamma.event.EventLog.current().removeSubscriber(sub);
+            rootLogger.detachAppender(logs);
+        }
+        assertTrue(events.stream().anyMatch(e -> com.gamma.la.core.LinkEventTypes.LINK_EXPANDED.equals(e.type())
+                && alias.equals(e.attributes().get("value"))), "the agent's link.expanded row keeps the alias: " + events);
+        for (com.gamma.audit.Event e : events)
+            assertNoRaw("an event row during the agent's calls (" + e.type() + ")",
+                    e.message() + " " + e.attributes() + " " + e.payload());
+        for (ch.qos.logback.classic.spi.ILoggingEvent e : logs.list)
+            assertNoRaw("a log line during the agent's calls", e.getFormattedMessage());
     }
 }

@@ -19,6 +19,7 @@ class RateLimiterBudgetTest {
     }
 
     private static final String DASHBOARD = "control.rateLimit.dashboard.capacity";
+    private static final String AGENT_CAPACITY = "control.rateLimit.agent.capacity";
 
     /** The /bi/query bucket keeps burst 120 by default and honours its override (MixedLoadBenchmark raises it so a
      *  fast runner measures load, not the throttle). */
@@ -37,6 +38,35 @@ class RateLimiterBudgetTest {
         assertFalse(m.tryConsume("k", 5), "two tokens left: a weight of 5 is refused");
         assertTrue(m.tryConsume("k", 2), "and spent none of them");
         assertFalse(m.tryConsume("k", 1));
+    }
+
+    /** W6 S0: a weighted 429 says when the route's whole weight is back, not when the next token is. */
+    @Test
+    void aWeightedRetryAfterWaitsForTheWholeWeight() {
+        RateLimiter l = new RateLimiter(20.0, 0.5);
+        l.useClock(() -> 0L);
+        assertTrue(l.tryConsume("k", 20));
+        assertFalse(l.tryConsume("k", 20));
+        assertEquals(40, l.retryAfterSeconds("k", 20), "20 tokens at 0.5 a second");
+        assertEquals(2, l.retryAfterSeconds("k"), "one token: the unweighted answer is unchanged");
+    }
+
+    /** W6 S0: no agent burst below the heaviest agent data route's weight - refused on PUT, raised when read from elsewhere. */
+    @Test
+    void anAgentBurstBelowARoutesWeightIsRefusedOrRaised() {
+        java.util.Map<String, Integer> routes = java.util.Map.of("POST /db/query", 1, "POST /lookups/test", 20);
+        String problem = AgentGate.burstProblem(19, routes);
+        assertTrue(problem != null && problem.contains("rate.agent_burst 19") && problem.contains("POST /lookups/test")
+                && problem.contains("at least 20"), String.valueOf(problem));
+        assertEquals(null, AgentGate.burstProblem(20, routes));
+        assertEquals(null, AgentGate.burstProblem(1, AgentGate.DATA_ROUTES), "today's routes weigh 1: every legal burst pays");
+
+        System.setProperty(AGENT_CAPACITY, "0.5");   // below the heaviest weight (1): the bucket still holds a whole call
+        try {
+            assertEquals(AgentGate.heaviestDataWeight(), burst(RateLimiter.agent()));
+        } finally {
+            System.clearProperty(AGENT_CAPACITY);
+        }
     }
 
     @Test
