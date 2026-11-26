@@ -96,10 +96,14 @@ const buttons = (el: HTMLElement, text: string) =>
 
 describe('InsightProfilesComponent', () => {
     it('a link to a Profile that no longer exists says so and shows the first Profile', () => {
-        const { el, list } = create({ author: true, query: { profile: 'gone' } });
+        const { fixture, el, list } = create({ author: true, query: { profile: 'gone' } });
         expect(el.querySelector('[data-testid="missing-profile"]')?.textContent).toContain('gone');
         expect(el.querySelector('h2')?.textContent).toContain('sales');
         expect(list).toHaveBeenCalledWith('sales');
+        // Picking a Profile clears the notice.
+        el.querySelector<HTMLElement>('[aria-current="true"]')!.click();
+        fixture.detectChanges();
+        expect(el.querySelector('[data-testid="missing-profile"]')).toBeNull();
     });
 
     it('marks the Insight a link names with ?insight=', () => {

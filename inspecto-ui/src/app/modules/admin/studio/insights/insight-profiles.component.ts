@@ -109,7 +109,7 @@ function row(d: ComponentDef): ProfileRow {
                                             class="hover:bg-hover w-full rounded-lg px-3 py-2 text-left"
                                             [class.bg-hover]="p.id === selectedId()"
                                             [attr.aria-current]="p.id === selectedId() ? 'true' : null"
-                                            (click)="selectedId.set(p.id)"
+                                            (click)="selectedId.set(p.id); missingProfile.set(null)"
                                         >
                                             <span class="block text-sm font-semibold">{{ p.id }}</span>
                                             <span class="text-secondary block text-xs"
