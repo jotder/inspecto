@@ -128,7 +128,9 @@ naming the person as the actor.
   An enrichment preview answers the same 403 to a machine client.
 - ⚠ An enrichment preview (`preview_enrichment`) answers a Reference's values **unmasked** to a person who holds
   `canAuthorWorkbench` and to that person's agent (operator decision D-AK22, 2026-11-26), so the agent sends those raw
-  values to its model provider. Grant `canAuthorWorkbench` to agents' people with that in mind. Every other agent
+  values to its model provider. The preview may also name a `path:` file anywhere under the Space safety roots, so
+  such an agent can read any Dataset's stored rows raw, and it checks no Dataset sharing (both accepted, D-AK22). Grant
+  `canAuthorWorkbench` to agents' people with that in mind. Every other agent
   data route must prove its answer masked as it is for the person, or it answers 500.
 - The proposal never becomes live — no second person has approved it. The person the agent acts for cannot approve
   it either (four eyes, always).

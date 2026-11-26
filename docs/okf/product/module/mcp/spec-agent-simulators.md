@@ -69,6 +69,14 @@ decided instead (D-AK22, 2026-11-26, replacing §4 for this route): the answer i
 - **A `path:` Reference** stays as it is for a person: raw and jailed to the safety roots (`PREVIEW-REFERENCE-PATH-UNJAILED-1`).
   A person's agent gets the same; it is not refused.
 - **Board.** `ENRICHMENT-PREVIEW-UNMASKED-1` is closed as accepted for builders (D-AK22).
+- ⚠ **Two wider risks, accepted as built by the operator after the lane's security review (D-AK22, 2026-11-26), each
+  filed P2 to revisit:**
+  1. `ENRICHMENT-PREVIEW-PATH-REACH-1` — a `path:` Reference is jailed only to the Space safety roots, so a builder's
+     agent may name ANY data file under them and page any Dataset's store raw (`SELECT * FROM r LIMIT 200 OFFSET n`, 200
+     rows per call at weight 2), past `/db/query` masking and the agent `RAW_GETS` refusals (rejected rows, view data, a
+     file under an operator root).
+  2. `ENRICHMENT-PREVIEW-SHARING-1` — the route checks no Dataset sharing: a by-name Reference whose Dataset is shared
+     away is answered raw, to the person and to their agent.
 
 ## Tests
 
