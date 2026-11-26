@@ -1,7 +1,7 @@
 ---
 type: Spec
 title: Agent authoring previews (AGENT-KIT-1 W6 group A) — design and as-built
-description: Which authoring previews an AI agent may call through the MCP endpoint or directly (parsing, schema casts and mapping, schema suggestion, mapping check, keyed lookup), why each is safe for every agent, the body cap, the no-file-reference rule, the sealed schema preview, the preview_config MCP Tool and the tests that prove it.
+description: Which authoring previews an AI agent may call through the MCP endpoint or directly (parsing, schema casts and mapping, schema suggestion, mapping check), why each is safe for every agent, the body cap, the no-file-reference rule, the sealed schema preview, the preview_config MCP Tool and the tests that prove it.
 tags: [agent-kit, mcp, agents, authoring, security]
 timestamp: 2026-11-26T00:00:00Z
 item: module.mcp
@@ -15,13 +15,13 @@ code: features/inspecto-mcp
 
 Widening plan `docs/superpower/2026-11-25-agent-kit-ak2-widening-plan.md` § W6, group A; decision **D-AK10**
 (signed 2026-11-25): the authoring previews are open to **every** agent, a person's and a machine's. An agent tries
-its draft against the server's own parser, casts and lookups until it is clean, then proposes once
+its draft against the server's own parser, casts and mapping until it is clean, then proposes once
 (`propose_change`), instead of proposing and reading the refusal. Groups B to E (simulators, Space tests, analytic
 reads, analyst previews) are separate changes, each with its own review.
 
-## The five routes
+## The four routes
 
-All five are `read-shaped` exemptions in `CapabilityManifest` (no capability) and sit in `AgentGate.AUTHORING_PREVIEWS`,
+All four are `read-shaped` exemptions in `CapabilityManifest` (no capability) and sit in `AgentGate.AUTHORING_PREVIEWS`,
 part of the allowed bucket ([The agent gate](spec-mcp.md#the-agent-gate-ak-2a)). None is person-only.
 
 | Route | What it does | Why it persists nothing |
@@ -30,12 +30,11 @@ part of the allowed bucket ([The agent gate](spec-mcp.md#the-agent-gate-ak-2a)).
 | `POST /config/suggest/schema` | infers typed fields from parsed `sampleRows` (and the drift from a posted draft) | a throwaway DuckDB |
 | `POST /config/preview/schema` | casts `sampleRows` against a schema draft and runs its mapping rules | a throwaway DuckDB, **sealed** (below) |
 | `POST /components/mapping/validate` | checks a mapping's `rules` | pure validation, no I/O |
-| `POST /lookups/test` | looks one value up in a loaded Pipeline's keyed join | the point index is kept in memory (`LookupRoutes.WARM`, at most 8); nothing is written |
 
 ## The three bounds, for an agent
 
 Applied in `ControlApi.handle` on every door (a direct request and every in-process replay, so the MCP tool too)
-whenever the Subject is an agent and the route is one of the five; a person's own token is unchanged.
+whenever the Subject is an agent and the route is one of the four; a person's own token is unchanged.
 
 1. **Body cap.** At most `AgentGate.PREVIEW_MAX_BODY_BYTES` (256 KiB, the MCP endpoint's own cap), read once with
    `rawBody(ex, cap)` before the handler parses it: over it is **413**, refused on the declared `Content-Length` or after
@@ -45,8 +44,7 @@ whenever the Subject is an agent and the route is one of the five; a person's ow
    `mapping_file`, `grammar`, `ingester_config.grammar` or Decode Profile ref through — throws before the path is
    resolved, probed or read, and the route answers **422** "… names a file: an agent's preview draft names no file".
    A missing and an existing file get the same answer, so the refusal is no existence oracle. Data paths (`dirs`,
-   a join's `reference`) are resolved, never read, by a parse, and stay allowed; `/lookups/test` reads the Reference of
-   a Pipeline the server already loaded, never a path from the body.
+   a join's `reference`) are resolved, never read, by a parse, and stay allowed.
 3. **Sealed SQL (every caller).** `ComponentPreview.schema` runs in a `SqlSandbox`, sealed after the sample rows are
    seeded (`enable_external_access=false`, `lock_configuration=true`), as `ComponentPreview.transform` already did. An
    `EXPR` mapping rule is the author's SQL emitted verbatim: before the seal, `(SELECT content FROM
@@ -54,20 +52,23 @@ whenever the Subject is an agent and the route is one of the five; a person's ow
    (which needs no capability). Sealed, it is a 422 for everyone. The parsing preview stays unsealed — it must read its
    own temp sample file — and every draft value it puts into SQL is quoted (`SqlIdent.sqlStr` / `q`).
 
-**What the lookup answer shows.** `/lookups/test` returns the matched Reference row's mapped columns, unmasked, as it
-does for any signed-in person (the route has no capability). An agent sees what its person, or any caller, sees; a
-Reference is configuration data, not a masked Dataset.
+**Why `POST /lookups/test` is not one (operator, 2026-11-26).** The plan listed it in group A, and the lane's security
+review refused it: it returns the matched Reference row's columns unmasked, a fuzzy match also lists `candidates` — keys
+the caller never sent, so repeated calls enumerate the Reference — and it has no per-caller rate limit, while
+`refresh: true` rebuilds an in-memory index of up to 256 MiB on every call. A Reference can be a Pipeline's own output
+store. It stays refused to every agent (a person's own token is unchanged) until masking, a bounded candidate list and
+a rate limit are built and proven: BACKLOG `AGENT-LOOKUP-PREVIEW-1`.
 
 ## The MCP Tool
 
-`preview_config` (read, `readOnlyHint: true`) — arguments `kind` (`lookup`, `mapping`, `parsing`, `schema`,
+`preview_config` (read, `readOnlyHint: true`) — arguments `kind` (`mapping`, `parsing`, `schema`,
 `suggest-schema`) and `body` (the route's own JSON body); `McpTools.PREVIEWS` maps each kind to its route. A refusal
 comes back as the route's status (`isError`, "HTTP 413", "HTTP 422 … names a file").
 
 ## Skills and golden tasks
 
 - `author-pipeline` and `safe-config-change` say **preview, then propose**: parse a pasted sample, read the suggested
-  schema, check the casts and the mapping, and test a lookup before `dry_run_pipeline` and `propose_change`.
+  schema, and check the casts and the mapping before `dry_run_pipeline` and `propose_change`.
 - Developer golden tasks `dev-12-schema-from-sample` (the suggested types of an inline sample) and
   `dev-13-cast-rejects` (how many rows of an inline sample a schema draft rejects: 3, the ground truth
   `ControlApiAgentPreviewsTest` asserts on the same rows).
@@ -76,14 +77,14 @@ comes back as the route's status (`isError`, "HTTP 413", "HTTP 422 … names a f
 
 - `ControlApiAgentPreviewsTest` (real HTTP): a person's agent and a machine agent each get every preview's own 200, and
   a before-and-after read (every file under the Space, the Pending Changes, the Pipelines) is unchanged; a body over the
-  cap is 413 on all five routes for both, while the person's own token is not capped; a draft naming an existing or a
+  cap is 413 on all four routes for both, while the person's own token is not capped; a draft naming an existing or a
   missing file is 422 "names a file" for both agents while the person's own token reads it; the EXPR `read_text` probe
   reads nothing for the person or the agent.
 - `AgentGateParityTest.theAuthoringPreviewsAreAllowedToEveryAgent`; `McpToolRoutesTest` (every `preview_config` kind
   replays a manifest route the gate allows a person's agent); `ControlApiMcpWriteToolsTest` (the tool end to end, and
   the file-naming draft through it).
 - **Falsified** (each negative test turned red with its guard removed, then restored): the body cap off; the
-  `withoutConfigRefs` scope off; the schema preview unsealed; the five routes out of `ALLOWED` (the 200 test is 403).
+  `withoutConfigRefs` scope off; the schema preview unsealed; the four routes out of `ALLOWED` (the 200 test is 403).
 
 ## Security review
 

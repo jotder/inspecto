@@ -364,8 +364,7 @@ final class McpTools {
             "parsing", "/config/preview/parsing",
             "suggest-schema", "/config/suggest/schema",
             "schema", "/config/preview/schema",
-            "mapping", "/components/mapping/validate",
-            "lookup", "/lookups/test");
+            "mapping", "/components/mapping/validate");
 
     static final List<Tool> WRITE_TOOLS = List.of(
             new Tool("validate_config", "Validate a config",
@@ -382,12 +381,11 @@ final class McpTools {
                                     + "/pipelines/authored/{id}/dry-run takes them.", false)),
                     a -> new Call("POST", "/pipelines/authored/" + seg(a.get("pipeline")) + "/dry-run", bodyOf(a))),
             new Tool("preview_config", "Preview a config draft",
-                    "Try a draft against the server's own parser, casts and lookups on sample data; writes nothing. kind "
+                    "Try a draft against the server's own parser, casts and mapping on sample data; writes nothing. kind "
                             + "parsing: a Pipeline draft's parsing: settings over raw text, body {config, sample_text}. "
                             + "suggest-schema: the typed fields the server infers from parsed rows, body {sampleRows, "
                             + "frontend?, decimalSeparator?, config?}. schema: a schema draft's casts and mapping over parsed "
-                            + "rows, body {config, sampleRows}. mapping: a mapping's rules checked, body {rules}. lookup: one "
-                            + "value through a loaded Pipeline's keyed join, body {pipeline, step, value, at?}. At most 256 KiB; "
+                            + "rows, body {config, sampleRows}. mapping: a mapping's rules checked, body {rules}. At most 256 KiB; "
                             + "the draft must be inline - one naming a file (schema_file, grammar, mapping_file) is refused. "
                             + "Preview until clean, then propose.",
                     List.of(new Arg("kind", Kind.ENUM, true, "Which preview.", List.copyOf(new java.util.TreeSet<>(PREVIEWS.keySet()))),

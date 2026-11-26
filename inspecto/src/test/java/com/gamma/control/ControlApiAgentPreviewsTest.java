@@ -33,7 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * AGENT-KIT-1 widening plan W6 group A over real HTTP (D-AK10, signed 2026-11-25: the authoring previews for every agent):
- * a person's agent and a machine agent each call the five previews and get the route's own 200, and a before-and-after
+ * a person's agent and a machine agent each call the four previews and get the route's own 200, and a before-and-after
  * read of the Space shows nothing persisted; an agent's body over 256 KiB is 413 while the person's own token is not
  * capped; a draft naming a config file is refused before the file is read (the person's own token still reads it); and
  * the schema preview's EXPR rule reaches no file for anyone (its DuckDB is sealed).
@@ -221,12 +221,14 @@ class ControlApiAgentPreviewsTest {
                         "{\"rules\":[{\"targetColumn\":\"kg\",\"sourceExpression\":\"weight_kg\",\"transformType\":\"DIRECT\"}]}", who));
                 assertTrue(mapping.get("clean").asBoolean(), mapping.toString());
 
-                JsonNode hit = data(post(c, "/lookups/test", lookup, who));
-                assertTrue(hit.get("hit").asBoolean(), hit.toString());
-                assertEquals("24991", hit.get("matchedKey").asText());
+                // not a group-A preview: unmasked Reference values, no rate limit (operator 2026-11-26)
+                assertEquals(403, post(c, "/lookups/test", lookup, who).statusCode(), who + ": the lookup test stays refused");
 
                 assertEquals(before, state(c), who + ": nothing persisted");
             }
+            JsonNode hit = data(post(c, "/lookups/test", lookup, DEV));   // the person's own token still answers
+            assertTrue(hit.get("hit").asBoolean(), hit.toString());
+            assertEquals("24991", hit.get("matchedKey").asText());
         }
     }
 

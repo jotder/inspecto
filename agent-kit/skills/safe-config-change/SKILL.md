@@ -29,8 +29,7 @@ approves it. That person is never you and never the person you act for (four eye
    reading the refusal: `kind: parsing` parses a raw sample with a Pipeline draft's parsing settings (body
    `{config, sample_text}`); `kind: suggest-schema` gives the types the server infers from parsed rows (body
    `{sampleRows}`); `kind: schema` casts rows against a schema draft and runs its mapping (body `{config,
-   sampleRows}`: read `rejectedCount` and `rejectedRows`); `kind: mapping` checks mapping rules (body `{rules}`);
-   `kind: lookup` tests one value through a Pipeline's keyed join (body `{pipeline, step, value}`). Nothing is
+   sampleRows}`: read `rejectedCount` and `rejectedRows`); `kind: mapping` checks mapping rules (body `{rules}`). Nothing is
    written. Put the draft inline: a draft that names a file is refused (422 "names a file"), and a body is at most
    256 KiB — send a sample of rows, not a whole file. Preview until clean.
 4. **Dry-run** a Pipeline with `dry_run_pipeline`: argument `pipeline` = the Pipeline id, and `body`
@@ -113,7 +112,7 @@ changes their mind or you proposed something wrong — then propose the correcte
 - `get_pending_change` — one proposal, its author and agent client
 - `diff_pending_change` — the diff the approver reads
 - `validate_config` — the save gate's findings, without saving
-- `preview_config` — a draft's parsing, schema casts, mapping or lookup tried on sample data, writing nothing
+- `preview_config` — a draft's parsing, schema casts or mapping tried on sample data, writing nothing
 - `dry_run_pipeline` — a Pipeline draft run on sample rows, writing nothing
 - `propose_change` — the held write
 - `withdraw_change` — take a proposal back
