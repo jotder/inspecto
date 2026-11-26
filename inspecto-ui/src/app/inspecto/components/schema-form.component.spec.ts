@@ -373,6 +373,48 @@ describe('InspectoSchemaFormComponent', () => {
         expect(fixture.componentInstance.form.get('patterns')?.value).toEqual(['^CALL']);
     });
 
+    /**
+     * INSIGHT-PROFILE-LIST-INPUT-1: after Enter or "+", the draft <input> itself must be empty — typing the
+     * next value appended to the old text (product ⏎ channel ⏎ gave `productchannel`).
+     */
+    for (const withLoader of [false, true]) {
+        it(`clears the list input after Enter and "+" (${withLoader ? 'with' : 'without'} suggestions)`, async () => {
+            TestBed.configureTestingModule({
+                imports: [InspectoSchemaFormComponent],
+                providers: [provideNoopAnimations()],
+            });
+            const fixture = TestBed.createComponent(InspectoSchemaFormComponent);
+            const c = fixture.componentInstance;
+            if (withLoader) c.optionLoaders = { patterns: async () => [{ value: 'region', label: 'region' }] };
+            c.specs = LIST_SPECS;
+            fixture.detectChanges();
+            sfOpen(fixture, 'patterns');
+            const input = fixture.nativeElement.querySelector('input[placeholder="^CALL"]') as HTMLInputElement;
+            // No render between typing and Enter: the zoneless app schedules change detection, so a quick
+            // Enter lands before the [value] binding ever saw the typed text — draft "" → "" writes nothing.
+            const type = (text: string) => {
+                input.value += text; // a browser appends to whatever the input still shows
+                input.dispatchEvent(new Event('input'));
+            };
+
+            type('product');
+            input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+            fixture.detectChanges();
+            expect(input.value).toBe('');
+
+            type('channel');
+            fixture.detectChanges(); // "+" is disabled until a render shows the draft — a mouse cannot be quicker
+            (fixture.nativeElement.querySelector('button[aria-label="Add entry to Patterns"]') as HTMLButtonElement).click();
+            fixture.detectChanges();
+            expect(input.value).toBe('');
+
+            type('partner');
+            input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }));
+            fixture.detectChanges();
+            expect(c.form.get('patterns')?.value).toEqual(['product', 'channel', 'partner']);
+        });
+    }
+
     describe('extraValidators (host-supplied domain rules)', () => {
         /** Stands in for the Pipelines measure grammar: rejects any entry containing `!`. */
         const noBang: ValidatorFn = (c: AbstractControl) =>
