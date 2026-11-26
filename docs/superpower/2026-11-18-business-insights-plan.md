@@ -392,7 +392,7 @@ Spec: [`okf/product/module/engine/spec-kpi-projection.md`](../okf/product/module
 - **Found in passing and fixed**: `ObjectReadMasking` treated every Alert scope as a Dataset id; a `kpi:` scope made
   `GET /alerts` fail (500). A `kpi:` scope now masks nothing (its text holds no key).
 - **Deliberately deferred**: (the editor's KPI fields and "arm from a Widget" shipped in §11.7); a role-aware
-  owner for rule evaluation (would need roles stamped on the rule, as Jobs stamp `updatedByRoles`).
+  owner for rule evaluation — **closed 2026-11-26, §11.14**.
 
 ### 11.7 P1 leftovers — overlays on a public share, KPI Alert Rules in the UI (2026-11-25)
 
@@ -515,7 +515,9 @@ changepoint **and** drift; one Insights Dataset per Profile.
 - **Signals**: `insight.scan.completed` (counts) and `insight.found` per new Insight (≤ 20 per run, band ≥ elevated)
   for Notification Rules.
 - **Deliberately deferred**: the Profile editor UI and the Insight Feed Visualization Type; D-BI4 owner tuning within
-  Builder bounds (today: who may save the Profile tunes it); the sharing envelope does not yet narrow by a Mapping Dataset's `basedOn` base (as KPI History); depth-2 slices (`BI-EXPLAIN-DEPTH2-1`); I-9, I-10 (built next, §11.10).
+  Builder bounds (today: who may save the Profile tunes it); the sharing envelope does not yet narrow by a Mapping Dataset's `basedOn` base (the core seam closed it 2026-11-26,
+  §11.14; `InsightScanJobType.envelope` still calls the store-less `SharingEnvelope.of(List)` — the insights lane
+  switches it to `of(store, …)`); depth-2 slices (`BI-EXPLAIN-DEPTH2-1`); I-9, I-10 (built next, §11.10).
 
 ### 11.10 P3 I-9 concentration and I-10 distribution shift — as built (2026-11-26)
 
@@ -566,6 +568,23 @@ changepoint **and** drift; one Insights Dataset per Profile.
   404 is the empty state naming the `insight.scan` Job and linking the Jobs screen.
 - **Deferred**: a "Run scan now" shortcut (the Jobs screen runs it); the Insight Feed Visualization Type for
   Dashboards; `run=all` history and band filters in the feed.
+
+### 11.14 Loose ends A — as built (2026-11-26)
+
+Operator decisions (2026-11-26, the recommended options):
+
+- **A Mapping's base joins the sharing envelope.** `SharingEnvelope.of(store, sources)` adds, for every Mapping
+  source (`origin: mapping`), its `basedOn` base, recursively through Mappings; a base shared differently from the
+  rest refuses in words, a base that does not resolve (or a Mapping loop) refuses too. Callers: KPI History
+  (`KpiSnapshotJobType.envelope`) and model output Datasets (`ScoreDatasets`, which already added one level). Insights
+  (`InsightScanJobType.envelope`, in `features/inspecto-insights`) still calls `of(List)` — its lane switches it.
+- **KPI Alert Rules stamp roles and re-check access at evaluation.** The owner's held roles are stamped as `ownerRoles`
+  when the owner saves (another editor never lends theirs; server-stamped, a client value is dropped at every write
+  door and every raw-file import, via `JobAuthority.stampFiles`); every sweep re-checks that the owner, with those
+  roles, may still view the KPI and read its Dataset; if not, the rule is skipped and ONE Incident names it and why
+  (deduped while active on `kpiRuleAccess`). Spec: `okf/product/module/engine/spec-kpi-projection.md`.
+- Residual: a rule file written straight to disk keeps whatever `ownerRoles` it holds (the same trust as any
+  registry file written outside the routes).
 
 ## 12. Board row
 

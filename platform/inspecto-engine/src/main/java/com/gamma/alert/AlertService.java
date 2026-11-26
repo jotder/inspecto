@@ -193,6 +193,21 @@ public final class AlertService {
 
     private volatile java.util.function.Function<AlertRule, java.util.OptionalDouble> kpiProbe;
 
+    /**
+     * Wire the KPI-rule owner re-check (`BI-INSIGHTS-1` loose ends A, operator 2026-11-26): the rule → why its owner,
+     * with the roles stamped at save, may no longer view the KPI or read its Dataset; {@code null} = still may. A refused
+     * rule is skipped (never fires) and raises ONE Incident naming it and why — deduped on {@link #KPI_ACCESS_KEY} while
+     * that Incident is active, so a sweep never adds a second.
+     */
+    public void kpiAccess(java.util.function.Function<AlertRule, String> check) {
+        this.kpiAccess = check;
+    }
+
+    private volatile java.util.function.Function<AlertRule, String> kpiAccess;
+
+    /** The Incident attribute deduping a KPI rule's lost-access Incident: the rule's name. */
+    public static final String KPI_ACCESS_KEY = "kpiRuleAccess";
+
     /** Wire the LA-23 Investigation-rule evaluator (a Function so this engine never names the optional module). */
     public void investigationProbe(java.util.function.Function<AlertRule, InvestigationMeasureProbe.Reading> probe) {
         this.investigationProbe = probe;
@@ -682,6 +697,19 @@ public final class AlertService {
             if (!rule.isKpiRule()) continue;
             var probe = kpiProbe;
             if (probe == null) continue;
+            var access = kpiAccess;
+            String refused = access == null ? null : access.apply(rule);
+            if (refused != null) {
+                Map<String, String> attrs = new LinkedHashMap<>();
+                attrs.put(KPI_ACCESS_KEY, rule.name());
+                attrs.put("kpi", rule.kpi());
+                attrs.put("reason", refused);
+                incidents.openIncident("Alert Rule '" + rule.name() + "' skipped: its owner lost access",
+                        "Alert Rule '" + rule.name() + "' is not evaluated: " + refused
+                                + ". Share the KPI and its Dataset to the rule's owner again, or re-save the rule as a user who may read them.",
+                        "error", rule.scalarScope(), attrs, KPI_ACCESS_KEY);
+                continue;
+            }
             evaluateScalar(rule, probe.apply(rule), nowMs, out);
         }
 

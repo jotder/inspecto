@@ -117,7 +117,7 @@ final class AlertRoutes implements RouteModule {
         ComponentStore store = store(api);
         // R3 envelope: the authenticated Subject becomes the owner — who the rule's alerts are addressed to.
         Map<String, Object> shaped = ComponentAccess.onCreate(e, body);
-        AlertRule rule = parse(api, shaped);                                 // 422 on an invalid rule
+        AlertRule rule = parse(api, shaped, KpiAlertProbe.rolesFor(e, shaped.get(ComponentAccess.OWNER), null));   // 422 on an invalid rule
         if (RouteErrors.exists(store, TYPE, rule.name()))
             throw new ApiException(409, ErrorCodes.CONFLICT, "alert rule '" + rule.name() + "' already exists (use PUT to update)");
         PendingChanges.hold(api, e, TYPE, rule.name(), persisted(rule, shaped), null);   // maker-checker
@@ -136,7 +136,7 @@ final class AlertRoutes implements RouteModule {
         // R3 envelope: edit access against the stored rule, owner/shares carried forward, and an owner change
         // only by the owner or an access admin — so an edit never silently re-addresses someone's alerts.
         Map<String, Object> shaped = ComponentAccess.onUpdate(e, TYPE, name, stored, patched);
-        AlertRule rule = parse(api, shaped);
+        AlertRule rule = parse(api, shaped, KpiAlertProbe.rolesFor(e, shaped.get(ComponentAccess.OWNER), stored));
         PendingChanges.hold(api, e, TYPE, name, persisted(rule, shaped), stored);   // maker-checker
         Map<String, Object> content = write(api, store, name, persisted(rule, shaped));
         alerts(api).upsert(rule);
@@ -163,8 +163,14 @@ final class AlertRoutes implements RouteModule {
         ComponentStore store = new ComponentStore(WriteGates.requireWriteRoot(api, "alert rule write").resolve("registry"));
         // No Subject: a consequence fires on data, not on a request. An existing rule keeps its envelope (the
         // owner its alerts go to, its shares), exactly as a plain content save does in R3.
-        Map<String, Object> shaped = carryEnvelope(storedContent(store, ApiContext.str(body, "name")), body);
-        AlertRule rule = parse(api, shaped);
+        Map<String, Object> prior = storedContent(store, ApiContext.str(body, "name"));
+        Map<String, Object> shaped = carryEnvelope(prior, body);
+        // The stored rule's stamped roles carry forward only while its owner does (BI-INSIGHTS-1 loose ends A).
+        List<String> carriedRoles = null;
+        if (prior != null && prior.get(KpiAlertProbe.OWNER_ROLES) != null
+                && java.util.Objects.equals(prior.get(ComponentAccess.OWNER), shaped.get(ComponentAccess.OWNER)))
+            carriedRoles = List.of(String.valueOf(prior.get(KpiAlertProbe.OWNER_ROLES)).split(","));
+        AlertRule rule = parse(api, shaped, carriedRoles);
         Map<String, Object> content = write(api, store, rule.name(), persisted(rule, shaped));
         alerts(api).upsert(rule);
         return content;
@@ -245,7 +251,14 @@ final class AlertRoutes implements RouteModule {
      *  {@code POST /bundle/import} item ({@code BundleRoutes}, a per-item failure). {@code BiTemplates} writes only
      *  {@code widget} / {@code dashboard}. */
     static AlertRule parse(ApiContext api, Map<String, Object> body) {
-        return parse(api.writeRoot(), api::dataRoot, body);
+        return parse(api, body, null);
+    }
+
+    /** {@link #parse(ApiContext, Map)} with the server-known {@code ownerRoles} stamped before the save gate reads the KPI. */
+    static AlertRule parse(ApiContext api, Map<String, Object> body, java.util.Collection<String> ownerRoles) {
+        if (!EditionFeatures.present(EditionFeatures.ALERT_DISPATCH))   // the consequence's door (G9)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, EditionFeatures.refusal(EditionFeatures.ALERT_DISPATCH));
+        return parseContent(api.writeRoot(), api::dataRoot, body, ownerRoles);
     }
 
     /** {@link #parse(ApiContext, Map)} against explicit roots (a Space Template's staged tree). */
@@ -263,16 +276,25 @@ final class AlertRoutes implements RouteModule {
      */
     static AlertRule parseContent(java.nio.file.Path writeRoot, java.util.function.Supplier<java.nio.file.Path> dataRoot,
                                   Map<String, Object> body) {
+        return parseContent(writeRoot, dataRoot, body, null);
+    }
+
+    /**
+     * {@link #parseContent(java.nio.file.Path, java.util.function.Supplier, Map)}; a client-sent
+     * {@link KpiAlertProbe#OWNER_ROLES} is always dropped and {@code ownerRoles} (server-known, or null) stamped instead.
+     */
+    static AlertRule parseContent(java.nio.file.Path writeRoot, java.util.function.Supplier<java.nio.file.Path> dataRoot,
+                                  Map<String, Object> body, java.util.Collection<String> ownerRoles) {
         AlertRule rule;
         try {
-            rule = AlertRule.fromMap(body);
+            rule = KpiAlertProbe.stampRoles(AlertRule.fromMap(KpiAlertProbe.stripRoles(body)), ownerRoles);
         } catch (IllegalArgumentException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
         // MODULE-REORG-P4-2: a key the rule does not model is never silently dropped. An author-owned `x-` key is an
         // annotation and is carried through every save (AlertRule.extra); any other is refused loudly, as a Pipeline
         // refuses it - so a typo is not mistaken for a setting that was applied.
-        List<String> unknown = rule.extra().keySet().stream().filter(k -> !k.startsWith(AlertRule.AUTHOR_PREFIX)).toList();
+        List<String> unknown = rule.extra().keySet().stream().filter(k -> !k.startsWith(AlertRule.AUTHOR_PREFIX) && !KpiAlertProbe.OWNER_ROLES.equals(k)).toList();   // ownerRoles: server-stamped above
         if (!unknown.isEmpty())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, FindingCodes.ERR_UNKNOWN_CONFIG_KEY
                     + ": alert rule key(s) " + unknown + " are not part of an Alert Rule and would not be kept; "

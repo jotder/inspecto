@@ -160,6 +160,21 @@ class ScoreDatasetsTest {
         assertEquals(FINANCE_SHARES, dataset("risk_scores_fraud_latest").get("shares"));
     }
 
+    /** BI-INSIGHTS-1 loose ends A: the base two Mapping hops down still bounds the outputs. */
+    @Test
+    void aMappingChainsBaseSharedDifferentlyRefuses() throws Exception {
+        store.write("dataset", "base", Map.of("physicalRef", "calls", "owner", "alice",
+                "shares", List.of(Map.of("subjectType", "role", "subjectId", "sales"))));
+        store.write("dataset", "mid", Map.of("origin", "mapping", "basedOn", "base", "physicalRef", "calls"));
+        store.write("dataset", "calls", Map.of("origin", "mapping", "basedOn", "mid", "physicalRef", "calls",
+                "columns", List.of(Map.of("name", "msisdn", "classification", "MSISDN"))));
+
+        String reason = register("subscriber", FINANCE);
+
+        assertNotNull(reason);
+        assertTrue(reason.contains("shared differently"), reason);
+    }
+
     @Test
     void aBareLatestFromATemplateIsAdopted() throws Exception {
         store.write("dataset", "risk_scores_fraud_latest", Map.of("physicalRef", "risk_scores_fraud_latest"));
