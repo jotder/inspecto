@@ -74,7 +74,7 @@ final class PendingActions {
      */
     static void holdIfMachineAction(ApiContext api, HttpExchange ex, String method, String pattern) throws IOException {
         Subject s = ApiContext.subject(ex).orElse(null);
-        if (s == null || !s.agent() || !s.machine()) return;
+        if (AgentGate.posture(s) != AgentGate.Posture.MACHINE) return;
         if (AgentGate.bucket(method, pattern) != AgentGate.Bucket.ACTION) return;
         String path = ControlApi.routePath(ex);
         if (ApiContext.attr(ex, ATTR_APPROVED_ACTION) instanceof Map<?, ?> approved) {

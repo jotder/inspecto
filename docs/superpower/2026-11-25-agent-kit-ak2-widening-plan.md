@@ -179,6 +179,8 @@ needs only W3 and can start now.
 > withdrawn as unsafe for a person's agent). an-06 passes after a `work-cases` fix. Baseline: 0 refusals per accepted
 > proposal (4 holds, 0 refusals) and 11 refusals in two Link Analysis query tasks. Two grader fixes, ops-04's reply
 > check widened, the suites' setup corrected; board rows `AUDIT-ACTION-VERBS-1` and `MCP-AGENT-POSTURE-1` filed.
+> `MCP-AGENT-POSTURE-1` built 2026-11-26 (`get_agent_posture`, skills branch on it, grader `posture-before-action`,
+> adv-07; `okf/product/module/mcp/spec-agent-posture.md`); the live re-run of ops-08 with both postures is still owed here.
 > Rows and per-task numbers in `tests-agent-golden.md`. **The D-AK12 gate is open:** the operations and analyst
 > suites have each had one live run, person and machine tasks; W2, W6, W7 and W11 may start. Step 4 (Gemini CLI,
 > Codex CLI, a local model): not started — none of those CLIs is installed on the run's workstation and Ollama holds no

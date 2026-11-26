@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-410 route(s) registered; 399 in the OpenAPI contract, 11 not.
+411 route(s) registered; 400 in the OpenAPI contract, 11 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -27,6 +27,7 @@ tags: [api, routes, generated]
 | GET | `/access/roles` | The role table | access | — | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java` |
 | PUT | `/access/roles` | Replace the authored role table | access | `canConfigureAccess` | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java` |
 | GET | `/access/roles/{roleId}/effective` | What one role may do | access | — | `inspecto/src/main/java/com/gamma/control/AccessRoutes.java` |
+| GET | `/agent-posture` | Read the caller's agent posture | pending-actions | — | `inspecto/src/main/java/com/gamma/control/PendingActionRoutes.java` |
 | GET | `/agent/actions` | List autonomous agent actions | agent | — | `inspecto/src/main/java/com/gamma/control/AgentRoutes.java` |
 | GET | `/agent/actions/{actionId}` | One autonomous agent action | agent | — | `inspecto/src/main/java/com/gamma/control/AgentRoutes.java` |
 | GET | `/agent/approvals` | List agent approvals | agent | `canRevealLinkEntities` | `inspecto/src/main/java/com/gamma/control/AgentRoutes.java` |

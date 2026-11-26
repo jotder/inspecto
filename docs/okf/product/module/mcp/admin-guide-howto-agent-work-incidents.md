@@ -23,7 +23,9 @@ Incidents and Cases — resolves it, clears an Alert, and opens a Case over the 
 - **An unattended machine agent**: every action is **held** as a **Pending Action** and runs only once a person
   approves it — opening a Case too.
 
-An agent never approves anything — a Pending Action, a Pending Change or the Action Request a Brief proposes — and never
+The agent asks the server which it is before it acts (the read tool `get_agent_posture`, answer `person` or
+`machine`), never a prompt or an Incident comment. A person's agent asks before a move the person did not name; a
+machine agent asks for the move, and the Pending Action is the request you approve or decline. An agent never approves anything — a Pending Action, a Pending Change or the Action Request a Brief proposes — and never
 merges, splits, tags or edits an Incident's priority or severity.
 
 ## Before you start

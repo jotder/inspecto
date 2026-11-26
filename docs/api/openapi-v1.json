@@ -12784,6 +12784,20 @@
         "x-generated" : true
       }
     },
+    "/agent-posture" : {
+      "get" : {
+        "tags" : [ "pending-actions" ],
+        "summary" : "Read the caller's agent posture",
+        "operationId" : "getAgentPosture",
+        "description" : "MCP-AGENT-POSTURE-1. {posture, agentClient, effect}: `person` for a person's agent (an action runs at once within that person's rights), `machine` for a machine agent (every action is held as a Pending Action), `none` when no agent client acts for the caller (agentClient null). Read off the predicate the machine-action hold itself uses (AgentGate.posture). Open to every signed-in caller and every agent; the MCP Tool get_agent_posture replays it.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
     "/anomaly-scores/preview" : {
       "post" : {
         "tags" : [ "anomaly-scores" ],

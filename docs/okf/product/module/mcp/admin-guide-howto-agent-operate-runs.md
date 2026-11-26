@@ -24,9 +24,12 @@ the agent is decides what happens:
 - **An unattended machine agent**: every action is **held** as a **Pending Action** and runs only once a person
   approves it.
 
-An agent never approves and never takes a backup. It releases a quarantined file only after reading why the file was
-set aside, and asks the person first. Giving up on a backlog day discards that day's files for good, so the agent asks
-the person first there too. Its tools never force a drain in the quiet period or run a day on the previous Reference;
+The agent asks the server which it is before it acts (the read tool `get_agent_posture`, answer `person` or
+`machine`), never a prompt or a comment. A machine agent does not wait for a yes in chat: it asks for the action, and
+the Pending Action is the request you approve or decline. An agent never approves and never takes a backup. A
+person's agent releases a quarantined file only after reading why the file was set aside, and asks the person first.
+Giving up on a backlog day discards that day's files for good, so a person's agent asks the person first there too; a
+machine agent says what it discards in the Pending Action's reason. Its tools never force a drain in the quiet period or run a day on the previous Reference;
 a machine agent calling the API directly could ask for either, so before approving a backlog action, open it and read
 its whole request (the query shows there).
 

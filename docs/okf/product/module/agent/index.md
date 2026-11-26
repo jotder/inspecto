@@ -38,5 +38,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `ASSISTANT-SCREEN-HELP-1` | P3 | feature | The Assistant explains the screen or Widget a user is on | operator |
 | — | P2 | feature | AGT-5 per-tool dry-run seam — BLOCKED-EXTERNAL | — |
 | `AGT-SEGMENT-1` | P3 | chore | the assistant's commercial framing is an unvalidated product read. | — |
-| `MCP-AGENT-POSTURE-1` | P3 | feature | Nothing tells an agent whether it is a person's agent (its actions run at once) or a machine agent (every action held as a Pending Action… | — |
 | `DOCS-SKILLS-ALERTS-AGENTIC-1` | P3 | feature | hub-routed agent skills exist for docs lookup, pipeline authoring, incident investigation and case analysis (.claude/skills/) | demand |

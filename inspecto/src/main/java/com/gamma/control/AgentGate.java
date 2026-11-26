@@ -208,6 +208,32 @@ final class AgentGate {
         return write && (pattern.equals("/apps") || pattern.startsWith("/apps/") || pattern.startsWith("/access/"));
     }
 
+    /** An agent's posture (D-AK7, {@code MCP-AGENT-POSTURE-1}): how its {@link Bucket#ACTION} calls are treated. */
+    enum Posture {
+        /** A person's agent: its actions run at once within the person's rights (D-AK5); config changes are held. */
+        PERSON("person", "an action runs at once within your rights; a config change is held as a Pending Change"),
+        /** A machine agent: every action is held as a Pending Action, every config change as a Pending Change. */
+        MACHINE("machine", "an action is held as a Pending Action for a person to approve; a config change is held as a "
+                + "Pending Change");
+
+        final String id, effect;
+
+        Posture(String id, String effect) {
+            this.id = id;
+            this.effect = effect;
+        }
+    }
+
+    /**
+     * The posture of {@code subject}, or {@code null} for a caller no agent client acts for. The ONE predicate: the
+     * machine-action hold ({@code PendingActions.holdIfMachineAction}), the machine's {@link #PERSON_ONLY} refusal and the
+     * posture an agent is told ({@code GET /agent-posture}) all read it.
+     */
+    static Posture posture(Subject subject) {
+        if (subject == null || !subject.agent()) return null;
+        return subject.machine() ? Posture.MACHINE : Posture.PERSON;
+    }
+
     /** The bucket of the route registered as {@code method pattern} (pattern without {@code ^…$}). */
     static Bucket bucket(String method, String pattern) {
         if (never(method, pattern)) return Bucket.REFUSED;
@@ -228,7 +254,7 @@ final class AgentGate {
         String pattern = routeRegex.startsWith("^") && routeRegex.endsWith("$")
                 ? routeRegex.substring(1, routeRegex.length() - 1) : routeRegex;
         Bucket b = bucket(method, pattern);
-        if (b == Bucket.ALLOWED && subject.machine() && PERSON_ONLY.contains(method + " " + pattern))
+        if (b == Bucket.ALLOWED && posture(subject) == Posture.MACHINE && PERSON_ONLY.contains(method + " " + pattern))
             return "an agent machine client may not run a Pipeline — a delegated person may";
         if (b != Bucket.REFUSED) return null;
         return never(method, pattern)
