@@ -89,7 +89,7 @@ person** approves it. The agent never approves, never reveals a masked value, an
      console's client, and the write tools refuse it.
 4. **Ask the agent for an outcome**, for example "add a check that amount is never negative on orders, and tell me how
    many rows break it today". It validates, previews (parses a sample, suggests and checks a schema, checks a
-   mapping or a lookup), dry-runs where it builds a Pipeline, and proposes once the draft is clean. It reports a
+   mapping), dry-runs where it builds a Pipeline, and proposes once the draft is clean. It reports a
    Pending Change id (`pc-…`). The previews write nothing; an agent's preview body is at most 256 KiB and its draft
    may not name a file — it puts the schema, grammar or mapping inline.
 5. **A second person approves** on the Pending Changes screen. Each agent proposal reads "Proposed by *person* via
