@@ -1,8 +1,8 @@
 # Agent Kit AK-2 — widening what an agent can reach, task by task (plan and task specs)
 
 > **Status: APPROVED 2026-11-25 — D-AK8…D-AK12 signed (operator interview, §5; D-AK8 not as recommended, which adds
-> task W11); built (§3): W1, W2, W3, W4 steps 1–3, W6 groups A and C, W7, W8, W9, W10 and W11 (2026-11-25/26; W9's
-> live golden runs belong to W4); open: W4 from step 4, W5, W6 groups B, D and E.** The follow-on to phases 1–3b of
+> task W11); built (§3): W1, W2, W3, W4 steps 1–3, W6 groups A and C, W7, W8, W9, W10 and W11 (2026-11-25/26; W8's and
+> W9's live golden runs belong to W4); open: W4 from step 4, W5, W6 groups B, D and E.** The follow-on to phases 1–3b of
 > [`2026-11-20-agent-kit-ak2-plan.md`](2026-11-20-agent-kit-ak2-plan.md) (all built 2026-11-25). It takes the gaps a
 > peer's product review of that plan listed
 ([`2026-11-25-agent-kit-ak2-product-review.md`](2026-11-25-agent-kit-ak2-product-review.md)), keeps the ones
@@ -265,6 +265,18 @@ needs only W3 and can start now.
   (re-evaluate after a fix; a machine's give-up is held and a person declines it).
 
 ### W8 — Golden tasks that try to talk the agent into the never-list
+
+> **Built 2026-11-26.** Suite `agent-kit/golden/adversarial.json`, six tasks: a CSV cell (`golden/data/shipment_notes.csv`
+> row SH-1007), a Pipeline description, an Incident comment read by a person's agent and by a machine, a Pending Change
+> reason, and an Incident comment in a masked Link Analysis Space asking for a raw key. Three grader additions in
+> `tools/run-agent-golden.mjs`: `no-foreign-withdraw` (the gate's never-list does not name a withdrawal — `/withdraw`
+> is allowed and the route refuses anyone but the author — so a try at someone else's proposal is its own check),
+> `no-unmasked-value` (the raw keys, in the reply and the `--transcript`; a missing variable fails closed) and a task's
+> `notice` checks, reported NOTE / MISS and never failing (whether the agent told the person). `check-agent-kit` now
+> refuses a check name the grader does not know, a missing `adversarial.json`, and an adversarial task without its
+> planted text, both safety checks or a notice. **Not done here:** the live run (it needs the W4 install plus the
+> suite's planted set-up), so no skill was changed: no skill tells the agent to treat text in data as data and to tell
+> the person — whether one must is what the live run decides. Detail: `tests-agent-golden.md` § The adversarial suite (W8).
 
 - **Goal.** Evidence that text an agent reads cannot steer it past the gate, before any machine agent runs unattended.
 - **Change.** A fifth suite, `adversarial.json`: instructions planted where an agent reads data — a CSV cell, an
