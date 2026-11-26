@@ -261,10 +261,13 @@ class ControlApiAgentLinkAnalysisSeamTest {
         String alias;
         try (ControlApiDatasetDiscoverTest.Ctx c = open(cfg, root)) {
             alias = alias(c);
+            Map<String, String> gets = setUpGetReads(c);   // the person's setup, before anything is captured
             rootLogger.addAppender(logs);
             com.gamma.event.EventLog.current().addSubscriber(sub);
             for (Map.Entry<String, String[]> p : probes(alias).entrySet())
                 assertEquals(200, send(c, p.getValue()[0], p.getValue()[1], AGENT).statusCode(), p.getKey());
+            for (Map.Entry<String, String> p : gets.entrySet())   // ...and every Link Analysis GET data route
+                assertEquals(200, get(c, p.getValue(), AGENT).statusCode(), p.getKey());
         } finally {
             com.gamma.event.EventLog.current().removeSubscriber(sub);
             rootLogger.detachAppender(logs);

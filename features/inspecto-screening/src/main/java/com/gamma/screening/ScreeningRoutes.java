@@ -119,9 +119,10 @@ public final class ScreeningRoutes implements RouteModule {
         ScreeningHits.Page page = ScreeningHits.page(root, state, after, limit);
         List<Map<String, Object>> out = new ArrayList<>();
         Set<String> hidden = hiddenLists(ex, root);
-        for (Map<String, Object> rec : page.hits()) out.add(shown(rec, hidden));
-        // W6 S0 (D-AK13): a hit's subject and entry are masked at write; a restricted list's entry is withheld above
-        com.gamma.util.AnswerMasking.applied("screening hits (masked at write)", hidden.size());
+        boolean agent = agent(ex);
+        for (Map<String, Object> rec : page.hits()) out.add(shown(root, rec, hidden, agent));
+        // W6 (D-AK13): name and identifier masked at write, a restricted list's entry withheld, an agent's subject key masked
+        com.gamma.util.AnswerMasking.applied("screening hits (masked at write; key masked for an agent)", hidden.size() + 1);
         String next = page.next() == null ? null : com.gamma.control.Cursor.encode(List.of(page.next()));
         ApiContext.pagination(ex, cursor, next, limit, page.total());
         Map<String, Object> body = new LinkedHashMap<>();
@@ -148,8 +149,9 @@ public final class ScreeningRoutes implements RouteModule {
         Map<String, Object> rec = ScreeningHits.read(root, id);
         if (rec == null) throw notFound(id);
         Set<String> hidden = hiddenLists(ex, root);
-        com.gamma.util.AnswerMasking.applied("screening hit (masked at write)", hidden.size());   // W6 S0 (D-AK13)
-        return shown(rec, hidden);
+        // W6 (D-AK13): name and identifier masked at write; for an agent the subject key too (shown)
+        com.gamma.util.AnswerMasking.applied("screening hit (masked at write; key masked for an agent)", hidden.size() + 1);
+        return shown(root, rec, hidden, agent(ex));
     }
 
     /**
@@ -163,6 +165,28 @@ public final class ScreeningRoutes implements RouteModule {
         Set<String> out = new java.util.HashSet<>();
         for (EntityRegistry.EntityList l : EntityRegistry.fold(facts.facts(), facts.headSeq()).values())
             if (l.restricted()) out.add(l.id());
+        return out;
+    }
+
+    /** An AI agent client acting for a person (AGENT-KIT-1): it never reveals, so the subject key leaves masked. */
+    private static boolean agent(HttpExchange ex) {
+        return ApiContext.subject(ex).map(com.gamma.spi.auth.Subject::agent).orElse(false);
+    }
+
+    /**
+     * A hit as this caller reads it. The subject key is the raw value of the Job's key column, stored unmasked (the
+     * Job keys hits on it): for an agent it leaves as the Space token, as a score's key does ({@code EntityKeyMasking}),
+     * and the {@code dedupeKey} hashed over it is withheld, since a guessed key could be tested against it
+     * (AGENT-GET-DATA-READS-1 review, 2026-11-26). A person's read is unchanged ({@code SCREENING-HIT-KEY-RAW-1}).
+     */
+    private static Map<String, Object> shown(Path root, Map<String, Object> rec, Set<String> hidden, boolean agent) {
+        Map<String, Object> out = shown(rec, hidden);
+        if (agent) {
+            Object key = out.get("subjectKey");
+            if (key != null) out.put("subjectKey", com.gamma.mask.EvidenceMasker.forSpace(root).tokenFor(String.valueOf(key)));
+            out.put("subjectKeyMasked", true);
+            out.put("dedupeKey", null);
+        }
         return out;
     }
 

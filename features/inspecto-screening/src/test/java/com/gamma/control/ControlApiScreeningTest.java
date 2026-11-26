@@ -361,10 +361,16 @@ class ControlApiScreeningTest {
     @Test
     void anAgentsHitReadsAreProvenMaskedOrWithheldAndRevealIsRefused(@TempDir Path spaces) throws Exception {
         Path cfg = space(spaces, "acme");
-        String id = ScreeningLists.seedHit(cfg, "c1", "masked:0123456789abcdef", "sanctions", "osama bin laden", 0.97);
+        String rawKey = "447700900123";   // the Job's key column is stored raw: an MSISDN here
+        String id = ScreeningLists.seedHit(cfg, rawKey, "masked:0123456789abcdef", "sanctions", "osama bin laden", 0.97);
         withSpaces(spaces, port -> {
-            for (String path : List.of("/spaces/acme/screening/hits", "/spaces/acme/screening/hits/" + id))
-                assertEquals(200, send(port, "GET", path, null, AGENT).statusCode(), path);
+            for (String path : List.of("/spaces/acme/screening/hits", "/spaces/acme/screening/hits/" + id)) {
+                HttpResponse<String> agent = send(port, "GET", path, null, AGENT);
+                assertEquals(200, agent.statusCode(), path);
+                assertFalse(agent.body().contains(rawKey), "the subject key leaves masked for an agent: " + agent.body());
+                assertTrue(agent.body().contains("\"subjectKeyMasked\":true"), agent.body());
+                assertTrue(send(port, "GET", path, null, OPS).body().contains(rawKey), "a person's read is unchanged: " + path);
+            }
             HttpResponse<String> reveal = send(port, "GET", "/spaces/acme/screening/hits/" + id + "/reveal", null, AGENT);
             assertEquals(403, reveal.statusCode(), reveal.body());
             assertFalse(reveal.body().contains("osama"), reveal.body());
@@ -374,7 +380,7 @@ class ControlApiScreeningTest {
                     HttpResponse<String> r = send(port, "GET", path, null, AGENT);
                     assertEquals(500, r.statusCode(), path + ": " + r.body());
                     assertTrue(r.body().contains(com.gamma.control.ControlApi.MASKING_NOT_PROVEN), r.body());
-                    assertFalse(r.body().contains("osama") || r.body().contains("masked:"), r.body());
+                    assertFalse(r.body().contains("osama") || r.body().contains("masked:") || r.body().contains(rawKey), r.body());
                     assertEquals(200, send(port, "GET", path, null, OPS).statusCode(), "a person is unchanged: " + path);
                 }
             } finally {
