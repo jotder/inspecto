@@ -1,14 +1,33 @@
-import { ChangeDetectionStrategy, Component, effect, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
+import { switchMap } from 'rxjs';
+import { ActionRequestsService } from 'app/inspecto/api/action-requests.service';
 import { apiErrorMessage, needsPermission } from 'app/inspecto/api/api-base';
 import { Insight, InsightFeed, InsightFeedback, InsightsService } from 'app/inspecto/api/insights.service';
 import { LensService } from 'app/inspecto/api/lens.service';
+import { ObjectsService } from 'app/inspecto/api/objects.service';
+import { SessionService } from 'app/inspecto/auth/session.service';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
 import { bandBadge, sliceLabel } from 'app/inspecto/insights/insight-profile-form';
+import {
+    insightActionPayload,
+    insightCaseDescription,
+    insightCaseMember,
+    insightCaseTitle,
+    insightEvidence,
+} from 'app/inspecto/insights/insight-evidence';
+import { InsightActionRequestDialog, InsightActionRequestResult } from './insight-action-request.dialog';
+
+/** What was opened from one Insight in this view: the Case, and the Action Request when one was raised. */
+interface Opened {
+    caseId: string;
+    actionRequestId?: string;
+}
 
 const FEEDBACK: { status: InsightFeedback; label: string }[] = [
     { status: 'useful', label: 'Useful' },
@@ -79,12 +98,59 @@ const STATUS_WORDS: Record<string, string> = {
                                         {{ b.label }}
                                     </button>
                                 }
+                                @if (casesInstalled()) {
+                                    <button
+                                        mat-stroked-button
+                                        type="button"
+                                        data-testid="open-case"
+                                        [disabled]="!!caseBlocked() || busy() === i.insight_id"
+                                        [attr.title]="caseBlocked()"
+                                        (click)="openCase(i)"
+                                    >
+                                        Open a Case
+                                    </button>
+                                }
+                                @if (actionsInstalled()) {
+                                    <button
+                                        mat-stroked-button
+                                        type="button"
+                                        data-testid="request-action"
+                                        [disabled]="!!actionBlocked() || busy() === i.insight_id"
+                                        [attr.title]="actionBlocked()"
+                                        (click)="requestAction(i)"
+                                    >
+                                        Request action…
+                                    </button>
+                                }
                             </div>
+                            @if (opened()[i.insight_id]; as o) {
+                                <p class="mt-2 text-sm" role="status" data-testid="opened">
+                                    Opened Case
+                                    <a class="text-primary underline" [routerLink]="['/cases', o.caseId]">{{
+                                        o.caseId
+                                    }}</a>
+                                    @if (o.actionRequestId) {
+                                        and Action Request
+                                        <a
+                                            class="text-primary underline"
+                                            routerLink="/action-requests"
+                                            [queryParams]="{ id: o.actionRequestId }"
+                                            >{{ o.actionRequestId }}</a
+                                        >, waiting for approval.
+                                    }
+                                </p>
+                            }
                         </li>
                     }
                 </ul>
                 @if (!canFeedback()) {
                     <p class="text-secondary mt-2 text-xs">{{ noFeedbackReason }}</p>
+                }
+                @if (casesInstalled() && caseBlocked(); as why) {
+                    <p class="text-secondary mt-1 text-xs">Open a Case: {{ why }}</p>
+                }
+                @if (actionsInstalled() && actionBlocked(); as why) {
+                    <p class="text-secondary mt-1 text-xs">Request action: {{ why }}</p>
                 }
             }
         } @else {
@@ -103,6 +169,10 @@ export class InsightFeedComponent {
     private api = inject(InsightsService);
     private toastr = inject(ToastrService);
     private lens = inject(LensService);
+    private session = inject(SessionService);
+    private objects = inject(ObjectsService);
+    private actionRequests = inject(ActionRequestsService);
+    private dialog = inject(MatDialog);
 
     readonly profile = input.required<string>();
     readonly feedbackChoices = FEEDBACK;
@@ -115,6 +185,20 @@ export class InsightFeedComponent {
     readonly band = (i: Insight) => bandBadge(i.band);
     readonly slice = sliceLabel;
     readonly round = (n: number) => Math.round(n);
+
+    /** Each action shows only when its module is installed (`/bootstrap` features); a request also opens a Case. */
+    readonly casesInstalled = computed(() => this.session.features()['cases'] === true);
+    readonly actionsInstalled = computed(
+        () => this.casesInstalled() && this.session.features()['actionRequests'] === true,
+    );
+    /** Why an installed action is disabled for this reader, or null when they may use it. */
+    readonly caseBlocked = computed(() =>
+        this.lens.canManageIncidents() ? null : needsPermission('canManageIncidents'),
+    );
+    readonly actionBlocked = computed(
+        () => this.caseBlocked() ?? (this.lens.canWorkIncidents() ? null : needsPermission('canWorkIncidents')),
+    );
+    readonly opened = signal<Record<string, Opened>>({});
 
     constructor() {
         effect(() => this.load(this.profile()));
@@ -135,6 +219,78 @@ export class InsightFeedComponent {
                 this.loading.set(false);
             },
         });
+    }
+
+    /** `POST /cases/from-entities` with the Insight as its one member, so the Case carries the evidence. */
+    private caseFor(i: Insight) {
+        const e = insightEvidence(i, this.profile(), window.location.origin);
+        return this.objects.openCaseFromEntities(insightCaseTitle(e), insightCaseDescription(e), [
+            insightCaseMember(e),
+        ]);
+    }
+
+    openCase(i: Insight): void {
+        this.busy.set(i.insight_id);
+        this.caseFor(i).subscribe({
+            next: (made) => {
+                this.busy.set(null);
+                this.remember(i, { caseId: made.case.id });
+            },
+            error: (e) => {
+                this.busy.set(null);
+                this.toastr.error(apiErrorMessage(e, 'The Case was not opened.'));
+            },
+        });
+    }
+
+    /** Ask for the Connection, open the Case, then raise the Action Request from it (`POST /action-requests`). */
+    requestAction(i: Insight): void {
+        const e = insightEvidence(i, this.profile(), window.location.origin);
+        this.dialog
+            .open<InsightActionRequestDialog, unknown, InsightActionRequestResult>(InsightActionRequestDialog, {
+                data: { title: insightCaseTitle(e) },
+            })
+            .afterClosed()
+            .subscribe((choice) => {
+                if (!choice) return;
+                this.busy.set(i.insight_id);
+                let caseId = '';
+                this.caseFor(i)
+                    .pipe(
+                        switchMap((made) => {
+                            caseId = made.case.id;
+                            return this.actionRequests.propose({
+                                connection: choice.connection,
+                                payloadTemplate: insightActionPayload(e),
+                                caseId,
+                                reason: choice.reason || undefined,
+                            });
+                        }),
+                    )
+                    .subscribe({
+                        next: (ar) => {
+                            this.busy.set(null);
+                            this.remember(i, { caseId, actionRequestId: ar.id });
+                        },
+                        error: (err) => {
+                            this.busy.set(null);
+                            // The Case may exist already: show it, so a retry does not open a second one blindly.
+                            if (caseId) this.remember(i, { caseId });
+                            this.toastr.error(
+                                apiErrorMessage(
+                                    err,
+                                    caseId
+                                        ? 'The Case was opened, but the Action Request was not raised.'
+                                        : 'The Case was not opened.',
+                                ),
+                            );
+                        },
+                    });
+            });
+    }
+
+    private remember(i: Insight, o: Opened): void {
+        this.opened.update((m) => ({ ...m, [i.insight_id]: o }));
     }
 
     statusWords(i: Insight): string {

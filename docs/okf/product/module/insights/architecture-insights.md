@@ -84,7 +84,13 @@ counts as bars, the sentence "you would have seen N Insights in the last P perio
 saved. The selected Profile's feed reads `GET /insights?profile=` (band as a status badge with its word, slice,
 period, score, sentence) with **Useful / Not useful / Expected** buttons, disabled with the reason without
 canAuthorWorkbench; a 404 is the empty state that points to an `insight.scan` Job. No "Run scan now" shortcut: the
-Jobs screen runs the Job. User guide: [`user-guide-insights.md`](user-guide-insights.md).
+Jobs screen runs the Job. Each Insight also offers **Open a Case** (`POST /cases/from-entities`, the Insight as the
+member `insight:<id>` of Dataset `insights_<profile>`, reused on a second Case) and **Request action…** (an https
+Connection and a reason, then that Case and `POST /action-requests` from it, with `caseId` and the evidence as the
+payload). Both carry the evidence (sentence, type, slice as stored, period,
+value / expected / delta, score, band, Profile and Insight ids, a link back to the feed), show only when the module
+is installed, are disabled with the reason without canManageIncidents (and canWorkIncidents for the request), and
+link the created ids. No new route (I-17, 2026-11-26; `inspecto/insights/insight-evidence.ts`). User guide: [`user-guide-insights.md`](user-guide-insights.md).
 
 ## 5. The Insight scan (P3: I-8, Profiles, feed, feedback, replay, calendar)
 

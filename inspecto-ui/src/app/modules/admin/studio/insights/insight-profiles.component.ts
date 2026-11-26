@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } 
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { ActivatedRoute } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
 import { apiErrorMessage } from 'app/inspecto/api/api-base';
 import { ComponentDef, ComponentsService } from 'app/inspecto/api/components.service';
@@ -165,6 +166,7 @@ export class InsightProfilesComponent implements OnInit {
     private dialog = inject(MatDialog);
     private toastr = inject(ToastrService);
     private confirm = inject(InspectoConfirmService);
+    private route = inject(ActivatedRoute);
 
     readonly enabled = computed(() => this.session.features()['insights'] === true);
     readonly loading = signal(true);
@@ -174,6 +176,9 @@ export class InsightProfilesComponent implements OnInit {
     readonly selected = computed(() => this.profiles().find((p) => p.id === this.selectedId()) ?? null);
 
     ngOnInit(): void {
+        // A link back from a Case or an Action Request names the Profile (`?profile=`, BI-INSIGHTS-1 I-17).
+        const wanted = this.route.snapshot.queryParamMap.get('profile');
+        if (wanted) this.selectedId.set(wanted);
         this.load();
     }
 
