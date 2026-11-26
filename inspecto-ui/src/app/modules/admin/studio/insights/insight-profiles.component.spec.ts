@@ -14,6 +14,8 @@ import { SessionService } from 'app/inspecto/auth/session.service';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { expectNoA11yViolations } from 'app/inspecto/testing/a11y';
 import { InsightProfilesComponent } from './insight-profiles.component';
+import { InsightScanButtonComponent } from './insight-scan-button.component';
+import { By } from '@angular/platform-browser';
 
 const PROFILE: ComponentDef = {
     type: 'insight-profile',
@@ -185,5 +187,26 @@ describe('InsightProfilesComponent', () => {
         buttons(el, 'Delete')[0].click();
         await new Promise((r) => setTimeout(r, 0));
         expect(remove).toHaveBeenCalledWith('insight-profile', 'sales');
+    });
+
+    it('gives each Profile its own Run scan now, so a scan followed for one never shows under another', () => {
+        const west = {
+            ...PROFILE,
+            name: 'west',
+            ref: 'insight-profile/west',
+            content: { ...PROFILE.content, id: 'west' },
+        };
+        const { fixture, el } = create({ author: true, profiles: [PROFILE, west] });
+        const scan = () => fixture.debugElement.query(By.directive(InsightScanButtonComponent)).componentInstance;
+        const first = scan() as InsightScanButtonComponent;
+        first.running.set(true);
+        Array.from(el.querySelectorAll<HTMLButtonElement>('nav button'))
+            .find((b) => b.textContent?.includes('west'))!
+            .click();
+        fixture.detectChanges();
+        const second = scan() as InsightScanButtonComponent;
+        expect(second).not.toBe(first);
+        expect(second.profile()).toBe('west');
+        expect(second.running()).toBe(false);
     });
 });

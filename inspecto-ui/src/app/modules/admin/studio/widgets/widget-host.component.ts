@@ -342,7 +342,8 @@ export class WidgetHostComponent {
     readonly resolvedWidget = computed(() => {
         const w = this.widget() ?? this.fetchedWidget();
         const applied = this.appliedOptions();
-        return w && applied ? { ...w, options: applied } : w;
+        // Only over the Widget it was applied to: a newer `widget` input (a reload) wins.
+        return w && applied && applied.to === w ? { ...w, options: applied.options } : w;
     });
     readonly resolvedDataset = computed(() => this.dataset() ?? this.fetchedDataset());
 
@@ -364,7 +365,7 @@ export class WidgetHostComponent {
     );
     readonly props = signal<VizProps>({ labels: [], series: [] });
     /** Options applied from a Show-Me suggestion on this tile (saved); they win over the input Widget's. */
-    private readonly appliedOptions = signal<WidgetOptions | null>(null);
+    private readonly appliedOptions = signal<{ to: Widget; options: WidgetOptions } | null>(null);
     /** Show-Me's suggestions, read when its menu opens; null while reading. */
     readonly suggestions = signal<OverlaySuggestion<WidgetOptions>[] | null>(null);
     /** A Dataset-bound line / bar / area / combo tile, for a user who may save the Widget. */
@@ -562,7 +563,8 @@ export class WidgetHostComponent {
         if (!ok) return;
         this.widgetsApi.save({ ...widget, options: s.options }, { update: true }).subscribe({
             next: () => {
-                this.appliedOptions.set(s.options);
+                const source = this.widget() ?? this.fetchedWidget();
+                if (source) this.appliedOptions.set({ to: source, options: s.options });
                 toastr.success(`Widget "${widget.name}" saved`);
             },
             error: (e) => toastr.error(apiErrorMessage(e, 'The Widget was not saved.')),

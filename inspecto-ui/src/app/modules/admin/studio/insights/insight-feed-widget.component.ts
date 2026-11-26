@@ -30,7 +30,9 @@ export const INSIGHT_TILE_LIMIT = 10;
             <p class="text-warn text-sm" role="alert">{{ e }}</p>
         } @else if (feed(); as f) {
             @if (f.insights.length === 0) {
-                <p class="text-secondary text-sm">The latest run ({{ f.latestRun }}) found no Insight.</p>
+                <p class="text-secondary text-sm">
+                    The latest run{{ f.latestRun ? ' (' + f.latestRun + ')' : '' }} found no Insight.
+                </p>
             } @else {
                 <ul class="flex flex-col gap-2" [attr.aria-label]="'Insights of ' + viewId()">
                     @for (i of f.insights; track i.insight_id) {

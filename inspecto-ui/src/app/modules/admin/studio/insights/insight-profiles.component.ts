@@ -137,10 +137,13 @@ function row(d: ComponentDef): ProfileRow {
                                     <button mat-stroked-button type="button" (click)="edit(p.id)">Edit</button>
                                     <button mat-stroked-button type="button" (click)="remove(p.id)">Delete</button>
                                 }
-                                <app-insight-scan-button
-                                    [profile]="p.id"
-                                    (finished)="feedReload.set(feedReload() + 1)"
-                                />
+                                <!-- One button per Profile: switching Profile drops a scan being followed for another. -->
+                                @for (id of [p.id]; track id) {
+                                    <app-insight-scan-button
+                                        [profile]="id"
+                                        (finished)="feedReload.set(feedReload() + 1)"
+                                    />
+                                }
                             </div>
                             @if (p.description) {
                                 <p class="text-secondary mt-1 text-sm">{{ p.description }}</p>
