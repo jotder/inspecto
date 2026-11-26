@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-492 test class(es): 196 unit, 296 real-HTTP control-plane, 0 IT.
+493 test class(es): 196 unit, 297 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -211,6 +211,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiLinkAnalysisLimitsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiLinkAnalysisLimitsTest.java` | {@code GET\|PUT /settings/link-analysis/limits} and {@code PUT /system/link-analysis/limits} ({@code LA-CONFIG-LIMITS-1} |
 | `ControlApiLinkRefusalTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiLinkRefusalTest.java` | `SPACE-LINK-CENSUS-1` LC-3 over real HTTP: the census delete refusal ({@code -Dlinks.delete}, D-LC3) for each kind a |
 | `ControlApiLookupsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiLookupsTest.java` | LOOKUP-1 — {@code GET /lookups} over real HTTP: every keyed {@code transform.join} of the loaded Pipelines with its |
+| `ControlApiLookupTestAccessTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiLookupTestAccessTest.java` | LOOKUP-TEST-OPEN-READ-1 — {@code POST /lookups/test} over real HTTP, with an armed authenticator: no credential 401, |
 | `ControlApiMappingValidateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiMappingValidateTest.java` | {@code POST /components/mapping/validate} over real HTTP (ELT amendment UI plan §2.5, S6b): the |
 | `ControlApiMaskClassificationTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiMaskClassificationTest.java` | MASKING-UNION-RESIDUALS-1 over real HTTP ({@code POST /validate}, the save gate every save path runs): a {@code mask} step may |
 | `ControlApiMeasureRuleSpaceRootTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiMeasureRuleSpaceRootTest.java` | {@code MEASURE-PROBE-SPACE-ROOT-1} — <b>a measure Alert Rule in a named Space reads that Space's registry.</b> |

@@ -248,6 +248,17 @@ final class BiResultMasking {
         return engaged() && isMasked(column, false);
     }
 
+    /**
+     * One cell of a plain Dataset column as this caller sees it (RECON-READ-UNGATED-1): unchanged unless {@link #hidesFromCaller};
+     * then the linkable alias for a bare column, {@link #UNLINKABLE} for a calculated column derived from a key, as {@link #apply}
+     * renders a structured spec's dimension.
+     */
+    Object cell(String column, Object value) {
+        if (value == null || !hidesFromCaller(column)) return value;
+        String n = column.trim().toLowerCase(Locale.ROOT);
+        return derivedCalc.contains(n) ? UNLINKABLE : alias(String.valueOf(value));
+    }
+
     /** A Dataset column (any type) the caller may not see raw: masked, or not provably clean while the lineage is unknown. */
     private boolean isMasked(String column, boolean viaText) {
         String c = column == null ? "" : column.trim().toLowerCase(Locale.ROOT);

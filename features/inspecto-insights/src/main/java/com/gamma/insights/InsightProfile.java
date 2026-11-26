@@ -1,5 +1,7 @@
 package com.gamma.insights;
 
+import com.gamma.analytics.insight.Concentration;
+import com.gamma.analytics.insight.DistributionShift;
 import com.gamma.analytics.insight.Surprise;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
@@ -22,7 +24,12 @@ public record InsightProfile(String id, String dataset, String agg, String measu
     public static final String KIND = "insight-profile";
     public static final String PREFIX = "insights_";
     static final List<String> GRAINS = List.of("day", "week", "month");
-    static final List<String> TYPES = List.of(Surprise.SPIKE, Surprise.CHANGEPOINT, Surprise.DRIFT);
+    /** The tests over one slice's series. */
+    static final List<String> SERIES_TYPES = List.of(Surprise.SPIKE, Surprise.CHANGEPOINT, Surprise.DRIFT);
+    /** The tests over one dimension's mix of values (I-9, I-10); opt-in — the default stays {@link #SERIES_TYPES}. */
+    static final List<String> DIMENSION_TYPES = List.of(Concentration.TYPE, DistributionShift.TYPE);
+    static final List<String> TYPES = List.of(Surprise.SPIKE, Surprise.CHANGEPOINT, Surprise.DRIFT, Concentration.TYPE,
+            DistributionShift.TYPE);
     static final Set<String> ADDITIVE = Set.of("sum", "count");
     static final int MAX_DIMENSIONS = 12, MAX_VALUES = 200, MIN_LOOKBACK = 12, MAX_LOOKBACK = 120;
     /** The scan's statements share the BI row ceiling ({@code ListLimitSettings.MAX_ROWS}). */
@@ -67,8 +74,11 @@ public record InsightProfile(String id, String dataset, String agg, String measu
         List<String> dims = new ArrayList<>(new LinkedHashSet<>(strings(c.get("dimensions"))));
         if (dims.size() > MAX_DIMENSIONS) throw bad(id, "at most " + MAX_DIMENSIONS + " 'dimensions'");
         if (dims.contains(field)) throw bad(id, "the date column '" + field + "' cannot also be a dimension");
-        List<String> types = c.get("types") == null ? TYPES : new ArrayList<>(new LinkedHashSet<>(strings(c.get("types"))));
+        List<String> types = c.get("types") == null ? SERIES_TYPES : new ArrayList<>(new LinkedHashSet<>(strings(c.get("types"))));
         if (types.isEmpty() || !TYPES.containsAll(types)) throw bad(id, "'types' must be a non-empty subset of " + TYPES);
+        for (String t : types)
+            if (DIMENSION_TYPES.contains(t) && dims.isEmpty())
+                throw bad(id, "'" + t + "' compares the values of a dimension; name at least one in 'dimensions'");
         String sens = c.get("sensitivity") == null ? "normal" : String.valueOf(c.get("sensitivity"));
         double alpha = switch (sens) {
             case "low" -> 0.01;

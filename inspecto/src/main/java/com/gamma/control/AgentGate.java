@@ -120,8 +120,8 @@ final class AgentGate {
      * The authoring previews (widening plan W6 group A, D-AK10 signed 2026-11-25: for every agent): a draft's parsing over
      * raw sample text, its schema casts and mapping over parsed rows, the schema the server infers from rows, a mapping's
      * rule check. Each persists nothing (scratch DuckDB). {@code POST /lookups/test} is NOT one: it answers a Reference
-     * row's values unmasked, lists fuzzy {@code candidates} and has no rate limit, so it stays refused to agents until
-     * those are built (BACKLOG, operator 2026-11-26). For an agent the host runs them with two more bounds ({@code ControlApi.handle}): the body is at
+     * row's values; its people fix (masking, at most 5 candidates, per-caller budgets: LOOKUP-TEST-OPEN-READ-1) is built,
+     * but it stays refused to agents until the signed agent change (AGENT-LOOKUP-PREVIEW-1, after S0). For an agent the host runs them with two more bounds ({@code ControlApi.handle}): the body is at
      * most {@link #PREVIEW_MAX_BODY_BYTES} (413), and the draft may not name a config file — a {@code schema_file},
      * {@code grammar}, {@code mapping_file} or profile ref is refused before anything is read
      * ({@code PathJail.withoutConfigRefs}). The schema preview's draft SQL (an EXPR rule) runs sealed, with no file access.

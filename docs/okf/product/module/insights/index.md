@@ -20,7 +20,7 @@ tags: [product-item, module]
 | architecture | current | [Business Insights](architecture-insights.md) |
 | features | missing | |
 | feature-db | current | [Business Insights — feature database](feature-db.md) |
-| user-guide | missing | |
+| user-guide | current | [Business Insights — screens](user-guide-insights.md) |
 | admin-guide | missing | |
 | api | current | [HTTP routes — module.insights](api-routes.md) |
 | tests | current | [Business Insights — tests inventory](tests-inventory.md) |

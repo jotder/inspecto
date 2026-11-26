@@ -35,6 +35,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `RECON-CROSS-PERIOD-1` | P3 | feature | a Reconciliation is read one day at a time: | — |
-| `RECON-READ-UNGATED-1` | P2 | defect | the recon reads ignore Dataset sharing and masking: | — |
 | `PACK-PARTNER-SETTLEMENT-1` | P3 | feature | Partner settlement slices W1…W3 (wholesale, MVNO, roaming) and confirmation of the delegated decisions. | — |
 | `HOWTO-DOC-DRIFT-1` | P3 | chore | internal hub pages that contradict the code, found writing the P3 how-tos: | — |

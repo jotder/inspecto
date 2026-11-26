@@ -72,6 +72,20 @@ the headline change, per-dimension tables (cover values in bold), the mix / rate
 Visualization Type (Before → Mix → Rate → After) and the Moved-with list with its "does not say one causes the
 other" note. The request is built by `inspecto/viz/explain-request.ts` from the Widget's own `/bi/query` body.
 
+**Studio ▸ Insight Profiles** (`/studio/insights`, nav entry gated on the `insights` feature; P3 UI, 2026-11-26) lists
+the `insight-profile` components through the generic component routes and edits one in a dialog
+(`studio/insights/insight-profile-form.dialog.ts`; the form model is framework-free in
+`inspecto/insights/insight-profile-form.ts`). Save is `POST` / `PUT /components/insight-profile[/{id}]` with `If-Match`;
+a 422 from `InsightProfileValidator` is shown in its own words. Insight Types are a free list with the known names
+as help, so a type the server adds is authorable before the UI learns it — the server is the gate. *Propose
+dimensions from column roles* fills Dimensions from the Dataset's `dimension` columns (and an empty Date column from a
+`temporal` one). *Preview on history* posts the unsaved content to `POST /insights/preview` and draws the per-period
+counts as bars, the sentence "you would have seen N Insights in the last P periods" and the top Insights; nothing is
+saved. The selected Profile's feed reads `GET /insights?profile=` (band as a status badge with its word, slice,
+period, score, sentence) with **Useful / Not useful / Expected** buttons, disabled with the reason without
+canAuthorWorkbench; a 404 is the empty state that points to an `insight.scan` Job. No "Run scan now" shortcut: the
+Jobs screen runs the Job. User guide: [`user-guide-insights.md`](user-guide-insights.md).
+
 ## 5. The Insight scan (P3: I-8, Profiles, feed, feedback, replay, calendar)
 
 An **Insight Profile** (component kind `insight-profile`, `registry/insight-profiles/`) names a Measure (sum or
@@ -84,7 +98,7 @@ up to 12 dimensions, the tests, and the knobs: `sensitivity` (q ≤ 0.01 / 0.05 
 |---|---|
 | Read | One statement for the total and one per dimension, through `BiSpecRunner.runAsJob` — the `/bi/query` compiler, `SqlGuard`, sandbox and masking **as a reader who may not reveal**: a Measure over a masked column refuses the run; a classified slice value is stored as its alias. The Job runs as its author (`canView` the Profile, `canRead` the Dataset), as `kpi.snapshot`. A dimension with more than `maxValues` values is skipped and named in the run message |
 | "Now" | The last **complete** bucket; the bucket in progress is never scanned |
-| Insight Types (kernel `com.gamma.analytics.insight`) | **anomaly** (a spike) — robust z of now against the same season slot (`season: auto` = 7 for day, 52 for week, 12 for month; when ≥ 4 hold a value) or every earlier bucket; **trend-break** (a level shift) — largest CUSUM of the mean (σ from first differences), Kolmogorov tail, only when the change is in the last 2 × minSegment buckets; **drift** (a steady climb or slide) — Mann-Kendall with ties, Sen's slope |
+| Insight Types (kernel `com.gamma.analytics.insight`) | **anomaly** (a spike) — robust z of now against the same season slot (`season: auto` = 7 for day, 52 for week, 12 for month; when ≥ 4 hold a value) or every earlier bucket; **trend-break** (a level shift) — largest CUSUM of the mean (σ from first differences), Kolmogorov tail, only when the change is in the last 2 × minSegment buckets; **drift** (a steady climb or slide) — Mann-Kendall with ties, Sen's slope. Per dimension (I-9, I-10; opt-in in `types`, need ≥ 1 dimension, the default stays the three above): **concentration** — the share held by the top 3 values (re-ranked per bucket) as a series, robust z of now against the earlier buckets (1 share point floor; a dimension of ≤ 3 values is not tested), with HHI, Gini and the 80 % Pareto count in the explanation (`Concentration`); **distribution-shift** — PSI of now's value mix against the baseline window, p against each earlier bucket's leave-one-out PSI — the empirical rank within them, a scaled chi-square tail matched to them beyond the largest (PSI is too skewed for a normal tail; a rank alone floors at 1 ÷ (n + 1)), with total variation, the KS distance (nominal KS p for a count Measure only) and the value that moved most (`DistributionShift`). Their impact is the share of the whole that moved (share points; total variation), not \|Δ\| ÷ the Measure; a dimension with a negative amount is not tested |
 | False discoveries | Benjamini-Hochberg across every slice × test of the run; kept at q ≤ α |
 | Filters | slice support ≥ `minSupport` of the window; \|Δ\| ≥ `minImpact` × the Measure in that bucket; `exclude` calendar days are removed from every series, a finding dated on an `expected` day is dropped (and counted) |
 | Score 0–100 | impact × surprise × novelty (`InsightScore`, bands 40 / 70); novelty = 1 ÷ (1 + times the same type × slice was reported in the last `noveltyRuns` runs), 0 after *not useful* or *expected* feedback |

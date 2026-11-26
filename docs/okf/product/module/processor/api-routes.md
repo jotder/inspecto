@@ -231,7 +231,7 @@ tags: [api, routes, generated]
 | GET | `/kpis/{kpiId}/value` | Evaluate a KPI definition for the period to date | kpis | — | `inspecto/src/main/java/com/gamma/control/KpiRoutes.java` |
 | GET | `/lineage` | Lineage around one output table | lineage | — | `inspecto/src/main/java/com/gamma/control/LineageRoutes.java` |
 | GET | `/lookups` | Every keyed Reference lookup with its last run | Execution & Scheduling | — | `inspecto/src/main/java/com/gamma/control/LookupRoutes.java` |
-| POST | `/lookups/test` | Test one value against a keyed lookup | Execution & Scheduling | — | `inspecto/src/main/java/com/gamma/control/LookupRoutes.java` |
+| POST | `/lookups/test` | Test one value against a keyed lookup | Execution & Scheduling | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/LookupRoutes.java` |
 | GET | `/metrics/acquisition` | Acquisition metrics snapshot | metrics | — | `inspecto/src/main/java/com/gamma/control/AcquisitionRoutes.java` |
 | GET | `/modules` | List modules and their state | modules | — | `inspecto/src/main/java/com/gamma/control/ModulesRoutes.java` |
 | GET | `/nav/menus` | The Space's Menu tree | nav | — | `inspecto/src/main/java/com/gamma/control/NavRoutes.java` |

@@ -287,6 +287,14 @@ export const defaultNavigation: GammaNavigationItem[] = [
                         link: '/studio/dashboards',
                     },
                     {
+                        id: 'studio-insights',
+                        navFeature: 'insights',
+                        title: 'Insight Profiles',
+                        type: 'basic',
+                        icon: 'heroicons_outline:light-bulb',
+                        link: '/studio/insights',
+                    },
+                    {
                         id: 'studio-templates',
                         title: 'Template Gallery',
                         type: 'basic',
