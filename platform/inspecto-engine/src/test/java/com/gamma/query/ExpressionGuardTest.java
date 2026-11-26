@@ -119,4 +119,43 @@ class ExpressionGuardTest {
         bad("", "empty expression");
         bad("a".repeat(501), "length cap");
     }
+
+    /** EXPRESSION-GUARD-ESTRING-1: DuckDB reads a string with a letter/digit prefix as another literal kind. */
+    @Test
+    void killsPrefixedStringLiteralsDuckDbLexesDifferently() {
+        bad("E'\\''' || ') IS NOT NULL UNION ALL SELECT secret FROM s --'", "escape string smuggling a statement");
+        bad("e'\\'''", "escape string, lower case");
+        bad("E'x'", "any escape string");
+        bad("X'41'", "hex/blob literal");
+        bad("B'101'", "bit-string literal");
+        bad("N'x'", "national string literal");
+        bad("1e'\\'''", "DuckDB re-lexes the 'e' after a number as an escape-string prefix");
+        bad("amount_e'x'", "any identifier character before the quote");
+        bad("code = E'\\'' OR 1 = 1", "prefixed literal mid-expression");
+    }
+
+    /** DuckDB reads a number glued to a word as the number then a token (1e1from = 1e1 FROM): a denied keyword
+     *  would reach DuckDB unseen, so a number touching a letter, digit or _ never lexes. */
+    @Test
+    void killsNumbersGluedToAWord() {
+        bad("trim(1e1from y)", "denied keyword hidden behind a number");
+        bad("1from", "denied keyword glued to an integer");
+        bad("0x1F", "hex number");
+        bad("1_000", "digit-group separator");
+        bad("1.5e3", "exponent form");
+        ok("round(amount * 1.5, 2) + 10");
+        ok("col_2 + x1");
+    }
+
+    /** The fix refuses only the prefixed form: a standard string keeps backslashes and '' as text, as DuckDB does. */
+    @Test
+    void stillAcceptsStandardStringsWithBackslashesAndDoubledQuotes() {
+        ok("regexp_matches(code, '\\d+')");
+        ok("replace(path, '\\', '/')");
+        ok("code = 'it''s' OR code = ''''");
+        ok("coalesce(region,'UNKNOWN')");
+        ok("upper(region)||'-'");
+        ok("CAST('2026-01-01' AS date)");
+        ok("date '2026-01-01'");
+    }
 }

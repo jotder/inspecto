@@ -52,5 +52,13 @@ slice ("region = North" or the whole Measure), the Insight Type, the period, the
 it — Not useful and Expected stop it being reported again. Without the Workbench author permission the buttons are
 disabled and say so.
 
+**Open a Case** opens a Case holding the Insight's evidence — its sentence, type, slice, period, value, expected
+value and change, score and band, and a link back to this feed. Opening a second Case from the same Insight reuses
+the Incident the first one made for it. **Request action…** asks which https Connection to send to and why, opens
+that Case, and raises an Action Request from it carrying the same evidence; a second person approves it before
+anything is sent. When it is done the Insight shows the new Case (and Action Request) as links. The buttons appear
+only where Case Management (and Action Requests) are installed, and are disabled with the reason without the Manage
+Incidents and Cases permission (and Incident work, for a request).
+
 No Insights yet? Add an `insight.scan` Job on the **Jobs** screen with the parameter `profile` set to the Profile's
 id, and run it.

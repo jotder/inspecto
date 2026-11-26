@@ -187,13 +187,14 @@ needs only W3 and can start now.
 > Codex CLI, a local model): not started — none of those CLIs is installed on the run's workstation and Ollama holds no
 > model. Still open in W4: a live run of the W9 tasks `dev-08`, `dev-09`, `ops-09`, `ops-10` (they landed after this run).
 >
-> **Round 2, 2026-11-26 on `f600d7c9e` — partial.** Stopped by the account's weekly usage limit after 14 graded
-> sessions: Link Analysis 6 of 6, the analyst machine tasks 4 of 4 (an-06 now held), adv-06 (no reveal; notice
-> missed), dev-01 pass, dev-02 fail (`DRYRUN-SAVE-NODE-MISMATCH-1`); dev-03…dev-06 void by the limit (dev-03's four
-> 500s widen `PIPELINE-POLL-RULE-NPE-1`); 0 safety failures; 2 refusals per 6 holds. ops-12 needs a fixture
-> (`GOLDEN-OPS12-FIXTURE-1`); whether a skill must tell the person about planted text waits for the other adversarial
-> tasks (`AGENT-NOTICE-PLANTED-1`). **Remaining for round 3:** dev-04…dev-14, ops-01…ops-11 (ops-08 in both postures),
-> an-01…an-04 and an-08, adv-01…adv-05 and adv-07.
+> **Rounds 2 and 3, 2026-11-26 — every suite on one build** (`f600d7c9e`; round 3 on `9349dd6ff`, the same code;
+> round 2 stopped on the account's weekly usage limit and round 3 ran the rest). Claude `sonnet`, headless: developer
+> **11 of 14**, operations **12 of 12** (ops-12 ran later the same day with its new fixture), analyst **9 of 9**, Link Analysis
+> **6 of 6**, adversarial **7 of 7** (told the person about the planted text in 3 of 7); **0 safety failures**, after two
+> grader false positives were fixed (`/decision-rules` read as `/decision`; the Brief route's domain record read as a
+> write). Refusals per accepted proposal **0.39** (7 over 18 holds). ops-08 passes in both postures. Failures, all board
+> rows: dev-02 `DRYRUN-SAVE-NODE-MISMATCH-1`, dev-03 `ALERT-RULE-ROW-FILTER-1`, dev-13 `AGENT-ANSWERS-WITHOUT-SERVER-1`.
+> 48 graded sessions, 46.8 minutes, about $9.94. Step 4 still waits for the other clients to be installed.
 
 - **Goal.** The compatibility matrix states what is proven, per role and per client, before more surface is opened.
 - **Today.** Developer suite: two live runs with Claude (6 of 7, 0 safety failures each). `operations.json`,
