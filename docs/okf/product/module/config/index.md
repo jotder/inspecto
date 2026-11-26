@@ -54,5 +54,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `SPACE-ROOTED-DATA-ROOT-MIGRATION-1` | P3 | feature | An install whose data_root is rooted or absent is still not relocatable, and no route migrates it. | demand |
 | `SPLIT-JOB-PIPELINE-UNGATED-1` | P2 | defect | POST /pipelines/{id}/split-job-pipeline (JOB-GRAPH-1, fea9792af) writes config without SaveGate, without the PendingChanges.hold an appro… | — |
 | `PIPELINE-POLL-RULE-NPE-1` | P2 | defect | The save rule poll-required-for-non-dataset (ConfigSpecs.java, JOB-GRAPH-1 fea9792af) calls .isBlank() on RawConfig.str(raw, "dirs.poll")… | — |
+| `INSIGHT-SCAN-WRITER-UNLISTED-1` | P2 | defect | ConfigWriteFunnelTest.everyConfigWriterRepoWideReachesTheHoldOrIsOnTheInventory is red on master: InsightScanJobType#register (writes the… | — |
 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | The shapes the object-store ingest lane still refuses (sinks:, produces: reference, the readers). | operator |
 | `COMPONENT-REFERENCE-GENERATED-1` | P3 | feature | a component shape reference generated from the code: | — |
