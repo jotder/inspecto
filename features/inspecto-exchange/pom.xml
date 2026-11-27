@@ -12,6 +12,11 @@
     </parent>
 
     <artifactId>inspecto-exchange</artifactId>
+
+    <properties>
+        <!-- SIGNAL-BOARD-1 SB-1b: every Signal a test posts must fit the Signal Type catalog (SignalPostCheck). -->
+        <signals.checkFields>true</signals.checkFields>
+    </properties>
     <packaging>jar</packaging>
 
     <name>Inspecto — cross-space exchange / sharing (Standard edition, optional)</name>
@@ -70,6 +75,15 @@
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-http-spi</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- SIGNAL-BOARD-1 SB-1b: SignalPostCheckExtension. The forwarder posts from inside an EventLog tap, which swallows
+             every Throwable, so only the extension's record of a misfit can fail the test. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-engine</artifactId>
             <type>test-jar</type>
             <scope>test</scope>
         </dependency>

@@ -93,4 +93,20 @@ class EventLogAuditSinkTest {
         assertTrue(signals.stream().anyMatch(s -> "agent.tool.called".equals(s.type())));
         assertTrue(signals.stream().anyMatch(s -> "agent.tool.completed".equals(s.type())));
     }
+
+    /** The two types no other test posts, so the post-time check (SIGNAL-BOARD-1 SB-1b) sees their declared fields. */
+    @Test
+    void bridgesModelCalledAndHumanDecided() {
+        String capabilityId = "diagnose-" + UUID.randomUUID();
+        EventLogAuditSink sink = new EventLogAuditSink();
+
+        sink.emit(new ModelCalled(capabilityId, System.currentTimeMillis(), ModelTier.SMALL, true));
+        sink.emit(new HumanDecided(capabilityId, System.currentTimeMillis(), "approved", "analyst-1", "proposal-7"));
+
+        List<Signal> signals = Signals.query(log.store(), "agent.*", null, null, null, capabilityId, 10);
+        assertTrue(signals.stream().anyMatch(s -> "agent.model.called".equals(s.type())
+                && Boolean.TRUE.equals(s.payload().get("jsonFormat"))), signals.toString());
+        assertTrue(signals.stream().anyMatch(s -> "agent.human.decided".equals(s.type())
+                && "analyst-1".equals(s.payload().get("reviewer"))), signals.toString());
+    }
 }
