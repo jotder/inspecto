@@ -320,6 +320,14 @@ public final class JobService implements AutoCloseable {
     /** Test seam: shrink the per-Job pending bound for a non-coalescing Job. */
     void setMaxPendingSignalRuns(int max) { this.maxPendingSignalRuns = max; }
 
+    /** SIGNAL-BOARD-1 SB-2b: each on_signal Job's durable mark of the last Signal it handled, and the boot replay. */
+    private final SignalCatchUp signalCatchUp;
+    /** SB-2b (D-SB5): a missed Signal older than this is not replayed at boot; per Space, {@link #signalCatchUpSettings}. */
+    private volatile java.time.Duration signalCatchUpMaxAge = SignalCatchUp.DEFAULT_MAX_AGE;
+
+    /** Test visibility: {@code job}'s catch-up mark, or null. */
+    SignalCatchUp.Mark signalMarkOf(String job) { return signalCatchUp.markOf(job); }
+
     /** Per-job upstream commits seen since the job's last {@code on_pipeline_gate=all} firing. */
     private final Map<String, Set<String>> pendingUpstreams = new ConcurrentHashMap<>();
     /** The gate progress on disk, one {@code job<TAB>pipeline} line per pending commit, so a restart does not
@@ -416,6 +424,7 @@ public final class JobService implements AutoCloseable {
         this.gateFile = auditDir == null || auditDir.isBlank() ? null
                 : java.nio.file.Path.of(auditDir).resolve("job-gate-pending.tsv");
         loadGate();
+        this.signalCatchUp = new SignalCatchUp(auditDir);
         registerBuiltins();
         // Job Packs (P2c): load hot-deployable types BEFORE building Jobs, so a Job authored against a
         // pack type resolves at construction. Startup-scan signals no-op until the event log is wired.
@@ -900,7 +909,9 @@ public final class JobService implements AutoCloseable {
         // On-signal Triggers (P1c): subscribe to THIS space's ledger (per-instance subscriber list ⇒
         // space-correct), and mirror each ConsignmentEvent as a pipeline.commit signal so on_signal:pipeline.commit
         // works. Both are no-ops when no event ledger is wired (bare-JobService test constructors).
+        Instant signalCut = Instant.now();   // SB-2b: older Signals are the boot catch-up's, newer ones the subscriber's
         if (eventLog != null) {
+            signalCatchUp.hold(List.copyOf(configs), signalCut);   // SB-2b: before the subscriber, see hold()
             signalSubscriber = this::onSignalEvent;
             eventLog.addSubscriber(signalSubscriber);
             bus.subscribe(this::mirrorPipelineCommit);   // bus is per-space, discarded with this service
@@ -919,6 +930,7 @@ public final class JobService implements AutoCloseable {
         log.info("JobService started: {} job(s) — {} cron-scheduled, {} event-triggered, {} signal-triggered",
                 jobs.size(), cronCount, eventCount, signalCount);
         catchUpMissedFires();
+        catchUpMissedSignals(signalCut);
     }
 
     /** Arm one config's cron schedule; {@link #removeJob} cancels the returned {@link Scheduler.CronHandle}
@@ -959,6 +971,7 @@ public final class JobService implements AutoCloseable {
     public String typeSaveRefusal(JobConfig c) { return registry.saveRefusal(c.type(), c); }
 
     public synchronized void upsertJob(JobConfig c) {
+        signalCatchUp.saved(configFor(c.name()).orElse(null), c, Instant.now());   // SB-2b
         removeJobInternal(c.name());
         configs.add(c);
         if (c.enabled()) {
@@ -976,6 +989,7 @@ public final class JobService implements AutoCloseable {
      *  cancelled so the cron chain stops re-arming instead of ticking as an inert no-op forever. */
     public synchronized void removeJob(String name) {
         removeJobInternal(name);
+        signalCatchUp.removed(name);   // SB-2b: a Job saved later under this name starts at now
         auditOrphanOutputStores();   // deleting a runner job can orphan a pipeline's Stage-2 chain
         auditSharedPipelines();      // ...and deleting one of two sharers resolves the shared-pipeline finding
     }
@@ -1242,44 +1256,96 @@ public final class JobService implements AutoCloseable {
     private void onSignalEvent(Event e) {
         if (!EventType.SIGNAL.equals(e.type())) return;
         Signal sig = Signal.fromEvent(e);
-        String emitter = emittingJob(sig.source());
-        int newDepth = intOf(sig.payload().get("chainDepth")) + 1;
         for (JobConfig c : configs) {
             if (!c.enabled() || !c.hasSignal()) continue;
             if (!Signals.matchesType(sig.type(), c.onSignal())) continue;
-            if (c.name().equals(emitter)) continue;                       // self-loop guard
-            if (c.hasWhen() && !WhenGuard.eval(c.when(), sig.payload())) {
-                recordSkipped(c.name(), "signal:" + sig.type(), "when guard false");
-                continue;
-            }
-            if (newDepth > maxChainDepth) { cutChain(c.name(), sig, newDepth); continue; }
-            String cid = sig.correlationId();
-            // §7.2 layer 2: bind: resolves $signal.<field>.
-            // ⚠ PIPELINE-DRYRUN-1 step 5 — this path needs a DIFFERENT mechanism from fireOnCommit's, and
-            // the plan read as if both were the same one-line fix. fireOnCommit has the ConsignmentEvent in
-            // hand; here the Firing is built from a Signal's payload, so the flag has to travel IN the
-            // payload — put there by PipelineConsignmentSignal.emit (pipeline.batch.*) and by
-            // commitPayload (the pipeline.commit mirror) — and be read back out here.
-            Firing firing = new Firing(Map.of(), sig.payload(), signalDryRun(sig.payload()));
-            if (!c.coalesce()) {                                           // one Run per Signal, bounded
-                SignalLane lane = signalLanes.computeIfAbsent(c.name(), k -> new SignalLane());
-                if (lane.pending().incrementAndGet() > maxPendingSignalRuns) {
-                    lane.pending().decrementAndGet();
-                    refuseSignal(c.name(), sig);
-                    continue;
-                }
-                submitRun(newRunId(c.name()), c.name(), "signal:" + sig.type(), cid, sig.signalId(), newDepth,
-                        firing, lane);
-                continue;
-            }
-            var followUp = signalFollowUps.computeIfAbsent(c.name(), k -> new java.util.concurrent.atomic.AtomicReference<>());
-            String runId = newRunId(c.name());
-            if (!followUp.compareAndSet(null, runId)) continue;           // folded into the queued follow-up
-            submitRun(runId, c.name(), "signal:" + sig.type(), cid,
-                    // 🔴 THE causation link: every signal this Run emits nests under the signal
-                    // that fired it. Without it /signals/tree is permanently flat.
-                    sig.signalId(), newDepth, firing, null, followUp);
+            reactToSignal(c, sig);
         }
+    }
+
+    /**
+     * One Job's reaction to one matching Signal, under every guard: the self-loop guard, {@code when}, the chain cut,
+     * the queued-Run bound or folding, dry-run inheritance and the causation link. The live subscriber and the boot
+     * catch-up ({@link #catchUpMissedSignals}) both come here, and each outcome is told to {@link #signalCatchUp}, so
+     * the Job's mark moves only past a Signal it has handled (SIGNAL-BOARD-1 SB-2b).
+     */
+    private void reactToSignal(JobConfig c, Signal sig) {
+        String emitter = emittingJob(sig.source());
+        int newDepth = intOf(sig.payload().get("chainDepth")) + 1;
+        if (c.name().equals(emitter)) { signalCatchUp.handled(c.name(), sig); return; }   // self-loop guard
+        if (c.hasWhen() && !WhenGuard.eval(c.when(), sig.payload())) {
+            recordSkipped(c.name(), "signal:" + sig.type(), "when guard false");
+            signalCatchUp.handled(c.name(), sig);
+            return;
+        }
+        if (newDepth > maxChainDepth) { cutChain(c.name(), sig, newDepth); signalCatchUp.handled(c.name(), sig); return; }
+        String cid = sig.correlationId();
+        // §7.2 layer 2: bind: resolves $signal.<field>.
+        // ⚠ PIPELINE-DRYRUN-1 step 5 — this path needs a DIFFERENT mechanism from fireOnCommit's, and
+        // the plan read as if both were the same one-line fix. fireOnCommit has the ConsignmentEvent in
+        // hand; here the Firing is built from a Signal's payload, so the flag has to travel IN the
+        // payload — put there by PipelineConsignmentSignal.emit (pipeline.batch.*) and by
+        // commitPayload (the pipeline.commit mirror) — and be read back out here.
+        Firing firing = new Firing(Map.of(), sig.payload(), signalDryRun(sig.payload()));
+        if (!c.coalesce()) {                                           // one Run per Signal, bounded
+            SignalLane lane = signalLanes.computeIfAbsent(c.name(), k -> new SignalLane());
+            if (lane.pending().incrementAndGet() > maxPendingSignalRuns) {
+                lane.pending().decrementAndGet();
+                refuseSignal(c.name(), sig);
+                signalCatchUp.handled(c.name(), sig);
+                return;
+            }
+            String runId = newRunId(c.name());
+            signalCatchUp.queued(c.name(), sig, runId);
+            submitRun(runId, c.name(), "signal:" + sig.type(), cid, sig.signalId(), newDepth,
+                    firing, lane);
+            return;
+        }
+        var followUp = signalFollowUps.computeIfAbsent(c.name(), k -> new java.util.concurrent.atomic.AtomicReference<>());
+        String runId = newRunId(c.name());
+        if (!followUp.compareAndSet(null, runId)) {                   // folded into the queued follow-up
+            signalCatchUp.handled(c.name(), sig);
+            return;
+        }
+        signalCatchUp.queued(c.name(), sig, runId);
+        submitRun(runId, c.name(), "signal:" + sig.type(), cid,
+                // 🔴 THE causation link: every signal this Run emits nests under the signal
+                // that fired it. Without it /signals/tree is permanently flat.
+                sig.signalId(), newDepth, firing, null, followUp);
+    }
+
+    /**
+     * SB-2b: at boot, replay the Signals each {@code on_signal} Job missed while the service was down, through
+     * {@link #reactToSignal}. {@code cut} is the moment the live subscriber was attached; a missed Signal older than
+     * the Space's age limit is not replayed and is posted as one {@code job.signal.missed} Signal per Job.
+     */
+    private void catchUpMissedSignals(Instant cut) {
+        EventLog el = eventLog;
+        if (el == null) return;
+        try {
+            signalCatchUp.replay(el.store(), List.copyOf(configs), cut, signalCatchUpMaxAge, this::reactToSignal,
+                    (c, m) -> emitSignal(SignalType.JOB_SIGNAL_MISSED, Severity.WARN, null, null, Ref.of("job", c.name()),
+                            Map.of("job", m.job(), "onSignal", m.onSignal(), "count", m.count(),
+                                    "oldestAt", m.oldest().toString(), "newestAt", m.newest().toString(),
+                                    "signalIds", m.signalIds(), "maxAgeHours", signalCatchUpMaxAge.toHours())));
+        } catch (RuntimeException ex) {
+            log.warn("[JOB] Signal catch-up at boot failed ({}); missed reactions are not replayed", ex.toString());
+        }
+    }
+
+    /** SB-2b: the Space's catch-up age limit, read from {@code signal-catch-up.toon} in its config root
+     *  ({@code max_age_hours}, default 24). Call before {@link #start()}. */
+    public void signalCatchUpSettings(java.nio.file.Path configRoot) {
+        this.signalCatchUpMaxAge = SignalCatchUp.maxAgeFor(configRoot);
+    }
+
+    /** SB-2b: a Run's Signal is handled unless a planned stop skipped or cancelled the Run; such a Signal is replayed
+     *  at the next boot. */
+    private boolean signalRunHandled(String runId) {
+        if (!closing) return true;
+        JobRun r = liveRuns.get(runId);
+        return r != null && !"RUNNING".equals(r.status()) && !"SKIPPED".equals(r.status())
+                && !"CANCELLED".equals(r.status());
     }
 
     /** Mirror each committed ConsignmentEvent as a {@code pipeline.commit} signal (§8.3) so a Job may
@@ -1603,6 +1669,7 @@ public final class JobService implements AutoCloseable {
         if (job == null) {
             if (lane != null) lane.pending().decrementAndGet();
             if (followUp != null) followUp.compareAndSet(runId, null);
+            signalCatchUp.ended(runId, true);   // SB-2b: decided, no Run to wait for
             return;
         }
         // PRODUCT-ASSEMBLY-1 PA-7b (D-PA24): read-only (an entitlement past its grace, or a trial build without one) runs no
@@ -1610,6 +1677,7 @@ public final class JobService implements AutoCloseable {
         if (com.gamma.module.Entitlements.readOnly()) {
             if (lane != null) lane.pending().decrementAndGet();
             if (followUp != null) followUp.compareAndSet(runId, null);
+            signalCatchUp.ended(runId, true);   // SB-2b: decided, no Run to wait for
             recordSkipped(name, trigger, "read-only: " + com.gamma.module.Entitlements.readOnlyReason());
             return;
         }
@@ -1619,6 +1687,7 @@ public final class JobService implements AutoCloseable {
         if (held != null) {
             if (lane != null) lane.pending().decrementAndGet();
             if (followUp != null) followUp.compareAndSet(runId, null);
+            signalCatchUp.ended(runId, true);   // SB-2b: decided, no Run to wait for
             recordSkipped(name, trigger, "held: " + held);
             return;
         }
@@ -1644,6 +1713,7 @@ public final class JobService implements AutoCloseable {
             } finally {
                 // a follow-up that never reached its start (skipped by a gate, interrupted) frees the slot too
                 if (followUp != null) followUp.compareAndSet(runId, null);
+                signalCatchUp.ended(runId, signalRunHandled(runId));   // SB-2b: move the Job's Signal mark
                 if (scoped) MDC.remove(EventLog.SPACE_MDC_KEY);
             }
         });
