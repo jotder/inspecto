@@ -13,7 +13,7 @@ tags: [feature-db, module]
 > product is in `target/product-docs/feature-db.csv` (sortable). Hub: [index](index.md) · Product Map Item
 > [`module.insights`](../../../../../product-map/module/insights.toon).
 
-8 row(s).
+9 row(s).
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
@@ -23,5 +23,6 @@ tags: [feature-db, module]
 | "GET /insights" | route | insights | basic;standard;advanced;preview | businessInsights | ga | `"GET /insights"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
 | "GET /insights/brief" | route | insights | basic;standard;advanced;preview | businessInsights | ga | `"GET /insights/brief"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /insights/([^/]+)/([^/]+)/feedback" | route | insights | basic;standard;advanced;preview | businessInsights | ga | `"POST /insights/([^/]+)/([^/]+)/feedback"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
+| "POST /insights/brief/narrate" | route | insights | basic;standard;advanced;preview | businessInsights | ga | `"POST /insights/brief/narrate"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /insights/explain" | route | insights | basic;standard;advanced;preview | businessInsights | ga | `"POST /insights/explain"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
 | "POST /insights/preview" | route | insights | basic;standard;advanced;preview | businessInsights | ga | `"POST /insights/preview"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
