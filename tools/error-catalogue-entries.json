@@ -1,0 +1,326 @@
+{
+  "$comment": "ERROR-CATALOGUE-1: the cause and the fix of every refusal code, keyed by code. tools/render-error-catalogue.mjs reads the code set and each HTTP status from the Java constants, and fails when a code has no entry here or an entry names no code. 'status' overrides the derived HTTP status.",
+  "MALFORMED_REQUEST": {
+    "cause": "The request could not be read: the body is not a JSON object, a required field or query parameter is missing, or a value has the wrong type or format.",
+    "fix": "Read the message — it names the field and the shape it wants. Send a JSON object body with every required field, then retry."
+  },
+  "NOT_FOUND": {
+    "cause": "Nothing exists at this path or id: a misspelled route, an id that was never created or was deleted, or a name in another Space.",
+    "fix": "List the collection first (the matching GET) and use an id from it; check the Space in the path. A route of a switched-off module answers MODULE_DISABLED, not this."
+  },
+  "METHOD_NOT_ALLOWED": {
+    "cause": "The path exists but does not take this HTTP method.",
+    "fix": "Use the method the API contract (docs/api/openapi-v1.json) lists for this path."
+  },
+  "PATH_JAIL_VIOLATION": {
+    "cause": "A path in the request leaves the folder it must stay in (the config root, the data root or a Space's allowed folders), or a draft names a config file a caller may not reach.",
+    "fix": "Use a path relative to the Space's own folders, with no '..' and no absolute path outside the allowed roots; for a config reference, name the component (kind/name), not a file."
+  },
+  "CONFLICT": {
+    "cause": "The request clashes with what exists: the name is already taken, the target is used by other configs, or the object is in a state that refuses this action.",
+    "fix": "Read the message and details: pick another name, or repoint or remove the dependents it lists. Some deletes accept ?force=true when the message says so."
+  },
+  "CONFLICT_STALE_VERSION": {
+    "cause": "The object changed after you read it: the If-Match version you sent is no longer current, or a concurrent writer kept winning.",
+    "fix": "GET the object again, re-apply your change to the fresh copy, and resend with its new version or ETag in If-Match."
+  },
+  "CONFIG_VALIDATION_FAILED": {
+    "cause": "The request parsed but its content is refused: a config that would not load or run, a value out of range, an unknown key, or a reference to something that does not exist. The default code of every 422.",
+    "fix": "Read error.message and every ERROR in error.details.findings[]: each names its fieldPath, often a code (listed under Config finding codes) and guidance. Fix them all, then resubmit; preview or validate routes check a draft without saving it."
+  },
+  "INTERNAL": {
+    "status": 500,
+    "cause": "The server failed while answering — a defect or an outage, not a problem with the request.",
+    "fix": "Retry once. If it repeats, report it with the correlationId from the body; the server log carries the cause under that id."
+  },
+  "CONTROL_PLANE_READ_ONLY": {
+    "cause": "Config writes are switched off on this server: it was started without a config write root.",
+    "fix": "An operator restarts the server with -Dassist.write.root=<config folder>. Reads keep working meanwhile."
+  },
+  "CAPABILITY_UNAVAILABLE": {
+    "cause": "The route needs a module or a service this install does not have — not installed in this edition, or a dependency (such as the run lease database) is down.",
+    "fix": "Check GET /health/details and the edition. Install or enable the module, or wait for the dependency; this is not fixed by changing the request."
+  },
+  "STORE_BUSY": {
+    "cause": "A shared store is locked by another request or server and did not free within the bounded wait.",
+    "fix": "Retry after a short wait. Nothing in the request needs to change."
+  },
+  "UNAUTHENTICATED": {
+    "cause": "The request carries no credentials, or they are invalid or expired.",
+    "fix": "Sign in again, or refresh the token or API key the request carries."
+  },
+  "PERMISSION_DENIED": {
+    "cause": "You are signed in, but your role lacks the Capability this route requires, or the object belongs to a Space or share you cannot reach. An agent is also refused routes outside its allowed set.",
+    "fix": "The message names the Capability. Ask an administrator for a role that holds it, or, for an agent, propose the change for a person to approve instead of calling the route."
+  },
+  "RATE_LIMITED": {
+    "cause": "Too many expensive requests from you in a short time: your request budget for this route is spent.",
+    "fix": "Wait the number of seconds in the Retry-After header, then retry. Batch or cache reads instead of repeating them."
+  },
+  "NOT_SUPPORTED": {
+    "cause": "The route exists but cannot do this for this target on this host — for example run-to-here on a Collector that does not read files.",
+    "fix": "Use the alternative the message names, or a different target."
+  },
+  "PAYLOAD_TOO_LARGE": {
+    "cause": "The request body is over the route's size cap (an agent's body is capped at 256 KiB).",
+    "fix": "Send less: split the change, page an upload, or reference the data by name instead of inlining it."
+  },
+  "INTEGRITY_VIOLATION": {
+    "cause": "Stored evidence disagrees with its own recorded hashes, so the store is refused rather than read.",
+    "fix": "Not fixable from the request. Report it with the correlationId; an operator restores the store from backup or investigates the tampering."
+  },
+  "MODULE_DISABLED": {
+    "cause": "The route belongs to a module that is installed but switched off in this Space.",
+    "fix": "An administrator switches the module on for the Space (PUT /settings/modules), or use a Space where it is on."
+  },
+  "ERR_SAFETY_POLICY_UNREADABLE": {
+    "cause": "A Safety Policy file in scope exists but cannot be read as a valid policy, so every gate and run in its scope fails closed.",
+    "fix": "An operator fixes or removes the Space's config/safety-policy.toon (GET /health names the unreadable file), then retries."
+  },
+  "ENTITLEMENT_READ_ONLY": {
+    "cause": "The install is read-only: its entitlement expired and the grace period ended, or a trial build has no entitlement. Reads continue.",
+    "fix": "An administrator installs a renewed entitlement; writes resume without a restart."
+  },
+  "DEMO_ROSTER_CONFLICT": {
+    "status": 409,
+    "cause": "One demo user is defined differently in two Spaces attached to the same demo server. Demo builds only.",
+    "fix": "Make that user's row in config/demo-users.toon identical in both Spaces, or attach only one of them, then restart the demo server."
+  },
+  "ERR_ARMED_WITHOUT_SCHEMA": {
+    "cause": "The Pipeline is active but has no schema at all, so it would register and then be skipped every cycle.",
+    "fix": "Give it a schema (processing.schema_file or processing.schemas), or save it with active: false until it has one."
+  },
+  "ERR_ROUTE_UNARMABLE": {
+    "cause": "An active Pipeline's route: block would refuse to arm; the finding's message names each reason.",
+    "fix": "Correct the branch at the finding's fieldPath as its message and guidance say, or save with active: false and fix it before activating."
+  },
+  "WARN_ROUTE_UNARMABLE": {
+    "cause": "The same route: problem as ERR_ROUTE_UNARMABLE on an inactive draft; it will refuse at activation.",
+    "fix": "Correct the branch before you set active: true."
+  },
+  "ERR_STEP_DISABLE_UNPARKABLE": {
+    "cause": "An active Pipeline lists processing.disabled_steps that cannot be parked. Only the sinks of route: branches can be disabled; an unknown or upstream step, the route node itself, every branch at once, or a Pipeline with no dirs.backup is refused.",
+    "fix": "Disable only route-branch sinks, keep at least one branch live, and set dirs.backup; to stop everything, save active: false instead."
+  },
+  "WARN_STEP_DISABLE_UNPARKABLE": {
+    "cause": "The same disabled_steps problem on an inactive draft; it will refuse at activation.",
+    "fix": "Correct disabled_steps before you set active: true."
+  },
+  "ERR_DEDUP_WINDOW_UNARMABLE": {
+    "cause": "An active windowed dedup (scope: window(...)) has no order_by tie-break, or its scope: value is malformed — a durable ledger must never record a random winner.",
+    "fix": "Add an order_by that picks one winner per key, and write scope as window(<duration>)."
+  },
+  "WARN_DEDUP_WINDOW_UNARMABLE": {
+    "cause": "The same windowed-dedup problem on an inactive draft; it will refuse at activation.",
+    "fix": "Add order_by and a valid scope before you set active: true."
+  },
+  "ERR_CHAIN_WITHOUT_OUTPUT_STORE": {
+    "cause": "An active Pipeline has chain Steps (steps:, or processing.dedup / summarize / profile / join) but no top-level output_store:, so the chain never runs.",
+    "fix": "Add output_store: naming the Dataset the chain writes, and a pipeline Job that runs it."
+  },
+  "WARN_CHAIN_WITHOUT_OUTPUT_STORE": {
+    "cause": "The same missing output_store: on an inactive draft; it will refuse at activation.",
+    "fix": "Add output_store: before you set active: true."
+  },
+  "WARN_CHAIN_WITHOUT_PIPELINE_JOB": {
+    "cause": "The Pipeline has a chain and an output_store:, but no enabled Job of type: pipeline names its file, so the chain never runs.",
+    "fix": "Create or enable a Job with type: pipeline and pipeline_config: naming this Pipeline's file."
+  },
+  "ERR_STEP_CONFIG_INVALID": {
+    "cause": "An active Pipeline's lookup, profile, dedup or filter Step would be refused at run time: a required key is missing or malformed, or it names a column the declared schema does not carry.",
+    "fix": "Fix the Step at the finding's fieldPath: add the missing key, or use a column the schema declares (check spelling and case)."
+  },
+  "WARN_STEP_CONFIG_INVALID": {
+    "cause": "The same Step problem on an inactive draft; it will refuse at activation.",
+    "fix": "Fix the Step before you set active: true."
+  },
+  "ERR_COLLECTOR_CONFIG_INVALID": {
+    "cause": "An active Pipeline's Collector cannot be honoured — for example post_action on_success: MOVE with no archive_path.",
+    "fix": "Set collector.post_action.archive_path (for example archive/yyyy/MM/dd), or choose RETAIN, DELETE or RENAME."
+  },
+  "WARN_COLLECTOR_CONFIG_INVALID": {
+    "cause": "The same Collector problem on an inactive draft; it will refuse at activation.",
+    "fix": "Fix the Collector before you set active: true."
+  },
+  "WARN_COLLECTOR_KEY_INERT": {
+    "cause": "Remote-only Collector keys (fetch, retry, circuit_breaker, a non-RETAIN post_action) on a Collector that reads a local inbox — they are accepted but never act.",
+    "fix": "Bind a remote Connection, or remove the keys; a local inbox's throttle is processing.intake."
+  },
+  "ERR_SINK_DUCKLAKE_SHARED_TABLE": {
+    "cause": "Two sinks[] destinations register into the same DuckLake catalog and table, so every batch would insert both destinations' files into it.",
+    "fix": "Give each destination its own DuckLake table, or merge them into one destination."
+  },
+  "ERR_EDITION_FEATURE": {
+    "cause": "The config uses a feature this edition does not include — Alert Rules, the post_action MOVE archive, or DuckLake registration (Standard and Advanced only).",
+    "fix": "Remove the feature from the config, or run the Standard or Advanced edition."
+  },
+  "ERR_ROUTE_PREDICATE_COLUMN": {
+    "cause": "An active route: branch's where: reads a column the declared schema does not carry, so the branch would fail on the first row.",
+    "fix": "Use a column the schema declares in the where: predicate (check spelling and case), or add the column to the schema."
+  },
+  "WARN_ROUTE_PREDICATE_COLUMN": {
+    "cause": "The same unknown-column predicate on an inactive draft; it will refuse at activation.",
+    "fix": "Fix the where: predicate before you set active: true."
+  },
+  "ERR_SUMMARIZE_MEASURE_TYPE": {
+    "cause": "An active summarize Step applies sum or avg to a field the schema declares as non-numeric; the database refuses it at run time.",
+    "fix": "Aggregate a numeric field, use count / min / max, or declare the field with a numeric type in the schema."
+  },
+  "WARN_SUMMARIZE_MEASURE_TYPE": {
+    "cause": "The same non-numeric measure on an inactive draft; it will refuse at activation.",
+    "fix": "Fix the measure before you set active: true."
+  },
+  "WARN_UNRESOLVED_CONNECTION": {
+    "cause": "An imported Pipeline binds a Connection this Space does not hold. Bundles never carry Connections (secrets never travel), so the import lands inactive.",
+    "fix": "Create the named Connection in this Space, then activate the Pipeline."
+  },
+  "ERR_WEBHOOK_CONNECTION_UNKNOWN": {
+    "cause": "A webhook: block names a Connection this Space does not hold, so every run would refuse before sending.",
+    "fix": "Create the Connection first, or name an existing https Connection."
+  },
+  "ERR_WEBHOOK_CONNECTION_NOT_HTTPS": {
+    "cause": "A webhook: block names a Connection that is not an https one; the webhook sink accepts only https.",
+    "fix": "Name an https Connection."
+  },
+  "ERR_WEBHOOK_INVALID": {
+    "cause": "The webhook: block itself is refused — an inline url: or token:, an unknown key, no connection, or a batch_size out of bounds. The message is the parser's own.",
+    "fix": "Put the URL and secret in an https Connection and name it in connection:; remove unknown keys; keep batch_size within the bounds the message gives."
+  },
+  "ERR_EXCEL_INVALID": {
+    "cause": "The excel: block is refused — no path, a path leaving the data root, a bad or duplicate sheet name, max_rows out of bounds, an unknown key, or a sheet sql the SQL guard refuses.",
+    "fix": "Correct the item the message names: a relative path under the data root, unique sheet names, max_rows within bounds, a plain SELECT for sheet sql."
+  },
+  "ERR_LOOKUP_ON_INGEST": {
+    "cause": "A processing.map.fields[] row calls lookup.reference; the ingest lane cannot resolve a Reference, so every batch would fail.",
+    "fix": "Move the lookup into a Pipeline transform.sql Step or a transform.join; keep the mapping row to plain expressions."
+  },
+  "ERR_SCHEMA_FILE_UNRESOLVED": {
+    "cause": "An active Pipeline's schema_file resolves to no file beside its config, so it would register and never load.",
+    "fix": "Name the schema file as it is saved (usually <name>.toon in the same folder), or save the Schema first."
+  },
+  "WARN_SCHEMA_FILE_UNRESOLVED": {
+    "cause": "The same unresolved schema_file on an inactive draft; it will refuse at activation.",
+    "fix": "Fix schema_file before you set active: true."
+  },
+  "ERR_SELECTOR_NOT_INDEX": {
+    "cause": "A delimited or fixed-width Pipeline's schema selects a column by name where the load needs its zero-based index in raw.fields[].selector.",
+    "fix": "Set each raw.fields[].selector to the column's zero-based position (0, 1, 2, …)."
+  },
+  "ERR_UNKNOWN_CONFIG_KEY": {
+    "cause": "The config carries a block or key no component reads; the engine would ignore it and what it configures would be lost.",
+    "fix": "Remove the key, or move it to where the component reads it (check spelling and nesting against the kind's shape)."
+  },
+  "WARN_UNKNOWN_CONFIG_KEY": {
+    "cause": "The same unread key in a config already on disk, reported while reading rather than saving.",
+    "fix": "Remove or move the key at the next edit."
+  },
+  "ERR_UNKNOWN_CLASSIFICATION": {
+    "cause": "A column carries a classification this Space does not know, so it would mask nothing.",
+    "fix": "Use a classification the Space defines (its Entity Types and masking classes), or define the new class first."
+  },
+  "ERR_SAFETY_STATE_ADVANCE_REFUSED": {
+    "cause": "The config would advance progress state (a remote, database-export or Kafka Collector, content dedup, markers with duplicate_check, windowed dedup, a Job's incremental_column) in a Space whose Safety Policy sets permit.advance_state: false.",
+    "fix": "Remove the state-advancing setting, or have an administrator allow it in the Space's Safety Policy."
+  },
+  "ERR_STEP_COLUMN_METADATA_INVALID": {
+    "cause": "A sql Step's fields[] row carries column metadata (description, unit, classification, synonym) that is not a plain string, or names no distinct output column (blank or duplicate name).",
+    "fix": "Give each fields[] row a unique name matching an output column, and plain string metadata values."
+  },
+  "ERR_COLUMN_BREAKS": {
+    "status": 409,
+    "cause": "The Schema save removes, renames or narrows a column another config uses, and the Space's Safety Policy sets columns: refuse-breaking.",
+    "fix": "Repoint the consumers the body lists first, keep the column, or re-send with ?force=true to save anyway."
+  },
+  "WARN_COLUMN_BREAKS": {
+    "cause": "The Schema save removes, renames or narrows a column another config uses; the save went ahead.",
+    "fix": "Update the consumers the finding lists, or they fail at their next run."
+  },
+  "ERR_LINK_DANGLING": {
+    "cause": "The saved config adds a link to a Pipeline, Connection or other config that does not exist, and the server refuses dangling links.",
+    "fix": "Create the target first, or correct the name at the finding's fieldPath."
+  },
+  "WARN_LINK_DANGLING": {
+    "cause": "The saved config links to something that does not exist; the save went ahead.",
+    "fix": "Create the target or correct the name, or the config fails when it runs."
+  },
+  "EMPTY_GRAPH": {
+    "cause": "The Pipeline graph has no nodes.",
+    "fix": "Add at least an entry node and the Steps it feeds."
+  },
+  "DUPLICATE_NODE": {
+    "cause": "Two nodes in the graph share one id.",
+    "fix": "Give every node a unique id, and update the edges that point at the renamed one."
+  },
+  "DANGLING_FROM": {
+    "cause": "An edge starts at a node id the graph does not have.",
+    "fix": "Correct the edge's from: to an existing node id, or add the node."
+  },
+  "DANGLING_TO": {
+    "cause": "An edge points at a node id the graph does not have.",
+    "fix": "Correct the edge's to: to an existing node id, or add the node."
+  },
+  "CYCLE": {
+    "cause": "Data edges form a loop; a Pipeline must be a directed graph without cycles.",
+    "fix": "Remove one edge of the loop the message lists."
+  },
+  "NO_ENTRY": {
+    "cause": "Every node has an inbound edge, so nothing starts the Pipeline.",
+    "fix": "Make one node an entry (no inbound edge) — usually the Collector or input node."
+  },
+  "ILLEGAL_EMIT": {
+    "cause": "An edge uses a relationship its source node type does not emit.",
+    "fix": "Use one of the relationships the message lists for that node type."
+  },
+  "ILLEGAL_ACCEPT": {
+    "cause": "An edge carries data into a node type that does not accept data.",
+    "fix": "Point the edge at a node that accepts it, or use a relationship the target accepts (the message lists them)."
+  },
+  "ILLEGAL_PAIRING": {
+    "cause": "An outcome or route edge targets a node that can neither accept that relationship nor read it as rows — an entry node, or a specialised consumer fed the wrong stream.",
+    "fix": "Point the edge at a Step or sink that takes rows, or at a consumer of that relationship."
+  },
+  "UNKNOWN_TYPE": {
+    "cause": "A node's type is not registered in this build, so its wiring cannot be checked (warning).",
+    "fix": "Check the type's spelling against the node types this edition lists; install the module that contributes it."
+  },
+  "RETIRED_RELATION": {
+    "cause": "An edge named a relation retired in 4.0.0 (success, failure, on_commit); it was dropped when the graph was read (warning, the run is unchanged).",
+    "fix": "Remove the edge, or rewire it with a current relationship."
+  },
+  "NODE_MODE_UNDECLARED": {
+    "cause": "A contributed node type declares no mode, so the graph is refused at arming.",
+    "fix": "The module providing the node type must declare its mode; use a built-in type until it does."
+  },
+  "SQL_STEP_UNAUDITED": {
+    "cause": "A transform.sql node runs hand-written SQL, which the batch's cast-failure audit does not cover (warning; never blocks a save).",
+    "fix": "Nothing required. Prefer select / derive Steps when you want cast failures audited."
+  },
+  "UNKNOWN_USE_KIND": {
+    "cause": "A node's use: names a component kind that does not exist.",
+    "fix": "Write use: as <kind>/<name> with a component kind this Space has (for example grammar/<name>)."
+  },
+  "UNKNOWN_USE_REF": {
+    "cause": "A node's use: names a component of a known kind that does not exist — often a typo.",
+    "fix": "Name an existing component (list that kind first), or create it."
+  },
+  "JOIN_REFERENCE_MISSING": {
+    "cause": "A transform.join node names no reference.",
+    "fix": "Set reference: to reference/<pipeline> or a data-file path."
+  },
+  "JOIN_ON_MISSING": {
+    "cause": "A transform.join node names no on: key column(s).",
+    "fix": "Set on: to the key column, or a list of them, present on both sides."
+  },
+  "JOIN_MATCH_UNKNOWN": {
+    "cause": "A transform.join node's match: is not a mode the join runs.",
+    "fix": "Use one of the match modes the message lists."
+  },
+  "JOIN_KEYED_INVALID": {
+    "cause": "A keyed transform.join's settings cannot run, judged from the config alone.",
+    "fix": "Correct the key settings the message names."
+  },
+  "UNKNOWN_JOIN_REFERENCE": {
+    "cause": "A transform.join's reference: names a Pipeline or file that does not exist.",
+    "fix": "Name an existing Reference Pipeline or data file, or create it first."
+  }
+}
