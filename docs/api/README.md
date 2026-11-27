@@ -17,7 +17,8 @@
   `node tools/openapi-merge.mjs --write`; `tools/check-openapi-fragments.mjs`, `ContractFragmentsTest` and
   `ApiContractTest` fail when the document and the fragments disagree. Design and decisions: the reorg plan §6
   *P1 OpenAPI fragments as built*.
-- **[`component-shapes/`](component-shapes)** — one JSON file per `propose_change` kind: the content its create,
+- **[`component-shapes/`](component-shapes)** — one JSON file per `propose_change` kind, and per component kind
+  `propose_change` does not offer (`proposeChange: false`, COMPONENT-REFERENCE-MORE-KINDS-1): the content its create,
   update or edit sends (keys, type, required, default, allowed values, unknown-key policy, an example). Generated,
   never hand-edited: `ComponentShapesTest` (features/inspecto-mcp) derives each file from the code and fails when one is
   stale; `node tools/render-component-shapes.mjs` renders them as

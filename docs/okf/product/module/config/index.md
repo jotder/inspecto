@@ -59,4 +59,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `SPACES-CONSOLIDATION-1` | P3 | chore | Space config is in git, its data is in C:\sandbox\inspecto_spaces\<id>: | operator |
 | `PIPELINE-POLL-RULE-NPE-1` | P2 | defect | The save rule poll-required-for-non-dataset (ConfigSpecs.java, JOB-GRAPH-1 fea9792af) calls .isBlank() on RawConfig.str(raw, "dirs.poll")… | — |
 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | The shapes the object-store ingest lane still refuses (sinks:, produces: reference, the readers). | operator |
-| `COMPONENT-REFERENCE-MORE-KINDS-1` | P3 | feature | the shape reference for the kinds propose_change does not offer: | demand |
+| `COMPONENT-REFERENCE-GOVERNANCE-KINDS-1` | P3 | feature | the shape reference for the four governance component kinds: | demand |

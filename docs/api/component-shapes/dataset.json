@@ -1,0 +1,250 @@
+{
+  "kind" : "dataset",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "proposeChange" : false,
+  "operations" : {
+    "create" : {
+      "route" : "POST /components/dataset",
+      "content" : "content"
+    },
+    "update" : {
+      "route" : "PUT /components/dataset/{id}",
+      "content" : "content"
+    },
+    "delete" : {
+      "route" : "DELETE /components/dataset/{id}",
+      "content" : null
+    }
+  },
+  "shapes" : {
+    "content" : {
+      "source" : "UnknownComponentKeys.DATASET (the Dataset key census) + DatasetEntryRules.validate and the virtual-Dataset SQL check (ComponentRoutes.validateKind)",
+      "unknownKeys" : "refused",
+      "extensionPrefix" : "x-",
+      "fields" : [
+        {
+          "path" : "basedOn",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "calculated",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "columns",
+          "type" : "array",
+          "required" : false
+        },
+        {
+          "path" : "compaction",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "dataAsOf",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "dateField",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "defaultLinkMapping",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "description",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "eventDate",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "eventDateColumn",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "feed",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "identifyingColumn",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "importFilter",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "importFormat",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "importPipeline",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "importSource",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "kind",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "lastImport",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "mapping",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "materialized",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "measures",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "name",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "origin",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "owner",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "partitions",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "physicalRef",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "poll",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "primaryEntityType",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "query",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "recordType",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "retention",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "shares",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "sourceName",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "sql",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "storage",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "tags",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "title",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "view",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "viz",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "watchInbox",
+          "type" : "any",
+          "required" : false
+        }
+      ],
+      "example" : {
+        "physicalRef" : "orders",
+        "description" : "One row per order",
+        "columns" : [
+          {
+            "name" : "order_id",
+            "type" : "VARCHAR"
+          },
+          {
+            "name" : "amount",
+            "type" : "DOUBLE"
+          }
+        ]
+      },
+      "notes" : [
+        "An unknown key is refused (422) for an agent; a person's save keeps it with an `UNKNOWN_KEY` warning (both: `POST /validate`).",
+        "`columns`, `calculated`, `query`, `filters` and the other blocks are accepted whole: their inner keys are not censused.",
+        "`sql` (a virtual Dataset) needs `sourceName` and meets the SQL safety check; `basedOn` (a Mapping) names a Dataset the caller can see; a column's `classification` must be one the Space knows."
+      ]
+    }
+  }
+}

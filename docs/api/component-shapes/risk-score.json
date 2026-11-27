@@ -1,0 +1,177 @@
+{
+  "kind" : "risk-score",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "proposeChange" : false,
+  "operations" : {
+    "create" : {
+      "route" : "POST /components/risk-score",
+      "content" : "content"
+    },
+    "update" : {
+      "route" : "PUT /components/risk-score/{id}",
+      "content" : "content"
+    },
+    "delete" : {
+      "route" : "DELETE /components/risk-score/{id}",
+      "content" : null
+    }
+  },
+  "shapes" : {
+    "content" : {
+      "source" : "RiskScoreModel.MODEL_KEYS + RiskScoreModel.fromMap (risk-score's validator on the component save door)",
+      "unknownKeys" : "refused",
+      "fields" : [
+        {
+          "path" : "dataScope",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "description",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "entityType",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "factors",
+          "type" : "array",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "factors[].cap",
+          "type" : "integer",
+          "required" : false
+        },
+        {
+          "path" : "factors[].dataset",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "factors[].evidence",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "factors[].filters",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "factors[].id",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "factors[].key",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "factors[].label",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "factors[].measure",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "factors[].weight",
+          "type" : "number",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "factors[].when",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "highThreshold",
+          "type" : "number",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "id",
+          "type" : "string",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "maxEntities",
+          "type" : "integer",
+          "required" : false
+        },
+        {
+          "path" : "name",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "owner",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "retainDays",
+          "type" : "integer",
+          "required" : false
+        },
+        {
+          "path" : "retainRuns",
+          "type" : "integer",
+          "required" : false
+        },
+        {
+          "path" : "segments",
+          "type" : "array",
+          "required" : false
+        },
+        {
+          "path" : "shares",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "watchList",
+          "type" : "object",
+          "required" : false
+        }
+      ],
+      "example" : {
+        "entityType" : "account",
+        "highThreshold" : 60,
+        "factors" : [
+          {
+            "id" : "cash_in",
+            "dataset" : "transfers",
+            "key" : "payee_account",
+            "measure" : "count",
+            "weight" : 0.5,
+            "cap" : 40
+          }
+        ]
+      },
+      "notes" : [
+        "Run by the `risk.score` Job; the save also checks the Datasets and the output store in the Space.",
+        "Unknown keys are refused, not ignored. The save also checks, in the Space, the Datasets it reads and its output store."
+      ]
+    }
+  }
+}

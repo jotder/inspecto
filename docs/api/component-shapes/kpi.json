@@ -1,0 +1,155 @@
+{
+  "kind" : "kpi",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "proposeChange" : false,
+  "operations" : {
+    "create" : {
+      "route" : "POST /components/kpi",
+      "content" : "content"
+    },
+    "update" : {
+      "route" : "PUT /components/kpi/{id}",
+      "content" : "content"
+    },
+    "delete" : {
+      "route" : "DELETE /components/kpi/{id}",
+      "content" : null
+    }
+  },
+  "shapes" : {
+    "content" : {
+      "source" : "KpiDefinition.KEYS + KpiDefinition.fromMap (ComponentRoutes.validateKind)",
+      "unknownKeys" : "refused",
+      "extensionPrefix" : "x-",
+      "fields" : [
+        {
+          "path" : "asOf",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "bands",
+          "type" : "object",
+          "required" : false
+        },
+        {
+          "path" : "comparison",
+          "type" : "string",
+          "required" : false,
+          "default" : "previous",
+          "values" : [
+            "last-year",
+            "none",
+            "previous"
+          ]
+        },
+        {
+          "path" : "dataset",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "description",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "direction",
+          "type" : "string",
+          "required" : false,
+          "default" : "up",
+          "values" : [
+            "band",
+            "down",
+            "up"
+          ]
+        },
+        {
+          "path" : "format",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "grain",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser",
+          "values" : [
+            "day",
+            "month",
+            "quarter",
+            "week",
+            "year"
+          ]
+        },
+        {
+          "path" : "measure",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "name",
+          "type" : "string",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "owner",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "requirement",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "shares",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "target",
+          "type" : "number",
+          "required" : false
+        },
+        {
+          "path" : "timeField",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "timezone",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "title",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "unit",
+          "type" : "any",
+          "required" : false
+        }
+      ],
+      "example" : {
+        "title" : "Orders per day",
+        "dataset" : "orders",
+        "measure" : "count",
+        "timeField" : "order_date",
+        "grain" : "day"
+      },
+      "notes" : [
+        "`measure` is `count` or `agg(field)`; the save also checks the Dataset exists and has the fields (KpiRoutes.requireMeasure).",
+        "`requirement` links the KPI to the Requirement it delivers."
+      ]
+    }
+  }
+}
