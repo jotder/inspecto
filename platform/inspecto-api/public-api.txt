@@ -497,6 +497,7 @@ com.gamma.config.spec.Finding | public record Finding(Severity severity, String 
 com.gamma.config.spec.Finding | public static Finding error(String, String)
 com.gamma.config.spec.Finding | public static Finding warning(String, String)
 com.gamma.config.spec.FindingCodes | public final class FindingCodes
+com.gamma.config.spec.FindingCodes | public static final String ERR_ALERT_ROW_FILTER_INVALID
 com.gamma.config.spec.FindingCodes | public static final String ERR_ARMED_WITHOUT_SCHEMA
 com.gamma.config.spec.FindingCodes | public static final String ERR_CHAIN_WITHOUT_OUTPUT_STORE
 com.gamma.config.spec.FindingCodes | public static final String ERR_COLLECTOR_CONFIG_INVALID

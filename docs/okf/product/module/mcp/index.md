@@ -44,5 +44,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `PENDING-CHANGE-SECRET-READBACK-1` | P3 | defect | a Job's secret parameter can be read back through its Pending Change: | — |
 | `DRYRUN-PREVIEW-UNMASKED-1` | P3 | defect | Pipeline dry-run and test-run previews are not masked: | — |
 | `DRYRUN-SAVE-NODE-MISMATCH-1` | P3 | defect | dry_run_pipeline (POST /pipelines/authored/{id}/dry-run) seeds and runs a graph whose source.dataset node propose_change (PUT /pipelines/… | — |
-| `ALERT-RULE-ROW-FILTER-1` | P3 | feature | A Measure Alert Rule (dataset, measure, comparator, threshold) has no row filter, so "alert when more than 5 shipments are undelivered" c… | — |
+| `VALIDATE-ALERT-SKIPS-RULE-PARSE-1` | P3 | defect | POST /validate (validate_config) with type: alert runs SaveGate only, not the Alert Rule's own parse (AlertRoutes.parseContent), so a dra… | — |
 | `AGENT-ANSWERS-WITHOUT-SERVER-1` | P3 | feature | Asked which sample rows a planned schema rejects (golden task dev-13), the agent loaded no skill, called no tool and worked the answer ou… | — |

@@ -224,6 +224,23 @@ describe('AlertRuleFormDialog', () => {
         });
     });
 
+    it('re-saving a measure rule keeps its row filter as stored and says so (ALERT-RULE-ROW-FILTER-1)', () => {
+        const when = {
+            kind: 'group',
+            op: 'AND',
+            items: [{ kind: 'condition', field: 'status', operator: '!=', value: 'delivered' }],
+        };
+        const { c, save, fixture } = create({ rule: { ...MEASURE_RULE, when } as unknown as AlertRule });
+        expect(fixture.nativeElement.querySelector('[data-testid="row-filter-kept"]')).not.toBeNull();
+        expect(fixture.nativeElement.querySelector('inspecto-query-condition-group')).toBeNull();
+
+        c.schemaForm.form.patchValue({ threshold: 5 });
+        c.save();
+        const [, body] = save.mock.lastCall as unknown as [string, Record<string, unknown>];
+        expect(body['when']).toEqual(when);
+        expect(body['threshold']).toBe(5);
+    });
+
     it('creates a per-entity Measure rule in the AlertRule.fromMap shape (no kind, metric, window or when)', () => {
         const { c, save } = create({});
         c.schemaForm.form.get('kind')!.setValue('measure');

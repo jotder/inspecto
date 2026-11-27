@@ -919,6 +919,13 @@ public final class ConfigSpecs {
                         "Key columns of the Dataset (a Dataset measure rule only): the Measure is evaluated per "
                                 + "key and every breaching key raises its own Alert and Incident. Each column "
                                 + "must exist in the Dataset's Schema."),
+                // ALERT-RULE-ROW-FILTER-1: the row filter of a Dataset measure rule (and a windowed rule's condition).
+                FieldSpec.of("alert.when", "Row filter", FieldType.MAP,
+                        "A Dataset measure rule only: a condition group {kind: group, op: AND|OR, items: [{kind: "
+                                + "condition, field, operator, value}]} (the when shape /bi/query takes); the Measure "
+                                + "counts only the rows that match, e.g. field status, operator !=, value delivered. "
+                                + "Every field must be a column of the Dataset and none masked "
+                                + "(ERR_ALERT_ROW_FILTER_INVALID). On a windowed rule it filters each Window's rows."),
                 FieldSpec.of("alert.stormCap", "Storm cap", FieldType.INT,
                         "With alert.by: above this many breaching keys, one storm Alert replaces the per-key "
                                 + "Alerts. Default 100."),

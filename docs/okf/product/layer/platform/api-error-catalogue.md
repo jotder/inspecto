@@ -53,11 +53,12 @@ Read from `error.errorCode`. 23 codes.
 
 ## Config finding codes
 
-Read from `findings[].code — on a refused save error.details.findings[].code`. 41 codes.
+Read from `findings[].code — on a refused save error.details.findings[].code`. 42 codes.
 
 | Code | Severity | Status | Cause | Fix |
 |---|---|---|---|---|
 | `COMPONENT_INVALID` | ERROR | 422 | POST /validate: the component draft is refused as a whole — the message is the refusal the save would give. | Fix what the message names (a missing required key, a bad value, a reference to nothing), then validate again before saving. |
+| `ERR_ALERT_ROW_FILTER_INVALID` | ERROR | 422 | A Measure Alert Rule's row filter (when) cannot be applied: it is not a complete condition group (a condition with no field, operator or value, an unknown operator, an empty group), it names a column the Dataset does not have, or it filters on a column the Space masks — an alert never reveals, so it may not count rows by a masked value. | Read the message — it names the condition or column. Complete the condition, use a column from the Dataset's Schema (GET /datasets/{id}/rows lists them), or filter on an unmasked column; a filter on another Dataset needs a derived Dataset first. |
 | `ERR_ARMED_WITHOUT_SCHEMA` | ERROR | 422 | The Pipeline is active but has no schema at all, so it would register and then be skipped every cycle. | Give it a schema (processing.schema_file or processing.schemas), or save it with active: false until it has one. |
 | `ERR_CHAIN_WITHOUT_OUTPUT_STORE` | ERROR | 422 | An active Pipeline has chain Steps (steps:, or processing.dedup / summarize / profile / join) but no top-level output_store:, so the chain never runs. | Add output_store: naming the Dataset the chain writes, and a pipeline Job that runs it. |
 | `ERR_COLLECTOR_CONFIG_INVALID` | ERROR | 422 | An active Pipeline's Collector cannot be honoured — for example post_action on_success: MOVE with no archive_path. | Set collector.post_action.archive_path (for example archive/yyyy/MM/dd), or choose RETAIN, DELETE or RENAME. |

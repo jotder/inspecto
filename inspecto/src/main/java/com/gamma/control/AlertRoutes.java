@@ -306,6 +306,7 @@ final class AlertRoutes implements RouteModule {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "an Alert Rule over an Investigation (investigation:) is authored through "
                     + "POST /inv/investigations/{id}/alert-rules, which checks that you own the Investigation");
         requireGroupingColumns(writeRoot, dataRoot, rule);
+        requireRowFilter(writeRoot, dataRoot, rule);
         requireWindow(writeRoot, dataRoot, rule);
         KpiAlertProbe.requireReadable(writeRoot, rule);   // BI-INSIGHTS-1 I-17: the KPI, read as the rule's owner
         requireRunbook(writeRoot, rule);
@@ -393,6 +394,46 @@ final class AlertRoutes implements RouteModule {
                 throw refused("a windowed alert needs one drain to commit as one Consignment: Pipeline '" + name
                         + "' has processing.batch.max_files " + maxFiles + "; set it to at least "
                         + WINDOWED_MIN_BATCH_FILES + " (the Telco CEP template uses 64)");
+        }
+    }
+
+    /**
+     * ALERT-RULE-ROW-FILTER-1: a Dataset measure rule's row filter ({@link AlertRule#rowFilter}) is refused (422,
+     * {@code ERR_ALERT_ROW_FILTER_INVALID}, fail closed) unless every field it reads is in the Dataset's Schema and none
+     * is masked. The masking judgement is {@code /bi/query}'s own ({@link BiResultMasking#vet}) for a caller who cannot
+     * reveal - an alert never reveals, so a rule may not count rows by a masked value whoever saves it (the value would
+     * bisect the raw keys). The tree's completeness is {@link AlertRule}'s. Runs inside {@link #parse}.
+     */
+    static void requireRowFilter(java.nio.file.Path writeRoot, java.util.function.Supplier<java.nio.file.Path> dataRoot,
+                                 AlertRule rule) {
+        Map<String, Object> filter = rule.rowFilter();
+        if (filter == null) return;
+        if (writeRoot == null)
+            throw new ApiException(503, ErrorCodes.CONTROL_PLANE_READ_ONLY,
+                    "alert rule write disabled: set -Dassist.write.root to enable");
+        String ds = rule.dataset();
+        String code = FindingCodes.ERR_ALERT_ROW_FILTER_INVALID + ": ";
+        List<String> columns;
+        try {
+            columns = new com.gamma.query.DatasetMeasureProbe(() -> writeRoot, dataRoot).columns(ds);
+        } catch (IllegalArgumentException e) {
+            throw refused(code + "alert.when cannot be checked against the Schema of dataset '" + ds + "': " + e.getMessage());
+        }
+        List<String> unknown = rule.rowFilterColumns().stream().filter(c -> !columns.contains(c)).toList();
+        if (!unknown.isEmpty())
+            throw refused(code + "alert.when reads column(s) " + unknown + " that are not in the Schema of dataset '"
+                    + ds + "' (have: " + columns + ")");
+        ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
+        Map<String, Object> dataset = store.get("dataset", ds)
+                .map(com.gamma.pipeline.ComponentRegistry.Component::content).orElse(Map.of());
+        com.gamma.query.MeasureCompiler.Spec spec = new com.gamma.query.MeasureCompiler.Spec(ds,
+                List.of(new com.gamma.query.MeasureCompiler.Measure("count", null)), List.of(), Map.of(), List.of(),
+                List.of(), 1, filter);
+        try {
+            BiResultMasking.of(writeRoot, store, new com.gamma.pipeline.ViewStore(writeRoot.resolve("views")), ds, dataset,
+                    false).vet(spec, true, null);
+        } catch (ApiException masked) {
+            throw refused(code + "alert.when: " + masked.getMessage());
         }
     }
 

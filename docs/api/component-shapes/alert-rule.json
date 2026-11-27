@@ -200,8 +200,9 @@
         },
         {
           "path" : "when",
-          "type" : "any",
-          "required" : false
+          "type" : "object",
+          "required" : false,
+          "description" : "A Dataset measure rule only: a condition group {kind: group, op: AND|OR, items: [{kind: condition, field, operator, value}]} (the when shape /bi/query takes); the Measure counts only the rows that match, e.g. field status, operator !=, value delivered. Every field must be a column of the Dataset and none masked (ERR_ALERT_ROW_FILTER_INVALID). On a windowed rule it filters each Window's rows."
         },
         {
           "path" : "window",

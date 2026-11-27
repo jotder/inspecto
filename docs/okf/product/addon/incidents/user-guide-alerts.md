@@ -37,7 +37,10 @@ the control's `valueChanges`. Rules of the save:
   keys the form does not model (a newer field) are still carried over.
 - `stormCap` travels **only with a non-empty `by`** (the engine refuses it alone); a cleared `by` (`null`, or
   the list's "explicitly none" `[]`) removes both.
-- The engine refuses `when` and `maximumAge` on a Measure rule, so the Measure kind offers neither. A
+- A Measure rule may carry a row filter `when` (`ALERT-RULE-ROW-FILTER-1`), written through the API or an agent; the
+  Measure kind does not edit it yet but **re-sends a stored one unchanged** (`storedRowFilter`) and says so under the
+  form — `when` is a form-owned key, so dropping it would make the rule count every row. Editing it here is `ALERT-RULE-FILTER-UI-1`.
+- The engine refuses `maximumAge` on a Measure rule, so the Measure kind does not offer it. A
   freshness (`maximumAge`) or Investigation rule stays **edit-only** here: its target is shown read-only and
   kept as stored.
 - A server refusal renders in the dialog (`<inspecto-alert variant="error">` with `apiErrorMessage`) — the

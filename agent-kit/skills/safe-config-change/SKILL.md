@@ -32,7 +32,9 @@ them: do the task you were given, then end your answer with one line naming what
    `inspecto://glossary` if unsure).
 2. **Validate** with `validate_config`: `type` is `expectation`, `alert`, `job`, `widget` or `dashboard`, `config` is
    the draft. The answer is `{findings, clean}`. Fix every finding whose severity is an error and validate again.
-   Never propose a draft that is not clean. A Decision Rule, a Notification Rule or a Notification Channel has no `validate_config` type: its
+   Never propose a draft that is not clean. An Alert Rule's row filter (`when`) is checked against the Dataset's
+   Schema and masking only when it is proposed: a 422 naming `ERR_ALERT_ROW_FILTER_INVALID` names the column to fix.
+   A Decision Rule, a Notification Rule or a Notification Channel has no `validate_config` type: its
    own route checks the content before it holds it, so a bad draft comes back as a 422 naming the field.
 3. **Preview** the parts a draft is made of with `preview_config` before you propose, rather than proposing and
    reading the refusal: `kind: parsing` parses a raw sample with a Pipeline draft's parsing settings (body
