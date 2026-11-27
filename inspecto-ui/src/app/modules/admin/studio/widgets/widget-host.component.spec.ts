@@ -1,3 +1,5 @@
+import { signal } from '@angular/core';
+import { SessionService } from 'app/inspecto/auth/session.service';
 import { TestBed } from '@angular/core/testing';
 import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of } from 'rxjs';
@@ -17,6 +19,10 @@ import { WidgetsService } from './widgets.service';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 import { DrillEvent, WidgetHostComponent } from './widget-host.component';
+import { SessionService } from 'app/inspecto/auth/session.service';
+import { MatDialog } from '@angular/material/dialog';
+import { signal } from '@angular/core';
+import { ExplainDialogComponent } from './explain.dialog';
 
 const DS: Dataset = {
     id: 'cdr_sample',
@@ -670,5 +676,142 @@ describe('WidgetHostComponent', () => {
         fixture.detectChanges();
         expect(fixture.componentInstance.showMeOffered()).toBe(false);
         expect(fixture.nativeElement.querySelector('[data-testid="tile-show-me"]')).toBeNull();
+    });
+    // ── BI-INSIGHTS-1 loose ends B: Explain this change is offered to every viewer, gated only on the add-on ──
+    function explainTile(insights: boolean) {
+        const open = vi.fn();
+        TestBed.overrideProvider(MatDialog, { useValue: { open } });
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+            {
+                provide: DatasetResultService,
+                useValue: {
+                    run: () =>
+                        Promise.resolve({
+                            ok: true,
+                            rows: [
+                                { day: '2026-01-01', sum_duration_s: 1 },
+                                { day: '2026-01-02', sum_duration_s: 3 },
+                            ],
+                        }),
+                },
+            },
+            { provide: SessionService, useValue: { features: signal({ insights }) } },
+            {
+                provide: LensService,
+                useValue: { canAuthorWorkbench: () => false, canAuthorAlertRules: () => false },
+            },
+        ]);
+        fixture.componentRef.setInput('widget', {
+            ...WIDGET,
+            vizType: 'line',
+            controls: { x: [{ field: 'day', grain: 'day' }], y: [{ field: 'duration_s', agg: 'sum' }] },
+        });
+        fixture.componentRef.setInput('dataset', {
+            ...DS,
+            columns: [
+                { name: 'day', type: 'date', role: 'dimension' },
+                { name: 'region', type: 'string', role: 'dimension' },
+                { name: 'duration_s', type: 'number', role: 'measure' },
+            ],
+        });
+        fixture.detectChanges();
+        return { fixture, open };
+    }
+
+    it('a viewer who may not author still gets Explain this change, which opens the dialog on the last period', async () => {
+        const { fixture, open } = explainTile(true);
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const button = fixture.nativeElement.querySelector('[data-testid="explain-change"]') as HTMLButtonElement;
+        expect(button).not.toBeNull();
+        button.click();
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(open.mock.calls[0][0]).toBe(ExplainDialogComponent);
+        expect(open.mock.calls[0][1].data.request).toMatchObject({ field: 'day', grain: 'day', at: '2026-01-02' });
+    });
+
+    it('no Explain this change when the Business Insights add-on is not installed', async () => {
+        const { fixture } = explainTile(false);
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(fixture.componentInstance.explainable()).toBeNull();
+        expect(fixture.nativeElement.querySelector('[data-testid="explain-change"]')).toBeNull();
+    });
+});
+
+describe('WidgetHostComponent — why Explain is off (INSIGHT-EXPLAIN-HIDDEN-REASON-1)', () => {
+    beforeEach(() => registerBuiltinViz());
+
+    function explainTile(opts: { author?: boolean; vizType?: string; insights?: boolean } = {}) {
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+            {
+                provide: DatasetResultService,
+                useValue: {
+                    run: () => Promise.resolve({ ok: true, rows: [{ day: '2026-01-01', sum_duration_s: 1 }] }),
+                },
+            },
+            {
+                provide: SessionService,
+                useValue: {
+                    features: signal({ insights: opts.insights ?? true }),
+                    authMode: () => 'none',
+                    capabilities: () => [],
+                },
+            },
+            {
+                provide: LensService,
+                useValue: { canAuthorWorkbench: () => opts.author ?? true, canAuthorAlertRules: () => false },
+            },
+        ]);
+        const line = opts.vizType !== 'kpi';
+        fixture.componentRef.setInput('widget', {
+            ...WIDGET,
+            vizType: opts.vizType ?? 'line',
+            controls: line
+                ? { x: [{ field: 'day', grain: 'day' }], y: [{ field: 'duration_s', agg: 'sum' }] }
+                : WIDGET.controls,
+        });
+        fixture.componentRef.setInput('dataset', DS);
+        fixture.detectChanges();
+        return fixture;
+    }
+
+    async function settle(fixture: ReturnType<typeof explainTile>) {
+        await fixture.whenStable();
+        fixture.detectChanges();
+        return fixture.nativeElement as HTMLElement;
+    }
+
+    it('an author sees a disabled Explain with the reason on a time chart with no dimension column', async () => {
+        const fixture = explainTile();
+        const el = await settle(fixture);
+        expect(fixture.componentInstance.explainable()).toBeNull();
+        expect(fixture.componentInstance.explainReason()).toBe(
+            'The Dataset has no dimension column to explain the change by.',
+        );
+        expect(el.querySelector('[data-testid="explain-change"]')).toBeNull();
+        const wrap = el.querySelector('[data-testid="explain-change-reason"]')!;
+        expect(wrap.getAttribute('aria-label')).toBe(
+            'Explain this change is unavailable: The Dataset has no dimension column to explain the change by.',
+        );
+        expect(wrap.getAttribute('tabindex')).toBe('0');
+        expect((el.querySelector('[data-testid="explain-change-off"]') as HTMLButtonElement).disabled).toBe(true);
+        await expectNoA11yViolations(el);
+    });
+
+    it('a reader who cannot change the Widget sees nothing', async () => {
+        const el = await settle(explainTile({ author: false }));
+        expect(el.querySelector('[data-testid="explain-change-reason"]')).toBeNull();
+    });
+
+    it('stays hidden on a KPI tile', async () => {
+        const kpi = explainTile({ vizType: 'kpi' });
+        const el = await settle(kpi);
+        expect(kpi.componentInstance.explainReason()).toBe('');
+        expect(el.querySelector('[data-testid="explain-change-reason"]')).toBeNull();
     });
 });
