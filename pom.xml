@@ -380,6 +380,10 @@
              rather than relying on user-property propagation, so the gate is one documented switch. Default
              `auto` = today's admission behaviour, so ordinary runs are unchanged. -->
         <ingest.lane>auto</ingest.lane>
+        <!-- SIGNAL-BOARD-1 §11.3: the post-time Signal Type check (SignalPostCheck). Off here; a module turns it on
+             in its own <properties> once its Signal Types are declared (engine and processor: SB-1a; the
+             feature modules: SB-1b). -->
+        <signals.checkFields>false</signals.checkFields>
     </properties>
 
     <!-- M1: single source of truth for the versions of the deps that were duplicated across
@@ -749,6 +753,7 @@
                         <systemPropertyVariables>
                             <!-- The ELT parity-gate switch — see the `ingest.lane` property above. -->
                             <ingest.lane>${ingest.lane}</ingest.lane>
+                            <signals.checkFields>${signals.checkFields}</signals.checkFields>
                             <!--
                               Path containment (PathJail / ConfigSafetyValidator) refuses anything
                               outside the allowed roots, which default to the working directory. Tests

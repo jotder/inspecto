@@ -2496,6 +2496,18 @@ public final class JobService implements AutoCloseable {
         return registry.descriptor(id);
     }
 
+    /** The Signal Type catalog of this Space (SIGNAL-BOARD-1 §11.2): every provider's types plus the dotted
+     *  {@code emits} of the Job Types its loaded Job Packs bring. Throws when two providers declare one type. */
+    public com.gamma.signal.SignalTypeCatalog signalTypeCatalog() {
+        List<com.gamma.signal.SignalTypeCatalog.PackEmit> packEmits = new ArrayList<>();
+        for (JobTypeDescriptor d : jobTypes())
+            registry.ownerOf(d.id()).ifPresent(pack -> {
+                for (String type : d.emits()) packEmits.add(new com.gamma.signal.SignalTypeCatalog.PackEmit(pack, d.id(), type));
+            });
+        return com.gamma.signal.SignalTypeCatalog.assemble(
+                com.gamma.module.EntitledServices.load(com.gamma.signal.SignalTypeProvider.class), packEmits);
+    }
+
     /** Every Job Type as the catalog route serves it: the descriptor plus its provenance (§7.3). */
     public List<Map<String, Object>> jobTypeViews() {
         return jobTypes().stream().map(d -> jobTypeView(d.id()).orElseThrow()).toList();

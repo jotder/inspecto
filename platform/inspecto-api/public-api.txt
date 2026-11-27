@@ -1137,6 +1137,7 @@ com.gamma.event.EventLog | public static final String DEFAULT_SPACE_ID
 com.gamma.event.EventLog | public static final String SPACE_MDC_KEY
 com.gamma.event.EventLog | public static int tapCount()
 com.gamma.event.EventLog | public static void addTap(java.util.function.BiConsumer<EventLog, Event>)
+com.gamma.event.EventLog | public static void postCheck(Consumer<Event>)
 com.gamma.event.EventLog | public static void register(String, EventLog)
 com.gamma.event.EventLog | public static void removeTap(java.util.function.BiConsumer<EventLog, Event>)
 com.gamma.event.EventLog | public static void unregister(String)
@@ -1387,6 +1388,7 @@ com.gamma.job.JobService | public boolean isRunning(String)
 com.gamma.job.JobService | public boolean isSystemJob(String)
 com.gamma.job.JobService | public boolean trigger(String)
 com.gamma.job.JobService | public boolean trigger(String, String)
+com.gamma.job.JobService | public com.gamma.signal.SignalTypeCatalog signalTypeCatalog()
 com.gamma.job.JobService | public final class JobService implements AutoCloseable
 com.gamma.job.JobService | public int maxConcurrentRuns()
 com.gamma.job.JobService | public java.util.OptionalLong eventRetentionDays()
@@ -2781,6 +2783,37 @@ com.gamma.signal.Signal | public static final String ATTR_SPACE
 com.gamma.signal.Signal | public static final String ATTR_TYPE
 com.gamma.signal.SignalEmitter | public interface SignalEmitter
 com.gamma.signal.SignalEmitter | void emit(String, Severity, Map<String, Object>)
+com.gamma.signal.SignalField | public Map<String, Object> toMap()
+com.gamma.signal.SignalField | public record SignalField(String name, Kind kind, boolean always, String description)
+com.gamma.signal.SignalField | public static SignalField always(String, Kind, String)
+com.gamma.signal.SignalField | public static SignalField optional(String, Kind, String)
+com.gamma.signal.SignalField.Kind | constant BOOLEAN
+com.gamma.signal.SignalField.Kind | constant INTEGER
+com.gamma.signal.SignalField.Kind | constant LIST
+com.gamma.signal.SignalField.Kind | constant MAP
+com.gamma.signal.SignalField.Kind | constant NUMBER
+com.gamma.signal.SignalField.Kind | constant STRING
+com.gamma.signal.SignalField.Kind | public String wire()
+com.gamma.signal.SignalField.Kind | public enum Kind
+com.gamma.signal.SignalTypeCatalog | public List<Entry> entries()
+com.gamma.signal.SignalTypeCatalog | public List<String> problems(String, Map<String, ?>)
+com.gamma.signal.SignalTypeCatalog | public Optional<Entry> find(String)
+com.gamma.signal.SignalTypeCatalog | public final class SignalTypeCatalog
+com.gamma.signal.SignalTypeCatalog | public static SignalTypeCatalog assemble(Iterable<? extends SignalTypeProvider>, Collection<PackEmit>)
+com.gamma.signal.SignalTypeCatalog | public static SignalTypeCatalog installed()
+com.gamma.signal.SignalTypeCatalog | public static final Set<String> STAMPED
+com.gamma.signal.SignalTypeCatalog.Entry | public Map<String, Object> toMap()
+com.gamma.signal.SignalTypeCatalog.Entry | public record Entry(SignalTypeDecl decl, String source, boolean fieldsDeclared)
+com.gamma.signal.SignalTypeCatalog.PackEmit | public record PackEmit(String pack, String jobType, String type)
+com.gamma.signal.SignalTypeDecl | public Map<String, Object> toMap()
+com.gamma.signal.SignalTypeDecl | public SignalField field(String)
+com.gamma.signal.SignalTypeDecl | public boolean covers(String)
+com.gamma.signal.SignalTypeDecl | public boolean family()
+com.gamma.signal.SignalTypeDecl | public record SignalTypeDecl(String type, String title, String poster, List<SignalField> fields, String since)
+com.gamma.signal.SignalTypeDecl | public static boolean isDotted(String)
+com.gamma.signal.SignalTypeProvider | List<SignalTypeDecl> signalTypes()
+com.gamma.signal.SignalTypeProvider | String source()
+com.gamma.signal.SignalTypeProvider | public interface SignalTypeProvider
 com.gamma.spi.auth.AccessDecider | Decision decide(HttpExchange, Subject, String, String, String, Map<String, Object>)
 com.gamma.spi.auth.AccessDecider | String ATTR_MATCHED_POLICY
 com.gamma.spi.auth.AccessDecider | default Explanation explain(HttpExchange, Subject, String, String, String, Map<String, Object>)

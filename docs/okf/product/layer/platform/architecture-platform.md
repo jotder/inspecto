@@ -45,7 +45,7 @@ only when it is **Installed** in the build, **Enabled** for the Space and **Perm
   notifications). Two process-wide singletons exist: `EventLog.global()` and `MetricRegistry.global()`.
   No annotations, no container.
 - **`ServiceLoader` extension points.** Extension points are plain `META-INF/services` contracts.
-  **48**<!--count:spi-extension-points--> distinct interfaces are discovered this way (derived by
+  **49**<!--count:spi-extension-points--> distinct interfaces are discovered this way (derived by
   `tools/check-doc-counts.mjs` from the `ServiceLoader.load`, `OptionalSpi.all` and `SpiSlot` call sites
   in main code). An absent module is simply not discovered, so the no-op path wins. This is what makes
   Editions build flavors. See §5.

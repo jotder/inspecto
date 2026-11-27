@@ -320,6 +320,7 @@
     "/recon/rows",
     "/expectations/breached-count",
     "/signals/count",
+    "/signals/types",
     "/jobs/{jobId}/runs/{runId}/diff/{diffId}",
     "/audit/route-inventory",
     "/assist/skills",
@@ -6867,6 +6868,20 @@
         "summary" : "Count Signals in a window",
         "operationId" : "getSignalsCount",
         "description" : "{count, datasets, capped} for ?type= (comma-separated, each exact or a prefix.* glob) between ?since= and ?until=; datasets counts distinct payload.dataset values once, and capped marks a lower bound when the ledger page was full. No capability gate. 422 without type; 400 for a non-numeric time bound.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
+    "/signals/types" : {
+      "get" : {
+        "tags" : [ "signals" ],
+        "summary" : "Signal Type catalog",
+        "operationId" : "getSignalsTypes",
+        "description" : "{types, count}: every Signal Type that can be posted in this Space (SIGNAL-BOARD-1), each with type (a dotted name or a prefix.* family), title, poster, fields [{name, kind, always, description}], since, source (core, module:<id> or pack:<file>) and fieldsDeclared (false for a Job Pack's emits). Gated on canAuthorWorkbench.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."

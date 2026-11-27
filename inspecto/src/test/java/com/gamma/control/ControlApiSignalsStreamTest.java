@@ -52,7 +52,17 @@ class ControlApiSignalsStreamTest {
 
     private static Signal sig(String type, Severity sev, String correlationId) {
         return new Signal(null, type, Instant.now(), sev, Ref.of("job", "x"), null,
-                correlationId, null, null, null, type, Map.of("k", "v"), 1);
+                correlationId, null, null, null, type, payload(type), 1);
+    }
+
+    /** Each type's real payload shape: a posted Signal must fit its declaration (SIGNAL-BOARD-1 SB-1a post-time check). */
+    private static Map<String, Object> payload(String type) {
+        return switch (type) {
+            case "job.run.started" -> Map.of("job", "x", "run", "r", "trigger", "manual");
+            case "job.run.completed" -> Map.of("job", "x", "run", "r", "outcome", "SUCCESS", "durationMs", 1L);
+            case "job.run.failed" -> Map.of("job", "x", "run", "r", "outcome", "FAILED", "message", "boom");
+            default -> Map.of();
+        };
     }
 
     @Test

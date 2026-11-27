@@ -1,7 +1,7 @@
 # Signal Board — one clear meaning for Signal, and a board Jobs can trust (`SIGNAL-BOARD-1`)
 
 Status: **APPROVED 2026-11-27 — D-SB1…D-SB5 all DECIDED (operator, 2026-11-27); SB-0 done 2026-11-27 (results §10;
-the live stop test is still owed); the D-SB5 age limit is 24 hours; SB-1 in design (§11); nothing built.** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
+the live stop test is still owed); the D-SB5 age limit is 24 hours; SB-1 designed (§11); SB-1a built 2026-11-27 (§11.6), SB-1b and SB-1c open.** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
 Builds on the shipped Signal Backbone ([spec-signal-backbone](../okf/product/module/event/spec-signal-backbone.md));
 it replaces none of it. SB-2 lands inside the link graph of `SPACE-COHERENCE-1`
 ([plan](2026-11-27-space-coherence-plan.md)).
@@ -272,3 +272,52 @@ SB-1b without failing module tests.
   post one from config, for example a Step or a Job parameter. That is a new decision, **D-SB8**, before SB-1c.
 - Three score types (`risk.score.produced`, `anomaly.score.produced`, `churn.score.produced`) are core `SignalType`
   constants although their Jobs live in modules; SB-1b checks whether they move.
+- **Correction (SB-1a, 2026-11-27): config CAN post a Signal of the author's choosing.** A Decision Rule's
+  `emit-signal` consequence (`BuiltInConsequences.emitSignal`) takes its type from `params.type` (default
+  `decision-rule.<rule>`) and its payload keys from `params.payload`. D-SB8 is still needed (a Job or Step cannot), but
+  it must also decide how these authored types are declared. Until then the post-time check lets an uncatalogued type
+  posted with `source.kind = decision-rule` through.
+
+### 11.6 SB-1a as built (2026-11-27, lane off `origin/master` `c6a73d065`)
+
+- **API** (`platform/inspecto-engine`, `com.gamma.signal`, `@PublicApi(since = "4.0.0")`): `SignalField(name, kind,
+  always, description)` with `Kind` `string|integer|number|boolean|list|map`; `SignalTypeDecl(type, title, poster,
+  fields, since)` (dotted name or `prefix.*` family; a repeated field or a bad name is refused); `SignalTypeProvider`
+  (`signalTypes()` plus `source()`, `core` or `module:<id>`, found through `EntitledServices.load` like
+  `JobTypeProvider`); `SignalTypeCatalog.assemble(providers, packEmits)`: a type from two providers is an
+  `IllegalStateException`, a pack emit is listed with `fieldsDeclared: false` and never overrides a provider, `find`
+  takes the exact name else the longest family. `chainDepth` is a framework stamp (`STAMPED`), never a type's field.
+  `JobService.signalTypeCatalog()` adds the Space's loaded Job Packs' dotted `emits`.
+- **`CoreSignalTypes`**: 52 types, fields read from each posting site: the 30 `SignalType` constants, the engine posts
+  outside a Job (`pipeline.batch.committed|parked|failed|retry_exhausted`, `pipeline.step.abandoned`, `dataset.write`,
+  `audit.write_failed`, `collector.delivery.anomaly`, `collector.file.problem`, `quality.schema_drift`,
+  `alert-rule.fired|cleared`, `expectation.violated`, `decision-rule.applied|create-alert|render-widget|generate-report`)
+  and the core Job Types whose types are not `SignalType` constants (`space.comparison.completed`,
+  `kpi.snapshot.completed`, `expectation.evaluate.completed`, `space.test.completed|failed`). §11.1 was short: the six
+  `*Signal` classes and the five Job-Type constants were not in it, and `job.run.step` / `consignment.counted` exist
+  only in tests.
+- **`GET /signals/types`** → `{types, count}`, each with `type, title, poster, fields, since, source, fieldsDeclared`.
+  Gated on `canAuthorWorkbench` (the Job form's audience) although `/signals` and `/jobs/types` are ungated; manifest
+  entry, core fragment, `openapi-v1.json` regenerated; `ControlApiSignalTypesTest` (401 / 403 / 200).
+- **Post-time check** (`SignalPostCheck`): runs at the ledger write, `EventLog.emit`, through a test-only
+  `EventLog.postCheck` hook that `Signal` installs when it loads with `-Dsignals.checkFields=true`; a Signal built and
+  handed straight to a consumer (a test fixture) is not checked. A misfit throws `AssertionError`, so the posting sites
+  that swallow a `RuntimeException` cannot hide it. ⚠ A Run posts on a worker thread whose `Future` nobody reads, so
+  the throw alone vanished there (found by the verification pass: a misfit on `job.run.completed` showed only as
+  "expected a job run within 10s"). Every misfit is therefore also recorded and printed to stderr, and
+  `SignalPostCheckExtension` (engine test-jar, JUnit auto-detection, so the processor's tests get it too) fails the
+  running test when one was recorded. Root pom: `signals.checkFields=false`, passed to Surefire;
+  `inspecto-engine` and `inspecto-processor` set it `true`. Openings: a type a loaded pack declares passes on its name,
+  and an uncatalogued type from a Decision Rule passes (D-SB8). Test-only types are declared by `TestSignalTypes`
+  (engine test-jar, source `test`). Five tests posted real core types with payloads the real code never writes
+  (`RunContextCausationTest`, `ControlApiConsignmentTrailTest`, `ControlApiDatasetFreshnessTest`,
+  `ControlApiSignalsTest`, `ControlApiSignalsStreamTest`); their fixtures now carry the declared shape. No declaration
+  was loosened to make a test pass.
+- **Guard** `tools/check-signal-types.mjs` (+ fixture test), in the CI `guards` job: a dotted literal as the type of
+  `new [com.gamma.signal.]Signal(id, "<t>", …)` (the id may be a call), `emit("<t>", Severity.X, …)` or
+  `emitSignal("<t>", …)` in main code must be declared by a
+  provider (as a literal, or as a `Class.CONSTANT` the provider names). `PENDING` (module literals SB-1b declares) is
+  empty: no module posts a literal type today.
+- **Board row text** (`docs/BACKLOG.md`): "SB-1a built 2026-11-27: the Signal Type catalog (`com.gamma.signal`), 52 core
+  types with fields, `GET /signals/types`, the post-time check on in engine and processor tests, the name guard. Next:
+  SB-1b (module providers, then the check on per module), SB-1c (Job form pick list); D-SB8 open."

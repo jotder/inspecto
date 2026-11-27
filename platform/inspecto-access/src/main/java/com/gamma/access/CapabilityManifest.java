@@ -278,6 +278,9 @@ public final class CapabilityManifest {
             // ScreeningRoutes (SCREENING-1) — deciding a Screening Hit is working a triage item (SCR-D13).
             new Entry("POST", "/screening/hits/([^/]+)/decide", Roles.CAN_WORK_INCIDENTS),
             new Entry("GET", "/screening/hits/([^/]+)/reveal", Roles.CAN_REVEAL_LINK_ENTITIES),
+            // SignalRoutes (SIGNAL-BOARD-1 SB-1a) — the Signal Type catalog feeds the Job form's on_signal pick list, so it
+            // is read by whoever authors Jobs. The ledger reads (/signals, /signals/tree, ...) stay Space-access only.
+            new Entry("GET", "/signals/types", Roles.CAN_AUTHOR_WORKBENCH),
             // EnrichmentRoutes
             new Entry("POST", "/enrichment", Roles.CAN_AUTHOR_WORKBENCH),
             // SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1: the preview executes the draft's transform — authoring, not a read.

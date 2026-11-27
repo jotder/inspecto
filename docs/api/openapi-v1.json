@@ -8597,6 +8597,20 @@
         "x-generated" : true
       }
     },
+    "/signals/types" : {
+      "get" : {
+        "tags" : [ "signals" ],
+        "summary" : "Signal Type catalog",
+        "operationId" : "getSignalsTypes",
+        "description" : "{types, count}: every Signal Type that can be posted in this Space (SIGNAL-BOARD-1), each with type (a dotted name or a prefix.* family), title, poster, fields [{name, kind, always, description}], since, source (core, module:<id> or pack:<file>) and fieldsDeclared (false for a Job Pack's emits). Gated on canAuthorWorkbench.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
     "/jobs/{jobId}/runs/{runId}/diff/{diffId}" : {
       "get" : {
         "tags" : [ "jobs" ],

@@ -90,7 +90,7 @@ class ControlApiSignalsTest {
             log.emit(signal("dataset.write", "tf_cdr"));
             log.emit(signal("job.dataset.produced", "tf_cdr"));       // the same Dataset, the other way
             log.emit(signal("job.dataset.produced", "tf_irsf_offenders"));
-            log.emit(signal("job.run.succeeded", null));             // another type: not counted
+            log.emit(signal("job.run.completed", null));             // another type: not counted
 
             String base = "/spaces/acme/signals/count?type=";
             JsonNode both = JSON.readTree(send(c.port, "GET", base + "dataset.write,%20job.dataset.produced", null).body()).get("data");
@@ -119,7 +119,18 @@ class ControlApiSignalsTest {
 
     private static com.gamma.signal.Signal sig(String type, String dataset) {
         return new com.gamma.signal.Signal(null, type, null, null, com.gamma.signal.Ref.of("job", "t"), null, null,
-                null, "acme", null, null, dataset == null ? java.util.Map.of() : java.util.Map.of("dataset", dataset), 0);
+                null, "acme", null, null, payload(type, dataset), 0);
+    }
+
+    /** Each type's real payload shape: a posted Signal must fit its declaration (SIGNAL-BOARD-1 SB-1a post-time check). */
+    private static java.util.Map<String, Object> payload(String type, String dataset) {
+        return switch (type) {
+            case "dataset.write" -> java.util.Map.of("dataset", dataset, "rows", 1L, "at", "2026-11-27T00:00:00Z");
+            case "job.dataset.produced" -> java.util.Map.of("dataset", dataset, "rows", 1L);
+            case "job.run.started" -> java.util.Map.of("job", "t", "run", "r", "trigger", "manual");
+            case "job.run.completed" -> java.util.Map.of("job", "t", "run", "r", "outcome", "SUCCESS", "durationMs", 1L);
+            default -> java.util.Map.of();
+        };
     }
 
     private static com.gamma.audit.Event signal(String type, String dataset) {
