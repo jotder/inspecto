@@ -320,6 +320,51 @@ class ControlApiAgentLookupTest {
         }
     }
 
+    /**
+     * LOOKUP-TEST-PATH-RAW-1 (operator, 2026-11-27): a path Reference into a data folder - the {@code region_dim} store
+     * itself, and that Pipeline's rejected rows - is refused 422 to the person and the person's agent on both doors, before
+     * any index is built; a machine is refused 403 as before. Each probe holds the first key, so it would answer it raw
+     * without the guard; read by name ({@code reference/region_dim}) the same data answers masked.
+     */
+    @Test
+    void aPathReferenceIntoADataStoreIsRefusedToEveryCallerBeforeAnyBuild(@TempDir Path dir) throws Exception {
+        for (String area : List.of("region/errors/rejected.csv", "region/db/part0.parquet")) {
+            Path space = Files.createDirectories(dir.resolve("case" + area.hashCode()));
+            Path probe = space.resolve(area);
+            if (!area.endsWith(".parquet")) {
+                Files.createDirectories(probe.getParent());
+                Files.writeString(probe, "msisdn,owner_msisdn,region\n" + KEYS.get(0) + "," + OWNER_OF_FIRST + ",R0\n");
+            }
+            try (Ctx c = open(space, """
+                    output_store: enriched_calls
+                    steps[1]:
+                      - join:
+                          reference: %s
+                          key: msisdn
+                          match: exact
+                          on: ID
+                          columns[2]: owner_msisdn, region
+                    """.formatted(probe.toString().replace('\\', '/')))) {
+                Map<String, Object> b = body(c, c.exact, KEYS.get(0), false);
+                for (String who : List.of(PERSON, AGENT)) {
+                    HttpResponse<String> r = test(c, who, b);
+                    assertEquals(422, r.statusCode(), who + " " + probe + ": " + r.body());
+                    assertTrue(r.body().contains("may not name a file in a data folder"), r.body());
+                    assertNoRaw(who, r.body());
+                }
+                JsonNode viaMcp = tool(c, AGENT, b);
+                assertTrue(viaMcp.path("isError").asBoolean() && text(viaMcp).startsWith("HTTP 422"), viaMcp.toString());
+                assertNoRaw("agent MCP", viaMcp.toString());
+                HttpResponse<String> machine = test(c, MACHINE, b);
+                assertEquals(403, machine.statusCode(), machine.body());
+                assertNoRaw("machine", machine.body());
+                assertEquals("cold", data(get(c.api, PERSON, "/lookups")).get("lookups").get(0).get("index").get("state").asText(),
+                        "nothing was built for anyone");
+            }
+            com.gamma.control.AgentGateProbe.clearLookups();
+        }
+    }
+
     @Test
     void theRouteGateStillDecidesForAnAgent(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, BY_NAME)) {

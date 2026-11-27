@@ -463,6 +463,12 @@ under it are the decision.
 - **D-AK12 — as recommended, a gate:** the operations, analyst and Link Analysis suites live with Claude first, then
   the developer suite on the Gemini CLI, Codex CLI and a local model. W2, W6, W7 and W11 start only after the
   operations and analyst suites have one live run each (W11 is under the gate because it widens the analyst role).
+- **D-AK26 (operator, 2026-11-27; reverses the raw-path part of D-AK22 and D-AK25):** a `path:` Reference no longer
+  reads a data folder. `POST /enrichment/preview` and `POST /lookups/test` refuse (422, every caller) a path into a
+  Dataset's store or a Pipeline's folders (store, rejected rows, raw copies, inbox, working folders); such data is read by name, where sharing and masking apply. The enrichment preview
+  now checks a by-name Reference's Dataset sharing as the lookup test does. A path outside every data folder keeps
+  D-AK22/D-AK25 (raw for a builder and a builder's agent, 403 for a machine). Closes `ENRICHMENT-PREVIEW-PATH-REACH-1`,
+  `ENRICHMENT-PREVIEW-SHARING-1` and `LOOKUP-TEST-PATH-RAW-1`.
 
 ## 6. Risks
 

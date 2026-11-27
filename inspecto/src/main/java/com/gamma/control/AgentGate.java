@@ -170,6 +170,10 @@ final class AgentGate {
      * D-AK25 (operator, 2026-11-27): a lookup test over a {@code path:} Reference (no classification) answers raw to a person
      * or a person's agent holding {@code canAuthorWorkbench}; a machine agent's is refused by the route (403). A by-name
      * Reference's test stays masked for every agent.
+     * Operator, 2026-11-27 (reversing that part of D-AK22 and D-AK25): neither route reads a data folder by path any more
+     * ({@code PathReferenceGuard}: a Dataset's store, rejected rows, raw copies: 422), and the enrichment preview
+     * checks a by-name Reference's Dataset sharing as the lookup test does; the raw stamp now covers only a path outside
+     * every data folder (the enrichment preview: also a by-name Reference the caller may view, D-AK22).
      */
     static final Set<String> RAW_FOR_BUILDERS = Set.of(
             "POST /enrichment/preview", "POST /risk-scores/preview", "POST /anomaly-scores/preview", "POST /lookups/test");

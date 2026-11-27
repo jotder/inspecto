@@ -38,7 +38,8 @@ its weight in the agent budget. As built in S0:
 Group B added the simulators (`AgentGate.SIMULATORS`, 2026-11-26): `POST /decision-rules/{id}/simulate` and
 `POST /rule-templates/{id}/simulate`, weight 1 each, and `POST /enrichment/preview`, weight 2 — the one route raw by
 operator decision (D-AK22, `AgentGate.RAW_FOR_BUILDERS`): its stamp `AnswerMasking.unmaskedByDecision` proves only a scope
-the host opened for such a route, so a raw answer anywhere else still fails closed —
+the host opened for such a route, so a raw answer anywhere else still fails closed; since D-AK26 (2026-11-27) it reads no
+data folder by path and no Dataset the caller cannot view —
 [spec-agent-simulators.md](spec-agent-simulators.md).
 
 Not on the list, because they answer no Dataset value: the overlap profile (names and counts) and the two dossier
@@ -245,7 +246,11 @@ people fix `LOOKUP-TEST-OPEN-READ-1` (2026-11-26) built: `canView` on every Data
 - **A `path:` Reference (D-AK25, operator 2026-11-27, as D-AK22).** It has no classification. A person's agent gets the
   raw answer, stamped `AnswerMasking.unmaskedByDecision` (the route is on `AgentGate.RAW_FOR_BUILDERS`, so that stamp
   proves it); a machine agent gets 403 before any index is built. ⚠ A builder's agent sends that file's values to its
-  model provider. Filed P2 to revisit: `LOOKUP-TEST-PATH-RAW-1`.
+  model provider. **D-AK26 (operator, 2026-11-27):** a path into a data folder — a Dataset's store, a Pipeline's folders
+  (rejected rows, raw copies, inbox, working folders) — is refused 422
+  for every caller before any index is built (`PathReferenceGuard`, shared with the enrichment preview); that data is
+  tested by name, masked and sharing-checked. The raw stamp now covers only a file outside every data folder.
+  `LOOKUP-TEST-PATH-RAW-1` closed.
 - **Budget (D-AK17).** Weight 1. A call that builds the index (asked, cold, evicted, its Step or Reference changed) pays
   20 in all: the host charges 1, the route spends 19 more through the `AgentBudget` charger before the build (429 past
   the budget, the kept index unchanged). The agent burst floor is the heaviest call, so `AgentGate.PEAK_DATA_WEIGHTS`
