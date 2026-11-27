@@ -13,7 +13,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { switchMap } from 'rxjs';
+import { Observable, of, switchMap } from 'rxjs';
 import { ActionRequestsService } from 'app/inspecto/api/action-requests.service';
 import { apiErrorMessage, needsPermission } from 'app/inspecto/api/api-base';
 import { Insight, InsightBand, InsightFeed, InsightFeedback, InsightsService } from 'app/inspecto/api/insights.service';
@@ -23,6 +23,7 @@ import { SessionService } from 'app/inspecto/auth/session.service';
 import { InspectoEmptyStateComponent } from 'app/inspecto/components/empty-state.component';
 import { InspectoSkeletonComponent } from 'app/inspecto/components/skeleton.component';
 import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.component';
+import { fmtDateTime } from 'app/inspecto/format/format';
 import { bandBadge, sliceLabel } from 'app/inspecto/insights/insight-profile-form';
 import {
     insightActionPayload,
@@ -157,7 +158,7 @@ const STATUS_WORDS: Record<string, string> = {
                                 <span class="text-secondary text-xs">{{ i.insight_type }} · {{ i.period }}</span>
                                 @if (run() === 'all' && i.run_at) {
                                     <span class="text-secondary text-xs" data-testid="insight-run"
-                                        >found {{ i.run_at }}</span
+                                        >found {{ fmtDateTime(i.run_at) }}</span
                                     >
                                 }
                                 <span class="text-secondary ml-auto text-xs tabular-nums"
@@ -269,6 +270,7 @@ export class InsightFeedComponent {
     readonly busy = signal<string | null>(null);
     readonly band = (i: Insight) => bandBadge(i.band);
     readonly slice = sliceLabel;
+    readonly fmtDateTime = fmtDateTime;
     readonly round = (n: number) => Math.round(n);
     readonly hasInsight = (f: InsightFeed, id: string) => f.insights.some((i) => i.insight_id === id);
 
@@ -316,8 +318,13 @@ export class InsightFeedComponent {
         });
     }
 
-    /** `POST /cases/from-entities` with the Insight as its one member, so the Case carries the evidence. */
-    private caseFor(i: Insight) {
+    /**
+     * `POST /cases/from-entities` with the Insight as its one member, so the Case carries the evidence. A Case already
+     * opened for this Insight on this page is reused, so a retry does not open a second one (plan §11.13).
+     */
+    private caseFor(i: Insight): Observable<{ case: { id: string } }> {
+        const known = this.opened()[i.insight_id]?.caseId;
+        if (known) return of({ case: { id: known } });
         const e = insightEvidence(i, this.profile(), window.location.origin);
         return this.objects.openCaseFromEntities(insightCaseTitle(e), insightCaseDescription(e), [
             insightCaseMember(e),
@@ -385,7 +392,8 @@ export class InsightFeedComponent {
     }
 
     private remember(i: Insight, o: Opened): void {
-        this.opened.update((m) => ({ ...m, [i.insight_id]: o }));
+        // Merge: Open a Case on a reused Case must not drop the Action Request already shown.
+        this.opened.update((m) => ({ ...m, [i.insight_id]: { ...m[i.insight_id], ...o } }));
     }
 
     statusWords(i: Insight): string {
