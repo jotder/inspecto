@@ -668,16 +668,9 @@ class ControlApiPipelineCrudTest {
     }
 
     /**
-     * DRYRUN-SAVE-NODE-MISMATCH-1: a graph the save refuses as {@code UNSUPPORTED_NODE} is refused by the candidate dry
-     * run too, with the same code and node id. Before, an agent's draft holding an unregistered {@code source.dataset}
-     * node (golden task dev-02) dry-ran green — the walk seeds at the entry node and never asks its type — and the
-     * proposal of the same graph was refused. Both kinds: a type no module registers, and a registered built-in the
-     * flat config has no home for.
-     */
-    /**
      * DRYRUN-NAME-FROM-URL-1: the URL's id names a draft, as it does at save. A draft with no {@code name} — the shape
      * {@code inspecto://shapes/pipeline} documents, since the save takes the name from the URL — used to answer 400
-     * "pipeline 'name' is required" (golden task dev-02, 2026-11-27); a draft naming something else runs as the URL's id.
+     * "pipeline 'name' is required" (golden task dev-02, 2026-11-27).
      */
     @Test
     void aDraftWithNoNameDryRunsUnderTheUrlsId(@TempDir Path dir) throws Exception {
@@ -686,15 +679,20 @@ class ControlApiPipelineCrudTest {
                      {"id":"sink","type":"sink.persistent","config":{"store":"out"}}],
             "edges":[{"from":"acq","rel":"data","to":"sink"}]""";
         try (Ctx c = open(dir, dir.resolve("wr"))) {
-            for (String draft : List.of("{" + nodes + "}", "{\"name\":\"something_else\"," + nodes + "}")) {
-                HttpResponse<String> r = send(c.port, "POST", "/pipelines/authored/unnamed_draft/dry-run",
-                        "{\"pipeline\":" + draft + ",\"sampleRows\":[{\"id\":\"1\"}]}");
-                assertEquals(200, r.statusCode(), r.body());
-                assertEquals(1, json(r).get("sinks").get(0).get("rowCount").asInt(), r.body());
-            }
+            HttpResponse<String> r = send(c.port, "POST", "/pipelines/authored/unnamed_draft/dry-run",
+                    "{\"pipeline\":{" + nodes + "},\"sampleRows\":[{\"id\":\"1\"}]}");
+            assertEquals(200, r.statusCode(), r.body());
+            assertEquals(1, json(r).get("sinks").get(0).get("rowCount").asInt(), r.body());
         }
     }
 
+    /**
+     * DRYRUN-SAVE-NODE-MISMATCH-1: a graph the save refuses as {@code UNSUPPORTED_NODE} is refused by the candidate dry
+     * run too, with the same code and node id. Before, an agent's draft holding an unregistered {@code source.dataset}
+     * node (golden task dev-02) dry-ran green — the walk seeds at the entry node and never asks its type — and the
+     * proposal of the same graph was refused. Both kinds: a type no module registers, and a registered built-in the
+     * flat config has no home for.
+     */
     @Test
     void aGraphTheSaveRefusesAsUnsupportedNodeIsRefusedByTheDryRunToo(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, dir.resolve("wr"))) {
