@@ -902,6 +902,19 @@ interface ConsignmentIngestStrategy {
     }
 
     /**
+     * A member's origin as the Consignment manifest records it ({@code MemberEntry.originalRelPath}, written by
+     * {@code ConsignmentIngestor}): the original inbox path relative to {@code dirs.poll}, {@code archive!entry}
+     * for one entry of a multi-entry archive.
+     */
+    static String manifestOrigin(PipelineConfig cfg, java.io.File file) {
+        java.io.File src = com.gamma.etl.unpack.UnpackOrigins.originalOr(file);
+        if (cfg.dirs().poll() == null) return src.getName();
+        java.nio.file.Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
+        String rel = poll.relativize(src.toPath().toAbsolutePath().normalize()).toString().replace('\\', '/');
+        return com.gamma.etl.unpack.UnpackOrigins.totalFor(src) > 1 ? rel + "!" + file.getName() : rel;
+    }
+
+    /**
      * The write of a batch's survivors: ONE call named by {@link #consolidatedBaseName} when
      * {@code processing.output_per_member} is off (byte-identical to the old call), else one write per member,
      * each named by {@link #memberStem}, over that member's own rows (a copy of {@code table} filtered on
@@ -916,14 +929,14 @@ interface ConsignmentIngestStrategy {
         boolean versioned = cfg.producesReference() && cfg.reference().load().versionedStore();
         if (!cfg.outputPerMember() || versioned) {
             String baseName = consolidatedBaseName(survivors, batch, cfg);
-            if (!versioned) baseName = nonCollidingBaseName(baseName, batch, cfg, dbDir);
+            if (!versioned) baseName = nonCollidingBaseName(baseName, batch, survivors, cfg, dbDir);
             return writeAndTrace(conn, table, partCols, cfg, dbDir, baseName,
                     batch.batchId(), srcIdToFile, writeScope, selectedTable);
         }
         List<Consignment.Member> owners = survivors.stream().filter(m -> srcIdToFile.containsKey(m.srcId())).toList();
         if (owners.size() == 1) {
             Consignment.Member m = owners.get(0);
-            String baseName = nonCollidingBaseName(memberStem(cfg, m.file()), batch, cfg, dbDir);
+            String baseName = nonCollidingBaseName(memberStem(cfg, m.file()), batch, List.of(m), cfg, dbDir);
             return writeAndTrace(conn, table, partCols, cfg, dbDir, baseName,
                     batch.batchId(), srcIdToFile, writeScope, selectedTable);
         }
@@ -939,7 +952,7 @@ interface ConsignmentIngestStrategy {
             try {
                 // the member is its own branch-ledger scope: a second call under the same scope would read as
                 // "already committed" and drop its rows (see writeAndTrace)
-                String baseName = nonCollidingBaseName(memberStem(cfg, m.file()), batch, cfg, dbDir);
+                String baseName = nonCollidingBaseName(memberStem(cfg, m.file()), batch, List.of(m), cfg, dbDir);
                 Written w = writeAndTrace(conn, copy, partCols, cfg, dbDir, baseName, batch.batchId(),
                         Map.of(m.srcId(), srcIdToFile.get(m.srcId())),
                         (writeScope == null ? "" : writeScope) + MEMBER_SCOPE + m.srcId(),
@@ -958,15 +971,31 @@ interface ConsignmentIngestStrategy {
 
     /**
      * Cross-batch output-name collision guard ({@code OUTPUT-NAME-OVERWRITE-1}): when {@code candidateBaseName}
-     * would write an output file that already exists in {@code dbDir} and belongs to an already-committed
-     * batch (either another batch, or an earlier committed execution of the same {@code batchId} under
-     * {@code on_change: reprocess}), disambiguate with {@code __<8 hex of batchId>} so the earlier output is
-     * never silently overwritten. An uncommitted retry of the same {@code batchId} (failover after crash
-     * before ack) keeps {@code candidateBaseName} so it overwrites its own partial output in place.
+     * would write an output file that already exists in {@code dbDir} and belongs to a committed batch of a
+     * DIFFERENT origin (e.g. {@code later/feed.csv} after {@code feed.csv}), disambiguate so the earlier file's
+     * output is never silently overwritten. A re-delivery of the SAME origin path (a re-run, or a corrected
+     * same-name day under {@code on_change: reprocess}) keeps the name and so REPLACES its own earlier output —
+     * the LA-DAILY-INGEST-1 owner call of 2026-10-14; accumulating would serve every row twice
+     * ({@code ENGINE-ETL-TESTS-RED-1}). A one-origin name is disambiguated by its origin's fingerprint, so that
+     * file's own re-delivery lands on the same disambiguated name; only a multi-origin name uses the batch id.
+     *
+     * @param owners the members whose rows this output holds (the survivors written under this name) — never a
+     *               failed or quarantined member of the batch, which would claim a name it does not write
      */
-    static String nonCollidingBaseName(String candidateBaseName, Consignment batch, PipelineConfig cfg, String dbDir) {
+    static String nonCollidingBaseName(String candidateBaseName, Consignment batch, List<Consignment.Member> owners,
+                                       PipelineConfig cfg, String dbDir) {
         if (candidateBaseName == null || batch == null || cfg == null || dbDir == null) return candidateBaseName;
-        if (!hasCommittedCollision(candidateBaseName, batch.batchId(), cfg, dbDir)) return candidateBaseName;
+        java.util.Set<String> origins = new java.util.HashSet<>();
+        java.util.Set<String> stems = new java.util.HashSet<>();
+        for (Consignment.Member m : owners)
+            if (memberStem(cfg, m.file()).equalsIgnoreCase(candidateBaseName)) {
+                origins.add(manifestOrigin(cfg, m.file()));
+                stems.add(FileNames.outputStem(cfg, m.file().getName()).toLowerCase(java.util.Locale.ROOT));
+            }
+        if (!hasCommittedCollision(candidateBaseName, batch.batchId(), origins, stems, cfg, dbDir)) return candidateBaseName;
+        if (origins.size() == 1)
+            return candidateBaseName + "__"
+                    + com.gamma.etl.FailureText.fingerprint(cfg, origins.iterator().next()).substring(3, 11);
         String tag = shortBatchTag(batch.batchId());
         String disambiguated = candidateBaseName + "__" + tag;
         int suffix = 2;
@@ -976,8 +1005,8 @@ interface ConsignmentIngestStrategy {
         return disambiguated;
     }
 
-    private static boolean hasCommittedCollision(String candidateBaseName, String batchId,
-                                                 PipelineConfig cfg, String dbDir) {
+    private static boolean hasCommittedCollision(String candidateBaseName, String batchId, java.util.Set<String> origins,
+                                                 java.util.Set<String> stems, PipelineConfig cfg, String dbDir) {
         boolean isUri = com.gamma.config.safety.PathJail.isUri(dbDir);
         if (!isUri && !stemExistsInDbDir(dbDir, candidateBaseName)) return false;
 
@@ -986,10 +1015,8 @@ interface ConsignmentIngestStrategy {
         java.nio.file.Path mDir = Paths.get(manifestsDir);
         if (!java.nio.file.Files.isDirectory(mDir)) return false;
 
-        // If this exact batchId already has a committed manifest (e.g. on_change: reprocess with identical
-        // byte size), re-running it is a new execution rather than an uncommitted crash-before-ack retry.
-        if (java.nio.file.Files.isRegularFile(mDir.resolve(batchId + ".json"))) return true;
-
+        // A committed manifest of this same batchId (or of another batch of the same origin) is a re-delivery of
+        // the same file: its output is this file's own, and is replaced.
         java.nio.file.Path dbRoot = isUri ? null : Paths.get(dbDir).toAbsolutePath().normalize();
         try (java.util.stream.Stream<java.nio.file.Path> files = java.nio.file.Files.list(mDir)) {
             for (java.nio.file.Path p : files.toList()) {
@@ -1000,6 +1027,8 @@ interface ConsignmentIngestStrategy {
                 try {
                     ConsignmentManifest m = ManifestStore.read(manifestsDir, otherId);
                     if (m.outputs == null) continue;
+                    if (ownedBySameOrigin(m, origins, stems, cfg))
+                        continue;   // same origin: a re-delivery, not a collision
                     for (ConsignmentManifest.OutputEntry oe : m.outputs) {
                         if (oe.outputFile() == null) continue;
                         if (isUri) {
@@ -1019,6 +1048,21 @@ interface ConsignmentIngestStrategy {
             }
         } catch (IOException ignored) { /* unreadable manifestsDir — skip */ }
         return false;
+    }
+
+    /**
+     * Whether an earlier manifest's output under this name was written by a file of the SAME origin: its SUCCESS
+     * members of this stem (the ones that can own the name) exist and all share an origin with this write. A failed
+     * or quarantined member of that batch wrote nothing, so it never makes the name its own.
+     */
+    private static boolean ownedBySameOrigin(ConsignmentManifest m, java.util.Set<String> origins,
+                                             java.util.Set<String> stems, PipelineConfig cfg) {
+        if (m.members == null || origins.isEmpty()) return false;
+        List<ConsignmentManifest.MemberEntry> owners = m.members.stream()
+                .filter(me -> com.gamma.etl.MemberStatus.SUCCESS.name().equals(me.status()) && me.filename() != null
+                        && stems.contains(FileNames.outputStem(cfg, me.filename()).toLowerCase(java.util.Locale.ROOT)))
+                .toList();
+        return !owners.isEmpty() && owners.stream().allMatch(me -> origins.contains(me.originalRelPath()));
     }
 
     private static boolean stemExistsInDbDir(String dbDir, String baseName) {
