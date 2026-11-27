@@ -69,7 +69,9 @@ decided instead (D-AK22, 2026-11-26, replacing §4 for this route): the answer i
 - **A `path:` Reference** is jailed to the safety roots (`PREVIEW-REFERENCE-PATH-UNJAILED-1`) and, since D-AK26
   (operator, 2026-11-27), may not name a file in a data folder: a path into a Dataset's store (its `physicalRef` or
   `sourceName` under the data root), a loaded Pipeline's folders (store, `errors`/`quarantine` rejected rows, `backup`
-  raw copies, inbox, working folders, every `sinks[]` and route-branch store) is refused 422 for every caller, before
+  raw copies, inbox, working folders, every `sinks[]` and route-branch store, a DuckLake output's `data_path`; a
+  Dataset's store is looked for under the Space data root and under `-Ddata.dir` when set, as the routes and the engine
+  disagree there: `CONTROLAPI-DATA-DIR-MISMATCH-1`) is refused 422 for every caller, before
   anything is read; a glob, or a folder (DuckDB reads every file below a folder), is refused when what it can reach holds any of them (`PathReferenceGuard`). Such data is previewed by name. A backup archive and the
   restricted quarantine need no rule: DuckDB refuses a `.zip`, and the sealed read's allowlist refuses a folder inside or
   holding a `.restricted` store (`PathJail`; both falsified 2026-11-27). A path outside every data folder answers as before: raw to a
@@ -100,7 +102,8 @@ rows, and a shared-away by-name Reference, for the person, the person's agent (b
 Pipeline-folder branch or the sharing check, each probe answered the raw value (200) and its test went red; so did a
 folder path above a store and a store named only by `sinks[]`/a route branch (`aFolderPathAboveAStore…`,
 `aSinkStore…`) without the folder rule and the sinks/route rule. (The sinks and route lists name the same stores, so
-neither alone can be turned red.) Not tested over HTTP: a glob (`*` is no legal Windows path), a symlink spelling.
+neither alone can be turned red.) Likewise a DuckLake `data_path` and a Dataset store under `-Ddata.dir`
+(`aDuckLakeDataPath…`, `aDatasetStoreUnderTheDataDirOverride…`). Not tested over HTTP: a glob (`*` is no legal Windows path), a symlink spelling.
 
 ## References
 

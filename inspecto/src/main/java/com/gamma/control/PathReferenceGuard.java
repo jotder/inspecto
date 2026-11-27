@@ -20,9 +20,9 @@ import java.util.regex.Pattern;
  * {@code ENRICHMENT-PREVIEW-PATH-REACH-1} and {@code LOOKUP-TEST-PATH-RAW-1} (operator, 2026-11-27, reversing that part of
  * D-AK22 and D-AK25): a {@code path:} Reference that the enrichment preview or the lookup test reads may not name a file in
  * a data folder. Refused (422) when it lies in a loaded Pipeline's folders (its store, every {@code sinks[]} and route
- * branch store, its rejected rows in {@code errors}/{@code quarantine}, its raw copies in {@code backup}, its inbox and
+ * branch store, a DuckLake output's {@code data_path}, its rejected rows in {@code errors}/{@code quarantine}, its raw copies in {@code backup}, its inbox and
  * working folders), or in the store of a registry Dataset (its {@code physicalRef} or {@code sourceName} under the data
- * root); a glob, or a folder (DuckDB reads a folder's files below it), is refused when what it can reach holds any of them. A Dataset is read by name ({@code ref:} / {@code reference/<pipeline>}), where its sharing
+ * root, and under {@code -Ddata.dir} when set: {@code CONTROLAPI-DATA-DIR-MISMATCH-1}); a glob, or a folder (DuckDB reads a folder's files below it), is refused when what it can reach holds any of them. A Dataset is read by name ({@code ref:} / {@code reference/<pipeline>}), where its sharing
  * and its classification apply. A path under none of them keeps its behaviour: raw for a builder and a builder's agent,
  * 403 for a machine agent.
  *
@@ -85,18 +85,31 @@ final class PathReferenceGuard {
             if (p.routeConfig() != null && p.routeConfig().get("branches") instanceof List<?> branches)
                 for (Object b : branches)
                     if (b instanceof java.util.Map<?, ?> m && m.get("database") != null) folders.add(m.get("database").toString());
+            // a DuckLake output writes its Parquet files to data_path (the parser resolved it), outside dirs.database
+            List<java.util.Map<String, Object>> lakes = new ArrayList<>();
+            if (p.output() != null) lakes.add(p.output().duckLake());
+            if (p.sinks() != null) for (PipelineConfig.Sink s : p.sinks()) lakes.add(s.duckLake());
+            for (java.util.Map<String, Object> lake : lakes)
+                if (lake != null && lake.get("data_path") != null) folders.add(lake.get("data_path").toString());
             for (String s : folders)
                 // blank = unset (it would resolve to the working directory); an object store is no local folder
                 if (s != null && !s.isBlank() && !com.gamma.config.safety.PathJail.isUri(s))
                     out.add(Path.of(s).toAbsolutePath().normalize());
         }
-        Path writeRoot = api.writeRoot(), dataRoot = api.dataRoot();
-        if (writeRoot == null || dataRoot == null) return out;
+        Path writeRoot = api.writeRoot();
+        // the data root the Space's engine writes Datasets under: -Ddata.dir overrides the Space's own (the rule
+        // CollectorService applies), while ControlApi.dataRoot() does not read it; guard under both (fail closed)
+        List<Path> dataRoots = new ArrayList<>();
+        if (api.dataRoot() != null) dataRoots.add(api.dataRoot());
+        String dataDir = System.getProperty("data.dir");
+        if (dataDir != null && !dataDir.isBlank()) dataRoots.add(Path.of(dataDir));
+        if (writeRoot == null || dataRoots.isEmpty()) return out;
         for (ComponentRegistry.Component ds : new ComponentStore(writeRoot.resolve("registry")).list("dataset"))
             for (String store : com.gamma.mask.EvidenceMasker.datasetStores(ds.content())) {
                 int slash = store.indexOf('/');
                 String head = slash < 0 ? store : store.substring(0, slash);
-                if (DataRef.isSafeShape(head)) out.add(dataRoot.resolve(head).toAbsolutePath().normalize());
+                if (DataRef.isSafeShape(head))
+                    for (Path dataRoot : dataRoots) out.add(dataRoot.resolve(head).toAbsolutePath().normalize());
             }
         return out;
     }

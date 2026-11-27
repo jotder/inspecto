@@ -136,7 +136,11 @@ class ControlApiAgentSimulatorsTest {
             String fwd = base.toString().replace("\\", "/");
             Path feeds = TestConfigs.csv(base.resolve("feeds").resolve("main"), PipelineConfigBatchTest.miniSchema())
                     .name("FEEDS").format("PARQUET").write();
-            Files.writeString(config.resolve("feeds_pipeline.toon"), Files.readString(feeds).replace("active: true", "active: false")
+            // ...and its DuckLake output writes its files to data_path (s1/lakes/feeds), outside every other folder
+            String withLake = Files.readString(feeds).replace("output:\n  format: PARQUET\n",
+                    "output:\n  format: PARQUET\n  ducklake:\n    enabled: false\n    data_path: \"" + fwd + "/lakes/feeds\"\n");
+            assertNotEquals(Files.readString(feeds), withLake, "the DuckLake block was placed");
+            Files.writeString(config.resolve("feeds_pipeline.toon"), withLake.replace("active: true", "active: false")
                     + "\nsinks[2]{database,format}:\n  \"" + fwd + "/feeds/main/db\",PARQUET\n  \"" + fwd + "/feeds/sms\",PARQUET\n"
                     + "\nroute:\n  mode: case\n  default: sms\n  branches[2]{key,where,database}:\n"
                     + "    main,\"1 = 1\",\"" + fwd + "/feeds/main/db\"\n    sms,\"1 = 0\",\"" + fwd + "/feeds/sms\"\n");
@@ -147,10 +151,12 @@ class ControlApiAgentSimulatorsTest {
                     .toString().replace("\\", "/");
             String main = Files.createDirectories(base.resolve("feeds").resolve("main").resolve("db")).resolve("part0.parquet")
                     .toString().replace("\\", "/");
+            String lake = Files.createDirectories(base.resolve("lakes").resolve("feeds")).resolve("part0.parquet")
+                    .toString().replace("\\", "/");
             DuckDbUtil.loadDriver();
             File seed = DuckDbUtil.tempDbFile("regionseed_");
             try (Connection conn = DuckDbUtil.openConnection(seed); Statement st = conn.createStatement()) {
-                for (String to : List.of(part, sms, main))
+                for (String to : List.of(part, sms, main, lake))
                     st.execute("COPY (SELECT * FROM (VALUES ('" + A + "','EU'),('" + B + "','US')) t(msisdn,region)) TO '"
                             + to + "' (FORMAT PARQUET)");
             } finally {
@@ -385,6 +391,38 @@ class ControlApiAgentSimulatorsTest {
     void aSinkStoreIsRefusedToEveryCaller(@TempDir Path root) throws Exception {
         try (Ctx c = open(root, true)) {
             assertRefusedToEveryCaller(c, root.resolve("s1/feeds/sms/part0.parquet"));
+        }
+    }
+
+    /** A DuckLake output's {@code data_path} ({@code s1/lakes/feeds}): FEEDS writes its files there, outside its dirs. */
+    @Test
+    void aDuckLakeDataPathIsRefusedToEveryCaller(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, true)) {
+            assertRefusedToEveryCaller(c, root.resolve("s1/lakes/feeds/part0.parquet"));
+        }
+    }
+
+    /**
+     * {@code -Ddata.dir} overrides a Space's data root for its engine, while {@code ControlApi.dataRoot()} does not read
+     * it: a registry Dataset's store under {@code -Ddata.dir} ({@code calls} there) is refused too.
+     */
+    @Test
+    void aDatasetStoreUnderTheDataDirOverrideIsRefusedToEveryCaller(@TempDir Path root) throws Exception {
+        Path override = root.resolve("elsewhere");
+        Path store = Files.createDirectories(override.resolve("calls").resolve("dt=2026")).resolve("data.parquet");
+        System.setProperty("data.dir", override.toString());
+        try (Ctx c = open(root, true)) {
+            DuckDbUtil.loadDriver();
+            File seed = DuckDbUtil.tempDbFile("dataDirSeed_");
+            try (Connection conn = DuckDbUtil.openConnection(seed); Statement st = conn.createStatement()) {
+                st.execute("COPY (SELECT * FROM (VALUES ('" + A + "','EU'),('" + B + "','US')) t(msisdn,region)) TO '"
+                        + store.toString().replace("\\", "/") + "' (FORMAT PARQUET)");
+            } finally {
+                DuckDbUtil.deleteTempDb(seed);
+            }
+            assertRefusedToEveryCaller(c, store);
+        } finally {
+            System.clearProperty("data.dir");
         }
     }
 
