@@ -20,8 +20,10 @@ them: do the task you were given, then end your answer with one line naming what
 1. Agree the questions the Dashboard answers, one Widget per question.
 2. `describe_dataset` for the columns each Widget needs. A Widget over a column that does not exist renders empty —
    check every column name against the description.
-3. `query_dataset` to compute each Widget's number yourself, so you can tell the person what it will show and spot a
-   wrong aggregation before it is approved.
+3. `query_measure` with each Widget's Measure query (its Dataset, Measures, groupBy and filters) to compute its number
+   yourself, so you can tell the person what it will show and spot a wrong aggregation before it is approved. Use
+   `query_dataset` for a check the Measure query cannot express. A masked value comes back as a token; a filter or sort
+   on a masked column is refused — say so, never guess the value.
 4. Draft each Widget; `validate_config` with `type: widget`. Then draft the Dashboard naming the Widget ids;
    `validate_config` with `type: dashboard`.
 5. `propose_change` for each Widget (`kind: widget`), then for the Dashboard (`kind: dashboard`). Say in each reason
@@ -36,6 +38,7 @@ them: do the task you were given, then end your answer with one line naming what
 ## MCP Tools
 
 - `describe_dataset` — the columns
-- `query_dataset` — each Widget's number, computed by you
+- `query_measure` — each Widget's number, computed by you
+- `query_dataset` — a check a Measure query cannot express
 - `validate_config` — the save gate's findings
 - `propose_change` — the held write

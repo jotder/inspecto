@@ -50,6 +50,9 @@ class AgentDataRoutesParityTest {
             "POST /risk-scores/preview", "features/inspecto-scoring/src/test/java/com/gamma/control/ControlApiRiskScoreTest.java",
             "POST /anomaly-scores/preview", "features/inspecto-anomaly/src/test/java/com/gamma/anomaly/ControlApiAnomalyScoreTest.java",
             "POST /screening/check", "features/inspecto-screening/src/test/java/com/gamma/control/ControlApiScreeningTest.java",
+            // D1 (W6 group D): the analytic reads
+            "POST /bi/query", "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentAnalyticReadsTest.java",
+            "POST /queries/([^/]+)/run", "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentAnalyticReadsTest.java",
             // W6 group B: the simulators
             "POST /decision-rules/([^/]+)/simulate", SIMULATORS_PROOF,
             "POST /rule-templates/([^/]+)/simulate", SIMULATORS_PROOF,

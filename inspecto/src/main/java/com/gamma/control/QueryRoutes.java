@@ -104,8 +104,12 @@ final class QueryRoutes implements RouteModule {
         }
 
         // 4. Execute with pagination / sort / projection.
+        // The masking judges columns by their position in the author's select list, which a caller's projection would
+        // reorder or trim: with masking in force, mask the author's whole result first and project afterwards.
+        List<String> projection = projection(body);
+        boolean projectAfterMasking = masking != null && !projection.isEmpty();
         QueryExecutor.Request req = new QueryExecutor.Request(datasetId, relationSql, resolved,
-                limit(body), offset(body), projection(body), sort(body));
+                limit(body), offset(body), projectAfterMasking ? List.of() : projection, sort(body));
         QueryExecutor.Result result;
         try {
             result = QueryExecutor.run(req);
@@ -122,7 +126,25 @@ final class QueryRoutes implements RouteModule {
 
         if (masking == null) return response(result, null);
         QueryExecutor.Result shown = masking.apply(result, null, resolved);
+        if (projectAfterMasking) shown = project(shown, projection);
         return response(shown, masking.describe());
+    }
+
+    /** The caller's projection over an already-masked result; a name the result lacks is refused as the executor would. */
+    private static QueryExecutor.Result project(QueryExecutor.Result r, List<String> projection) {
+        List<ResultSetDescriptor.Column> columns = new ArrayList<>();
+        for (String want : projection) {
+            ResultSetDescriptor.Column found = r.columns().stream().filter(c -> c.name().equalsIgnoreCase(want)).findFirst()
+                    .orElseThrow(() -> new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown projection column: " + want));
+            columns.add(found);
+        }
+        List<Map<String, Object>> rows = new ArrayList<>(r.rows().size());
+        for (Map<String, Object> row : r.rows()) {
+            Map<String, Object> out = new LinkedHashMap<>();
+            for (ResultSetDescriptor.Column c : columns) out.put(c.name(), row.get(c.name()));
+            rows.add(out);
+        }
+        return new QueryExecutor.Result(columns, rows, r.rowCount(), r.truncated(), r.elapsedMs());
     }
 
     // ── response shaping (design §6.2) ────────────────────────────────────────────

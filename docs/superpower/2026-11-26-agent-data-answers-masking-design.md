@@ -7,7 +7,8 @@
 > added at the build and replacing §4 for that route; as built:
 > [`spec-agent-simulators.md`](../okf/product/module/mcp/spec-agent-simulators.md)); **E built
 > 2026-11-26** (score previews weight 5, a draft raw for a person's agent and 403 for a machine (D-AK23); screening check weight 2 per started 10 subjects (D-AK24) with at most 10 matches per subject for an agent; MCP
-> Tools `preview_score` and `check_screening`, as built in `spec-agent-data-seam.md` § Group E); D1, D2 and the lookup change not
+> Tools `preview_score` and `check_screening`, as built in `spec-agent-data-seam.md` § Group E); **D1 built 2026-11-26** (as built:
+> [`spec-agent-data-seam.md`](../okf/product/module/mcp/spec-agent-data-seam.md) § D1). D2 and the lookup change not
 > built.**
 > Unblocks widening plan
 > [`2026-11-25-agent-kit-ak2-widening-plan.md`](2026-11-25-agent-kit-ak2-widening-plan.md) § W6 groups B, D and E (D-AK10:
@@ -226,7 +227,7 @@ behaves as the tool, `McpRoutesManifestParityTest`, `McpToolRoutesTest`, `openap
 | Change | Work | Estimate |
 |---|---|---|
 | S0 shared seam ✅ built 2026-11-26 | `DATA_ROUTES`, stamp, 500 seam, agent budget at both doors, no-body audit test, retrofit `/db/query` and LA reads, parity test ([as built](../okf/product/module/mcp/spec-agent-data-seam.md); budget defaults burst 60, 0.5/s chosen in S0) | 2–3 days |
-| D1 | `bi/query`, `queries/run`: masking exists; tests | 1–1.5 days |
+| D1 ✅ built 2026-11-26 | `bi/query`, `queries/run`: masking exists; tests ([as built](../okf/product/module/mcp/spec-agent-data-seam.md#d1--the-analytic-reads); MCP Tools `query_measure`, `run_saved_query`; a saved query naming no Dataset withheld from an agent, chosen in D1) | 1–1.5 days |
 | B | rule-templates (exists, tests), decision simulate without stamp, enrichment Reference masking + path refusal (fixes the people defect too) | 3 days |
 | E | score previews (raw keys, masked echo), screening ≤ 10, name-redaction tests | 2 days |
 | Recon fix (people, §8) | `canView` and masking per side on four routes, post-cache | 2–3 days |

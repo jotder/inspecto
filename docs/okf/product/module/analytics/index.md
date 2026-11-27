@@ -41,4 +41,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `REPORT-DASHBOARD-AUTHORING-1` | P3 | feature | a Report Job cannot filter | — |
 | `DECISION-RULE-SIMULATE-WRITES-1` | P3 | defect | Decision Rule simulate writes the rule file | — |
 | `VIEW-DATA-UNMASKED-1` | P2 | defect | GET /views/{id}/data answers a view's rows with no masking and no capability check, to people as well as agents | — |
+| `LAKE-CATALOG-UNMASKED-1` | P2 | defect | When a shared DuckLake catalog is configured (-Dinspecto.ducklake.catalog), every query sandbox attaches it as lake (QueryExecutor.attach… | — |
 | `DUCKDB-2-0-1-HAVANA-TZ-1` | P3 | chore | DuckDB 2.0.1's zone data keeps Cuba on UTC−4 from 2026-11-01 to about mid-March 2027; the JDK's tzdata 2026b does not. | — |

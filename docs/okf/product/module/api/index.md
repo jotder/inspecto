@@ -37,5 +37,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `COMPONENT-VALIDATE-ALL-1` | P3 | feature | a dry run (executing preview) for a KPI, Reconciliation, Dataset, Widget or Dashboard: | — |
 | `DB-QUERY-STORE-SHARING-1` | P3 | chore | verify: may a /db/query store read reach a shared-away Dataset? | — |
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
+| `IDEMPOTENCY-AGENT-REPLAY-1` | P2 | defect | An Idempotency-Key replay is answered before the handler (ControlApi), so the masked-answer stamp check never sees it, and the cache key'… | — |
 | `OPENAPI-ASN1-ROUTES-1` | P2 | defect | Eleven live routes have no operation in docs/api/openapi-v1.json, so OpenApiPathsContractTest is red on master: | — |
 | `ERROR-CATALOGUE-1` | P3 | feature | an error catalogue: | — |

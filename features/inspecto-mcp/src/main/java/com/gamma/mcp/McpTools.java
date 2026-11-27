@@ -207,7 +207,7 @@ final class McpTools {
                     a -> new Call("GET", "/datasets/" + seg(a.get("dataset")) + "/freshness", null)),
             new Tool("query_dataset", "Query a Dataset (read-only SQL)",
                     "Run one read-only SQL SELECT over a Dataset's stored rows. The statement must pass the server's "
-                            + "read-only SQL check; classified values come back masked unless your person may reveal them.",
+                            + "read-only SQL check; classified values come back masked (an agent never reveals them).",
                     List.of(id("dataset", "The Dataset (store) the SQL reads from."),
                             new Arg("sql", Kind.SQL, true, "One read-only SELECT statement."), limit()),
                     a -> {
@@ -217,6 +217,22 @@ final class McpTools {
                         if (a.get("limit") != null) body.put("limit", a.get("limit"));
                         return new Call("POST", "/db/query", McpRoutes.jsonBytes(body));
                     }),
+            // W6 group D, change D1: the analytic reads a Widget runs; masked and budgeted as query_dataset (AgentGate.ANALYTIC_READS)
+            new Tool("query_measure", "Query a Measure",
+                    "Compute one Measure query over a Dataset - what a Widget shows: its Measures (count, sum, avg...) "
+                            + "grouped and filtered. Classified values come back masked (an agent never reveals them), "
+                            + "and a filter, sort or value-revealing Measure on a masked column is refused.",
+                    List.of(body("The Measure query, as POST /bi/query takes it: {dataset, measures:[{id, agg, field?}], "
+                            + "groupBy?, filters?, orderBy?, limit?}.", true)),
+                    a -> new Call("POST", "/bi/query", bodyOf(a))),
+            new Tool("run_saved_query", "Run a saved query",
+                    "Run one saved query of this Space and return its rows. Classified values come back masked "
+                            + "(an agent never reveals them); a parameter or sort on a masked column is refused, and a saved "
+                            + "query that reads no Dataset is withheld from an agent.",
+                    List.of(id("query", "The saved query id."),
+                            body("The run request, as POST /queries/{id}/run takes it: {parameters?, limit?, offset?, "
+                                    + "projection?, sort?}.", false)),
+                    a -> new Call("POST", "/queries/" + seg(a.get("query")) + "/run", bodyOf(a))),
             new Tool("list_pipelines", "List Pipelines",
                     "The Pipelines registered in this Space, broken ones included with their reason.",
                     List.of(), get("/pipelines")),

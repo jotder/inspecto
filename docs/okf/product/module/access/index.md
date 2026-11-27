@@ -45,6 +45,8 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
 | `AGENT-STORED-RECORD-READS-1` | P2 | defect | 43 GET routes answer stored records that can echo entity keys or row values other features wrote into them, and sit outside the agent dat… | operator |
 | `VIEW-DATA-UNMASKED-1` | P2 | defect | GET /views/{id}/data answers a view's rows with no masking and no capability check, to people as well as agents | — |
+| `LAKE-CATALOG-UNMASKED-1` | P2 | defect | When a shared DuckLake catalog is configured (-Dinspecto.ducklake.catalog), every query sandbox attaches it as lake (QueryExecutor.attach… | — |
+| `IDEMPOTENCY-AGENT-REPLAY-1` | P2 | defect | An Idempotency-Key replay is answered before the handler (ControlApi), so the masked-answer stamp check never sees it, and the cache key'… | — |
 | `SCREENING-HIT-KEY-RAW-1` | P2 | defect | A screening hit stores and answers the subject key raw: subjectKey is the value of the Screening Job's keyField column (ScreeningHits.rai… | — |
 | `SCREENING-CASE-KEY-RAW-1` | P2 | defect | Confirming a screening hit writes the subject key raw onto the Incident and Case it opens. | — |
 | `RISK-SCORE-MEASURE-UNMASKED-1` | P2 | defect | A Risk Score or Anomaly model's measure and filters can read a classified column's values raw: only evidence is masked. | — |
