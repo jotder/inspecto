@@ -4,7 +4,7 @@
 > signed 2026-11-24 (operator, recommended options); P0 I-3 KPI History built 2026-11-24 (§11.1, D-BI11, D-BI12); P0 I-14 model output Datasets built 2026-11-24 (§11.3).** Every decision in §11 is closed. Board row: `BI-INSIGHTS-1`
 > (§12). The new terms are in `GLOSSARY.md` §7.
 > **P4 Language (I-18, I-19) is designed and approved 2026-11-27 — D-BI14…D-BI24 signed (operator, recommended options):
-> [`2026-11-27-bi-insights-p4-language-plan.md`](2026-11-27-bi-insights-p4-language-plan.md); build slices open.**
+> [`2026-11-27-bi-insights-p4-language-plan.md`](2026-11-27-bi-insights-p4-language-plan.md); all slices BR-0..BR-5 and AQ-0..AQ-1 built 2026-11-27 (§11.17).**
 > Scope: insights on **business data** — the Measures over Datasets (revenue, usage, subscribers, transactions,
 > margin, leakage, partners, churn). Not observability: pipeline health stays with Metrics and Alert Rules.
 > Inventory checked against the code on 2026-11-18 (three read-only sweeps plus spot checks); every BUILT / PARTIAL /
@@ -713,6 +713,15 @@ Operator interview 2026-11-26, three decisions:
   and up); the feed hides those actions when `/bootstrap` does not report them.
 - **D-BI4 owner tuning within Builder bounds is dropped**: whoever may save an Insight Profile tunes it. No bounds
   model will be built; removed from the deferral lists here and in the hub.
+
+### 11.17 P4 Language - Dashboard Brief and Ask the Dashboard - as built (2026-11-27)
+
+Slices BR-0..BR-5 and AQ-0, AQ-1 of [`2026-11-27-bi-insights-p4-language-plan.md`](2026-11-27-bi-insights-p4-language-plan.md) are built (its §12
+lists where the build differs from the design). Decisions D-BI14..D-BI24 stand as signed. In short: `GET /insights/brief` (templated, every
+edition) and `POST /insights/brief/narrate` (503 without AI Assist), the `insight-brief` capability with `BriefGroundingGuard`, the Visualization
+Type `insight-brief`, a Brief page in a Report PDF through the engine contract `BriefPageProvider`, and the draft-only tool `widget_from_question`
+behind an Ask box. **Deferred**: a Brief on a public share (D-BI19); the Ask box stays hidden until a backend reports `features.intelligence`.
+Durable facts: hub `architecture-insights.md` § 7. P5 stays open, so both plans remain in `docs/superpower/`.
 
 ## 12. Board row
 

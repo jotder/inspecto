@@ -5,7 +5,7 @@ description: How "Explain this change" finds the slices that carry a Measure's c
 item: module.insights
 audience: internal
 status: current
-verified: 2026-11-26 last-edit
+verified: 2026-11-27 last-edit
 code: [features/inspecto-insights, platform/inspecto-analytics, inspecto]
 ---
 
@@ -160,3 +160,80 @@ writes timestamps as UTC text (`CAST(? AS TIMESTAMP)`); `InsightScanJobTest` pin
 - **Not yet**: the explain dialog does not show pairs; a revealer sees aliases in stored pairs (the Job never reveals).
 - **Tests**: `PairExplainGoldenTest` (hand-computed region × plan), `InsightScanJobTest` (alias, masked-Measure vet),
   `ControlApiExplainDepth2Test` (401/403/200, read, stale, hidden Profile — falsified by dropping the view check).
+
+## 7. Dashboard Brief and Ask the Dashboard (P4 "Language": I-18, I-19; as built 2026-11-27)
+
+Plan (design, decisions D-BI14…D-BI24): `docs/superpower/2026-11-27-bi-insights-p4-language-plan.md`. A language model never
+states a number, writes SQL or answers in prose about data: it fills slots and a closed vocabulary, and the server checks.
+
+### 7.1 The Brief (every edition)
+
+- **Selection** — `InsightBrief` (`features/inspecto-insights`): one Profile's latest run (`run_at` max), status not
+  `not_useful` / `expected`, band elevated or high, best score first, ties by `insight_id`, at most 5 (cap 10; at most 5 Profiles per
+  call). Nothing qualifies → `summary` "Nothing unusual in *period*"; a latest run older than two grains of the Profile →
+  `stale: true` and `note` "Last scan was *n* days ago". Each line carries the stored sentence, band, score, type, slice, `measure`
+  and the reproducing query. Insights are alias-only at rest, so a revealer sees aliases too.
+- **`GET /insights/brief?profiles=a,b&max=`** — the templated Brief as the caller. A Profile the caller may not view is **omitted**
+  (the others still return); a Profile with no scan says so in words. `read-shaped` exemption, no capability.
+- **One selection, three readers** — the Dashboard tile, the narrate route and the Report page all call the one selection, so screen
+  and PDF agree by construction.
+
+### 7.2 Narrate (Standard and up, AI Assist)
+
+- **`POST /insights/brief/narrate`** `{profiles, max?}` — builds the Brief **as the caller and never from the body** (evidence in a body
+  is ignored), then asks the agent. **503 `CAPABILITY_UNAVAILABLE`** "AI Assist is not installed" when no agent registered, while
+  `GET /insights/brief` stays 200. Standard rate-limit bucket; `read-shaped` exemption. The agent is reached by
+  `HostContext.of(api).service().assistAgent()` (no new core accessor was needed); `/bootstrap` `features.agent` (added in BR-3,
+  `BootstrapRoutes`) is the UI gate.
+- **Seam** — `BriefNarrator` (insights) sends the evidence to the `insight-brief` capability (`InsightBriefSkill`,
+  `features/inspecto-agent`). The model writes **line skeletons** `[n] text {value} …`; `BriefSlots` fills `{value}`, `{expected}`,
+  `{delta}`, `{pct}`, `{period}` from the cited Insight. `BriefGroundingGuard` rejects, per line: a literal digit, an unknown slot, a
+  missing or second `[n]`, markdown / HTML / links, a cause word ("because", "due to"…), a direction word contradicting the Insight's
+  direction or naming both directions, and finally the older `NumericGroundingGuard` as a belt. A rejected line is repaired (≤ 2 rounds,
+  the reason fed back) and then falls back **per sentence** to that Insight's stored sentence (`source: template`, shown as a Template
+  mark). `modelBacked=false` when no model answered.
+- **Cache** — a per-process LRU (64) keyed by data root, Profile, `run_id`, max and the cited Insights; **filled only for a
+  model-backed answer and read only after the view check**, so a person who may not view a Profile never gets its cached text, and the
+  same scan reads identically on screen and in a delivered PDF (D-BI17, D-BI23).
+- **Egress** — what leaves to the model provider is the stored sentences and slices of the Insights, which are alias-only at rest: a
+  classified value never appears. Unclassified values (region, product) **are** sent to the configured provider.
+
+### 7.3 Widget and Report page
+
+- **Widget** — Visualization Type `insight-brief` (`view.plugins.ts`, `insight-brief-widget.component.ts`), view-bound to an Insight
+  Profile like `insight-feed`; band as a word, narrated paragraph above the cited lines, plain text only. The **Narrate** button shows
+  only when `/bootstrap` `features.agent` is true; a 503 latches an in-place note. Several Profiles = several Widgets; Narrate saves
+  nothing.
+- **Report page** — `ReportWidget` accepts `insight-brief` when bound to a Profile; `ReportJob` asks the engine contract
+  `BriefPageProvider` (ServiceLoader; `contracts[3]` of the `insights` module.toon), implemented by `InsightBriefPages`, which runs
+  **as the Job's author** (the `kpi.snapshot` / `insight.scan` pattern) with the route's selection and the same cache.
+  `BriefPageRenderer` (Java2D) draws wrapped plain text, the band as a word and a footer: **"Templated from the stored Insights"** or
+  **"Model-written, checked against the Insights"**. An author who may not view the Profile fails the Run in words. The page sits at the
+  Widget's position in `widgets:`. The PDF has no text layer, so tests pin the page model, not extracted text.
+
+### 7.4 Ask the Dashboard (draft only)
+
+- **Tool** `widget_from_question` (`features/inspecto-intelligence`, `WidgetFromQuestion`): with no `measures` it returns the
+  **vocabulary** (per visible Dataset: column name, role, type, allowed aggregates; no values, no rows; a masked column is listed and
+  flagged); with `measures` it validates a closed spec (≤ 2 breakdowns, filters, one trailing window, one comparison, top-N ≤ 50), builds
+  the `/bi/query` body, runs `MeasureCompiler.parse` and the SQL guard, and returns a **draft Widget** with a templated caption. It
+  persists nothing; a masked column is refused as `/bi/query` refuses it unless the caller may reveal.
+- **Visibility gotcha** — a tool call carries capabilities, not a user id (`ToolCaller`), so a restricted Dataset is visible only to a
+  caller holding `canConfigureAccess`; an owner or share-listed user is not recognised and the Dataset is hidden (fail closed).
+- **Filters and window** travel in the returned `query` body, not the Widget: a draft Widget carries none, and the UI warns when the
+  question had one.
+- **UI** — `ask-dashboard.component.ts` on the Dashboard editor: `inspecto-ai-assist` in `prompting` mode, live `/bi/query` preview as
+  the caller, **Save through the gated `POST /components/widget`**, so a Pending Change policy answers 202 and nothing shows as saved.
+
+### 7.5 Deliberate deferrals and gaps
+
+- **No Brief on a public share** (D-BI19). A Brief of Alerts or Incidents is the Incident Brief, a different thing.
+- **The Ask box stays hidden until a backend publishes `features.intelligence`.** The UI keys off it (`ask-dashboard.component.ts`
+  `enabled`), but the `intelligence` module declares no routes, so `BootstrapRoutes` never reports the feature (board row
+  `INSIGHT-LANGUAGE-FOLLOWUPS-1`).
+- Not built: the Builder placing a Brief first in a Dashboard's layout; a live preview drive in Basic and Standard shapes. P5
+  (scenarios, segment migration, network value) is open on the same board row.
+- **Tests** — fake models only: `BriefGroundingGuardTest` (a test per rejection class, whole-feature mutants), `InsightBriefSkillTest`,
+  `GoldenEvalTest` fixtures, `ControlApiInsightBriefNarrateTest`, `InsightBriefPagesTest`, `ReportBriefPageTest`,
+  `WidgetFromQuestionTest`, and vitest specs for the tile and the Ask box. Real-model quality is not CI-testable; nothing ran `-Pai`
+  end-to-end through the route.

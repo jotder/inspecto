@@ -865,8 +865,18 @@ Type** ↔ **Widget**. ⛔ not an observability finding — that is an **Alert**
 **Insight** *(added 2026-11-18, D-BI1; built 2026-11-26 — rows of the Dataset `insights_<profile>`)* — One computed finding of an **Insight Type**
 about a Measure, for one slice and one period: value, expected value, delta, impact, a 0–100 score with bands,
 its explanation parts and the structured query that reproduces it. Deterministic; a language model may only
-restate it. ⛔ not an **Alert** (an Insight informs; an **Alert Rule** may be armed from one) and ⛔ not an
+restate it, and only into a slot the server fills from the stored Insight (the model writes the words around a
+`{value}`, never a figure). ⛔ not an **Alert** (an Insight informs; an **Alert Rule** may be armed from one) and ⛔ not an
 **Incident**.
+
+**Dashboard Brief** *(added 2026-11-27, D-BI14; built 2026-11-27, `BI-INSIGHTS-1` P4 — qualified, like **Incident Brief**,
+which stays the Assistant's one-Incident output)* — The top **Insights** of one **Insight Profile**'s latest scan, in plain
+sentences: elevated or high band, best score first, at most five, each line the Insight's stored sentence and a link to it
+in the feed; "Nothing unusual in *period*" when none qualify. Shown by the Visualization Type `insight-brief` (a **Widget**) and
+as a page of a Report PDF (the **Brief page**). It is built from stored Insights in every edition. **Narrate** is the verb for
+a language model rewriting it (Standard and up, AI Assist): each sentence cites one Insight, the server fills every figure,
+and a sentence that fails a check falls back to the stored one. ⛔ not a "summary", "digest" or "executive summary"; ⛔ not an
+**Incident** or **Alert**; ⛔ not the **Incident Brief**.
 
 **Insight Profile** *(added 2026-11-18, D-BI1; built 2026-11-26 — a Measure only, a KPI target not yet)* — The
 authored Component (kind `insight-profile`) that says which Measure or **KPI** to watch, across which dimensions, with which Insight Types
