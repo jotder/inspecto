@@ -125,6 +125,19 @@ export function insightProfileAttributes(isEdit: boolean): AttributeSpec[] {
         },
         num('noveltyRuns', 'Novelty runs', 0, 52, 'Runs a repeated Insight counts as less new. Default 4.'),
         num('maxInsights', 'Insights per run', 1, 200, 'The most Insights one run keeps. Default 50.'),
+        {
+            key: 'pairs',
+            label: 'Pairs of dimensions',
+            type: 'boolean',
+            tier: 'advanced',
+            required: false,
+            default: false,
+            help: 'Also store which pairs of dimensions explain the last change, for Explain. Needs at least 2 dimensions.',
+        },
+        {
+            ...num('maxPairValues', 'Value pairs per pair', 10, 1000, 'The most value pairs one pair of dimensions may hold. Default 200.'),
+            dependsOn: { key: 'pairs', equals: true },
+        },
         { key: 'description', label: 'Description', type: 'multiline', tier: 'optional', required: false },
     ];
 }
@@ -175,6 +188,8 @@ const AUTHORED = new Set([
     'season',
     'noveltyRuns',
     'maxInsights',
+    'pairs',
+    'maxPairValues',
     'description',
     'calendar',
 ]);
@@ -201,6 +216,12 @@ export function toInsightProfileContent(
     for (const k of ['minImpact', 'minSupport', 'maxValues', 'lookback', 'noveltyRuns', 'maxInsights']) {
         const n = v[k];
         if (n !== null && n !== undefined && n !== '' && !Number.isNaN(Number(n))) out[k] = Number(n);
+    }
+    // Depth 2 (plan §11.12): `pairs` is written only when on; maxPairValues only with it. The server checks ≥ 2 dimensions.
+    if (v['pairs'] === true || v['pairs'] === 'true') {
+        out['pairs'] = true;
+        const mp = v['maxPairValues'];
+        if (mp !== null && mp !== undefined && mp !== '' && !Number.isNaN(Number(mp))) out['maxPairValues'] = Number(mp);
     }
     const season = str(v['season']);
     if (season) out['season'] = /^[0-9]+$/.test(season) ? Number(season) : season;

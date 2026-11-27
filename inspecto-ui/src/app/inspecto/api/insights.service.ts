@@ -59,6 +59,23 @@ export interface ExplainResult {
     refused: { dimension: string; reason: string }[];
     movedWith: ExplainMoved[];
     movedWithNote: string;
+    /** Depth 2 only: the pairs an `insight.scan` stored for a Profile with `pairs: true`, or null with {@link pairsNote}. */
+    pairs?: ExplainPairs | null;
+    pairsNote?: string;
+}
+
+/** Depth 2 (plan §11.12): pairs of dimensions ("product × partner") precomputed by the Profile's scan. */
+export interface ExplainPairs {
+    profile: string;
+    computedAt: string;
+    previous: string;
+    current: string;
+    before: number | null;
+    after: number | null;
+    /** The stored totals no longer equal today's: the data was restated since the run. */
+    stale: boolean;
+    drivers: ExplainDriver[];
+    refused: { dimension: string; reason: string }[];
 }
 
 /** One stored Insight (BI-INSIGHTS-1 P3, a row of `insights_<profile>`), as `GET /insights` serves it. */

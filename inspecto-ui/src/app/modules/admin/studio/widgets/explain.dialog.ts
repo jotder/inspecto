@@ -124,6 +124,46 @@ export function driverSentence(d: ExplainDriver): string {
                         <p class="text-secondary text-xs mt-1">{{ r.movedWithNote }}</p>
                     </section>
                 }
+
+                @if (r.kind !== 'ratio') {
+                    <section aria-labelledby="explain-pairs" data-testid="explain-pairs">
+                        <h3 id="explain-pairs" class="text-sm font-semibold mb-1">Pairs of dimensions</h3>
+                        @if (pairsError(); as pe) {
+                            <inspecto-alert variant="warning" title="Pairs not shown">{{ pe }}</inspecto-alert>
+                        } @else if (pairsResult(); as pr) {
+                            @if (pr.pairs; as p) {
+                                <p class="text-secondary text-xs mb-2" data-testid="explain-pairs-source">
+                                    Stored by the scan of Insight Profile {{ p.profile }} at {{ p.computedAt }}, for
+                                    {{ p.previous }} to {{ p.current }}.
+                                </p>
+                                @if (p.stale) {
+                                    <inspecto-alert variant="warning" title="The data changed since this scan" data-testid="explain-pairs-stale">
+                                        The stored totals no longer match today’s figures: the data was restated after the
+                                        scan ran. Run the Profile’s scan again for current pairs.
+                                    </inspecto-alert>
+                                }
+                                @for (d of p.drivers; track d.dimension) {
+                                    <p class="text-sm mb-1" data-testid="explain-pair-driver">
+                                        <span class="font-semibold">{{ d.dimension }}</span>: {{ sentence(d) }}
+                                    </p>
+                                } @empty {
+                                    <p class="text-sm">No pair of dimensions was scored.</p>
+                                }
+                                @for (x of p.refused; track x.dimension) {
+                                    <p class="text-secondary text-xs" data-testid="explain-pair-refused">
+                                        {{ x.dimension }}: not explained — {{ x.reason }}.
+                                    </p>
+                                }
+                            } @else {
+                                <p class="text-secondary text-sm" data-testid="explain-pairs-note">{{ pr.pairsNote }}</p>
+                            }
+                        } @else {
+                            <button mat-stroked-button type="button" [disabled]="pairsLoading()" (click)="loadPairs()">
+                                Look at pairs of dimensions
+                            </button>
+                        }
+                    </section>
+                }
             } @else {
                 <inspecto-skeleton />
             }
@@ -140,6 +180,24 @@ export class ExplainDialogComponent {
     readonly result = signal<ExplainResult | null>(null);
     readonly error = signal<string | null>(null);
     readonly waterfall = signal<VizPlugin | null>(getViz('waterfall') ?? null);
+    readonly pairsResult = signal<ExplainResult | null>(null);
+    readonly pairsError = signal<string | null>(null);
+    readonly pairsLoading = signal(false);
+
+    /** Depth 2 on demand: a second call reads what an Insight Profile's scan stored (plan §11.12). */
+    loadPairs(): void {
+        this.pairsLoading.set(true);
+        this.insights.explain({ ...this.data.request, depth: 2 }).subscribe({
+            next: (r) => {
+                this.pairsResult.set(r);
+                this.pairsLoading.set(false);
+            },
+            error: (e: unknown) => {
+                this.pairsError.set(apiErrorMessage(e, 'The pairs of dimensions could not be read.'));
+                this.pairsLoading.set(false);
+            },
+        });
+    }
 
     /** I-5: the first dimension's mix / rate split as a waterfall: Before → Mix → Rate → After. */
     readonly bridge = computed(() => {

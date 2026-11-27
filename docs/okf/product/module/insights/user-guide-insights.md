@@ -21,6 +21,13 @@ works underneath: [`architecture-insights.md`](architecture-insights.md).
 On a Widget over a date, the light-bulb tile action **Explain this change** names the dimension values that carry the
 change between one period and the one before it. See [`architecture-insights.md`](architecture-insights.md) §4.
 
+For a sum or a count, **Look at pairs of dimensions** in the dialog also shows which pairs of values (`product × partner`)
+carry the change. Pairs are not computed on the spot: they are what the `insight.scan` Job of an Insight Profile with
+**Pairs of dimensions** on stored for that period, over the same Dataset, Measure, date column, grain and filters. The
+dialog names that Profile and when it ran, warns when the data changed since the scan (run the scan again), lists the
+pairs that were not explained with their reason (too many value pairs: raise **Value pairs per pair** or pair coarser
+columns), and otherwise says how to get pairs. A ratio has no pairs: its mix and rate are shown instead.
+
 ## Insight Profiles
 
 **Studio ▸ Insight Profiles** lists the Space's Insight Profiles. An Insight Profile says what the `insight.scan` Job
@@ -37,6 +44,7 @@ To create one (needs the Workbench author permission), choose **New Insight Prof
 | Insight Types | `anomaly` (one period far from usual), `trend-break` (the level changed and stayed), `drift` (a steady rise or fall), or another type the server lists. The server refuses one it does not run, in words. |
 | Sensitivity | Low, Normal or High — how many false alarms are tolerated. |
 | Advanced | Minimum impact and support, values per dimension, lookback, season, novelty runs, Insights per run. Blank keeps the server default. |
+| Pairs of dimensions | Advanced, off by default. Each scan also stores which pairs of dimensions explain the last change, for *Explain this change*. Needs at least 2 dimensions. **Value pairs per pair** (10–1000, default 200) caps each pair; a pair with more is refused in words. |
 | Business calendar | Holidays and promotions: **Exclude** leaves the period out of every series; **Expected** drops a finding dated in it. |
 
 **Preview on history** replays the Profile as it is in the form over the last 4–52 periods (12 by default), as you:

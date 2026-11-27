@@ -595,8 +595,12 @@ changepoint **and** drift; one Insights Dataset per Profile.
   equal the live depth-1 totals (data restated since the run). None → `pairs: null` and `pairsNote` saying how to get
   them (save such a Profile with `pairs: true`, run its `insight.scan` after the bucket completes). A ratio with
   depth 2 is refused in words (422). A Profile the caller may not read is indistinguishable from none.
-- **Not done**: the UI (the explain dialog shows no pairs yet); a revealer still sees aliases in stored pairs (the Job
+- **Not done**: a revealer still sees aliases in stored pairs (the Job
   never reveals); depth 3.
+- **UI (`INSIGHT-PROFILE-PAIRS-UI-1`, 2026-11-27)**: the Profile editor authors `pairs` and `maxPairValues` (Advanced; written only when
+  pairs is on, the server validator stays the gate); the Explain dialog asks `depth: 2` on demand (**Look at pairs of
+  dimensions**, not offered for a ratio) and shows the pair drivers, the source Profile and scan time, `stale` in words,
+  refused pairs with reasons, or `pairsNote`.
 
 ### 11.13 P3 I-17 second half — a Case or an Action Request from an Insight — as built (2026-11-26)
 

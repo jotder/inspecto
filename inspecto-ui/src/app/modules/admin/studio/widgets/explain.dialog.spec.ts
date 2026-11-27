@@ -72,6 +72,69 @@ describe('ExplainDialogComponent', () => {
         expect(f.nativeElement.textContent).toContain('Cannot explain this change');
     });
 
+    it('asks depth 2 on demand and draws the pairs, the stale flag and refused pairs', async () => {
+        const ADD: ExplainResult = { ...RESULT, kind: 'additive', mixRate: [] };
+        const calls: unknown[] = [];
+        const withPairs: ExplainResult = {
+            ...ADD,
+            pairs: {
+                profile: 'margin_rev',
+                computedAt: '2026-11-26T10:00:00Z',
+                previous: '2026-01',
+                current: '2026-02',
+                before: 800,
+                after: 1000,
+                stale: true,
+                drivers: [{ ...RESULT.drivers[0], dimension: 'product × partner', cover: ['A × X'], covered: 0.9 }],
+                refused: [{ dimension: 'plan × city', reason: 'more than 200 value pairs (maxPairValues)' }],
+            },
+        };
+        TestBed.configureTestingModule({
+            imports: [ExplainDialogComponent],
+            providers: [
+                { provide: MAT_DIALOG_DATA, useValue: { title: 'Sales', request: { dataset: 'd' } } },
+                {
+                    provide: InsightsService,
+                    useValue: { explain: (b: { depth?: number }) => (calls.push(b), of(b.depth === 2 ? withPairs : ADD)) },
+                },
+            ],
+        });
+        const f = TestBed.createComponent(ExplainDialogComponent);
+        f.detectChanges();
+        const el: HTMLElement = f.nativeElement;
+        expect(el.querySelector('[data-testid="explain-pair-driver"]')).toBeNull();
+        const btn = Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('pairs of dimensions'))!;
+        btn.click();
+        f.detectChanges();
+        expect(calls[1]).toEqual({ dataset: 'd', depth: 2 });
+        expect(el.querySelector('[data-testid="explain-pair-driver"]')?.textContent).toContain('product × partner');
+        expect(el.querySelector('[data-testid="explain-pair-driver"]')?.textContent).toContain('A × X explains 90 %');
+        expect(el.querySelector('[data-testid="explain-pairs-stale"]')?.textContent).toContain('data changed since this scan');
+        expect(el.querySelector('[data-testid="explain-pair-refused"]')?.textContent).toContain('plan × city: not explained');
+        expect(el.querySelector('[data-testid="explain-pairs-source"]')?.textContent).toContain('margin_rev');
+        await expectNoA11yViolations(el);
+    });
+
+    it('shows pairsNote when no Profile stored pairs, and offers no pairs for a ratio', () => {
+        const ADD: ExplainResult = { ...RESULT, kind: 'additive', mixRate: [] };
+        const none = { ...ADD, pairs: null, pairsNote: 'No precomputed pairs of dimensions exist for this Measure.' };
+        TestBed.configureTestingModule({
+            imports: [ExplainDialogComponent],
+            providers: [
+                { provide: MAT_DIALOG_DATA, useValue: { title: 'Sales', request: {} } },
+                { provide: InsightsService, useValue: { explain: (b: { depth?: number }) => of(b.depth === 2 ? none : ADD) } },
+            ],
+        });
+        const f = TestBed.createComponent(ExplainDialogComponent);
+        f.detectChanges();
+        f.componentInstance.loadPairs();
+        f.detectChanges();
+        expect(f.nativeElement.querySelector('[data-testid="explain-pairs-note"]')?.textContent).toContain('No precomputed pairs');
+        TestBed.resetTestingModule();
+        const r = make(of(RESULT));
+        expect(r.nativeElement.querySelector('[data-testid="explain-pairs"]')).toBeNull();
+    });
+
     it('words a dimension that explains nothing', () => {
         expect(driverSentence({ ...RESULT.drivers[0], explains: false })).toBe('No small set of values explains the change.');
         expect(driverSentence({ ...RESULT.drivers[0], cover: ['E', 'N'], covered: 1.1 })).toBe('E and N explain 110 % of the change.');
