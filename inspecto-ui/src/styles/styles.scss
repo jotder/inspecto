@@ -162,6 +162,21 @@ body.light,
     --gamma-text-primary: var(--gamma-primary);
     --gamma-text-primary-rgb: var(--gamma-primary-rgb);
     --gamma-text-warn-rgb: var(--gamma-warn-rgb);
+
+    .mat-mdc-tab:not(.mat-mdc-tab-active):not(.mdc-tab--active) .mdc-tab__text-label {
+        color: var(--gamma-text-secondary);
+    }
+
+    .mat-expansion-panel-header-description {
+        color: var(--gamma-text-secondary);
+    }
+
+    .mat-mdc-button.mat-warn,
+    .mat-mdc-outlined-button.mat-warn {
+        --mat-button-text-label-text-color: var(--gamma-warn-700);
+        --mat-button-outlined-label-text-color: var(--gamma-warn-700);
+        color: var(--gamma-warn-700);
+    }
 }
 body.dark,
 .dark,
@@ -169,6 +184,14 @@ body.dark,
     --gamma-text-primary: var(--gamma-primary-400);
     --gamma-text-primary-rgb: var(--gamma-primary-400-rgb);
     --gamma-text-warn-rgb: var(--gamma-warn-400-rgb);
+
+    .mat-mdc-tab:not(.mat-mdc-tab-active):not(.mdc-tab--active) .mdc-tab__text-label {
+        color: var(--gamma-text-secondary);
+    }
+
+    .mat-expansion-panel-header-description {
+        color: var(--gamma-text-secondary);
+    }
 }
 
 /* Material dialogs render with gamma's LIGHT Material theme even in dark mode (gamma's dark scheme is only

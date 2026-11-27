@@ -18,10 +18,9 @@ import { PRODUCT } from './product.generated';
 export const appConfig: ApplicationConfig = {
     providers: [
         ...provideInspectoShell({ environment, product: PRODUCT, routes: laAppRoutes }),
-        // Notices open at the top centre, not the shell's bottom right (LA-FULL-CYCLE-TEST-1 phase 6, finding 19): there
-        // they covered the graph's minimap, and the top right holds the page's own actions (Save's notice covered Save).
-        // Listed after the shell's provideToastr, so this one is the config in force.
-        provideToastr({ positionClass: 'toast-top-center' }),
+        // Notices open at the bottom right (matching the shell) so they never overlap the top-center canvas header or
+        // "Start an Investigation" card. Listed after the shell's provideToastr, so this one is the config in force.
+        provideToastr({ positionClass: 'toast-bottom-right' }),
         // `GET /bootstrap` once, before routing: the auth mode, the module flags (`LA_FEATURES` reads them), the Product and its
         // nav and, under OIDC, a session resumed from the refresh cookie. Never rejects.
         // The shared-Investigation viewer (`/embed/...`) is anonymous and talks to nothing but its one public read, so it skips the

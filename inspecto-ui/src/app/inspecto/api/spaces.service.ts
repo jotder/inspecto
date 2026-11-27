@@ -239,6 +239,8 @@ export class SpacesService {
 
     /** Every hosted space's manifest (sorted by id, server-side). */
     readonly availableSpaces = signal<Space[]>([]);
+    /** True once {@link refresh} has resolved at least once for the current session. */
+    readonly loaded = signal(false);
     /** Whether this server is the CRUD-capable discover runtime (GET /spaces/_meta). */
     readonly multiSpace = signal(false);
     /** True when `GET /spaces/_meta` says `locationsEnabled: false`, or a folder route answered
@@ -292,6 +294,7 @@ export class SpacesService {
                 // SPACE-LOCATIONS-1: `spaces.allowed.roots` unset ⇒ the folder routes answer 409; say so up front.
                 this.locationsDisabled.set(meta.locationsEnabled === false);
                 this.availableSpaces.set(spaces);
+                this.loaded.set(true);
             }),
             switchMap(({ meta, spaces }) =>
                 this.fallbackSpace(meta.multiSpace, spaces).pipe(
@@ -308,6 +311,14 @@ export class SpacesService {
         if (typeof localStorage === 'undefined') return;
         if (id) localStorage.setItem(STORAGE_KEY, id);
         else localStorage.removeItem(STORAGE_KEY);
+    }
+
+    /** Clear the previous session's Space roster so a newly signed-in user never inherits it before refresh. */
+    resetForSession(clearSelection = false): void {
+        this.availableSpaces.set([]);
+        this.loaded.set(false);
+        this.reads.clear();
+        if (clearSelection) this.selectSpace(null);
     }
 
     // ── server-global CRUD (/spaces) ─────────────────────────────────────────────

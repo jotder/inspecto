@@ -724,6 +724,34 @@ describe('DataPageComponent - Datasets, Entities and Mappings (LA-DATA-PAGE-1)',
         expect(q(el, 'data-description-empty')!.textContent).toContain('No description yet');
     });
 
+    it('humanizes raw technical dataset ids into primary titles with monospace id metadata', () => {
+        const datasets = [
+            {
+                type: 'dataset',
+                name: 'bill_of_lading_dataset',
+                ref: 'dataset/bill_of_lading_dataset',
+                content: {
+                    origin: 'import',
+                    kind: 'stream',
+                    physicalRef: 'bol/database',
+                    importPipeline: 'bill_of_lading_dataset',
+                    columns: [
+                        { name: 'shipper_id', type: 'string' },
+                        { name: 'consignee_id', type: 'string' },
+                    ],
+                },
+            },
+        ];
+        const { el } = create(datasets);
+        expect(q(el, 'data-name')!.textContent!.trim()).toBe('Bill of lading dataset');
+        const idEl = q(el, 'data-id')!;
+        expect(idEl.textContent!.trim()).toBe('bill_of_lading_dataset');
+        expect(idEl.className).toContain('font-mono');
+        const meta = q(el, 'data-toggle-bill_of_lading_dataset')!.querySelector('[data-testid="data-meta"]')!;
+        expect(meta.textContent).toContain('bill_of_lading_dataset');
+        expect(meta.querySelector('.font-mono')?.textContent?.trim()).toBe('bill_of_lading_dataset');
+    });
+
     it('LA-DATA-DETAILS-1: Rename or describe opens the details dialog and shows what it saved', () => {
         const { fixture, el } = create();
         const open = vi

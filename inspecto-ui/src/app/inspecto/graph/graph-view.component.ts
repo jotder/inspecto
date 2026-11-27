@@ -36,7 +36,7 @@ import { registerRadialLayout } from './graph-radial-layout';
 import { LayoutSuperseded, registerSlicedLayouts } from './graph-sliced-layout';
 import { NodeRule, NodeRuleDetails, nodeRuleColor } from './node-rules';
 import { NodeKind } from 'app/inspecto/api';
-import { ICON_COLOR_SWATCHES, canvasTheme } from 'app/inspecto/theme/chart-tokens';
+import { HULL_LABEL_COLORS, ICON_COLOR_SWATCHES, canvasTheme } from 'app/inspecto/theme/chart-tokens';
 
 // The layout ids, labels and capped-layout fallback are plain data in ./graph-layouts; re-exported so importers of this file are unchanged.
 export { CAPPED_LAYOUT_FALLBACK, GRAPH_LAYOUTS };
@@ -531,13 +531,23 @@ export function buildPluginList(p: GraphViewPlugins | null, swatches: readonly s
     for (const [group, members] of p.hulls ?? []) {
         if (members.length < 2) continue;
         const color = swatches[i++ % swatches.length];
+        const shortGroup = group.includes(':') ? group.split(':').pop()! : group;
+        const labelStyle = {
+            labelText: `Cluster · ${shortGroup}`,
+            labelFill: HULL_LABEL_COLORS.fill,
+            labelFontSize: 12,
+            labelBackground: true,
+            labelBackgroundFill: HULL_LABEL_COLORS.background,
+            labelBackgroundRadius: 4,
+            labelPadding: [2, 6],
+        };
         out.push(
             p.bubbleSets
                 ? {
                       type: 'bubble-sets',
                       key: `bubble-sets-${group}`,
                       members,
-                      labelText: `community ${group}`,
+                      ...labelStyle,
                       fill: color,
                       fillOpacity: 0.1,
                       stroke: color,
@@ -549,7 +559,7 @@ export function buildPluginList(p: GraphViewPlugins | null, swatches: readonly s
                       members,
                       corner: 'smooth',
                       padding: 14,
-                      labelText: `community ${group}`,
+                      ...labelStyle,
                       fill: color,
                       fillOpacity: 0.08,
                       stroke: color,

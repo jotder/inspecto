@@ -645,36 +645,6 @@ export class LinkAnalysisToolboxComponent {
         return CATALOGUE_TOOLS[id]?.runsOn ?? 'browser';
     }
 
-    /**
-     * The chip on a row that runs on both tabs, naming the OTHER tab ('' = the row runs only here). A row that runs
-     * only where it is listed carries no chip (T-087: "both / browser / server" told the analyst nothing).
-     */
-    alsoOn(runsOn: RunsOn): string {
-        // without the Investigations add-on the Whole Dataset tab is not shown, so nothing points at it
-        if (runsOn !== 'both' || !this.investigationsEnabled()) return '';
-        return this.side() === 'browser' ? 'Also on Whole Dataset' : 'Also on screen';
-    }
-
-    /** A server row's size in words: the largest Working Set it answers at once (above it the run is queued). */
-    inlineCeiling(n: number | undefined): string {
-        return typeof n === 'number' && Number.isFinite(n) ? `Instant up to ${fmt(n)} nodes` : '';
-    }
-
-    /** A browser group's cap in words: the smallest browser cap among the algorithms behind it; '' = no cap. */
-    toolCap(id: string): string {
-        const t = CATALOGUE_TOOLS[id];
-        if (!t || t.listed !== 'browser') return '';
-        const caps = t.server
-            .map((a) =>
-                a === 'betweennessCentrality'
-                    ? betweennessNodeCapValue()
-                    : browserAlgorithmCapValue(a as BrowserCappedAlgorithm),
-            )
-            .filter((c) => Number.isFinite(c) && c > 0);
-        const cap = id === 'scoring' ? suspicionNodeCapValue() : caps.length ? Math.min(...caps) : 0;
-        return cap ? `Up to ${fmt(cap)} nodes` : '';
-    }
-
     /** The open tool group (accordion: one open at a time; `null` = all collapsed). */
     readonly tab = signal<AnalysisTab | null>('path');
     readonly pathFrom = signal('');

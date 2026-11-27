@@ -239,4 +239,20 @@ describe('SpacesService', () => {
         expect(req.request.body).toEqual({ id: 'delta', path: '/srv/spaces/delta', dataRoot: '/srv/data/delta' });
         req.flush(SPACES[0]);
     });
+
+    it('loaded() tracks refresh() and resetForSession() clears the prior user roster and selection', () => {
+        expect(svc.loaded()).toBe(false);
+        svc.refresh().subscribe();
+        httpMock.expectOne(`${base}/spaces/_meta`).flush({ multiSpace: true });
+        httpMock.expectOne(`${base}/spaces`).flush(SPACES);
+        httpMock.expectOne(`${base}/spaces/alpha/bootstrap`).flush({ session: { capabilities: ['x'] } });
+        expect(svc.loaded()).toBe(true);
+        expect(svc.availableSpaces().length).toBe(2);
+        expect(svc.currentSpaceId()).toBe('alpha');
+
+        svc.resetForSession(true);
+        expect(svc.loaded()).toBe(false);
+        expect(svc.availableSpaces()).toEqual([]);
+        expect(svc.currentSpaceId()).toBeNull();
+    });
 });

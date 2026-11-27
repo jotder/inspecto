@@ -60,7 +60,7 @@ const AUDIENCES: readonly { id: Audience; label: string }[] = [
             <div class="text-secondary text-xs font-semibold uppercase tracking-wider">Settings</div>
             <div class="flex max-w-320 flex-col gap-4 md:min-h-0 md:flex-1 md:flex-row md:items-start">
                 <nav
-                    class="flex shrink-0 flex-col gap-3 md:max-h-full md:w-60 md:overflow-y-auto"
+                    class="flex shrink-0 flex-col gap-3 md:max-h-full md:w-72 md:overflow-y-auto"
                     aria-label="Settings sections"
                 >
                     @for (group of groups(); track group.id) {
@@ -90,7 +90,9 @@ const AUDIENCES: readonly { id: Audience; label: string }[] = [
                                         <span class="text-secondary truncate text-xs">{{ drawer.description }}</span>
                                     </span>
                                     @if (!drawer.canChange()) {
-                                        <inspecto-chip variant="soft" tone="neutral">Read-only</inspecto-chip>
+                                        <inspecto-chip class="shrink-0 whitespace-nowrap" variant="soft" tone="neutral"
+                                            >Read-only</inspecto-chip
+                                        >
                                     }
                                 </button>
                             }

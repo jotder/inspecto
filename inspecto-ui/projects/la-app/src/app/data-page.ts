@@ -76,6 +76,16 @@ export interface TypeChoice extends EntityTypeGuide {
 
 const str = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null);
 
+/**
+ * Turns a raw technical dataset id (e.g. `bill_of_lading_dataset`) into a human-readable primary title
+ * (`Bill of lading dataset`) when no explicit `title` is stored; plain single-word ids are left as-is.
+ */
+export function readableDatasetName(id: string): string {
+    if (/\s/.test(id) || !/[_-]/.test(id)) return id;
+    const words = id.replace(/[_-]+/g, ' ').trim();
+    return words ? words[0].toUpperCase() + words.slice(1) : id;
+}
+
 /** The id prefix of an Entity List's Parquet store (`EntityListSidecar.PREFIX`): a store, not data to read as links. */
 const ENTITY_LIST_STORE = 'entity_list_';
 
@@ -128,7 +138,7 @@ export function dataEntry(def: ComponentDef): DataEntry {
             columns.length >= 2);
     return {
         id: def.name,
-        name: str(c['title'])?.trim() || def.name,
+        name: str(c['title'])?.trim() || readableDatasetName(def.name),
         description: str(c['description']) ?? '',
         origin,
         mappable,

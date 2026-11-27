@@ -22,7 +22,7 @@ import { UserComponent } from 'app/layout/common/user/user.component';
 import { ConnectivityBannerComponent } from '@inspecto/core/components/connectivity-banner.component';
 import { EntitlementBannerComponent } from '@inspecto/core/components/entitlement-banner.component';
 import { APP_ENVIRONMENT } from '@inspecto/core/api/app-environment';
-import { LensService } from '@inspecto/core/api';
+import { LensService, SpacesService } from '@inspecto/core/api';
 import { SessionService } from '@inspecto/core/auth/session.service';
 import { LA_APP_SHORTCUTS, ShortcutsHelpDialog, isEditingTarget } from 'app/inspecto/shortcuts-help.dialog';
 import { appAreas, appOfUrl, areaIcon, productNav, ProductNavEntry } from '@inspecto/core/product/product-host';
@@ -242,7 +242,7 @@ export const railLink = (n: ProductNavEntry): RailLink => ({ path: n.path, label
             <main class="flex min-h-0 flex-1 flex-col">
                 @if (noAccess()) {
                     <la-app-no-access></la-app-no-access>
-                } @else {
+                } @else if (!awaitingSpaces()) {
                     <router-outlet></router-outlet>
                 }
             </main>
@@ -266,7 +266,12 @@ export class LaShellComponent {
     private readonly env = inject(APP_ENVIRONMENT);
     private readonly lens = inject(LensService);
     private readonly session = inject(SessionService);
+    private readonly spaces = inject(SpacesService);
     private readonly router = inject(Router);
+    /** True while an authenticated session is still waiting for its Space roster to load. */
+    protected readonly awaitingSpaces = computed(
+        () => this.session.authMode() === 'oidc' && this.session.authenticated?.() === true && !this.spaces.loaded(),
+    );
     /** The Product's areas. PA-4: the server's nav when it resolved one for this Product, else the generated nav under the feature rule. */
     private readonly areas = computed(() => productNav(this.session.product(), PRODUCT, this.session.features()));
     /** PA-5b: the Apps that draw an area, in Product order. More than one: the switcher shows, and the rail shows one App. */

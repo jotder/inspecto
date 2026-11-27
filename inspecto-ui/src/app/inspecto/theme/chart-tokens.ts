@@ -207,3 +207,9 @@ export function canvasTheme(dark: boolean): CanvasTheme {
  * edge did not hand a grey-blue swatch to a link type (nor reshuffle every automatic colour).
  */
 export const NEUTRAL_LINK_GREYS: readonly string[] = [SLATE[400], SLATE[500]];
+
+/** High-contrast pill styling for G6 hull/bubble-sets community labels across both light and dark canvases. */
+export const HULL_LABEL_COLORS = {
+    fill: '#e2e8f0',
+    background: 'rgba(15, 23, 42, 0.85)',
+} as const;

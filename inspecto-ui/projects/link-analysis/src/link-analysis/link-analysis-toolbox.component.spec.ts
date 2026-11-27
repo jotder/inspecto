@@ -1268,18 +1268,19 @@ describe('LinkAnalysisToolboxComponent search around', () => {
         const rows = (el: HTMLElement): string[] =>
             Array.from(el.querySelectorAll('section > button > span.font-medium')).map((s) => s.textContent!.trim());
 
-        it('without the Investigations add-on no card says "Also on Whole Dataset" (that tab is not shown)', () => {
-            const { fixture, c } = make(GRAPH, [], false);
+        it('no card renders "Also on Whole Dataset" or "Up to N nodes" on the On screen tab', () => {
+            const { fixture } = make(GRAPH, [], true);
             TestBed.inject(GraphRunsService).catalogue.set(CATALOGUE as never);
             fixture.detectChanges();
-            const chips = Array.from(
-                (fixture.nativeElement as HTMLElement).querySelectorAll('section > button inspecto-chip'),
-            ).map((x) => x.textContent!.trim());
+            const el = fixture.nativeElement as HTMLElement;
+            const chips = Array.from(el.querySelectorAll('section > button inspecto-chip')).map((x) =>
+                x.textContent!.trim(),
+            );
             expect(chips).not.toContain('Also on Whole Dataset');
-            expect(c.alsoOn('both')).toBe('');
+            expect(el.textContent).not.toMatch(/Up to [\d,]+ nodes/);
         });
 
-        it('the Browser tab lists what runs in the browser once by question, badged with where it runs and its cap', async () => {
+        it('the Browser tab lists what runs in the browser once by question without cross-tab or cap chips', async () => {
             const { fixture, c } = make(GRAPH, [], true);
             TestBed.inject(GraphRunsService).catalogue.set(CATALOGUE as never);
             fixture.detectChanges();
@@ -1302,12 +1303,10 @@ describe('LinkAnalysisToolboxComponent search around', () => {
             ]);
             expect(c.runsOn('centrality')).toBe('both');
             expect(c.runsOn('explain')).toBe('both'); // its edge-index reads run on the server
-            expect(c.toolCap('centrality')).toBe('Up to 1,000 nodes'); // betweenness is sampled above 500 (LA-PERF-P5-1)
-            // T-087: a row that also runs on the other tab names it; no raw "both / browser / server" chip
             const chips = Array.from(el.querySelectorAll('section > button inspecto-chip')).map((x) =>
                 x.textContent!.trim(),
             );
-            expect(chips).toContain('Also on Whole Dataset');
+            expect(chips).not.toContain('Also on Whole Dataset');
             expect(chips.filter((t) => /^(both|browser|server|suggested)$/.test(t))).toEqual([]);
             await expectNoA11yViolations(el);
         });
@@ -1334,9 +1333,9 @@ describe('LinkAnalysisToolboxComponent search around', () => {
             expect(names).not.toContain('Centrality'); // under its cap its server twins are the algorithm rows
             const risk = el.querySelector('[data-server-algorithm=propagatedRisk]')!;
             expect(risk.querySelector('inspecto-chip')).toBeNull(); // runs only here: no where-chip
-            expect(risk.textContent).toContain('Instant up to');
+            expect(risk.textContent).not.toContain('Instant up to');
             expect(risk.textContent).not.toMatch(/waits for|≤/);
-            expect(el.querySelector('[data-server-algorithm=pageRank]')!.textContent).toContain('Also on screen');
+            expect(el.querySelector('[data-server-algorithm=pageRank]')!.textContent).not.toContain('Also on screen');
             (risk.querySelector('button') as HTMLButtonElement).click();
             fixture.detectChanges();
             const panel = risk.querySelector('inspecto-link-analysis-server-algorithms')!;

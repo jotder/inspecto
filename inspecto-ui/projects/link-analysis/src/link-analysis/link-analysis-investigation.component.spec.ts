@@ -945,7 +945,7 @@ describe('LinkAnalysisInvestigationComponent - queued seed entities (operator 20
         const queued = el.querySelector('[data-testid="queued-seeds"]') as HTMLElement;
         expect(queued.textContent).toContain('Queued start entities (2)');
         expect(queued.textContent).toContain('Nothing is created until then');
-        expect(button('Start Investigation').textContent).toContain('with 2 queued start entities');
+        expect(button('Start Investigation').textContent).toContain('(2 entities)');
         expect(inv.createInvestigation).not.toHaveBeenCalled();
         expect(inv.appendInvestigationOp).not.toHaveBeenCalled();
         await expectNoA11yViolations(el);

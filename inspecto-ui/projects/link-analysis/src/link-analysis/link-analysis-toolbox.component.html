@@ -38,12 +38,6 @@
                 >
                     <mat-icon class="icon-size-5" svgIcon="heroicons_outline:server-stack"></mat-icon>
                     <span class="font-medium">{{ a.label }}</span>
-                    @if (alsoOn(a.runsOn); as also) {
-                        <inspecto-chip class="whitespace-nowrap" variant="soft">{{ also }}</inspecto-chip>
-                    }
-                    <span class="text-secondary hidden text-xs sm:inline">{{
-                        inlineCeiling(a.inlineNodeCeiling)
-                    }}</span>
                     <mat-icon
                         class="icon-size-4 ml-auto shrink-0"
                         [svgIcon]="
@@ -85,12 +79,6 @@
                         <span class="text-secondary hidden text-xs sm:inline" [id]="'tool-hint-' + t.id">{{
                             t.hint
                         }}</span>
-                    }
-                    @if (alsoOn(runsOn(t.id)); as also) {
-                        <inspecto-chip class="whitespace-nowrap" variant="soft">{{ also }}</inspecto-chip>
-                    }
-                    @if (toolCap(t.id); as cap) {
-                        <span class="text-secondary hidden whitespace-nowrap text-xs sm:inline">{{ cap }}</span>
                     }
                     @if (toolBadge(t.id); as badge) {
                         <inspecto-chip class="whitespace-nowrap">{{ badge }}</inspecto-chip>

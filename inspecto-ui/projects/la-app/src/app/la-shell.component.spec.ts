@@ -349,4 +349,64 @@ describe('la-app shell and landing page', () => {
         const elYes = await render({ geoMap: true, investigations: true, entityPages: true }, null, 'none', true);
         expect(elYes.querySelector('nav[aria-label="Areas"] a[href="/approvals"]')).toBeTruthy();
     });
+
+    it('holds the router outlet while an authenticated session awaits its Space roster, then shows no-access on empty Spaces', async () => {
+        const authenticated = signal(true);
+        TestBed.configureTestingModule({
+            providers: [
+                provideHttpClient(),
+                provideHttpClientTesting(),
+                provideNoopAnimations(),
+                {
+                    provide: LensService,
+                    useValue: {
+                        canAuthorWorkbench: signal(false),
+                        canManageIncidents: signal(false),
+                        canAdminister: signal(false),
+                        canApproveLinkExpansions: signal(false),
+                    },
+                },
+                {
+                    provide: SessionService,
+                    useValue: {
+                        authMode: signal<'none' | 'oidc'>('oidc'),
+                        authenticated,
+                        actorName: signal('Demo Outsider'),
+                        loginRequired: signal(false),
+                        actor: signal('outsider'),
+                        features: signal({ geoMap: true, investigations: true, entityPages: true }),
+                        product: signal(null),
+                        entitlement: signal(null),
+                    },
+                },
+                {
+                    provide: SpaceGuideService,
+                    useValue: {
+                        load: () => of({ hasSpace: true, datasets: 1, columnsDescribed: true, views: 1, lists: 1 }),
+                    },
+                },
+                provideRouter([
+                    {
+                        path: '',
+                        component: LaShellComponent,
+                        children: [{ path: '', component: LandingComponent }],
+                    },
+                ]),
+            ],
+        });
+        harness = await RouterTestingHarness.create('/');
+        harness.detectChanges();
+        const el = harness.routeNativeElement as HTMLElement;
+        expect(el.querySelector('la-app-landing'), 'landing must not mount before Spaces load').toBeNull();
+        expect(el.querySelector('[data-testid="la-no-access"]')).toBeNull();
+
+        const spaces = TestBed.inject(SpacesService);
+        spaces.availableSpaces.set([]);
+        spaces.loaded.set(true);
+        harness.detectChanges();
+
+        expect(el.querySelector('[data-testid="la-no-access"]')).toBeTruthy();
+        expect(el.querySelector('la-app-landing')).toBeNull();
+        expect(el.querySelector('nav[aria-label="Areas"]')).toBeNull();
+    });
 });

@@ -42,7 +42,7 @@ export interface FoundAction {
             </h3>
             @if (!graph()?.nodes?.length) {
                 <p class="text-secondary m-0 text-xs">
-                    Draw a graph first: these questions are asked of what is on screen.
+                    Draw a graph first — these questions run on the visible canvas.
                 </p>
             } @else {
                 <div class="flex flex-wrap gap-1" role="group" aria-label="Questions">

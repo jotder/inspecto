@@ -68,6 +68,7 @@ export const laAppRoutes: Route[] = [
             },
             // The library's lazy boundaries, exactly as the gamma host loads them.
             area('link-analysis', () => import('@inspecto/link-analysis/link-analysis/link-analysis.routes')),
+            { path: 'geo', redirectTo: 'geo-map', pathMatch: 'full' },
             area('geo-map', () => import('@inspecto/link-analysis/geo-map/geo-map.routes')),
             // The Entities pages (Entity Type Profile, Entity Profile), the library's own lazy boundary.
             // NOT behind the area guard: the Space guide's "What the columns hold" (/entities?tab=columns) is a step of every

@@ -32,7 +32,9 @@ export class CallbackComponent implements OnInit {
         const target = this.session.takeReturnUrl(this.state);
         this.session.completeLogin(this.code, this.state).subscribe((ok) => {
             if (ok) {
-                this.router.navigateByUrl(target ?? '/');
+                const settled = this.session.sessionSettled?.();
+                if (settled) void settled.then(() => this.router.navigateByUrl(target ?? '/'));
+                else this.router.navigateByUrl(target ?? '/');
             } else {
                 sessionStorage.setItem('inspecto.signInFailed', '1');
                 this.router.navigate(['/sign-in']);

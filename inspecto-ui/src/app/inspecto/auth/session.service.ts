@@ -499,6 +499,7 @@ export class SessionService {
                     // Mark authenticated synchronously: the caller navigates into the app on `true`, and the
                     // authGuard reads `authenticated` immediately — deferring it to the async bootstrap
                     // re-fetch below would bounce the user back to sign-in mid-redirect.
+                    this.spaces.resetForSession(false);
                     this.accessToken.set(r.accessToken);
                     this.authenticated.set(true);
                     writeResumable(true);
@@ -580,6 +581,7 @@ export class SessionService {
         this.actor.set(null);
         this.subjectDisplayName.set(null);
         this.capabilities.set([]);
+        this.spaces.resetForSession(!rememberPage);
         if (rememberPage) recordReturnUrl(this.router.url);
         if (!this.router.url.startsWith('/sign-in')) void this.router.navigate(['/sign-in']);
     }
