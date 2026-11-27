@@ -226,10 +226,22 @@ class ConsignmentOutputsTest {
                 "a leading non-date partition column must not defeat the lookup");
     }
 
-    /** No triple ⇒ null, never a guess: a wrong record_day silently mis-buckets a file for §10.1. */
+    /** A single-column ISO day ({@code ref_day=} / {@code dt=} / {@code record_day=}) is a declared day, not a guess:
+     *  DATED-REFERENCE-RUNS-1 ({@code dbb720aae}) buckets a dated Reference's {@code ref_day=} files by it in the
+     *  work ledger. Only a strict {@code yyyy-MM-dd} value counts. */
     @Test
-    void yieldsNullWhenThePartitionSchemeCarriesNoDayTriple() {
-        assertNull(ConsignmentOutputs.recordDay("dt=2026-08-04"));
+    void derivesRecordDayFromASingleIsoDaySegment() {
+        assertEquals("2026-08-04", ConsignmentOutputs.recordDay("dt=2026-08-04"));
+        assertEquals("2026-08-04", ConsignmentOutputs.recordDay("ref_day=2026-08-04"));
+        assertEquals("2026-08-04", ConsignmentOutputs.recordDay("region=EU/record_day=2026-08-04"));
+        assertNull(ConsignmentOutputs.recordDay("dt=2026-8-4"), "not yyyy-MM-dd");
+        assertNull(ConsignmentOutputs.recordDay("dt=2026-02-30"), "not a calendar day");
+        assertNull(ConsignmentOutputs.recordDay("day_key=2026-08-04"), "only the named day columns");
+    }
+
+    /** No day triple and no ISO day column ⇒ null, never a guess: a wrong record_day silently mis-buckets a file. */
+    @Test
+    void yieldsNullWhenThePartitionSchemeCarriesNoDay() {
         assertNull(ConsignmentOutputs.recordDay("year=2026/month=07"));
         assertNull(ConsignmentOutputs.recordDay("region=EU"));
         assertNull(ConsignmentOutputs.recordDay(""));
@@ -263,7 +275,7 @@ class ConsignmentOutputsTest {
     void aStraddlingFileFallsBackToThePartitionKey() {
         assertEquals("2026-07-01", ConsignmentOutputs.recordDay("year=2026/month=07/day=01",
                 bounds("2026-07-01T23:59:00", "2026-07-02T00:01:00")));
-        assertNull(ConsignmentOutputs.recordDay("dt=2026-07-01",
+        assertNull(ConsignmentOutputs.recordDay("region=EU",
                         bounds("2026-07-01T23:59:00", "2026-07-02T00:01:00")),
                 "and with no derivable partition day either, null — never a guess");
     }

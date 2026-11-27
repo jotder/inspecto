@@ -48,7 +48,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `VIEW-DATA-UNMASKED-1` | P2 | defect | GET /views/{id}/data answers a view's rows with no masking and no capability check, to people as well as agents | — |
 | `INGEST-MULTIFILE-BATCH-REPLAN-DUP-1` | P3 | defect | A multi-file Consignment re-planned after a failover can write a second, differently named output. | operator |
 | — | P2 | feature | Postgres multi-user | operator |
-| `ENGINE-ETL-TESTS-RED-1` | P2 | defect | Eight inspecto-etl / inspecto-engine tests fail on master since the 2026-11-25 pushes of OUTPUT-NAME-OVERWRITE-1 (e37f96b1a) and DATED-RE… | — |
 | `DUCKDB-2-WINDOW-SELF-JOIN-UPSTREAM-1` | P3 | chore | Drop the window_self_join workaround once a fixed DuckDB driver is pinned. | — |
 | `DUCKDB-2-0-1-HAVANA-TZ-1` | P3 | chore | DuckDB 2.0.1's zone data keeps Cuba on UTC−4 from 2026-11-01 to about mid-March 2027; the JDK's tzdata 2026b does not. | — |
 | `RUN-TRIGGER-ACTOR-SPOOF-1` | P3 | defect | ?actor= on POST /jobs/{name}/trigger, POST /jobs/runs/{id}/replay and POST /pipelines/authored/{id}/trigger is free text written into the… | — |

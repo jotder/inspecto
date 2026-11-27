@@ -1,7 +1,8 @@
 # Business insights P4 — Language: Dashboard Brief and Ask the Dashboard (`BI-INSIGHTS-1` P4)
 
-> **Status: DESIGN APPROVED 2026-11-27 - D-BI14..D-BI24 signed (operator, recommended options; option (a) of every row
-> in §10); BR-0 and AQ-0 built (board row), BR-1…BR-5 and AQ-1 open.** Design only. Parent: [`2026-11-18-business-insights-plan.md`](2026-11-18-business-insights-plan.md)
+> **Status: BUILT 2026-11-27 - D-BI14..D-BI24 signed (operator, recommended options; option (a) of every row
+> in §10); BR-0..BR-5 and AQ-0, AQ-1 all built (as built: §12). P4 is complete; the plan stays here, not archived, because P5 is open on the
+> same board row `BI-INSIGHTS-1`.** The sections up to §11 are the design as signed. Parent: [`2026-11-18-business-insights-plan.md`](2026-11-18-business-insights-plan.md)
 > (§4 principles, §6 I-18 / I-19, §9 P4, §10 traps, §11 decisions; D-BI5 "templated sentences first, Brief in P4";
 > D-BI13 Business Insights in every edition). Items: `module.insights`, `module.agent`, `module.intelligence`,
 > `module.engine`, `layer.product`. Board row: `BI-INSIGHTS-1` stays **one** row; P4 is its slices BR-0…BR-5 and AQ-0…AQ-1.
@@ -284,6 +285,27 @@ If the operator signs (a) throughout, P4 adds **two routes** (`GET /insights/bri
   only reader of data, so no new server-as-caller read is introduced. Worth a separate look at whether `/assist/{intent}`
   should gain a capability gate at all (not filed: out of P4's scope; raise if the operator wants it).
 - **Vocabulary creep** — *Brief* is overloaded by one word; the qualified names and the ⛔ lines in §3 are the guard.
+
+## 12. As built (2026-11-27, checked against the code)
+
+Durable facts live in the hub: [`architecture-insights.md`](../okf/product/module/insights/architecture-insights.md) § 7 and
+[`user-guide-insights.md`](../okf/product/module/insights/user-guide-insights.md). Where the build differs from §4–§8:
+
+- **No new core accessor (BR-2).** `HostContext.of(api).service().assistAgent()` already existed; `BootstrapRoutes` added
+  `features.agent` (BR-3). The narrate route lives in the insights module, not in core.
+- **Cache granularity.** The cache is per Profile, keyed by data root, Profile, `run_id`, max and the cited Insights (not "profiles,
+  run_ids, mode"), and is filled only for a model-backed answer and read only after the view check (`BriefNarrator`).
+- **Brief lines carry `measure`** (BR-1 needed it as evidence; added to `GET /insights/brief` in BR-2).
+- **Report page (BR-4)** goes through the engine contract `BriefPageProvider` (`platform/inspecto-engine`, ServiceLoader), implemented
+  by `InsightBriefPages` as the Job's author. A paragraph line the model replaced by the stored sentence is suffixed "(templated)".
+  The PDF has no text layer; tests pin the page model, and the engine tests use a fake provider (`FakeBriefPages`).
+- **Ask the Dashboard (AQ-0, AQ-1)**: `WidgetFromQuestion` (intelligence) and `ask-dashboard.component.ts`. A restricted Dataset is
+  visible only to a caller holding `canConfigureAccess` (`ToolCaller` has no user id). Filters and window travel in the returned
+  `query`, not the Widget. **Gap: the `intelligence` module declares no routes, so `/bootstrap` never reports `features.intelligence`
+  and the Ask box stays hidden.**
+- **Deliberately not built**: a Brief on a public share (D-BI19); the Builder placing a Brief first in a Dashboard; a live preview drive
+  in Basic and Standard shapes; a real model end-to-end (`-Pai`) through the route.
+- **Open work** is on the board as `INSIGHT-LANGUAGE-FOLLOWUPS-1`, and P5 (scenarios, segment migration, network value) is still open.
 
 ## References
 

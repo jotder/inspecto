@@ -18,8 +18,9 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * {@code OUTPUT-NAME-OVERWRITE-1}: a second file with the same file name (e.g. {@code later/feed.csv} after
- * {@code feed.csv}, or {@code feed.csv} again under {@code on_change: reprocess}) must not silently overwrite
- * the first file's output rows on any Pipeline when {@code processing.output_per_member} is off (the default).
+ * {@code feed.csv}) must not silently overwrite the first file's output rows on any Pipeline when
+ * {@code processing.output_per_member} is off (the default). A re-delivery of the SAME path ({@code feed.csv}
+ * again under {@code on_change: reprocess}) is a correction and replaces its own output.
  */
 class OutputNameOverwriteTest {
 
@@ -83,9 +84,7 @@ class OutputNameOverwriteTest {
         assertTrue(files.stream().anyMatch(p -> p.getFileName().toString().contains("feed__")), files.toString());
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"java", "duckdb"})
-    void onChangeReprocessPreserves112Plus106Rows(String path, @TempDir Path dir) throws Exception {
+    private static PipelineConfig reprocessPipeline(Path dir, String path) throws Exception {
         AcquisitionLedgers.use(new InMemoryAcquisitionLedger());
         Path orig = pipelineToon(dir, path, "");
         Path toon = dir.resolve("reprocess_pipeline.toon");
@@ -98,7 +97,15 @@ class OutputNameOverwriteTest {
                 """);
         PipelineConfig cfg = PipelineConfig.load(toon.toString());
         Files.createDirectories(Path.of(cfg.dirs().poll()));
+        return cfg;
+    }
 
+    /** A corrected SAME-path file under {@code on_change: reprocess} REPLACES its output (LA-DAILY-INGEST-1 owner
+     *  call, 2026-10-14): keeping v1 beside v2 would serve every row twice ({@code ENGINE-ETL-TESTS-RED-1}). */
+    @ParameterizedTest
+    @ValueSource(strings = {"java", "duckdb"})
+    void onChangeReprocessOfTheSamePathReplacesItsOutput(String path, @TempDir Path dir) throws Exception {
+        PipelineConfig cfg = reprocessPipeline(dir, path);
         Path inbox = Path.of(cfg.dirs().poll());
         Files.writeString(inbox.resolve("feed.csv"), rowsBody("v1_", 112));
         CollectorProcessor.run(cfg);
@@ -108,36 +115,107 @@ class OutputNameOverwriteTest {
         CollectorProcessor.run(cfg);
 
         List<Path> files = outputs(cfg);
-        assertEquals(218, totalCsvRows(files), path + ": v1 (112) + v2 (106) must both survive: " + files);
+        assertEquals(1, files.size(), path + ": v2 replaced v1's file: " + files);
+        assertEquals(106, totalCsvRows(files), path + ": only v2's rows are served: " + files);
     }
 
     @Test
-    void onChangeReprocessSameByteSizePreservesBothOutputs(@TempDir Path dir) throws Exception {
-        AcquisitionLedgers.use(new InMemoryAcquisitionLedger());
-        Path orig = pipelineToon(dir, "duckdb", "");
-        Path toon = dir.resolve("reprocess_same_size.toon");
-        Files.writeString(toon, Files.readString(orig) + """
-                collector:
-                  duplicate:
-                    mode: checksum
-                    algorithm: SHA256
-                    on_change: reprocess
-                """);
-        PipelineConfig cfg = PipelineConfig.load(toon.toString());
-        Files.createDirectories(Path.of(cfg.dirs().poll()));
-
+    void onChangeReprocessSameByteSizeReplacesItsOutput(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = reprocessPipeline(dir, "duckdb");
         Path inbox = Path.of(cfg.dirs().poll());
         Files.writeString(inbox.resolve("feed.csv"), "ID,AMT,EVENT_DATE\na1,1.0,2020-04-03\na2,2.0,2020-04-03\n");
         CollectorProcessor.run(cfg);
         assertEquals(2, totalCsvRows(outputs(cfg)));
 
-        // Identical byte size, different content -> ConsignmentId mints the same batchId, but manifest already exists
+        // Identical byte size, different content -> ConsignmentId mints the same batchId, whose manifest exists
         Files.writeString(inbox.resolve("feed.csv"), "ID,AMT,EVENT_DATE\nb1,1.0,2020-04-03\nb2,2.0,2020-04-03\n");
         CollectorProcessor.run(cfg);
 
         List<Path> files = outputs(cfg);
-        assertEquals(2, files.size(), "two distinct output files: " + files);
-        assertEquals(4, totalCsvRows(files), "both 2-row batches survive: " + files);
+        assertEquals(1, files.size(), "one output file: " + files);
+        assertEquals(2, totalCsvRows(files), "only the corrected rows: " + files);
+        assertTrue(Files.readString(files.get(0)).contains("b1"), files.toString());
+    }
+
+    /** The disambiguated name is the ORIGIN's, so {@code later/feed.csv}'s own correction replaces its own file,
+     *  and {@code feed.csv}'s file is untouched. */
+    @Test
+    void aCorrectionOfTheSecondOriginReplacesOnlyItsOwnDisambiguatedFile(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = reprocessPipeline(dir, "duckdb");
+        Path inbox = Path.of(cfg.dirs().poll());
+        Files.writeString(inbox.resolve("feed.csv"), rowsBody("a", 112));
+        CollectorProcessor.run(cfg);
+        Path later = Files.createDirectories(inbox.resolve("later"));
+        Files.writeString(later.resolve("feed.csv"), rowsBody("b", 106));
+        CollectorProcessor.run(cfg);
+        assertEquals(218, totalCsvRows(outputs(cfg)));
+
+        Files.writeString(later.resolve("feed.csv"), rowsBody("c", 50));
+        CollectorProcessor.run(cfg);
+
+        List<Path> files = outputs(cfg);
+        assertEquals(2, files.size(), "feed.csv's file + later/feed.csv's file: " + files);
+        assertEquals(162, totalCsvRows(files), "112 + the corrected 50: " + files);
+    }
+
+    // ── a failed or quarantined member never makes a name its own (verification finding, 2026-11-27) ──
+
+    /** {@code feed.csv} landed as {@code feed_out.csv} in b1; {@code later/feed.csv} in the same b1 was quarantined
+     *  ({@code claimOutputStem}). Its re-delivery is a DIFFERENT origin from the file that owns the name. */
+    @Test
+    void aQuarantinedSameStemMemberOfTheEarlierBatchDoesNotMakeItsReDeliveryTheOwner(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = pipeline(dir, "duckdb", "");
+        Path inbox = Path.of(cfg.dirs().poll());
+        Path db = Files.createDirectories(Path.of(cfg.dirs().database()).resolve("day=03"));
+        Path out = Files.writeString(db.resolve("feed_out.csv"), "ID\na1\n");
+        writeManifest(cfg, "b1", List.of(
+                new com.gamma.etl.ConsignmentManifest.MemberEntry("feed.csv", 0, "feed.csv", "", "SUCCESS"),
+                new com.gamma.etl.ConsignmentManifest.MemberEntry("feed.csv", 1, "later/feed.csv", "", "QUARANTINED_MISMATCH")),
+                out);
+
+        com.gamma.etl.Consignment.Member later = member(inbox, "later/feed.csv", 0);
+        com.gamma.etl.Consignment b2 = new com.gamma.etl.Consignment("b2", null, null, List.of(later));
+        assertNotEquals("feed", ConsignmentIngestStrategy.nonCollidingBaseName("feed", b2, List.of(later), cfg,
+                cfg.dirs().database()), "later/feed.csv must not overwrite feed.csv's rows");
+
+        com.gamma.etl.Consignment.Member again = member(inbox, "feed.csv", 0);
+        com.gamma.etl.Consignment b3 = new com.gamma.etl.Consignment("b3", null, null, List.of(again));
+        assertEquals("feed", ConsignmentIngestStrategy.nonCollidingBaseName("feed", b3, List.of(again), cfg,
+                cfg.dirs().database()), "feed.csv's own re-delivery replaces");
+    }
+
+    /** In b2 {@code feed.csv} failed and {@code later/feed.csv} is the only survivor: only the survivor owns the name. */
+    @Test
+    void aFailedSameStemMemberOfThisBatchDoesNotClaimTheEarlierOutput(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = pipeline(dir, "duckdb", "");
+        Path inbox = Path.of(cfg.dirs().poll());
+        Path db = Files.createDirectories(Path.of(cfg.dirs().database()).resolve("day=03"));
+        Path out = Files.writeString(db.resolve("feed_out.csv"), "ID\na1\n");
+        writeManifest(cfg, "b1", List.of(
+                new com.gamma.etl.ConsignmentManifest.MemberEntry("feed.csv", 0, "feed.csv", "", "SUCCESS")), out);
+
+        com.gamma.etl.Consignment.Member failed = member(inbox, "feed.csv", 0);
+        com.gamma.etl.Consignment.Member survivor = member(inbox, "later/feed.csv", 1);
+        com.gamma.etl.Consignment b2 = new com.gamma.etl.Consignment("b2", null, null, List.of(failed, survivor));
+        assertNotEquals("feed", ConsignmentIngestStrategy.nonCollidingBaseName("feed", b2, List.of(survivor), cfg,
+                cfg.dirs().database()));
+    }
+
+    private static com.gamma.etl.Consignment.Member member(Path inbox, String rel, int srcId) throws Exception {
+        Path f = inbox.resolve(rel);
+        Files.createDirectories(f.getParent());
+        Files.writeString(f, "ID\nx\n");
+        return new com.gamma.etl.Consignment.Member(f.toFile(), srcId, Files.size(f), null);
+    }
+
+    private static void writeManifest(PipelineConfig cfg, String batchId,
+                                      List<com.gamma.etl.ConsignmentManifest.MemberEntry> members, Path out) throws Exception {
+        com.gamma.etl.ConsignmentManifest m = new com.gamma.etl.ConsignmentManifest();
+        m.batchId = batchId;
+        m.members = members;
+        m.outputs = List.of(new com.gamma.etl.ConsignmentManifest.OutputEntry("day=03", out.toAbsolutePath().toString()));
+        Files.createDirectories(Path.of(cfg.dirs().manifestsDir()));
+        com.gamma.etl.ManifestStore.write(cfg.dirs().manifestsDir(), m);
     }
 
     @Test

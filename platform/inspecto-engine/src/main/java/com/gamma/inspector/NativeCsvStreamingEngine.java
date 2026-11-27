@@ -193,7 +193,7 @@ final class NativeCsvStreamingEngine {
         LocalDateTime mStart = LocalDateTime.now();
         String dbDir = databaseDir(batch, cfg);
         List<String> partCols = partitionColumns(schema);
-        String baseName = nonCollidingBaseName(memberStem(cfg, m.file()), batch, cfg, dbDir);
+        String baseName = nonCollidingBaseName(memberStem(cfg, m.file()), batch, List.of(m), cfg, dbDir);
         IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                 FileNames.safe(cfg, m.file().getName()), 1, 1);
 
@@ -239,7 +239,7 @@ final class NativeCsvStreamingEngine {
         LocalDateTime mStart = LocalDateTime.now();
         String dbDir = databaseDir(batch, cfg);
         List<String> partCols = partitionColumns(schema);
-        String baseName = nonCollidingBaseName(memberStem(cfg, m.file()), batch, cfg, dbDir);
+        String baseName = nonCollidingBaseName(memberStem(cfg, m.file()), batch, List.of(m), cfg, dbDir);
         IngestProgress.track(cfg.identity().pipelineName(), batch.batchId(),
                 FileNames.safe(cfg, m.file().getName()), 1, 1);
 
