@@ -162,7 +162,7 @@ is passed on as the replayed route's JSON body, unchanged.
 |---|---|---|---|
 | `validate_config` | read | `type`, `config` | `POST /validate` (`{type, config}`); refusal findings come back as data |
 | `dry_run_pipeline` | read | `pipeline`, `body?` | `POST /pipelines/authored/{pipeline}/dry-run` |
-| `preview_config` | read | `kind`, `body` | one of the four authoring previews (W6 group A, [spec-agent-previews.md](spec-agent-previews.md)) |
+| `preview_config` | read | `kind`, `body` | one of the four authoring previews ([W6 group A](spec-agent-previews.md)) |
 | `propose_change` | write | `kind`, `operation`, `id?`, `version?`, `content?`, `reason?` | the kind's own write route, below; `reason` rides as the request attribute `RequestAttrs.ATTR_CHANGE_REASON`, which `PendingChanges.hold` reads before the `X-Change-Reason` header (an in-process replay need not be header-safe; a header holding "—" or "→" made the replay throw — `AGENT-PROPOSE-500-1`, fixed 2026-11-24) |
 | `list_requirements` | read | — | `GET /requirements` (W2 step 2: what a `requirement-kpi` proposal starts from) |
 | `list_pipeline_versions` | read | `pipeline` | `GET /pipelines/{pipeline}/history` (W2 step 2: what a `pipeline-restore` restores) |
@@ -173,7 +173,8 @@ is passed on as the replayed route's JSON body, unchanged.
 | `export_bundle` | read | `body` | `POST /bundle/export` |
 | `preview_promotion` | read | `body` | `POST /promotion/preview` (`canAdminister`) |
 | `run_pipeline_now` | write | `pipeline`, `body?` | `POST /pipelines/authored/{pipeline}/run` (`canAuthorWorkbench`; D-AK2: a person, never a machine) |
-| `run_space_tests` | read | `body?` | `POST /tests/run` (`{cases?}`; `canAuthorWorkbench`; W6 group C, D-AK10: a person, never a machine) — [Agent Space tests](spec-agent-space-tests.md) |
+| `run_space_tests` | read | `body?` | `POST /tests/run` (`{cases?}`; `canAuthorWorkbench`; W6 group C, D-AK10: a person, never a machine) — [W6 C](spec-agent-space-tests.md) |
+| `simulate_decision_rule`, `simulate_rule_template`, `preview_enrichment` | read | per tool | [W6 B](spec-agent-simulators.md) |
 
 **`propose_change` allowlist** (`McpTools.CHANGE_ROUTES`, the builder tutorials' kinds, each route on
 `PendingChanges.REPLAYABLE`): `pipeline` (create and update `PUT /pipelines/{id}/graph`, delete
@@ -362,7 +363,7 @@ agent token calling a route directly is treated the same.
      (D-AK2: a delegated person only, never a machine), and `/pending-actions/{id}/withdraw`; since **W6 group A**
      (2026-11-26) the four authoring previews (`AgentGate.AUTHORING_PREVIEWS`: `/config/preview/parsing|schema`,
      `/config/suggest/schema`, `/components/mapping/validate`), for every agent, body-capped at 256 KiB and naming
-     no config file ([Agent authoring previews](spec-agent-previews.md)); data answers: [S0 seam](spec-agent-data-seam.md), D1 adds `/bi/query`, `/queries/{id}/run`, tools `query_measure`, `run_saved_query`;
+     no config file ([Agent authoring previews](spec-agent-previews.md)); data answers (S0, D1): [seam](spec-agent-data-seam.md);
      since **W6 group C** (2026-11-26) `POST /tests/run`, a delegated person's agent only (`AgentGate.PERSON_ONLY`,
      D-AK10), still gated `canAuthorWorkbench` ([Agent Space tests](spec-agent-space-tests.md));
   3. **actions** (**AK-2d**, 2026-11-25) — `AgentGate.ACTIONS`, the operational routes of plan §4.6: `POST

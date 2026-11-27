@@ -125,6 +125,13 @@ naming the person as the actor.
   schema, grammar or mapping file instead of carrying it inline. Both are the agent's to fix; tell it so.
 - The Space tests answer 403 "may not run a Pipeline or the Space tests" — the agent signed in as a machine client;
   only an agent acting for a person runs them. A 403 naming `canAuthorWorkbench` means the person lacks that right.
+  An enrichment preview answers the same 403 to a machine client.
+- ⚠ An enrichment preview (`preview_enrichment`) answers a Reference's values **unmasked** to a person who holds
+  `canAuthorWorkbench` and to that person's agent (operator decision D-AK22, 2026-11-26), so the agent sends those raw
+  values to its model provider. The preview may also name a `path:` file anywhere under the Space safety roots, so
+  such an agent can read any Dataset's stored rows raw, and it checks no Dataset sharing (both accepted, D-AK22). Grant
+  `canAuthorWorkbench` to agents' people with that in mind. Every other agent
+  data route must prove its answer masked as it is for the person, or it answers 500.
 - The proposal never becomes live — no second person has approved it. The person the agent acts for cannot approve
   it either (four eyes, always).
 - 401 on every call — the token's audience is not the install's, or the agent's client sets no `azp`/`client_id`.

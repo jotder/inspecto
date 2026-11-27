@@ -40,13 +40,19 @@ class AgentDataRoutesParityTest {
         for (String p : AgentGate.LA_READS_WITHOUT_VALUES) NO_DATASET_VALUES.put(p, "names, counts or verdicts");
     }
 
+    private static final String SIMULATORS_PROOF = "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentSimulatorsTest.java";
+
     /** Each data route → the test file (from the repo root) that proves it over real HTTP, and the text it probes it by. */
     private static final Map<String, String> PROOF_FILE = Map.of(
             "POST /db/query", "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentDataSeamTest.java",
             "POST /inv/", "la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiAgentLinkAnalysisSeamTest.java",
             // D1 (W6 group D): the analytic reads
             "POST /bi/query", "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentAnalyticReadsTest.java",
-            "POST /queries/([^/]+)/run", "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentAnalyticReadsTest.java");
+            "POST /queries/([^/]+)/run", "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentAnalyticReadsTest.java",
+            // W6 group B: the simulators
+            "POST /decision-rules/([^/]+)/simulate", SIMULATORS_PROOF,
+            "POST /rule-templates/([^/]+)/simulate", SIMULATORS_PROOF,
+            "POST /enrichment/preview", SIMULATORS_PROOF);
 
     private static final String MCP_PROOF = "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentDataSeamTest.java";
     private static final String LA_PROOF = "la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiAgentLinkAnalysisSeamTest.java";
@@ -197,5 +203,24 @@ class AgentDataRoutesParityTest {
         assertNotEquals(AgentGate.agentBudgetKey(agent), AgentGate.agentBudgetKey(other), "two clients of one person never share");
         assertNotEquals("analyst-1", AgentGate.agentBudgetKey(agent), "never the person's own key");
         assertEquals("agent:bot:client:bot", AgentGate.agentBudgetKey(machine));
+    }
+
+    /**
+     * D-AK22 (operator, 2026-11-26): the enrichment preview is the ONE data route whose answer is raw by decision, and only
+     * for a person or a person's agent (never a machine). Widening this set needs its own operator decision; every other data
+     * route must prove a masking step, since its scope never accepts the raw stamp ({@code AnswerMaskingTest}).
+     */
+    @Test
+    void theEnrichmentPreviewIsTheOnlyRawByDecisionRouteAndNeverForAMachine() {
+        assertEquals(Set.of("POST /enrichment/preview"), AgentGate.RAW_FOR_BUILDERS);
+        for (String r : AgentGate.RAW_FOR_BUILDERS) {
+            assertTrue(AgentGate.DATA_ROUTES.containsKey(r), r + " is still a stamped, weighted data route");
+            assertTrue(AgentGate.PERSON_ONLY.contains(r), r + " is refused to a machine agent");
+        }
+        assertEquals(2, AgentGate.DATA_ROUTES.get("POST /enrichment/preview"), "design §4 weight");
+        Subject machine = new Subject("client:bot", Set.of(), null, Map.of(), null, null, "svc", "bot");
+        assertNotNull(AgentGate.refusal(machine, "POST", "^/enrichment/preview$"));
+        Subject agent = new Subject("dev-1", Set.of(), null, Map.of(), null, null, null, "claude-code");
+        assertNull(AgentGate.refusal(agent, "POST", "^/enrichment/preview$"), "a person's agent reaches the route's own gate");
     }
 }

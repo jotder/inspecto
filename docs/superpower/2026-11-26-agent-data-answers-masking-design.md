@@ -2,8 +2,12 @@
 
 > 🟡 **SIGNED 2026-11-26 — D-AK13…D-AK21 signed in an operator interview (D-AK13, 14, 17, 20, 21 as recommended;
 > D-AK15, 16, 18, 19 not as recommended, §5); the people-facing defects of §8 filed and fixed first. **S0 built 2026-11-26**
-> (the shared seam, as built: [`spec-agent-data-seam.md`](../okf/product/module/mcp/spec-agent-data-seam.md)); **D1 built
-> 2026-11-26** (same page, § D1); B, E, D2 and the lookup change not built.**
+> (the shared seam, as built: [`spec-agent-data-seam.md`](../okf/product/module/mcp/spec-agent-data-seam.md)). **B built
+> 2026-11-26** (Decision Rule and Rule Template simulate; the enrichment preview raw by decision for builders, **D-AK22**
+> added at the build and replacing §4 for that route; as built:
+> [`spec-agent-simulators.md`](../okf/product/module/mcp/spec-agent-simulators.md)). **D1 built 2026-11-26** (as built:
+> [`spec-agent-data-seam.md`](../okf/product/module/mcp/spec-agent-data-seam.md) § D1). E, D2 and the lookup change not
+> built.**
 > Unblocks widening plan
 > [`2026-11-25-agent-kit-ak2-widening-plan.md`](2026-11-25-agent-kit-ak2-widening-plan.md) § W6 groups B, D and E (D-AK10:
 > "once masking is proven per route") and board row `AGENT-LOOKUP-PREVIEW-1`. The operator chose on 2026-11-26 to settle
@@ -187,6 +191,7 @@ decision.
 | **D-AK19** | Audit | A new `agent.data.read` row with a keyed digest | **Not as recommended — existing rows only:** `mcp.tool.called` and the route rows, with the redaction rule of §3.6 (screened names never in clear). |
 | **D-AK20** | Decision Rule simulate writes a stamp | For an agent, answer without writing | **As recommended.** |
 | **D-AK21** | Order and split | S0, D1, B, E, D2, `lookups/test`; one change and one security review each | **As recommended**, and the people defects first (§8): the recon fix lands before D2, the lookup fix before the lookup change. |
+| **D-AK22** (operator, 2026-11-26, at B's build; replaces §4 for the route) | How does `POST /enrichment/preview` mask? | §4: the transform sees masked Reference rows (found impractical: the HMAC token is computed in Java, so every Reference row would be tokenized per call, and a tokenized Reference never joins a raw sample) | **Unmasked for builders.** A person or a person's agent holding `canAuthorWorkbench` gets the raw preview; a machine agent 403 (person-only); a `path:` Reference stays raw and jailed. The answer is still stamped — as deliberately raw, a stamp only `AgentGate.RAW_FOR_BUILDERS` accepts — and weighs 2. ⚠ A builder's agent sends raw Reference values to its model provider. `ENRICHMENT-PREVIEW-UNMASKED-1` closed as accepted for builders. **Also accepted as built (operator, 2026-11-26, after B's security review; filed P2 to revisit):** (1) a builder's agent may name a `path:` Reference to any data file under the Space safety roots, so it can page any Dataset's store raw, 200 rows per call at weight 2, past `/db/query` masking and the `RAW_GETS` refusals (`ENRICHMENT-PREVIEW-PATH-REACH-1`); (2) a by-name Reference whose Dataset is shared away is answered raw, to the person and to their agent (`ENRICHMENT-PREVIEW-SHARING-1`). |
 
 ## 6. Proof plan
 
@@ -237,8 +242,8 @@ now in the order, add about 4–5 days, two of which D2 and the lookup change no
 |---|---|---|---|
 | `RECON-READ-UNGATED-1` | P2 defect | `POST /recon/columns`, `/recon/run`, `/recon/breaks` and `/recon/rows` carry no capability, no `ComponentAccess.canView` and no masking (`ReconRoutes.java:70-76`, :251-283, :708-715): any signed-in caller reads the raw rows of any Dataset, a shared-away one or one with classified keys included; the answer cache is shared across callers. **Fixed 2026-11-26** for people: `canView` on every side (404 as an unknown Dataset), per-side masking through `DatasetCellMasking` after the cache read; spec `okf/product/module/reconciliation/spec-reconciliation.md` § Access and masking | D2 |
 | `LOOKUP-TEST-OPEN-READ-1` ✅ **fixed 2026-11-26** (`canAuthorWorkbench`, `canView` on Datasets over the Reference's store, masking by classification, ≤ 5 masked candidates, per-caller test and reload budgets; a `path:` Reference has no classification and answers raw) | P2 defect | `POST /lookups/test` had no capability (`LookupRoutes.java:47`): any signed-in caller reads a Reference's mapped columns unmasked, enumerates keys through fuzzy `candidates`, and rebuilds an index of up to 256 MiB per call with `refresh: true`, with no rate limit | the lookup change |
-| `ENRICHMENT-PREVIEW-UNMASKED-1` | P3 defect | a `canAuthorWorkbench` author without reveal gets Reference columns raw (the transform may select the Reference whole, 200 rows), and a path reference reads a store under the safety roots past the Dataset's masking (`EnrichmentRoutes.java:143-165`); group B's enrichment masking fixes it for people too | B |
-| `RULE-TEMPLATE-SIMULATE-SHARING-1` | P3 defect | Rule Template simulate skips `canView` on its source Dataset (`RuleRoutes.java:99-102`); rows stay masked | B |
+| `ENRICHMENT-PREVIEW-UNMASKED-1` ✅ **closed 2026-11-26 as accepted for builders** (D-AK22) | P3 defect | a `canAuthorWorkbench` author without reveal gets Reference columns raw (the transform may select the Reference whole, 200 rows), and a path reference reads a store under the safety roots past the Dataset's masking (`EnrichmentRoutes.java:143-165`); group B's enrichment masking fixes it for people too | B |
+| `RULE-TEMPLATE-SIMULATE-SHARING-1` ✅ **fixed 2026-11-26** (group B: 404 as a missing Dataset) | P3 defect | Rule Template simulate skips `canView` on its source Dataset (`RuleRoutes.java:99-102`); rows stay masked | B |
 | `DECISION-RULE-SIMULATE-WRITES-1` | P3 defect | Decision Rule simulate writes the rule file outside versioning and any approval policy (`DecisionRoutes.java:185-189`) | — (D-AK20 covers agents) |
 | `DB-QUERY-STORE-SHARING-1` | P3 chore (verify) | a `/db/query` store read checks the write root, `SqlGuard`, the path jail and the restricted quarantine but never `ComponentAccess.canView` (`DbBrowserRoutes.java:155-186`, :251-300); business-store reads were kept open by DB-QUERY-UNGATED-1, so whether a shared-away Dataset's store must be refused is unproven over HTTP and unsettled | S0 retrofits `/db/query` |
 

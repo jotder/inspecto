@@ -162,7 +162,8 @@ class ControlApiMcpWriteToolsTest {
                 assertFalse(byName.get(w).at("/annotations/readOnlyHint").asBoolean(true), w);
                 assertFalse(byName.get(w).at("/annotations/destructiveHint").asBoolean(true), w);
             }
-            for (String r : List.of("validate_config", "dry_run_pipeline", "preview_config", "run_space_tests", "list_pending_changes", "get_pending_change",
+            for (String r : List.of("validate_config", "dry_run_pipeline", "preview_config", "run_space_tests",
+                    "simulate_decision_rule", "simulate_rule_template", "preview_enrichment", "list_pending_changes", "get_pending_change",
                     "diff_pending_change", "export_bundle", "preview_promotion"))
                 assertTrue(byName.get(r).at("/annotations/readOnlyHint").asBoolean(false), r);
             assertEquals(List.of("alert-rule", "dashboard", "decision-rule", "entity-list", "expectation", "job", "notification-channel", "notification-rule",

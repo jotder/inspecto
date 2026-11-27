@@ -1,5 +1,6 @@
 package com.gamma.control;
 
+import com.gamma.access.ComponentAccess;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
@@ -63,6 +64,7 @@ final class RuleRoutes implements RouteModule {
         ComponentStore store = new ComponentStore(writeRoot.resolve("registry"));
 
         Map<String, Object> config = component(store, TYPE, id)
+                .filter(t -> ComponentAccess.canView(ex, t))   // shared away = absent, as GET /components lists it
                 .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND, "unknown rule template '" + id + "'"));
         RuleTemplate template = RuleTemplate.from(config);
 
@@ -97,7 +99,10 @@ final class RuleRoutes implements RouteModule {
         String relationSql = null;
         BiResultMasking masking = null;
         if (source != null) {
+            // RULE-TEMPLATE-SIMULATE-SHARING-1: a source Dataset shared away from the caller is indistinguishable from a
+            // missing one (same 404, same text), as BiRoutes and QueryRoutes refuse it
             Map<String, Object> dataset = component(store, "dataset", source)
+                    .filter(d -> ComponentAccess.canView(ex, d))
                     .orElseThrow(() -> new ApiException(404, ErrorCodes.NOT_FOUND,
                             "rule template '" + id + "' reads unknown dataset '" + source + "'"));
             try {

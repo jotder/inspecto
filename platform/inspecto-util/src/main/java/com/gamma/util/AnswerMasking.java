@@ -27,11 +27,13 @@ public final class AnswerMasking {
     /** One request's proof. Not thread-safe: it lives on the request's thread. */
     public static final class Scope implements AutoCloseable {
         private final Scope outer;
+        private final boolean rawAllowed;
         private int masked = -1;
         private String basis;
 
-        private Scope(Scope outer) {
+        private Scope(Scope outer, boolean rawAllowed) {
             this.outer = outer;
+            this.rawAllowed = rawAllowed;
         }
 
         /** Whether a masking step stamped this scope. */
@@ -66,7 +68,16 @@ public final class AnswerMasking {
 
     /** Open a scope on this thread; close it (try-with-resources) once the answer is decided. */
     public static Scope open() {
-        Scope s = new Scope(CURRENT.get());
+        return open(false);
+    }
+
+    /**
+     * Open a scope on this thread. {@code rawAllowed}: the host opened it for a route whose answer an operator decision
+     * makes deliberately unmasked for its authorized callers ({@code AgentGate.RAW_FOR_BUILDERS}), so
+     * {@link #unmaskedByDecision} proves it. In any other scope that stamp proves nothing.
+     */
+    public static Scope open(boolean rawAllowed) {
+        Scope s = new Scope(CURRENT.get(), rawAllowed);
         CURRENT.set(s);
         return s;
     }
@@ -79,6 +90,19 @@ public final class AnswerMasking {
         Scope s = CURRENT.get();
         if (s == null || ignoreStampsForTest) return;
         s.masked = Math.max(0, s.masked) + Math.max(0, maskedColumns);
+        s.basis = basis;
+    }
+
+    /**
+     * Stamp the current scope as deliberately unmasked by an operator decision (D-AK22: the enrichment preview is raw for an
+     * authorized builder and that builder's agent). It proves the answer ONLY in a scope the host opened with
+     * {@code rawAllowed}; anywhere else it records nothing, so a route that answers raw without such a decision still fails
+     * closed. A no-op outside a scope.
+     */
+    public static void unmaskedByDecision(String basis) {
+        Scope s = CURRENT.get();
+        if (s == null || ignoreStampsForTest || !s.rawAllowed) return;
+        s.masked = Math.max(0, s.masked);
         s.basis = basis;
     }
 

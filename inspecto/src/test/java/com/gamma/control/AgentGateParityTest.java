@@ -93,10 +93,15 @@ class AgentGateParityTest {
         }
         // the four capability-gated writes the plan allows: an Action Request (held by its own design), the promotion
         // preview (a read behind canAdminister), a run (D-AK2, a person only) and the Space tests (W6 group C, D-AK10,
-        // a person only)
+        // a person only), and the simulators (W6 group B: a Decision Rule or Rule Template simulated, canAuthorWorkbench)
         assertEquals(Set.of("POST /action-requests", "POST /promotion/preview", "POST /pipelines/authored/([^/]+)/run",
-                        "POST /tests/run"), gatedButAllowed);
-        assertEquals(Set.of("POST /pipelines/authored/([^/]+)/run", "POST /tests/run"), AgentGate.PERSON_ONLY);
+                        "POST /tests/run", "POST /decision-rules/([^/]+)/simulate", "POST /rule-templates/([^/]+)/simulate",
+                        "POST /enrichment/preview"),
+                gatedButAllowed);
+        for (String sim : AgentGate.SIMULATORS.keySet())
+            assertEquals(Roles.CAN_AUTHOR_WORKBENCH, m.get(sim), sim + " keeps the route's own gate");
+        assertEquals(Set.of("POST /pipelines/authored/([^/]+)/run", "POST /tests/run", "POST /enrichment/preview"),
+                AgentGate.PERSON_ONLY);
         assertEquals(Roles.CAN_AUTHOR_WORKBENCH, m.get("POST /tests/run"), "the Space tests keep the route's own gate");
     }
 

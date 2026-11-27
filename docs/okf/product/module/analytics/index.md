@@ -39,7 +39,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `COMPONENT-VALIDATE-ALL-1` | P3 | feature | a dry run (executing preview) for a KPI, Reconciliation, Dataset, Widget or Dashboard: | — |
 | `BUILDER-API-PAPERCUTS-1` | P3 | defect | small gaps that cost an agent calls: | — |
 | `REPORT-DASHBOARD-AUTHORING-1` | P3 | feature | a Report Job cannot filter | — |
-| `RULE-TEMPLATE-SIMULATE-SHARING-1` | P3 | defect | Rule Template simulate skips ComponentAccess.canView on its source Dataset | — |
 | `DECISION-RULE-SIMULATE-WRITES-1` | P3 | defect | Decision Rule simulate writes the rule file | — |
 | `VIEW-DATA-UNMASKED-1` | P2 | defect | GET /views/{id}/data answers a view's rows with no masking and no capability check, to people as well as agents | — |
 | `LAKE-CATALOG-UNMASKED-1` | P2 | defect | When a shared DuckLake catalog is configured (-Dinspecto.ducklake.catalog), every query sandbox attaches it as lake (QueryExecutor.attach… | — |
