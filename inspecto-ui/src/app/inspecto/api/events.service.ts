@@ -92,6 +92,29 @@ export const EVENT_TYPES: string[] = [
     'OBJECT_NOTE',
 ];
 
+/** One payload field of a Signal Type, as `GET /signals/types` serves it. */
+export interface SignalTypeField {
+    name: string;
+    kind: 'string' | 'integer' | 'number' | 'boolean' | 'list' | 'map';
+    always: boolean;
+    description: string;
+}
+
+/**
+ * One Signal Type (SIGNAL-BOARD-1): a dotted name or a `prefix.*` family, what posts it, its payload fields, and where it
+ * is declared (`core`, `module:<id>`, `pack:<file>`). `fieldsDeclared` is false for a Job Pack's emit and for a family
+ * whose payload is chosen at run time.
+ */
+export interface SignalTypeInfo {
+    type: string;
+    title: string;
+    poster: string;
+    fields: SignalTypeField[];
+    since: string | null;
+    source: string;
+    fieldsDeclared: boolean;
+}
+
 /** Operational event stream + saved views (CONTROL scope). */
 @Injectable({ providedIn: 'root' })
 export class EventsService {
@@ -113,6 +136,16 @@ export class EventsService {
         return this.http.get<{ count: number; datasets: number; capped: boolean }>(apiUrl('/signals/count'), {
             params: toParams({ type, ...(sinceMs ? { since: sinceMs } : {}) } as Record<string, unknown>),
         });
+    }
+
+    /**
+     * SIGNAL-BOARD-1 SB-1c: every Signal Type that can be posted in this Space (`GET /signals/types`), each with its
+     * declared payload fields. Gated on canAuthorWorkbench: it feeds the Job form's `on_signal` suggestions.
+     */
+    signalTypes(): Observable<SignalTypeInfo[]> {
+        return this.http
+            .get<{ types?: SignalTypeInfo[] }>(apiUrl('/signals/types'))
+            .pipe(map((r) => (Array.isArray(r?.types) ? r.types : [])));
     }
 
     signals(filter: { type?: string; source?: string; limit?: number } = {}): Observable<EventRow[]> {

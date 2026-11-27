@@ -83,12 +83,13 @@ export const JOB_ATTRIBUTES: AttributeSpec[] = [
     {
         key: 'onSignal',
         label: 'On signal',
-        type: 'string',
+        type: 'autocomplete',
         tier: 'required',
         dependsOn: { key: 'scheduleMode', equals: 'signal' },
         placeholder: 'e.g. pipeline.commit',
-        // `Signals.matchesType`: exact (case-insensitive) or a `prefix.*` glob. Free text on purpose —
-        // there is no signal-type catalog endpoint, and a job may be armed for a signal not yet emitted.
+        // `Signals.matchesType`: exact (case-insensitive) or a `prefix.*` glob. Suggestions come from the Signal Type
+        // catalog (GET /signals/types, SIGNAL-BOARD-1 SB-1c); free text stays valid for a glob and for a type no
+        // provider declares yet (a Space-declared type, D-SB8).
         help: 'The signal type to fire on — exact (pipeline.commit, dataset.write) or a prefix glob (dataset.*). A file landing in a Pipeline emits pipeline.commit.',
     },
     {

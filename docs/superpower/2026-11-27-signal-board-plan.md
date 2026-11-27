@@ -1,7 +1,7 @@
 # Signal Board — one clear meaning for Signal, and a board Jobs can trust (`SIGNAL-BOARD-1`)
 
 Status: **APPROVED 2026-11-27 — D-SB1…D-SB5 all DECIDED (operator, 2026-11-27); SB-0 done 2026-11-27 (results §10;
-the live stop test is still owed); the D-SB5 age limit is 24 hours; SB-1 designed (§11); SB-1a built 2026-11-27 (§11.6), SB-1b built 2026-11-27 (§11.7), SB-1c open.** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
+the live stop test is still owed); the D-SB5 age limit is 24 hours; SB-1 designed (§11); SB-1a built 2026-11-27 (§11.6), SB-1b built 2026-11-27 (§11.7), SB-1c built 2026-11-27 (§11.8): SB-1 complete.** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
 Builds on the shipped Signal Backbone ([spec-signal-backbone](../okf/product/module/event/spec-signal-backbone.md));
 it replaces none of it. SB-2 lands inside the link graph of `SPACE-COHERENCE-1`
 ([plan](2026-11-27-space-coherence-plan.md)).
@@ -270,6 +270,8 @@ SB-1b without failing module tests.
 - **Nothing in config can post a Signal of the author's choosing today.** Only code posts; `ConsignmentProcessJobType`
   passes a type through, but its callers are code too. So D-SB4 (a Space declares its own types) also needs a way to
   post one from config, for example a Step or a Job parameter. That is a new decision, **D-SB8**, before SB-1c.
+  *(SB-1c shipped without it, 2026-11-27: the pick list keeps free text, so a Space-declared type can still be typed;
+  see §11.8. D-SB8 stays open.)*
 - Three score types (`risk.score.produced`, `anomaly.score.produced`, `churn.score.produced`) are core `SignalType`
   constants although their Jobs live in modules; SB-1b checks whether they move.
 - **Correction (SB-1a, 2026-11-27): config CAN post a Signal of the author's choosing.** A Decision Rule's
@@ -347,3 +349,20 @@ SB-1b without failing module tests.
 - **Board row text**: "SB-1b built 2026-11-27: a Signal Type provider in each posting module (agent, backup,
   case-management, exchange, insights, ops, reconciliation, screening), the check on in the eleven posting modules'
   tests. Next: SB-1c (Job form pick list); D-SB8 open."
+
+### 11.8 SB-1c as built (2026-11-27, lane off `origin/master` `6ccab0ff6`)
+
+- **The Job form's On signal is a pick list**: `onSignal` in `job-attributes.ts` is `type: 'autocomplete'`, fed by
+  `signalTypeOptionLoader()` (`inspecto/components/entity-option-loaders.ts`) over `EventsService.signalTypes()`
+  (`GET /signals/types`, Space-scoped by the interceptor). The value is the bare type (a family stays `prefix.*`); the
+  label adds the title, and the filter matches both, so "failed" finds `job.run.failed`, `pipeline.batch.failed`, ….
+- **Free text stays valid**, as the house rule for autocomplete fields says: a glob, and a type no provider declares
+  yet (a Space-declared type, D-SB8), are typed in. So SB-1c did not wait for D-SB8; once D-SB8 lands, Space-declared
+  types appear in the list through the same route.
+- A refusal (a person without `canAuthorWorkbench`) or an unreachable route degrades to no suggestions; the field still
+  works.
+- Shown in the preview against a backend built from this lane: 52 core types listed, the bare type stored on pick, a
+  free-text glob accepted. Not done here: showing the chosen type's payload fields beside `when` / `bind`, which is
+  SB-2 (the save check).
+- **Board row text**: "SB-1c built 2026-11-27: the Job form's On signal suggests the catalogued Signal Types, free text
+  kept. SB-1 is complete. Next: SB-2 (a saved Job is checked against the catalog); D-SB8 open."
