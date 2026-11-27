@@ -56,7 +56,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `PACK-SALES-MARKETING-1` | P3 | feature | A Sales & Marketing BI pack: sales, commissions, marketing and churn analytics. | operator |
 | `USER-HANDBOOK-1` | P2 | feature | The Handbook: users learn to build, ship and manage an App from the console's Help, organised by lifecycle for three tracks. | — |
 | `HOWTO-DOC-DRIFT-1` | P3 | chore | internal hub pages that contradict the code, found writing the P3 how-tos: | — |
-| `COMPONENT-REFERENCE-GENERATED-1` | P3 | feature | a component shape reference generated from the code: | — |
+| `COMPONENT-REFERENCE-MORE-KINDS-1` | P3 | feature | the shape reference for the kinds propose_change does not offer: | demand |
 | `GOAL-RECIPES-1` | P3 | feature | recipes keyed by goal | — |
 | `HANDBOOK-PRODUCT-DISAGREE-1` | P3 | defect | Handbook pages that disagree with the product: | — |
 | `AGENT-ENTRYPOINTS-1` | P3 | feature | ship the machine-readable entry points with the install: | — |

@@ -157,7 +157,7 @@ public record AlertRule(String name, String metric, String comparator, double th
      * Every key {@link #fromMap} models (and the R3 {@code shares} envelope key, which the save routes carry
      * themselves). A key outside this set is carried in {@link #extra} (MODULE-REORG-P4-2).
      */
-    static final Set<String> MODELLED = Set.of("name", "metric", "comparator", "threshold", "window", "severity",
+    public static final Set<String> MODELLED = Set.of("name", "metric", "comparator", "threshold", "window", "severity",
             "onPipeline", "dataset", "measure", "when", "maximumAge", "investigation", "relation", "description",
             "by", "stormCap", "owner", "valueMeasure", "healAfterSweeps", "shares", "runbook", "indexLag", "pattern",
             "kpi", "projection", "rag");

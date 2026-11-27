@@ -1,0 +1,132 @@
+{
+  "kind" : "entity-list",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "operations" : {
+    "members" : {
+      "route" : "POST /entity-lists/{id}/members",
+      "content" : "members"
+    },
+    "retire" : {
+      "route" : "POST /entity-lists/{id}/retire",
+      "content" : "retire"
+    },
+    "attributes" : {
+      "route" : "PUT /entity-lists/{id}/attributes",
+      "content" : "attributes"
+    }
+  },
+  "shapes" : {
+    "members" : {
+      "source" : "EntityListRoutes (keys read inline; declared in the generator and held to the route's source)",
+      "unknownKeys" : "ignored",
+      "extensionPrefix" : "x-",
+      "fields" : [
+        {
+          "path" : "add",
+          "type" : "array",
+          "required" : false
+        },
+        {
+          "path" : "addRanges",
+          "type" : "array",
+          "required" : false
+        },
+        {
+          "path" : "expiresAt",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "reason",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "remove",
+          "type" : "array",
+          "required" : false
+        },
+        {
+          "path" : "removeRanges",
+          "type" : "array",
+          "required" : false
+        }
+      ],
+      "example" : {
+        "add" : [
+          "acct-1001"
+        ],
+        "reason" : "confirmed mule account"
+      },
+      "notes" : [
+        "add, remove: values to add or take off; addRanges, removeRanges: value ranges; expiresAt: an ISO-8601 instant after now (absent = permanent)",
+        "The MCP tool's `reason` fills `reason` when the content has none."
+      ]
+    },
+    "retire" : {
+      "source" : "EntityListRoutes (keys read inline; declared in the generator and held to the route's source)",
+      "unknownKeys" : "ignored",
+      "extensionPrefix" : "x-",
+      "fields" : [
+        {
+          "path" : "reason",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        }
+      ],
+      "example" : {
+        "reason" : "replaced by the 2027 list"
+      },
+      "notes" : [
+        "a retired list takes no more edits (409)",
+        "The MCP tool's `reason` fills `reason` when the content has none."
+      ]
+    },
+    "attributes" : {
+      "source" : "EntityListRoutes (keys read inline; declared in the generator and held to the route's source)",
+      "unknownKeys" : "ignored",
+      "extensionPrefix" : "x-",
+      "fields" : [
+        {
+          "path" : "autoApply",
+          "type" : "boolean",
+          "required" : false
+        },
+        {
+          "path" : "ownerKind",
+          "type" : "string",
+          "required" : false,
+          "values" : [
+            "admin",
+            "analyst"
+          ]
+        },
+        {
+          "path" : "reason",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "visibility",
+          "type" : "string",
+          "required" : false,
+          "values" : [
+            "open",
+            "restricted"
+          ]
+        }
+      ],
+      "example" : {
+        "autoApply" : true,
+        "reason" : "apply to every new Case"
+      },
+      "notes" : [
+        "exclusion lists only; name at least one of ownerKind, autoApply, visibility",
+        "The MCP tool's `reason` fills `reason` when the content has none."
+      ]
+    }
+  }
+}

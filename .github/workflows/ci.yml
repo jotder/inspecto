@@ -470,6 +470,13 @@ jobs:
       - name: Guard — spec-editions offerings matrix is generated, not hand-edited
         run: node tools/render-offerings-matrix.mjs --check && node --test tools/render-offerings-matrix.test.mjs
 
+      # Component shape reference (COMPONENT-REFERENCE-GENERATED-1): every propose_change kind has a
+      # docs/api/component-shapes/<kind>.json, and the config hub's api-component-shapes.md is rendered from them. The JSON
+      # itself is derived from the code by features/inspecto-mcp ComponentShapesTest, which fails when a file is stale.
+      # The fix is `node tools/render-component-shapes.mjs --write`, never a hand edit.
+      - name: Guard — component shape reference covers every propose_change kind and is rendered
+        run: node tools/render-component-shapes.mjs --check && node --test tools/render-component-shapes.test.mjs
+
       # Module-architecture report (informational, exit 0) + REGRESSION ratchet: split packages and populated closed
       # registries may only fall vs tools/module-architecture-baseline.json. Never wire --check (non-zero by design).
       - name: Guard — module-architecture report and no-regression ratchet

@@ -1,0 +1,106 @@
+{
+  "kind" : "decision-rule",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "operations" : {
+    "create" : {
+      "route" : "POST /decision-rules",
+      "content" : "content"
+    },
+    "update" : {
+      "route" : "PUT /decision-rules/{id}",
+      "content" : "content"
+    },
+    "delete" : {
+      "route" : "DELETE /decision-rules/{id}",
+      "content" : null
+    }
+  },
+  "shapes" : {
+    "content" : {
+      "source" : "DecisionRoutes.normalize (other keys are stored as sent)",
+      "unknownKeys" : "kept",
+      "extensionPrefix" : "x-",
+      "fields" : [
+        {
+          "path" : "consequences",
+          "type" : "array",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "description",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "enabled",
+          "type" : "boolean",
+          "required" : false,
+          "default" : true
+        },
+        {
+          "path" : "name",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "priority",
+          "type" : "integer",
+          "required" : false,
+          "default" : 100
+        },
+        {
+          "path" : "target",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "targetType",
+          "type" : "string",
+          "required" : false,
+          "default" : "pipeline",
+          "values" : [
+            "job",
+            "pipeline"
+          ]
+        },
+        {
+          "path" : "when",
+          "type" : "object",
+          "required" : false,
+          "default" : {
+            "items" : [ ],
+            "kind" : "group",
+            "op" : "AND"
+          }
+        }
+      ],
+      "example" : {
+        "name" : "drop-test-orders",
+        "target" : "orders",
+        "when" : {
+          "kind" : "group",
+          "op" : "AND",
+          "items" : [
+            {
+              "kind" : "condition",
+              "field" : "customer",
+              "operator" : "=",
+              "value" : "TEST"
+            }
+          ]
+        },
+        "consequences" : [
+          {
+            "type" : "drop"
+          }
+        ]
+      },
+      "notes" : [
+        "`consequences[]` items name a consequence `type` with its parameters: `GET /decision-rules/consequences`.",
+        "`when` is a condition tree whose root is a group (`kind: group`, `op`, `items`)."
+      ]
+    }
+  }
+}

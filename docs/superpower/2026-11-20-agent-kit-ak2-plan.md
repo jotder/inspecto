@@ -152,7 +152,7 @@ Skills of §1.1 **link** to these pages rather than copy them, so a docs fix rea
 
 | Change | Why (spike) | Board row |
 |---|---|---|
-| A **component shape reference generated from the code**: every kind's keys, types, required or optional, defaults, an example | agents learned shapes from 422 text; also the missing config-key reference; a generated page cannot drift | `COMPONENT-REFERENCE-GENERATED-1` |
+| A **component shape reference generated from the code**: every kind's keys, types, required or optional, defaults, an example | agents learned shapes from 422 text; also the missing config-key reference; a generated page cannot drift | `COMPONENT-REFERENCE-GENERATED-1` — built 2026-11-27 for every `propose_change` kind ([`api-component-shapes.md`](../okf/product/module/config/api-component-shapes.md)); the other kinds: `COMPONENT-REFERENCE-MORE-KINDS-1` |
 | **Recipes keyed by goal** ("daily count by region with a target", "join two Datasets", "reconcile across days"), with check blocks | the derived-Dataset recipe was the largest gap and lived only inside shipped templates | `GOAL-RECIPES-1` (first: `DERIVED-DATASET-AUTHORING-1`) |
 | **Fix pages that disagree with the product** | the Handbook says Add data is on by default (it is off); Handbook and guide disagree on scheduling a Dashboard; an agent follows a page literally | `HANDBOOK-PRODUCT-DISAGREE-1` |
 | **Machine-readable entry points shipped with the install**: the API contract, the shipped templates, a flat page index (id, audience, edition, permission, URL) | both runs said the contract and the templates closed their largest gaps | `AGENT-ENTRYPOINTS-1` |

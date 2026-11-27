@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.mcp`](../../../../../product-map/module/mcp.toon).
 
-13 test class(es): 2 unit, 11 real-HTTP control-plane, 0 IT.
+14 test class(es): 3 unit, 11 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -20,11 +20,12 @@ Run the whole module, or chosen classes (commas between classes, never `+`):
 
 ```bash
 mvn -o test -pl features/inspecto-mcp
-mvn -o test -pl features/inspecto-mcp -Dtest=ControlApiAgentAnalystPreviewsTest,ControlApiAgentAnalyticReadsTest
+mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest,ControlApiAgentAnalystPreviewsTest
 ```
 
 | test class | package | kind | file | summary |
 |---|---|---|---|---|
+| `ComponentShapesTest` | `com.gamma.mcp` | unit | `features/inspecto-mcp/src/test/java/com/gamma/mcp/ComponentShapesTest.java` | The component shape reference (COMPONENT-REFERENCE-GENERATED-1): for every {@code propose_change} kind |
 | `ControlApiAgentAnalystPreviewsTest` | `com.gamma.mcp` | real-HTTP control-plane test | `features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentAnalystPreviewsTest.java` | AGENT-KIT-1 W6 group E over real HTTP, on both doors (direct REST and the MCP {@code preview_score} / |
 | `ControlApiAgentAnalyticReadsTest` | `com.gamma.mcp` | real-HTTP control-plane test | `features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentAnalyticReadsTest.java` | AGENT-KIT-1 W6 group D, change D1 of the signed design ({@code 2026-11-26-agent-data-answers-masking-design.md}) over |
 | `ControlApiAgentDataSeamTest` | `com.gamma.mcp` | real-HTTP control-plane test | `features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentDataSeamTest.java` | AGENT-KIT-1 W6 S0 over real HTTP, {@code POST /db/query} on both doors (direct REST and the MCP {@code query_dataset} |

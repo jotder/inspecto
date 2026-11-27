@@ -1229,7 +1229,7 @@ final class ComponentRoutes implements RouteModule {
      * {@code tags} is not here because it is spec-declared on {@code widget} — it is projected by
      * {@link WidgetTags} after this check, never read from the body.)
      */
-    private static final Set<String> COMPONENT_ENVELOPE_KEYS = Set.of("name", "owner", "shares");
+    static final Set<String> COMPONENT_ENVELOPE_KEYS = Set.of("name", "owner", "shares");
 
     /**
      * Keys a Java reader reads but the kind's {@link ConfigSpec} does not declare — the
@@ -1258,7 +1258,7 @@ final class ComponentRoutes implements RouteModule {
      *       {@link #COMPONENT_ENVELOPE_KEYS}, because no {@code widget}/{@code dashboard} body has them.</li>
      * </ul>
      */
-    private static final Map<String, Set<String>> COMPONENT_PARSER_ONLY_KEYS = Map.of(
+    static final Map<String, Set<String>> COMPONENT_PARSER_ONLY_KEYS = Map.of(
             "widget", Set.of("dataset"),
             "dashboard", Set.of("dataset", "datasetId", "widget", "widgetId", "widgets"),
             "expectation", Set.of("when", "lastResult", "createdAt", "updatedAt"));

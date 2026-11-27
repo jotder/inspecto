@@ -1,0 +1,87 @@
+{
+  "kind" : "notification-channel",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "operations" : {
+    "create" : {
+      "route" : "POST /notifications/channels",
+      "content" : "content"
+    },
+    "update" : {
+      "route" : "PUT /notifications/channels/{id}",
+      "content" : "content"
+    },
+    "delete" : {
+      "route" : "DELETE /notifications/channels/{id}",
+      "content" : null
+    }
+  },
+  "shapes" : {
+    "content" : {
+      "source" : "ChannelConfig.MODELLED + ChannelConfig.fromMap",
+      "unknownKeys" : "refused",
+      "extensionPrefix" : "x-",
+      "fields" : [
+        {
+          "path" : "createdAt",
+          "type" : "integer",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "description",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "digestMinutes",
+          "type" : "integer",
+          "required" : false,
+          "default" : 0
+        },
+        {
+          "path" : "enabled",
+          "type" : "boolean",
+          "required" : false,
+          "default" : true
+        },
+        {
+          "path" : "id",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "kind",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "name",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "target",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "template",
+          "type" : "string",
+          "required" : false
+        }
+      ],
+      "example" : {
+        "id" : "ops-email",
+        "kind" : "email",
+        "target" : "ops@example.com"
+      },
+      "notes" : [
+        "`createdAt` is kept from the stored Channel on an update; a Channel carries no secret."
+      ]
+    }
+  }
+}

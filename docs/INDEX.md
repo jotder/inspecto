@@ -87,7 +87,8 @@ add or rename files, never edit the table. Shape checked by `tools/check-product
 ## Contracts and audits
 
 - [`api/`](api/README.md) — **machine-readable v1 HTTP contract**: `openapi-v1.json` + canonical `examples/`,
-  enforced by `ApiContractTest`; `schemas/` (metadata-bundle JSON Schema + samples).
+  enforced by `ApiContractTest`; `schemas/` (metadata-bundle JSON Schema + samples); `component-shapes/` (each
+  `propose_change` kind's content shape, generated from the code by `ComponentShapesTest`).
 - [`../compliance/`](../compliance/) — the NFR-7 compliance tree (repo root, shipped in the deploy bundle's
   docs). [`controls-matrix.md`](../compliance/controls-matrix.md) is the **C2 single mapping table** (SOC 2 TSC
   ↔ ISO 27001 Annex A ↔ NIST 800-53 → implementing file/route/gate → evidence → responsibility); the ISO SoA

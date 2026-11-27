@@ -1,0 +1,11 @@
+{
+  "kind" : "pipeline-restore",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "operations" : {
+    "restore" : {
+      "route" : "POST /pipelines/{id}/history/{version}/restore",
+      "content" : null
+    }
+  },
+  "shapes" : { }
+}
