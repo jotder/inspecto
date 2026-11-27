@@ -53,6 +53,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `UI-SCHEMA-FORM-EDITOR-1` | P3 | feature | Move <inspecto-schema-form>'s in-row editor onto pen-field, which first needs several new pen-field features. | demand |
 | `UI-TOKENS-RUNS-BACKLOG-1` | P3 | defect | npm run lint:tokens (the UI workflow's design-system guard) flags four hand-rolled status fills (bg-amber-1…, bg-green-1…, bg-red-1…, bg-… | — |
 | `ALERT-RULE-FILTER-UI-1` | P3 | feature | The Alert Rule form cannot author or edit a Measure rule's row filter (when). | — |
+| `WIDGETS-SPEC-SESSION-MOCK-1` | P3 | defect | widgets.component.spec.ts fails 11 of its tests on master (seen 2026-11-27, BR-3): TypeError: this.session.features is not a function at… | — |
 | `UI-BUNDLE-BUDGETS-RED-1` | P3 | defect | The la-app and gamma bundle checks fail on master (seen 2026-11-19). | — |
 | `PACK-SALES-MARKETING-1` | P3 | feature | A Sales & Marketing BI pack: sales, commissions, marketing and churn analytics. | operator |
 | `USER-HANDBOOK-1` | P2 | feature | The Handbook: users learn to build, ship and manage an App from the console's Help, organised by lifecycle for three tracks. | — |

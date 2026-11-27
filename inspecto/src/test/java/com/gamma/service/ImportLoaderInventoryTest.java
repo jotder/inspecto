@@ -166,6 +166,9 @@ class ImportLoaderInventoryTest {
                     + "tree and never read as config");
         ALLOWED.put("audit-anchoring.json", "the durable \"anchoring started\" record (AuditAnchors) in "
                 + "<config root>.secrets/ beside the key — a SIBLING of the config tree, so no import reaches it");
+        ALLOWED.put("META-INF/inspecto/mcp/api/errors-v1.json", "the generated error catalogue McpTools serves as the MCP "
+                + "Resource inspecto://errors (AGENT-KIT-1 W5), read from the inspecto-mcp jar on the classpath, never from a "
+                + "Space config root - an import cannot plant it (" + REPO + ")");
         ALLOWED.put("META-INF/inspecto/module.toon", "a classpath resource read from module jars by ModuleManifests, "
                 + "not a Space file: an import cannot plant it because it is read from the classpath, never from a "
                 + "Space config root (" + REPO + ")");

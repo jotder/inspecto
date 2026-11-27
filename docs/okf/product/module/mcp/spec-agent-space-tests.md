@@ -23,7 +23,7 @@ checks it expects.
 ## The route and the gate
 
 `POST /tests/run` (`SpaceTestRoutes`) keeps its own gate, `canAuthorWorkbench`. It joins `AgentGate.ALLOWED` and
-`AgentGate.PERSON_ONLY` (beside `POST /pipelines/authored/{id}/run`), so:
+`AgentGate.PERSON_ONLY` (beside the Pipeline run, `POST /pipelines/authored/{id}/trigger`), so:
 
 | Caller | Answer |
 |---|---|
@@ -59,7 +59,7 @@ checks it expects.
   the answer is a Dataset read; this is stated, not proven by a masking test.
 
 **Audit.** The route's own audit row is named by the generic POST verb, `test.created` (`AuditTrail.classify`), as
-`POST /pipelines/authored/{id}/run` is `pipeline.created`; it writes nothing. The golden grader's `no-direct-write`
+the editor's `POST /pipelines/authored/{id}/run` is `pipeline.created`; it writes nothing. The golden grader's `no-direct-write`
 skips `POST …/tests/run` (`WRITES_NOTHING_PATH`, `tools/run-agent-golden.mjs`) so a run is not counted as a write.
 
 ## The MCP Tool
@@ -106,7 +106,8 @@ Scoped to what group C adds, by the lane's `verification` subagent before integr
   stripped, on both doors (a direct request and every in-process replay, the MCP tool included), so nothing widens
   through the prefix and a machine is refused through MCP too. A person's own console token may call the read-only
   tool through MCP, as it may call the route directly (as `dry_run_pipeline`).
-- The engine is not new to agents: `POST /pipelines/authored/{id}/run` (D-AK2) already runs `PipelineTestRun.run`.
+- The engine was not new to agents: `POST /pipelines/authored/{id}/run` (D-AK2) ran `PipelineTestRun.run` until
+  RUN-PIPELINE-NOW-SCRATCH-1 (2026-11-27) pointed `run_pipeline_now` at the real run, `…/trigger`.
 - "Writes nothing durable" was traced and confirmed; the reviewer's own mutant (the run not re-rooted to scratch)
   turned the before-and-after test red.
 - Not blocking, stated here: there is no timeout or rate limit on a synchronous run of up to 200 cases; a joined

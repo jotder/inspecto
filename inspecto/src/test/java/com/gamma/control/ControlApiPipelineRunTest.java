@@ -152,6 +152,56 @@ class ControlApiPipelineRunTest {
         }
     }
 
+    /**
+     * RUN-PIPELINE-NOW-SCRATCH-1: MCP Tool {@code run_pipeline_now} replays this route, so a person's agent holding
+     * {@code canOperateRuns} runs the Pipeline for real (D-AK2: a delegated person within their own rights); a machine
+     * agent is refused ({@code AgentGate.PERSON_ONLY}); and the editor's scratch {@code …/run} is not an agent route any more.
+     */
+    @Test
+    void aPersonsAgentRunsForRealAndAMachineAgentIsRefused(@TempDir Path dir) throws Exception {
+        Path dataDir = dir.resolve("data");
+        seedParquet(dataDir, "events", "(1,150),(2,50),(3,200)");
+        seedFlow(dir.resolve("wr"), FLOW);
+        com.gamma.access.Roles.write(dir.resolve("wr"), java.util.Map.of(), List.of(), List.of("ops-bot"));   // the Space admits the machine
+        com.gamma.spi.auth.Authenticators.forTest(ex -> {
+            String h = String.valueOf(ex.getRequestHeaders().getFirst("Authorization"));
+            java.util.Set<String> caps = java.util.Set.of(com.gamma.access.Roles.CAN_OPERATE_RUNS,
+                    com.gamma.access.Roles.CAN_AUTHOR_WORKBENCH);
+            return switch (h) {
+                case "Bearer agent" -> java.util.Optional.of(new com.gamma.spi.auth.Subject("op-1", caps, null,
+                        java.util.Map.of(), null, null, null, "claude-code"));
+                case "Bearer bot" -> java.util.Optional.of(new com.gamma.spi.auth.Subject("client:ops-bot", caps, null,
+                        java.util.Map.of(), null, null, "svc-ops", "ops-bot"));
+                default -> java.util.Optional.empty();
+            };
+        });
+        try (Ctx c = open(dir, dir.resolve("wr"), dataDir)) {
+            HttpResponse<String> bot = sendAs(c.port, "Bearer bot", "POST", "/pipelines/authored/evt_rollup/trigger");
+            assertEquals(403, bot.statusCode(), bot.body());
+            assertTrue(bot.body().contains("may not run a Pipeline"), bot.body());
+            HttpResponse<String> scratch = sendAs(c.port, "Bearer agent", "POST", "/pipelines/authored/evt_rollup/run");
+            assertEquals(403, scratch.statusCode(), "the scratch run-to-here is no agent route: " + scratch.body());
+
+            HttpResponse<String> r = sendAs(c.port, "Bearer agent", "POST", "/pipelines/authored/evt_rollup/trigger");
+            assertEquals(202, r.statusCode(), r.body());
+            String runId = json(r).get("runId").asText();
+            JsonNode run = null;
+            for (long end = System.nanoTime() + 15_000_000_000L; System.nanoTime() < end; Thread.sleep(100)) {
+                run = json(sendAs(c.port, "Bearer agent", "GET", "/jobs/runs/" + runId));
+                if (!"RUNNING".equals(run.get("status").asText())) break;
+            }
+            assertEquals("SUCCESS", run.get("status").asText(), run.toString());
+            assertEquals(2, sinkRowCount(dataDir, "rollup"), "a real run landed data");
+        } finally {
+            com.gamma.spi.auth.Authenticators.forTest(null);
+        }
+    }
+
+    private HttpResponse<String> sendAs(int port, String auth, String method, String path) throws Exception {
+        return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
+                .header("Authorization", auth).method(method, BodyPublishers.noBody()).build(), BodyHandlers.ofString());
+    }
+
     @Test
     void runIsGatedOnTheWriteRoot(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, null, null)) {

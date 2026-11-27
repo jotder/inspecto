@@ -87,3 +87,21 @@ export const INSIGHT_FEED_PLUGIN: VizPlugin = {
     transformProps: NO_PROPS,
     render: { kind: 'component', componentKey: 'insight-feed' },
 };
+
+/**
+ * BI-INSIGHTS-1 P4 BR-3: the Dashboard Brief - one Insight Profile's top Insights as plain sentences
+ * (`GET /insights/brief`), with a Narrate button when AI Assist is installed. Bound like the feed (`viewId` = the Profile).
+ */
+export const INSIGHT_BRIEF_PLUGIN: VizPlugin = {
+    meta: {
+        type: 'insight-brief',
+        label: 'Insight brief',
+        icon: 'heroicons_outline:document-text',
+        fit: {},
+        viewKind: 'insight-profile',
+    },
+    controls: [],
+    buildQuery: NO_QUERY,
+    transformProps: NO_PROPS,
+    render: { kind: 'component', componentKey: 'insight-brief' },
+};

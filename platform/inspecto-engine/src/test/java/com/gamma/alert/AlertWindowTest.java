@@ -153,15 +153,21 @@ class AlertWindowTest {
     }
 
     @Test
-    void aWhenTreeIsAcceptedOnAWindowedRuleOnly() {
+    void aWhenTreeIsAWindowsFilterOrAPlainRulesRowFilter() {
         Map<String, Object> when = Map.of("kind", "group", "op", "AND", "items",
                 List.of(Map.of("kind", "condition", "field", "duration_s", "operator", "<", "value", "3")));
         Map<String, Object> windowed = rule(Map.of());
         windowed.put("when", when);
         assertEquals(when, accepted(windowed).when());
+        // ALERT-RULE-ROW-FILTER-1: a plain Measure rule takes the same tree as its row filter, strictly
         Map<String, Object> plain = new HashMap<>(windowed);
         plain.remove("window");
-        refused(plain, "has none unless it is windowed");
+        AlertRule plainRule = AlertRule.fromMap(plain);
+        assertTrue(!plainRule.isWindowed());
+        assertEquals(when, plainRule.when());
+        plain.put("when", Map.of("kind", "group", "op", "AND", "items",
+                List.of(Map.of("kind", "condition", "field", "duration_s"))));
+        refused(plain, "ERR_ALERT_ROW_FILTER_INVALID");
     }
 
     @Test

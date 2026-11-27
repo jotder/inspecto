@@ -172,7 +172,7 @@ is passed on as the replayed route's JSON body, unchanged.
 | `propose_action` | write | `body` | `POST /action-requests` (`canWorkIncidents`; held for approval by design) |
 | `export_bundle` | read | `body` | `POST /bundle/export` |
 | `preview_promotion` | read | `body` | `POST /promotion/preview` (`canAdminister`) |
-| `run_pipeline_now` | write | `pipeline`, `body?` | `POST /pipelines/authored/{pipeline}/run` (`canAuthorWorkbench`; D-AK2: a person, never a machine) |
+| `run_pipeline_now` | write | `pipeline` | `POST /pipelines/authored/{pipeline}/trigger`, a real run (`canOperateRuns`; D-AK2: a person, never a machine) |
 | `run_space_tests` | read | `body?` | `POST /tests/run` (`{cases?}`; `canAuthorWorkbench`; W6 group C, D-AK10: a person, never a machine) — [W6 C](spec-agent-space-tests.md) |
 | `simulate_decision_rule`, `simulate_rule_template`, `preview_enrichment` | read | per tool | [W6 B](spec-agent-simulators.md) |
 
@@ -359,7 +359,7 @@ agent token calling a route directly is treated the same.
      for a person — the guards that refuse those under a policy (`holdRefusing*`) read the policy only;
   2. **allowed** — reads (GET), and `POST /mcp`, `/validate`, `/pipelines/authored/{id}/dry-run`,
      `/bundle/export`, `/promotion/preview`, `/pending-changes/{id}/withdraw`, `/action-requests` (held by its
-     own design), `/db/query` (the AK-1 `query_dataset` read) and `/pipelines/authored/{id}/run`
+     own design), `/db/query` (the AK-1 `query_dataset` read) and `/pipelines/authored/{id}/trigger`
      (D-AK2: a delegated person only, never a machine), and `/pending-actions/{id}/withdraw`; since **W6 group A**
      (2026-11-26) the four authoring previews (`AgentGate.AUTHORING_PREVIEWS`: `/config/preview/parsing|schema`,
      `/config/suggest/schema`, `/components/mapping/validate`), for every agent, body-capped at 256 KiB and naming
