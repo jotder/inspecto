@@ -375,9 +375,10 @@ export class AlertRuleFormDialog implements AfterViewInit {
           : undefined;
 
     /** A stored Measure rule's row filter (ALERT-RULE-ROW-FILTER-1): not editable here, so re-sent as stored —
-     *  `when` is a form-owned key, and dropping it would make the rule count every row. */
+     *  `when` is a form-owned key, and dropping it would make the rule count every row. A windowed rule's `when`
+     *  is its Window condition, not a row filter of this form's rule, so it is left as before. */
     readonly storedRowFilter: ConditionGroup | null =
-        this.authored === 'measure' && this.data.rule?.when ? this.data.rule.when : null;
+        this.authored === 'measure' && !this.data.rule?.window && this.data.rule?.when ? this.data.rule.when : null;
 
     /** Deep-cloned on edit — the condition editor mutates the bound group in place. */
     readonly when: ConditionGroup = this.data.rule?.when ? structuredClone(this.data.rule.when) : emptyGroup('AND');

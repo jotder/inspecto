@@ -261,7 +261,7 @@ final class WindowSql {
     }
 
     /** Every {@code field} and {@code valueField} a Condition Language tree reads. */
-    static void whenFields(Object node, Set<String> out) {
+    private static void whenFields(Object node, Set<String> out) {
         if (!(node instanceof Map<?, ?> m)) return;
         Object items = m.get("items") != null ? m.get("items") : m.get("conditions");
         if (items instanceof List<?> l) {

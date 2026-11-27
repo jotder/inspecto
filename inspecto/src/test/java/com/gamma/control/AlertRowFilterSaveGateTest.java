@@ -91,6 +91,14 @@ class AlertRowFilterSaveGateTest {
         refused(s, rule("statuss", "delivered"), "reads column(s) [statuss] that are not in the Schema of dataset 'shipments'");
         refused(s, rule("owner", "bob"), "[owner]");             // a column of `ledger`, not of `shipments`
         refused(s, rule("ledger.owner", "bob"), "[ledger.owner]");
+        // the field is compiled as written: a padded name is another column, never `status`
+        refused(s, rule("status ", "delivered"), "[status ]");
+        // a leaf is a leaf by its kind, as the compiler reads it: an `items` list on it hides nothing
+        Map<String, Object> hidden = rule("status", "delivered");
+        hidden.put("when", Map.of("kind", "group", "op", "AND", "items", List.of(Map.of("kind", "condition",
+                "field", "ledger.owner", "operator", "!=", "value", "bob", "items", List.of(
+                        Map.of("kind", "condition", "field", "status", "operator", "!=", "value", "x"))))));
+        refused(s, hidden, "[ledger.owner]");
     }
 
     @Test

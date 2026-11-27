@@ -705,8 +705,28 @@ public record AlertRule(String name, String metric, String comparator, double th
         Map<String, Object> filter = rowFilter();
         if (filter == null) return List.of();
         java.util.Set<String> out = new java.util.LinkedHashSet<>();
-        WindowSql.whenFields(filter, out);
+        filterFields(filter, out);
         return List.copyOf(out);
+    }
+
+    /**
+     * The fields {@code node} reads, walked exactly as {@link com.gamma.query.ConditionSql} renders it: a node is a group
+     * by its {@code kind} first (a leaf carrying {@code items} is still a leaf), and a field is taken verbatim, untrimmed -
+     * the compiled statement quotes it as written, so {@code "status "} is not {@code status}.
+     */
+    private static void filterFields(Object node, java.util.Set<String> out) {
+        if (!(node instanceof Map<?, ?> m)) return;
+        Object kind = m.get("kind");
+        boolean group = "group".equals(kind) || (!"condition".equals(kind) && (m.containsKey("items") || m.containsKey("conditions")));
+        if (group) {
+            Object items = m.get("items") != null ? m.get("items") : m.get("conditions");
+            if (items instanceof List<?> l) for (Object it : l) filterFields(it, out);
+            return;
+        }
+        for (String k : List.of("field", "valueField")) {
+            Object f = m.get(k);
+            if (f != null && !String.valueOf(f).isEmpty()) out.add(String.valueOf(f));
+        }
     }
 
     /** The keys of {@code alert} this record does not model, in authored order (MODULE-REORG-P4-2). */
