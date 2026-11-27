@@ -148,6 +148,16 @@
             ></inspecto-ai-assist>
         </div>
 
+        <!-- BI-INSIGHTS-1 P4 AQ-1: Ask the Dashboard — one question becomes a draft Widget, previewed live as the
+             caller, saved through the gated Widget write. Renders nothing unless /bootstrap reports `intelligence`. -->
+        <app-ask-dashboard
+            [datasets]="datasets()"
+            [existingIds]="widgetIds()"
+            [disabled]="writesDisabled()"
+            disabledReason="Writes are disabled on this server"
+            (saved)="onAskSaved($event)"
+        />
+
         @if (filterColumns().length) {
             <div>
                 <div class="text-secondary mb-1 text-xs font-semibold uppercase tracking-wider">Cross-filter</div>

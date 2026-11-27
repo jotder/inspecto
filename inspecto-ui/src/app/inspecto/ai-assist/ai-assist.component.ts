@@ -103,8 +103,31 @@ export class AiAssistComponent {
     /** Why the pane disabled it — surfaced as the button tooltip so the block is never silent. */
     readonly disabledReason = input('');
 
+    /**
+     * Opt-in (Ask the Dashboard, BI-INSIGHTS-1 P4 AQ-1): the tool REFUSES some questions in words (a hidden
+     * column, "why did it move", a forecast) and arrives as a 422. With this set the refusal is shown in place,
+     * where the operator is looking, instead of as a toast that disappears; the box keeps its text. Every other
+     * pane keeps the toast.
+     */
+    readonly inlineRefusal = input(false, { transform: booleanAttribute });
+
+    /** Opt-in: the pane shows the draft its own way (a live preview), so the field-by-field diff is not drawn. */
+    readonly hideDiff = input(false, { transform: booleanAttribute });
+
+    /** The Apply button's wording — a pane that saves says "Save". */
+    readonly applyLabel = input('Apply');
+
+    /** Set when the pane cannot take the draft yet (e.g. a required name is missing); explained by the pane. */
+    readonly applyDisabled = input(false, { transform: booleanAttribute });
+
     /** The operator applied this candidate. The pane writes it through its own validated route. */
     readonly applyDraft = output<AiDraft>();
+
+    /** The candidate now on screen (null when none) — lets a pane draw its own preview in the `[aiDraftPreview]` slot. */
+    readonly drafted = output<AiDraft | null>();
+
+    /** The tool's refusal, in its words — set only with {@link inlineRefusal}. */
+    readonly refusal = signal<string | null>(null);
 
     readonly running = signal(false);
     readonly drafts = signal<AiDraft[] | null>(null);
@@ -161,6 +184,8 @@ export class AiAssistComponent {
         if (this.blocked()) return;
         this.running.set(true);
         this.drafts.set(null);
+        this.drafted.emit(null);
+        this.refusal.set(null);
         this.derivedArgs.set(null);
         this.selected.set(0);
         const call = this.prompting()
@@ -178,6 +203,7 @@ export class AiAssistComponent {
                 } else {
                     this.drafts.set(adaptToolResult(this.tool(), result));
                 }
+                this.drafted.emit(this.activeDraft());
             },
             error: (err: unknown) => {
                 this.running.set(false);
@@ -198,7 +224,9 @@ export class AiAssistComponent {
                 }
                 // 422 in prompt mode = the model produced nothing usable. Retryable, and the operator's
                 // own words are the thing to change, so the message is theirs and the box keeps its text.
-                this.toastr.error(apiErrorMessage(err, 'The suggestion could not be produced.'));
+                const message = apiErrorMessage(err, 'The suggestion could not be produced.');
+                if (this.inlineRefusal() && status === 422) this.refusal.set(message);
+                else this.toastr.error(message);
             },
         });
     }
@@ -214,6 +242,7 @@ export class AiAssistComponent {
 
     dismiss(): void {
         this.drafts.set(null);
+        this.drafted.emit(null);
         this.derivedArgs.set(null);
         this.selected.set(0);
         this.showUnchanged.set(false);

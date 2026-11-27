@@ -158,3 +158,26 @@ describe('configDiff', () => {
         expect(removed?.after).toBe('—');
     });
 });
+
+describe('adaptToolResult · widget_from_question', () => {
+    it('keeps the templated caption, the draft Widget and the /bi/query body the preview runs', () => {
+        const [d] = adaptToolResult('widget_from_question', {
+            kind: 'widget',
+            clean: false,
+            findings: [{ path: 'controls.y', message: 'needs a measure' }],
+            draft: { vizType: 'kpi', datasetId: 'sales' },
+            query: { dataset: 'sales' },
+            caption: 'Count of rows',
+            persisted: false,
+        });
+        expect(d.label).toBe('Count of rows');
+        expect(d.config).toEqual({ vizType: 'kpi', datasetId: 'sales' });
+        expect(d.previewQuery).toEqual({ dataset: 'sales' });
+        expect(d.clean).toBe(false);
+        expect(d.findings).toEqual([{ severity: 'ERROR', fieldPath: 'controls.y', message: 'needs a measure' }]);
+    });
+
+    it('yields no candidate when the result carries no draft', () => {
+        expect(adaptToolResult('widget_from_question', { kind: 'widget' })).toEqual([]);
+    });
+});
