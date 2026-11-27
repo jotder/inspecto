@@ -3,6 +3,8 @@
 > **Status: DESIGN APPROVED 2026-11-18 — D-BI1, D-BI2, D-BI3 signed (operator, recommended options); D-BI4…D-BI10
 > signed 2026-11-24 (operator, recommended options); P0 I-3 KPI History built 2026-11-24 (§11.1, D-BI11, D-BI12); P0 I-14 model output Datasets built 2026-11-24 (§11.3).** Every decision in §11 is closed. Board row: `BI-INSIGHTS-1`
 > (§12). The new terms are in `GLOSSARY.md` §7.
+> **P4 Language (I-18, I-19) is designed and approved 2026-11-27 — D-BI14…D-BI24 signed (operator, recommended options):
+> [`2026-11-27-bi-insights-p4-language-plan.md`](2026-11-27-bi-insights-p4-language-plan.md); build slices open.**
 > Scope: insights on **business data** — the Measures over Datasets (revenue, usage, subscribers, transactions,
 > margin, leakage, partners, churn). Not observability: pipeline health stays with Metrics and Alert Rules.
 > Inventory checked against the code on 2026-11-18 (three read-only sweeps plus spot checks); every BUILT / PARTIAL /

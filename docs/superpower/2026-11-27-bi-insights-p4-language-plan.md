@@ -1,7 +1,7 @@
 # Business insights P4 — Language: Dashboard Brief and Ask the Dashboard (`BI-INSIGHTS-1` P4)
 
-> **Status: DESIGN PROPOSED 2026-11-27 — decisions D-BI14…D-BI24 open for the operator (recommended option first in
-> §10); nothing built.** Design only. Parent: [`2026-11-18-business-insights-plan.md`](2026-11-18-business-insights-plan.md)
+> **Status: DESIGN APPROVED 2026-11-27 - D-BI14..D-BI24 signed (operator, recommended options; option (a) of every row
+> in §10); BR-0 and AQ-0 built (board row), BR-1…BR-5 and AQ-1 open.** Design only. Parent: [`2026-11-18-business-insights-plan.md`](2026-11-18-business-insights-plan.md)
 > (§4 principles, §6 I-18 / I-19, §9 P4, §10 traps, §11 decisions; D-BI5 "templated sentences first, Brief in P4";
 > D-BI13 Business Insights in every edition). Items: `module.insights`, `module.agent`, `module.intelligence`,
 > `module.engine`, `layer.product`. Board row: `BI-INSIGHTS-1` stays **one** row; P4 is its slices BR-0…BR-5 and AQ-0…AQ-1.
@@ -257,17 +257,17 @@ fixtures. If the operator caps usage, targeted tests only and say the full gate 
 
 | ID | Decision | Options |
 |---|---|---|
-| D-BI14 | Name and home of the Brief | **(a)** *Dashboard Brief*, qualified beside *Incident Brief*; built in the `insights` module (Basic), narration in `inspecto-agent` as capability `insight-brief` · (b) *Insight Brief* · (c) build it entirely in `inspecto-agent` (Standard+ only) |
-| D-BI15 | Does a Brief exist without AI Assist | **(a)** yes — a **templated** Brief in every edition (D-BI5, D-BI13); only the model *narration* needs AI Assist · (b) the whole Brief is AI Assist-only (Basic users get the feed only) |
-| D-BI16 | How a Dashboard shows a Brief | **(a)** Visualization Type `insight-brief`, a Widget bound to one Profile (like `insight-feed`; no Dashboard schema change; several Profiles = several Widgets) · (b) a Dashboard-level `brief: {profiles[], max}` setting rendered above the grid (schema change + link census work; merged ranking across Profiles) |
-| D-BI17 | When a Brief is narrated, and caching | **(a)** on an explicit **Narrate** click (and by the Report Job); cached by (profiles, `run_id`s, mode), served only after the caller's per-Profile view check · (b) automatically on every Dashboard open (a model call per open) |
-| D-BI18 | Grounding strictness | **(a)** slot-filled lines (no literal digits), one Insight per sentence, direction and no-cause checks, `NumericGroundingGuard` kept as a second net · (b) reuse `NumericGroundingGuard` as-is (the model writes numbers; rounded-integer and ×100 matches allowed) |
-| D-BI19 | Brief on a public share | **(a)** no, not in P4 (a share has no Insight reader and never reveals; revisit with a snapshot design) · (b) a templated Brief baked at share time |
-| D-BI20 | Home of Ask the Dashboard | **(a)** new draft-only intelligence tool `widget_from_question` (the `query_author` / `kpi_report_builder` pattern; runs as the caller) · (b) a `/assist/ask` skill in `inspecto-agent` (runs as the server — **not recommended**) · (c) a route in the insights module |
-| D-BI21 | What Ask returns | **(a)** a draft Widget previewed live, plus a templated one-line caption; no model-written answer · (b) also a model-worded answer, grounded |
-| D-BI22 | Ask's vocabulary and Datasets | **(a)** the Widget builder's closed vocabulary (≤ 2 breakdowns, filters, trailing window, compare, top-N), over Datasets the caller may view, the Dashboard's first · (b) wider (joins, calculated Measures) — needs those to exist first |
-| D-BI23 | Narration in a delivered Report PDF | **(a)** allowed with AI Assist, cached per scan run, the page footer says "model-written, checked against the Insights" · (b) PDFs are always templated |
-| D-BI24 | How the Brief page is requested | **(a)** a `insight-brief` Widget id in the Report Job's `widgets:` list draws the Brief page (screen and PDF agree by construction; order = position) · (b) a separate `brief:` Job parameter listing Profiles |
+| D-BI14 | ✅ **SIGNED 2026-11-27 (a)** — Name and home of the Brief | **(a)** *Dashboard Brief*, qualified beside *Incident Brief*; built in the `insights` module (Basic), narration in `inspecto-agent` as capability `insight-brief` · (b) *Insight Brief* · (c) build it entirely in `inspecto-agent` (Standard+ only) |
+| D-BI15 | ✅ **SIGNED 2026-11-27 (a)** — Does a Brief exist without AI Assist | **(a)** yes — a **templated** Brief in every edition (D-BI5, D-BI13); only the model *narration* needs AI Assist · (b) the whole Brief is AI Assist-only (Basic users get the feed only) |
+| D-BI16 | ✅ **SIGNED 2026-11-27 (a)** — How a Dashboard shows a Brief | **(a)** Visualization Type `insight-brief`, a Widget bound to one Profile (like `insight-feed`; no Dashboard schema change; several Profiles = several Widgets) · (b) a Dashboard-level `brief: {profiles[], max}` setting rendered above the grid (schema change + link census work; merged ranking across Profiles) |
+| D-BI17 | ✅ **SIGNED 2026-11-27 (a)** — When a Brief is narrated, and caching | **(a)** on an explicit **Narrate** click (and by the Report Job); cached by (profiles, `run_id`s, mode), served only after the caller's per-Profile view check · (b) automatically on every Dashboard open (a model call per open) |
+| D-BI18 | ✅ **SIGNED 2026-11-27 (a)** — Grounding strictness | **(a)** slot-filled lines (no literal digits), one Insight per sentence, direction and no-cause checks, `NumericGroundingGuard` kept as a second net · (b) reuse `NumericGroundingGuard` as-is (the model writes numbers; rounded-integer and ×100 matches allowed) |
+| D-BI19 | ✅ **SIGNED 2026-11-27 (a)** — Brief on a public share | **(a)** no, not in P4 (a share has no Insight reader and never reveals; revisit with a snapshot design) · (b) a templated Brief baked at share time |
+| D-BI20 | ✅ **SIGNED 2026-11-27 (a)** — Home of Ask the Dashboard | **(a)** new draft-only intelligence tool `widget_from_question` (the `query_author` / `kpi_report_builder` pattern; runs as the caller) · (b) a `/assist/ask` skill in `inspecto-agent` (runs as the server — **not recommended**) · (c) a route in the insights module |
+| D-BI21 | ✅ **SIGNED 2026-11-27 (a)** — What Ask returns | **(a)** a draft Widget previewed live, plus a templated one-line caption; no model-written answer · (b) also a model-worded answer, grounded |
+| D-BI22 | ✅ **SIGNED 2026-11-27 (a)** — Ask's vocabulary and Datasets | **(a)** the Widget builder's closed vocabulary (≤ 2 breakdowns, filters, trailing window, compare, top-N), over Datasets the caller may view, the Dashboard's first · (b) wider (joins, calculated Measures) — needs those to exist first |
+| D-BI23 | ✅ **SIGNED 2026-11-27 (a)** — Narration in a delivered Report PDF | **(a)** allowed with AI Assist, cached per scan run, the page footer says "model-written, checked against the Insights" · (b) PDFs are always templated |
+| D-BI24 | ✅ **SIGNED 2026-11-27 (a)** — How the Brief page is requested | **(a)** a `insight-brief` Widget id in the Report Job's `widgets:` list draws the Brief page (screen and PDF agree by construction; order = position) · (b) a separate `brief:` Job parameter listing Profiles |
 
 If the operator signs (a) throughout, P4 adds **two routes** (`GET /insights/brief`, `POST /insights/brief/narrate`),
 **one Visualization Type** (`insight-brief`), **one agent capability** (`insight-brief`), **one intelligence tool**
