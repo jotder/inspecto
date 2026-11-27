@@ -914,24 +914,35 @@ type; ⛔ never *Claim* (`la-claims` is another pack).
 
 ## 8. Observability
 
-**Signal** — A lightweight **emitted fact** — it *announces, never decides* (the Signal network,
-okf/living-operational-system, The thesis). One envelope — as built, the 13-field `Signal` record `{ signalId, type, at, severity, source, subject, correlationId, causationId, space, actor, message, payload, schemaVersion }` (`okf/product/module/observability/plan-observability.md` §3.1; this entry showed the seven-field design sketch until 2026-09-08)
-where `source` is a metadata **Ref** (`rel:'emits'`) to the producer. Every run, job, Alert Rule firing, failed
-Expectation, Decision Consequence and operator action emits one, to a single **signal ledger**. **Event, Alert and
-Notification are *views* over this one ledger, not parallel stores** (unified in R4). ⚠️ §6-proposed → **binding**.
+**Event** — One **record** on a Space's ledger that something happened: a file collected, a Run started, a log
+line, an audit row. The engine owns its fixed type names (`EventType`). Nobody is expected to act on an Event; it is
+the history. The Signal Ledger page (`/events`) renders the ledger newest-first. **Binding (operator, 2026-11-27,
+`SIGNAL-BOARD-1`).**
 
-**Event** — A **view** of a Signal on the operational activity stream (file collected, Run started/finished,
-error). The Signal Ledger page (`/events`) renders the ledger newest-first with each signal's source and severity.
+**Signal** — An **Event posted for a Job to act on** — it *announces, never decides*. It carries an envelope the Job
+can read: the 13-field `Signal` record `{ signalId, type, at, severity, source, subject, correlationId, causationId,
+space, actor, message, payload, schemaVersion }`, where `source` is a metadata **Ref** (`rel:'emits'`) to the poster
+and `type` is an open dotted name (`pipeline.commit`, `job.dataset.produced`). It is stored as an Event of type
+`SIGNAL`: **every Signal is an Event, not every Event is a Signal.** A Signal is stateless — never claimed or closed —
+and every Job whose `on_signal` matches its type gets it. **Binding (operator, 2026-11-27, `SIGNAL-BOARD-1`;** until
+then this entry said the reverse, that an Event is a view of a Signal).
+
+**Signal Type** — The template of a Signal: its dotted name, who posts it and the payload fields it carries
+(*Type* → *Instance*: Signal Type → Signal). **Binding (`SIGNAL-BOARD-1`).**
+
+**Signal Board** — The Signals of one Space as its Jobs see them: which Signal Types are posted, by what, and which
+Jobs listen. Derived, never authored. Its listener is the Space's Job service, not the Jobs: a Job is a definition and
+starts a Run only when the Job service matches a posted Signal. **Binding (`SIGNAL-BOARD-1`).**
 
 **Metric** — An **observability** time-series signal (throughput, error rate, lag) derived from Signals.
 *(Ops sense only; the BI aggregation is a **Measure**.)*
 
 **Alert Rule** — *(see §4)* watches a Metric — or a BI Measure (BI-5) — vs a threshold.
 
-**Alert** — A fired instance of an Alert Rule (severity: info / warning / critical) — the `ALERT_FIRED` **view**
-of the signal ledger.
+**Alert** — A fired instance of an Alert Rule (severity: info / warning / critical) — read from the ledger
+(the `ALERT_FIRED` Event and the `alert-rule.fired` Signal).
 
-**Notification** — Delivery of a Signal to a channel (email, webhook); a **consumer** of the ledger. Per-user
+**Notification** — Delivery of an Event or a Signal to a channel (email, webhook); a **consumer** of the ledger. Per-user
 preferences in Settings.
 
 ---

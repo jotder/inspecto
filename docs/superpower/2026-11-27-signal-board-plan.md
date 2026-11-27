@@ -1,6 +1,7 @@
 # Signal Board — one clear meaning for Signal, and a board Jobs can trust (`SIGNAL-BOARD-1`)
 
-Status: **APPROVED 2026-11-27 — D-SB1…D-SB5 all DECIDED (operator, 2026-11-27); nothing built; next is SB-0.** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
+Status: **APPROVED 2026-11-27 — D-SB1…D-SB5 all DECIDED (operator, 2026-11-27); SB-0 done 2026-11-27 (results §10;
+the live stop test and the D-SB5 age limit wait on the operator); nothing built; next is SB-1.** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
 Builds on the shipped Signal Backbone ([spec-signal-backbone](../okf/product/module/event/spec-signal-backbone.md));
 it replaces none of it. SB-2 lands inside the link graph of `SPACE-COHERENCE-1`
 ([plan](2026-11-27-space-coherence-plan.md)).
@@ -62,22 +63,32 @@ is stored, and it starts a Run for every Job that matches. Listening costs one c
 | # | Finding | Evidence |
 |---|---|---|
 | G1 | The glossary states the relation backwards, so "Event" and "Signal" read as two names for one thing. | `GLOSSARY.md` §8 against `Signal.toEvent()` and `SignalType`'s own class comment |
-| G2 | Some facts a Job could usefully react to are plain Events, so no Job can listen to them. Candidates: a paused Pipeline, a broken config link, a file changed outside the server, a sequence gap. | 58 fixed types; how many are reactable is not yet counted (SB-0) |
-| G3 | One fact is posted in several places. A committed Consignment is a `ConsignmentEvent` on its own bus, a `pipeline.commit` Signal (a mirror) and a `pipeline.batch.committed` Signal. A Job has two keys to react to it: `on_pipeline` and `on_signal`. | `JobService.mirrorPipelineCommit`, `ConsignmentAuditWriter`, `fireOnCommit` |
+| G2 | Some facts a Job could usefully react to are plain Events, so no Job can listen to them. **Counted in SB-0: 21 of the 58 fixed types; 6 more already have a Signal twin** (§10.3). | §10.3 |
+| G3 | One fact is posted in several places. A committed Consignment is a `ConsignmentEvent` on its own bus, a `BATCH_COMMITTED` Event, a `pipeline.commit` Signal (a mirror) and a `pipeline.batch.committed` Signal. A Job has two keys to react to it: `on_pipeline` and `on_signal`. **SB-0 found four facts posted twice or more** (§10.3). | `JobService.mirrorPipelineCommit`, `ConsignmentAuditWriter`, `CollectorService` line 1403 |
 | G4 | There is no one list of Signal Types. Names are spread over eight constants classes and the Job Type declarations, and no type declares its payload fields. | `SignalType` class comment; the seven module classes |
-| G5 | Nothing checks a Job's `on_signal` against what is ever posted, or its `when` and `bind` against the payload. A mistyped type is a Job that never fires, with no finding. | Not verified at the save gate: see §8 |
+| G5 | Nothing checks a Job's `on_signal` against what is ever posted, or its `when` and `bind` against the payload. A mistyped type is a Job that never fires, with no finding. **Confirmed in SB-0** (§10.2). | `LinkCensus` declares `job.on_signal` and `job.when` with no check; `JobRoutes` never reads `on_signal` |
 | G6 | A loop between Jobs is found only at run time, by the depth cut. The chain Job → type → Job is knowable at save time. | `cutChain` |
-| G8 | Reaction looks live-only. The Job service reacts as a Signal is posted, and the queued follow-up Run is held in memory. If the server stops after a Signal is stored and before its Run starts, that reaction is probably lost, and nothing replays it at boot. | `onSignalEvent`, `signalFollowUps`; not verified: see §8 |
+| G8 | Reaction is live-only. The Job service reacts as a Signal is posted, and the queued Run is held in memory. If the server stops after a Signal is stored and before its Run finishes, the reaction is not retried at boot. **Confirmed from the code in SB-0, not by a live stop** (§10.1). | `onSignalEvent`, `catchUpMissedFires` (cron only), `skipUnstarted` |
+| G9 | A Job file changed on disk (a hand edit, a `git pull`) is not applied until the Space restarts; the Space lock reports the change but nothing re-reads it. Only the API, a bundle import and a promotion register a Job live. **Found in SB-0** (§10.2). | `upsertJob` callers: `JobRoutes`, `BundleRoutes`, `SpacePromotionRoutes`; no watcher on `config/jobs` |
 | G7 | Nobody can see the board. There is a ledger of what was posted, but no view of which types a Space posts, which Jobs listen, and which postings nobody heard. | No route or page |
 
 ## 5. Plan
 
-**SB-0 Define and measure.** Docs and a read-only tool; no behaviour change.
-- Rewrite the `GLOSSARY.md` §8 entries with §2, add **Signal Type** and **Signal Board**, and correct the two hub pages
-  that repeat the old sentence.
-- Classify the 58 fixed Event types: record only, or reactable. List every fact posted more than once.
-- Settle the items of §8, G8 first: stop a server between a stored Signal and its Run, boot it, and see whether the
-  Job runs.
+**SB-0 Define and measure.** Docs and a read-only tool; no behaviour change. **Done 2026-11-27 except the live stop
+test; results in §10.**
+- ✅ Rewrite the `GLOSSARY.md` §8 entries with §2, add **Signal Type** and **Signal Board**, and correct the hub page
+  that repeated the old sentence (`plan-observability-scope.md`, OPS-1).
+- ✅ Classify the 58 fixed Event types: record only, or reactable. List every fact posted more than once.
+- ✅ (from the code) Settle the items of §8, G8 first. ⏳ Still owed: the live stop test — stop a server between a
+  stored Signal and its Run, boot it, and see whether the Job runs. It confirms G8; it does not change the plan.
+
+**No restart, as a rule of this plan (operator, 2026-11-27).** Saving a Job or a Signal Type takes effect at once, with
+no server or Space restart. SB-1 keeps it for Signal Types. G9 (a Job file changed on disk) is fixed in SB-2c.
+
+**SB-2c Apply a Job file changed on disk.** When the Space lock finds a `config/jobs` file added, changed or removed
+outside the server, the Job service applies it through the same path as the API save (`upsertJob` / `removeJob`),
+after the same checks. A file that fails a check is not applied and stays a finding, so a half-written file never
+replaces a working Job.
 
 **SB-2b Catch-up at boot (only if SB-0 confirms G8).** The Job service keeps, per Job, a mark of the last Signal it
 handled. At boot it reads the ledger from each Job's mark and starts the Runs that were missed, under the same guards
@@ -129,10 +140,8 @@ so it goes last and one fact at a time.
 
 ## 8. Not verified
 
-- Whether a reaction is lost when the server stops between a stored Signal and its Run (G8), and whether anything
-  replays it at boot.
-- Whether the save gate already checks `on_signal`, `when` or `bind` in any way.
-- Whether a committed Consignment also writes a `BATCH_COMMITTED` Event beside the two Signals.
+- G8 by a live stop (the code is read, §10.1).
+- Whether a Signal posted while a Space boots, before its Job service subscribes (`JobService.start`), can be missed.
 - Whether a Job of a generic type (for example a SQL Job) can post a type of the author's choosing today.
 - Where the Space's ledger file sits on disk under the data root.
 - No build or test was run for this plan; it is a reading of the code.
@@ -140,3 +149,64 @@ so it goes last and one fact at a time.
 ## 9. Board
 
 Filed 2026-11-27: `SIGNAL-BOARD-1` on `docs/BACKLOG.md` (P2, §3.5); this plan's row is in `docs/INDEX.md`.
+
+## 10. SB-0 results (2026-11-27, read on `origin/master` `566072b62`)
+
+### 10.1 G8: a reaction is not retried across a restart
+
+- The Job service subscribes to the Space's ledger in `JobService.start` and reacts on the posting thread; each matched
+  Job's Run goes to an in-memory worker pool. Nothing about a pending Run is written before it starts.
+- **Planned stop:** a Run waiting for a slot is recorded SKIPPED ("the Space is shutting down", `skipUnstarted`); a
+  running one is recorded CANCELLED. Both show in the Run history, and neither is run again at boot.
+- **Crash:** a queued Run leaves no record at all.
+- **Boot:** `catchUpMissedFires` replays only a cron Job with `catch_up: true` and a missed fire. Signal Jobs have no
+  catch-up.
+- So SB-2b is needed. **Age limit for D-SB5, proposed (operator to confirm): 24 hours**, the same as the default Run
+  deadline ceiling (`job.deadlineCeilingSeconds` = 86400), configurable per Space. A missed Signal older than that is
+  not replayed; the board (SB-3) lists it as missed.
+
+### 10.2 Save checks and a Job edited on disk
+
+- **Save:** `JobRoutes` never reads `on_signal`, and `LinkCensus` declares `job.on_signal` and `job.when` with no
+  check (one of the 11 unchecked links of `SPACE-COHERENCE-1` §3). A mistyped type is saved silently. (G5)
+- **Edited on disk:** only `JobRoutes`, `BundleRoutes` (import) and `SpacePromotionRoutes` call `upsertJob` /
+  `removeJob`. No watcher re-reads `config/jobs`. The Space lock reports the change (`CONFIG_CHANGED_OUTSIDE`) but does
+  not apply it, so the Job waits for a restart. (G9 → SB-2c)
+
+### 10.3 The 58 fixed Event types
+
+**Posted twice or more (4 facts, 6 Event types) — SB-4 picks one:**
+
+| Fact | Event | Signal(s) |
+|---|---|---|
+| A Consignment committed | `BATCH_COMMITTED` | `pipeline.batch.committed`, `pipeline.commit` (mirror) — plus the `ConsignmentEvent` bus |
+| A Consignment failed | `BATCH_FAILED` | `pipeline.batch.failed` |
+| A Job Run started / failed | `JOB_STARTED`, `JOB_FAILED` | `job.run.started`, `job.run.failed` |
+| An Alert fired / cleared | `ALERT_FIRED`, `ALERT_CLEARED` | `alert-rule.fired`, `alert-rule.cleared` |
+
+The built-in Notification rules read the Event side (`BATCH_FAILED`, `JOB_FAILED`), so SB-4 moves those readers before
+it removes a posting. The Alert Signal names are not in `SignalType` (more evidence for G4).
+
+**Reactable, no Signal today (21) — SB-4 candidates:**
+
+| Area | Event types |
+|---|---|
+| Pipeline | `PIPELINE_PAUSED`, `PIPELINE_RESUMED`, `PIPELINE_CONSERVATION_IMBALANCE` |
+| Collection | `FILE_QUARANTINED`, `FILE_FETCH_FAILED`, `SOURCE_CIRCUIT_OPEN`, `SEQUENCE_GAP` |
+| Config | `CONFIG_LINK_BROKEN`, `CONFIG_CHANGED_OUTSIDE` |
+| Storage | `STORE_DELETE_CONFLICT`, `STORE_DELETE_UNFENCED` |
+| Quality and output | `EXPECTATION_FAILED`, `REPORT_READY` |
+| Sharing | `EXCHANGE_REFRESHED` |
+| Entities | `ENTITY_LIST_CHANGED`, `ENTITY_IDENTITY_CHANGED` |
+| Work objects | `OBJECT_OPENED`, `OBJECT_SLA_BREACH`, `OBJECT_LINKED`, `OBJECT_ASSIGNED`, `OBJECT_ESCALATED` |
+
+**Record only (31) — stay Events:** `LOG`, `AUDIT`, `SIGNAL` (the carrier row), `ACCESS_DENIED`,
+`SECURITY_TRIGGERED`, `SERVICE_STARTED`, `LAYOUT_CONTRACT_VIOLATION`, `PIPELINE_REGISTERED`, `PIPELINE_UNREGISTERED`,
+`PIPELINE_RENAMED`, `SCHEDULER_SETTINGS_CHANGED`, `FILE_RECEIVED`, `FILE_DISCOVERED`, `FILE_FETCHED`,
+`FILE_VALIDATED`, `FILE_ARCHIVED`, `FILE_STABLE`, `FILE_CHANGED`, `DEDUP_RECORDS_DROPPED`,
+`FLOW_CONSERVATION_IMBALANCE` (legacy name), `EXCHANGE_OFFERED`, `EXCHANGE_REQUESTED`, `EXCHANGE_GRANTED`,
+`EXCHANGE_DENIED`, `EXCHANGE_REVOKED`, `LA_UPLOAD`, `GEO_PROJECTED`, `GEO_ROUTES_PROJECTED`, `OBJECT_ACTIVITY`,
+`OBJECT_NOTE`, `REPORT_TRUNCATED`.
+
+Per-file progress, security and audit rows are high in volume or sensitive, and no Job is meant to start from them.
+The sort is a judgement on names and comments, not on use; SB-4 reconfirms each before it promotes one.
