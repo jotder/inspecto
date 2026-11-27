@@ -49,8 +49,9 @@ Alongside the three that were there: `inspecto://glossary`, `inspecto://catalog`
 `safe-config-change` (the Draft step and the 422 row; the Decision Rule, Notification Rule, Channel and
 `requirement-kpi` content now points at the shape instead of listing keys), `author-pipeline`, `add-expectations`,
 `author-alert-rules`, `build-dashboard` and `work-cases` (Entity Lists) read the kind's shape resource before they
-draft. One piece of prose stays: the Decision Rule `when` condition tree and its operators, because the generated
-shape types `when` only as an object.
+draft. Two pieces of prose stay, because the generated shape types the field without its values: the Decision Rule
+`when` condition tree and its operators (`when` is only an object), and a Notification Channel's `kind`, EMAIL or
+WEBHOOK (only a string).
 
 ## Tests
 

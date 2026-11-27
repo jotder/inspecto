@@ -89,7 +89,8 @@ Widgets are a few proposals, not dozens.
   endsWith in between isNull isNotNull matches`). A consequence `{action: "emit-signal", params: {type: "<signal
   type>"}}` emits a signal when the rule applies.
 - A **Notification Rule** turns every event of its `eventType` (a signal type too) into a notification of its `category`.
-- A **Notification Channel** is where deliveries go (an address, or a URL). Never put a token or password in `target`
+- A **Notification Channel** is where deliveries go: `kind` EMAIL (an address in `target`) or WEBHOOK (a URL; the
+  shape types `kind` only as a string). Never put a token or password in `target`
   — it is shown to everyone who lists the Channels.
 - An update replaces the whole rule, and no MCP Tool lists these rules: to change one, ask the person for its name
   rather than guessing it.
