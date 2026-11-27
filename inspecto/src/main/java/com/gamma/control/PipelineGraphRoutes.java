@@ -912,7 +912,7 @@ final class PipelineGraphRoutes implements RouteModule {
      * draft of a pipeline that does not exist yet previews too (no 404).
      */
     private Object dryRunFlow(ApiContext api, String id, Map<String, Object> body) {
-        PipelineGraph g = candidateGraph(api, body);
+        PipelineGraph g = candidateGraph(api, id, body);
         if (g == null) {
             // BUNDLE-AUTHORED-PIPELINE-STORE-1: the REGISTERED pipeline wins — a PipelineStore graph under the
             // same id must never shadow it. The store answers only for a grandfathered, unregistered id.
@@ -1242,10 +1242,16 @@ final class PipelineGraphRoutes implements RouteModule {
      * The candidate graph in a dry-run body's {@code pipeline} key, or {@code null} when the caller wants the
      * stored pipeline. Goes through the same {@link #parseAndValidateFlow} the save route uses — a draft that
      * could not be saved must not preview as if it could (400 malformed / 422 invalid, identically).
+     *
+     * <p>The URL's id is the draft's name, as the save sets it (DRYRUN-NAME-FROM-URL-1): a draft copied from the
+     * {@code inspecto://shapes/pipeline} example carries no {@code name}, and the dry run answered 400 "pipeline 'name' is
+     * required" for a graph the save accepts.
      */
-    private PipelineGraph candidateGraph(ApiContext api, Map<String, Object> body) {
+    private PipelineGraph candidateGraph(ApiContext api, String id, Map<String, Object> body) {
         if (body == null || !(body.get("pipeline") instanceof Map<?, ?>)) return null;
-        PipelineGraph g = parseAndValidateFlow(api, mapAt(body, "pipeline"));
+        Map<String, Object> draft = new LinkedHashMap<>(mapAt(body, "pipeline"));
+        draft.put("name", id);   // the URL name wins over any name in the draft, as in saveGraph
+        PipelineGraph g = parseAndValidateFlow(api, draft);
         // DRYRUN-SAVE-NODE-MISMATCH-1: the save's node check too, so a node type the save refuses as UNSUPPORTED_NODE
         // is refused here, with the same code and words, instead of seeding a green run. Only this check: the save's
         // completeness refusals (NO_ACQUISITION, NO_PARSER, ...) stay save-only, because a dry run of a partial draft

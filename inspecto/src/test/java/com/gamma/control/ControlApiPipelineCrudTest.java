@@ -674,6 +674,27 @@ class ControlApiPipelineCrudTest {
      * proposal of the same graph was refused. Both kinds: a type no module registers, and a registered built-in the
      * flat config has no home for.
      */
+    /**
+     * DRYRUN-NAME-FROM-URL-1: the URL's id names a draft, as it does at save. A draft with no {@code name} — the shape
+     * {@code inspecto://shapes/pipeline} documents, since the save takes the name from the URL — used to answer 400
+     * "pipeline 'name' is required" (golden task dev-02, 2026-11-27); a draft naming something else runs as the URL's id.
+     */
+    @Test
+    void aDraftWithNoNameDryRunsUnderTheUrlsId(@TempDir Path dir) throws Exception {
+        String nodes = """
+            "nodes":[{"id":"acq","type":"acquisition"},
+                     {"id":"sink","type":"sink.persistent","config":{"store":"out"}}],
+            "edges":[{"from":"acq","rel":"data","to":"sink"}]""";
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            for (String draft : List.of("{" + nodes + "}", "{\"name\":\"something_else\"," + nodes + "}")) {
+                HttpResponse<String> r = send(c.port, "POST", "/pipelines/authored/unnamed_draft/dry-run",
+                        "{\"pipeline\":" + draft + ",\"sampleRows\":[{\"id\":\"1\"}]}");
+                assertEquals(200, r.statusCode(), r.body());
+                assertEquals(1, json(r).get("sinks").get(0).get("rowCount").asInt(), r.body());
+            }
+        }
+    }
+
     @Test
     void aGraphTheSaveRefusesAsUnsupportedNodeIsRefusedByTheDryRunToo(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir, dir.resolve("wr"))) {

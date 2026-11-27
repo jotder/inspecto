@@ -200,6 +200,8 @@ proposal refused (golden task dev-02). ⚖ Only that check: the save's completen
 `NO_PARSER`, `NO_PERSISTENT_SINK`) and shape refusals such as `ENRICHMENT_NOT_TERMINAL` stay save-only, so a partial
 draft still previews and a mid-walk enrichment still gets the warning above. A stored Pipeline's dry run is not
 checked: it was saved, so it lowers. Pinned by `ControlApiPipelineCrudTest` and `ModuleRemovalPipelineTest`.
+The draft is named by the URL's id, as the save names it (`DRYRUN-NAME-FROM-URL-1`, 2026-11-27): a draft with no `name`,
+the shape `inspecto://shapes/pipeline` documents, used to answer 400 "pipeline 'name' is required" (golden task dev-02).
 
 ✅ **A mid-walk enrichment cannot be SAVED (2026-09-24, `ENRICHMENT-MIDWALK-LANES-DISAGREE-1`, operator
 decision).** The two lanes disagreed about it: `PipelineExecutor.execute` skips the node and starves

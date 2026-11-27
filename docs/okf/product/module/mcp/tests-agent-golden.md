@@ -484,7 +484,7 @@ tools. ⚠ An interactive user can meet the same window on a first prompt sent a
 
 **dev-02 used the new pattern** (`acquisition` with `connector: dataset` → `transform.summarize` → `sink.persistent`)
 in both passes and never guessed a node type. Its 10 refusals were all fixable friction, each named by the server: the
-draft dry run wants a `name` the save takes from the URL; `transform.summarize` measures in three wrong spellings
+draft dry run wanted a `name` the save takes from the URL (it now takes the URL's id, `DRYRUN-NAME-FROM-URL-1`); `transform.summarize` measures in three wrong spellings
 (an object, `{name, expr}`, `sum(x) as y`) before `sum(cost_eur)`; a `sum` over a sample whose `cost_eur` was text;
 a dry run with no sample rows; and `NO_PERSISTENT_SINK` on the first two proposals. Whether the `instructions` sentence
 alone changes dev-13 is not measured: the blocking run had it, and no blocking run was made without it.
