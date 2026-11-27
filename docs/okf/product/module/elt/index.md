@@ -34,7 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `SPLIT-JOB-PIPELINE-DROPS-PROCESSING-1` | P2 | defect | Splitting a Pipeline into a Job Pipeline deletes its processing.join, processing.dedup, processing.summarize and processing.profile block… | — |
 | `AUTHORING-REDESIGN-1` | P3 | feature | Only letter (d) of the authoring redesign is left; no CREATE MACRO exists in any main source. | demand |
 | — | P3 | feature | Step Processor catalog | — |
 | `REPROCESS-ARCHIVE-MEMBER-1` | P3 | defect | Reprocessing ONE Consignment of a zip restores the whole archive under the member's composite name and reads every entry again, so rows d… | — |

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-496 test class(es): 197 unit, 299 real-HTTP control-plane, 0 IT.
+497 test class(es): 197 unit, 300 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -338,6 +338,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ImportRowFilterHugeExponentTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ImportRowFilterHugeExponentTest.java` | A decimal filter value with a huge exponent is refused before {@code BigDecimal.toPlainString} expands it into |
 | `IndexBuildOwnerRunAuthorityTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/IndexBuildOwnerRunAuthorityTest.java` | T5 residuals (a)+(b): the RUN path refuses an la.index.build Job whose owner is not its last editor, unless that |
 | `JobGraphRoutesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/JobGraphRoutesTest.java` | Backend routes for JOB-GRAPH-1: |
+| `JobPipelineSplitChainTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/JobPipelineSplitChainTest.java` | SPLIT-JOB-PIPELINE-DROPS-PROCESSING-1: {@code POST /pipelines/{id}/split-job-pipeline} carries a Pipeline's Stage-2 |
 | `JobWritersTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/JobWritersTest.java` | ASSURE-XLSX-ATTACHMENTS-1 re-verification finding 2: <b>every route that can write a {@code job} passes |
 | `KpiCompletenessWidgetTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/KpiCompletenessWidgetTest.java` | The completeness tile (§8-D, operator 2026-10-09: Signals behind a Dataset). The shipped {@code telco-ra} Space |
 | `KpiSnapshotJobTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/KpiSnapshotJobTest.java` | {@code kpi.snapshot} (`BI-INSIGHTS-1` P0, I-3) run by a real JobService: it is registered through ServiceLoader, |

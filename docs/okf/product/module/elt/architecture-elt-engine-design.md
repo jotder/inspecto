@@ -349,4 +349,17 @@ multi-destination `sinks:` arming. ⚠ **Refused at rest as well:** a *legacy* (
 predicate speaks raw-column vocabulary the landed store no longer has, and any filter carrying pre-parse
 include/exclude keys. An explicit `steps:` filter is post-map and runs fine.
 
+**Split into a Job Pipeline** (`POST /pipelines/{id}/split-job-pipeline`, JOB-GRAPH-1 JG3) moves exactly the
+chain this route runs into its own Job Pipeline, so the two files together do what the one did. An authored
+`steps:` list moves verbatim. A file without one moves its four Stage-2 blocks (`processing.join`, `dedup`,
+`summarize` and `profile`) as `steps:` entries in that order, with a join's `reference` written as authored,
+not as the parser's resolved absolute path. Its `processing.csv_settings.where` is the Stage-1 filter and stays
+on the onboarding Pipeline. The Job Pipeline's `output.format` is `PARQUET`, as the at-rest run's format-less
+sink wrote, never the onboarding Pipeline's `output.format`, which names the landed store. The parser refuses `steps:` together with any of the four blocks, so no file holds
+both. ⛔ The split refuses, with 422 `ERR_SPLIT_CHAIN_NOT_MOVABLE` (also on a preview), and writes nothing in two
+cases. One is a `route`, block or step, which runs on the ingest lane. The other is a
+`processing.disabled_steps` entry naming a step that would move. `JobPipelineSplitChainTest` runs the original's
+at-rest chain and the split Job Pipeline over the same landed rows and compares the output, dedup included
+(`SPLIT-JOB-PIPELINE-DROPS-PROCESSING-1`, 2026-11-28).
+
 ---

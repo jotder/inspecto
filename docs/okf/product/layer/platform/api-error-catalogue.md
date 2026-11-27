@@ -55,7 +55,7 @@ Read from `error.errorCode`. 23 codes.
 
 ## Config finding codes
 
-Read from `findings[].code — on a refused save error.details.findings[].code`. 54 codes.
+Read from `findings[].code — on a refused save error.details.findings[].code`. 55 codes.
 
 | Code | Severity | Status | Cause | Fix |
 |---|---|---|---|---|
@@ -88,6 +88,7 @@ Read from `findings[].code — on a refused save error.details.findings[].code`.
 | `ERR_SCHEMA_FILE_UNRESOLVED` | ERROR | 422 | An active Pipeline's schema_file resolves to no file beside its config, so it would register and never load. | Name the schema file as it is saved (usually <name>.toon in the same folder), or save the Schema first. |
 | `ERR_SELECTOR_NOT_INDEX` | ERROR | 422 | A delimited or fixed-width Pipeline's schema selects a column by name where the load needs its zero-based index in raw.fields[].selector. | Set each raw.fields[].selector to the column's zero-based position (0, 1, 2, …). |
 | `ERR_SINK_DUCKLAKE_SHARED_TABLE` | ERROR | 422 | Two sinks[] destinations register into the same DuckLake catalog and table, so every batch would insert both destinations' files into it. | Give each destination its own DuckLake table, or merge them into one destination. |
+| `ERR_SPLIT_CHAIN_NOT_MOVABLE` | ERROR | 422 | Splitting the Pipeline into a Job Pipeline would change what it does: it routes records (route runs on the ingest lane, where each branch lands its own store), or processing.disabled_steps disables a step that would move into the Job Pipeline. fieldPath names which. | For a route, keep the Pipeline as it is or author the Job Pipeline yourself; for a disabled step, enable it or remove it, then split again. Nothing was written. |
 | `ERR_STEP_COLUMN_METADATA_INVALID` | ERROR | 422 | A sql Step's fields[] row carries column metadata (description, unit, classification, synonym) that is not a plain string, or names no distinct output column (blank or duplicate name). | Give each fields[] row a unique name matching an output column, and plain string metadata values. |
 | `ERR_STEP_CONFIG_INVALID` | ERROR | 422 | An active Pipeline's lookup, profile, dedup or filter Step would be refused at run time: a required key is missing or malformed, or it names a column the declared schema does not carry. | Fix the Step at the finding's fieldPath: add the missing key, or use a column the schema declares (check spelling and case). |
 | `ERR_STEP_DISABLE_UNPARKABLE` | ERROR | 422 | An active Pipeline lists processing.disabled_steps that cannot be parked. Only the sinks of route: branches can be disabled; an unknown or upstream step, the route node itself, every branch at once, or a Pipeline with no dirs.backup is refused. | Disable only route-branch sinks, keep at least one branch live, and set dirs.backup; to stop everything, save active: false instead. |

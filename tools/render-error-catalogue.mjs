@@ -42,6 +42,7 @@ export const SOURCES = [
     { family: 'finding', file: 'inspecto/src/main/java/com/gamma/control/LinkRefusals.java', pick: ['ERR_LINK_DANGLING', 'WARN_LINK_DANGLING'] },
     { family: 'graph', file: 'platform/inspecto-engine/src/main/java/com/gamma/pipeline/PipelineValidator.java', pick: 'screaming' },
     { family: 'graph', file: 'inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java', pick: ['UNKNOWN_JOIN_REFERENCE'] },
+    { family: 'finding', file: 'inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java', pick: ['ERR_SPLIT_CHAIN_NOT_MOVABLE'] },
     { family: 'lowering', file: 'platform/inspecto-engine/src/main/java/com/gamma/pipeline/PipelineEditable.java', pick: 'screaming' },
 ];
 
