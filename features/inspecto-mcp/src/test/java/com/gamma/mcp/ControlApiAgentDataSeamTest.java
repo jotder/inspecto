@@ -239,10 +239,15 @@ class ControlApiAgentDataSeamTest {
 
     @Test
     void theAgentBudgetIs429PastItsBoundOnEachDoorPerClientAndSubject(@TempDir Path root) throws Exception {
-        System.setProperty(BUDGET, "5");   // the heaviest data route weight (a score preview, W6 group E)
+        System.setProperty(BUDGET, "20");   // the heaviest agent call (a lookup test that builds its index)
         System.setProperty(REFILL, "0.01");   // no refill within the test
         try (Ctx c = open(root, null)) {
-            for (int i = 0; i < 5; i++) assertEquals(200, query(c, AGENT, "SELECT region FROM calls").statusCode(), "direct #" + i);
+            // the agent's standard per-caller bucket is 20 too: a minute on the test clock refills it (1 per 3 s) while the
+            // agent budget regains 0.6, so the call past 20 meets the agent budget, not the standard bucket
+            java.util.concurrent.atomic.AtomicLong now = new java.util.concurrent.atomic.AtomicLong(System.nanoTime());
+            com.gamma.control.AgentGateProbe.useRateLimitClock(c.api, now::get);
+            for (int i = 0; i < 20; i++) assertEquals(200, query(c, AGENT, "SELECT region FROM calls").statusCode(), "direct #" + i);
+            now.addAndGet(60_000_000_000L);
             HttpResponse<String> past = query(c, AGENT, "SELECT region FROM calls");
             assertEquals(429, past.statusCode(), past.body());
             assertTrue(past.body().contains("agent data budget"), past.body());
@@ -251,10 +256,11 @@ class ControlApiAgentDataSeamTest {
             assertTrue(text(sameBudget).startsWith("HTTP 429"), "the MCP door spends the same budget: " + sameBudget);
 
             // another agent client of the same person has its own budget, and the MCP replay spends it
-            for (int i = 0; i < 5; i++) {
+            for (int i = 0; i < 20; i++) {
                 JsonNode ok = tool(c, AGENT2, "SELECT region FROM calls");
                 assertFalse(ok.path("isError").asBoolean(), "MCP #" + i + ": " + ok);
             }
+            now.addAndGet(60_000_000_000L);   // the standard bucket again (each MCP call counts once on /mcp)
             JsonNode mcpPast = tool(c, AGENT2, "SELECT region FROM calls");
             assertTrue(mcpPast.path("isError").asBoolean() && text(mcpPast).startsWith("HTTP 429"), mcpPast.toString());
 

@@ -167,9 +167,26 @@ final class AgentGate {
      * D-AK23 (operator, 2026-11-26): a DRAFT score preview ({@code content}) answers its factor and feature values raw to a
      * person or a person's agent holding {@code canAuthorWorkbench}; a machine agent's draft is refused by the route (403).
      * A saved model's preview keeps its key and evidence masked for every agent.
+     * D-AK25 (operator, 2026-11-27): a lookup test over a {@code path:} Reference (no classification) answers raw to a person
+     * or a person's agent holding {@code canAuthorWorkbench}; a machine agent's is refused by the route (403). A by-name
+     * Reference's test stays masked for every agent.
      */
     static final Set<String> RAW_FOR_BUILDERS = Set.of(
-            "POST /enrichment/preview", "POST /risk-scores/preview", "POST /anomaly-scores/preview");
+            "POST /enrichment/preview", "POST /risk-scores/preview", "POST /anomaly-scores/preview", "POST /lookups/test");
+
+    /**
+     * The lookup test (design {@code 2026-11-26-agent-data-answers-masking-design.md}, {@code AGENT-LOOKUP-PREVIEW-1},
+     * D-AK15, D-AK16, D-AK25; MCP Tool {@code test_lookup}): one value through a loaded Pipeline's keyed join, for every
+     * agent. The matched key, the mapped columns and at most 5 fuzzy candidates are masked by the Reference's
+     * classification ({@code LookupRoutes}, which stamps the answer); a raw {@code value} is allowed (D-AK15). Weight 1, and
+     * a call that builds the index pays {@link #LOOKUP_BUILD_WEIGHT} in all (the route spends the rest through
+     * {@code com.gamma.util.AgentBudget}). The route's own gate ({@code canAuthorWorkbench}, the per-caller budgets, the
+     * 256 MiB index cap) still decides.
+     */
+    static final String LOOKUP_TEST = "POST /lookups/test";
+
+    /** What an agent's lookup test that builds its index costs in all (design §3.4): the heaviest agent call. */
+    static final int LOOKUP_BUILD_WEIGHT = 20;
 
     /** An agent's authoring-preview body cap: the MCP endpoint's own 256 KiB, so a direct call gets no more than a tool call. */
     static final int PREVIEW_MAX_BODY_BYTES = 256 * 1024;
@@ -192,7 +209,8 @@ final class AgentGate {
      * group C, D-AK10: a delegated person only, as a run): each case runs its Pipeline over the case folder's own files
      * into a JVM-temp scratch root deleted afterwards, with no batch commit, batch audit, provenance or Signal, and answers
      * verdicts (counts, a checksum, a named column's min or max), never rows; the simulators ({@link #SIMULATORS},
-     * W6 group B) and the reconciliation reads ({@link #RECON_READS}, D2), each an agent data route.
+     * W6 group B), the reconciliation reads ({@link #RECON_READS}, D2) and the lookup test ({@link #LOOKUP_TEST}), each an
+     * agent data route.
      */
     static final Set<String> ALLOWED;
 
@@ -239,6 +257,7 @@ final class AgentGate {
         all.addAll(ANALYST_PREVIEWS.keySet());
         all.addAll(ANALYTIC_READS);
         all.addAll(RECON_READS.keySet());
+        all.add(LOOKUP_TEST);
         all.addAll(SIMULATORS.keySet());
         ALLOWED = Set.copyOf(all);
     }
@@ -258,7 +277,7 @@ final class AgentGate {
      * step stamped ({@code com.gamma.util.AnswerMasking}). S0 lists {@code POST /db/query} and the Link Analysis reads that
      * answer entity ids or rows, and the masked value GETs ({@link #VALUE_GETS}); D1 adds {@link #ANALYTIC_READS}, group B
      * {@link #SIMULATORS}, group E the analyst previews ({@link #ANALYST_PREVIEWS}, weights 5 and 2), D2 the reconciliation
-     * reads ({@link #RECON_READS}); {@code /lookups/test} joins in its own change.
+     * reads ({@link #RECON_READS}), and the last change the lookup test ({@link #LOOKUP_TEST}, 1; 20 when it builds).
      */
     static final Map<String, Integer> DATA_ROUTES;
 
@@ -307,12 +326,22 @@ final class AgentGate {
         m.putAll(ANALYST_PREVIEWS);
         m.putAll(SIMULATORS);
         m.putAll(RECON_READS);
+        m.put(LOOKUP_TEST, 1);
         DATA_ROUTES = Map.copyOf(m);
     }
 
-    /** The weight of the heaviest {@link #DATA_ROUTES} entry: the smallest agent burst that can ever pay every route. */
+    /** Each data route's most expensive call: its {@link #DATA_ROUTES} weight, or what a call that does the most costs in all
+     *  (a lookup test that builds its index, {@link #LOOKUP_BUILD_WEIGHT}). */
+    static final Map<String, Integer> PEAK_DATA_WEIGHTS;
+    static {
+        Map<String, Integer> m = new HashMap<>(DATA_ROUTES);
+        m.put(LOOKUP_TEST, LOOKUP_BUILD_WEIGHT);
+        PEAK_DATA_WEIGHTS = Map.copyOf(m);
+    }
+
+    /** The weight of the heaviest {@link #PEAK_DATA_WEIGHTS} entry: the smallest agent burst that can ever pay every call. */
     static int heaviestDataWeight() {
-        return heaviest(DATA_ROUTES);
+        return heaviest(PEAK_DATA_WEIGHTS);
     }
 
     static int heaviest(Map<String, Integer> routes) {

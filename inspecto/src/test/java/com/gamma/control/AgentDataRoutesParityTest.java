@@ -63,7 +63,9 @@ class AgentDataRoutesParityTest {
             Map.entry("POST /recon/columns", RECON_PROOF),
             Map.entry("POST /recon/run", RECON_PROOF),
             Map.entry("POST /recon/breaks", RECON_PROOF),
-            Map.entry("POST /recon/rows", RECON_PROOF));
+            Map.entry("POST /recon/rows", RECON_PROOF),
+            // AGENT-LOOKUP-PREVIEW-1: the lookup test
+            Map.entry("POST /lookups/test", "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentLookupTest.java"));
 
     private static final String MCP_PROOF = "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentDataSeamTest.java";
     private static final String LA_PROOF = "la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiAgentLinkAnalysisSeamTest.java";
@@ -222,11 +224,15 @@ class AgentDataRoutesParityTest {
      * its own operator decision; every other data route must prove a masking step, since its scope never accepts the raw
      * stamp ({@code AnswerMaskingTest}). The enrichment preview refuses a machine at the gate ({@code PERSON_ONLY}); a score
      * preview admits a machine for a saved model and its route refuses a machine's draft (403, proved in each module's test).
+     * D-AK25 (operator, 2026-11-27): the lookup test is raw by decision over a {@code path:} Reference only; it admits a
+     * machine for a by-name Reference, masked, and its route refuses a machine's path Reference (403,
+     * {@code ControlApiAgentLookupTest}).
      */
     @Test
     void theRawByDecisionRoutesAreTheDecidedOnesAndNeverForAMachine() {
-        assertEquals(Set.of("POST /enrichment/preview", "POST /risk-scores/preview", "POST /anomaly-scores/preview"),
-                AgentGate.RAW_FOR_BUILDERS);
+        assertEquals(Set.of("POST /enrichment/preview", "POST /risk-scores/preview", "POST /anomaly-scores/preview",
+                        "POST /lookups/test"), AgentGate.RAW_FOR_BUILDERS);
+        assertFalse(AgentGate.PERSON_ONLY.contains("POST /lookups/test"), "a machine tests a by-name Reference, masked");
         for (String r : AgentGate.RAW_FOR_BUILDERS)
             assertTrue(AgentGate.DATA_ROUTES.containsKey(r), r + " is still a stamped, weighted data route");
         assertTrue(AgentGate.PERSON_ONLY.contains("POST /enrichment/preview"), "the enrichment preview is refused to a machine agent");

@@ -419,6 +419,24 @@ class McpToolRoutesTest {
         assertThrows(McpTools.BadArgs.class, () -> t.validate(new LinkedHashMap<>(Map.of("step", "run"))), "the body is required");
     }
 
+    /**
+     * AGENT-LOOKUP-PREVIEW-1: test_lookup only reads and replays the lookup test (canAuthorWorkbench), the body passed on
+     * as the route takes it; the body is required.
+     */
+    @Test
+    void testLookupReplaysTheLookupTestOnly() {
+        McpTools.Tool t = McpTools.tool("test_lookup");
+        assertFalse(t.write());
+        McpTools.Call c = t.router().route(t.validate(new LinkedHashMap<>(Map.of("body",
+                Map.of("pipeline", "p1", "step", "join", "value", "249", "refresh", true)))));
+        assertEquals("POST /lookups/test", c.method() + " " + c.path());
+        String sent = new String(c.body(), java.nio.charset.StandardCharsets.UTF_8);
+        assertTrue(sent.contains("\"value\":\"249\"") && sent.contains("\"refresh\":true"), sent);
+        assertTrue(CapabilityManifest.ENTRIES.stream().anyMatch(m -> m.method().equals("POST")
+                && m.pattern().equals("/lookups/test") && "canAuthorWorkbench".equals(m.capability())));
+        assertThrows(McpTools.BadArgs.class, () -> t.validate(new LinkedHashMap<>()), "the body is required");
+    }
+
     /** AGENT-NOTICE-PLANTED-1: list_comments only reads, and replays the one route whose masking
      *  ControlApiObjectReadMaskingTest proves for an agent token. */
     @Test

@@ -39,6 +39,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `APPROVAL-POLICY-PRESET-1` | P3 | feature | a Standard install is not gated by default: | — |
 | `OIDC-SUPER-ROLE-TEST-RED-1` | P3 | defect | OidcAuthenticatorTest.superRoleGrantsAllCapabilities fails on master: the super role now also grants canDraftInvestigations, which the te… | — |
 | `ENRICHMENT-PREVIEW-PATH-REACH-1` | P2 | defect | A builder's agent can page any Dataset's store raw through an enrichment preview path: Reference: | — |
+| `LOOKUP-TEST-PATH-RAW-1` | P2 | defect | A lookup test over a path: Reference answers the file's values raw to a builder and to a builder's agent: | — |
 | `ENRICHMENT-PREVIEW-SHARING-1` | P2 | defect | The enrichment preview never checks Dataset sharing: | — |
 | `DB-QUERY-STORE-SHARING-1` | P3 | chore | verify: may a /db/query store read reach a shared-away Dataset? | — |
 | `RECON-STATE-READS-UNMASKED-1` | P3 | defect | The recon state reads return recorded Break keys raw, and two skip the Reconciliation's sharing (filed 2026-11-26, RECON-READ-UNGATED-1 f… | — |

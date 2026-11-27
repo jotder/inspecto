@@ -299,17 +299,21 @@ class ControlApiAgentAnalyticReadsTest {
 
     @Test
     void theAgentBudgetIsChargedOnBothDoorsAnd429PastItsBound(@TempDir Path root) throws Exception {
-        // 5: the heaviest data route weighs 5 (W6 group E's score previews), and RateLimiter.agent raises a lower burst to it
-        System.setProperty(BUDGET, "5");
+        // 20: the heaviest agent call weighs 20 (a lookup test that builds its index), and RateLimiter.agent raises a
+        // lower burst to it
+        System.setProperty(BUDGET, "20");
         System.setProperty(REFILL, "0.01");   // no refill within the test
         try (Ctx c = open(root, null)) {
-            assertEquals(200, measure(c, AGENT, BY_MSISDN).statusCode(), "direct /bi/query spends 1");
-            assertEquals(200, measure(c, AGENT, BY_MSISDN).statusCode(), "and again: 1");
-            assertEquals(200, run(c, AGENT, "calls_q", Map.of()).statusCode(), "direct /queries/{id}/run spends 1");
-            assertFalse(measureTool(c, AGENT, BY_MSISDN).path("isError").asBoolean(), "query_measure spends 1");
-            assertFalse(runTool(c, AGENT, "calls_q").path("isError").asBoolean(), "run_saved_query spends 1");
+            for (int i = 0; i < 8; i++) {
+                assertEquals(200, measure(c, AGENT, BY_MSISDN).statusCode(), "direct /bi/query spends 1 #" + i);
+                assertEquals(200, run(c, AGENT, "calls_q", Map.of()).statusCode(), "direct /queries/{id}/run spends 1 #" + i);
+            }
+            for (int i = 0; i < 2; i++) {
+                assertFalse(measureTool(c, AGENT, BY_MSISDN).path("isError").asBoolean(), "query_measure spends 1 #" + i);
+                assertFalse(runTool(c, AGENT, "calls_q").path("isError").asBoolean(), "run_saved_query spends 1 #" + i);
+            }
             HttpResponse<String> past = run(c, AGENT, "calls_q", Map.of());
-            assertEquals(429, past.statusCode(), "the budget of 5 is spent across both routes and both doors: " + past.body());
+            assertEquals(429, past.statusCode(), "the budget of 20 is spent across both routes and both doors: " + past.body());
             assertTrue(past.body().contains("agent data budget"), past.body());
             assertTrue(past.headers().firstValue("Retry-After").isPresent(), "429 says when to retry");
             assertEquals(429, measure(c, AGENT, BY_MSISDN).statusCode());

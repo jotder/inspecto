@@ -540,7 +540,19 @@ final class McpTools {
                             + "it holds the References' raw values, which you then hold too - select only the columns you "
                             + "need. A delegated person's agent only, never a machine (D-AK22). Needs canAuthorWorkbench.",
                     List.of(body("The preview request: {config: the enrichment draft, sampleRows: [rows]}.", true)),
-                    a -> new Call("POST", "/enrichment/preview", bodyOf(a))));
+                    a -> new Call("POST", "/enrichment/preview", bodyOf(a))),
+            // AGENT-LOOKUP-PREVIEW-1: the lookup test, masked by the Reference's classification (AgentGate.LOOKUP_TEST)
+            new Tool("test_lookup", "Test a lookup",
+                    "Send one value through a loaded Pipeline's keyed lookup (a join Step with key, or from/to) and see "
+                            + "what it matches; writes nothing. Body {pipeline, step, value, at? (the row time for match "
+                            + "asof), blockValues? (fuzzy), refresh? (rebuild the index)}; GET /lookups lists the Steps. "
+                            + "Classified values come back masked (an agent never reveals them); you may send a value as you "
+                            + "know it. A fuzzy lookup answers at most 5 candidates. A Reference read by path has no "
+                            + "classification: its answer is NOT masked, and a machine agent is refused it. A test costs 1 "
+                            + "of your data budget, 20 when it builds the index. Needs canAuthorWorkbench. Test, then propose.",
+                    List.of(body("The test request, as POST /lookups/test takes it: {pipeline, step, value, at?, "
+                            + "blockValues?, refresh?}.", true)),
+                    a -> new Call("POST", "/lookups/test", bodyOf(a))));
 
     // ── AK-2d: operations tools (plan §4.6, §6.2 lane C) ─────────────────────────────────────────
 

@@ -109,7 +109,7 @@ counts come from the item tags on [`BACKLOG.md`](../../BACKLOG.md) (192 open row
 
 # Modules
 
-* [Access policy (roles, grants, row scope, audit trail)](module/access/index.md) - `module.access` · 18 doc(s) · 19 open row(s)
+* [Access policy (roles, grants, row scope, audit trail)](module/access/index.md) - `module.access` · 18 doc(s) · 20 open row(s)
 * [Acquisition and collectors](module/acquire/index.md) - `module.acquire` · 3 doc(s) · 2 open row(s)
 * [Action Requests](module/action-requests/index.md) - `module.action-requests` · 10 doc(s) · 1 open row(s)
 * [Hosted model providers for the assistant](module/agent-hosted/index.md) - `module.agent-hosted` · 7 doc(s) · 0 open row(s)

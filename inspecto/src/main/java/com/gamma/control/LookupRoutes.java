@@ -212,12 +212,18 @@ final class LookupRoutes implements RouteModule {
      * Reference's store is not viewable by the caller; the matched key, the mapped columns and at most
      * {@link #MAX_CANDIDATES} fuzzy candidates are masked as {@code /bi/query} masks them ({@link #masking}); 429 past
      * the per-caller {@link #calls} budget, or the {@link #reloads} budget for a call that builds the index.
+     *
+     * <p>AGENT-LOOKUP-PREVIEW-1: an agent data route ({@link AgentGate#LOOKUP_TEST}). An agent's answer is stamped (masked
+     * by the Reference's classification, or raw by decision for a {@code path:} Reference, D-AK25, which a machine agent is
+     * refused: 403); its per-route budgets are its own (agent client and subject), and a call that builds the index pays
+     * {@link AgentGate#LOOKUP_BUILD_WEIGHT} of the agent budget in all.
      */
     private static Object test(ApiContext api, HttpExchange ex, Map<String, Object> body) throws Exception {
-        String caller = ApiContext.subject(ex).map(com.gamma.spi.auth.Subject::id).orElseGet(() -> {
-            String ip = ApiContext.ip(ex);
-            return ip == null ? "unknown" : ip;
-        });
+        com.gamma.spi.auth.Subject subject = ApiContext.subject(ex).orElse(null);
+        // an agent spends its own per-route budgets, never its person's (D-AK17: keyed by agent client and subject)
+        String agentKey = AgentGate.agentBudgetKey(subject);
+        String ip = ApiContext.ip(ex);
+        String caller = agentKey != null ? agentKey : subject != null ? subject.id() : ip == null ? "unknown" : ip;
         charge(ex, calls, caller, "/lookups/test");
         String pipeline = body == null || body.get("pipeline") == null ? null : body.get("pipeline").toString();
         String step = body == null || body.get("step") == null ? null : body.get("step").toString();
@@ -249,9 +255,17 @@ final class LookupRoutes implements RouteModule {
         Masking mask = masking(api, ex, node, loaded);
         if (mask == null)   // a Dataset over the Reference is shared away from the caller: as absent as an unknown Step
             throw new ApiException(404, ErrorCodes.NOT_FOUND, "no keyed lookup '" + step + "' in pipeline '" + pipeline + "'");
+        boolean agent = subject != null && subject.agent();
+        if (agent && mask.path() && subject.machine())   // D-AK25: a path Reference answers raw, so never to a machine
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "a machine agent tests a lookup over a by-name "
+                    + "Reference only: a path Reference has no classification, so its values would answer unmasked (D-AK25)");
         boolean refresh = Boolean.TRUE.equals(body.get("refresh"));
-        // every build this call causes (asked, cold, evicted, changed) spends the build budget, not only refresh: true
-        Warmed w = warmUp(api, pipeline, node, refresh, () -> charge(ex, reloads, caller, "a lookup index build"));
+        // every build this call causes (asked, cold, evicted, changed) spends the build budget, not only refresh: true;
+        // an agent's build also pays the rest of its weight 20 in the agent budget (design §3.4), before anything is read
+        Warmed w = warmUp(api, pipeline, node, refresh, () -> {
+            charge(ex, reloads, caller, "a lookup index build");
+            if (agent) chargeAgentBuild(ex);
+        });
         Warm warm = w.warm();
         String reason = w.reason(), stamp = w.stamp();
         String valStr = value == null ? null : value.toString();
@@ -294,7 +308,24 @@ final class LookupRoutes implements RouteModule {
         index.put("reloaded", reason);                 // why this answer built the index, or null when it was kept
         index.put("watchesReference", stamp != null);  // false: a Reference change is only seen on reload
         out.put("index", index);
+        // AGENT-KIT-1 W6 (D-AK13): prove the masking for an agent's answer. A by-name Reference was masked by its
+        // classification; a path Reference has none and answers raw by decision (D-AK25; the host accepts that stamp only
+        // on AgentGate.RAW_FOR_BUILDERS). A by-name Reference read with no registry was classified by nothing: no stamp,
+        // so an agent's answer is withheld (500). A no-op for a person.
+        if (mask.basis() != null) com.gamma.util.AnswerMasking.applied(mask.basis(), mask.hiddenOf(sources));
+        else if (mask.path()) com.gamma.util.AnswerMasking.unmaskedByDecision("lookup over a path Reference: raw for a builder (D-AK25)");
         return out;
+    }
+
+    /**
+     * An agent's lookup test that builds its index costs {@link AgentGate#LOOKUP_BUILD_WEIGHT} in all: the host charged the
+     * route's weight before the handler; the rest is spent here, before the build, through the host's charger
+     * ({@link com.gamma.util.AgentBudget}) - a 429 past the budget. Fails closed when no charger is there.
+     */
+    private static void chargeAgentBuild(HttpExchange ex) {
+        if (!(ApiContext.attr(ex, com.gamma.util.AgentBudget.ATTR) instanceof java.util.function.IntConsumer charge))
+            throw new IllegalStateException("an agent's lookup index build reached no agent budget");
+        charge.accept(AgentGate.LOOKUP_BUILD_WEIGHT - AgentGate.DATA_ROUTES.get(AgentGate.LOOKUP_TEST));
     }
 
     /**
@@ -325,9 +356,20 @@ final class LookupRoutes implements RouteModule {
      * How one caller sees a lookup's Reference values (LOOKUP-TEST-OPEN-READ-1): {@code bi} masks a by-name Reference as
      * {@code /bi/query} masks a Dataset over its store; {@code null} = raw. A {@code path:} Reference has no
      * classification (no Dataset or Pipeline schema describes the file), so nothing in it is masked: its readers can
-     * already dry-run a Pipeline over the same file.
+     * already dry-run a Pipeline over the same file. {@code basis}: the by-name Reference a registry classified, else
+     * {@code null}; {@code path}: the Reference is a {@code path:} one.
      */
-    private record Masking(List<BiResultMasking> bis, List<String> keyColumns) {
+    private record Masking(List<BiResultMasking> bis, List<String> keyColumns, String basis, boolean path) {
+        /** How many of the key and answered Reference columns this caller sees masked (the stamp's count). */
+        int hiddenOf(List<Map<String, String>> sources) {
+            java.util.Set<String> cols = new java.util.LinkedHashSet<>(keyColumns);
+            for (Map<String, String> s : sources)
+                for (String c : s.values()) if (!PointLookup.MATCHED_KEY.equals(c)) cols.add(c);
+            int n = 0;
+            for (String c : cols) if (hiding(c) != null) n++;
+            return n;
+        }
+
         /** The first masking that hides {@code column}, or {@code null}: strictest wins across the Datasets on the store. */
         private BiResultMasking hiding(String column) {
             for (BiResultMasking bi : bis) if (bi.hidesFromCaller(column)) return bi;
@@ -362,15 +404,17 @@ final class LookupRoutes implements RouteModule {
         for (String k : List.of("key", "from", "to"))
             if (node.cfg(k) != null && !node.cfg(k).toString().isBlank()) keyColumns.add(node.cfg(k).toString().trim());
         String ref = null;
+        boolean path = false;
         try {
             Object r = node.cfg("reference");
             com.gamma.enrich.EnrichmentConfig.Reference parsed = r == null ? null : ReferenceReader.parse(r.toString());
             if (parsed != null && parsed.byName()) ref = parsed.ref();
+            else path = parsed != null;
         } catch (RuntimeException unparseable) {
             // the build refuses it (422) before anything is answered
         }
         Path writeRoot = api.writeRoot();
-        if (ref == null || writeRoot == null) return new Masking(List.of(), keyColumns);   // no registry, no classification
+        if (ref == null || writeRoot == null) return new Masking(List.of(), keyColumns, null, path);   // no classification
         // the stores the Reference is: the producing Pipeline's name and its Stream (PipelineSchemas.producers' rule)
         java.util.Set<String> stores = new java.util.LinkedHashSet<>();
         stores.add(ref);
@@ -393,7 +437,7 @@ final class LookupRoutes implements RouteModule {
         overStore.put("physicalRef", it.next());
         if (it.hasNext()) overStore.put("sourceName", it.next());
         bis.add(BiResultMasking.of(writeRoot, registry, views, "(lookup " + ref + ")", overStore, reveal));
-        return new Masking(bis, keyColumns);
+        return new Masking(bis, keyColumns, "lookup " + ref, false);
     }
 
     /** {@code dataset} reads one of {@code stores} directly (its {@code physicalRef} or {@code sourceName}, by its head). */

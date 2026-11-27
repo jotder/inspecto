@@ -397,7 +397,8 @@ class ControlApiAgentReconReadsTest {
 
     @Test
     void theAgentBudgetIsChargedByWeightOnBothDoorsAnd429PastItsBound(@TempDir Path root) throws Exception {
-        System.setProperty(BUDGET, "13");     // run 5 + breaks 5 + rows 2 + columns 1
+        // 20 (the heaviest agent call, a lookup build, is the floor): run 5 + breaks 5 + rows 2 + columns 1 + run 5 + rows 2
+        System.setProperty(BUDGET, "20");
         System.setProperty(REFILL, "0.01");   // no refill within the test
         Map<String, Map<String, Object>> reads = reads(SUBS, "m2");
         try (Ctx c = open(root, null)) {
@@ -405,8 +406,10 @@ class ControlApiAgentReconReadsTest {
             assertFalse(tool(c, AGENT, "/recon/breaks", reads.get("/recon/breaks")).path("isError").asBoolean(), "breaks spends 5");
             assertEquals(200, post(c, AGENT, "/recon/rows", reads.get("/recon/rows")).statusCode(), "rows spends 2");
             assertFalse(tool(c, AGENT, "/recon/columns", reads.get("/recon/columns")).path("isError").asBoolean(), "columns 1");
+            assertEquals(200, post(c, AGENT, "/recon/run", reads.get("/recon/run")).statusCode(), "a second run spends 5");
+            assertFalse(tool(c, AGENT, "/recon/rows", reads.get("/recon/rows")).path("isError").asBoolean(), "rows again 2");
             HttpResponse<String> past = post(c, AGENT, "/recon/columns", reads.get("/recon/columns"));
-            assertEquals(429, past.statusCode(), "the budget of 13 is spent across the four routes and both doors: " + past.body());
+            assertEquals(429, past.statusCode(), "the budget of 20 is spent across the four routes and both doors: " + past.body());
             assertTrue(past.body().contains("agent data budget"), past.body());
             assertTrue(past.headers().firstValue("Retry-After").isPresent(), "429 says when to retry");
             assertTrue(text(tool(c, AGENT, "/recon/run", reads.get("/recon/run"))).startsWith("HTTP 429"),

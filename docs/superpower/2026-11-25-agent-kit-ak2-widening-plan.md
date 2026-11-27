@@ -1,9 +1,9 @@
 # Agent Kit AK-2 — widening what an agent can reach, task by task (plan and task specs)
 
 > **Status: APPROVED 2026-11-25 — D-AK8…D-AK12 signed (operator interview, §5; D-AK8 not as recommended, which adds
-> task W11); built (§3): W1, W2, W3, W4 steps 1–3, W6 groups A, B, C, D (D1 and D2) and E, W7, W8, W9, W10 and W11
-> (2026-11-25/27; W8's and W9's live golden runs belong to W4); open: W4 from step 4, W5, and the agent change of
-> `POST /lookups/test` (`AGENT-LOOKUP-PREVIEW-1`).** The follow-on to phases 1–3b of
+> task W11); built (§3): W1, W2, W3, W4 steps 1–3, W6 groups A, B, C, D (D1 and D2) and E and the agent change of
+> `POST /lookups/test` (`AGENT-LOOKUP-PREVIEW-1`, MCP Tool `test_lookup`, 2026-11-27), W7, W8, W9, W10 and W11
+> (2026-11-25/27; W8's and W9's live golden runs belong to W4); open: W4 from step 4 and W5.** The follow-on to phases 1–3b of
 > [`2026-11-20-agent-kit-ak2-plan.md`](2026-11-20-agent-kit-ak2-plan.md) (all built 2026-11-25). It takes the gaps a
 > peer's product review of that plan listed
 ([`2026-11-25-agent-kit-ak2-product-review.md`](2026-11-25-agent-kit-ak2-product-review.md)), keeps the ones

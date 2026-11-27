@@ -59,13 +59,13 @@ class RateLimiterBudgetTest {
         assertTrue(problem != null && problem.contains("rate.agent_burst 19") && problem.contains("POST /lookups/test")
                 && problem.contains("at least 20"), String.valueOf(problem));
         assertEquals(null, AgentGate.burstProblem(20, routes));
-        // W6 group E: a score preview weighs 5, so the real list refuses a burst of 4
-        assertEquals(5, AgentGate.heaviestDataWeight());
-        String real = AgentGate.burstProblem(4, AgentGate.DATA_ROUTES);
-        assertTrue(real != null && real.contains("at least 5") && real.contains("-scores/preview"), String.valueOf(real));
-        assertEquals(null, AgentGate.burstProblem(5, AgentGate.DATA_ROUTES));
+        // AGENT-LOOKUP-PREVIEW-1: a lookup test that builds its index costs 20, so the real list refuses a burst of 19
+        assertEquals(20, AgentGate.heaviestDataWeight());
+        String real = AgentGate.burstProblem(19, AgentGate.PEAK_DATA_WEIGHTS);
+        assertTrue(real != null && real.contains("at least 20") && real.contains("POST /lookups/test"), String.valueOf(real));
+        assertEquals(null, AgentGate.burstProblem(20, AgentGate.PEAK_DATA_WEIGHTS));
 
-        System.setProperty(AGENT_CAPACITY, "0.5");   // below the heaviest weight (5): the bucket still holds a whole call
+        System.setProperty(AGENT_CAPACITY, "0.5");   // below the heaviest weight (20): the bucket still holds a whole call
         try {
             assertEquals(AgentGate.heaviestDataWeight(), burst(RateLimiter.agent()));
         } finally {

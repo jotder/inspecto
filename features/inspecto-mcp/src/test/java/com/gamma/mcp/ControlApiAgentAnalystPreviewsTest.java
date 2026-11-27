@@ -247,35 +247,39 @@ class ControlApiAgentAnalystPreviewsTest {
 
     @Test
     void eachCallSpendsItsWeightOnBothDoorsAndNeverThePersonsBudget(@TempDir Path root) throws Exception {
-        System.setProperty(BUDGET, "5");
+        System.setProperty(BUDGET, "20");     // the heaviest agent call (a lookup test that builds its index)
         System.setProperty(REFILL, "0.01");   // no refill within the test
         try (Ctx c = open(root)) {
-            assertEquals(200, preview(c, AGENT).statusCode(), "a score preview weighs 5: the whole burst");
+            for (int i = 0; i < 4; i++)
+                assertEquals(200, preview(c, AGENT).statusCode(), "a score preview weighs 5: four are the whole burst #" + i);
             HttpResponse<String> past = check(c, AGENT);
             assertEquals(429, past.statusCode(), "nothing left for a check's 2: " + past.body());
             assertTrue(past.body().contains("agent data budget"), past.body());
             assertTrue(past.headers().firstValue("Retry-After").isPresent(), "429 says when to retry");
             assertTrue(text(previewTool(c, AGENT)).startsWith("HTTP 429"), "the MCP door spends the same budget");
 
-            // another agent client of the same person: a check weighs 2, so two fit in 5 and a third does not
-            for (int i = 0; i < 2; i++) assertFalse(checkTool(c, AGENT2).path("isError").asBoolean(), "MCP check #" + i);
-            JsonNode third = checkTool(c, AGENT2);
-            assertTrue(third.path("isError").asBoolean() && text(third).startsWith("HTTP 429"), third.toString());
+            // another agent client of the same person: a check weighs 2, so ten fit in 20 and an eleventh does not
+            for (int i = 0; i < 10; i++) assertFalse(checkTool(c, AGENT2).path("isError").asBoolean(), "MCP check #" + i);
+            JsonNode eleventh = checkTool(c, AGENT2);
+            assertTrue(eleventh.path("isError").asBoolean() && text(eleventh).startsWith("HTTP 429"), eleventh.toString());
 
             assertEquals(200, check(c, MACHINE).statusCode(), "a machine agent has its own budget");
 
             // a third client: the anomaly preview weighs 5 too, charged before the route answers
-            assertEquals(404, anomaly(c, AGENT3).statusCode(), "the whole burst spent on the anomaly preview");
-            assertEquals(429, anomaly(c, AGENT3).statusCode(), "nothing left for a second one");
+            for (int i = 0; i < 4; i++)
+                assertEquals(404, anomaly(c, AGENT3).statusCode(), "the burst spent on anomaly previews #" + i);
+            assertEquals(429, anomaly(c, AGENT3).statusCode(), "nothing left for a fifth one");
             assertTrue(text(anomalyTool(c, AGENT3)).startsWith("HTTP 429"), "nor through preview_score kind anomaly");
 
-            // D-AK24: a check costs 2 per started 10 subjects - 11 subjects spend 4 of 5, so a 1-subject check (2) is refused
-            List<Map<String, Object>> eleven = new java.util.ArrayList<>();
+            // D-AK24: a check costs 2 per started 10 subjects - 81 subjects spend 18 of 20, so an 11-subject check (4) is refused
+            List<Map<String, Object>> many = new java.util.ArrayList<>(), eleven = new java.util.ArrayList<>();
+            for (int i = 0; i < 81; i++) many.add(Map.of("name", NAME));
             for (int i = 0; i < 11; i++) eleven.add(Map.of("name", NAME));
             assertEquals(200, post(c, AGENT4, "/screening/check", JSON.writeValueAsString(
-                    Map.of("lists", List.of("watch"), "subjects", eleven))).statusCode(), "11 subjects cost 4");
-            JsonNode after = checkTool(c, AGENT4);
-            assertTrue(after.path("isError").asBoolean() && text(after).startsWith("HTTP 429"), "1 token left: " + after);
+                    Map.of("lists", List.of("watch"), "subjects", many))).statusCode(), "81 subjects cost 18");
+            HttpResponse<String> after = post(c, AGENT4, "/screening/check", JSON.writeValueAsString(
+                    Map.of("lists", List.of("watch"), "subjects", eleven)));
+            assertEquals(429, after.statusCode(), "2 tokens left, 11 subjects cost 4: " + after.body());
             for (int i = 0; i < 3; i++)
                 assertEquals(200, preview(c, PERSON).statusCode(), "the person's own previews spend no agent budget #" + i);
         }

@@ -99,8 +99,10 @@ class AgentGateParityTest {
         // the two score previews (W6 group E: reads behind canWorkIncidents, masked data routes)
         assertEquals(Set.of("POST /action-requests", "POST /promotion/preview", "POST /pipelines/authored/([^/]+)/run",
                         "POST /tests/run", "POST /decision-rules/([^/]+)/simulate", "POST /rule-templates/([^/]+)/simulate",
-                        "POST /enrichment/preview", "POST /risk-scores/preview", "POST /anomaly-scores/preview"),
+                        "POST /enrichment/preview", "POST /risk-scores/preview", "POST /anomaly-scores/preview",
+                        "POST /lookups/test"),   // AGENT-LOOKUP-PREVIEW-1: a masked data route behind canAuthorWorkbench
                 gatedButAllowed);
+        assertEquals(Roles.CAN_AUTHOR_WORKBENCH, m.get(AgentGate.LOOKUP_TEST), "the lookup test keeps the route's own gate");
         for (String sim : AgentGate.SIMULATORS.keySet())
             assertEquals(Roles.CAN_AUTHOR_WORKBENCH, m.get(sim), sim + " keeps the route's own gate");
         assertEquals(Set.of("POST /pipelines/authored/([^/]+)/run", "POST /tests/run", "POST /enrichment/preview"),
@@ -113,18 +115,39 @@ class AgentGateParityTest {
 
     /**
      * W6 group A (D-AK10): the four authoring previews are allowed to every agent — read-shaped exemptions, none
-     * person-only. {@code /lookups/test} is not one: refused to agents until AGENT-LOOKUP-PREVIEW-1 (operator 2026-11-26).
+     * person-only. {@code /lookups/test} is not one: it answers Reference values, so it is a data route of its own
+     * (AGENT-LOOKUP-PREVIEW-1), never an authoring preview.
      */
     @Test
     void theAuthoringPreviewsAreAllowedToEveryAgent() {
         Map<String, String> m = manifest();
         assertEquals(4, AgentGate.AUTHORING_PREVIEWS.size());
-        assertNotEquals(AgentGate.Bucket.ALLOWED, bucket("POST /lookups/test"), "the lookup test stays refused to agents");
+        assertFalse(AgentGate.AUTHORING_PREVIEWS.contains(AgentGate.LOOKUP_TEST), "the lookup test is a data route, not a preview");
         for (String key : AgentGate.AUTHORING_PREVIEWS) {
             assertEquals("exempt:read-shaped", m.get(key), key);
             assertEquals(AgentGate.Bucket.ALLOWED, bucket(key), key);
             assertFalse(AgentGate.PERSON_ONLY.contains(key), key);
         }
+    }
+
+    /**
+     * AGENT-LOOKUP-PREVIEW-1 (signed design D-AK13, D-AK15, D-AK16, D-AK17, D-AK25): the lookup test is allowed to every agent
+     * behind its own {@code canAuthorWorkbench}, not person-only (a machine tests a by-name Reference, masked), a data route
+     * of weight 1 whose call that builds the index costs 20 in all — the heaviest agent call, so the agent burst is never
+     * below it.
+     */
+    @Test
+    void theLookupTestIsAnAgentDataRouteWeighingTwentyWhenItBuilds() {
+        assertEquals(AgentGate.Bucket.ALLOWED, bucket(AgentGate.LOOKUP_TEST));
+        assertFalse(AgentGate.PERSON_ONLY.contains(AgentGate.LOOKUP_TEST));
+        assertEquals(1, AgentGate.DATA_ROUTES.get(AgentGate.LOOKUP_TEST));
+        assertEquals(20, AgentGate.LOOKUP_BUILD_WEIGHT);
+        assertEquals(20, AgentGate.PEAK_DATA_WEIGHTS.get(AgentGate.LOOKUP_TEST));
+        assertEquals(20, AgentGate.heaviestDataWeight());
+        for (Map.Entry<String, Integer> e : AgentGate.DATA_ROUTES.entrySet())
+            if (!e.getKey().equals(AgentGate.LOOKUP_TEST))
+                assertEquals(e.getValue(), AgentGate.PEAK_DATA_WEIGHTS.get(e.getKey()), e.getKey() + " has one cost");
+        assertEquals(AgentGate.DATA_ROUTES.keySet(), AgentGate.PEAK_DATA_WEIGHTS.keySet());
     }
 
     /**

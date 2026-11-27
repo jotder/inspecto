@@ -1,7 +1,7 @@
 ---
 type: Spec
-title: Agent data answers — the shared seam (AGENT-KIT-1 W6 S0, D1, D2) — as-built
-description: How every agent-reachable route that answers Dataset values proves its masking ran (the masked-answer stamp and the fail-closed 500), the agent data routes list, the one weighted agent rate budget charged at both doors, the install settings that tune it, the audit rule, the analytic reads opened by D1, the reconciliation reads opened by D2 and the tests that prove each part.
+title: Agent data answers — the shared seam (AGENT-KIT-1 W6 S0, D1, D2, lookups) — as-built
+description: How every agent-reachable route that answers Dataset values proves its masking ran (the masked-answer stamp and the fail-closed 500), the agent data routes list, the one weighted agent rate budget charged at both doors, the install settings that tune it, the audit rule, the analytic reads opened by D1, the reconciliation reads opened by D2, the lookup test opened last and the tests that prove each part.
 tags: [agent-kit, mcp, agents, masking, rate-limit, security]
 timestamp: 2026-11-27T00:00:00Z
 item: module.mcp
@@ -17,7 +17,8 @@ Change **S0** of the signed design `docs/superpower/2026-11-26-agent-data-answer
 D-AK13…D-AK21, signed 2026-11-26). S0 builds the parts every later data change uses, and moves `POST /db/query` and the
 Link Analysis reads onto them. S0 opened no new route to agents; groups D1, B, E, D2 and `/lookups/test` join one change each, each with its own
 security review (D-AK21). **D1 is built** (2026-11-26): [the analytic reads](#d1--the-analytic-reads); **D2 is built**
-(2026-11-27): [the reconciliation reads](#d2--the-reconciliation-reads).
+(2026-11-27): [the reconciliation reads](#d2--the-reconciliation-reads); **the lookup test is built** (2026-11-27), the
+last change of the order: [the lookup test](#the-lookup-test-agent-lookup-preview-1).
 
 ## The agent data routes
 
@@ -31,6 +32,7 @@ its weight in the agent budget. As built in S0:
 | The analyst previews (`AgentGate.ANALYST_PREVIEWS`, group E, [below](#group-e-the-analyst-previews)): the two score previews; the screening check | 5; 2 |
 | `POST /bi/query` (MCP Tool `query_measure`) and `POST /queries/{id}/run` (`run_saved_query`), `AgentGate.ANALYTIC_READS` (D1) | 1 |
 | The reconciliation reads (MCP Tool `reconcile_preview`), `AgentGate.RECON_READS` (D2, [below](#d2--the-reconciliation-reads)): `POST /recon/run`, `/recon/breaks`; `/recon/rows`; `/recon/columns` | 5; 2; 1 |
+| `POST /lookups/test` (MCP Tool `test_lookup`), `AgentGate.LOOKUP_TEST` ([below](#the-lookup-test-agent-lookup-preview-1)) | 1; 20 when it builds its index |
 | The 28 GET reads of masked values (`AgentGate.VALUE_GETS`, operator 2026-11-26, `AGENT-GET-DATA-READS-1`): Dataset rows, `/db/table`, a KPI value; Risk Score, Risk Score list, Anomaly Score, prediction; an Entity List; screening hits; regulatory reports; the Link Analysis GETs — Dataset discover, Entity and Entity Type profiles and summary, entity identities, value measures, a graph run, an Investigation's log, Working Set, comparison, dossier and bundle, a Draft's log and Working Set, the public Investigation link | 1 |
 
 Group B added the simulators (`AgentGate.SIMULATORS`, 2026-11-26): `POST /decision-rules/{id}/simulate` and
@@ -41,8 +43,7 @@ the host opened for such a route, so a raw answer anywhere else still fails clos
 
 Not on the list, because they answer no Dataset value: the overlap profile (names and counts) and the two dossier
 verifications (verdicts and hashes). `AgentDataRoutesParityTest` makes every agent-allowed write route either a data
-route or one named with its reason, so a new allowed route is classified before it ships. `POST /lookups/test` stays
-refused to agents (`AGENT-LOOKUP-PREVIEW-1`).
+route or one named with its reason, so a new allowed route is classified before it ships.
 
 **Every GET route is classified** in `inspecto/src/test/resources/agent-get-routes.tsv` (pattern, class, reason), and
 `AgentDataRoutesParityTest` fails when a `.get("…")` registration in the source is missing from it. The classes:
@@ -148,9 +149,9 @@ the direct refusal is audited as `access.denied`. A weighted call spends its who
   boot re-apply them (`applyInstallRateLimits`); an unchanged budget keeps its buckets. ⚠ The defaults are this change's
   choice (the design names no number): sixty page reads at once, then one every 2 s, the Link Analysis pace.
 - **Never a burst a route cannot pay.** `PUT /system/link-analysis/limits` answers 422 for a `rate.agent_burst` below the
-  heaviest `DATA_ROUTES` weight (`AgentGate.burstProblem`); a lower value from a hand-edited document or the system
-  property is raised to that weight with a warning (`RateLimiter.agent`). Since group E the heaviest route weighs 5 (a
-  score preview), so a burst of 1–4 is refused (`RateLimiterBudgetTest`).
+  heaviest call's weight (`AgentGate.PEAK_DATA_WEIGHTS`, `AgentGate.burstProblem`); a lower value from a hand-edited document or the system
+  property is raised to that weight with a warning (`RateLimiter.agent`). Since the lookup change the heaviest call weighs 20 (a
+  lookup test that builds its index), so a burst of 1–19 is refused (`RateLimiterBudgetTest`).
 - **The other buckets.** The existing per-route buckets (`/db/query` standard, `/mcp`, the Link Analysis bucket) still
   apply to an agent, now keyed by the same `agent:<client>:<subject>` key instead of the person's id. So an agent's call
   is never less limited than before, and never touches the person's buckets. A person's request is unchanged.
@@ -222,10 +223,38 @@ for people first: `ComponentAccess.canView` on every side, masking per side). Fo
 - **Out of scope.** `POST /recon/{id}/record`, `/recon/{id}/breaks/status` (they persist) and `/recon/promote` stay
   refused. The recorded-state GETs (`/recon/{id}/state`, `/recon/promoted`) were already refused to agents as `RAW_GETS`;
   their people defect stays open as `RECON-STATE-READS-UNMASKED-1`.
-- **Budget.** The heaviest data route still weighs 5, so the agent burst floor is unchanged. The `/recon/*` standard
+- **Budget.** At D2 the heaviest data route still weighed 5 (the lookup change raised the floor to 20). The `/recon/*` standard
   bucket still applies, keyed by the agent key.
 - **Audit (D-AK19).** No new row: a direct call is read-shaped and leaves none; an MCP call leaves `mcp.tool.called`.
   No key value an agent sends reaches an audit row or a log line (tested).
+
+## The lookup test (AGENT-LOOKUP-PREVIEW-1)
+
+The last change of the signed order (built 2026-11-27): `POST /lookups/test` — one value through a loaded Pipeline's
+keyed join — for every agent, a person's and a machine's. It keeps its gate `canAuthorWorkbench` and everything the
+people fix `LOOKUP-TEST-OPEN-READ-1` (2026-11-26) built: `canView` on every Dataset over the Reference's store (else the
+404 of an unknown Step), masking by classification, at most 5 fuzzy candidates, per-caller budgets. For an agent it is
+`AgentGate.LOOKUP_TEST`, in `ALLOWED` and on `DATA_ROUTES`; it was never an authoring preview.
+
+- **Masking (D-AK16).** Over a by-name Reference (`reference/<pipeline>`) the matched key, the mapped columns and every
+  fuzzy candidate are masked as `/bi/query` masks a Dataset over that store; `LookupRoutes.test` stamps the answer
+  (basis `lookup <reference>`, masked = the key and answered columns hidden from the caller). A raw `value` is allowed
+  (D-AK15); the answer echoes it in `compared` and names the match masked. A sixth candidate is never listed. A by-name
+  Reference with no write root has no registry to classify it: no stamp, so an agent's answer is withheld (500) — ⚠ a
+  default of this change, not a design decision.
+- **A `path:` Reference (D-AK25, operator 2026-11-27, as D-AK22).** It has no classification. A person's agent gets the
+  raw answer, stamped `AnswerMasking.unmaskedByDecision` (the route is on `AgentGate.RAW_FOR_BUILDERS`, so that stamp
+  proves it); a machine agent gets 403 before any index is built. ⚠ A builder's agent sends that file's values to its
+  model provider. Filed P2 to revisit: `LOOKUP-TEST-PATH-RAW-1`.
+- **Budget (D-AK17).** Weight 1. A call that builds the index (asked, cold, evicted, its Step or Reference changed) pays
+  20 in all: the host charges 1, the route spends 19 more through the `AgentBudget` charger before the build (429 past
+  the budget, the kept index unchanged). The agent burst floor is the heaviest call, so `AgentGate.PEAK_DATA_WEIGHTS`
+  holds 20 for the route and a burst below 20 is refused or raised. The route's own per-caller budgets (20 calls then
+  one per 3 s; 3 builds then one per 30 s) are keyed by the agent key for an agent, so they never spend the person's.
+  The 256 MiB index cap is unchanged.
+- **MCP Tool.** `test_lookup` (`body` = `{pipeline, step, value, at?, blockValues?, refresh?}`), read-only; `GET
+  /lookups` lists the Steps. The skills `author-pipeline` and `safe-config-change` test a lookup before proposing it.
+- **Audit (D-AK19).** No new row; an MCP call leaves `mcp.tool.called`. The value is not logged (tested).
 
 ## Cost and audit
 
@@ -247,6 +276,7 @@ for people first: `ComponentAccess.canView` on every side, masking per side). Fo
 | `ControlApiAgentLinkAnalysisSeamTest` (`la/inspecto-geo-link`) | each of the 16 Link Analysis data routes answers an agent 200 with no raw id; unstamped, each answers 500 with no value while a person still gets 200; across all 16, no event row or log line written for the agent holds a raw id, and its `link.expanded` row keeps the alias | removing the seam check; the `ExplorationMasking` stamp; `auditedValue` returning the raw key |
 | `ControlApiAgentAnalyticReadsTest` (`features/inspecto-mcp`) | D1: `/bi/query` and `/queries/{id}/run` for a person's agent and a machine agent, direct and through `query_measure` / `run_saved_query`: the masked column a token; unstamped, 500 with no row while a person gets 200; a saved query naming no Dataset withheld from an agent; a `projection` that reorders an aliased key still masked; a filter, `max` or sort on the masked column 422; a `none` Space raw; the budget spent across both routes and doors, 429 past it, the machine's and the person's untouched; no request value in an audit row or log line, both MCP rows present | removing the D1 data-route entries (no 500 when unstamped); the `BiResultMasking.apply` stamp; projecting before masking |
 | `ControlApiAgentReconReadsTest` (`features/inspecto-mcp`) | D2: the four recon reads for a person's agent and a machine agent, direct and through `reconcile_preview`: the classified key a token on every side, the raw `key` asked for echoed as the Break list's token; unstamped, 500 with no row while a person gets 200; a revealer's raw answer read back from the cache reaches an agent (that revealer's own included) masked, and an agent-filled cache entry reaches the revealer raw and a person without reveal masked; a shared-away side 404; page, sample and offset bounds 422; a sum or filter over the key 422; a classified VARCHAR key against an integer key: the 422 never quotes a stored key; a `none` Space raw; the weights 5, 5, 2, 1 spent across both doors, 429 past the budget, the machine's and the person's untouched; no sent key in an audit row or log line | removing the stamp from the recon masking; serving a cached Break list unmasked; dropping the D2 data-route entries; a no-op `Read.scrub` |
+| `ControlApiAgentLookupTest` (`features/inspecto-mcp`) | the lookup test for a person's agent and a machine agent, direct and through `test_lookup`: the matched key, the classified mapping and every candidate a token, a raw value asked included; seven fuzzy matches → five candidates; unstamped, 500 with no value while a person gets 200; a `path:` Reference raw to a person's agent, 403 to a machine with no index built, and 500 unstamped; no `canAuthorWorkbench` 403; a build spends 20 and a plain test 1 on both doors, 429 past the budget, the person's own budgets untouched; no sent value in a log line | — |
 | `AgentDataRoutesParityTest` (`inspecto`) | every data route agent-allowed and weighted; every allowed write route classified; every GET route in the source classified in `agent-get-routes.tsv`, `data` = `VALUE_GETS`, `raw` = `RAW_GETS` refused to agents and unchanged for people; every data route has its proving test; weight and key for agents only | — |
 | `ControlApiRiskScoreTest`, `ControlApiRiskScoreListTest` (`features/inspecto-scoring`), `ControlApiAnomalyScoreTest`, `ControlApiPredictionReadTest`, `ControlApiEntityListTest`, `ControlApiScreeningTest`, `ControlApiRegulatoryReportsTest` | each module's value GETs: an agent's answer 200 and masked; unstamped, 500 with no value while a person still gets 200; the screening reveal refused to an agent; an agent's screening hit carries no raw subject key | removing any one stamp: `EntityKeyMasking.put`, `RiskScoreRoutes.list`, `EntityListRoutes.one`, either `ScreeningRoutes` stamp, either `RegulatoryReportRoutes` stamp, `KpiRoutes.value`, the identities renderer, `EntityProfiles.typeProfile`; refusing no raw GET (`AgentDataRoutesParityTest`) |
 | `AnswerMaskingTest` (`inspecto-util`), `RateLimiterBudgetTest#theAgentBudgetSpendsByWeightAllOrNothing` | scope nesting, other-thread stamps unseen, 2xx-only refusal; weighted all-or-nothing spend, default burst 60 | — |

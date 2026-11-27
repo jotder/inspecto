@@ -32,4 +32,14 @@ public final class AgentGateProbe {
     public static boolean reachesTheHold(String method, String path) {
         return PendingChanges.replayable(method, path);
     }
+
+    /** Drive every rate-limit bucket of {@code api} from {@code nanos} ({@code ControlApi.useRateLimitClock}). */
+    public static void useRateLimitClock(ControlApi api, java.util.function.LongSupplier nanos) {
+        api.useRateLimitClock(nanos);
+    }
+
+    /** Drop every warm lookup index and refill every caller's lookup budgets ({@code LookupRoutes}, AGENT-LOOKUP-PREVIEW-1). */
+    public static void clearLookups() {
+        LookupRoutes.clearWarm();
+    }
 }

@@ -33,7 +33,9 @@ them: do the task you were given, then end your answer with one line naming what
    runs, so a refusal (400 or 422) names what to fix. (`validate_config` with `type: pipeline` judges the Pipeline's
    *config file* form, not the graph `propose_change` takes — do not use it for a graph.)
 5. **Read the result.** Check the per-step row counts and the output columns against what the person asked for. If a
-   count is zero or a column is missing, fix the draft and dry-run again.
+   count is zero or a column is missing, fix the draft and dry-run again. When you change an existing Pipeline's keyed
+   lookup (a join Step with `key`), **test the lookup, then propose**: `test_lookup` sends one value through the lookup
+   as it runs now and shows what it matches (skill `safe-config-change`), instead of proposing and reading the refusal.
 6. **Propose** with `propose_change` (`kind: pipeline`, `operation: create` or `update`, `id`, `content: <graph>`,
    `reason`). Report the Pending Change id.
 7. **After approval** (the person tells you, or `get_pending_change` shows `approved`), run it once with
@@ -63,6 +65,7 @@ them: do the task you were given, then end your answer with one line naming what
 - `get_pipeline` — one Pipeline's graph
 - `preview_config` — a sample parsed, a schema suggested or cast, a mapping checked
 - `dry_run_pipeline` — the draft validated and run on sample rows
+- `test_lookup` — one value through an existing keyed lookup, masked
 - `validate_config` — not for a graph (see step 4)
 - `propose_change` — the held write
 - `get_pending_change` — whether it was approved

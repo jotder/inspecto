@@ -221,8 +221,10 @@ class ControlApiAgentPreviewsTest {
                         "{\"rules\":[{\"targetColumn\":\"kg\",\"sourceExpression\":\"weight_kg\",\"transformType\":\"DIRECT\"}]}", who));
                 assertTrue(mapping.get("clean").asBoolean(), mapping.toString());
 
-                // not a group-A preview: unmasked Reference values, no rate limit (operator 2026-11-26)
-                assertEquals(403, post(c, "/lookups/test", lookup, who).statusCode(), who + ": the lookup test stays refused");
+                // not a group-A preview but a data route (AGENT-LOOKUP-PREVIEW-1): this path Reference answers raw to a
+                // person's agent and is refused to a machine (D-AK25; ControlApiAgentLookupTest proves the rest)
+                assertEquals(AGENT.equals(who) ? 200 : 403, post(c, "/lookups/test", lookup, who).statusCode(),
+                        who + ": the lookup test over a path Reference");
 
                 assertEquals(before, state(c), who + ": nothing persisted");
             }

@@ -56,8 +56,9 @@ whenever the Subject is an agent and the route is one of the four; a person's ow
 review refused it: it returns the matched Reference row's columns unmasked, a fuzzy match also lists `candidates` — keys
 the caller never sent, so repeated calls enumerate the Reference — and it has no per-caller rate limit, while
 `refresh: true` rebuilds an in-memory index of up to 256 MiB on every call. A Reference can be a Pipeline's own output
-store. It stays refused to every agent (a person's own token is unchanged) until masking, a bounded candidate list and
-a rate limit are built and proven: BACKLOG `AGENT-LOOKUP-PREVIEW-1`.
+store. It stayed refused to every agent until masking, a bounded candidate list and a rate limit were built and proven
+(`LOOKUP-TEST-OPEN-READ-1`, then `AGENT-LOOKUP-PREVIEW-1`, 2026-11-27): it is now an agent data route, not a preview —
+[the lookup test](spec-agent-data-seam.md#the-lookup-test-agent-lookup-preview-1), MCP Tool `test_lookup`.
 
 ## The MCP Tool
 

@@ -103,6 +103,13 @@ Widgets are a few proposals, not dozens.
   your sample rows joined to the live References and answers the first 200 rows; nothing is written. ⚠ The answer is
   NOT masked: it holds the References' raw values. Select only the columns the check needs, and never repeat a raw value
   to anyone but the person you act for. A machine agent is refused (403 "nor preview an enrichment").
+- **Test the lookup, then propose** a change to a Pipeline's keyed lookup (a join Step with `key`, or `from` and
+  `to`). `test_lookup` (body `{pipeline, step, value}`) sends one value through the lookup as it runs now and answers
+  what it matched and the columns it adds; nothing is written. Test values the change should and should not match
+  before you propose, and again after approval. Classified values come back masked; you may send a value as you know
+  it. A fuzzy lookup answers at most 5 candidates. A test costs 1 of your data budget; `refresh: true` rebuilds the
+  index and costs 20, so do not ask for it unless the Reference changed. ⚠ A Reference read by path is NOT masked;
+  a machine agent is refused it (403).
 
 ## A KPI from a Requirement, and restoring a Pipeline
 
@@ -146,5 +153,6 @@ changes their mind or you proposed something wrong — then propose the correcte
 - `simulate_decision_rule` — a saved Decision Rule's content and how many sample rows it matches, writing nothing
 - `simulate_rule_template` — a saved Rule Template's matching rows over its Dataset, masked, writing nothing
 - `preview_enrichment` — an enrichment draft run on sample rows and the live References, UNMASKED, writing nothing
+- `test_lookup` — one value through a Pipeline's keyed lookup, masked (a path Reference is not), writing nothing
 - `propose_change` — the held write
 - `withdraw_change` — take a proposal back

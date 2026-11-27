@@ -256,13 +256,17 @@ class ControlApiAgentSimulatorsTest {
      */
     @Test
     void eachSimulatorSpendsItsWeightInTheAgentBudget(@TempDir Path root) throws Exception {
-        System.setProperty(BUDGET, "5");
+        System.setProperty(BUDGET, "20");     // the floor: the heaviest agent call (a lookup build) weighs 20
         System.setProperty(REFILL, "0.01");   // no refill within the test
         Map<String, Object> preview = enrichment(root);
         try (Ctx c = open(root)) {
-            assertEquals(200, post(c, AGENT, "/decision-rules/high_cost/simulate", sample()).statusCode());   // 5 → 4
-            assertEquals(200, post(c, AGENT, "/rule-templates/big/simulate", Map.of()).statusCode());          // 4 → 3
-            assertEquals(200, post(c, AGENT, "/enrichment/preview", preview).statusCode());                    // 3 → 1
+            for (int i = 0; i < 4; i++) {
+                assertEquals(200, post(c, AGENT, "/decision-rules/high_cost/simulate", sample()).statusCode());   // -1
+                assertEquals(200, post(c, AGENT, "/rule-templates/big/simulate", Map.of()).statusCode());          // -1
+                assertEquals(200, post(c, AGENT, "/enrichment/preview", preview).statusCode());                    // -2
+            }                                                                                                       // 20 → 4
+            assertEquals(200, post(c, AGENT, "/enrichment/preview", preview).statusCode());                        // 4 → 2
+            assertEquals(200, post(c, AGENT, "/rule-templates/big/simulate", Map.of()).statusCode());              // 2 → 1
             JsonNode last = tool(c, AGENT, "simulate_decision_rule", Map.of("rule", "high_cost", "body", sample()));
             assertFalse(last.path("isError").asBoolean(), "the MCP door spends the last unit: " + last);       // 1 → 0
             HttpResponse<String> past = post(c, AGENT, "/decision-rules/high_cost/simulate", sample());
