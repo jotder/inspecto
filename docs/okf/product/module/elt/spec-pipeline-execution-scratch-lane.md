@@ -194,8 +194,8 @@ Any future node type the walk has no executor for gets the same named warning.
 ✅ **The candidate dry run refuses what the save has no home for (2026-11-27, `DRYRUN-SAVE-NODE-MISMATCH-1`).** A
 dry run with a `pipeline` body first runs the save's node check, `PipelineEditable.unsupportedNodes`, the same
 check `lower` makes: an unregistered type (an agent's guessed `source.dataset`) or a built-in that is deliberately
-not authorable is a **422** `CONFIG_VALIDATION_FAILED` naming `UNSUPPORTED_NODE`, the node and the type, as
-`PUT …/graph` answers. Before, the walk seeded at that node without asking its type, so the dry run was green and the
+not authorable is a **422** `CONFIG_VALIDATION_FAILED` naming `UNSUPPORTED_NODE`, the node and the type in its message,
+the code and words `PUT …/graph` gives in its `refusals[]` (the dry run has no `refusals[]` list). Before, the walk seeded at that node without asking its type, so the dry run was green and the
 proposal refused (golden task dev-02). ⚖ Only that check: the save's completeness refusals (`NO_ACQUISITION`,
 `NO_PARSER`, `NO_PERSISTENT_SINK`) and shape refusals such as `ENRICHMENT_NOT_TERMINAL` stay save-only, so a partial
 draft still previews and a mid-walk enrichment still gets the warning above. A stored Pipeline's dry run is not
