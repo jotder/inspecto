@@ -34,5 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `SIGNAL-BOARD-1` | P2 | feature | One clear meaning for Signal, and a board Jobs can trust. | — |
 | `SES-SNS-LIVE-CHECKS-1` | P3 | chore | live checks of the SES/SNS adapter, when a customer names SES | external |
 | `AGENT-STORED-RECORD-READS-1` | P2 | defect | 43 GET routes answer stored records that can echo entity keys or row values other features wrote into them, and sit outside the agent dat… | operator |

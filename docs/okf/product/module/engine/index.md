@@ -42,6 +42,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `SPACE-COHERENCE-1` | P2 | feature | Space config at agent speed: one link graph behind every edit, agents strict first. | — |
 | — | P2 | feature | SPACE-LINK-CENSUS-1 the link census: the default flip and the plan scope not built | — |
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
+| `SIGNAL-BOARD-1` | P2 | feature | One clear meaning for Signal, and a board Jobs can trust. | — |
 | `LEGAL-HOLD-SCOPE-1` | P3 | feature | A legal hold does not yet protect a Pipeline's data partitions, and holds have no screen. | — |
 | `BI-INSIGHTS-1` | P2 | feature | Advanced insights on business data in Widgets and Dashboards, authored and tuned as Insight Profiles. | — |
 | `VIEW-DATA-UNMASKED-1` | P2 | defect | GET /views/{id}/data answers a view's rows with no masking and no capability check, to people as well as agents | — |
