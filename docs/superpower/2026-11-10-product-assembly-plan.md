@@ -1780,7 +1780,11 @@ Module `features/inspecto-realtime` (package `com.gamma.realtime`), the commit-h
   The Incident opens inside the same evaluation as its Alert, so event → Incident is at most the Alert figure: the
   10 s Incident budget is met wherever the 5 s Alert budget is. Measured cost of one evaluation: 150-300 ms with 10
   breaching windows, about 50 ms with none. On a saturated desk the CPU-bound ingest (not the evaluation) misses the
-  budget; the CI assertion therefore needs a CI runner that is not shared with other builds. The stated rate, 5,000
+  budget; the CI assertion therefore needs a CI runner that is not shared with other builds. Since 2026-11-27 the
+  harness checks that condition itself: it samples the CPUs other processes leave it, and below 3.5 for more than a tenth of
+  the run (D-PA39's 4-core node, less half a core for the OS; an average hides the contended stretches that delay a
+  burst) an over-budget p95 is skipped with its figures instead of failing the gate; on a host that meets the condition
+  the 5 s assertion is unchanged (a full gate on a shared desk had failed at p95 9.2 s). The stated rate, 5,000
   events/s (D-PA39), holds with margin on the production evaluator.
 - **The one real-broker run** (`RealtimeLatencyHarnessTest.theSameThroughARealBroker`, skips unless a broker
   answers at `-Dkafka.it.bootstrap`): the same harness through the real `KafkaConnector` (raw CSV payload, one

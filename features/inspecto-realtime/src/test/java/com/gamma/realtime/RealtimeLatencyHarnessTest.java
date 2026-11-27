@@ -41,7 +41,11 @@ import static org.junit.jupiter.api.Assertions.*;
  * most that figure.
  *
  * <p>In CI it runs a CI-sized load ({@code -Drealtime.harness.rate}, default 1,000 events/s, for
- * {@code -Drealtime.harness.seconds}, default 40) and asserts p95 ≤ 5 s with no burst missed. The full-rate run
+ * {@code -Drealtime.harness.seconds}, default 40) and asserts p95 ≤ 5 s with no burst missed. D-PA39 is stated for one
+ * 4-core node, so the harness samples how many CPUs other processes leave it: below {@value #NODE_CORES} (less
+ * {@value #OS_SLACK_CORES} for the OS) for more than a tenth of the run,
+ * an over-budget p95 is skipped with its figures (the condition did not hold), never passed; a missed burst or a missing
+ * Incident fails on any host. The full-rate run
  * ({@code -Drealtime.harness.rate=5000 -Drealtime.harness.seconds=60}) is recorded in the plan's "PA-9d as built".
  */
 class RealtimeLatencyHarnessTest {
@@ -53,6 +57,10 @@ class RealtimeLatencyHarnessTest {
     private static final int WARM_UP_S = 6;
     private static final int KEYS = 100_000;
     private static final long P95_BUDGET_MS = 5_000;
+    /** D-PA39 holds "on one 4-core node": the cores other processes must leave this run for the latency to count. */
+    private static final int NODE_CORES = 4;
+    /** The OS and the idle Maven parent take a little of a dedicated node; a 4-vCPU runner still counts as the node. */
+    private static final double OS_SLACK_CORES = 0.5;
     private static final DateTimeFormatter TS = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSSSSS").withZone(ZoneOffset.UTC);
 
     /** Where the producer's events go, and the pipeline's {@code collector:} block that reads them. */
@@ -169,11 +177,14 @@ class RealtimeLatencyHarnessTest {
                 org.slf4j.MDC.remove(com.gamma.event.EventLog.SPACE_MDC_KEY);
             }
 
+            List<Double> freeCores = new java.util.concurrent.CopyOnWriteArrayList<>();
+            Thread sampler = Thread.ofPlatform().daemon().start(() -> sampleFreeCores(freeCores, writing));
             Thread writer = Thread.ofVirtual().start(() -> write(feed, planted, writing));
             long until = System.currentTimeMillis() + SECONDS * 1000L + 20_000;
             while (System.currentTimeMillis() < until && (writing.get() || !raised.keySet().containsAll(planted.keySet())))
                 Thread.sleep(50);
             writer.join();
+            sampler.join();
 
             List<Long> latencies = new ArrayList<>();
             int missed = 0;
@@ -193,10 +204,42 @@ class RealtimeLatencyHarnessTest {
                     open.stream().anyMatch(r -> r.incidentId() != null));
             assertTrue(planted.size() >= (SECONDS - WARM_UP_S) / BURST_EVERY_S - 1, "bursts planted: " + planted.size());
             assertEquals(0, missed, "every planted burst raised its Alert: " + planted.keySet() + " vs " + raised.keySet());
-            long p95 = latencies.get(Math.min(latencies.size() - 1, (int) Math.ceil(latencies.size() * 0.95) - 1));
-            assertTrue(p95 <= P95_BUDGET_MS, "D-PA39: p95 event -> Alert " + p95 + " ms > " + P95_BUDGET_MS + " ms " + latencies);
             assertTrue(open.stream().anyMatch(r -> r.incidentId() != null),
                     "the CRITICAL rule escalated: its Alert links the keys' Incidents " + open);
+            long p95 = latencies.get(Math.min(latencies.size() - 1, (int) Math.ceil(latencies.size() * 0.95) - 1));
+            String verdict = "D-PA39: p95 event -> Alert " + p95 + " ms vs " + P95_BUDGET_MS + " ms " + latencies;
+            // D-PA39 is stated for one 4-core node. When other processes left this run fewer cores than that for more
+            // than a tenth of it (an average hides the stretches that delay a burst), the condition did not hold: an
+            // over-budget p95 is then not a measurement of the product, so it is reported and skipped - never passed,
+            // never the budget raised. Unknown load (no sample) asserts as a held condition.
+            double[] sorted = freeCores.stream().mapToDouble(Double::doubleValue).sorted().toArray();
+            double free = sorted.length == 0 ? Double.NaN : sorted[sorted.length / 10];
+            System.out.printf("PA9D host: %.1f of %d logical CPUs free of other processes for 90%% of the run (%d samples)%n",
+                    free, Runtime.getRuntime().availableProcessors(), sorted.length);
+            org.junit.jupiter.api.Assumptions.assumeTrue(p95 <= P95_BUDGET_MS || Double.isNaN(free) || free >= NODE_CORES - OS_SLACK_CORES,
+                    () -> "D-PA39 condition not held (" + String.format("%.1f", free) + " CPUs free of other processes for 90% "
+                            + "of the run; the stated latency assumes a " + NODE_CORES + "-core node), so the latency was not measured: " + verdict);
+            assertTrue(p95 <= P95_BUDGET_MS, verdict);
+        }
+    }
+
+    /**
+     * Every 500 ms while the producer writes: logical CPUs not taken by OTHER processes (system load minus this JVM's).
+     * A reading the OS cannot give (negative) is dropped.
+     */
+    private static void sampleFreeCores(List<Double> out, AtomicBoolean writing) {
+        var os = (com.sun.management.OperatingSystemMXBean) java.lang.management.ManagementFactory.getOperatingSystemMXBean();
+        int cpus = Runtime.getRuntime().availableProcessors();
+        os.getCpuLoad();   // the first reading of each is a baseline
+        os.getProcessCpuLoad();
+        while (writing.get()) {
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                return;
+            }
+            double system = os.getCpuLoad(), self = os.getProcessCpuLoad();
+            if (system >= 0 && self >= 0) out.add(cpus * (1 - Math.max(0, system - self)));
         }
     }
 
