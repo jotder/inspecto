@@ -22,6 +22,11 @@
   never hand-edited: `ComponentShapesTest` (features/inspecto-mcp) derives each file from the code and fails when one is
   stale; `node tools/render-component-shapes.mjs` renders them as
   [`api-component-shapes.md`](../okf/product/module/config/api-component-shapes.md) (COMPONENT-REFERENCE-GENERATED-1).
+- **[`errors-v1.json`](errors-v1.json)** — the error catalogue: every refusal code (`error.errorCode`, a config
+  finding's `code`, a Pipeline graph finding's `code`) with its HTTP status, cause and fix. Generated, never
+  hand-edited: `node tools/render-error-catalogue.mjs --write` from the code constants and
+  `tools/error-catalogue-entries.json`; rendered as
+  [`api-error-catalogue.md`](../okf/product/layer/platform/api-error-catalogue.md) (`ERROR-CATALOGUE-1`).
 - **[`examples/`](examples)** — canonical example payloads, one file per named shape. The contract test
   validates each example against its schema's `required` tree, so examples cannot drift from the contract.
 

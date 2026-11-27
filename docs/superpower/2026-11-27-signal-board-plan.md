@@ -1,7 +1,6 @@
 # Signal Board — one clear meaning for Signal, and a board Jobs can trust (`SIGNAL-BOARD-1`)
 
-Status: **DRAFT 2026-11-27 — direction agreed by the operator (D-SB1 decided); D-SB2…D-SB5 open; nothing built; next
-is SB-0.** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
+Status: **APPROVED 2026-11-27 — D-SB1…D-SB5 all DECIDED (operator, 2026-11-27); nothing built; next is SB-0.** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
 Builds on the shipped Signal Backbone ([spec-signal-backbone](../okf/product/module/event/spec-signal-backbone.md));
 it replaces none of it. SB-2 lands inside the link graph of `SPACE-COHERENCE-1`
 ([plan](2026-11-27-space-coherence-plan.md)).
@@ -95,7 +94,10 @@ Job Type `emits`, loaded Job Packs. A module keeps owning its names; the catalog
 `$signal.<field>` in `when` and `bind` is a declared payload field. A chain of Jobs that closes on itself is a finding.
 - `on_signal` becomes one declared link (Job → Signal Type) in the link graph of `SPACE-COHERENCE-1`, so impact
   analysis answers "which Jobs stop firing if this Job no longer posts this type".
-- Roll-out follows that plan: a warning for a person first; an agent is refused (D-CO1).
+- An `on_signal` type that nothing posts is a **warning for everyone, agents included** (D-SB3): a Job Pack or a later
+  Job may post it, so the Job is saved and the finding names it. This is the one exception to "agents are refused"
+  in D-CO1. The other findings of this phase (a `$signal.<field>` the type does not declare, a chain that closes on
+  itself) follow D-CO1's roll-out: a warning for a person, a refusal for an agent.
 
 **SB-3 The Signal Board view.** Per Space: each type, what posts it, which Jobs listen, when it was last posted, and
 counts of Runs started, guards that said no, refusals and chain cuts. Two lists matter most: a type posted that no Job
@@ -115,15 +117,15 @@ so it goes last and one fact at a time.
 - **API.** Two new read routes. `openapi-v1.json` is regenerated with them.
 - **Risk.** SB-4 can change how often a Job fires if a double posting is removed carelessly; hence one fact per change.
 
-## 7. Decisions
+## 7. Decisions (all signed, operator, 2026-11-27)
 
-| # | Decision | Recommendation |
+| # | Decision | Decided |
 |---|---|---|
-| **D-SB1** ✅ | Who is the board for, and does a Signal carry state? | **DECIDED:** Jobs; stateless |
-| D-SB2 | Keep `on_pipeline` beside `on_signal`? | Keep the key, define it as short for `on_signal: pipeline.commit` on that Pipeline, one code path |
-| D-SB3 | An `on_signal` type nothing posts: warn or refuse? | A person is warned (a Job Pack may arrive later); an agent is refused |
-| D-SB4 | May a Space declare its own Signal Types in config? | Yes, in SB-1, so a Space's own Jobs can post a type with declared fields |
-| D-SB5 | If G8 is confirmed: catch up at boot, and how far back? | Yes (SB-2b), bounded by an age limit so a long outage does not start a flood of stale Runs |
+| **D-SB1** ✅ | Who is the board for, and does a Signal carry state? | **Jobs; stateless.** Every Job that listens gets each Signal |
+| **D-SB2** ✅ | Keep `on_pipeline` beside `on_signal`? | **Keep the key**, defined as short for `on_signal: pipeline.commit` on that Pipeline, on one code path; no config changes |
+| **D-SB3** ✅ | An `on_signal` type nothing posts: warn or refuse? | **Warn everyone**, agents included (differs from the recommendation, which refused an agent); the finding names the type |
+| **D-SB4** ✅ | May a Space declare its own Signal Types in config? | **Yes, in SB-1**, so a Space's own Jobs can post a type with declared fields |
+| **D-SB5** ✅ | If G8 is confirmed: catch up at boot, and how far back? | **Yes (SB-2b), with an age limit**, so a long outage does not start a flood of stale Runs; the limit's value is set in SB-0 |
 
 ## 8. Not verified
 

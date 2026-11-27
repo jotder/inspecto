@@ -514,6 +514,13 @@ jobs:
       - name: Guard — the Handbook manifest holds together and its external render cannot leak
         run: node tools/check-handbook.mjs && node tools/render-handbook-reference.mjs --check && node --test tools/check-handbook.test.mjs tools/render-handbook.test.mjs tools/publish-handbook.test.mjs tools/handbook-checks.test.mjs tools/run-handbook-checks.test.mjs tools/handbook-editions.test.mjs tools/render-handbook-reference.test.mjs
 
+      # Error catalogue (ERROR-CATALOGUE-1): docs/api/errors-v1.json and the hub page api-error-catalogue.md are current, every
+      # refusal code (ErrorCodes, FindingCodes, the Pipeline graph codes) has a cause and a fix in
+      # tools/error-catalogue-entries.json, and no main-code ApiException or ERR_/WARN_ constant names an uncatalogued code.
+      # The fix when it fails: add the entry, then `node tools/render-error-catalogue.mjs --write` — never a hand edit.
+      - name: Guard — the error catalogue is current and covers every refusal code
+        run: node tools/render-error-catalogue.mjs --check && node --test tools/render-error-catalogue.test.mjs
+
       # Agent Kit guard (AGENT-KIT-1 AK-3/AK-4): every Agent Skill names only real MCP Tools and external Handbook pages and
       # no repository path; the golden tasks are well-formed; the golden grader's logic holds on recorded states. Reads
       # tracked files only; no build, no server, ~0.3s. The golden tasks themselves need a live install and a model.
