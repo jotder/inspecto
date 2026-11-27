@@ -123,11 +123,31 @@
       ]
     },
     {
+      "code": "SPACE_HOLDS_DATA",
+      "family": "envelope",
+      "status": 409,
+      "cause": "The Space already holds data, so its data folder cannot be changed here.",
+      "fix": "Leave the Space's data folder as it is; to use another folder, create a new Space there.",
+      "definedIn": [
+        "inspecto/src/main/java/com/gamma/service/SpaceLocations.java"
+      ]
+    },
+    {
+      "code": "SPACE_LOCATIONS_DISABLED",
+      "family": "envelope",
+      "status": 409,
+      "cause": "No folders are allowed for Spaces on this server (spaces.allowed.roots unset), so every route that takes a Space folder is off.",
+      "fix": "An operator sets -Dspaces.allowed.roots (or the SPACES_ALLOWED_ROOTS environment variable) to the folders Spaces may use and restarts the server.",
+      "definedIn": [
+        "inspecto/src/main/java/com/gamma/service/SpaceLocations.java"
+      ]
+    },
+    {
       "code": "PAYLOAD_TOO_LARGE",
       "family": "envelope",
       "status": 413,
-      "cause": "The request body is over the route's size cap (an agent's body is capped at 256 KiB).",
-      "fix": "Send less: split the change, page an upload, or reference the data by name instead of inlining it.",
+      "cause": "The request is over one of the route's caps: the body size (an agent's preview, simulator and MCP bodies are capped at 256 KiB) or a count or quota the message names.",
+      "fix": "Send less: split the change, page an upload, or reference the data by name instead of inlining it; stay under the limit the message names.",
       "definedIn": [
         "spi/inspecto-auth-spi/src/main/java/com/gamma/spi/auth/ErrorCodes.java"
       ]
@@ -166,8 +186,8 @@
       "code": "RATE_LIMITED",
       "family": "envelope",
       "status": 429,
-      "cause": "Too many expensive requests from you in a short time: your request budget for this route is spent.",
-      "fix": "Wait the number of seconds in the Retry-After header, then retry. Batch or cache reads instead of repeating them.",
+      "cause": "Too many expensive requests from you in a short time: your request budget for this route is spent, or one call alone costs more than the whole budget.",
+      "fix": "When a Retry-After header is present, wait that many seconds and retry. When it is absent, or the message says the call is over the budget, retrying will not help: make the call cheaper (fewer rows, a smaller range) or batch and cache reads.",
       "definedIn": [
         "spi/inspecto-auth-spi/src/main/java/com/gamma/spi/auth/ErrorCodes.java"
       ]
@@ -230,6 +250,17 @@
       "fix": "Retry after a short wait. Nothing in the request needs to change.",
       "definedIn": [
         "spi/inspecto-auth-spi/src/main/java/com/gamma/spi/auth/ErrorCodes.java"
+      ]
+    },
+    {
+      "code": "COMPONENT_INVALID",
+      "family": "finding",
+      "status": 422,
+      "severity": "ERROR",
+      "cause": "POST /validate: the component draft is refused as a whole — the message is the refusal the save would give.",
+      "fix": "Fix what the message names (a missing required key, a bad value, a reference to nothing), then validate again before saving.",
+      "definedIn": [
+        "inspecto/src/main/java/com/gamma/control/ComponentRoutes.java"
       ]
     },
     {
@@ -494,6 +525,17 @@
       "fix": "Put the URL and secret in an https Connection and name it in connection:; remove unknown keys; keep batch_size within the bounds the message gives.",
       "definedIn": [
         "platform/inspecto-config/src/main/java/com/gamma/config/spec/FindingCodes.java"
+      ]
+    },
+    {
+      "code": "UNKNOWN_KEY",
+      "family": "finding",
+      "status": null,
+      "severity": "ERROR for an agent, WARNING for a person",
+      "cause": "The component carries a key nothing reads. A person's save keeps it with no effect (warnings[].code); an agent's save is refused.",
+      "fix": "Remove the key or correct its spelling against the kind's shape; prefix it with x- to mark it as deliberately extra.",
+      "definedIn": [
+        "inspecto/src/main/java/com/gamma/control/ComponentRoutes.java"
       ]
     },
     {
@@ -774,8 +816,8 @@
     {
       "code": "JOIN_REFERENCE_MISSING",
       "family": "graph",
-      "status": null,
-      "cause": "A transform.join node names no reference.",
+      "status": 422,
+      "cause": "A transform.join node names no reference. A save refuses it with this as the error.errorCode of a 422 as well.",
       "fix": "Set reference: to reference/<pipeline> or a data-file path.",
       "definedIn": [
         "platform/inspecto-engine/src/main/java/com/gamma/pipeline/PipelineValidator.java"

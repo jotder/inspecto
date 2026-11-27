@@ -54,16 +54,16 @@
     "fix": "The message names the Capability. Ask an administrator for a role that holds it, or, for an agent, propose the change for a person to approve instead of calling the route."
   },
   "RATE_LIMITED": {
-    "cause": "Too many expensive requests from you in a short time: your request budget for this route is spent.",
-    "fix": "Wait the number of seconds in the Retry-After header, then retry. Batch or cache reads instead of repeating them."
+    "cause": "Too many expensive requests from you in a short time: your request budget for this route is spent, or one call alone costs more than the whole budget.",
+    "fix": "When a Retry-After header is present, wait that many seconds and retry. When it is absent, or the message says the call is over the budget, retrying will not help: make the call cheaper (fewer rows, a smaller range) or batch and cache reads."
   },
   "NOT_SUPPORTED": {
     "cause": "The route exists but cannot do this for this target on this host — for example run-to-here on a Collector that does not read files.",
     "fix": "Use the alternative the message names, or a different target."
   },
   "PAYLOAD_TOO_LARGE": {
-    "cause": "The request body is over the route's size cap (an agent's body is capped at 256 KiB).",
-    "fix": "Send less: split the change, page an upload, or reference the data by name instead of inlining it."
+    "cause": "The request is over one of the route's caps: the body size (an agent's preview, simulator and MCP bodies are capped at 256 KiB) or a count or quota the message names.",
+    "fix": "Send less: split the change, page an upload, or reference the data by name instead of inlining it; stay under the limit the message names."
   },
   "INTEGRITY_VIOLATION": {
     "cause": "Stored evidence disagrees with its own recorded hashes, so the store is refused rather than read.",
@@ -85,6 +85,16 @@
     "status": 409,
     "cause": "One demo user is defined differently in two Spaces attached to the same demo server. Demo builds only.",
     "fix": "Make that user's row in config/demo-users.toon identical in both Spaces, or attach only one of them, then restart the demo server."
+  },
+  "SPACE_LOCATIONS_DISABLED": {
+    "status": 409,
+    "cause": "No folders are allowed for Spaces on this server (spaces.allowed.roots unset), so every route that takes a Space folder is off.",
+    "fix": "An operator sets -Dspaces.allowed.roots (or the SPACES_ALLOWED_ROOTS environment variable) to the folders Spaces may use and restarts the server."
+  },
+  "SPACE_HOLDS_DATA": {
+    "status": 409,
+    "cause": "The Space already holds data, so its data folder cannot be changed here.",
+    "fix": "Leave the Space's data folder as it is; to use another folder, create a new Space there."
   },
   "ERR_ARMED_WITHOUT_SCHEMA": {
     "cause": "The Pipeline is active but has no schema at all, so it would register and then be skipped every cycle.",
@@ -304,7 +314,8 @@
     "fix": "Name an existing component (list that kind first), or create it."
   },
   "JOIN_REFERENCE_MISSING": {
-    "cause": "A transform.join node names no reference.",
+    "status": 422,
+    "cause": "A transform.join node names no reference. A save refuses it with this as the error.errorCode of a 422 as well.",
     "fix": "Set reference: to reference/<pipeline> or a data-file path."
   },
   "JOIN_ON_MISSING": {
@@ -322,5 +333,14 @@
   "UNKNOWN_JOIN_REFERENCE": {
     "cause": "A transform.join's reference: names a Pipeline or file that does not exist.",
     "fix": "Name an existing Reference Pipeline or data file, or create it first."
+  },
+  "COMPONENT_INVALID": {
+    "cause": "POST /validate: the component draft is refused as a whole — the message is the refusal the save would give.",
+    "fix": "Fix what the message names (a missing required key, a bad value, a reference to nothing), then validate again before saving."
+  },
+  "UNKNOWN_KEY": {
+    "severity": "ERROR for an agent, WARNING for a person",
+    "cause": "The component carries a key nothing reads. A person's save keeps it with no effect (warnings[].code); an agent's save is refused.",
+    "fix": "Remove the key or correct its spelling against the kind's shape; prefix it with x- to mark it as deliberately extra."
   }
 }

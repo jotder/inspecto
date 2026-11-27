@@ -64,6 +64,20 @@ test('the sweep finds a stray ERR_ constant and an ApiException naming an uncata
     assert.match(out.join('\n'), /LOCAL_CODE/);
 });
 
+test('the sweep sees a qualified ApiException, a computed status, a Finding literal across lines and a code map', () => {
+    const list = build(read, entries());
+    const files = {
+        'a/src/main/java/A.java': 'throw new com.gamma.spi.auth.ApiException(422, "QUALIFIED_NEW", "m");',
+        'b/src/main/java/B.java': 'throw new ApiException(b ? 409 : 422, "COMPUTED_NEW", "m"); throw new ApiException(r.status(), r.code(), "m");',
+        'c/src/main/java/C.java': 'out.add(new Finding(Severity.ERROR, f(x),\n   "msg " + g(y),\n   "FINDING_NEW", null));',
+        'd/src/main/java/D.java': 'Map.of("code", "MAP_NEW", "key", k); out.add(new Finding(Severity.ERROR, "", m, "UNKNOWN_KEY", null));',
+        'e/src/main/java/E.java': 'throw new SpaceLocations.Refused(409, SpaceLocations.HOLDS_DATA, "m"); throw new Refused(409, NOT_A_CODE, "m");',
+    };
+    const out = uncatalogued(Object.keys(files), (f) => files[f], list).join('\n');
+    for (const c of ['QUALIFIED_NEW', 'COMPUTED_NEW', 'FINDING_NEW', 'MAP_NEW', 'NOT_A_CODE']) assert.match(out, new RegExp(c));
+    assert.doesNotMatch(out, /UNKNOWN_KEY|HOLDS_DATA|r\.code/);
+});
+
 test('the sweep over the repo finds nothing uncatalogued', () => {
     const files = execFileSync('git', ['ls-files', '*/src/main/java/*.java'], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean);
     assert.deepEqual(uncatalogued(files, read, build(read, entries())), []);

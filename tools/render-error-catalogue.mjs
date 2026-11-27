@@ -34,12 +34,19 @@ const SELF = 'node tools/render-error-catalogue.mjs';
 export const SOURCES = [
     { family: 'envelope', file: 'spi/inspecto-auth-spi/src/main/java/com/gamma/spi/auth/ErrorCodes.java', pick: null },
     { family: 'envelope', file: 'providers/inspecto-demo-auth/src/main/java/com/gamma/demoauth/DemoUsers.java', pick: ['ROSTER_CONFLICT'] },
+    { family: 'envelope', file: 'inspecto/src/main/java/com/gamma/service/SpaceLocations.java', pick: ['DISABLED', 'HOLDS_DATA'] },
     { family: 'finding', file: 'platform/inspecto-config/src/main/java/com/gamma/config/spec/FindingCodes.java', pick: null },
     { family: 'finding', file: 'inspecto/src/main/java/com/gamma/control/ColumnRefusals.java', pick: ['ERR_COLUMN_BREAKS'] },
     { family: 'finding', file: 'inspecto/src/main/java/com/gamma/service/ColumnContract.java', pick: ['WARN_COLUMN_BREAKS'] },
     { family: 'finding', file: 'inspecto/src/main/java/com/gamma/control/LinkRefusals.java', pick: ['ERR_LINK_DANGLING', 'WARN_LINK_DANGLING'] },
     { family: 'graph', file: 'platform/inspecto-engine/src/main/java/com/gamma/pipeline/PipelineValidator.java', pick: 'screaming' },
     { family: 'graph', file: 'inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java', pick: ['UNKNOWN_JOIN_REFERENCE'] },
+];
+
+/** Codes written as string literals at their only use, not as constants. The sweep finds a new one and fails. */
+export const LITERALS = [
+    { family: 'finding', code: 'COMPONENT_INVALID', file: 'inspecto/src/main/java/com/gamma/control/ComponentRoutes.java' },
+    { family: 'finding', code: 'UNKNOWN_KEY', file: 'inspecto/src/main/java/com/gamma/control/ComponentRoutes.java' },
 ];
 
 export const FAMILIES = {
@@ -98,12 +105,17 @@ export function build(read, entries) {
             });
         }
     }
+    for (const l of LITERALS) {
+        if (!read(l.file).includes(`"${l.code}"`)) problems.push(`${l.file}: literal "${l.code}" not found — update LITERALS`);
+        if (codes.has(l.code)) codes.get(l.code).definedIn.push(l.file);
+        else codes.set(l.code, { code: l.code, family: l.family, constant: null, definedIn: [l.file], status: null, doc: '' });
+    }
     const list = [...codes.values()];
     for (const e of list) {
         const a = entries[e.code];
         if (!a) { problems.push(`${e.code} (${e.definedIn[0]}) has no entry in ${ENTRIES} — add its cause and fix`); continue; }
         if (a.status !== undefined) e.status = a.status;
-        if (e.family === 'finding') e.severity = e.code.startsWith('WARN_') ? 'WARNING' : 'ERROR';
+        if (e.family === 'finding') e.severity = a.severity ?? (e.code.startsWith('WARN_') ? 'WARNING' : 'ERROR');
         if (e.family === 'finding' && e.status === null) e.status = e.severity === 'ERROR' ? 422 : null;
         e.cause = a.cause;
         e.fix = a.fix;
@@ -132,12 +144,19 @@ export function uncatalogued(files, read, list) {
         if (!sourceFiles.has(f))
             for (const c of constantsOf(java))
                 if (/^(ERR|WARN)_/.test(c.value) && !known.has(c.value)) out.push(`${f}: ${c.name} = "${c.value}"`);
-        for (const m of java.matchAll(/new\s+ApiException\(\s*\d{3}\s*,\s*("([^"]*)"|([A-Za-z_][\w.]*))\s*,/g)) {
-            if (m[2] !== undefined) { if (!known.has(m[2])) out.push(`${f}: new ApiException(…, "${m[2]}", …)`); continue; }
+        // new [pkg.]ApiException(<status expression>, CODE, …) and SpaceLocations.Refused(…) — the status may be any expression
+        for (const m of java.matchAll(/new\s+(?:[\w.]+\.)?(?:ApiException|Refused)\(\s*(?:[^,()"]|\([^()]*\))+,\s*("([^"]*)"|([A-Za-z_][\w.]*))\s*,/g)) {
+            if (m[2] !== undefined) { if (!known.has(m[2])) out.push(`${f}: refusal code "${m[2]}"`); continue; }
             const last = m[3].split('.').pop();
             if (!/^[A-Z][A-Z0-9_]+$/.test(last) || m[3].startsWith('ErrorCodes.')) continue;   // a variable, or a catalogued ErrorCodes constant
-            if (!knownNames.has(last)) out.push(`${f}: new ApiException(…, ${m[3]}, …)`);
+            if (!knownNames.has(last)) out.push(`${f}: refusal code ${m[3]}`);
         }
+        // a literal code in a Finding (its whole argument list, across lines) or in a {"code": "…"} map
+        for (const m of java.matchAll(/new\s+Finding\(((?:[^()]|\((?:[^()]|\([^()]*\))*\))*)\)/g))
+            for (const lit of m[1].matchAll(/"([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)"/g))
+                if (!known.has(lit[1])) out.push(`${f}: Finding code "${lit[1]}"`);
+        for (const m of java.matchAll(/"code"\s*,\s*"([A-Z][A-Z0-9_]+)"/g))
+            if (!known.has(m[1])) out.push(`${f}: "code", "${m[1]}"`);
     }
     return out;
 }
@@ -191,6 +210,9 @@ export function toPage(list) {
     lines.push('## Adding a code', '',
         `A new code constant, or a \`new ApiException(status, CODE, …)\` naming a code this page does not list, fails`,
         `\`${SELF} --check\` (pre-commit and CI). Add its cause and fix to \`${ENTRIES}\`, then run \`${SELF} --write\`.`,
+        'The sweep reads `new ApiException(…)`, `new SpaceLocations.Refused(…)`, `new Finding(…)` and `"code", "…"` maps;',
+        'a code handed through a helper method of your own is not seen, so add a code as a constant in one of the files',
+        'the generator lists (`SOURCES`) and pass the constant.',
         'Codes are API: never renamed, never reused for another meaning.', '');
     return lines.join('\n');
 }
