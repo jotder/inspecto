@@ -83,6 +83,8 @@ export interface ProposeActionRequest {
     connection: string;
     method?: string;
     payloadTemplate: Record<string, unknown>;
+    /** Merged into the payload verbatim (never interpolated); a key cannot also be in `payloadTemplate`. */
+    payloadData?: Record<string, unknown>;
     incidentId?: string;
     caseId?: string;
     reason?: string;

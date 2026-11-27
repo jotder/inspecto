@@ -11132,7 +11132,7 @@
         "tags" : [ "action-requests" ],
         "summary" : "Propose an Action Request",
         "operationId" : "postActionRequests",
-        "description" : "Saves a pending outbound call raised from one Incident or Case (body connection, payloadTemplate, incidentId or caseId, optional method, idempotencyKey, reason, context) for four-eyes approval. Gated on canWorkIncidents. 422 for an unknown key, an invalid field or a Connection refused by egress checks; 404 for an unknown linked object; 413 when the rendered payload is too large; 503 when read-only or operational objects or outbound transport are absent.",
+        "description" : "Saves a pending outbound call raised from one Incident or Case (body connection, payloadTemplate, incidentId or caseId, optional payloadData sent verbatim, method, idempotencyKey, reason, context) for four-eyes approval. Gated on canWorkIncidents. 422 for an unknown key, an invalid field or a Connection refused by egress checks; 404 for an unknown linked object; 413 when the rendered payload is too large; 503 when read-only or operational objects or outbound transport are absent.",
         "responses" : {
           "default" : {
             "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."

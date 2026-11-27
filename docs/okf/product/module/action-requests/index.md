@@ -32,6 +32,4 @@ Status: `current` (in this folder) · `missing` (a real gap) · `n/a` (decided: 
 
 Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `module.action-requests` — the board is the only list; change the row there.
 
-| Row | Priority | Kind | Title | Hold |
-|---|---|---|---|---|
-| `ACTION-TEMPLATE-ESCAPE-1` | P3 | defect | An Action Request payload cannot carry literal {{…}} text (filed 2026-11-26, BI-INSIGHTS-1 I-17). | — |
+_No open rows._

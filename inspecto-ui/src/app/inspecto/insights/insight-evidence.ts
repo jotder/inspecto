@@ -73,7 +73,12 @@ export function insightCaseMember(e: InsightEvidence): { id: string; dataset: st
     return { id: `insight:${e.insightId}`, dataset: `insights_${e.profileId}`, label: insightCaseTitle(e) };
 }
 
-/** The Action Request payload: the evidence as one JSON object, plus the Case it was raised from. */
-export function insightActionPayload(e: InsightEvidence): Record<string, unknown> {
-    return { insight: { ...e }, case: '{{case.id}}' };
+/** The Action Request payload template: the Case it was raised from (interpolated server-side). */
+export function insightActionPayload(_e: InsightEvidence): Record<string, unknown> {
+    return { case: '{{case.id}}' };
+}
+
+/** The Action Request `payloadData`: the evidence as one JSON object, sent verbatim - `{{x}}` in an Insight's sentence is never interpolated. */
+export function insightActionData(e: InsightEvidence): Record<string, unknown> {
+    return { insight: { ...e } };
 }

@@ -339,6 +339,29 @@ class ControlApiActionRequestsTest {
 
     // ── delivery ────────────────────────────────────────────────────────────────────────────────
 
+    /** ACTION-TEMPLATE-ESCAPE-1: copied data (an Insight sentence) is sent verbatim, never interpolated. */
+    @Test
+    void payloadDataIsSentVerbatimWhileTheTemplateStillInterpolates(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
+        try (Ctx c = open(cfg, tmp, true)) {
+            String inc = incident(c);
+            allowLoopback(c);
+            String literal = "Spend up {{author}} on {{incident.id}} {{nope}}";
+            String req = "{\"connection\":\"hook\",\"incidentId\":\"" + inc + "\","
+                    + "\"payloadTemplate\":{\"ticket\":\"{{incident.id}}\"},"
+                    + "\"payloadData\":{\"insight\":{\"sentence\":\"" + literal + "\"}}}";
+            JsonNode rec = data(send(c, "POST", "/action-requests", req, AUTHOR), 200);
+            assertEquals(inc, rec.at("/payload/ticket").asText(), "the template still interpolates");
+            assertEquals(literal, rec.at("/payload/insight/sentence").asText(), "payloadData is verbatim");
+            String clash = "{\"connection\":\"hook\",\"incidentId\":\"" + inc + "\","
+                    + "\"payloadTemplate\":{\"insight\":\"x\"},\"payloadData\":{\"insight\":{}}}";
+            assertEquals(422, send(c, "POST", "/action-requests", clash, AUTHOR).statusCode(),
+                    "a key in both is ambiguous");
+            assertEquals(422, send(c, "POST", "/action-requests", req.replace("{\"insight\":{\"sentence\"",
+                    "[{\"insight\":{\"sentence\"").replace("}}}", "}}]}"), AUTHOR).statusCode(),
+                    "payloadData must be an object");
+        }
+    }
+
     @Test
     void anApprovedRequestIsDeliveredExactlyOnceAcrossRetries(@TempDir Path cfg, @TempDir Path tmp) throws Exception {
         try (Ctx c = open(cfg, tmp, true)) {

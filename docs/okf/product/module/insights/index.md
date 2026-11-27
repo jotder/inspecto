@@ -37,4 +37,3 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `BI-INSIGHTS-1` | P2 | feature | Advanced insights on business data in Widgets and Dashboards, authored and tuned as Insight Profiles. | — |
 | `INSIGHT-PILOT-TELCO-RA-1` | P3 | defect | The telco-ra Business Insights pilot has no history to scan (filed 2026-11-27). | — |
 | `INSIGHT-CASE-EXISTING-1` | P3 | feature | An Insight can only open a NEW Case (filed 2026-11-26, BI-INSIGHTS-1 I-17). | demand |
-| `ACTION-TEMPLATE-ESCAPE-1` | P3 | defect | An Action Request payload cannot carry literal {{…}} text (filed 2026-11-26, BI-INSIGHTS-1 I-17). | — |

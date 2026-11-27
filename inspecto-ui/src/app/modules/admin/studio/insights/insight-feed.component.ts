@@ -26,6 +26,7 @@ import { StatusBadgeComponent } from 'app/inspecto/components/status-badge.compo
 import { fmtDateTime } from 'app/inspecto/format/format';
 import { bandBadge, sliceLabel } from 'app/inspecto/insights/insight-profile-form';
 import {
+    insightActionData,
     insightActionPayload,
     insightCaseDescription,
     insightCaseMember,
@@ -364,6 +365,7 @@ export class InsightFeedComponent {
                             return this.actionRequests.propose({
                                 connection: choice.connection,
                                 payloadTemplate: insightActionPayload(e),
+                                payloadData: insightActionData(e),
                                 caseId,
                                 reason: choice.reason || undefined,
                             });

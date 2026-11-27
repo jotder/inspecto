@@ -98,9 +98,10 @@ value / expected / delta, score, band, Profile and Insight ids, a link back to t
 is installed, are disabled with the reason without canManageIncidents (and canWorkIncidents for the request), and
 link the created ids. No new route (I-17, 2026-11-26; `inspecto/insights/insight-evidence.ts`). The feed link's
 `?insight=` marks that Insight (or says it is not in the latest run); a `?profile=` naming no Profile says so. Open:
-adding an Insight to an EXISTING Case (`INSIGHT-CASE-EXISTING-1`: `POST /cases/from-entities` always opens one), and
-`{{x}}` in a sentence is interpolated by the Action Request template renderer, not sent verbatim
-(`ACTION-TEMPLATE-ESCAPE-1`: the route has no literal form). User guide: [`user-guide-insights.md`](user-guide-insights.md).
+adding an Insight to an EXISTING Case (`INSIGHT-CASE-EXISTING-1`: `POST /cases/from-entities` always opens one).
+The evidence goes to `POST /action-requests` as `payloadData`, merged into the payload verbatim — `payloadTemplate`
+is still interpolated, so a `{{x}}` in an Insight's sentence is sent as written (`ACTION-TEMPLATE-ESCAPE-1`, closed
+2026-11-27; a key in both is a 422). User guide: [`user-guide-insights.md`](user-guide-insights.md).
 
 ## 5. The Insight scan (P3: I-8, Profiles, feed, feedback, replay, calendar)
 

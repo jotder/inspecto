@@ -118,7 +118,8 @@ describe('InsightFeedComponent — Case / Action Request (I-17)', () => {
         expect(body['caseId']).toBe('CASE-7');
         expect(body['connection']).toBe('ticketing');
         expect(body['reason']).toBe('Check it');
-        const payload = body['payloadTemplate'] as { insight: Record<string, unknown> };
+        expect(body['payloadTemplate']).toEqual({ case: '{{case.id}}' });
+        const payload = body['payloadData'] as { insight: Record<string, unknown> };
         expect(payload.insight).toEqual(
             expect.objectContaining({
                 insightId: 'i1',

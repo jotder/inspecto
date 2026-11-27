@@ -64,7 +64,7 @@ public final class ActionRequestRoutes implements RouteModule {
     }
 
     static final int LIST_CAP = 500;
-    private static final Set<String> CREATE_KEYS = Set.of("connection", "method", "payloadTemplate",
+    private static final Set<String> CREATE_KEYS = Set.of("connection", "method", "payloadTemplate", "payloadData",
             "idempotencyKey", "incidentId", "caseId", "reason", "context");
     private static final Set<String> DECIDE_KEYS = Set.of("reason");
 
@@ -261,6 +261,14 @@ public final class ActionRequestRoutes implements RouteModule {
         if (!ActionRequests.METHODS.contains(method)) throw invalid("'method' must be one of " + ActionRequests.METHODS);
         Object template = spec.get("payloadTemplate");
         if (!(template instanceof Map<?, ?>)) throw invalid("'payloadTemplate' must be a JSON object");
+        // payloadData: copied data (an Insight's sentence) merged into the payload verbatim - never interpolated,
+        // so a `{{x}}` inside it is sent as written (ACTION-TEMPLATE-ESCAPE-1)
+        Object data = spec.get("payloadData");
+        if (data != null && !(data instanceof Map<?, ?>)) throw invalid("'payloadData' must be a JSON object");
+        if (data instanceof Map<?, ?> dm)
+            for (Object k : dm.keySet())
+                if (((Map<?, ?>) template).containsKey(k))
+                    throw invalid("'" + k + "' is in both 'payloadTemplate' and 'payloadData' — a key has one source");
         String key = ApiContext.str(spec, "idempotencyKey");
         if (key != null && !ActionRequests.SAFE_KEY.matcher(key).matches())
             throw invalid("'idempotencyKey' must match " + ActionRequests.SAFE_KEY.pattern());
@@ -300,6 +308,7 @@ public final class ActionRequestRoutes implements RouteModule {
         context.put("origin", origin);
         context.put("author", author);
         Map<String, Object> payload = (Map<String, Object>) ActionRequests.render(template, context);
+        if (data instanceof Map<?, ?> dm) dm.forEach((k, v) -> payload.put(String.valueOf(k), v));
         if (ApiContext.JSON.writeValueAsString(payload).getBytes(StandardCharsets.UTF_8).length > ActionRequests.MAX_PAYLOAD_BYTES)
             throw new ApiException(413, ErrorCodes.PAYLOAD_TOO_LARGE, "the rendered payload is over "
                     + ActionRequests.MAX_PAYLOAD_BYTES + " bytes");
