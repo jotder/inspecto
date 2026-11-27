@@ -51,6 +51,7 @@ class ReportBriefPageTest {
         store.write("widget", "amount_by_region", bar);
         store.write("widget", "brief_sales", brief("sales", "Sales Brief"));
         store.write("widget", "brief_denied", brief("denied", "Denied"));
+        store.write("widget", "brief_tall", brief("tall", "Tall"));
         System.setProperty("assist.write.root", writeRoot.toString());
     }
 
@@ -96,6 +97,32 @@ class ReportBriefPageTest {
         seed(writeRoot);
         assertEquals("SUCCESS", job(pdfParams(outDir, "brief_sales,amount_by_region")).run().status());
         assertEquals(3, pages(outDir), "Brief page, chart page, table page");
+    }
+
+    /** The page heights in PDF order (each page is one image, sized to it). */
+    private static List<Integer> heights(Path outDir) throws Exception {
+        try (Stream<Path> files = Files.list(outDir)) {
+            String pdf = new String(Files.readAllBytes(files.findFirst().orElseThrow()), StandardCharsets.ISO_8859_1);
+            Matcher m = Pattern.compile("/Subtype /Image /Width (\\d+) /Height (\\d+)").matcher(pdf);
+            List<Integer> out = new java.util.ArrayList<>();
+            while (m.find()) out.add(Integer.parseInt(m.group(2)));
+            return out;
+        }
+    }
+
+    @Test
+    void theBriefIsThePageAtItsPositionNotJustSomePage(@TempDir Path writeRoot, @TempDir Path outDir, @TempDir Path outDir2) throws Exception {
+        seed(writeRoot);
+        assertEquals("SUCCESS", job(pdfParams(outDir, "brief_tall,amount_by_region")).run().status());
+        List<Integer> first = heights(outDir);
+        assertEquals(3, first.size());
+        assertTrue(first.get(0) > WidgetChartRenderer.CHART_H, "the Brief is first when listed first: " + first);
+        assertEquals(WidgetChartRenderer.CHART_H, first.get(1));
+
+        assertEquals("SUCCESS", job(pdfParams(outDir2, "amount_by_region,brief_tall")).run().status());
+        List<Integer> second = heights(outDir2);
+        assertEquals(WidgetChartRenderer.CHART_H, second.get(0), "the chart is first when listed first: " + second);
+        assertTrue(second.get(1) > WidgetChartRenderer.CHART_H, "the Brief is second: " + second);
     }
 
     @Test
