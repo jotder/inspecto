@@ -445,8 +445,8 @@ no task calls yet, with why, and fails when an entry is stale: `propose_action` 
 cannot be staged deterministically). Six tasks were added for it — `dev-15-withdraw-proposal`,
 `dev-16-run-pipeline-now`, `ops-13-job-now-and-replay`, `ops-14-evaluate-alerts`, `ops-15-machine-withdraw-held`
 and `la-07-attach-to-case` (their setup lines are in each suite). dev-16's run is real since RUN-PIPELINE-NOW-SCRATCH-1
-(2026-11-27: `run_pipeline_now` replays `POST /pipelines/authored/{id}/trigger`, `canOperateRuns`); the grader counts
-its `pipeline.created` row as data, not a config write (`DATA_RUN_PATH`). **Not run live yet**: they are graded by
+(2026-11-27: `run_pipeline_now` replays `POST /pipelines/authored/{id}/trigger`, `canOperateRuns`); its
+`pipeline.created` row answers 202, which `no-direct-write` already skips, and the task also checks `get_run`. **Not run live yet**: they are graded by
 `tools/run-agent-golden.test.mjs` only; W4's next live round runs them.
 
 ## Rerun of 2026-11-27 — dev-02, dev-12 and dev-13

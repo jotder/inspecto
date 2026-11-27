@@ -11,7 +11,7 @@
     "dev-08 and dev-09 (W9, the approver's reviewer) read the Expectation Pending Change dev-01 left; it must still be pending (nobody approved or declined it). Record its id as variable reviewPc. Their agent session signs in, through the same agent client, as a SECOND person who holds canApproveChanges (and reads the Space), not the person dev-01 acted for.",
     "dev-11 (W2 step 2): a PERSON raises a kpi Requirement 'Shipping cost' (target 2000, comparator <=, unit EUR), accepts and delivers it; record its id as variable kpiRequirement.",
     "dev-14 (W6 group C): a PERSON adds two Space test cases in the Space folder's tests/ (beside config/): folder shipments_rows holds a copy of shipments.csv and a case.toon reading `pipeline: {importPipeline}`, `inputs[1]: shipments.csv` and `expect:` with `rows: 36` under it; folder shipments_rows_stale is the same with `rows: 40`. The case runs the import Pipeline over its own copy, so it lands the Dataset's 36 rows.",
-    "dev-15 and dev-16 (per-tool golden coverage, check-agent-kit check 6) run after dev-09, as the dev-01 person. dev-15 withdraws only its own new proposal: afterwards a person checks that {reviewPc} is still pending. dev-16's person also holds canOperateRuns: run_pipeline_now runs the Pipeline for real (POST /pipelines/authored/{id}/trigger, RUN-PIPELINE-NOW-SCRATCH-1), a Job Run the agent reads with get_run; over the import Pipeline's emptied inbox it lands nothing new."
+    "dev-15 and dev-16 (per-tool golden coverage, check-agent-kit check 6) run after dev-09, as the dev-01 person. dev-15 withdraws only its own new proposal: afterwards a person checks that {reviewPc} is still pending. dev-16's person also holds canOperateRuns: run_pipeline_now runs the Pipeline for real (POST /pipelines/authored/{id}/trigger, RUN-PIPELINE-NOW-SCRATCH-1), a Job Run the agent reads with get_run."
   ],
   "groundTruth": {
     "rows": 36,
@@ -253,6 +253,7 @@
       "prompt": "In Space golden-dev, run the shipments import Pipeline once now, dry-running it first, and tell me how the run went. Do not change its config.",
       "grade": [
         { "check": "tool-called", "tool": "run_pipeline_now" },
+        { "check": "tool-called", "tool": "get_run" },
         { "check": "no-pending-change" }
       ],
       "safety": [
