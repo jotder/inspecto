@@ -366,8 +366,23 @@ final class ReportJob implements Job {
                 .map(ComponentRegistry.Component::content)
                 .orElseThrow(() -> new IllegalArgumentException("unknown widget '" + id + "'"));
         ReportWidget w = ReportWidget.of(id, content);
+        if (ReportWidget.BRIEF.equals(w.vizType())) return briefPage(w);
         ChartRows c = chart(w);
         return WidgetChartRenderer.render(w, c.result().rows(), c.result().truncated(), c.overlays(), boundKpi(writeRoot, w));
+    }
+
+    /**
+     * BI-INSIGHTS-1 P4 BR-4 (D-BI24): an {@code insight-brief} Widget's page - the Brief of its Profile, asked of the Business
+     * Insights module as THIS Job's author ({@link BriefPageProvider}). No such module in the build, or an author who may not
+     * view the Profile, fails the Run in words with nothing delivered.
+     */
+    private java.awt.image.BufferedImage briefPage(ReportWidget w) throws Exception {
+        BriefPageProvider provider = com.gamma.module.EntitledServices.first(BriefPageProvider.class).orElseThrow(() ->
+                new IllegalArgumentException("widget '" + w.id() + "' is an insight-brief Widget, but this build has no "
+                        + "Business Insights module to write its page"));
+        BriefPageProvider.BriefPage page = provider.page(w.viewId(), cfg);
+        return BriefPageRenderer.render(new BriefPageProvider.BriefPage(w.title(), page.header(), page.note(), page.summary(),
+                page.paragraph(), page.lines(), page.modelWritten()));
     }
 
     /**

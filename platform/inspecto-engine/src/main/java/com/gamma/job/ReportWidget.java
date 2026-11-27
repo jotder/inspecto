@@ -12,26 +12,38 @@ import java.util.Set;
  * A Studio Widget as a report PDF draws it (REPORT-PDF-CHARTS-1): its title, its type and the headless BI query its
  * field mapping compiles to — the server twin of the SPA's {@code buildXyQuery} / {@code buildValueQuery}
  * ({@code inspecto-ui/src/app/inspecto/viz/plugins/plugin-helpers.ts}). Only Dataset-bound {@code bar}, {@code line}
- * and {@code kpi} Widgets are drawn; anything else is refused by name, never skipped.
+ * and {@code kpi} Widgets are drawn, and a view-bound {@code insight-brief} Widget is drawn as a Brief page
+ * (BI-INSIGHTS-1 P4 BR-4, {@link BriefPageProvider}); anything else is refused by name, never skipped.
  *
  * @param measureIds the result columns holding the measures, in channel order ({@link MeasureCompiler.Measure#id})
  * @param body       the {@code POST /bi/query}-shaped body {@link MeasureCompiler#parse} reads
+ * @param viewId     an {@code insight-brief} Widget's Insight Profile; {@code null} for every Dataset-bound Widget
  * @param options    the Widget's stored {@code options} — its Chart Markers, bound KPI and overlay
  *                   (REPORT-CHART-MARKERS-1, drawn by {@link WidgetChartRenderer})
  */
 record ReportWidget(String id, String title, String vizType, String datasetId, String x, String series,
                     List<String> measureIds, List<String> measureLabels, Map<String, Object> body,
-                    Map<?, ?> options) {
+                    Map<?, ?> options, String viewId) {
 
     static final Set<String> DRAWN = Set.of("bar", "line", "kpi");
+    /** The Dashboard Brief Widget: view-bound to an Insight Profile, drawn as a text page. */
+    static final String BRIEF = "insight-brief";
     /** Rows a chart query may return; a cut result says so on the page. */
     static final int MAX_ROWS = 1000;
 
     static ReportWidget of(String id, Map<String, Object> w) {
         String vizType = str(w.get("vizType"));
+        if (BRIEF.equals(vizType)) {
+            String profile = str(w.get("viewId"));
+            if (profile == null)
+                throw new IllegalArgumentException("widget '" + id + "' is an insight-brief Widget with no Insight Profile bound to it");
+            Map<?, ?> o = w.get("options") instanceof Map<?, ?> m ? m : Map.of();
+            return new ReportWidget(id, str(o.get("title")) != null ? str(o.get("title")) : id, vizType, null, null, null,
+                    List.of(), List.of(), Map.of(), o, profile);
+        }
         if (!DRAWN.contains(vizType))
             throw new IllegalArgumentException("widget '" + id + "' is a " + vizType
-                    + " Widget; a report PDF draws bar, line and kpi Widgets");
+                    + " Widget; a report PDF draws bar, line and kpi Widgets, and a Dashboard Brief (insight-brief)");
         String datasetId = str(w.get("datasetId"));
         if (datasetId == null || str(w.get("viewId")) != null || str(w.get("queryId")) != null)
             throw new IllegalArgumentException("widget '" + id + "' is not bound to a Dataset (a view-, query- or "
@@ -106,7 +118,7 @@ record ReportWidget(String id, String title, String vizType, String datasetId, S
         if (overlay != null && ChartMarkers.OVERLAY_VIZ_TYPES.contains(vizType) && xc != null
                 && str(xc.get("grain")) != null && !"auto".equals(str(xc.get("grain"))))
             body.put("overlay", overlay);
-        return new ReportWidget(id, title, vizType, datasetId, x, series, ids, labels, body, options);
+        return new ReportWidget(id, title, vizType, datasetId, x, series, ids, labels, body, options, null);
     }
 
     /** The wire fragment {@code {forecast?: {horizon?, level?}, anomaly?: {}}} of {@code options.overlay} (the SPA's overlayFragment). */

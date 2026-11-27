@@ -2,8 +2,6 @@ package com.gamma.insights;
 
 import com.gamma.access.ComponentAccess;
 import com.gamma.access.WriteGates;
-import com.gamma.assist.AssistRequest;
-import com.gamma.assist.AssistResult;
 import com.gamma.assist.spi.AssistAgent;
 import com.gamma.control.BiSpecRunner;
 import com.gamma.control.HostContext;
@@ -50,6 +48,7 @@ public final class InsightsRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
+        BriefNarrator.bind(api);
         api.get("/insights", (e, m) -> feed(api, e));
         api.get("/insights/brief", (e, m) -> brief(api, e));
         // No capability: read-shaped like GET /insights/brief (the caller's own view decides); the narrator's cost is the
@@ -166,27 +165,14 @@ public final class InsightsRoutes implements RouteModule {
                 if (e.status == 404) continue;
                 throw e;
             }
-            List<Map<String, Object>> rows = List.of();
-            Map<String, Map<String, Object>> fb = Map.of();
-            if (dir != null) synchronized (InsightStore.lock(dir)) {
-                rows = InsightStore.read(dir);
-                fb = InsightStore.feedback(dir);
-            }
-            if (rows.isEmpty() && ids.size() == 1)
+            Map<String, Object> one = InsightBrief.fromStore(WriteGates.requireWriteRoot(api, "Insights"), dir, id.trim(), max);
+            if (!one.containsKey("runId") && ids.size() == 1)
                 throw new ApiException(404, ErrorCodes.NOT_FOUND, "no Insights for insight-profile '" + id.trim()
                         + "' yet - no scan has run; run its insight.scan Job");
-            profiles.add(InsightBrief.select(id.trim(), grainOf(api, id.trim()), rows, fb, max, Instant.now()));
+            profiles.add(one);
         }
         return profiles;
     }
-
-    /** Narrations kept per run (D-BI17): small, since an entry is a few sentences and a new run replaces the old one. */
-    private static final int CACHE_MAX = 64;
-    private final Map<String, Map<String, Object>> narrations = new LinkedHashMap<>(16, 0.75f, true) {
-        @Override protected boolean removeEldestEntry(Map.Entry<String, Map<String, Object>> eldest) {
-            return size() > CACHE_MAX;
-        }
-    };
 
     /**
      * {@code POST /insights/brief/narrate} {@code {profiles, max?}} (P4 BR-2): the Brief of {@link #brief}, built AS THE
@@ -214,7 +200,7 @@ public final class InsightsRoutes implements RouteModule {
         List<Map<String, Object>> narrated = new ArrayList<>();
         boolean anyModel = false;
         for (Map<String, Object> p : briefs) {
-            Map<String, Object> n = narrateProfile(api, agent, p, max);
+            Map<String, Object> n = BriefNarrator.narrate(agent, api.dataRoot(), p, max);
             anyModel |= Boolean.TRUE.equals(n.get("modelBacked"));
             narrated.add(n);
         }
@@ -225,71 +211,6 @@ public final class InsightsRoutes implements RouteModule {
         out.put("brief", Map.of("profiles", briefs));
         out.put("narration", narration);
         return out;
-    }
-
-    @SuppressWarnings("unchecked")
-    private Map<String, Object> narrateProfile(ApiContext api, AssistAgent agent, Map<String, Object> p, int max) {
-        String profile = String.valueOf(p.get("profile"));
-        List<Map<String, Object>> lines = p.get("lines") instanceof List<?> l ? (List<Map<String, Object>>) l : List.of();
-        Map<String, Object> out = new LinkedHashMap<>();
-        out.put("profile", profile);
-        out.put("runId", p.get("runId"));
-        if (lines.isEmpty()) {
-            out.put("sentences", List.of());
-            out.put("modelBacked", false);
-            out.put("repaired", false);
-            return out;
-        }
-        String key = api.dataRoot() + "|" + profile + "|" + p.get("runId") + "|" + max + "|"
-                + lines.stream().map(x -> String.valueOf(x.get("insightId"))).toList();
-        synchronized (narrations) {
-            Map<String, Object> hit = narrations.get(key);
-            if (hit != null) return hit;
-        }
-        Map<String, Object> reply = Map.of();
-        String reason = null;
-        try {
-            AssistResult r = agent.assist(new AssistRequest("insight-brief", Map.of(),
-                    Map.of("profile", profile, "evidence", lines), null));
-            if (r.status() == AssistResult.Status.OK) reply = r.data();
-            else reason = r.message() == null ? "no narrator" : r.message();
-        } catch (RuntimeException e) {
-            reason = "narration failed";
-        }
-        boolean model = Boolean.TRUE.equals(reply.get("modelBacked"));
-        out.put("sentences", reply.get("sentences") instanceof List<?> s && !s.isEmpty() ? s : templated(lines));
-        out.put("modelBacked", model);
-        out.put("repaired", Boolean.TRUE.equals(reply.get("repaired")));
-        if (reason == null) reason = reply.get("reason") instanceof String s ? s : null;
-        if (reason != null) out.put("reason", reason);
-        if (model) synchronized (narrations) {
-            narrations.put(key, out);
-        }
-        return out;
-    }
-
-    /** The Brief's own sentences in the narration's shape, for a Profile the narrator could not answer. */
-    private static List<Map<String, Object>> templated(List<Map<String, Object>> lines) {
-        List<Map<String, Object>> out = new ArrayList<>();
-        for (Map<String, Object> l : lines) {
-            Map<String, Object> s = new LinkedHashMap<>();
-            s.put("n", out.size() + 1);
-            s.put("text", "[" + (out.size() + 1) + "] " + l.get("sentence"));
-            s.put("cites", List.of(String.valueOf(l.get("insightId"))));
-            s.put("source", "template");
-            out.add(s);
-        }
-        return out;
-    }
-
-    /** The Profile's grain (what "stale" is measured in); {@code day} when the Profile no longer resolves. */
-    private static String grainOf(ApiContext api, String profile) {
-        try {
-            return new ComponentStore(WriteGates.requireWriteRoot(api, "Insights").resolve("registry"))
-                    .get(InsightProfile.KIND, profile).map(c -> String.valueOf(c.content().get("grain"))).orElse("day");
-        } catch (RuntimeException e) {
-            return "day";
-        }
     }
 
     /** ISO instants do not sort as text (".5Z" after ".55Z"), so compare them parsed. */

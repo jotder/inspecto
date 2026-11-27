@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-440 test class(es): 440 unit, 0 real-HTTP control-plane, 0 IT.
+441 test class(es): 441 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -267,6 +267,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `PublishTlsTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/PublishTlsTest.java` | ASSURE-BI-PUBLICATION-1 TLS fix: {@link PublishPinnedSocketFactory} dials the checked address whatever host the |
 | `RecipeExecutionParityTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/RecipeExecutionParityTest.java` | The Phase-3 parity gate (S4), execution half — deferred 2026-08-06 ("lands with S3's executor |
 | `ReferenceCompactorTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ReferenceCompactorTest.java` | Reference Phase-2 P3 verify: {@link ReferenceCompactor} collapses an append-only versioned Reference |
+| `ReportBriefPageTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ReportBriefPageTest.java` | BI-INSIGHTS-1 P4 BR-4: an {@code insight-brief} Widget in a report Job's {@code widgets:} draws the Dashboard Brief as a |
 | `ReportChartMarkersTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ReportChartMarkersTest.java` | REPORT-CHART-MARKERS-1: a report PDF's chart page draws the Widget's Chart Markers (BI-INSIGHTS-1 I-2) and its |
 | `ReportJobDeliveryTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ReportJobDeliveryTest.java` | BI-4 scheduled export delivery: the dataset scope renders a CSV artifact into out_dir. |
 | `ReportPdfChartsTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ReportPdfChartsTest.java` | REPORT-PDF-CHARTS-1: a {@code format: pdf} report Job with {@code widgets:} carries each bar / line / KPI Widget as a |
