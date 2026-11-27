@@ -929,14 +929,14 @@ interface ConsignmentIngestStrategy {
         boolean versioned = cfg.producesReference() && cfg.reference().load().versionedStore();
         if (!cfg.outputPerMember() || versioned) {
             String baseName = consolidatedBaseName(survivors, batch, cfg);
-            if (!versioned) baseName = nonCollidingBaseName(baseName, batch, cfg, dbDir);
+            if (!versioned) baseName = nonCollidingBaseName(baseName, batch, survivors, cfg, dbDir);
             return writeAndTrace(conn, table, partCols, cfg, dbDir, baseName,
                     batch.batchId(), srcIdToFile, writeScope, selectedTable);
         }
         List<Consignment.Member> owners = survivors.stream().filter(m -> srcIdToFile.containsKey(m.srcId())).toList();
         if (owners.size() == 1) {
             Consignment.Member m = owners.get(0);
-            String baseName = nonCollidingBaseName(memberStem(cfg, m.file()), batch, cfg, dbDir);
+            String baseName = nonCollidingBaseName(memberStem(cfg, m.file()), batch, List.of(m), cfg, dbDir);
             return writeAndTrace(conn, table, partCols, cfg, dbDir, baseName,
                     batch.batchId(), srcIdToFile, writeScope, selectedTable);
         }
@@ -952,7 +952,7 @@ interface ConsignmentIngestStrategy {
             try {
                 // the member is its own branch-ledger scope: a second call under the same scope would read as
                 // "already committed" and drop its rows (see writeAndTrace)
-                String baseName = nonCollidingBaseName(memberStem(cfg, m.file()), batch, cfg, dbDir);
+                String baseName = nonCollidingBaseName(memberStem(cfg, m.file()), batch, List.of(m), cfg, dbDir);
                 Written w = writeAndTrace(conn, copy, partCols, cfg, dbDir, baseName, batch.batchId(),
                         Map.of(m.srcId(), srcIdToFile.get(m.srcId())),
                         (writeScope == null ? "" : writeScope) + MEMBER_SCOPE + m.srcId(),
@@ -978,13 +978,21 @@ interface ConsignmentIngestStrategy {
      * the LA-DAILY-INGEST-1 owner call of 2026-10-14; accumulating would serve every row twice
      * ({@code ENGINE-ETL-TESTS-RED-1}). A one-origin name is disambiguated by its origin's fingerprint, so that
      * file's own re-delivery lands on the same disambiguated name; only a multi-origin name uses the batch id.
+     *
+     * @param owners the members whose rows this output holds (the survivors written under this name) — never a
+     *               failed or quarantined member of the batch, which would claim a name it does not write
      */
-    static String nonCollidingBaseName(String candidateBaseName, Consignment batch, PipelineConfig cfg, String dbDir) {
+    static String nonCollidingBaseName(String candidateBaseName, Consignment batch, List<Consignment.Member> owners,
+                                       PipelineConfig cfg, String dbDir) {
         if (candidateBaseName == null || batch == null || cfg == null || dbDir == null) return candidateBaseName;
         java.util.Set<String> origins = new java.util.HashSet<>();
-        for (Consignment.Member m : batch.members())
-            if (memberStem(cfg, m.file()).equalsIgnoreCase(candidateBaseName)) origins.add(manifestOrigin(cfg, m.file()));
-        if (!hasCommittedCollision(candidateBaseName, batch.batchId(), origins, cfg, dbDir)) return candidateBaseName;
+        java.util.Set<String> stems = new java.util.HashSet<>();
+        for (Consignment.Member m : owners)
+            if (memberStem(cfg, m.file()).equalsIgnoreCase(candidateBaseName)) {
+                origins.add(manifestOrigin(cfg, m.file()));
+                stems.add(FileNames.outputStem(cfg, m.file().getName()).toLowerCase(java.util.Locale.ROOT));
+            }
+        if (!hasCommittedCollision(candidateBaseName, batch.batchId(), origins, stems, cfg, dbDir)) return candidateBaseName;
         if (origins.size() == 1)
             return candidateBaseName + "__"
                     + com.gamma.etl.FailureText.fingerprint(cfg, origins.iterator().next()).substring(3, 11);
@@ -998,7 +1006,7 @@ interface ConsignmentIngestStrategy {
     }
 
     private static boolean hasCommittedCollision(String candidateBaseName, String batchId, java.util.Set<String> origins,
-                                                 PipelineConfig cfg, String dbDir) {
+                                                 java.util.Set<String> stems, PipelineConfig cfg, String dbDir) {
         boolean isUri = com.gamma.config.safety.PathJail.isUri(dbDir);
         if (!isUri && !stemExistsInDbDir(dbDir, candidateBaseName)) return false;
 
@@ -1019,8 +1027,7 @@ interface ConsignmentIngestStrategy {
                 try {
                     ConsignmentManifest m = ManifestStore.read(manifestsDir, otherId);
                     if (m.outputs == null) continue;
-                    if (m.members != null && m.members.stream()
-                            .anyMatch(me -> me.originalRelPath() != null && origins.contains(me.originalRelPath())))
+                    if (ownedBySameOrigin(m, origins, stems, cfg))
                         continue;   // same origin: a re-delivery, not a collision
                     for (ConsignmentManifest.OutputEntry oe : m.outputs) {
                         if (oe.outputFile() == null) continue;
@@ -1041,6 +1048,21 @@ interface ConsignmentIngestStrategy {
             }
         } catch (IOException ignored) { /* unreadable manifestsDir — skip */ }
         return false;
+    }
+
+    /**
+     * Whether an earlier manifest's output under this name was written by a file of the SAME origin: its SUCCESS
+     * members of this stem (the ones that can own the name) exist and all share an origin with this write. A failed
+     * or quarantined member of that batch wrote nothing, so it never makes the name its own.
+     */
+    private static boolean ownedBySameOrigin(ConsignmentManifest m, java.util.Set<String> origins,
+                                             java.util.Set<String> stems, PipelineConfig cfg) {
+        if (m.members == null || origins.isEmpty()) return false;
+        List<ConsignmentManifest.MemberEntry> owners = m.members.stream()
+                .filter(me -> com.gamma.etl.MemberStatus.SUCCESS.name().equals(me.status()) && me.filename() != null
+                        && stems.contains(FileNames.outputStem(cfg, me.filename()).toLowerCase(java.util.Locale.ROOT)))
+                .toList();
+        return !owners.isEmpty() && owners.stream().allMatch(me -> origins.contains(me.originalRelPath()));
     }
 
     private static boolean stemExistsInDbDir(String dbDir, String baseName) {

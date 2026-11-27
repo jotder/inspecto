@@ -158,6 +158,66 @@ class OutputNameOverwriteTest {
         assertEquals(162, totalCsvRows(files), "112 + the corrected 50: " + files);
     }
 
+    // ── a failed or quarantined member never makes a name its own (verification finding, 2026-11-27) ──
+
+    /** {@code feed.csv} landed as {@code feed_out.csv} in b1; {@code later/feed.csv} in the same b1 was quarantined
+     *  ({@code claimOutputStem}). Its re-delivery is a DIFFERENT origin from the file that owns the name. */
+    @Test
+    void aQuarantinedSameStemMemberOfTheEarlierBatchDoesNotMakeItsReDeliveryTheOwner(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = pipeline(dir, "duckdb", "");
+        Path inbox = Path.of(cfg.dirs().poll());
+        Path db = Files.createDirectories(Path.of(cfg.dirs().database()).resolve("day=03"));
+        Path out = Files.writeString(db.resolve("feed_out.csv"), "ID\na1\n");
+        writeManifest(cfg, "b1", List.of(
+                new com.gamma.etl.ConsignmentManifest.MemberEntry("feed.csv", 0, "feed.csv", "", "SUCCESS"),
+                new com.gamma.etl.ConsignmentManifest.MemberEntry("feed.csv", 1, "later/feed.csv", "", "QUARANTINED_MISMATCH")),
+                out);
+
+        com.gamma.etl.Consignment.Member later = member(inbox, "later/feed.csv", 0);
+        com.gamma.etl.Consignment b2 = new com.gamma.etl.Consignment("b2", null, null, List.of(later));
+        assertNotEquals("feed", ConsignmentIngestStrategy.nonCollidingBaseName("feed", b2, List.of(later), cfg,
+                cfg.dirs().database()), "later/feed.csv must not overwrite feed.csv's rows");
+
+        com.gamma.etl.Consignment.Member again = member(inbox, "feed.csv", 0);
+        com.gamma.etl.Consignment b3 = new com.gamma.etl.Consignment("b3", null, null, List.of(again));
+        assertEquals("feed", ConsignmentIngestStrategy.nonCollidingBaseName("feed", b3, List.of(again), cfg,
+                cfg.dirs().database()), "feed.csv's own re-delivery replaces");
+    }
+
+    /** In b2 {@code feed.csv} failed and {@code later/feed.csv} is the only survivor: only the survivor owns the name. */
+    @Test
+    void aFailedSameStemMemberOfThisBatchDoesNotClaimTheEarlierOutput(@TempDir Path dir) throws Exception {
+        PipelineConfig cfg = pipeline(dir, "duckdb", "");
+        Path inbox = Path.of(cfg.dirs().poll());
+        Path db = Files.createDirectories(Path.of(cfg.dirs().database()).resolve("day=03"));
+        Path out = Files.writeString(db.resolve("feed_out.csv"), "ID\na1\n");
+        writeManifest(cfg, "b1", List.of(
+                new com.gamma.etl.ConsignmentManifest.MemberEntry("feed.csv", 0, "feed.csv", "", "SUCCESS")), out);
+
+        com.gamma.etl.Consignment.Member failed = member(inbox, "feed.csv", 0);
+        com.gamma.etl.Consignment.Member survivor = member(inbox, "later/feed.csv", 1);
+        com.gamma.etl.Consignment b2 = new com.gamma.etl.Consignment("b2", null, null, List.of(failed, survivor));
+        assertNotEquals("feed", ConsignmentIngestStrategy.nonCollidingBaseName("feed", b2, List.of(survivor), cfg,
+                cfg.dirs().database()));
+    }
+
+    private static com.gamma.etl.Consignment.Member member(Path inbox, String rel, int srcId) throws Exception {
+        Path f = inbox.resolve(rel);
+        Files.createDirectories(f.getParent());
+        Files.writeString(f, "ID\nx\n");
+        return new com.gamma.etl.Consignment.Member(f.toFile(), srcId, Files.size(f), null);
+    }
+
+    private static void writeManifest(PipelineConfig cfg, String batchId,
+                                      List<com.gamma.etl.ConsignmentManifest.MemberEntry> members, Path out) throws Exception {
+        com.gamma.etl.ConsignmentManifest m = new com.gamma.etl.ConsignmentManifest();
+        m.batchId = batchId;
+        m.members = members;
+        m.outputs = List.of(new com.gamma.etl.ConsignmentManifest.OutputEntry("day=03", out.toAbsolutePath().toString()));
+        Files.createDirectories(Path.of(cfg.dirs().manifestsDir()));
+        com.gamma.etl.ManifestStore.write(cfg.dirs().manifestsDir(), m);
+    }
+
     @Test
     void generationModeSameStemAcrossBatchesPreserves112Plus106Rows(@TempDir Path dir) throws Exception {
         Path schema = dir.resolve("call_schema.toon");
