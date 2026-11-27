@@ -86,7 +86,7 @@
         "cron" : "0 2 * * *"
       },
       "notes" : [
-        "`type` is an open registry: `GET /jobs/types` lists the installed ones and each type's own parameters, which sit beside these keys.",
+        "`type` is an open registry: `GET /jobs/types` lists the installed ones and each type's own parameters, which sit beside these keys as single values: an object-valued key is refused (422), except `args`, `bind` and the `incremental` block.",
         "The author keys (createdBy, updatedBy, updatedByRoles) are stamped by the server; a value in the body is discarded."
       ]
     }

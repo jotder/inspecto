@@ -22,8 +22,10 @@ before it is sent instead of after a refusal. The same facts, one JSON file per 
 
 How the columns are derived: **keys** from the kind's key census in code, its `ConfigSpecs` fields or the record its
 route parses into; **type, description, allowed values** from the spec when there is one, else the record or the
-example; **required** from the spec, or — marked ¹ — because the real parser refuses the example without it (so it
-is required in the example's shape); **default** from the spec, or what the parser fills in. These are the content
+example; **required** because the real parser refuses the example without it — **yes** when the spec says so too,
+**yes¹** when only the parser does (so it may be required in the example's shape only), **no²** when the spec
+declares it required but the save does not refuse its absence; **default** from the spec, or what the parser fills
+in; **set by the server** for keys the server stamps or the store adds. These are the content
 checks of each save door without a Space: whether a named Dataset, Pipeline or Job exists is checked on save, and
 previewed with `validate_config`.
 
@@ -48,7 +50,7 @@ previewed with `validate_config`.
 - `update` → `PUT /alerts/rules/{id}`
 - `delete` → `DELETE /alerts/rules/{id}` — no content
 
-Keys from AlertRule.MODELLED + AlertRule.fromMap (POST /alerts/rules also checks the Dataset and the edition). A key outside this list is **kept** as sent.
+Keys from AlertRule.MODELLED + AlertRoutes.parseContent (the save also checks the Dataset and the edition). A key outside this list is **refused** (422) — except an annotation named `x-…`, which is kept.
 
 | Key | Type | Required | Default | Allowed values | Description |
 |---|---|---|---|---|---|
@@ -117,7 +119,7 @@ Keys from ConfigSpecs.dashboard() (the component key census refuses any other ke
 | `name` | string |  |  |  |  |
 | `owner` | any | set by the server |  |  |  |
 | `shares` | any |  |  |  |  |
-| `tiles` | array | yes |  |  | Placed widgets — each {widgetId, span:1-4} on a four-column grid (1 = quarter, 4 = full row); array order is the layout order. |
+| `tiles` | array | no² |  |  | Placed widgets — each {widgetId, span:1-4} on a four-column grid (1 = quarter, 4 = full row); array order is the layout order. |
 | `widget` | any |  |  |  |  |
 | `widgetId` | any |  |  |  |  |
 | `widgets` | any |  |  |  |  |
@@ -332,7 +334,7 @@ Keys from ConfigSpecs.job() + JobConfig.fromMap (any other key is a parameter of
 | `type` | string | yes |  |  | The Job Type id — an open registry key (built-ins: enrich, report, maintenance, pipeline; plus any module/pack-provided id). See GET /jobs/types. |
 | `when` | string |  |  |  |  |
 
-- `type` is an open registry: `GET /jobs/types` lists the installed ones and each type's own parameters, which sit beside these keys.
+- `type` is an open registry: `GET /jobs/types` lists the installed ones and each type's own parameters, which sit beside these keys as single values: an object-valued key is refused (422), except `args`, `bind` and the `incremental` block.
 - The author keys (createdBy, updatedBy, updatedByRoles) are stamped by the server; a value in the body is discarded.
 
 Example:
@@ -365,7 +367,7 @@ Keys from ChannelConfig.MODELLED + ChannelConfig.fromMap. A key outside this lis
 | `target` | string | yes¹ |  |  |  |
 | `template` | string |  |  |  |  |
 
-- `createdAt` is kept from the stored Channel on an update; a Channel carries no secret.
+- An update merges the body onto the stored Channel: only the keys that change are needed; `id` comes from the URL and `createdAt` is kept. A Channel carries no secret.
 
 Example:
 
@@ -533,7 +535,7 @@ Keys from ConfigSpecs.widget() (the component key census refuses any other key).
 | `shares` | any |  |  |  |  |
 | `tags` | array |  |  |  | Free-text tags for the widget gallery. |
 | `viewId` | string |  |  |  | A saved investigation view (geo-map/link-analysis) rendered instead of a dataset query — or, for a working-set widget, the Investigation whose Working Set it reads. |
-| `vizType` | string | yes |  |  | The viz plugin type: kpi, bar, line, pie, table, geo-map, link-analysis, … |
+| `vizType` | string | no² |  |  | The viz plugin type: kpi, bar, line, pie, table, geo-map, link-analysis, … |
 | `workingSet` | object |  |  |  | A working-set widget's binding (LA-21): {relation: entities\|links\|excluded, mode: frozen\|live, pin: {step, workingSetHash, pinnedAt}}. Frozen (the default) re-reads the relation at the pinned step; live re-reads the head and shows drift since the pin. |
 
 - `vizType` names a Visualization Type; `controls` maps its fields to columns.

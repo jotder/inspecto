@@ -29,7 +29,8 @@ const DOC = { thing: { kind: 'thing', operations: { create: { route: 'POST /thin
 shapes: { content: { source: 'Thing.KEYS', unknownKeys: 'refused', extensionPrefix: 'x-',
     fields: [{ path: 'name', type: 'string', required: true, requiredBy: 'spec', description: 'The | name' },
         { path: 'mode', type: 'string', required: true, requiredBy: 'parser', default: 'fast', values: ['fast', 'slow'] },
-        { path: 'owner', type: 'any', required: false, setBy: 'server' }],
+        { path: 'owner', type: 'any', required: false, setBy: 'server' },
+        { path: 'tiles', type: 'array', required: false, specRequired: true }],
     example: { name: 'n', mode: 'fast' }, notes: ['A note.'] } } } };
 
 test('renderPage: banner, index row, the fields table and the example', () => {
@@ -39,6 +40,7 @@ test('renderPage: banner, index row, the fields table and the example', () => {
     assert.ok(md.includes('| `name` | string | yes |  |  | The \\| name |'), 'spec-required, pipe escaped');
     assert.ok(md.includes('| `mode` | string | yes¹ | `fast` | `fast` `slow` |  |'), 'parser-required is marked');
     assert.ok(md.includes('| `owner` | any | set by the server |'), 'a server-stamped key says so');
+    assert.ok(md.includes('| `tiles` | array | no² |'), 'a spec-required key the save does not enforce says so');
     assert.ok(md.includes('is **refused** (422)') && md.includes('- A note.') && md.includes('"mode": "fast"'));
     assert.ok(md.includes('- `delete` → `DELETE /things/{id}` — no content'));
 });

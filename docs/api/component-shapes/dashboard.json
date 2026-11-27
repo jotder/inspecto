@@ -92,8 +92,8 @@
         {
           "path" : "tiles",
           "type" : "array",
-          "required" : true,
-          "requiredBy" : "spec",
+          "required" : false,
+          "specRequired" : true,
           "description" : "Placed widgets — each {widgetId, span:1-4} on a four-column grid (1 = quarter, 4 = full row); array order is the layout order."
         },
         {

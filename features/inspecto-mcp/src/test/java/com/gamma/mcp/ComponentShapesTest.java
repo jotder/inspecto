@@ -58,7 +58,7 @@ import static org.junit.jupiter.api.Assertions.fail;
  *       {@link ConfigSpecs} fields, or the components of the record the route parses into;</li>
  *   <li><b>type, description, allowed values, pattern</b> — the {@link FieldSpec} when the kind has a spec, else the
  *       record component's Java type, else the JSON type of the example or the default;</li>
- *   <li><b>required</b> — the spec's flag, or: the real parser refuses the example without the key;</li>
+ *   <li><b>required</b> — the real parser refuses the example without the key (a spec flag the save does not enforce is {@code specRequired});</li>
  *   <li><b>default</b> — the spec's default, or: what the real parser fills in when the key is absent;</li>
  *   <li><b>unknown keys</b> — the example plus one made-up key, through the real parser: refused, kept or ignored;</li>
  *   <li><b>example</b> — a minimal body the real parser accepts (this test fails if it stops accepting it).</li>
@@ -161,13 +161,15 @@ class ComponentShapesTest {
         boolean top = parsed != null;
         boolean server = b.server().contains(key);
         boolean bySpec = f != null && f.required();
-        boolean required = !server && (bySpec || top && requiredByParser(key, b));
+        // top-level keys: required = the real parser refuses the example without it; a nested spec path has no probe
+        boolean required = !server && (top ? requiredByParser(key, b) : bySpec);
         // a required key has no default, whatever the spec declares (Expectation's spec defaults `kind`; its parser requires it)
         Object def = required || server ? null
                 : f != null && f.defaultValue() != null ? f.defaultValue() : top ? derivedDefault(key, b, parsed) : null;
         out.put("type", b.types().containsKey(key) ? b.types().get(key) : f != null ? specType(f) : type(key, b, def));
         out.put("required", required);
         if (required) out.put("requiredBy", bySpec ? "spec" : "parser");
+        else if (bySpec && !server) out.put("specRequired", true);   // declared required, not refused on save
         if (server) out.put("setBy", "server");
         if (def != null) out.put("default", sorted(def));
         List<String> values = f != null && !f.enumValues().isEmpty() ? f.enumValues()
@@ -359,9 +361,9 @@ class ComponentShapesTest {
                 .with(Map.of(), Set.of("lastResult", "createdAt", "updatedAt", "owner"));
         out.put("expectation", ops(expectation, "create", "update"));
 
-        Body alertRule = new Body("AlertRule.MODELLED + AlertRule.fromMap (POST /alerts/rules also checks the Dataset and the edition)",
+        Body alertRule = new Body("AlertRule.MODELLED + AlertRoutes.parseContent (the save also checks the Dataset and the edition)",
                 AlertRule.MODELLED,
-                body -> AlertRule.fromMap(body).toMap(),
+                ShapeProbe::alertRule,
                 m("name", "orders-error-rate", "metric", "error_rate", "comparator", "gt", "threshold", 0.05,
                   "window", "1h", "onPipeline", "orders"),
                 ConfigSpecs.alert().fields(), "alert.", null,
@@ -376,12 +378,13 @@ class ComponentShapesTest {
                 new TreeSet<>(JobConfig.fromMap(Map.of("job", m("name", "n", "type", "report", "cron", "0 2 * * *",
                         "on_pipeline", "p", "on_signal", "s", "when", "true", "catch_up", true, "args", m("a", "b"),
                         "bind", m("a", "b")))).toMap().keySet()),
-                body -> { Map<String, Object> raw = Map.of("job", body); refuseSpecErrors(ConfigSpecs.job(), raw);
+                body -> { ShapeProbe.jobNested(body); Map<String, Object> raw = Map.of("job", body); refuseSpecErrors(ConfigSpecs.job(), raw);
                           return JobConfig.fromMap(raw).toMap(); },
                 m("name", "orders-nightly-report", "type", "report", "cron", "0 2 * * *"),
                 ConfigSpecs.job().fields(), "job.", JobConfig.class, Map.of(), List.of(),
                 List.of("`type` is an open registry: `GET /jobs/types` lists the installed ones and each type's own "
-                        + "parameters, which sit beside these keys.",
+                        + "parameters, which sit beside these keys as single values: an object-valued key is refused (422), except "
+                        + "`args`, `bind` and the `incremental` block.",
                         "The author keys (" + String.join(", ", new TreeSet<>(JobConfig.AUTHOR_KEYS))
                                 + ") are stamped by the server; a value in the body is discarded."));
         out.put("job", ops(job, "create", "update"));
@@ -434,7 +437,8 @@ class ComponentShapesTest {
                           return ChannelConfig.fromMap(body, 0L).toMap(); },
                 m("id", "ops-email", "kind", "email", "target", "ops@example.com"),
                 List.of(), "", ChannelConfig.class, Map.of(), List.of(),
-                List.of("`createdAt` is kept from the stored Channel on an update; a Channel carries no secret."))
+                List.of("An update merges the body onto the stored Channel: only the keys that change are needed; `id` comes "
+                        + "from the URL and `createdAt` is kept. A Channel carries no secret."))
                 .with(Map.of(), Set.of("name", "createdAt"));
         out.put("notification-channel", ops(channel, "create", "update"));
 

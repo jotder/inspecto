@@ -87,8 +87,8 @@
         {
           "path" : "vizType",
           "type" : "string",
-          "required" : true,
-          "requiredBy" : "spec",
+          "required" : false,
+          "specRequired" : true,
           "description" : "The viz plugin type: kpi, bar, line, pie, table, geo-map, link-analysis, …"
         },
         {

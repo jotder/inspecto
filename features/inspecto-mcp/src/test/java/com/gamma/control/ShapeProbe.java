@@ -38,8 +38,13 @@ public final class ShapeProbe {
         return keys;
     }
 
-    /** The envelope keys the component store adds to every persisted component. */
-    public static Set<String> envelopeKeys() {
-        return ComponentRoutes.COMPONENT_ENVELOPE_KEYS;
+    /** An Alert Rule body through {@code AlertRoutes.parseContent} (no Space): the rule checks and its unknown-key refusal. */
+    public static Map<String, Object> alertRule(Map<String, Object> body) {
+        return AlertRoutes.parseContent(null, () -> null, body).toMap();
+    }
+
+    /** {@code JobRoutes.refuseNestedSettings}: a Job body's object-valued keys other than args, bind and incremental are 422. */
+    public static void jobNested(Map<String, Object> body) {
+        JobRoutes.refuseNestedSettings(body);
     }
 }

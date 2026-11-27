@@ -47,7 +47,8 @@ export function renderShape(name, shape) {
             : shape.unknownKeys === 'kept' ? ' as sent.' : ' (nothing reads it).'), '');
     L.push('| Key | Type | Required | Default | Allowed values | Description |', '|---|---|---|---|---|---|');
     for (const f of shape.fields) {
-        const req = f.setBy === 'server' ? 'set by the server' : f.required ? (f.requiredBy === 'parser' ? 'yes¹' : 'yes') : '';
+        const req = f.setBy === 'server' ? 'set by the server' : f.required ? (f.requiredBy === 'parser' ? 'yes¹' : 'yes')
+            : f.specRequired ? 'no²' : '';
         const values = f.values ? f.values.map((v) => '`' + v + '`').join(' ') : f.pattern ? `pattern ${code(f.pattern)}` : '';
         L.push(`| \`${f.path}\` | ${cell(f.type)} | ${req} | ${cell(code(f.default))} | ${cell(values)} | ${cell(f.description)} |`);
     }
@@ -75,8 +76,10 @@ export function renderPage(docs) {
         '`docs/api/component-shapes/<kind>.json`.', '',
         'How the columns are derived: **keys** from the kind\'s key census in code, its `ConfigSpecs` fields or the record its',
         'route parses into; **type, description, allowed values** from the spec when there is one, else the record or the',
-        'example; **required** from the spec, or — marked ¹ — because the real parser refuses the example without it (so it',
-        'is required in the example\'s shape); **default** from the spec, or what the parser fills in. These are the content',
+        'example; **required** because the real parser refuses the example without it — **yes** when the spec says so too,',
+        '**yes¹** when only the parser does (so it may be required in the example\'s shape only), **no²** when the spec',
+        'declares it required but the save does not refuse its absence; **default** from the spec, or what the parser fills',
+        'in; **set by the server** for keys the server stamps or the store adds. These are the content',
         'checks of each save door without a Space: whether a named Dataset, Pipeline or Job exists is checked on save, and',
         'previewed with `validate_config`.', '',
         '| Kind | Operations |', '|---|---|'];

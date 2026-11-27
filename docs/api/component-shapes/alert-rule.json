@@ -17,8 +17,8 @@
   },
   "shapes" : {
     "content" : {
-      "source" : "AlertRule.MODELLED + AlertRule.fromMap (POST /alerts/rules also checks the Dataset and the edition)",
-      "unknownKeys" : "kept",
+      "source" : "AlertRule.MODELLED + AlertRoutes.parseContent (the save also checks the Dataset and the edition)",
+      "unknownKeys" : "refused",
       "extensionPrefix" : "x-",
       "fields" : [
         {

@@ -80,7 +80,7 @@
         "target" : "ops@example.com"
       },
       "notes" : [
-        "`createdAt` is kept from the stored Channel on an update; a Channel carries no secret."
+        "An update merges the body onto the stored Channel: only the keys that change are needed; `id` comes from the URL and `createdAt` is kept. A Channel carries no secret."
       ]
     }
   }
