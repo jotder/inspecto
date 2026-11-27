@@ -1,7 +1,7 @@
 # Signal Board — one clear meaning for Signal, and a board Jobs can trust (`SIGNAL-BOARD-1`)
 
 Status: **APPROVED 2026-11-27 — D-SB1…D-SB5 all DECIDED (operator, 2026-11-27); SB-0 done 2026-11-27 (results §10;
-the live stop test is still owed); the D-SB5 age limit is 24 hours; SB-1 designed (§11); SB-1a built 2026-11-27 (§11.6), SB-1b built 2026-11-27 (§11.7), SB-1c built 2026-11-27 (§11.8): SB-1 complete.** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
+the live stop test is still owed); the D-SB5 age limit is 24 hours; SB-1 designed (§11); SB-1a built 2026-11-27 (§11.6), SB-1b built 2026-11-27 (§11.7), SB-1c built 2026-11-27 (§11.8): SB-1 complete. SB-3 built 2026-11-28 (§12).** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
 Builds on the shipped Signal Backbone ([spec-signal-backbone](../okf/product/module/event/spec-signal-backbone.md));
 it replaces none of it. SB-2 lands inside the link graph of `SPACE-COHERENCE-1`
 ([plan](2026-11-27-space-coherence-plan.md)).
@@ -366,3 +366,52 @@ SB-1b without failing module tests.
   SB-2 (the save check).
 - **Board row text**: "SB-1c built 2026-11-27: the Job form's On signal suggests the catalogued Signal Types, free text
   kept. SB-1 is complete. Next: SB-2 (a saved Job is checked against the catalog); D-SB8 open."
+
+## 12. SB-3 as built (2026-11-28, lane off `origin/master` `d9a88975e`)
+
+- **`GET /signals/board?hours=`** (`SignalRoutes.board`, logic in `SignalBoard`, processor `com.gamma.control`): the board
+  of the Space over the last `hours` (default 24, clamped to 1…168; a non-number is a 400). Gated on
+  `canAuthorWorkbench`, the audience of `/signals/types`, because it lists every Job's `on_signal`; manifest entry, core
+  fragment, `openapi-v1.json` regenerated; classified `none` in `agent-get-routes.tsv` (type names, counts, emitter refs
+  and Job names, no payload values). No engine change: it reads `JobService.signalTypeCatalog()`, `jobs()` and
+  `runsFor()`, plus one ledger page.
+- **Rows**: every catalog entry, plus any posted type the catalog does not know (`catalogued: false`). A posted member of
+  a family (`exchange.acme.offer`) counts under the family row. Each row: `title, poster, source, family, posted,
+  lastPosted, postedBy` (emitter refs seen, at most 10, with `postedByTotal` / `postedByTruncated`), `listeners`
+  (`{job, key, value, enabled}`, at most 50, with `listenersTotal` / `listenersTruncated`), `runsStarted`
+  (`job.run.started` whose `trigger` is `signal:<type>`; for `pipeline.commit` also `event:<pipeline>`, the Runs of
+  `on_pipeline` Jobs), `guardsSaidNo`, `refused`
+  (`job.signal.refused` by `refusedType`), `chainCuts` (`job.chain.cut` by `signalType`) and `missed`.
+- **The two findings**: `unheard`, a type posted in the window that no ENABLED Job hears, decided per posted type with the
+  Job service's own match (a family member nobody listens to is listed even when another member is heard; found by the
+  verification pass); `unposted`, a Job whose
+  `on_signal` overlaps no catalog entry and no type posted in the window (disabled Jobs included, with `enabled`). A
+  family row and a glob overlap when either prefix contains the other. `on_pipeline` is listed as a listener of
+  `pipeline.commit` (D-SB2), so a Pipeline's commits are not reported unheard.
+- **Bounds and honesty**: `types` ≤ 500, `unheard` and `unposted` ≤ 100, each with `<name>Total` and `<name>Truncated`.
+  The ledger is ONE page of `EventQuery.MAX_LIMIT` Signals; `capped` says it was full, so every ledger count is a
+  floor. A `when` guard that says no posts no Signal: it is counted from each Job's in-memory Run history (a `SKIPPED`
+  Run, message `when guard false`), which keeps 50 Runs per Job and starts empty at each server start; `guardsCapped`
+  says the server started inside the window, or a Job's history is full and began inside it. ⚠ Open: the start is the
+  JVM's; a Space whose Job service is created later (added at run time) begins its history later, so for it
+  `guardsCapped` can read false while the count is still a floor. Closing it needs a start time on `JobService`
+  (an engine change, left out of this lane). `lastPosted` is within the window only.
+- **SB-2b hook**: SB-2b was not on `origin/master` when this lane finished. `SignalBoard.Inputs.missedByType` is the
+  seam (the route passes `null`): while it is `null`, `missedTracked` is false and every row's `missed` is `null`
+  (unknown, never 0); SB-2b passes a type → count map and the UI then shows a Missed column. Its storage was not guessed.
+- **Agents**: MCP tool `get_signal_board` (`hours?`) replays the route (`spec-mcp.md` table). The `-Pai` intelligence
+  tools (`signals_query`, `signal_timeline`) were left as they are.
+- **UI**: the Signal Ledger page (`/events`) gains Ledger / Board section tabs in the page header, shown only with
+  `canAuthorWorkbench`; `signal-board.component.ts` shows the window (24 h, 3 days, 7 days), a lower-bound alert when
+  `capped` or `guardsCapped`, the two findings first, then every type in `<inspecto-data-table>`. The Board reads core
+  routes, so it shows even where the events module (the Ledger tab) is absent.
+- **Tests**: `SignalBoardTest` (each count on its type, family rows, both findings, `on_pipeline`, every bound, the
+  `missed` seam) and `ControlApiSignalBoardTest` (armed 401 / 403 / 200, a live `when` guard counted, `hours` clamped,
+  400 for a non-number); UI `signal-board.component.spec.ts` (incl. axe) and two tab tests in `events.component.spec.ts`.
+- **Preview** (backend from this lane on :8181, `spaces/` of the lane): Default Space, 54 types, `maintenance.scheduler.findings`
+  posted by `job:orphan_audit` and heard by no Job; on `demo`, `backup_verify` listens to `maintenance.backup.completed`,
+  which no provider on that classpath declares (the backup module is not on `run-backend.ps1`'s classpath), so it is
+  reported unposted, correctly for that build.
+- **Board row text**: "SB-3 built 2026-11-28: `GET /signals/board` (types, posters, listeners, Runs started, guards, refusals,
+  chain cuts; the unheard and unposted lists), the Board tab on the Signal Ledger page, MCP `get_signal_board`; `missed`
+  waits on SB-2b. Next: SB-2, SB-2b, SB-2c (in flight), SB-4; D-SB8 open."

@@ -8611,6 +8611,20 @@
         "x-generated" : true
       }
     },
+    "/signals/board" : {
+      "get" : {
+        "tags" : [ "signals" ],
+        "summary" : "Signal Board",
+        "operationId" : "getSignalsBoard",
+        "description" : "The Signal Board of this Space over the last ?hours= (default 24, at most 168; 400 for a non-number) (SIGNAL-BOARD-1 SB-3): types [{type, title, poster, source, catalogued, family, posted, lastPosted, postedBy, listeners [{job, key, value, enabled}], runsStarted, guardsSaidNo, refused, chainCuts, missed}], unheard (each posted type, family members on their own, that no enabled Job hears) and unposted (a Job whose on_signal matches no catalogued type and nothing posted). Every list carries <name>Total and <name>Truncated. capped marks ledger counts as floors (the window held more Signals than one page); guardsCapped marks guardsSaidNo as a floor (it reads the in-memory Run history, which starts at server start); missed stays null while missedTracked is false. Gated on canAuthorWorkbench.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
     "/jobs/{jobId}/runs/{runId}/diff/{diffId}" : {
       "get" : {
         "tags" : [ "jobs" ],

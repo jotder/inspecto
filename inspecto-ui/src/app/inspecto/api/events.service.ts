@@ -115,6 +115,69 @@ export interface SignalTypeInfo {
     fieldsDeclared: boolean;
 }
 
+/** A Job listening to a Signal Type: through `on_signal`, or `on_pipeline` (short for `on_signal: pipeline.commit`). */
+export interface SignalBoardListener {
+    job: string;
+    key: 'on_signal' | 'on_pipeline';
+    value: string;
+    enabled: boolean;
+}
+
+/** One row of the Signal Board (SIGNAL-BOARD-1 SB-3): a type, who posts it, who listens and how listening went. */
+export interface SignalBoardType {
+    type: string;
+    title: string | null;
+    poster: string | null;
+    source: string | null;
+    catalogued: boolean;
+    family: boolean;
+    posted: number;
+    lastPosted: string | null;
+    /** Emitter refs seen (at most 10), with the true count. */
+    postedBy: string[];
+    postedByTotal: number;
+    postedByTruncated: boolean;
+    listeners: SignalBoardListener[];
+    listenersTotal: number;
+    listenersTruncated: boolean;
+    runsStarted: number;
+    guardsSaidNo: number;
+    refused: number;
+    chainCuts: number;
+    /** `null` until missed Signals are recorded (SB-2b); then a count. */
+    missed: number | null;
+}
+
+/** `GET /signals/board`: the board of the current Space over `hours`. Every list carries its true total. */
+export interface SignalBoard {
+    hours: number;
+    since: string;
+    until: string;
+    /** The ledger page was full: posting, Run, refusal and chain-cut counts are floors. */
+    capped: boolean;
+    /** The guard count reads each Job's Run history in memory, which does not reach back over the whole window
+     *  (the server started inside it, or the history is full): it is a floor. */
+    guardsCapped: boolean;
+    missedTracked: boolean;
+    types: SignalBoardType[];
+    typesTotal: number;
+    typesTruncated: boolean;
+    /** Per posted type (a family member is listed on its own). */
+    unheard: {
+        type: string;
+        posted: number;
+        lastPosted: string | null;
+        postedBy: string[];
+        postedByTotal: number;
+        postedByTruncated: boolean;
+    }[];
+    unheardTotal: number;
+    unheardTruncated: boolean;
+    unposted: { job: string; onSignal: string; enabled: boolean }[];
+    unpostedTotal: number;
+    unpostedTruncated: boolean;
+}
+
 /** Operational event stream + saved views (CONTROL scope). */
 @Injectable({ providedIn: 'root' })
 export class EventsService {
@@ -146,6 +209,11 @@ export class EventsService {
         return this.http
             .get<{ types?: SignalTypeInfo[] }>(apiUrl('/signals/types'))
             .pipe(map((r) => (Array.isArray(r?.types) ? r.types : [])));
+    }
+
+    /** SIGNAL-BOARD-1 SB-3: the Signal Board of this Space over the last `hours` (`GET /signals/board`, canAuthorWorkbench). */
+    signalBoard(hours: number): Observable<SignalBoard> {
+        return this.http.get<SignalBoard>(apiUrl('/signals/board'), { params: toParams({ hours }) });
     }
 
     signals(filter: { type?: string; source?: string; limit?: number } = {}): Observable<EventRow[]> {

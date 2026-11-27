@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-496 test class(es): 197 unit, 299 real-HTTP control-plane, 0 IT.
+498 test class(es): 198 unit, 300 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -286,6 +286,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiSecurityTriggersTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSecurityTriggersTest.java` | The §8 security triggers over real HTTP (ses-sns-adapter-design): refusals the audit trail records become ONE |
 | `ControlApiSettingsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSettingsTest.java` | {@code SettingsRoutes} per-space branding, geo, Link Analysis caps and icon map over real HTTP: defaults before any save, a PUT round-trip that |
 | `ControlApiShareTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiShareTest.java` | BI-6 public dashboard sharing, every gate: disabled-by-default 503, issue + anonymous resolve, <!-- vocab-allow: quoted Javadoc --> |
+| `ControlApiSignalBoardTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSignalBoardTest.java` | {@code GET /signals/board} (SIGNAL-BOARD-1 SB-3) over real HTTP with an armed Authenticator: 401 without a credential, |
 | `ControlApiSignalsStreamTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSignalsStreamTest.java` | Integration test for the SSE live-push counterpart to {@code GET /signals} |
 | `ControlApiSignalsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSignalsTest.java` | {@code GET /signals} over real HTTP: a failing Job run emits {@code job.run.started} (INFO) and |
 | `ControlApiSignalTypesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSignalTypesTest.java` | {@code GET /signals/types} (SIGNAL-BOARD-1 SB-1a) over real HTTP with an armed Authenticator: 401 without a |
@@ -407,6 +408,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `SchemaFileFindingsTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SchemaFileFindingsTest.java` | {@link ConfigRoutes#schemaFileFindings}: the pre-flight check that a pipeline draft's |
 | `ServerFaultsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ServerFaultsTest.java` | ERR-5XX-ROUTE-BODIES (operator, 2026-09-28), over real HTTP: a route-built 500/502/503 names a curated |
 | `ShippedExamplesPassTheSaveGateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ShippedExamplesPassTheSaveGateTest.java` | Every shipped example Pipeline under {@code inspecto/examples/} passes the authoring gate and loads |
+| `SignalBoardTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SignalBoardTest.java` | {@link SignalBoard} (SIGNAL-BOARD-1 SB-3) over a hand-built catalog, Job list, Run history and ledger page: each count |
 | `SpaceLockRenameRewriteTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpaceLockRenameRewriteTest.java` | SE-2a opt-in rewrite (D-SE3): a hand rename of a Pipeline in a Space whose {@code space.toon} says |
 | `SpacePromotionTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpacePromotionTest.java` | SE-6b — {@link SpacePromotion#compute} without HTTP: connections and secrets, placeholders against secret |
 | `SpaceTemplateUpgradeTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/SpaceTemplateUpgradeTest.java` | SE-5b — {@link SpaceTemplateUpgrade#propose}, the three-way classification the HTTP proof does not reach: a file the Space |
