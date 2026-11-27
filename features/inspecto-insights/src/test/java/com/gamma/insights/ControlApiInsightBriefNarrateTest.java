@@ -243,6 +243,19 @@ class ControlApiInsightBriefNarrateTest {
     }
 
     @Test
+    void bootstrapReportsTheAgentOnlyWhenOneIsRegistered(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root)) {
+            HttpRequest req = HttpRequest.newBuilder(URI.create("http://localhost:" + c.port() + "/api/v1/bootstrap")).build();
+            JsonNode before = JSON.readTree(client.send(req, HttpResponse.BodyHandlers.ofString()).body()).get("data").get("features");
+            assertTrue(before.has("agent"), "present and false, never merely absent: " + before);
+            assertFalse(before.get("agent").asBoolean());
+            agent(c);
+            JsonNode after = JSON.readTree(client.send(req, HttpResponse.BodyHandlers.ofString()).body()).get("data").get("features");
+            assertTrue(after.get("agent").asBoolean());
+        }
+    }
+
+    @Test
     void theStandardRateLimitBucketApplies(@TempDir Path root) throws Exception {
         try (Ctx c = open(root)) {
             seed(c, "daily", "r1", Map.of(), Instant.now());
