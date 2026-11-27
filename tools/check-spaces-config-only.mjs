@@ -151,7 +151,7 @@ function run() {
   console.error(`✗ Spaces-config-only guard: ${findings.length} finding(s)`);
   for (const f of findings.slice(0, 40)) console.error(`  ${f.kind.padEnd(6)} ${f.path}  — ${f.why}`);
   if (findings.length > 40) console.error(`  … ${findings.length - 40} more`);
-  console.error('  Space configuration is tracked, Space data is not (docs/superpower/2026-11-25-spaces-consolidation-plan.md).');
+  console.error('  Space configuration is tracked, Space data is not (docs/okf/product/module/config/spec-space-data-layout.md).');
   return 1;
 }
 

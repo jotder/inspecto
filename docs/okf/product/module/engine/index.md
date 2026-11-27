@@ -39,6 +39,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `REFERENCE-LOAD-REPLACE-1` | P3 | chore | reference.load: replace is not on the run-scoped replace: Add a file's *Replace everything* on a Reference and the Reference's own key ar… | — |
 | `ARRIVALS-STANDARD-STORE-1` | P3 | feature | Arrivals mode (the merge map, retention) exists only for an import Dataset; a Standard Pipeline's own store has none, and the run claim s… | — |
 | `REPLACED-STATE-READERS-1` | P3 | defect | Four readers of the Consignment output registry ignore REPLACED (filed 2026-11-20, BASIC-ELT-PROFILE-1 B4 review). | — |
+| `SPACE-COHERENCE-1` | P2 | feature | Space config at agent speed: one link graph behind every edit, agents strict first. | — |
 | — | P2 | feature | SPACE-LINK-CENSUS-1 the link census: the default flip and the plan scope not built | — |
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
 | `LEGAL-HOLD-SCOPE-1` | P3 | feature | A legal hold does not yet protect a Pipeline's data partitions, and holds have no screen. | — |

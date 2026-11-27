@@ -34,6 +34,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `SPACE-COHERENCE-1` | P2 | feature | Space config at agent speed: one link graph behind every edit, agents strict first. | — |
 | `ENRICHMENT-PREVIEW-PATH-REACH-1` | P2 | defect | A builder's agent can page any Dataset's store raw through an enrichment preview path: Reference: | — |
 | `LOOKUP-TEST-PATH-RAW-1` | P2 | defect | A lookup test over a path: Reference answers the file's values raw to a builder and to a builder's agent: | — |
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |

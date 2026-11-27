@@ -4,14 +4,24 @@
  * Template's folder when it still has some (a custom Template, a fixture) and otherwise has the Template's own generator
  * write it (`tools/seed-space-data.mjs`).
  */
-import { cpSync, existsSync, mkdirSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { GENERATORS, seed } from './seed-space-data.mjs';
+
+/**
+ * True when {@code dir} holds at least one file. An empty folder is not shipped data: a test that ran a Template's Pipeline in
+ * place leaves empty status folders behind (`TEMPLATE-STRAY-STATUS-DIR-1`), and treating those as data would copy nothing and
+ * never run the generator.
+ */
+export function holdsFiles(dir) {
+  if (!existsSync(dir)) return false;
+  return readdirSync(dir, { withFileTypes: true }).some((e) => (e.isDirectory() ? holdsFiles(join(dir, e.name)) : true));
+}
 
 /** Put the Template's data into {@code dataDir}: copy {@code <templatesDir>/<template>/data} if it exists, else generate it. */
 export function seedData(template, dataDir, templatesDir) {
   const shipped = join(templatesDir, template, 'data');
-  if (existsSync(shipped)) {
+  if (holdsFiles(shipped)) {
     mkdirSync(dataDir, { recursive: true });
     cpSync(shipped, dataDir, { recursive: true });
     return 'copied';
