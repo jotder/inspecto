@@ -221,7 +221,9 @@ describe('InsightFeedComponent — history and band filters', () => {
         fixture.detectChanges();
         expect(list).toHaveBeenLastCalledWith('sales', { run: 'all', band: null });
         expect(el.textContent).toContain('Every kept run (4)');
-        expect(el.querySelector('[data-testid="insight-run"]')?.textContent).toContain('2026-11-18');
+        const found = el.querySelector('[data-testid="insight-run"]')?.textContent ?? '';
+        expect(found).toContain('Nov 2026'); // N1: the app's date format, never the raw ISO string
+        expect(found).not.toContain('T06:00');
         button('High').click();
         fixture.detectChanges();
         expect(list).toHaveBeenLastCalledWith('sales', { run: 'all', band: 'high' });

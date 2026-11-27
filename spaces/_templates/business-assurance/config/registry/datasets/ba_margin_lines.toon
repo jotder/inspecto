@@ -1,2 +1,11 @@
 view: ba_margin_lines
 description: "Daily revenue, cost and margin by product, channel and partner"
+columns[8]{name,type,role}:
+  ds,date,temporal
+  product,string,dimension
+  channel,string,dimension
+  partner,string,dimension
+  units,number,measure
+  revenue,number,measure
+  cost,number,measure
+  margin,number,measure

@@ -161,6 +161,28 @@ export interface DrillEvent extends DrillPair {
                     >
                         <mat-icon class="icon-size-4" svgIcon="heroicons_outline:light-bulb"></mat-icon>
                     </button>
+                } @else if (explainReason() && tileState() === 'ready') {
+                    <!-- INSIGHT-EXPLAIN-HIDDEN-REASON-1: tell an author why Explain is off on this time chart. -->
+                    <span
+                        class="inline-flex"
+                        tabindex="0"
+                        role="button"
+                        aria-disabled="true"
+                        [matTooltip]="explainReason()"
+                        [attr.aria-label]="'Explain this change is unavailable: ' + explainReason()"
+                        data-testid="explain-change-reason"
+                    >
+                        <button
+                            mat-icon-button
+                            type="button"
+                            disabled
+                            aria-hidden="true"
+                            tabindex="-1"
+                            data-testid="explain-change-off"
+                        >
+                            <mat-icon class="icon-size-4" svgIcon="heroicons_outline:light-bulb"></mat-icon>
+                        </button>
+                    </span>
                 }
                 @if (showMeOffered() && tileState() === 'ready') {
                     <!-- BI-INSIGHTS-1 I-20: Show-Me on the tile — read on open, applied only on a click (saves the Widget). -->
@@ -438,6 +460,21 @@ export class WidgetHostComponent {
     /** BI-INSIGHTS-1 P2: the explain request for this Widget's last period, when the add-on is installed, the user may
      *  view it (operator 2026-11-26), and the Widget is a Measure over a grained date on a Dataset; null hides the action. */
     readonly explainable = computed<ExplainRequest | null>(() => {
+        const out = this.explainOutcome();
+        return out && 'request' in out ? out.request : null;
+    });
+
+    /** INSIGHT-EXPLAIN-HIDDEN-REASON-1: why Explain is off, for a user who may change the Widget or its Dataset, on a
+     *  time chart (one grained date) only; '' keeps the action hidden where Explain does not apply at all. */
+    readonly explainReason = computed<string>(() => {
+        const out = this.explainOutcome();
+        if (!out || !('reason' in out) || !out.timeChart || !this.lens.canAuthorWorkbench()) return '';
+        return out.reason;
+    });
+
+    private readonly explainOutcome = computed<
+        { request: ExplainRequest } | { reason: string; timeChart: boolean } | null
+    >(() => {
         if (!this.session.features()['insights']) return null;
         const plugin = this.plugin();
         const widget = this.resolvedWidget();
@@ -450,12 +487,10 @@ export class WidgetHostComponent {
             options: widget.options,
         });
         if (widget.queryId) spec.queryId = widget.queryId;
-        const out = explainRequest(
-            biQueryBody(spec, this.colMetas()),
-            dataset.columns ?? [],
-            this.props().labels.at(-1),
-        );
-        return 'request' in out ? out.request : null;
+        const body = biQueryBody(spec, this.colMetas());
+        const out = explainRequest(body, dataset.columns ?? [], this.props().labels.at(-1));
+        if ('request' in out) return out;
+        return { reason: out.reason, timeChart: !!body && !body.query && Object.keys(body.grains ?? {}).length === 1 };
     });
 
     openExplain(): void {

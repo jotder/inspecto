@@ -16,7 +16,7 @@ import { seriesColors } from 'app/inspecto/viz/series-colors';
     template: `
         @let p = preview();
         <p class="mt-3 text-sm font-semibold" role="status" data-testid="preview-summary">{{ summary() }}</p>
-        <div class="mt-2 h-48">
+        <div class="mt-2">
             <inspecto-chart type="bar" [data]="chart()" [ariaLabel]="chartLabel()" emptyMessage="No period to show." />
         </div>
         @if (p.skipped?.length) {
