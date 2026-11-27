@@ -152,7 +152,7 @@ export function uncatalogued(files, read, list) {
             if (!knownNames.has(last)) out.push(`${f}: refusal code ${m[3]}`);
         }
         // a literal code in a Finding (its whole argument list, across lines) or in a {"code": "…"} map
-        for (const m of java.matchAll(/new\s+Finding\(((?:[^()]|\((?:[^()]|\([^()]*\))*\))*)\)/g))
+        for (const m of java.matchAll(/(?:new\s+(?:[\w.]+\.)?Finding|\.coded)\(((?:[^()]|\((?:[^()]|\([^()]*\))*\))*)\)/g))
             for (const lit of m[1].matchAll(/"([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)"/g))
                 if (!known.has(lit[1])) out.push(`${f}: Finding code "${lit[1]}"`);
         for (const m of java.matchAll(/"code"\s*,\s*"([A-Z][A-Z0-9_]+)"/g))
@@ -210,7 +210,7 @@ export function toPage(list) {
     lines.push('## Adding a code', '',
         `A new code constant, or a \`new ApiException(status, CODE, …)\` naming a code this page does not list, fails`,
         `\`${SELF} --check\` (pre-commit and CI). Add its cause and fix to \`${ENTRIES}\`, then run \`${SELF} --write\`.`,
-        'The sweep reads `new ApiException(…)`, `new SpaceLocations.Refused(…)`, `new Finding(…)` and `"code", "…"` maps;',
+        'The sweep reads `new ApiException(…)`, `new SpaceLocations.Refused(…)`, `new Finding(…)`, `.coded(…)` and `"code", "…"` maps;',
         'a code handed through a helper method of your own is not seen, so add a code as a constant in one of the files',
         'the generator lists (`SOURCES`) and pass the constant.',
         'Codes are API: never renamed, never reused for another meaning.', '');

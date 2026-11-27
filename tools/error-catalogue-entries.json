@@ -94,7 +94,7 @@
   "SPACE_HOLDS_DATA": {
     "status": 409,
     "cause": "The Space already holds data, so its data folder cannot be changed here.",
-    "fix": "Leave the Space's data folder as it is; to use another folder, create a new Space there."
+    "fix": "Move the data folder by hand with the server stopped (see the Space anatomy guide, Config tree vs data root), then set data_root in the Space's space.toon."
   },
   "ERR_ARMED_WITHOUT_SCHEMA": {
     "cause": "The Pipeline is active but has no schema at all, so it would register and then be skipped every cycle.",
@@ -315,8 +315,8 @@
   },
   "JOIN_REFERENCE_MISSING": {
     "status": 422,
-    "cause": "A transform.join node names no reference. A save refuses it with this as the error.errorCode of a 422 as well.",
-    "fix": "Set reference: to reference/<pipeline> or a data-file path."
+    "cause": "A transform.join node names no reference. Also the error.errorCode of a 422 from a dry-run when the reference resolves but its file cannot be read; the message names the resolved target.",
+    "fix": "Set reference: to reference/<pipeline> or a data-file path; when a dry-run cannot read it, seed the reference file or point the node at one that exists."
   },
   "JOIN_ON_MISSING": {
     "cause": "A transform.join node names no on: key column(s).",
@@ -339,8 +339,8 @@
     "fix": "Fix what the message names (a missing required key, a bad value, a reference to nothing), then validate again before saving."
   },
   "UNKNOWN_KEY": {
-    "severity": "ERROR for an agent, WARNING for a person",
-    "cause": "The component carries a key nothing reads. A person's save keeps it with no effect (warnings[].code); an agent's save is refused.",
+    "severity": "WARNING",
+    "cause": "The component carries a key nothing reads. A person's save keeps it with no effect (a WARNING, warnings[].code); for an agent the same finding is an ERROR and its save is refused.",
     "fix": "Remove the key or correct its spelling against the kind's shape; prefix it with x- to mark it as deliberately extra."
   }
 }
