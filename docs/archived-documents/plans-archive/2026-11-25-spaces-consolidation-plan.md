@@ -1,10 +1,6 @@
 # Spaces in source control, data outside it — one data root, one build target (`SPACES-CONSOLIDATION-1`)
 
-Status (2026-11-27): **P0–P5 shipped; P6 partly done; D-SC1…D-SC15 all signed; no engine change.** §5 and §8 below are the forward
-plan as first written; what was built, in order, is §10–§23, and §24 is the review that closes the open items. Still open: the live-install
-and private-Space boots, the cleanup that waits on owners (board rows `SPACES-CONSOLIDATION-1`, `SANDBOX-CLEANUP-1`,
-`LA-INDEX-UNDER-DATA-ROOT-1`). Opened 2026-11-25. Owner: this shift. Items: `module.config`, `layer/platform`. Extends `SPACE-DATA-ROOT-1` and
-`SPACE-RELOCATABLE-ROOTS-1` (both shipped).
+Status: **ARCHIVED 2026-11-27 — P0–P5 shipped; the open items moved to `docs/superpower/2026-11-27-space-coherence-plan.md` §10 and the board rows `SPACES-CONSOLIDATION-1`, `SANDBOX-CLEANUP-1`, `LA-INDEX-UNDER-DATA-ROOT-1`.** As built: `docs/okf/product/module/config/spec-space-data-layout.md`. Kept for provenance, not maintained. Opened 2026-11-25.
 
 **Revision note.** The first draft kept the live Spaces whole under `C:\sandbox\inspecto_spaces\<space>\` and
 recommended the native layout. The operator then said the rule is: **a Space's configuration is source-controlled,

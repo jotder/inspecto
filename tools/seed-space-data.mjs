@@ -11,7 +11,7 @@
  *
  * The generators are idempotent (a file whose bytes are unchanged is left alone) and, with `--out`, delete nothing.
  * Python is required for the `la-*` Templates; a missing interpreter is a named failure, never a silent skip.
- * A Template with no entry here ships hand-written samples or none (`docs/superpower/2026-11-25-spaces-consolidation-plan.md`).
+ * A Template with no entry here ships hand-written samples or none (`docs/okf/product/module/config/spec-space-data-layout.md`).
  */
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs';

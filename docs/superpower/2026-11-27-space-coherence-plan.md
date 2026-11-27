@@ -143,3 +143,36 @@ and query ledgers hold enough to date a last read (A2). SC-0 answers each before
 ## 9. Board rows
 
 Filed 2026-11-27: `SPACE-COHERENCE-1` on `docs/BACKLOG.md` (P2, §3.7); this plan's row is in `docs/INDEX.md`.
+
+## 10. Carried over from `SPACES-CONSOLIDATION-1` (plan archived 2026-11-27)
+
+P0–P5 of the Spaces consolidation shipped; what was built is in
+[spec-space-data-layout](../okf/product/module/config/spec-space-data-layout.md). The undone work lives here now, on
+the board rows `SPACES-CONSOLIDATION-1`, `SANDBOX-CLEANUP-1` and `LA-INDEX-UNDER-DATA-ROOT-1`. It is operations work
+on the shared sandbox, separate from SC-0…SC-4, and none of it blocks them.
+
+**In order (item 1 is the gate for 2 and 4):**
+1. **Boot check.** Attach and boot the three private Spaces (`inspecto-mfs`, `mfs-demo`, `la-mobile-money`) with
+   `tools/attach-private-spaces.ps1`, then start the Preview install (`:8080`) and the Basic install (`:8098`) once
+   each, one at a time. None has run since its state moved to `C:\sandbox\inspecto_spaces` on 2026-11-25.
+2. **Delete the quarantine.** `C:\sandbox\_pending-delete-20261125` holds 12.74 GB (47 folders and 156 logs, listed
+   in its `MANIFEST.txt`); nothing has been deleted. The P0 backups in `C:\sandbox\backup\spaces-p0-20261125` (about
+   48 GB) stay until item 1 has passed.
+3. **Owner questions.** Class D (`la-share`, `builds`, `la-deploy-pkgs`, `inspecto`, `inspecto_training`,
+   `la-video-out`), `antigravity`, the older backups beside the P0 set, and the debris in `inspecto-preview\backup`
+   and `parked`.
+4. **One build of `master` against `inspecto_spaces`.** It is also the first real run of the `package.ps1` seeding
+   step, which has only been parse-checked.
+
+**Also open:**
+- `assist.safety.roots` file routes against a data root outside the spaces root, and the `SPACES_DATA_ROOT` mount
+  form, are not verified.
+- Whether to commit the config of `telco-assurance`, `cricket-analytics` and `la-mobile-money` (D-SC5 said track; the
+  `telco-assurance` description says it is not committed) waits on the operator.
+- Five `config.secrets` files could not be copied by the shift account; their owning Windows account must copy them.
+- The `bi-p1-projection` worktree is blocked by an ownership check; its unpushed commits are unchecked
+  (`git cherry origin/master HEAD` once access is granted, never a blind delete).
+- The `inspecto-basic-*` entries in `.claude/launch.json` name a folder that no longer exists.
+- The test that writes into `spaces/_templates` is not found (`TEMPLATE-STRAY-STATUS-DIR-1`).
+- `LA-INDEX-UNDER-DATA-ROOT-1`: the Link Analysis index stays inside the Space's config folder (D-SC9), waiting for
+  a consumer to ask.
