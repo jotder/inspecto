@@ -68,7 +68,7 @@ final class DecisionRoutes implements RouteModule {
         api.delete("/decision-rules/([^/]+)", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> delete(api, e, ApiContext.name(m))));
         api.post("/decision-rules/([^/]+)/simulate", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> simulate(api, ApiContext.name(m), api.body(e))));
+                (e, m) -> simulate(api, e, ApiContext.name(m), api.body(e))));
         api.post("/decision-rules/([^/]+)/apply", ApiContext.withCapability("canOperateRuns",
                 (e, m) -> apply(api, e, ApiContext.name(m))));
     }
@@ -170,8 +170,12 @@ final class DecisionRoutes implements RouteModule {
 
     /** Dry-run preview (see class doc): evaluate the rule's {@code when} tree over the request's
      *  {@code sampleRows} via {@link ConditionTree} and stamp the real {@code matched}/{@code total}.
-     *  No sample ⇒ {@code 0/0}. Not an authoring edit (MET-5 parity — no version archived). */
-    private Object simulate(ApiContext api, String name, Map<String, Object> body) throws IOException {
+     *  No sample ⇒ {@code 0/0}. Not an authoring edit (MET-5 parity — no version archived).
+     *  <p>For an agent (AGENT-KIT-1 W6 group B, D-AK20) the answer is the same but nothing is written: the rule file stays
+     *  byte-identical. The answer reads no Dataset (the sample is the caller's own body), so its masking stamp names zero
+     *  masked columns (D-AK13). A person's simulate still stamps the file ({@code DECISION-RULE-SIMULATE-WRITES-1}). */
+    private Object simulate(ApiContext api, com.sun.net.httpserver.HttpExchange ex, String name, Map<String, Object> body)
+            throws IOException {
         ComponentStore store = store(api);
         Map<String, Object> rule = RouteErrors.existing(store, TYPE, "decision rule", name);
         List<Map<String, Object>> sample = ApiContext.sampleRows(body);
@@ -185,6 +189,9 @@ final class DecisionRoutes implements RouteModule {
         sim.put("checkedAt", System.currentTimeMillis());
         Map<String, Object> next = new LinkedHashMap<>(rule);
         next.put("lastSimulation", sim);
+        com.gamma.util.AnswerMasking.applied("decision-rule " + name + " (caller sample)", 0);
+        if (ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof com.gamma.spi.auth.Subject who && who.agent())
+            return next;   // D-AK20: an agent's simulation is answered, never written
         next.put("updatedAt", System.currentTimeMillis());
         store.write(TYPE, name, next, false);   // a simulation stamp isn't an authoring edit (MET-5 parity)
         return next;

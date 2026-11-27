@@ -158,7 +158,11 @@ final class EnrichmentRoutes implements RouteModule {
         for (EnrichmentConfig.Reference r : cfg.references())
             if (!r.byName()) WriteGates.jailToAllowedRoots(r.path(), "references." + r.name() + ".path");
         try {
-            return EnrichmentEngine.preview(cfg, sampleRows, HostContext.of(api).service().loadedPipelines(), PREVIEW_LIMIT).toMap();
+            Object preview = EnrichmentEngine.preview(cfg, sampleRows, HostContext.of(api).service().loadedPipelines(), PREVIEW_LIMIT).toMap();
+            // D-AK22 (operator, 2026-11-26): the preview is raw for an authorized builder and that builder's agent; the agent
+            // seam accepts this stamp only on AgentGate.RAW_FOR_BUILDERS, and a machine agent never reaches here (PERSON_ONLY)
+            com.gamma.util.AnswerMasking.unmaskedByDecision("enrichment preview: raw for a builder (D-AK22)");
+            return preview;
         } catch (Exception compute) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "enrichment preview failed on the sample: " + ServerFaults.sqlMessage(compute.getMessage(), api));
         }

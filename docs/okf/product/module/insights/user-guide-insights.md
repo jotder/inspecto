@@ -43,6 +43,12 @@ To create one (needs the Workbench author permission), choose **New Insight Prof
 a bar per period with the number of Insights, the total ("you would have seen N Insights in the last P periods") and
 the top Insights with their sentences. Nothing is saved until **Save**. A refused save shows the server's reason.
 
+A scan always counts back from today's last complete period, so a Dataset whose data stopped weeks ago gives no
+Insights. The **Business assurance** Space Template ships a worked example: the Profile `ba_margin_revenue` (daily
+revenue of `ba_margin_lines` by product, channel and partner, whose columns carry their roles) and the disabled Job
+`ba_insight_scan`. Its synthetic margin lines end yesterday, whatever the day, with a planted drop (product P2 at a fifth
+of its volume over the last four days), so **Preview on history** and **Run scan now** find Insights at once. The other pilot, `telco-ra`, has no such corpus yet (`INSIGHT-PILOT-TELCO-RA-1`).
+
 ## Reading and judging Insights
 
 Select a Profile to see the Insights of its latest run, best score first: the band (High, Elevated, Normal), the

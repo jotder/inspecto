@@ -162,7 +162,7 @@ is passed on as the replayed route's JSON body, unchanged.
 |---|---|---|---|
 | `validate_config` | read | `type`, `config` | `POST /validate` (`{type, config}`); refusal findings come back as data |
 | `dry_run_pipeline` | read | `pipeline`, `body?` | `POST /pipelines/authored/{pipeline}/dry-run` |
-| `preview_config` | read | `kind`, `body` | one of the four authoring previews (W6 group A, [spec-agent-previews.md](spec-agent-previews.md)) |
+| `preview_config` | read | `kind`, `body` | one of the four authoring previews ([W6 group A](spec-agent-previews.md)) |
 | `propose_change` | write | `kind`, `operation`, `id?`, `version?`, `content?`, `reason?` | the kind's own write route, below; `reason` rides as the request attribute `RequestAttrs.ATTR_CHANGE_REASON`, which `PendingChanges.hold` reads before the `X-Change-Reason` header (an in-process replay need not be header-safe; a header holding "—" or "→" made the replay throw — `AGENT-PROPOSE-500-1`, fixed 2026-11-24) |
 | `list_requirements` | read | — | `GET /requirements` (W2 step 2: what a `requirement-kpi` proposal starts from) |
 | `list_pipeline_versions` | read | `pipeline` | `GET /pipelines/{pipeline}/history` (W2 step 2: what a `pipeline-restore` restores) |
@@ -173,7 +173,8 @@ is passed on as the replayed route's JSON body, unchanged.
 | `export_bundle` | read | `body` | `POST /bundle/export` |
 | `preview_promotion` | read | `body` | `POST /promotion/preview` (`canAdminister`) |
 | `run_pipeline_now` | write | `pipeline`, `body?` | `POST /pipelines/authored/{pipeline}/run` (`canAuthorWorkbench`; D-AK2: a person, never a machine) |
-| `run_space_tests` | read | `body?` | `POST /tests/run` (`{cases?}`; `canAuthorWorkbench`; W6 group C, D-AK10: a person, never a machine) — [Agent Space tests](spec-agent-space-tests.md) |
+| `run_space_tests` | read | `body?` | `POST /tests/run` (`{cases?}`; `canAuthorWorkbench`; W6 group C, D-AK10: a person, never a machine) — [W6 C](spec-agent-space-tests.md) |
+| `simulate_decision_rule`, `simulate_rule_template`, `preview_enrichment` | read | per tool | [W6 B](spec-agent-simulators.md) |
 
 **`propose_change` allowlist** (`McpTools.CHANGE_ROUTES`, the builder tutorials' kinds, each route on
 `PendingChanges.REPLAYABLE`): `pipeline` (create and update `PUT /pipelines/{id}/graph`, delete
@@ -554,8 +555,8 @@ route's 403 through the tool, as on the direct call.
 - **Path segments.** An in-process replay matches its route on the raw path, so a `%3A` would reach the route still
   encoded and `masked:` would never be recognised. The W3 routers keep `:` and `@` as they are (`McpTools.idSeg`; both
   are legal in a segment, and the ID argument pattern admits no `/?#%`).
-- **No tool:** `GET /screening/hits/{id}/reveal` (never-list), `GET /risk-score-lists/{model}`. W6 group E's
-  `preview_score`, `check_screening`: [seam](spec-agent-data-seam.md#group-e-the-analyst-previews).
+- **No tool:** `GET /screening/hits/{id}/reveal` (never-list), `GET /risk-score-lists/{model}`. Group E:
+  [seam](spec-agent-data-seam.md).
 - **Tests:** `McpToolRoutesTest.everySpaceHealthAndScoreToolReplaysItsGatedGetRoute` (route and manifest capability
   per tool; no tool reaches the Screening Hit reveal); `ControlApiMcpTest.eachSpaceHealthAndScoreToolAnswersItsRoutesOwn403`
   (real HTTP, per tool: the token without the capability gets `HTTP 403` through the tool and 403 on the direct call,

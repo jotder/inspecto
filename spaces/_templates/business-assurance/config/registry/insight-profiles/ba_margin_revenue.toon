@@ -1,0 +1,8 @@
+dataset: ba_margin_lines
+description: "Daily revenue of the margin lines, scanned by product, channel and partner"
+field: ds
+grain: day
+measure:
+  agg: sum
+  field: revenue
+dimensions[3]: product,channel,partner
