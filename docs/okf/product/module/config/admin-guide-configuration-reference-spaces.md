@@ -54,11 +54,11 @@ spaces/
 **Data root — config here, high-growth state on a bigger disk.** `data/`, `audit/` and `duckdb/` live under the
 Space's data root: `data_root: <path>` in `space.toon` — rooted, or relative to the app root — else
 `-Dspaces.data.root=<mount>` → `<mount>/<id>`, else the Space folder. Configs are unchanged — `data/orders/inbox` or `../data/backups` resolve onto the data root.
-Example (all configs in `C:\sandbox\spaces`, all data in `C:\data`):
+Example (the sandbox's own layout, `SPACES-CONSOLIDATION-1`: all configs in the checkout's `spaces`, under version control; all data in `C:\sandbox\inspecto_spaces`, never committed):
 
 ```
--Dspaces.root=C:\sandbox\spaces -Dspaces.data.root=C:\data
-C:\sandbox\spaces\demo\{space.toon, config\}      C:\data\demo\{data\, audit\, duckdb\, .inspecto-space}
+-Dspaces.root=C:\sandbox\inspecto-clean\spaces -Dspaces.data.root=C:\sandbox\inspecto_spaces
+C:\sandbox\inspecto-clean\spaces\<id>\{space.toon, config\}      C:\sandbox\inspecto_spaces\<id>\{data\, audit\, duckdb\, .inspecto-space}
 ```
 
 The launchers (`serve.bat`, `serve.sh`, `serve-demo.*`) pass `SPACES_DATA_ROOT` as `-Dspaces.data.root`; unset leaves

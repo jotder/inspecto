@@ -1,7 +1,9 @@
 # Spaces in source control, data outside it — one data root, one build target (`SPACES-CONSOLIDATION-1`)
 
-Status: **APPROVED 2026-11-25 — D-SC1…D-SC9 all DECIDED (operator, 2026-11-25); no engine change; nothing built,
-nothing moved. P0 started 2026-11-25 (§9); the config backups and both private-data copies are done and verified.** Opened 2026-11-25. Owner: this shift. Items: `module.config`, `layer/platform`. Extends `SPACE-DATA-ROOT-1` and
+Status (2026-11-27): **P0–P5 shipped; P6 partly done; D-SC1…D-SC15 all signed; no engine change.** §5 and §8 below are the forward
+plan as first written; what was built, in order, is §10–§23, and §24 is the review that closes the open items. Still open: the live-install
+and private-Space boots, the cleanup that waits on owners (board rows `SPACES-CONSOLIDATION-1`, `SANDBOX-CLEANUP-1`,
+`LA-INDEX-UNDER-DATA-ROOT-1`). Opened 2026-11-25. Owner: this shift. Items: `module.config`, `layer/platform`. Extends `SPACE-DATA-ROOT-1` and
 `SPACE-RELOCATABLE-ROOTS-1` (both shipped).
 
 **Revision note.** The first draft kept the live Spaces whole under `C:\sandbox\inspecto_spaces\<space>\` and
@@ -91,7 +93,7 @@ way: every tracked file under `spaces/**` must be `space.toon`, `template.toon`,
 under a size cap; any `data/`, `*.csv`, `*.parquet`, `*.db` fails. Its test must show the guard fails on a planted
 CSV.
 
-## 4. Decisions (open — operator signs each)
+## 4. Decisions (all signed; D-SC10…D-SC15 are in §11, §17 and §19)
 
 | # | Decision | Recommendation |
 |---|---|---|
@@ -181,14 +183,11 @@ account access (not done here), then `git cherry origin/master HEAD`; push anyth
 
 `C:\sandbox\backup`; history rewrite (D-SC7); a data root on another volume; engine root resolution.
 
-## 8. Board rows (not yet filed)
+## 8. Board rows (filed 2026-11-27)
 
-All decisions are signed, so file as `docs/BACKLOG.md` rows tagged `[items: module.config, layer.platform ·
-kind: chore]`: `SPACES-CONSOLIDATION-1` (P0–P5, with the data-generation split as `SPACE-DATA-GENERATED-1`) and
-`SANDBOX-CLEANUP-1` (P6), plus the follow-up `LA-INDEX-UNDER-DATA-ROOT-1` (P3, `kind: feature`, `hold: demand`;
-the engine writes `<write root>/la-index` through `IndexRoutes.indexRoot`, D-SC9). Filing needs the census counts and
-the ledger line (`tools/check-backlog-items.mjs`, `tools/roll-backlog-ledger.mjs`), so it is a separate step from this
-plan's approval.
+`SPACES-CONSOLIDATION-1`, `SANDBOX-CLEANUP-1` and `LA-INDEX-UNDER-DATA-ROOT-1` (`hold: demand`; the engine writes
+`<write root>/la-index` through `IndexRoutes.indexRoot`, D-SC9) are on `docs/BACKLOG.md`. The data-generation split planned as
+`SPACE-DATA-GENERATED-1` shipped inside P2–P3 and needs no row.
 
 ## 9. P0 findings (2026-11-25, read-only plus a config-only backup)
 
@@ -516,7 +515,7 @@ cover a data root outside the spaces root.
 moved to `inspecto_spaces`: `telco-assurance`, `cricket-analytics` and `la-mobile-money`. The two real-data Spaces (`inspecto-mfs`,
 `mfs-demo`) were **not attached**, so nothing started a Collector on a private extract; their file counts and bytes were identical
 before and after (4 848 files 14 427 974 049 B; 61 225 files 30 603 577 987 B). `la-mobile-money` had no state backup, so its 13 270 files
-(59 959 975 B) were copied and counted equal first (`C:\sandboxackup\spaces-p0-20261125\la-mobile-money-state`).
+(59 959 975 B) were copied and counted equal first (`C:\sandbox\backup\spaces-p0-20261125\la-mobile-money-state`).
 **The build:** the existing deploy bundle's `lib\*.jar` (built 2026-11-24 12:17; this checkout has no `runtime\`) on the system JDK 27,
 without `inspecto-oidc.jar` and `inspecto-policy.jar`; with them the server exits at start (`OidcAuthenticator` needs its
 configuration), because the bundle's edition above Basic authenticates.
@@ -599,9 +598,37 @@ failures**, which brings the quarantine to 12.74 GB. Nothing deleted.
   rehearsal, stamped for the `C:\sandbox\spaces` stubs, newer data living in the repo Spaces (D-SC10). `C:\data` is left as an empty folder.
 - **`legacy-stubs\`** (under 1 MB): the five matching config stubs from `C:\sandbox\spaces`, which now holds only the three private Spaces
   (`inspecto-mfs`, `mfs-demo`, `la-mobile-money`), `_templates` and `onboarding-counters.tsv`.
-- **Class C** (0.72 GB): `ims-mfs-demo-backup` and `inspecto-mfs-backupsefore-map-move`, the older backups of the live installs; the P0
+- **Class C** (0.72 GB): `ims-mfs-demo-backup` and `inspecto-mfs-backups\before-map-move`, the older backups of the live installs; the P0
   backups, whose counts and bytes were verified, are the fallback.
 
 Checked first: no process names any of them; no `.ref` or `space.toon` under the Preview, Basic, `spaces-preview`, canonical or private roots
 names the stubs or `C:\data`; the `_refs` pointers name only the three private Spaces. Still not moved: D, E, F, G, H. The quarantine can be
 deleted once the Preview and Basic installs have started once.
+
+## 24. Review (2026-11-27): the source moved on, and what improves
+
+- **`origin/master` is 120 commits past the last Spaces push** (`8a221b3ad` to `137c7cdce`); none changes the layout. Re-checked on that
+  head: the guard passes (1,632 tracked files under `spaces/`, no data folder, empty baseline), `package.ps1` still runs the seeding step and
+  parses clean, and the generator registry still names 18 Templates. The Business Insights work added Insight config and a 2 KB seed to
+  `business-assurance`, inside the cap. Twelve Templates still ship committed data, all small samples or sink seeds (largest `telco-fraud`,
+  227 KB), all held by the §17 cap.
+- **Fixed, with a test.** `seedData` (`tools/space-data.mjs`) took any `data/` folder as shipped data, even an empty one. A Maven test that runs
+  a Template's Pipeline in place leaves empty `status` folders (`TEMPLATE-STRAY-STATUS-DIR-1`), after which a `seed-la-*` scaffold copied
+  nothing and never ran the generator. It now copies only a folder that holds a file (`holdsFiles`); the new case in
+  `tools/seed-space-data.test.mjs` fails without the change (`copied`, not `generated`).
+- **Fixed, text only.** The three board rows of §8 are filed. `admin-guide-configuration-reference-spaces.md` gave `C:\data` as its example
+  data root; it now shows the real layout. Two backspace bytes in this plan, where `\b` of a Windows path had been typed, are back to
+  `\backup` and `\before-map-move`.
+- **Found, left alone.** (1) Some test still writes into `spaces/_templates`; §14 and §18 moved the corpora to `target/` but did not search for
+  other writers. A check that `git status --porcelain spaces/` is empty after an affected-module run would catch any writer; it needs the
+  writer found first (`TEMPLATE-STRAY-STATUS-DIR-1`). (2) The comments in `tools/la-demo-cases.mjs` and `tools/record-la-live.mjs`, and a
+  brochure script, still name the quarantined installs; they say where a recording was made, so they stay. The stale `inspecto-basic-*` entries
+  in `.claude/launch.json` belong to another lane. (3) `package.ps1` seeding has only been parse-checked: the first bundle build is its real
+  test, and no one has run one since P3b.
+- **Next, in order.** (a) Boot the three private Spaces with `tools/attach-private-spaces.ps1`, then the Preview and Basic installs once, one at a
+  time; (b) delete the quarantine; (c) the owner questions (class D, `antigravity`, older backups); (d) build current `master` once
+  against `inspecto_spaces`, which also runs the `package.ps1` seeding. Item (a) is the gate for (b) and (d).
+- **Closing this plan.** It is 59 KB against the 60 KB docs-health cap (a plan over it is refused), so add no more sections. When (a)–(d) are done, distill the as-built
+  facts (the split layout, the generator contract, the guard, the private-Space attach, D-SC1…D-SC15) into
+  `okf/product/module/config/plan-spaces-templates.md`, move anything still open to the board, then `git mv` this plan to
+  `archived-documents/plans-archive/` with its row in `archived-documents/README.md` (the `handoff` skill checks this).

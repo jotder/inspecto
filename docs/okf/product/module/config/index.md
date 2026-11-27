@@ -52,6 +52,8 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `PENDING-CHANGE-SECRET-READBACK-1` | P3 | defect | a Job's secret parameter can be read back through its Pending Change: | — |
 | `ORIGIN-UPGRADE-UNHELD-1` | P3 | defect | a Space Template upgrade that adds and updates nothing rewrites the Space origin record without holdSet, even under an approval policy. | — |
 | `SPACE-ROOTED-DATA-ROOT-MIGRATION-1` | P3 | feature | An install whose data_root is rooted or absent is still not relocatable, and no route migrates it. | demand |
+| `LA-INDEX-UNDER-DATA-ROOT-1` | P3 | feature | The Link Analysis index is runtime data but lives in the Space's config folder: | demand |
+| `SPACES-CONSOLIDATION-1` | P3 | chore | Space config is in git, its data is in C:\sandbox\inspecto_spaces\<id>: | operator |
 | `SPLIT-JOB-PIPELINE-UNGATED-1` | P2 | defect | POST /pipelines/{id}/split-job-pipeline (JOB-GRAPH-1, fea9792af) writes config without SaveGate, without the PendingChanges.hold an appro… | — |
 | `PIPELINE-POLL-RULE-NPE-1` | P2 | defect | The save rule poll-required-for-non-dataset (ConfigSpecs.java, JOB-GRAPH-1 fea9792af) calls .isBlank() on RawConfig.str(raw, "dirs.poll")… | — |
 | `INSIGHT-SCAN-WRITER-UNLISTED-1` | P2 | defect | ConfigWriteFunnelTest.everyConfigWriterRepoWideReachesTheHoldOrIsOnTheInventory is red on master: InsightScanJobType#register (writes the… | — |

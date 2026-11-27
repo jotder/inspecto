@@ -70,3 +70,25 @@ test('--out writes only into the folder it is given (the Template folder is unto
   }
   assert.deepEqual(snap(), before);
 });
+
+test('a Template data folder that holds only empty folders is not shipped data: seedData generates instead of copying nothing (TEMPLATE-STRAY-STATUS-DIR-1)', { timeout: 120000 }, async () => {
+  const { seedData, holdsFiles } = await import('./space-data.mjs');
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  const root = mkdtempSync(join(tmpdir(), 'seed-stray-'));
+  try {
+    mkdirSync(join(root, 'tpl', 'order-to-cash', 'data', 'o2c', 'status'), { recursive: true });   // what a test leaves behind
+    assert.equal(holdsFiles(join(root, 'tpl', 'order-to-cash', 'data')), false);
+    const out = join(root, 'out');
+    assert.equal(seedData('order-to-cash', out, join(root, 'tpl')), 'generated');
+    assert.ok(filesUnder(out).length > 0, 'the generator wrote the corpus');
+
+    mkdirSync(join(root, 'tpl', 'custom', 'data', 'samples'), { recursive: true });
+    writeFileSync(join(root, 'tpl', 'custom', 'data', 'samples', 'a.csv'), 'x\n');
+    const out2 = join(root, 'out2');
+    assert.equal(seedData('custom', out2, join(root, 'tpl')), 'copied', 'a file makes it shipped data');
+    assert.ok(existsSync(join(out2, 'samples', 'a.csv')));
+
+    mkdirSync(join(root, 'tpl', 'bare', 'data', 'x'), { recursive: true });
+    assert.equal(seedData('bare', join(root, 'out3'), join(root, 'tpl')), 'none', 'empty folders and no generator: nothing');
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
