@@ -58,6 +58,8 @@ class ControlApiAnomalyScoreTest {
         if ("Bearer revealer".equals(auth))
             return Optional.of(new Subject("rev", Set.of("canWorkIncidents", "canRevealLinkEntities")));
         if ("Bearer agent".equals(auth)) return Optional.of(agentFor("rev", Set.of("canWorkIncidents", "canRevealLinkEntities")));
+        if ("Bearer agentauthor".equals(auth)) return Optional.of(agentFor("ana", CAPS));
+        if ("Bearer machine".equals(auth)) return Optional.of(new Subject("client:bot", CAPS, null, Map.of(), null, null, "svc", "bot"));
         return Optional.empty();
     };
 
@@ -288,6 +290,70 @@ class ControlApiAnomalyScoreTest {
             assertTrue(masked.startsWith("masked:"), "a classified evidence column is a token in the response");
             assertFalse(top.toString().contains("\"msisdn\":\"spike\""));
             assertTrue(top.get("evidence").get(0).has("mb"));
+        }
+    }
+
+    /**
+     * AGENT-KIT-1 W6 group E (D-AK13, D-AK15): "POST /anomaly-scores/preview" is an agent data route. The agent sends the
+     * raw key (allowed); the answer names it only as the Space token and carries the classified evidence masked. With every
+     * stamp a no-op the agent gets 500 with no key or evidence while a person still gets the preview.
+     */
+    @Test
+    void anAgentsScorePreviewIsProvenMaskedOrWithheld(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, null)) {
+            ComponentStore store = new ComponentStore(c.config.resolve("registry"));
+            store.write("dataset", "usage", Map.of("physicalRef", "usage",
+                    "columns", List.of(Map.of("name", "msisdn", "classification", "MSISDN"))));
+            Map<String, Object> content = AnomalyCorpus.model();
+            for (Object f : (List<?>) content.get("features")) {
+                @SuppressWarnings("unchecked") Map<String, Object> fm = (Map<String, Object>) f;
+                fm.put("evidence", List.of("msisdn", "mb"));
+            }
+            store.write(AnomalyModel.KIND, AnomalyCorpus.MODEL, content);
+            String path = "/spaces/s1/anomaly-scores/preview";
+            String body = "{\"model\":\"" + AnomalyCorpus.MODEL + "\",\"entityKey\":\"spike\",\"asOf\":\"2026-10-01\"}";
+            HttpResponse<String> r = send(c.port, "POST", path, body, "agent");
+            assertEquals(200, r.statusCode(), r.body());
+            JsonNode d = data(r);
+            assertTrue(d.get("found").asBoolean(), "the raw key an agent sends is scored (D-AK15): " + r.body());
+            assertTrue(d.get("keyMasked").asBoolean());
+            assertTrue(d.get("entityKey").asText().startsWith("masked:"), r.body());
+            assertTrue(d.at("/features/0/evidence/0/msisdn").asText().startsWith("masked:"), r.body());
+            assertFalse(r.body().contains("\"spike\""), "no raw key leaves: " + r.body());
+            com.gamma.util.AnswerMasking.ignoreStampsForTest(true);
+            try {
+                HttpResponse<String> agent = send(c.port, "POST", path, body, "agent");
+                assertEquals(500, agent.statusCode(), agent.body());
+                assertTrue(agent.body().contains(ControlApi.MASKING_NOT_PROVEN), agent.body());
+                assertFalse(agent.body().contains("spike") || agent.body().contains("masked:"), agent.body());
+                assertEquals(200, send(c.port, "POST", path, body, "revealer").statusCode(), "a person is unchanged");
+            } finally {
+                com.gamma.util.AnswerMasking.ignoreStampsForTest(false);
+            }
+        }
+    }
+
+    /**
+     * D-AK23 (operator 2026-11-26): a DRAFT preview is raw for a builder. A person's agent holding canAuthorWorkbench gets
+     * the same features and daily series the person gets; a machine agent's draft is 403. Falsified: removing the machine
+     * refusal in {@code AnomalyScoreRoutes.preview}.
+     */
+    @Test
+    void aDraftPreviewIsRawForABuildersAgentAndRefusedToAMachine(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, null)) {
+            com.gamma.access.Roles.write(c.config, Map.of(), List.of(), List.of("bot"));   // the Space admits client 'bot'
+            String draft = JSON.writeValueAsString(Map.of("content", AnomalyCorpus.model(), "entityKey", "spike",
+                    "asOf", "2026-10-01"));
+            HttpResponse<String> person = send(c.port, "POST", "/spaces/s1/anomaly-scores/preview", draft, "analyst");
+            assertEquals(200, person.statusCode(), person.body());
+            HttpResponse<String> agent = send(c.port, "POST", "/spaces/s1/anomaly-scores/preview", draft, "agentauthor");
+            assertEquals(200, agent.statusCode(), agent.body());
+            assertEquals(data(person).get("series"), data(agent).get("series"), "the daily series as the person gets it");
+            assertTrue(data(agent).get("keyMasked").asBoolean(), "the key still leaves masked");
+
+            HttpResponse<String> machine = send(c.port, "POST", "/spaces/s1/anomaly-scores/preview", draft, "machine");
+            assertEquals(403, machine.statusCode(), machine.body());
+            assertTrue(machine.body().contains("saved model only"), machine.body());
         }
     }
 

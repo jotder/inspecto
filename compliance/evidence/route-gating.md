@@ -406,8 +406,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/runs/([^/]+)/retries/cancel` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:126` |
 | POST | `/runs/([^/]+)/retries/retry-now` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:124` |
 | POST | `/runs/([^/]+)/trigger` | gated | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java:55` |
-| POST | `/screening/check` | exempt | read-shaped | `features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java:60` |
-| POST | `/screening/hits/([^/]+)/decide` | gated | `canWorkIncidents` | `features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java:65` |
+| POST | `/screening/check` | exempt | read-shaped | `features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java:64` |
+| POST | `/screening/hits/([^/]+)/decide` | gated | `canWorkIncidents` | `features/inspecto-screening/src/main/java/com/gamma/screening/ScreeningRoutes.java:69` |
 | PUT | `/settings/approval` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/PendingChangeRoutes.java:69` |
 | PUT | `/settings/approvers` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/ApproverRosterRoutes.java:41` |
 | PUT | `/settings/branding` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/SettingsRoutes.java:83` |

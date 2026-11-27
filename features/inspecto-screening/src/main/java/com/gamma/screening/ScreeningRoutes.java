@@ -48,6 +48,10 @@ public final class ScreeningRoutes implements RouteModule {
     static final int MAX_LISTS = 20;
     static final int MAX_VALUE_LENGTH = 512;
     static final int DEFAULT_LIMIT = 100, MAX_LIMIT = 500;
+    /** The most matches per subject a check answers an agent (D-AK16). */
+    static final int AGENT_MAX_MATCHES = 10;
+    /** D-AK24 (operator 2026-11-26): an agent's check costs {@value #AGENT_WEIGHT_PER_BATCH} per started {@value #AGENT_BATCH} subjects. */
+    static final int AGENT_BATCH = 10, AGENT_WEIGHT_PER_BATCH = 2;
 
     @Override
     public Set<String> featureIds() {
@@ -69,6 +73,7 @@ public final class ScreeningRoutes implements RouteModule {
     private Object check(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path root = WriteGates.requireWriteRoot(api, "screening");
         List<Screener.Subject> subjects = subjects(body);
+        if (agent(ex)) chargeAgentSubjects(ex, subjects.size());
         List<String> listIds = lists(body);
         // LA-GROW-EXCLUDE-1 GE-8: a check answers the matched entry, so a restricted list is refused (403) to a caller who
         // may not see its members. A Screening Job's hits are not refused: the hit reads hide a restricted list's entry
@@ -78,7 +83,7 @@ public final class ScreeningRoutes implements RouteModule {
         for (String id : listIds)
             if (folded.get(id) != null) EntityListFacts.requireSeesMembers(ex, folded.get(id), "screen against");
         double threshold = threshold(body.get("threshold"));
-        int maxMatches = maxMatches(body.get("maxMatches"));
+        int maxMatches = agent(ex) ? agentMaxMatches(body.get("maxMatches")) : maxMatches(body.get("maxMatches"));
         Instant now = Instant.now();
         List<Screener.Prepared> lists;
         try {
@@ -86,6 +91,11 @@ public final class ScreeningRoutes implements RouteModule {
         } catch (IllegalArgumentException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
         }
+        // W6 group E (D-AK13): each entry leaves as its list shows it - a masked list's entry is its Space token
+        // (Screener.load); the subjects echoed back are the caller's own values (D-AK15)
+        int maskedLists = (int) new java.util.LinkedHashSet<>(listIds).stream()
+                .filter(id -> EntityListFacts.masked(root, folded.get(id))).count();
+        com.gamma.util.AnswerMasking.applied("screening check (entries as each Entity List shows them)", maskedLists);
         List<Map<String, Object>> results = new ArrayList<>();
         for (Screener.Subject s : subjects) {
             Map<String, Object> r = new LinkedHashMap<>();
@@ -166,6 +176,21 @@ public final class ScreeningRoutes implements RouteModule {
         for (EntityRegistry.EntityList l : EntityRegistry.fold(facts.facts(), facts.headSeq()).values())
             if (l.restricted()) out.add(l.id());
         return out;
+    }
+
+    /**
+     * D-AK24 (operator 2026-11-26): an agent's check costs {@code ceil(n / 10) * 2} of its data budget, so every guess
+     * spends it. The host charged the route's weight (the first batch) before this handler; the rest is spent here, before
+     * any list is read, through the host's charger ({@link com.gamma.util.AgentBudget}) - a 429 past the budget, and a check
+     * costing more than the whole burst (1000 subjects: 200) is refused outright. Fails closed when no charger is there.
+     * A person is not charged and keeps 1..1000 subjects.
+     */
+    private static void chargeAgentSubjects(HttpExchange ex, int subjects) {
+        int extra = (subjects + AGENT_BATCH - 1) / AGENT_BATCH * AGENT_WEIGHT_PER_BATCH - AGENT_WEIGHT_PER_BATCH;
+        if (extra <= 0) return;
+        if (!(ApiContext.attr(ex, com.gamma.util.AgentBudget.ATTR) instanceof java.util.function.IntConsumer charge))
+            throw new IllegalStateException("an agent's screening check reached no agent budget");
+        charge.accept(extra);
     }
 
     /** An AI agent client acting for a person (AGENT-KIT-1): it never reveals, so the subject key leaves masked. */
@@ -375,6 +400,17 @@ public final class ScreeningRoutes implements RouteModule {
                 || n.intValue() < 1 || n.intValue() > Screener.MAX_MATCHES)
             throw bad("'maxMatches' must be an integer in 1.." + Screener.MAX_MATCHES);
         return n.intValue();
+    }
+
+    /**
+     * An agent's {@code maxMatches} (W6 group E, D-AK16 signed 2026-11-26): clamped to {@value #AGENT_MAX_MATCHES} per
+     * subject - a larger whole number is answered with {@value #AGENT_MAX_MATCHES}, not refused; anything else is checked
+     * as a person's.
+     */
+    static int agentMaxMatches(Object raw) {
+        if (raw instanceof Number n && n.doubleValue() == Math.rint(n.doubleValue()) && n.doubleValue() > AGENT_MAX_MATCHES)
+            return AGENT_MAX_MATCHES;
+        return Math.min(maxMatches(raw), AGENT_MAX_MATCHES);
     }
 
     private static ApiException bad(String message) {

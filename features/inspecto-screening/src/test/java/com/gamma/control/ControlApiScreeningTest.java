@@ -390,6 +390,65 @@ class ControlApiScreeningTest {
     }
 
     /** SCREENING-1-D3: reveal is gated on canRevealLinkEntities and audited; a hit whose Job is gone says why. */
+    /**
+     * AGENT-KIT-1 W6 group E (D-AK13, D-AK16): "POST /screening/check" is an agent data route. In a masked Space an agent's
+     * matched entry is the list's token, never the member; with every stamp a no-op the agent gets 500 with no match while
+     * a person still screens. An agent gets at most 10 matches per subject (a larger maxMatches is clamped, not refused);
+     * a person keeps the 1..20 range. Falsified: removing the check's stamp; removing the agent clamp.
+     */
+    @Test
+    void anAgentsCheckIsProvenMaskedOrWithheldAndCappedAtTen(@TempDir Path spaces) throws Exception {
+        Path cfg = spaces.resolve("acme").resolve("config");   // masking on: no masking_mode none
+        Files.createDirectories(cfg.resolve("registry"));
+        Files.createDirectories(spaces.resolve("acme").resolve("data"));
+        StringBuilder lists = new StringBuilder();
+        for (int i = 1; i <= 12; i++) {
+            ScreeningLists.create(cfg, "l" + i, "block", "subscriber", "default");
+            ScreeningLists.add(cfg, "l" + i, "default", List.of("Zarkov Quillfeather"));
+            lists.append(i == 1 ? "" : ",").append("\"l").append(i).append('"');
+        }
+        String path = "/spaces/acme/screening/check";
+        java.util.function.IntFunction<String> body = max -> "{\"lists\":[" + lists + "],\"maxMatches\":" + max
+                + ",\"subjects\":[{\"key\":\"s1\",\"name\":\"Zarkov Quillfeather\"}]}";
+        withSpaces(spaces, port -> {
+            HttpResponse<String> agent = send(port, "POST", path, body.apply(20), AGENT);
+            JsonNode matches = data(agent, 200).at("/results/0/matches");
+            assertEquals(10, matches.size(), "an agent gets at most 10 matches per subject: " + agent.body());
+            for (JsonNode m : matches) assertTrue(m.get("entry").asText().startsWith("masked:"), agent.body());
+            assertFalse(agent.body().contains("zarkov quillfeather"), "the member leaves as the list's token: " + agent.body());
+            assertEquals(10, data(send(port, "POST", path, body.apply(50), AGENT), 200).at("/results/0/matches").size(),
+                    "an agent's maxMatches past the person's range is clamped, not refused");
+            assertEquals(12, data(send(port, "POST", path, body.apply(20), OPS), 200).at("/results/0/matches").size(),
+                    "a person is unchanged");
+            assertEquals(422, send(port, "POST", path, body.apply(50), OPS).statusCode(), "and keeps the 1..20 range");
+            assertEquals(422, send(port, "POST", path, body.apply(0), AGENT).statusCode(), "an agent's 0 is refused as a person's");
+
+            // D-AK24 (operator 2026-11-26): an agent's check costs 2 per started 10 subjects; past the burst (60 by
+            // default) it is refused by the budget. A person keeps 1..1000 and is not charged.
+            java.util.function.IntFunction<String> many = n -> {
+                StringBuilder s = new StringBuilder();
+                for (int i = 0; i < n; i++) s.append(i == 0 ? "" : ",").append("{\"name\":\"Zarkov Quillfeather\"}");
+                return "{\"lists\":[\"l1\"],\"subjects\":[" + s + "]}";
+            };
+            assertEquals(200, send(port, "POST", path, many.apply(11), AGENT).statusCode(), "11 subjects cost 4");
+            HttpResponse<String> big = send(port, "POST", path, many.apply(301), AGENT);
+            assertEquals(429, big.statusCode(), "301 subjects cost 62, more than the burst: " + big.body());
+            assertTrue(big.body().contains("more than the agent burst"), big.body());
+            assertEquals(200, send(port, "POST", path, many.apply(301), OPS).statusCode(), "a person is unchanged");
+
+            com.gamma.util.AnswerMasking.ignoreStampsForTest(true);
+            try {
+                HttpResponse<String> unstamped = send(port, "POST", path, body.apply(5), AGENT);
+                assertEquals(500, unstamped.statusCode(), unstamped.body());
+                assertTrue(unstamped.body().contains(com.gamma.control.ControlApi.MASKING_NOT_PROVEN), unstamped.body());
+                assertFalse(unstamped.body().contains("masked:") || unstamped.body().contains("\"l1\""), unstamped.body());
+                assertEquals(200, send(port, "POST", path, body.apply(5), OPS).statusCode(), "a person is unchanged");
+            } finally {
+                com.gamma.util.AnswerMasking.ignoreStampsForTest(false);
+            }
+        });
+    }
+
     @Test
     void revealIsGatedOnCanRevealLinkEntities(@TempDir Path spaces) throws Exception {
         Path cfg = space(spaces, "acme");

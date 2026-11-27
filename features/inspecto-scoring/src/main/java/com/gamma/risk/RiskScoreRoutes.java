@@ -105,6 +105,7 @@ public final class RiskScoreRoutes implements RouteModule {
         String modelId;
         if (contentRef != null) {
             ApiContext.requireCapability(ex, "canAuthorWorkbench");
+            draftForBuilder(ex);
             if (!(contentRef instanceof Map<?, ?> raw))
                 throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'content' must be an object");
             @SuppressWarnings("unchecked") Map<String, Object> c = (Map<String, Object>) raw;
@@ -203,6 +204,22 @@ public final class RiskScoreRoutes implements RouteModule {
         boolean reveal = ApiContext.subject(ex)
                 .map(s -> s.capabilities().contains(AuditReadMasking.UNMASK_CAPABILITY)).orElse(true);
         com.gamma.mask.EntityKeyMasking.put(out, writeRoot, entityKey, reveal);
+    }
+
+    /**
+     * D-AK23 (operator 2026-11-26), for a draft ({@code content}) preview: a draft's factor measure (max, sum, …) or filter
+     * over a classified column answers its values raw (only evidence is masked; RISK-SCORE-MEASURE-UNMASKED-1, accepted for
+     * builders). A machine agent's draft is refused (403); a person's agent holding canAuthorWorkbench gets it raw, its
+     * answer stamped as unmasked by decision (the host accepts that stamp only on {@code AgentGate.RAW_FOR_BUILDERS}). A
+     * person is unchanged.
+     */
+    private static void draftForBuilder(HttpExchange ex) {
+        Subject s = ApiContext.subject(ex).orElse(null);
+        if (s == null || !s.agent()) return;
+        if (s.machine())
+            throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "a machine agent previews a saved model only: a "
+                    + "draft's measures and filters read a classified column's values unmasked (D-AK23)");
+        com.gamma.util.AnswerMasking.unmaskedByDecision("draft score preview: raw for a builder (D-AK23)");
     }
 
     /** SEC-7d as the GET applies it: a data-scoped caller reaches only a model carrying a scope it holds. */

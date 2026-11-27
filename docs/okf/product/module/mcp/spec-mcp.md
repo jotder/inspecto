@@ -555,8 +555,8 @@ route's 403 through the tool, as on the direct call.
 - **Path segments.** An in-process replay matches its route on the raw path, so a `%3A` would reach the route still
   encoded and `masked:` would never be recognised. The W3 routers keep `:` and `@` as they are (`McpTools.idSeg`; both
   are legal in a segment, and the ID argument pattern admits no `/?#%`).
-- **No tool:** `GET /screening/hits/{id}/reveal` (never-list), the score previews (`POST …/preview`, W6 group E),
-  `GET /risk-score-lists/{model}`.
+- **No tool:** `GET /screening/hits/{id}/reveal` (never-list), `GET /risk-score-lists/{model}`. Group E:
+  [seam](spec-agent-data-seam.md).
 - **Tests:** `McpToolRoutesTest.everySpaceHealthAndScoreToolReplaysItsGatedGetRoute` (route and manifest capability
   per tool; no tool reaches the Screening Hit reveal); `ControlApiMcpTest.eachSpaceHealthAndScoreToolAnswersItsRoutesOwn403`
   (real HTTP, per tool: the token without the capability gets `HTTP 403` through the tool and 403 on the direct call,

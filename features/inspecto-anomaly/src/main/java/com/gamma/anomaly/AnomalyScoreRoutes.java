@@ -188,6 +188,15 @@ public final class AnomalyScoreRoutes implements RouteModule {
         String modelId;
         if (contentRef != null) {
             ApiContext.requireCapability(ex, "canAuthorWorkbench");
+            // D-AK23 (operator 2026-11-26): a draft's measure, filter or daily series over a classified column answers its
+            // values raw - a machine agent's draft is 403, a person's agent's is raw by decision (RAW_FOR_BUILDERS)
+            Subject caller = ApiContext.subject(ex).orElse(null);
+            if (caller != null && caller.agent()) {
+                if (caller.machine())
+                    throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "a machine agent previews a saved model only: a "
+                            + "draft's measures and filters read a classified column's values unmasked (D-AK23)");
+                com.gamma.util.AnswerMasking.unmaskedByDecision("draft anomaly preview: raw for a builder (D-AK23)");
+            }
             if (!(contentRef instanceof Map<?, ?> raw))
                 throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "'content' must be an object");
             @SuppressWarnings("unchecked") Map<String, Object> c = (Map<String, Object>) raw;

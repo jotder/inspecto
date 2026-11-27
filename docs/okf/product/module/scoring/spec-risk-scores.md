@@ -234,6 +234,11 @@ evidence rows, under `PREVIEW_POLICY` (512 MB, 2 threads, 10 s). An entity no fa
 holds `canRevealLinkEntities` (`keyMasked` says which). The GET route does the same (2026-10-06), through one
 helper, `RiskScoreRoutes.putEntityKey`.
 
+**AI agents (AGENT-KIT-1 W6 group E, 2026-11-26).** An agent may call the preview (MCP Tool `preview_score`), with the
+raw key (D-AK15), and a draft model's values come back raw to a person's agent holding `canAuthorWorkbench` (a machine agent's draft is 403; D-AK23, `RISK-SCORE-MEASURE-UNMASKED-1` accepted for builders); an agent never reveals, so the key leaves as the token. The route is an agent data route of weight 5:
+its answer must carry the masking stamp (`EntityKeyMasking.put`) or the agent gets 500. The Anomaly Score preview is the
+same. As built: `module/mcp/spec-agent-data-seam.md` § Group E.
+
 **Import-capability scan (operator, 2026-10-06).** `ImportCapabilityGuardTest` lists `POST /risk-scores/preview` on
 its `ACTS` exemptions — a read-only POST (keys stay out of URLs) that writes nothing — so its `canWorkIncidents` gate
 is not read as a stricter write route of the `risk-score` kind. The kind's import capability is unchanged.

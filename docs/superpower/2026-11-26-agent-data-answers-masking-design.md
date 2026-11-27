@@ -2,11 +2,13 @@
 
 > 🟡 **SIGNED 2026-11-26 — D-AK13…D-AK21 signed in an operator interview (D-AK13, 14, 17, 20, 21 as recommended;
 > D-AK15, 16, 18, 19 not as recommended, §5); the people-facing defects of §8 filed and fixed first. **S0 built 2026-11-26**
-> (the shared seam, as built: [`spec-agent-data-seam.md`](../okf/product/module/mcp/spec-agent-data-seam.md)). **B built
+> (the shared seam, as built: [`spec-agent-data-seam.md`](../okf/product/module/mcp/spec-agent-data-seam.md)); **B built
 > 2026-11-26** (Decision Rule and Rule Template simulate; the enrichment preview raw by decision for builders, **D-AK22**
 > added at the build and replacing §4 for that route; as built:
-> [`spec-agent-simulators.md`](../okf/product/module/mcp/spec-agent-simulators.md)). **D1 built 2026-11-26** (as built:
-> [`spec-agent-data-seam.md`](../okf/product/module/mcp/spec-agent-data-seam.md) § D1). E, D2 and the lookup change not
+> [`spec-agent-simulators.md`](../okf/product/module/mcp/spec-agent-simulators.md)); **E built
+> 2026-11-26** (score previews weight 5, a draft raw for a person's agent and 403 for a machine (D-AK23); screening check weight 2 per started 10 subjects (D-AK24) with at most 10 matches per subject for an agent; MCP
+> Tools `preview_score` and `check_screening`, as built in `spec-agent-data-seam.md` § Group E); **D1 built 2026-11-26** (as built:
+> [`spec-agent-data-seam.md`](../okf/product/module/mcp/spec-agent-data-seam.md) § D1). D2 and the lookup change not
 > built.**
 > Unblocks widening plan
 > [`2026-11-25-agent-kit-ak2-widening-plan.md`](2026-11-25-agent-kit-ak2-widening-plan.md) § W6 groups B, D and E (D-AK10:
@@ -192,6 +194,8 @@ decision.
 | **D-AK20** | Decision Rule simulate writes a stamp | For an agent, answer without writing | **As recommended.** |
 | **D-AK21** | Order and split | S0, D1, B, E, D2, `lookups/test`; one change and one security review each | **As recommended**, and the people defects first (§8): the recon fix lands before D2, the lookup fix before the lookup change. |
 | **D-AK22** (operator, 2026-11-26, at B's build; replaces §4 for the route) | How does `POST /enrichment/preview` mask? | §4: the transform sees masked Reference rows (found impractical: the HMAC token is computed in Java, so every Reference row would be tokenized per call, and a tokenized Reference never joins a raw sample) | **Unmasked for builders.** A person or a person's agent holding `canAuthorWorkbench` gets the raw preview; a machine agent 403 (person-only); a `path:` Reference stays raw and jailed. The answer is still stamped — as deliberately raw, a stamp only `AgentGate.RAW_FOR_BUILDERS` accepts — and weighs 2. ⚠ A builder's agent sends raw Reference values to its model provider. `ENRICHMENT-PREVIEW-UNMASKED-1` closed as accepted for builders. **Also accepted as built (operator, 2026-11-26, after B's security review; filed P2 to revisit):** (1) a builder's agent may name a `path:` Reference to any data file under the Space safety roots, so it can page any Dataset's store raw, 200 rows per call at weight 2, past `/db/query` masking and the `RAW_GETS` refusals (`ENRICHMENT-PREVIEW-PATH-REACH-1`); (2) a by-name Reference whose Dataset is shared away is answered raw, to the person and to their agent (`ENRICHMENT-PREVIEW-SHARING-1`). |
+| **D-AK23** | (operator, 2026-11-26, from the group E security review) A DRAFT score preview's measures and filters over a classified column answer raw values | — | **As D-AK22 for the enrichment preview:** raw for a person's agent holding `canAuthorWorkbench` (`AgentGate.RAW_FOR_BUILDERS`, `AnswerMasking.unmaskedByDecision`), 403 for a machine agent; a saved model's preview keeps its key and evidence masked for every agent (its own measures: the open part of the people row). People row `RISK-SCORE-MEASURE-UNMASKED-1`, accepted for builders. |
+| **D-AK24** | (operator, 2026-11-26, from the group E security review) One screening check carries up to 1000 guesses for weight 2 | — | **No subject cap:** an agent's check costs `ceil(n/10)*2`, so a 1000-subject check (200) is past the burst and refused by the budget. People keep 1000 and are not charged. |
 
 ## 6. Proof plan
 

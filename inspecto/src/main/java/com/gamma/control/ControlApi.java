@@ -1441,6 +1441,17 @@ public final class ControlApi implements AutoCloseable, HostContext {
             ex.getResponseHeaders().set("Retry-After", Long.toString(bucket.retryAfterSeconds(key, weight)));
             throw new ApiException(429, ErrorCodes.RATE_LIMITED, "agent data budget exceeded - retry later");
         }
+        // W6 group E (D-AK24): a route whose cost grows with its body spends the rest itself (com.gamma.util.AgentBudget)
+        ApiContext.attr(ex, com.gamma.util.AgentBudget.ATTR, (java.util.function.IntConsumer) extra -> {
+            if (extra <= 0) return;
+            if (weight + extra > bucket.capacity())
+                throw new ApiException(429, ErrorCodes.RATE_LIMITED, "agent data budget: this call costs " + (weight + extra)
+                        + ", more than the agent burst of " + (long) bucket.capacity() + " - send less in one call");
+            if (!bucket.tryConsume(key, extra)) {
+                ex.getResponseHeaders().set("Retry-After", Long.toString(bucket.retryAfterSeconds(key, extra)));
+                throw new ApiException(429, ErrorCodes.RATE_LIMITED, "agent data budget exceeded - retry later");
+            }
+        });
     }
 
     /** Route-level PEP (ABAC A3): consult the edition's {@link AccessDecider} — a no-op when none is

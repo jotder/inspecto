@@ -46,6 +46,10 @@ class AgentDataRoutesParityTest {
     private static final Map<String, String> PROOF_FILE = Map.of(
             "POST /db/query", "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentDataSeamTest.java",
             "POST /inv/", "la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiAgentLinkAnalysisSeamTest.java",
+            // W6 group E: each module's own preview proof; both doors, the budget and the audit scan in ControlApiAgentAnalystPreviewsTest
+            "POST /risk-scores/preview", "features/inspecto-scoring/src/test/java/com/gamma/control/ControlApiRiskScoreTest.java",
+            "POST /anomaly-scores/preview", "features/inspecto-anomaly/src/test/java/com/gamma/anomaly/ControlApiAnomalyScoreTest.java",
+            "POST /screening/check", "features/inspecto-screening/src/test/java/com/gamma/control/ControlApiScreeningTest.java",
             // D1 (W6 group D): the analytic reads
             "POST /bi/query", "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentAnalyticReadsTest.java",
             "POST /queries/([^/]+)/run", "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentAnalyticReadsTest.java",
@@ -206,17 +210,19 @@ class AgentDataRoutesParityTest {
     }
 
     /**
-     * D-AK22 (operator, 2026-11-26): the enrichment preview is the ONE data route whose answer is raw by decision, and only
-     * for a person or a person's agent (never a machine). Widening this set needs its own operator decision; every other data
-     * route must prove a masking step, since its scope never accepts the raw stamp ({@code AnswerMaskingTest}).
+     * D-AK22 and D-AK23 (operator, 2026-11-26): the enrichment preview and a DRAFT score preview are the only data routes
+     * whose answer is raw by decision, and only for a person or a person's agent (never a machine). Widening this set needs
+     * its own operator decision; every other data route must prove a masking step, since its scope never accepts the raw
+     * stamp ({@code AnswerMaskingTest}). The enrichment preview refuses a machine at the gate ({@code PERSON_ONLY}); a score
+     * preview admits a machine for a saved model and its route refuses a machine's draft (403, proved in each module's test).
      */
     @Test
-    void theEnrichmentPreviewIsTheOnlyRawByDecisionRouteAndNeverForAMachine() {
-        assertEquals(Set.of("POST /enrichment/preview"), AgentGate.RAW_FOR_BUILDERS);
-        for (String r : AgentGate.RAW_FOR_BUILDERS) {
+    void theRawByDecisionRoutesAreTheDecidedOnesAndNeverForAMachine() {
+        assertEquals(Set.of("POST /enrichment/preview", "POST /risk-scores/preview", "POST /anomaly-scores/preview"),
+                AgentGate.RAW_FOR_BUILDERS);
+        for (String r : AgentGate.RAW_FOR_BUILDERS)
             assertTrue(AgentGate.DATA_ROUTES.containsKey(r), r + " is still a stamped, weighted data route");
-            assertTrue(AgentGate.PERSON_ONLY.contains(r), r + " is refused to a machine agent");
-        }
+        assertTrue(AgentGate.PERSON_ONLY.contains("POST /enrichment/preview"), "the enrichment preview is refused to a machine agent");
         assertEquals(2, AgentGate.DATA_ROUTES.get("POST /enrichment/preview"), "design §4 weight");
         Subject machine = new Subject("client:bot", Set.of(), null, Map.of(), null, null, "svc", "bot");
         assertNotNull(AgentGate.refusal(machine, "POST", "^/enrichment/preview$"));
