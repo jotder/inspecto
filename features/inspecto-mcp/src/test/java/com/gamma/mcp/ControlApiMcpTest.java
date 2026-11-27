@@ -398,6 +398,45 @@ class ControlApiMcpTest {
         }
     }
 
+    /** AK-2 W5 guard: every propose_change kind has a shape resource, and it reads its packaged generated file. */
+    @Test
+    void everyProposeKindHasAShapeResource() {
+        for (String kind : McpTools.CHANGE_ROUTES.keySet()) {
+            McpTools.Resource r = McpTools.resource("inspecto://shapes/" + kind);
+            assertNotNull(r, "propose_change kind " + kind + " has no inspecto://shapes resource");
+            assertNotNull(McpRoutes.class.getClassLoader().getResource(r.classpath()),
+                    "propose_change kind " + kind + " has no packaged shape file " + r.classpath()
+                            + " - regenerate docs/api/component-shapes (ComponentShapesTest -Dshapes.write=true)");
+        }
+    }
+
+    /** AK-2 W5: resources/read answers each kind's shape and the error catalogue, generated banner kept. */
+    @Test
+    void theShapeAndErrorResourcesAreServed(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir)) {
+            JsonNode list = body(modern(c.port, OPS, "resources/list", Map.of())).path("result").path("resources");
+            java.util.Set<String> uris = new java.util.HashSet<>();
+            list.forEach(n -> uris.add(n.path("uri").asText()));
+            assertTrue(uris.contains("inspecto://errors"), "listed: " + uris);
+            for (String kind : McpTools.CHANGE_ROUTES.keySet()) {
+                String uri = "inspecto://shapes/" + kind;
+                assertTrue(uris.contains(uri), "listed: " + uri);
+                JsonNode content = body(modern(c.port, OPS, "resources/read", Map.of("uri", uri)))
+                        .path("result").path("contents").get(0);
+                assertNotNull(content, uri + " was not read");
+                assertEquals("application/json", content.path("mimeType").asText());
+                JsonNode shape = JSON.readTree(content.path("text").asText());
+                assertEquals(kind, shape.path("kind").asText(), uri);
+                assertTrue(shape.path("generatedBy").asText().contains("never edit by hand"), uri + " keeps its banner");
+                assertTrue(shape.path("operations").size() > 0, uri + " names its operations");
+            }
+            JsonNode errors = JSON.readTree(body(modern(c.port, OPS, "resources/read", Map.of("uri", "inspecto://errors")))
+                    .path("result").path("contents").get(0).path("text").asText());
+            assertTrue(errors.path("generatedBy").asText().startsWith("node tools/render-error-catalogue.mjs"), "banner kept");
+            assertTrue(errors.path("codes").size() > 0, "the catalogue lists codes");
+        }
+    }
+
     /** The per-Space switch: an administrator turns feature {@code mcp} off and the host refuses the endpoint. */
     @Test
     void aSpaceThatSwitchedTheEndpointOffRefusesIt(@TempDir Path dir) throws Exception {

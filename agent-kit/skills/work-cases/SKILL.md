@@ -90,7 +90,8 @@ A regulator or an auditor may read the record later, so it holds only what you c
 
 An Entity List decides whom Screening matches, so every change to one is **held** as a **Pending Change** (`pc-…`) for
 another person to approve — for a person's agent too (an agent never takes the 24-hour fast path a person's short-lived
-add has). Use `propose_change` with `kind: entity-list` and `id` = the list:
+add has). Use `propose_change` with `kind: entity-list` and `id` = the list (each operation's fields and an example:
+the resource `inspecto://shapes/entity-list`):
 
 | Want | `operation` | `content` | Needs |
 |---|---|---|---|

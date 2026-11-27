@@ -22,7 +22,8 @@ them: do the task you were given, then end your answer with one line naming what
    shape is far more reliable than writing one from nothing.
 2. **Look at real rows.** `query_dataset` with a small `limit` (for example `SELECT * FROM <dataset> LIMIT 20`). The
    query is read-only and masked columns come back masked; never ask for them unmasked.
-3. **Draft the graph.** Keep the node ids readable; one Step per idea. For a derived Dataset (a join, a daily summary,
+3. **Draft the graph.** Read the resource `inspecto://shapes/pipeline` for the graph's fields and an example. Keep
+   the node ids readable; one Step per idea. For a derived Dataset (a join, a daily summary,
    a pivot), follow the recipe page below rather than guessing Step names. When the person gives you a raw sample of a
    new feed, or the draft maps values, **preview the pieces first** with `preview_config` (skill
    `safe-config-change`, step 3): parse the sample, read the types the server suggests, check which rows a schema

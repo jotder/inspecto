@@ -22,7 +22,8 @@ them: do the task you were given, then end your answer with one line naming what
 3. **Measure before you assert.** `query_dataset` to count how many rows would fail today (for example
    `SELECT count(*) FROM <dataset> WHERE amount < 0`). Tell the person the number: an Expectation that fails on
    day one is a finding, not a mistake, but they should know before approving it.
-4. Draft one Expectation per requirement; name it for what it checks.
+4. Draft one Expectation per requirement, from the resource `inspecto://shapes/expectation` (its fields and an
+   example); name it for what it checks.
 5. `validate_config` with `type: expectation` and the draft. Fix every error.
 6. `propose_change` (`kind: expectation`, `operation: create`, `content`, `reason`). One proposal per Expectation, so
    the approver can accept one and decline another.

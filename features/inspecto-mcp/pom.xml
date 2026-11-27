@@ -134,6 +134,16 @@
                 </includes>
                 <targetPath>META-INF/inspecto/mcp</targetPath>
             </resource>
+            <!-- AK-2 W5: the generated shape reference (inspecto://shapes/{kind}) and error catalogue (inspecto://errors),
+                 copied verbatim - their "generatedBy" banner included - from the commit the jar is built from. -->
+            <resource>
+                <directory>${project.basedir}/../../docs</directory>
+                <includes>
+                    <include>api/component-shapes/*.json</include>
+                    <include>api/errors-v1.json</include>
+                </includes>
+                <targetPath>META-INF/inspecto/mcp</targetPath>
+            </resource>
         </resources>
     </build>
 </project>

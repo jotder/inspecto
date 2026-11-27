@@ -24,7 +24,8 @@ them: do the task you were given, then end your answer with one line naming what
    yourself, so you can tell the person what it will show and spot a wrong aggregation before it is approved. Use
    `query_dataset` for a check the Measure query cannot express. A masked value comes back as a token; a filter or sort
    on a masked column is refused — say so, never guess the value.
-4. Draft each Widget; `validate_config` with `type: widget`. Then draft the Dashboard naming the Widget ids;
+4. Draft each Widget from the resource `inspecto://shapes/widget` (its fields and an example); `validate_config`
+   with `type: widget`. The Dashboard's shape is `inspecto://shapes/dashboard`. Then draft the Dashboard naming the Widget ids;
    `validate_config` with `type: dashboard`.
 5. `propose_change` for each Widget (`kind: widget`), then for the Dashboard (`kind: dashboard`). Say in each reason
    which Dashboard it belongs to, so the approver reviews them together.

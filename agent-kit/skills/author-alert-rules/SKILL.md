@@ -24,7 +24,7 @@ them: do the task you were given, then end your answer with one line naming what
    duplicate.
 3. **Back-test the threshold.** `query_dataset` to compute the Measure over the last weeks and count how often the
    condition would have fired. Tell the person: a rule that would have fired every day is noise.
-4. Draft the rule; `validate_config` with `type: alert` (the config type; `alert-rule` is only the `propose_change`
+4. Draft the rule from the resource `inspecto://shapes/alert-rule` (its fields and an example); `validate_config` with `type: alert` (the config type; `alert-rule` is only the `propose_change`
    kind). Fix every error.
 5. `propose_change` (`kind: alert-rule`, `operation: create`, `content`, `reason` that states the back-test, for
    example "would have fired 2 times in 30 days").

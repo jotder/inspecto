@@ -275,7 +275,9 @@ public final class McpRoutes implements RouteModule {
             + "only what the caller may see; classified values come back masked. A config change is never applied by you: "
             + "validate_config and dry_run_pipeline first, then propose_change, which holds it as a Pending Change for "
             + "another person to approve. Write tools need sign-in through an agent client. Read the inspecto://glossary "
-            + "resource and use its canonical terms. Call edition_and_modules before relying on a feature.";
+            + "resource and use its canonical terms. Before drafting a propose_change, read inspecto://shapes/{kind} for "
+            + "that kind's fields and an example; on a refusal, read inspecto://errors for what its code means. "
+            + "Call edition_and_modules before relying on a feature.";
 
     /**
      * {@link #INSTRUCTIONS} plus the caller's own posture (MCP-AGENT-POSTURE-1), read by replaying
@@ -366,7 +368,7 @@ public final class McpRoutes implements RouteModule {
         if (res.classpath() != null) {
             text = classpathText(res.classpath());
             status = text == null ? 404 : 200;
-            if (text == null) text = "{\"error\":\"the glossary is not packaged in this build\"}";
+            if (text == null) text = "{\"error\":\"" + res.name() + " is not packaged in this build\"}";
         } else {
             call = new McpTools.Call("GET", res.route(), null);
             ApiContext.Replayed r = replay(api, ex, call, "mcpResource", uri, client);

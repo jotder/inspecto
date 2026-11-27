@@ -143,9 +143,9 @@ over 256 KiB is cut and the result says so.
 A tool whose route belongs to a module this bundle lacks (Incidents need `ops`, briefs need
 `action-requests`) still lists, and its call returns the host's `503` explanation as an error result.
 
-**Resources:** `inspecto://glossary` (`text/markdown`, `docs/GLOSSARY.md` packaged into the module jar at
-build time — the canonical vocabulary every agent should use), `inspecto://catalog` (replays `GET /catalog`)
-and `inspecto://modules` (replays `GET /modules`).
+**Resources:** `inspecto://glossary` (packaged `docs/GLOSSARY.md`), `inspecto://catalog` (`GET /catalog`),
+`inspecto://modules` (`GET /modules`); `inspecto://errors` and `inspecto://shapes/{kind}`:
+[spec-agent-resources.md](spec-agent-resources.md).
 
 **Not exposed, on purpose:** connections, secrets, settings, access and role administration, bundle import,
 raw files, the `ops:*` SQL groups. No tool returns a secret.

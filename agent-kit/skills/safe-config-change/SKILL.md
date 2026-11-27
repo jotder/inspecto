@@ -24,8 +24,10 @@ them: do the task you were given, then end your answer with one line naming what
 
 ## The loop — for every change
 
-1. **Draft** the content. Start from what exists (`get_pipeline`, `list_expectations`, `list_alert_rules`,
-   `list_jobs`, `describe_dataset`) and change as little as the goal needs. Use the canonical words: Pipeline,
+1. **Draft** the content. Read the resource `inspecto://shapes/<kind>` for the kind you will propose (for example
+   `inspecto://shapes/decision-rule`): each operation's route, every field with its type, whether it is required,
+   its default and allowed values, and a worked example. Start from what exists (`get_pipeline`, `list_expectations`,
+   `list_alert_rules`, `list_jobs`, `describe_dataset`) and change as little as the goal needs. Use the canonical words: Pipeline,
    Dataset, Expectation, Alert Rule, Incident, Measure, Collector, Widget, Dashboard (read the resource
    `inspecto://glossary` if unsure).
 2. **Validate** with `validate_config`: `type` is `expectation`, `alert`, `job`, `widget` or `dashboard`, `config` is
@@ -67,7 +69,7 @@ them: do the task you were given, then end your answer with one line naming what
 | 403 "may not run a Pipeline or the Space tests" | a machine agent; only a delegated person's agent runs them | skip the step and say so |
 | 403 "needs sign-in through an agent client" | the token is the console's, not an agent client's | ask the administrator to register an agent client |
 | 403 "missing capability …" | the person you act for lacks the right | tell the person; never look for another route |
-| 422 | the content is refused; the message names the field | fix it, validate or preview again |
+| 422 | the content is refused; the message names the field | read each finding's `code` in the resource `inspecto://errors` (its cause and fix) and the field in `inspecto://shapes/<kind>`; fix it, validate or preview again |
 | 413 | a preview body over 256 KiB | send fewer sample rows |
 | 409 "already pending approval (pc-…)" | your earlier proposal for that id is still waiting | do not propose it again, and do not dodge it under a new id: read it with `get_pending_change`; if it is wrong, `withdraw_change` it, then propose the corrected one |
 | 423 | the install is read-only | stop; tell the person |
@@ -80,15 +82,15 @@ Widgets are a few proposals, not dozens.
 
 ## Decision Rules, Notification Rules and Channels
 
-- A **Decision Rule** is `{name, targetType: pipeline|job, target, when, consequences, priority?, enabled?}`; `when`
-  is a condition tree `{kind: "group", op: "AND"|"OR", items: [{kind: "condition", field, operator, value?}]}`
-  (operators `= != < <= > >= contains startsWith endsWith in between isNull isNotNull matches`). A consequence
-  `{action: "emit-signal", params: {type: "<signal type>"}}` emits a signal when the rule applies.
-- A **Notification Rule** is `{id, eventType, category, minLevel?, titleTemplate?, bodyTemplate?, enabled?}`: it turns
-  every event of `eventType` (a signal type too) into a notification of `category`.
-- A **Notification Channel** is `{id, kind: EMAIL|WEBHOOK, target, description?, enabled?, template?, digestMinutes?}`:
-  where deliveries go (an address, or a URL). Never put a token or password in `target` — it is shown to everyone
-  who lists the Channels.
+- Their content is in `inspecto://shapes/decision-rule`, `inspecto://shapes/notification-rule` and
+  `inspecto://shapes/notification-channel`: read the shape and its example before you draft one.
+- A **Decision Rule**'s `when` (the shape types it only as an object) is a condition tree `{kind: "group", op:
+  "AND"|"OR", items: [{kind: "condition", field, operator, value?}]}` (operators `= != < <= > >= contains startsWith
+  endsWith in between isNull isNotNull matches`). A consequence `{action: "emit-signal", params: {type: "<signal
+  type>"}}` emits a signal when the rule applies.
+- A **Notification Rule** turns every event of its `eventType` (a signal type too) into a notification of its `category`.
+- A **Notification Channel** is where deliveries go (an address, or a URL). Never put a token or password in `target`
+  — it is shown to everyone who lists the Channels.
 - An update replaces the whole rule, and no MCP Tool lists these rules: to change one, ask the person for its name
   rather than guessing it.
 - **Simulate, then propose** a Decision Rule update. `simulate_decision_rule` (argument `rule`, body `{sampleRows:
@@ -114,9 +116,8 @@ Widgets are a few proposals, not dozens.
 ## A KPI from a Requirement, and restoring a Pipeline
 
 - **`requirement-kpi`** (operation `create` only): `id` is a delivered `kpi` Requirement (`list_requirements` shows
-  kind and status; one that already names a `kpi` has made its KPI). `content` is what only a builder knows:
-  `{dataset, measure, timeField, grain}`, optionally `id` (the KPI's own id; default the Requirement's), `direction`,
-  `bands`, `format`. The Requirement gives the title, target and unit. Check the Dataset with `describe_dataset` first.
+  kind and status; one that already names a `kpi` has made its KPI). `content` is what only a builder knows (its
+  fields: `inspecto://shapes/requirement-kpi`); the Requirement gives the title, target and unit. Check the Dataset with `describe_dataset` first.
 - **`pipeline-restore`** (operation `restore` only): `id` is the Pipeline and `version` a kept version from
   `list_pipeline_versions`; no `content`. A restore is a save of that version, so the approver reads its diff against
   the current config.

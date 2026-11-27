@@ -1179,7 +1179,10 @@ if ($mcpJarSrc) {
         try { $mcpBody = $mcpReader.ReadToEnd() } finally { $mcpReader.Dispose() }
         if ($mcpBody -notmatch [regex]::Escape('com.gamma.mcp.McpRoutes')) { throw "inspecto-mcp.jar's RouteModule service file does not list com.gamma.mcp.McpRoutes - it lists only: $mcpBody" }
         if (-not ($mcpZip.Entries | Where-Object { $_.FullName -eq 'META-INF/inspecto/mcp/GLOSSARY.md' })) { throw 'inspecto-mcp.jar does not carry META-INF/inspecto/mcp/GLOSSARY.md - inspecto://glossary would be empty.' }
-        Write-Host '  verified: RouteModule registration and the packaged glossary present in the MCP endpoint module' -ForegroundColor DarkGray
+        # AK-2 W5: inspecto://errors and inspecto://shapes/{kind} read these generated files (ControlApiMcpTest proves one per kind).
+        if (-not ($mcpZip.Entries | Where-Object { $_.FullName -eq 'META-INF/inspecto/mcp/api/errors-v1.json' })) { throw 'inspecto-mcp.jar does not carry META-INF/inspecto/mcp/api/errors-v1.json - inspecto://errors would be empty.' }
+        if (-not ($mcpZip.Entries | Where-Object { $_.FullName -like 'META-INF/inspecto/mcp/api/component-shapes/*.json' })) { throw 'inspecto-mcp.jar carries no META-INF/inspecto/mcp/api/component-shapes/*.json - every inspecto://shapes/{kind} would be empty.' }
+        Write-Host '  verified: RouteModule registration, the packaged glossary, error catalogue and shape reference present in the MCP endpoint module' -ForegroundColor DarkGray
     } finally { $mcpZip.Dispose() }
 }
 if ($caseMgmtJarSrc) {
