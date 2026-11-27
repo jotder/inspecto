@@ -1,0 +1,22 @@
+[
+  {
+    "name": "narrates-the-brief-with-server-filled-figures",
+    "capabilityId": "insight-brief",
+    "input": {
+      "capabilityId": "insight-brief",
+      "partialInput": {
+        "profile": "sales",
+        "evidence": [
+          { "insightId": "ins-1", "type": "spike", "measure": "orders", "dimension": "city", "slice": "Hamburg",
+            "period": "2026-11-01", "value": 4.6, "expected": 3.0, "delta": 1.6, "band": "high",
+            "sentence": "orders for city = Hamburg was 4.60 in 2026-11, against a usual 3.00 (+53.3 %)" }
+        ]
+      }
+    },
+    "expect": {
+      "status": "OK",
+      "requiredDataKeys": ["narrative", "sentences", "grounded", "modelBacked"],
+      "minConfidence": 0.5
+    }
+  }
+]

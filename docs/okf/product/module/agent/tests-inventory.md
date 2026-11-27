@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.agent`](../../../../../product-map/module/agent.toon).
 
-28 test class(es): 25 unit, 3 real-HTTP control-plane, 0 IT.
+31 test class(es): 28 unit, 3 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -45,9 +45,12 @@ mvn -o test -pl features/inspecto-agent -Dtest=AssistAuditTest,AssistEndToEndTes
 | `ModelSeamTest` | `com.gamma.agent.model` | unit | `features/inspecto-agent/src/test/java/com/gamma/agent/model/ModelSeamTest.java` | Unit tests for the model seam, now backed by agent-kernel (U1): the deterministic fake, kernel tier |
 | `TimeoutModelProviderTest` | `com.gamma.agent.model` | unit | `features/inspecto-agent/src/test/java/com/gamma/agent/model/TimeoutModelProviderTest.java` | Hard-deadline enforcement (v4.1, B1): fast calls pass through, hung calls fail cleanly. |
 | `AlertRuleValidatorTest` | `com.gamma.agent.skill` | unit | `features/inspecto-agent/src/test/java/com/gamma/agent/skill/AlertRuleValidatorTest.java` | Direct branch coverage for the {@code diagnose-and-alert} shape oracle. {@code AlertRuleValidator} |
+| `BriefGroundingGuardTest` | `com.gamma.agent.skill` | unit | `features/inspecto-agent/src/test/java/com/gamma/agent/skill/BriefGroundingGuardTest.java` | One test per rejection class of the Brief grounding contract (BI-INSIGHTS-1 P4 §5.2), each paired with a |
+| `BriefSlotsTest` | `com.gamma.agent.skill` | unit | `features/inspecto-agent/src/test/java/com/gamma/agent/skill/BriefSlotsTest.java` | Pins the slot formats to the insights module's templated sentence (InsightScan.fmt / pct / share). |
 | `CronDescriberTest` | `com.gamma.agent.skill` | unit | `features/inspecto-agent/src/test/java/com/gamma/agent/skill/CronDescriberTest.java` | Unit tests for {@link CronDescriber} (deterministic cron → English) and the {@code nextRuns} |
 | `DiagnoseAndAlertSkillTest` | `com.gamma.agent.skill` | unit | `features/inspecto-agent/src/test/java/com/gamma/agent/skill/DiagnoseAndAlertSkillTest.java` | Golden tests for {@link DiagnoseAndAlertSkill}'s NL→alert-rule mode (M7, C1) — CPU-only via a |
 | `ExplainEntitySkillTest` | `com.gamma.agent.skill` | unit | `features/inspecto-agent/src/test/java/com/gamma/agent/skill/ExplainEntitySkillTest.java` | P2 golden tests for {@code explain-entity}, CPU-only (a {@link FakeModelProvider}, no Ollama). |
+| `InsightBriefSkillTest` | `com.gamma.agent.skill` | unit | `features/inspecto-agent/src/test/java/com/gamma/agent/skill/InsightBriefSkillTest.java` | Capability-level proofs for {@code insight-brief} with fake models only (real-model quality is not |
 | `KpiToSqlSkillTest` | `com.gamma.agent.skill` | unit | `features/inspecto-agent/src/test/java/com/gamma/agent/skill/KpiToSqlSkillTest.java` | Golden tests for {@code kpi-to-sql} (M6), CPU-only via a {@link FakeModelProvider} and a temp-rooted |
 | `NlToScheduleSkillTest` | `com.gamma.agent.skill` | unit | `features/inspecto-agent/src/test/java/com/gamma/agent/skill/NlToScheduleSkillTest.java` | Golden tests for {@link NlToScheduleSkill} (M4, A2) — fully CPU-only via a deterministic |
 | `ReportNarrativeSkillTest` | `com.gamma.agent.skill` | unit | `features/inspecto-agent/src/test/java/com/gamma/agent/skill/ReportNarrativeSkillTest.java` | Golden tests for {@code report-narrative} (M8), CPU-only via a {@link FakeModelProvider}. The point |

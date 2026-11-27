@@ -27,6 +27,7 @@ import com.gamma.agent.skill.DiagnoseAndAlertSkill;
 import com.gamma.agent.skill.ExplainEntitySkill;
 import com.gamma.agent.skill.KpiToSqlSkill;
 import com.gamma.agent.skill.NlToScheduleSkill;
+import com.gamma.agent.skill.InsightBriefSkill;
 import com.gamma.agent.skill.ReportNarrativeSkill;
 import com.gamma.agent.skill.ReportSqlSkill;
 import com.gamma.agent.skill.SuggestConfigSkill;
@@ -128,7 +129,8 @@ public final class UccAssistAgent implements AssistAgent {
                 new KpiToSqlSkill(),
                 new DiagnoseAndAlertSkill(),
                 new ReportSqlSkill(),
-                new ReportNarrativeSkill()));
+                new ReportNarrativeSkill(),
+                new InsightBriefSkill()));
         // The shared sync pipeline (R1): resolve → escalate (estimate confidence, abstain below
         // threshold) → audit one AgentCompleted. UCC supplies the registry, estimator, and abstain policy.
         this.orchestrator = new SyncOrchestrator(registry, estimator, escalation);
