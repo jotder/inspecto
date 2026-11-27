@@ -853,11 +853,12 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                     return (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd);
                 });
         alerting.measureProbe(measureProbe::value);
+        alerting.rowFilterProbe(r -> measureProbe.value(r.dataset(), r.measure(), r.rowFilter()));   // ALERT-RULE-ROW-FILTER-1
         alerting.eventDateProbe(measureProbe::dataAsOf);              // T8 event-date freshness
         // ASSURE-PER-ENTITY-ALERTS-1: a `by` rule reads its breaching keys through the SAME probe (same roots,
         // same Measure compilation), capped at the rule's storm cap.
         alerting.groupedMeasureProbe(r -> measureProbe.breaches(r.dataset(), r.measure(), r.by(),
-                r.comparator(), r.threshold(), r.stormCap()));
+                r.comparator(), r.threshold(), r.stormCap(), r.rowFilter()));
         // R2-05 follow-up: fired Alert / Incident text names a Dataset by its readable name from the SAME
         // per-Space registry the probe reads (the id stays in every attribute and the event).
         alerting.datasetLabel(measureProbe::label);

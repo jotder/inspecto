@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-494 test class(es): 196 unit, 298 real-HTTP control-plane, 0 IT.
+495 test class(es): 197 unit, 298 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -34,6 +34,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `AgentGateParityTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AgentGateParityTest.java` | The agent gate's three buckets against the capability manifest (AGENT-KIT-1 AK-2a, plan §4.1, §7 "a write route that |
 | `AgentRoutesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/AgentRoutesTest.java` | Integration tests for the AGT-5 (P0) {@code /agent/*} routes over real HTTP, against a fake {@link IntelligenceAgent}. |
 | `AlertRoutesWindowGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/AlertRoutesWindowGateTest.java` | PA-9b: the save gates of a windowed Alert Rule ({@link AlertRoutes#requireWindow}), each 422 paired with the accepted |
+| `AlertRowFilterSaveGateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AlertRowFilterSaveGateTest.java` | ALERT-RULE-ROW-FILTER-1: the save gate of a Dataset measure rule's row filter ({@link AlertRoutes#requireRowFilter}), |
 | `AlertRuleUnmodelledKeysTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/AlertRuleUnmodelledKeysTest.java` | {@code MODULE-REORG-P4-2} - the Alert Rule unmodelled-key policy, over real HTTP with a real Subject. |
 | `AnnotationTargetsScopeTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AnnotationTargetsScopeTest.java` | The CORE half of the SEC-7d data-scope guard and the ABAC A3 row-level PEP: {@link AnnotationTargets}' |
 | `ApiContextQueryDecodingTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ApiContextQueryDecodingTest.java` | {@link ApiContext#query} over a real JDK HttpServer: a query parameter is percent-decoded exactly ONCE. It used to |

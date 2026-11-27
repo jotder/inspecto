@@ -268,6 +268,17 @@
       ]
     },
     {
+      "code": "ERR_ALERT_ROW_FILTER_INVALID",
+      "family": "finding",
+      "status": 422,
+      "severity": "ERROR",
+      "cause": "A Measure Alert Rule's row filter (when) cannot be applied: it is not a complete condition group (a condition with no field, operator or value, an unknown operator, an empty group), it names a column the Dataset does not have, or it filters on a column the Space masks — an alert never reveals, so it may not count rows by a masked value.",
+      "fix": "Read the message — it names the condition or column. Complete the condition, use a column from the Dataset's Schema (GET /datasets/{id}/rows lists them), or filter on an unmasked column; a filter on another Dataset needs a derived Dataset first.",
+      "definedIn": [
+        "platform/inspecto-config/src/main/java/com/gamma/config/spec/FindingCodes.java"
+      ]
+    },
+    {
       "code": "ERR_ARMED_WITHOUT_SCHEMA",
       "family": "finding",
       "status": 422,

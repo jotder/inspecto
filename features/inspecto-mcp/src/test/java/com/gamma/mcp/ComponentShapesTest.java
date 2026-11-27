@@ -19,6 +19,7 @@ import com.gamma.notify.ChannelConfig;
 import com.gamma.notify.NotificationRule;
 import com.gamma.pipeline.PipelineCodec;
 import com.gamma.pipeline.PipelineEdge;
+import com.gamma.pipeline.PipelineEditable;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.query.KpiDefinition;
@@ -50,6 +51,9 @@ import static org.junit.jupiter.api.Assertions.fail;
  * its allowed values and an example — DERIVED from the code, never written by hand, into
  * {@code docs/api/component-shapes/<kind>.json} (one file per kind, so an MCP Resource {@code inspecto://shapes/{kind}} can
  * serve one; AK-2 widening plan W5). {@code node tools/render-component-shapes.mjs} renders the page people read.
+ * COMPONENT-REFERENCE-MORE-KINDS-1 adds the component kinds {@code propose_change} does not offer
+ * ({@link McpTools#COMPONENT_SHAPE_KINDS}): each file is named by its component type, carries {@code proposeChange: false}
+ * and the generic {@code /components/<type>} routes; {@link #UNSHAPED} names every other component kind and why.
  *
  * <p>How each column is derived, so it cannot drift from what a save accepts:
  * <ul>
@@ -79,8 +83,19 @@ class ComponentShapesTest {
 
     // ── the derivation ───────────────────────────────────────────────────────────────────────────
 
-    /** A list-of-objects key whose element keys come from a record ({@code nodes[]} of a Pipeline graph). */
-    record Element(String key, Class<? extends Record> record) {}
+    /**
+     * A list-of-objects key whose element keys come from a record ({@code nodes[]} of a Pipeline graph) or from the parser's
+     * own element key census ({@code factors[]} of a Risk Score model; {@code record} null).
+     */
+    record Element(String key, Class<? extends Record> record, Set<String> keys) {
+        Element(String key, Class<? extends Record> record) {
+            this(key, record, null);
+        }
+
+        Element(String key, Set<String> keys) {
+            this(key, null, keys);
+        }
+    }
 
     /**
      * One content shape: what a kind's create/update (or one Entity List operation) sends.
@@ -133,12 +148,17 @@ class ComponentShapesTest {
             if (e.getKey().contains(".") && top.contains(e.getKey().substring(0, e.getKey().indexOf('.'))))
                 fields.put(e.getKey(), field(e.getKey(), b, null, e.getValue()));
         for (Element el : b.elements()) {
-            for (RecordComponent rc : el.record().getRecordComponents()) {
-                String path = el.key() + "[]." + rc.getName();
+            Map<String, String> elementKeys = new LinkedHashMap<>();
+            if (el.record() != null)
+                for (RecordComponent rc : el.record().getRecordComponents()) elementKeys.put(rc.getName(), jsonType(rc.getType()));
+            else
+                for (String k : new TreeSet<>(el.keys())) elementKeys.put(k, elementType(b, el.key(), k));
+            for (var ek : elementKeys.entrySet()) {
+                String path = el.key() + "[]." + ek.getKey();
                 Map<String, Object> f = new LinkedHashMap<>();
                 f.put("path", path);
-                f.put("type", jsonType(rc.getType()));
-                boolean req = elementRequired(b, el.key(), rc.getName());
+                f.put("type", ek.getValue());
+                boolean req = elementRequired(b, el.key(), ek.getKey());
                 f.put("required", req);
                 if (req) f.put("requiredBy", "parser");
                 fields.put(path, f);
@@ -148,7 +168,8 @@ class ComponentShapesTest {
         Map<String, Object> shape = new LinkedHashMap<>();
         shape.put("source", b.source());
         shape.put("unknownKeys", unknownKeys(b));
-        shape.put("extensionPrefix", AcceptedConfigKeys.EXTENSION_PREFIX);
+        // the x- annotation is named only when the real parser keeps one (a module model's parser refuses it)
+        if (extensionKept(b)) shape.put("extensionPrefix", AcceptedConfigKeys.EXTENSION_PREFIX);
         shape.put("fields", new ArrayList<>(fields.values()));
         shape.put("example", b.example());
         if (!b.notes().isEmpty()) shape.put("notes", b.notes());
@@ -210,6 +231,14 @@ class ComponentShapesTest {
         }
     }
 
+    /** An element key's JSON type as the example's first element carries it; {@code any} when the example leaves it out. */
+    @SuppressWarnings("unchecked")
+    private static String elementType(Body b, String listKey, String key) {
+        Object first = ((List<Object>) b.example().get(listKey)).get(0);
+        Object v = ((Map<String, Object>) first).get(key);
+        return v == null ? "any" : jsonType(v.getClass());
+    }
+
     /** What the parser holds for {@code key} when the body leaves it out; {@code null} when nothing worth naming. */
     private static Object derivedDefault(String key, Body b, Object parsed) {
         Object from = parsed;
@@ -225,7 +254,7 @@ class ComponentShapesTest {
         Object v = read(from, key);
         if (v == null || v instanceof String s && s.isEmpty() || v instanceof Collection<?> c && c.isEmpty()
                 || v instanceof Map<?, ?> m && m.isEmpty()) return null;
-        if (v instanceof Enum<?> e) return e.name().toLowerCase(java.util.Locale.ROOT);
+        if (v instanceof Enum<?> e) return wire(e);
         if (v instanceof Record || !(v instanceof String || v instanceof Number || v instanceof Boolean
                 || v instanceof Map<?, ?> || v instanceof List<?>)) return null;
         return v;
@@ -283,6 +312,18 @@ class ComponentShapesTest {
         };
     }
 
+    /** {@code true} when the real parser accepts the example plus one {@code x-} annotation key. */
+    private static boolean extensionKept(Body b) {
+        Map<String, Object> probe = copy(b.example());
+        probe.put(AcceptedConfigKeys.EXTENSION_PREFIX + "zzProbe", "x");
+        try {
+            b.parse().apply(probe);
+            return true;
+        } catch (RuntimeException refused) {
+            return false;
+        }
+    }
+
     /** {@code refused}, {@code kept} or {@code ignored}: the example plus one made-up key, through the real parser. */
     private static String unknownKeys(Body b) {
         Map<String, Object> probe = copy(b.example());
@@ -314,7 +355,18 @@ class ComponentShapesTest {
     }
 
     private static List<String> lower(Enum<?>[] values) {
-        return java.util.Arrays.stream(values).map(v -> v.name().toLowerCase(java.util.Locale.ROOT)).toList();
+        return java.util.Arrays.stream(values).map(ComponentShapesTest::wire).toList();
+    }
+
+    /** An enum value as config spells it: its {@code wire()} when it has one ({@code last-year}), else its name in lower case. */
+    private static String wire(Enum<?> v) {
+        try {
+            return String.valueOf(v.getClass().getMethod("wire").invoke(v));
+        } catch (NoSuchMethodException none) {
+            return v.name().toLowerCase(java.util.Locale.ROOT);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static Set<String> components(Class<? extends Record> r) {
@@ -339,9 +391,14 @@ class ComponentShapesTest {
                 body -> { Map<String, Object> named = new LinkedHashMap<>(body); named.putIfAbsent("name", "orders");
                           return PipelineCodec.fromMap(named); },
                 m("active", true,
-                  "nodes", List.of(m("id", "read", "type", "source.file", "config", m("collector", "orders_inbox")),
-                                   m("id", "write", "type", "sink.parquet", "config", m("dataset", "orders"))),
-                  "edges", List.of(m("from", "read", "to", "write"))),
+                  // DRYRUN-SAVE-NODE-MISMATCH-1: real node types, a graph the save lowers (the example used to say
+                  // source.file / sink.parquet, which no module registers, and an agent extrapolated source.dataset).
+                  // A Dataset is read by an acquisition with connector: dataset; thePipelineExampleIsAGraphTheSaveLowers.
+                  "nodes", List.of(m("id", "read", "type", "acquisition", "config", m("connector", "dataset", "dataset", "orders")),
+                                   m("id", "total", "type", "transform.summarize",
+                                     "config", m("group_by", List.of("region"), "measures", List.of("sum(amount)"))),
+                                   m("id", "write", "type", "sink.persistent", "config", m("database", "orders_by_region"))),
+                  "edges", List.of(m("from", "read", "to", "total"), m("from", "total", "to", "write"))),
                 List.of(), "", PipelineGraph.class, Map.of(),
                 List.of(new Element("nodes", PipelineNode.class), new Element("edges", PipelineEdge.class)),
                 List.of("`name` comes from the URL (`PUT /pipelines/{id}/graph`); a name in the body is overwritten.",
@@ -475,6 +532,210 @@ class ComponentShapesTest {
                 Map.of("ownerKind", "string", "autoApply", "boolean", "visibility", "string", "reason", "string"),
                 Map.of("ownerKind", entityListConstant("OWNER_KINDS"), "visibility", entityListConstant("VISIBILITIES"))));
         out.put("entity-list", el);
+
+        componentKinds(out);
+        return out;
+    }
+
+    // ── the component kinds propose_change does not offer (COMPONENT-REFERENCE-MORE-KINDS-1) ─────
+
+    /** The store envelope every component carries ({@code ComponentRoutes.COMPONENT_ENVELOPE_KEYS}): stamped, never authored. */
+    private static final Set<String> ENVELOPE = Set.of("name", "owner", "shares");
+
+    /**
+     * Component kinds ({@code ComponentStore.WRITABLE_TYPES}) with no shape of their own, each with why: a kind joins
+     * {@link McpTools#COMPONENT_SHAPE_KINDS} by moving out of here. {@link #everyComponentKindIsShapedOrNamed} holds the
+     * three lists to the store's, so a new component kind cannot be left out silently.
+     */
+    static final Map<String, String> UNSHAPED = new TreeMap<>(Map.ofEntries(
+            Map.entry("channel", "the propose_change kind notification-channel is this kind's shape"),
+            Map.entry("grammar", "no parser on the component save door: stored as sent, so a shape would be hand-written"),
+            Map.entry("transform", "no parser on the component save door: stored as sent, so a shape would be hand-written"),
+            Map.entry("sink", "no parser on the component save door (only its reserved store names are checked)"),
+            Map.entry("query", "no parser on the component save door: stored as sent, so a shape would be hand-written"),
+            Map.entry("requirement", "no parser on the component save door: stored as sent, so a shape would be hand-written"),
+            Map.entry("link-analysis-view", "a saved console view: stored as sent, no parser on the component save door"),
+            Map.entry("geo-map-view", "a saved console view: stored as sent, no parser on the component save door"),
+            Map.entry("pattern-pack", "no parser on the component save door: stored as sent, so a shape would be hand-written"),
+            Map.entry("preset-query", "parsed against a Dataset's roles when listed or run, not on save: no save-time parser"),
+            Map.entry("rule-template", "no parser on the component save door: stored as sent, so a shape would be hand-written"),
+            Map.entry("access-catalog", "no parser on the component save door: stored as sent, so a shape would be hand-written"),
+            Map.entry("access-profile", "no parser on the component save door: stored as sent, so a shape would be hand-written"),
+            Map.entry("insight-profile", "its validator lives in inspecto-insights, which is not on inspecto-mcp's classpath"),
+            Map.entry("findings-spec", "deferred (COMPONENT-REFERENCE-GOVERNANCE-KINDS-1): FindingsSpec.fromMap, a canManageIncidents route"),
+            Map.entry("workflow", "deferred (COMPONENT-REFERENCE-GOVERNANCE-KINDS-1): Workflow.fromComponent, a canAdminister route"),
+            Map.entry("sla-policy", "deferred (COMPONENT-REFERENCE-GOVERNANCE-KINDS-1): SlaPolicy.fromComponent, a canAdminister route"),
+            Map.entry("escalation-rule", "deferred (COMPONENT-REFERENCE-GOVERNANCE-KINDS-1): EscalationRule.fromComponent, a canAdminister route")));
+
+    private static void componentKinds(Map<String, Map<String, Body>> out) {
+        Body dataset = new Body("UnknownComponentKeys.DATASET (the Dataset key census) + DatasetEntryRules.validate and the "
+                + "virtual-Dataset SQL check (ComponentRoutes.validateKind)",
+                union(ShapeProbe.unknownKeysCensus("dataset"), ENVELOPE),
+                body -> { ShapeProbe.component("dataset", "orders", body); refuseUnknown("dataset", body); return body; },
+                m("physicalRef", "orders", "description", "One row per order",
+                  "columns", List.of(m("name", "order_id", "type", "VARCHAR"), m("name", "amount", "type", "DOUBLE"))),
+                List.of(), "", null, Map.of(), List.of(),
+                List.of("An unknown key is refused (422) for an agent; a person's save keeps it with an `UNKNOWN_KEY` warning "
+                                + "(both: `POST /validate`).",
+                        "`columns`, `calculated`, `query`, `filters` and the other blocks are accepted whole: their inner keys "
+                                + "are not censused.",
+                        "`sql` (a virtual Dataset) needs `sourceName` and meets the SQL safety check; `basedOn` (a Mapping) names "
+                                + "a Dataset the caller can see; a column's `classification` must be one the Space knows."))
+                .with(Map.of(), ENVELOPE);
+        out.put("dataset", ops(dataset, "create", "update"));
+
+        Body recon = new Body("UnknownComponentKeys.RECONCILIATION (its key census) + ReconConfigLoader.bands and buildSpec "
+                + "(ReconKindValidator)",
+                union(ShapeProbe.unknownKeysCensus("reconciliation"), ENVELOPE),
+                body -> { ShapeProbe.component("reconciliation", "orders-vs-ledger", body); refuseUnknown("reconciliation", body);
+                          return body; },
+                m("leftDataset", "orders", "rightDataset", "ledger", "keyColumns", List.of("order_id"),
+                  "compareColumns", List.of(m("column", "amount", "agg", "sum", "toleranceType", "absolute", "tolerance", 0.01))),
+                List.of(), "", null,
+                Map.of("cardinality", lower(com.gamma.recon.ReconService.Cardinality.values())),
+                List.of(new Element("compareColumns", ShapeProbe.unknownKeysCensus("reconciliation.compareColumns"))),
+                List.of("Two or three Datasets: `leftDataset` (the anchor) and `rightDataset`, optionally `thirdDataset`, or "
+                                + "`datasets` (a list, the first is the anchor).",
+                        "`compareColumns[].agg` is `sum` (default) or `count`; `toleranceType` is `exact` (default), "
+                                + "`absolute` or `percent` (ReconService.Spec.of); `tolerance` defaults to 0.",
+                        "`bands` is `{okBelow, warnAbove}` in percent, 0 <= okBelow <= warnAbove <= 100.",
+                        "An unknown key (a `compareColumns` item's too) is refused (422) for an agent; a person's save keeps it "
+                                + "with an `UNKNOWN_KEY` warning."))
+                .with(Map.of(), ENVELOPE);
+        out.put("reconciliation", ops(recon, "create", "update"));
+
+        Body kpi = new Body("KpiDefinition.KEYS + KpiDefinition.fromMap (ComponentRoutes.validateKind)",
+                new TreeSet<>(KpiDefinition.KEYS),
+                body -> { ShapeProbe.component("kpi", "orders-daily", body); return KpiDefinition.fromMap("orders-daily", body); },
+                m("title", "Orders per day", "dataset", "orders", "measure", "count", "timeField", "order_date", "grain", "day"),
+                List.of(), "", KpiDefinition.class,
+                Map.of("grain", lower(KpiDefinition.Grain.values()), "comparison", lower(KpiDefinition.Comparison.values()),
+                        "direction", lower(KpiDefinition.Direction.values())), List.of(),
+                List.of("`measure` is `count` or `agg(field)`; the save also checks the Dataset exists and has the fields "
+                        + "(KpiRoutes.requireMeasure).", "`requirement` links the KPI to the Requirement it delivers."))
+                .with(Map.of("measure", "string"), ENVELOPE);
+        out.put("kpi", ops(kpi, "create", "update"));
+
+        Body schema = new Body("ConfigSpecs.schema() + the spec and config-safety gates (ComponentRoutes.validateKind)",
+                ShapeProbe.censusKeys("schema"),
+                body -> ShapeProbe.component("schema", "orders", body),
+                m("raw", m("name", "ORDERS", "format", "CSV",
+                        "fields", List.of(m("name", "ORDER_ID", "selector", "order_id", "type", "VARCHAR"))),
+                  "mapping", m("canonicalName", "orders")),
+                ConfigSpecs.schema().fields(), "", null, Map.of(), List.of(),
+                List.of("`raw.fields[]` items are `{name, selector, type}` plus optional `format`, `description`, `unit` and "
+                                + "`classification` (one the Space knows).",
+                        "The engine parses more than the spec names (Identifiers.validateSchema at run time); a shipped schema "
+                                + "may also carry `partitions[]`. The component's id is its `schema_file: schema/<id>` reference."))
+                .with(Map.of(), ENVELOPE);
+        out.put("schema", ops(schema, "create", "update"));
+
+        Body mapping = new Body("MappingRules.validate (keys read inline; declared in the generator and held to its source)",
+                union(Set.of("rules"), ENVELOPE),
+                body -> ShapeProbe.component("mapping", "orders", body),
+                m("rules", List.of(m("targetColumn", "order_id", "sourceExpression", "ORDER_ID", "transformType", "DIRECT"))),
+                List.of(), "", null, Map.of(),
+                List.of(new Element("rules", MAPPING_RULE_KEYS)),
+                List.of("`rules[].transformType` is one of " + String.join(", ", com.gamma.etl.TransformCompiler.TRANSFORM_TYPES)
+                        + " (blank = DIRECT); an `EXPR` rule's SQL is emitted as written (operator-authored, trusted).",
+                        "The save checks `rules` only when it is present: a mapping without `rules` saves and maps nothing.",
+                        "Preview the rules with `POST /components/mapping/validate`."))
+                .with(Map.of("rules", "array"), ENVELOPE);
+        out.put("mapping", ops(mapping, "create", "update"));
+
+        Body runbook = new Body("Runbook.MODELLED + Runbook.fromMap (the save also checks each step link's target exists)",
+                privateSet(com.gamma.alert.Runbook.class, "MODELLED"),
+                body -> com.gamma.alert.Runbook.fromMap("orders-late", body),
+                m("title", "Orders arrive late", "steps", List.of(m("text", "Check the Collector's last arrival"))),
+                List.of(), "", com.gamma.alert.Runbook.class, Map.of(),
+                List.of(new Element("steps", privateSet(com.gamma.alert.Runbook.class, "STEP_KEYS"))),
+                List.of("`steps[].link` is `{kind, id}` with kind one of "
+                        + String.join(", ", new TreeSet<>(com.gamma.alert.Runbook.LINK_KINDS)) + "; an Alert Rule names the "
+                        + "Runbook in its `runbook` key."))
+                .with(Map.of(), ENVELOPE);
+        out.put("runbook", ops(runbook, "create", "update"));
+
+        Body riskScore = model("risk-score", com.gamma.risk.RiskScoreModel.class, "factors", "FACTOR_KEYS",
+                body -> com.gamma.risk.RiskScoreModel.fromMap("account_risk", body),
+                m("entityType", "account", "highThreshold", 60,
+                  "factors", List.of(m("id", "cash_in", "dataset", "transfers", "key", "payee_account", "measure", "count",
+                          "weight", 0.5, "cap", 40))),
+                List.of("Run by the `risk.score` Job; the save also checks the Datasets and the output store in the Space."));
+        out.put("risk-score", ops(riskScore, "create", "update"));
+
+        Body anomaly = model("anomaly-model", com.gamma.anomaly.AnomalyModel.class, "features", "FEATURE_KEYS",
+                body -> com.gamma.anomaly.AnomalyModel.fromMap("wallet_activity", body),
+                m("entityType", "wallet", "bucket", "day", "window", 28,
+                  "features", List.of(m("id", "txn_count", "dataset", "wallet_txn", "key", "wallet_id", "time", "txn_ts",
+                          "measure", "count"))),
+                List.of("Run by the `anomaly.score` Job; `peers` is `{" + String.join(", ",
+                        new TreeSet<>(privateSet(com.gamma.anomaly.AnomalyModel.class, "PEER_KEYS"))) + "}`."));
+        out.put("anomaly-model", ops(anomaly, "create", "update"));
+
+        Body segmentation = model("segmentation-model", com.gamma.predictive.SegmentationModel.class, "segments", "SEGMENT_KEYS",
+                body -> com.gamma.predictive.SegmentationModel.fromMap("customer_rfm", body),
+                m("entityType", "customer", "dataset", "orders", "key", "customer_id", "time", "order_date",
+                  "frequency", "count", "monetary", "sum(amount)",
+                  "segments", List.of(m("label", "Champions", "recency", "4-5", "frequency", "4-5", "monetary", "4-5"))),
+                List.of("Run by the `predict.segment` Job. A score range is `*`, `n` or `a-b` inside `1..bins`; the first "
+                        + "matching `segments` row names the segment."));
+        out.put("segmentation-model", ops(segmentation, "create", "update"));
+
+        Body churn = model("churn-model", com.gamma.predictive.ChurnModel.class, "inputs", "INPUT_KEYS",
+                body -> com.gamma.predictive.ChurnModel.fromMap("customer_churn", body),
+                m("entityType", "customer", "dataset", "orders", "key", "customer_id", "time", "order_date", "intercept", -1.0,
+                  "inputs", List.of(m("name", "orders", "measure", "count", "transform", "log", "coefficient", -0.8))),
+                List.of("Run by the `predict.churn` Job; nothing is fitted: the intercept and coefficients are authored.",
+                        "`inputs[].transform` is none (default), log, cap (needs `cap`) or z (needs `mean` and `scale`)."));
+        out.put("churn-model", ops(churn, "create", "update"));
+
+        Body forecast = model("forecast-model", com.gamma.predictive.ForecastModel.class, null, null,
+                body -> com.gamma.predictive.ForecastModel.fromMap("sku_sales", body),
+                m("entityType", "product", "dataset", "sales", "key", "sku", "time", "sold_at", "measure", "count",
+                  "grain", "day", "method", "seasonal-naive", "horizon", 28),
+                List.of("Run by the `predict.forecast` Job; `alpha`, `beta` and `gamma` (0..1) are required by method "
+                        + "`holt-winters` and refused on `seasonal-naive`.", "`history` defaults to 364 at grain `day` (the default below, from the example) and to 156 at grain `week`."));
+        out.put("forecast-model", ops(forecast, "create", "update"));
+    }
+
+    /** The {@code mapping} rule keys {@code MappingRules.validate} reads ({@link #mappingRuleKeysAreReadByMappingRules} holds them). */
+    static final Set<String> MAPPING_RULE_KEYS = Set.of("targetColumn", "sourceExpression", "transformType");
+
+    /** A module model kind: its parser's private key census ({@code MODEL_KEYS}), its list element's, and its record. */
+    private static Body model(String kind, Class<? extends Record> record, String listKey, String elementKeysField,
+                              Function<Map<String, Object>, Object> parse, Map<String, Object> example, List<String> notes) {
+        List<String> all = new ArrayList<>(notes);
+        all.add("Unknown keys are refused, not ignored. The save also checks, in the Space, the Datasets it reads and its "
+                + "output store.");
+        return new Body(record.getSimpleName() + ".MODEL_KEYS + " + record.getSimpleName() + ".fromMap (" + kind
+                + "'s validator on the component save door)",
+                privateSet(record, "MODEL_KEYS"),
+                body -> { ShapeProbe.component(kind, "probe", body); return parse.apply(body); },
+                example, List.of(), "", record, Map.of(),
+                listKey == null ? List.of() : List.of(new Element(listKey, privateSet(record, elementKeysField))),
+                all).with(Map.of(), union(ENVELOPE, Set.of("id")));   // id: the URL's, stamped by the store
+    }
+
+    private static void refuseUnknown(String type, Map<String, Object> body) {
+        List<String> unknown = ShapeProbe.unknownKeys(type, body);
+        if (!unknown.isEmpty()) throw new IllegalArgumentException(type + " has unknown key(s) " + unknown);
+    }
+
+    /** A parser's private key census, read reflectively (the parser keeps it private; the reference reads it). */
+    @SuppressWarnings("unchecked")
+    private static Set<String> privateSet(Class<?> owner, String field) {
+        try {
+            var f = owner.getDeclaredField(field);
+            f.setAccessible(true);
+            return new TreeSet<>((Collection<String>) f.get(null));
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(owner.getSimpleName() + "." + field + " is gone: update ComponentShapesTest", e);
+        }
+    }
+
+    private static Set<String> union(Set<String> a, Set<String> b) {
+        Set<String> out = new TreeSet<>(a);
+        out.addAll(b);
         return out;
     }
 
@@ -526,8 +787,11 @@ class ComponentShapesTest {
             doc.put("generatedBy", "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: " + REGENERATE);
             Map<String, Object> operations = new LinkedHashMap<>();
             Map<String, Object> shapes = new LinkedHashMap<>();
-            Map<String, String> routes = McpTools.CHANGE_ROUTES.get(kind.getKey());
-            for (String op : McpTools.operations(kind.getKey())) {
+            boolean propose = McpTools.CHANGE_ROUTES.containsKey(kind.getKey());
+            // a kind propose_change does not offer is named by its component type and its routes are the component routes
+            doc.put("proposeChange", propose);
+            Map<String, String> routes = propose ? McpTools.CHANGE_ROUTES.get(kind.getKey()) : componentRoutes(kind.getKey());
+            for (String op : propose ? McpTools.operations(kind.getKey()) : List.copyOf(routes.keySet())) {
                 Body b = kind.getValue().get(op);
                 // one shape per distinct Body: create and update share "content"; each Entity List edit has its own
                 String shapeName = b == null ? null : kind.getValue().values().stream().distinct().count() == 1 ? "content" : op;
@@ -542,6 +806,15 @@ class ComponentShapesTest {
             docs.put(kind.getKey(), doc);
         }
         return docs;
+    }
+
+    /** The generic component routes ({@code ComponentRoutes}) of a kind {@code propose_change} does not offer. */
+    private static Map<String, String> componentRoutes(String kind) {
+        Map<String, String> out = new LinkedHashMap<>();
+        out.put("create", "POST /components/" + kind);
+        out.put("update", "PUT /components/" + kind + "/{id}");
+        out.put("delete", "DELETE /components/" + kind + "/{id}");
+        return out;
     }
 
     /** A default with its maps' keys sorted: a parser default built with Map.of (a Decision Rule's `when`) iterates in a per-JVM order. */
@@ -567,9 +840,10 @@ class ComponentShapesTest {
     @Test
     void everyProposeChangeKindHasAShapeAndEveryOperationIsCovered() {
         Map<String, Map<String, Body>> bodies = bodies();
-        assertEquals(new TreeSet<>(McpTools.CHANGE_ROUTES.keySet()), bodies.keySet(),
-                "every propose_change kind needs a shape in ComponentShapesTest.bodies(), and no other");
-        for (String kind : bodies.keySet())
+        assertEquals(McpTools.shapeKinds(), bodies.keySet(),
+                "every propose_change kind and every McpTools.COMPONENT_SHAPE_KINDS kind needs a shape in "
+                        + "ComponentShapesTest.bodies(), and no other");
+        for (String kind : McpTools.CHANGE_ROUTES.keySet())
             for (String op : McpTools.operations(kind)) {
                 boolean takesContent = !"delete".equals(op) && !"restore".equals(op);   // McpTools.proposeChange's rule
                 assertEquals(takesContent, bodies.get(kind).get(op) != null, kind + " " + op + ": content shape present iff it takes content");
@@ -600,6 +874,48 @@ class ComponentShapesTest {
         }
         if (!stale.isEmpty())
             fail("docs/api/component-shapes is stale against the code: " + stale + " - regenerate: " + REGENERATE);
+    }
+
+    /**
+     * COMPONENT-REFERENCE-MORE-KINDS-1: every component kind the store writes is a propose_change kind, a shaped component
+     * kind, or named in {@link #UNSHAPED} with why — never left out silently.
+     */
+    @Test
+    void everyComponentKindIsShapedOrNamed() {
+        Set<String> store = new TreeSet<>(com.gamma.pipeline.ComponentStore.WRITABLE_TYPES);
+        Set<String> accounted = new TreeSet<>(McpTools.shapeKinds());
+        accounted.addAll(UNSHAPED.keySet());
+        Set<String> missing = new TreeSet<>(store);
+        missing.removeAll(accounted);
+        assertTrue(missing.isEmpty(), "component kinds with no shape and no reason in ComponentShapesTest.UNSHAPED: " + missing);
+        for (String k : McpTools.COMPONENT_SHAPE_KINDS) {
+            assertTrue(store.contains(k), "COMPONENT_SHAPE_KINDS names " + k + ", which is no component kind");
+            assertTrue(!McpTools.CHANGE_ROUTES.containsKey(k), k + " is a propose_change kind: it needs no second listing");
+        }
+        for (String k : UNSHAPED.keySet()) {
+            assertTrue(store.contains(k), "UNSHAPED names " + k + ", which is no component kind");
+            assertTrue(!McpTools.shapeKinds().contains(k), k + " has a shape: take it off UNSHAPED");
+        }
+    }
+
+    @Test
+    void mappingRuleKeysAreReadByMappingRules() throws IOException {
+        String src = Files.readString(Path.of("../../platform/inspecto-engine/src/main/java/com/gamma/pipeline/MappingRules.java"));
+        for (String key : MAPPING_RULE_KEYS)
+            assertTrue(src.contains("rule.get(\"" + key + "\")"),
+                    "MappingRules no longer reads '" + key + "' from a rule: update ComponentShapesTest.MAPPING_RULE_KEYS");
+    }
+
+    /**
+     * DRYRUN-SAVE-NODE-MISMATCH-1: the Pipeline example is a graph the save LOWERS, not one the codec merely parses —
+     * an agent copies it, and an example naming node types no module registers taught it to guess another
+     * ({@code source.dataset}). Strict, as an active Pipeline's save is.
+     */
+    @Test
+    void thePipelineExampleIsAGraphTheSaveLowers() {
+        Map<String, Object> example = copy(bodies().get("pipeline").get("create").example());
+        example.putIfAbsent("name", "orders");
+        PipelineEditable.lower(PipelineCodec.fromMap(example), new LinkedHashMap<>(), true);
     }
 
     @Test

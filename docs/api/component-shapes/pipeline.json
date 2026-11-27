@@ -1,6 +1,7 @@
 {
   "kind" : "pipeline",
   "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "proposeChange" : true,
   "operations" : {
     "create" : {
       "route" : "PUT /pipelines/{id}/graph",
@@ -92,22 +93,39 @@
         "nodes" : [
           {
             "id" : "read",
-            "type" : "source.file",
+            "type" : "acquisition",
             "config" : {
-              "collector" : "orders_inbox"
+              "connector" : "dataset",
+              "dataset" : "orders"
+            }
+          },
+          {
+            "id" : "total",
+            "type" : "transform.summarize",
+            "config" : {
+              "group_by" : [
+                "region"
+              ],
+              "measures" : [
+                "sum(amount)"
+              ]
             }
           },
           {
             "id" : "write",
-            "type" : "sink.parquet",
+            "type" : "sink.persistent",
             "config" : {
-              "dataset" : "orders"
+              "database" : "orders_by_region"
             }
           }
         ],
         "edges" : [
           {
             "from" : "read",
+            "to" : "total"
+          },
+          {
+            "from" : "total",
             "to" : "write"
           }
         ]

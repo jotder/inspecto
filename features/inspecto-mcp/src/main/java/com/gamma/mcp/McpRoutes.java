@@ -277,7 +277,9 @@ public final class McpRoutes implements RouteModule {
             + "another person to approve. Write tools need sign-in through an agent client. Read the inspecto://glossary "
             + "resource and use its canonical terms. Before drafting a propose_change, read inspecto://shapes/{kind} for "
             + "that kind's fields and an example; on a refusal, read inspecto://errors for what its code means. "
-            + "Call edition_and_modules before relying on a feature.";
+            + "Call edition_and_modules before relying on a feature. For types, casts, parsing and what a draft would "
+            + "do to rows, ask the server - preview_config, dry_run_pipeline - and report its answer; never work it out "
+            + "yourself, even when it looks easy: the server's cast rules are the ones that count.";
 
     /**
      * {@link #INSTRUCTIONS} plus the caller's own posture (MCP-AGENT-POSTURE-1), read by replaying

@@ -71,6 +71,8 @@ public final class AlertService {
     private final Map<String, Long> lastFired = new ConcurrentHashMap<>();
     /** BI-5: evaluates {@code (dataset, measure)} → current scalar value; {@code null} disables measure rules. */
     private volatile java.util.function.BiFunction<String, String, java.util.OptionalDouble> measureProbe;
+    /** ALERT-RULE-ROW-FILTER-1: a measure rule with a row filter → its value over the matching rows; {@code null} leaves such rules inert. */
+    private volatile java.util.function.Function<AlertRule, java.util.OptionalDouble> rowFilterProbe;
     /** ASSURE-PER-ENTITY-ALERTS-1: a {@code by} rule → its breaching groups; {@code null} disables {@code by} rules. */
     private volatile java.util.function.Function<AlertRule, java.util.Optional<DatasetMeasureProbe.Breaches>>
             groupedProbe;
@@ -171,6 +173,15 @@ public final class AlertService {
     /** Wire the BI-5 measure evaluator (BiFunction so this engine stays decoupled from the query layer). */
     public void measureProbe(java.util.function.BiFunction<String, String, java.util.OptionalDouble> probe) {
         this.measureProbe = probe;
+    }
+
+    /**
+     * Wire the evaluator of a scalar measure rule WITH a row filter ({@link AlertRule#rowFilter}): the rule → its Measure
+     * over the matching rows. {@code null} leaves those rules inert - never the unfiltered {@link #measureProbe}, which
+     * would count every row and fire on data the rule excludes.
+     */
+    public void rowFilterProbe(java.util.function.Function<AlertRule, java.util.OptionalDouble> probe) {
+        this.rowFilterProbe = probe;
     }
 
     /**
@@ -684,6 +695,12 @@ public final class AlertService {
             if (rule.isWindowed()) continue;
             if (rule.isGrouped()) {                       // per-entity (by:) — its own edge-triggered pass
                 evaluateGrouped(rule, nowMs, out);
+                continue;
+            }
+            if (rule.rowFilter() != null) {               // ALERT-RULE-ROW-FILTER-1: only its matching rows
+                var filtered = rowFilterProbe;
+                if (filtered == null) continue;
+                evaluateScalar(rule, filtered.apply(rule), nowMs, out);
                 continue;
             }
             var probe = measureProbe;

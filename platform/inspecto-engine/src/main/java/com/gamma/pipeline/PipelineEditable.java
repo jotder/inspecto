@@ -267,6 +267,25 @@ public final class PipelineEditable {
         return type.substring(TRANSFORM_PREFIX.length());
     }
 
+    /**
+     * The save's {@link #UNSUPPORTED_NODE} refusals alone: one per node the flat config has no home for, exactly as
+     * {@link #lower} words them. The candidate dry run refuses on these too (DRYRUN-SAVE-NODE-MISMATCH-1) — before it,
+     * a draft holding an unregistered node (an agent's guessed {@code source.dataset}) dry-ran green, because the walk
+     * seeds at the entry node and never asks its type, and the proposal of that same graph was then refused.
+     */
+    public static List<PipelineCompileException.Refusal> unsupportedNodes(PipelineGraph g) {
+        List<PipelineCompileException.Refusal> out = new ArrayList<>();
+        for (PipelineNode n : g.nodes()) if (!isLowerable(n.type())) out.add(unsupportedNode(n));
+        return out;
+    }
+
+    private static PipelineCompileException.Refusal unsupportedNode(PipelineNode n) {
+        String t = n.type();
+        return new PipelineCompileException.Refusal(UNSUPPORTED_NODE, n.id(),
+                "the flat pipeline config has no home for a '" + t + "' node"
+                        + (PipelineNodeTypes.isKnown(t) ? "" : unregisteredNodeHint(t)));
+    }
+
     public static boolean isLowerable(String type) {
         // A contributed transform type lowers as a `steps:` entry, so the flat file DOES have a home for
         // it — which is what makes a plugin Step authorable rather than merely executable.
@@ -775,10 +794,7 @@ public final class PipelineEditable {
             // isLowerable, not LOWERABLE: a pack-contributed step has a steps: home (S2-5 found this gate
             // still read the closed built-in set, so the palette offered a type save then refused)
             if (!isLowerable(t)) {
-                refusals.add(new PipelineCompileException.Refusal(UNSUPPORTED_NODE, n.id(),
-                        "the flat pipeline config has no home for a '" + t + "' node"
-                                + (PipelineNodeTypes.isKnown(t) ? ""
-                                   : unregisteredNodeHint(t))));
+                refusals.add(unsupportedNode(n));
                 continue;
             }
             String unhomed = unhomedBinding(n);

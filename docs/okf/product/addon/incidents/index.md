@@ -37,5 +37,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `a
 | `LEGAL-HOLD-SCOPE-1` | P3 | feature | A legal hold does not yet protect a Pipeline's data partitions, and holds have no screen. | — |
 | `CASE-REASSIGN-CONSOLE-1` | P3 | feature | an existing Case cannot be re-assigned in the console | — |
 | `INCIDENTS-READ-ROUTE-1` | P3 | defect | no route found to read the Incidents a failed Expectation raised | — |
+| `ALERT-RULE-FILTER-UI-1` | P3 | feature | The Alert Rule form cannot author or edit a Measure rule's row filter (when). | — |
+| `VALIDATE-ALERT-SKIPS-RULE-PARSE-1` | P3 | defect | POST /validate (validate_config) with type: alert runs SaveGate only, not the Alert Rule's own parse (AlertRoutes.parseContent), so a dra… | — |
 | `MODULE-REORG-P7-INCIDENTS` | P3 | chore | Delete AlertMigration (and LegacyAlertObjects) in 5.0.0; 4.0.0 ships the migration. | — |
 | `DOCS-SKILLS-ALERTS-AGENTIC-1` | P3 | feature | hub-routed agent skills exist for docs lookup, pipeline authoring, incident investigation and case analysis (.claude/skills/) | demand |

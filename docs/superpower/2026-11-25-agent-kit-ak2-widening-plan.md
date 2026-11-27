@@ -2,7 +2,7 @@
 
 > **Status: APPROVED 2026-11-25 — D-AK8…D-AK12 signed (operator interview, §5; D-AK8 not as recommended, which adds
 > task W11); built (§3): W1, W2, W3, W4 steps 1–3, W6 groups A, B, C, D (D1 and D2) and E and the agent change of
-> `POST /lookups/test` (`AGENT-LOOKUP-PREVIEW-1`, MCP Tool `test_lookup`, 2026-11-27), W5, W7, W8, W9, W10 and
+> `POST /lookups/test` (`AGENT-LOOKUP-PREVIEW-1`, MCP Tool `test_lookup`, 2026-11-27), W5, W7, W8, W9, W10 (its per-tool golden rule 2026-11-27) and
 > W11 (2026-11-25/27; W8's and W9's live golden runs and W5's fewer-refusals re-run belong to W4); open: W4 from
 > step 4.** The follow-on to phases 1–3b of
 > [`2026-11-20-agent-kit-ak2-plan.md`](2026-11-20-agent-kit-ak2-plan.md) (all built 2026-11-25). It takes the gaps a
@@ -357,7 +357,19 @@ needs only W3 and can start now.
 > `## MCP Tools` list names is exercised by its suite — fails all twelve skills today: the suites' checks name outcomes
 > (Pending Changes, action paths, replies) and only two tools by name (`validate_config`, `dry_run_pipeline` in
 > `tool-before`). Any tool could be checked — every call leaves an `mcp.tool.called` audit row the grader reads — but
-> that is a golden check per listed tool, most of them reads whose call proves little. **Proposed rule shape, not built:** every *write*
+> that is a golden check per listed tool, most of them reads whose call proves little.
+> (4) **Per-tool rule built 2026-11-27 (lane `kit-tooling`), per tool rather than per skill:** `check-agent-kit` check 6
+> fails a *write* MCP Tool (read from each `new Tool(…)`'s `write` argument; reads exempt) that no golden task calls —
+> a `tool-called` check, `tool-before`'s `tool` or `before` (the grader proves both were called), or a `pending-change`
+> check for `propose_change`. An action `path` does not count: the path names a route, not the tool, so a task that
+> grades one now also carries a `tool-called` check (11 checks added to existing tasks; the grader tests carry the
+> call rows a live run records). New tasks for the tools no task called: `dev-15-withdraw-proposal`
+> (`withdraw_change`), `dev-16-run-pipeline-now`, `ops-13-job-now-and-replay` (`trigger_job`, `replay_job_run`),
+> `ops-14-evaluate-alerts`, `ops-15-machine-withdraw-held` (`withdraw_action`), `la-07-attach-to-case`. Exempt with
+> why (`WRITE_TOOL_EXEMPT`, stale entries fail): `propose_action` (no skill teaches it), `work_alert` (no suite stages
+> a firing Alert Rule), `cancel_graph_run` (a still-running run cannot be staged deterministically). The new tasks are
+> graded by the unit tests only; their first live run is W4's. The skill-scoped form below stays unbuilt: per tool, a
+> write tool several skills list (`withdraw_action`) is proved once. **The rule as first proposed:** every *write*
 > tool a skill lists is exercised by a grade or safety check (`tool`, a `propose_change` kind, or an action `path` the
 > tool replays) in a task that names the skill. It fails today for `run_pipeline_now` (author-pipeline),
 > `withdraw_change` (safe-config-change), `trigger_job` and `replay_job_run` (operate-runs), `withdraw_action`
@@ -463,6 +475,12 @@ under it are the decision.
 - **D-AK12 — as recommended, a gate:** the operations, analyst and Link Analysis suites live with Claude first, then
   the developer suite on the Gemini CLI, Codex CLI and a local model. W2, W6, W7 and W11 start only after the
   operations and analyst suites have one live run each (W11 is under the gate because it widens the analyst role).
+- **D-AK26 (operator, 2026-11-27; reverses the raw-path part of D-AK22 and D-AK25):** a `path:` Reference no longer
+  reads a data folder. `POST /enrichment/preview` and `POST /lookups/test` refuse (422, every caller) a path into a
+  Dataset's store or a Pipeline's folders (store, rejected rows, raw copies, inbox, working folders); such data is read by name, where sharing and masking apply. The enrichment preview
+  now checks a by-name Reference's Dataset sharing as the lookup test does. A path outside every data folder keeps
+  D-AK22/D-AK25 (raw for a builder and a builder's agent, 403 for a machine). Closes `ENRICHMENT-PREVIEW-PATH-REACH-1`,
+  `ENRICHMENT-PREVIEW-SHARING-1` and `LOOKUP-TEST-PATH-RAW-1`.
 
 ## 6. Risks
 

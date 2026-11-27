@@ -45,6 +45,14 @@ import java.util.Set;
  *   }
  * </pre>
  *
+ * <p><b>Row filter ({@code when}, ALERT-RULE-ROW-FILTER-1)</b> — a Dataset measure rule may add {@code when}, a
+ * Condition Language group over the Dataset's rows (the {@code when} shape {@code /bi/query} takes); the Measure is
+ * then computed over the matching rows only, compiled by {@link com.gamma.query.MeasureCompiler} with every operand
+ * bound. "Alert when more than 5 shipments are undelivered" is {@code measure: count}, {@code comparator: gt},
+ * {@code threshold: 5}, {@code when: {kind: group, op: AND, items: [{kind: condition, field: status, operator: "!=",
+ * value: delivered}]}}. The tree must be strictly complete; at save every field must be in the Dataset's Schema and
+ * none masked ({@code AlertRoutes}), else {@code ERR_ALERT_ROW_FILTER_INVALID}.
+ *
  * <p><b>Per-entity measure rules ({@code by}, ASSURE-PER-ENTITY-ALERTS-1)</b> — a Dataset measure rule may add
  * {@code by}, one or more key columns of the Dataset. The Measure is then evaluated per group ({@code GROUP BY}
  * the key columns) and every breaching key raises its OWN Alert (and, at critical/error, its own Incident),
@@ -467,9 +475,17 @@ public record AlertRule(String name, String metric, String comparator, double th
             require(metric == null, "a measure alert (dataset:) must not also declare a ledger metric");
             require(window == null, "a measure alert (dataset:) takes no ledger window (it reads current data); "
                     + "a windowed alert takes the block window: {type, size, time, …}");
-            // A windowed rule's `when` is a Condition Language tree over the Dataset's rows (D-PA42).
-            require(when == null || eventWindow != null,
-                    "alert.when scopes ledger rows; a measure alert (dataset:) has none unless it is windowed");
+            // `when` is a Condition Language tree over the Dataset's rows: per Window for a windowed rule (D-PA42), and
+            // the row filter of a plain Measure rule (ALERT-RULE-ROW-FILTER-1) - the Measure counts only matching rows.
+            // Strict for the plain rule: an incomplete leaf would constrain nothing and widen what the rule counts.
+            if (when != null && eventWindow == null) {
+                try {
+                    com.gamma.query.ConditionTree.validateStrict(when);
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException(com.gamma.config.spec.FindingCodes.ERR_ALERT_ROW_FILTER_INVALID
+                            + ": alert.when (the rule's row filter) " + e.getMessage());
+                }
+            }
             require(com.gamma.query.DatasetMeasureProbe.validMeasure(measure),
                     "alert.measure must be count or agg(field), agg a Measure aggregate (sum, avg, median, p95, …)");
         } else {
@@ -676,6 +692,41 @@ public record AlertRule(String name, String metric, String comparator, double th
      */
     public List<String> windowColumns() {
         return isWindowed() ? WindowSql.columns(List.of(this)) : List.of();
+    }
+
+    /** ALERT-RULE-ROW-FILTER-1: the row filter of a plain (not windowed) Dataset measure rule, else {@code null}. */
+    @SuppressWarnings("unchecked")
+    public Map<String, Object> rowFilter() {
+        return isMeasureRule() && !isWindowed() && when instanceof Map<?, ?> ? (Map<String, Object>) when : null;
+    }
+
+    /** Every {@code field} and {@code valueField} {@link #rowFilter} reads; empty without one. Checked against the Schema at save. */
+    public List<String> rowFilterColumns() {
+        Map<String, Object> filter = rowFilter();
+        if (filter == null) return List.of();
+        java.util.Set<String> out = new java.util.LinkedHashSet<>();
+        filterFields(filter, out);
+        return List.copyOf(out);
+    }
+
+    /**
+     * The fields {@code node} reads, walked exactly as {@link com.gamma.query.ConditionSql} renders it: a node is a group
+     * by its {@code kind} first (a leaf carrying {@code items} is still a leaf), and a field is taken verbatim, untrimmed -
+     * the compiled statement quotes it as written, so {@code "status "} is not {@code status}.
+     */
+    private static void filterFields(Object node, java.util.Set<String> out) {
+        if (!(node instanceof Map<?, ?> m)) return;
+        Object kind = m.get("kind");
+        boolean group = "group".equals(kind) || (!"condition".equals(kind) && (m.containsKey("items") || m.containsKey("conditions")));
+        if (group) {
+            Object items = m.get("items") != null ? m.get("items") : m.get("conditions");
+            if (items instanceof List<?> l) for (Object it : l) filterFields(it, out);
+            return;
+        }
+        for (String k : List.of("field", "valueField")) {
+            Object f = m.get(k);
+            if (f != null && !String.valueOf(f).isEmpty()) out.add(String.valueOf(f));
+        }
     }
 
     /** The keys of {@code alert} this record does not model, in authored order (MODULE-REORG-P4-2). */

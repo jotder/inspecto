@@ -47,7 +47,7 @@ final class EnrichmentRoutes implements RouteModule {
         // Stateless preview over an inline config. Gated like POST /enrichment: it EXECUTES the draft's transform
         // over the real reference views (SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1), so it is authoring, not a read.
         api.post("/enrichment/preview", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> previewEnrichment(api, api.body(e))));
+                (e, m) -> previewEnrichment(api, e, api.body(e))));
         api.get("/enrichment/([^/]+)/runs", (e, m) -> enrichment(api).runs(enrichJob(api, m)));
         api.get("/enrichment/([^/]+)/lineage", (e, m) ->
                 enrichment(api).lineage(enrichJob(api, m), ApiContext.query(e, "runId")));
@@ -139,8 +139,13 @@ final class EnrichmentRoutes implements RouteModule {
      * {@code {columns, rows, truncated}}. Stateless (inline config, no write root) and gated
      * {@code canAuthorWorkbench} (403), because it executes the draft's SQL. 400 for a missing config/sample; 422 when the draft does not parse or its transform
      * fails on the sample (the preview surfaces exactly the error a run would hit).
+     *
+     * <p>Operator, 2026-11-27 (reversing that part of D-AK22): a {@code path:} Reference into a data folder is refused 422
+     * ({@link PathReferenceGuard}, {@code ENRICHMENT-PREVIEW-PATH-REACH-1}); a by-name Reference whose Dataset the caller
+     * cannot view ({@link LookupRoutes#mayViewReference}) is as absent as a Pipeline that is not loaded (422, the engine's
+     * own refusal, {@code ENRICHMENT-PREVIEW-SHARING-1}).
      */
-    private Object previewEnrichment(ApiContext api, Map<String, Object> body) {
+    private Object previewEnrichment(ApiContext api, HttpExchange ex, Map<String, Object> body) {
         Object cfgObj = body.get("config");
         List<Map<String, Object>> sampleRows = ApiContext.sampleRows(body);
         if (!(cfgObj instanceof Map<?, ?>) || sampleRows.isEmpty())
@@ -155,12 +160,21 @@ final class EnrichmentRoutes implements RouteModule {
         }
         // PREVIEW-REFERENCE-PATH-UNJAILED-1: a path reference is a caller-named file whose rows the preview
         // returns — jail it to the safety roots BEFORE the engine opens it (403), as /validate does.
-        for (EnrichmentConfig.Reference r : cfg.references())
-            if (!r.byName()) WriteGates.jailToAllowedRoots(r.path(), "references." + r.name() + ".path");
+        List<com.gamma.etl.PipelineConfig> loaded = HostContext.of(api).service().loadedPipelines();
+        java.util.Set<String> hidden = new java.util.HashSet<>();
+        for (EnrichmentConfig.Reference r : cfg.references()) {
+            String field = "references." + r.name() + ".path";
+            if (!r.byName()) PathReferenceGuard.refuseDataStore(api, WriteGates.jailToAllowedRoots(r.path(), field), field);
+            else if (!LookupRoutes.mayViewReference(api, ex, r.ref(), loaded)) hidden.add(r.ref());
+        }
+        // a shared-away Reference's Pipeline leaves the context, so the engine refuses it exactly as one not loaded
+        List<com.gamma.etl.PipelineConfig> visible = hidden.isEmpty() ? loaded
+                : loaded.stream().filter(p -> !hidden.contains(p.identity().pipelineName())).toList();
         try {
-            Object preview = EnrichmentEngine.preview(cfg, sampleRows, HostContext.of(api).service().loadedPipelines(), PREVIEW_LIMIT).toMap();
+            Object preview = EnrichmentEngine.preview(cfg, sampleRows, visible, PREVIEW_LIMIT).toMap();
             // D-AK22 (operator, 2026-11-26): the preview is raw for an authorized builder and that builder's agent; the agent
-            // seam accepts this stamp only on AgentGate.RAW_FOR_BUILDERS, and a machine agent never reaches here (PERSON_ONLY)
+            // seam accepts this stamp only on AgentGate.RAW_FOR_BUILDERS, and a machine agent never reaches here (PERSON_ONLY).
+            // Since 2026-11-27 it reads no data folder by path and no Dataset the caller cannot view (above).
             com.gamma.util.AnswerMasking.unmaskedByDecision("enrichment preview: raw for a builder (D-AK22)");
             return preview;
         } catch (Exception compute) {

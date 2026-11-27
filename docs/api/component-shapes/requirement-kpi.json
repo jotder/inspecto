@@ -1,6 +1,7 @@
 {
   "kind" : "requirement-kpi",
   "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "proposeChange" : true,
   "operations" : {
     "create" : {
       "route" : "POST /requirements/{id}/kpi",
@@ -29,7 +30,7 @@
           "required" : false,
           "default" : "previous",
           "values" : [
-            "last_year",
+            "last-year",
             "none",
             "previous"
           ]

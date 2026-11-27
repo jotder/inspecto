@@ -38,6 +38,21 @@ public final class ShapeProbe {
         return keys;
     }
 
+    /** The Dataset / Reconciliation key census ({@code UnknownComponentKeys}): the keys and, for a Reconciliation, a compareColumns item's. */
+    public static Set<String> unknownKeysCensus(String type) {
+        return switch (type) {
+            case "dataset" -> UnknownComponentKeys.DATASET;
+            case "reconciliation" -> UnknownComponentKeys.RECONCILIATION;
+            case "reconciliation.compareColumns" -> UnknownComponentKeys.COMPARE_COLUMN;
+            default -> throw new IllegalArgumentException("no UnknownComponentKeys census for " + type);
+        };
+    }
+
+    /** The keys of {@code content} the Dataset / Reconciliation census does not know: an agent's save is refused (422) on any. */
+    public static java.util.List<String> unknownKeys(String type, Map<String, Object> content) {
+        return UnknownComponentKeys.of(type, content);
+    }
+
     /** An Alert Rule body through {@code AlertRoutes.parseContent} (no Space): the rule checks and its unknown-key refusal. */
     public static Map<String, Object> alertRule(Map<String, Object> body) {
         return AlertRoutes.parseContent(null, () -> null, body).toMap();

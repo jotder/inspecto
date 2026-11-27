@@ -192,6 +192,11 @@ function uniqueNameValidator(taken: string[]): ValidatorFn {
                             No conditions: every Consignment in the window counts.
                         </div>
                     }
+                } @else if (kind() === 'measure' && storedRowFilter) {
+                    <p class="text-secondary mt-4 text-sm" data-testid="row-filter-kept">
+                        This rule counts only the rows that match its row filter (<code>when</code>). The filter is
+                        kept as stored; this form cannot edit it yet.
+                    </p>
                 } @else if (!authored) {
                     <!-- Read-only: this form cannot re-author a freshness / Investigation rule's target; save keeps it as stored. -->
                     <dl class="text-secondary mt-4 space-y-1 text-sm" aria-label="Rule target (read-only)">
@@ -369,6 +374,12 @@ export class AlertRuleFormDialog implements AfterViewInit {
             }
           : undefined;
 
+    /** A stored Measure rule's row filter (ALERT-RULE-ROW-FILTER-1): not editable here, so re-sent as stored —
+     *  `when` is a form-owned key, and dropping it would make the rule count every row. A windowed rule's `when`
+     *  is its Window condition, not a row filter of this form's rule, so it is left as before. */
+    readonly storedRowFilter: ConditionGroup | null =
+        this.authored === 'measure' && !this.data.rule?.window && this.data.rule?.when ? this.data.rule.when : null;
+
     /** Deep-cloned on edit — the condition editor mutates the bound group in place. */
     readonly when: ConditionGroup = this.data.rule?.when ? structuredClone(this.data.rule.when) : emptyGroup('AND');
     /** Fixed ledger columns, plus any field an existing when-clause already references. */
@@ -475,6 +486,7 @@ export class AlertRuleFormDialog implements AfterViewInit {
             ...(description ? { description } : {}),
             ...(runbook ? { runbook } : {}),
             ...(kind === 'metric' && !this.whenEmpty() ? { when: this.when } : {}),
+            ...(kind === 'measure' && this.storedRowFilter ? { when: this.storedRowFilter } : {}),
         };
         this.saveError.set('');
         this.saving.set(true);

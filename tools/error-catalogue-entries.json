@@ -216,6 +216,10 @@
     "cause": "A delimited or fixed-width Pipeline's schema selects a column by name where the load needs its zero-based index in raw.fields[].selector.",
     "fix": "Set each raw.fields[].selector to the column's zero-based position (0, 1, 2, …)."
   },
+  "ERR_ALERT_ROW_FILTER_INVALID": {
+    "cause": "A Measure Alert Rule's row filter (when) cannot be applied: it is not a complete condition group (a condition with no field, operator or value, an unknown operator, an empty group), it names a column the Dataset does not have, or it filters on a column the Space masks — an alert never reveals, so it may not count rows by a masked value.",
+    "fix": "Read the message — it names the condition or column. Complete the condition, use a column from the Dataset's Schema (GET /datasets/{id}/rows lists them), or filter on an unmasked column; a filter on another Dataset needs a derived Dataset first."
+  },
   "ERR_UNKNOWN_CONFIG_KEY": {
     "cause": "The config carries a block or key no component reads; the engine would ignore it and what it configures would be lost.",
     "fix": "Remove the key, or move it to where the component reads it (check spelling and nesting against the kind's shape)."

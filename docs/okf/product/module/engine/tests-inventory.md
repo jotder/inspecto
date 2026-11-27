@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-438 test class(es): 438 unit, 0 real-HTTP control-plane, 0 IT.
+439 test class(es): 439 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -33,6 +33,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `AlertPurgeStoreTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertPurgeStoreTest.java` | {@link AlertStore#purgeResolvedBefore} on the heap store and the durable DuckDB file (real file, reopened). |
 | `AlertRecordsParityTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertRecordsParityTest.java` | MODULE-REORG-P7-INCIDENTS slices 1-2 — the characterisation of {@link AlertService} over its {@link AlertRecords} |
 | `AlertRetentionPinTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertRetentionPinTest.java` | MODULE-REORG-P7-INCIDENTS (retention of resolved Alert rows) - characterisation, written BEFORE the purge: on |
+| `AlertRowFilterTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertRowFilterTest.java` | ALERT-RULE-ROW-FILTER-1 — a Dataset measure Alert Rule's {@code when} row filter, over REAL DuckDB data through the |
 | `AlertRuleTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertRuleTest.java` | Rule parsing/validation + window/comparator semantics (v4.1, B5). |
 | `AlertServiceTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertServiceTest.java` | The alert engine's evaluation semantics (v4.1, B5): metric math over ledger rows, duration and <!-- vocab-allow: quoted Javadoc --> |
 | `AlertTest` | `com.gamma.alert` | unit | `platform/inspecto-engine/src/test/java/com/gamma/alert/AlertTest.java` | R2-05: the words an operator reads on a fired Alert and the Incident it raises. The machine ids stay |

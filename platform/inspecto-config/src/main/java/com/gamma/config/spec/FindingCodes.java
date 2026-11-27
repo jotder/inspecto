@@ -153,6 +153,11 @@ public final class FindingCodes {
      *  regardless of {@code active} (LA-ONBOARD-FIXES-1, F-4). */
     public static final String ERR_SELECTOR_NOT_INDEX = "ERR_SELECTOR_NOT_INDEX";
 
+    /** A Dataset Measure Alert Rule's row filter ({@code when}) that cannot be applied as written: not a complete
+     *  Condition Language group, a field outside the Dataset's Schema, or a field the Space masks — an alert never
+     *  reveals, so it may not count rows by a masked value (ALERT-RULE-ROW-FILTER-1). */
+    public static final String ERR_ALERT_ROW_FILTER_INVALID = "ERR_ALERT_ROW_FILTER_INVALID";
+
     // ── Safety ───────────────────────────────────────────────────────────────────────────────
     // (ConfigSafetyValidator issues register here as they migrate to the catalog)
 

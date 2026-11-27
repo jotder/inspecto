@@ -55,11 +55,12 @@ Read from `error.errorCode`. 23 codes.
 
 ## Config finding codes
 
-Read from `findings[].code — on a refused save error.details.findings[].code`. 53 codes.
+Read from `findings[].code — on a refused save error.details.findings[].code`. 54 codes.
 
 | Code | Severity | Status | Cause | Fix |
 |---|---|---|---|---|
 | `COMPONENT_INVALID` | ERROR | 422 | POST /validate: the component draft is refused as a whole — the message is the refusal the save would give. | Fix what the message names (a missing required key, a bad value, a reference to nothing), then validate again before saving. |
+| `ERR_ALERT_ROW_FILTER_INVALID` | ERROR | 422 | A Measure Alert Rule's row filter (when) cannot be applied: it is not a complete condition group (a condition with no field, operator or value, an unknown operator, an empty group), it names a column the Dataset does not have, or it filters on a column the Space masks — an alert never reveals, so it may not count rows by a masked value. | Read the message — it names the condition or column. Complete the condition, use a column from the Dataset's Schema (GET /datasets/{id}/rows lists them), or filter on an unmasked column; a filter on another Dataset needs a derived Dataset first. |
 | `ERR_ARMED_WITHOUT_SCHEMA` | ERROR | 422 | The Pipeline is active but has no schema at all, so it would register and then be skipped every cycle. | Give it a schema (processing.schema_file or processing.schemas), or save it with active: false until it has one. |
 | `ERR_BI_FILTER_OP_UNKNOWN` | ERROR | 422 | A BI query filter names an operator the compiler does not know. | Use one of: = (eq), != (ne, <>), >, >=, <, <=, gt, gte, lt, lte, like, in (with a non-empty value list), isNull, notNull. |
 | `ERR_CALCULATED_COLUMN_INVALID` | ERROR | 422 | A Dataset's calculated[] entry is refused: it is not an object, its name is not a plain identifier, or it has no expr. | Write each entry as {name: <plain identifier>, expr: <SQL expression over the row>}; fieldPath names the entry and the key. |
