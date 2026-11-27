@@ -5,6 +5,8 @@
 > (§12). The new terms are in `GLOSSARY.md` §7.
 > **P4 Language (I-18, I-19) is designed and approved 2026-11-27 — D-BI14…D-BI24 signed (operator, recommended options):
 > [`2026-11-27-bi-insights-p4-language-plan.md`](2026-11-27-bi-insights-p4-language-plan.md); all slices BR-0..BR-5 and AQ-0..AQ-1 built 2026-11-27 (§11.17).**
+> **P5 Advanced (I-13, I-15, I-16) is designed and approved 2026-11-28 — D-BI25…D-BI36 signed:
+> [`2026-11-28-bi-insights-p5-advanced-plan.md`](2026-11-28-bi-insights-p5-advanced-plan.md); nothing built.**
 > Scope: insights on **business data** — the Measures over Datasets (revenue, usage, subscribers, transactions,
 > margin, leakage, partners, churn). Not observability: pipeline health stays with Metrics and Alert Rules.
 > Inventory checked against the code on 2026-11-18 (three read-only sweeps plus spot checks); every BUILT / PARTIAL /
@@ -275,7 +277,7 @@ already exists there, and Q2/Q4 answer the questions an RA or finance lead asks 
 |---|---|---|
 | D-BI1 | Names | ✅ **SIGNED 2026-11-18: (a)** Insight Type / Insight / Insight Profile / Chart Marker / KPI History, added to `GLOSSARY.md` §7 · (b) other names |
 | D-BI2 | Where the scan lives | ✅ **SIGNED 2026-11-18: (a)** new `features/inspecto-insights` add-on; kernel and engine extended for overlays · (b) everything inside engine + analytics |
-| D-BI3 | Edition placement | ✅ **SIGNED 2026-11-18: (a)** overlays and KPI History in Standard BI; Insight Profiles / scan / explain as a "Business Insights" add-on (Standard+); language features with AI Assist; scenarios Advanced · (b) all in one add-on. **Add-on placement superseded by D-BI13** (every edition) |
+| D-BI3 | Edition placement | *Scenarios "Advanced" reversed by D-BI29 (2026-11-28).* ✅ **SIGNED 2026-11-18: (a)** overlays and KPI History in Standard BI; Insight Profiles / scan / explain as a "Business Insights" add-on (Standard+); language features with AI Assist; scenarios Advanced · (b) all in one add-on. **Add-on placement superseded by D-BI13** (every edition) |
 | D-BI4 | Who may tune | ✅ **SIGNED 2026-11-24: (a)** Builders author, owners tune within bounds, Business users give feedback · (b) Builders only. **Narrowed 2026-11-26 (operator):** owner tuning within Builder bounds is dropped — whoever may save a Profile tunes it; feedback and Explain for anyone who can view (§11.16) |
 | D-BI5 | Language features in the first release | ✅ **SIGNED 2026-11-24: (a)** no — templated sentences first, Brief in P4 · (b) yes |
 | D-BI6 | Pilot | ✅ **SIGNED 2026-11-24: (a)** `business-assurance` + `telco-ra` revenue · (b) `mobile-money` transaction value |
