@@ -50,6 +50,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `ASSURE-OPERABILITY-1` | P2 | feature | The two-host HA/DR drill, the offline vulnerability scan snapshot and tightened nightly thresholds remain. | operator |
 | `DEPLOY-SERVICE-WRAPPER-1` | P2 | chore | Run the service wrappers' live acceptance (kill -9 recovery and the reboot leg) on Windows and Linux. | — |
 | — | P2 | feature | Postgres multi-user | operator |
+| `TEMPLATE-STRAY-STATUS-DIR-1` | P3 | defect | A Maven test run writes into the shipped Space Template: an empty spaces/_templates/la-showcase/data/mule_transfers/status folder (untrac… | — |
 | `TOOL-TESTS-UNWIRED-BASELINE-1` | P3 | chore | 46 of 112 tools/*.test.mjs are named by no workflow, so no gate runs them. | demand |
 | `TEST-ENV-PG-ASN-UNRUN-1` | P3 | chore | Two test groups (Postgres and asn-*) cannot run on the shared User profile, so a green reactor does not cover them. | operator |
 | `IMPORT-LOADER-INVENTORY-RED-1` | P3 | defect | ImportLoaderInventoryTest.everyFixedNameALoaderReadsIsReservedOrAllowedWithAReason fails on master (seen 2026-11-19 by every BASIC-ELT-PR… | — |
