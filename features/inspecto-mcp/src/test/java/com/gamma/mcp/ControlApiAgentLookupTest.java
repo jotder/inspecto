@@ -366,6 +366,53 @@ class ControlApiAgentLookupTest {
         }
     }
 
+    /**
+     * Lookup-lane security review: a refused index build names the duplicated key, a Reference value. A 4xx passes the
+     * seam unstamped, so for a caller who may not reveal the 422 and {@code GET /lookups}' {@code index.error} withhold it.
+     */
+    @Test
+    void aRefusedBuildNamesNoReferenceValueToAnAgent(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, BY_NAME)) {
+            Path part = dir.resolve("region").resolve("db").resolve("part0.parquet");
+            try (Connection conn = DriverManager.getConnection("jdbc:duckdb:"); Statement st = conn.createStatement()) {
+                st.execute("COPY (SELECT * FROM (VALUES ('" + KEYS.get(0) + "','" + OWNER_OF_FIRST + "','R0'),('" + KEYS.get(0)
+                        + "','447700900999','R9')) AS t(msisdn, owner_msisdn, region)) TO '"
+                        + part.toString().replace('\\', '/') + "' (FORMAT PARQUET)");
+            }
+            for (String who : List.of(AGENT, MACHINE)) {
+                HttpResponse<String> refused = test(c, who, body(c, c.exact, "x", true));
+                assertEquals(422, refused.statusCode(), who + ": " + refused.body());
+                assertNoRaw(who, refused.body());
+                JsonNode viaMcp = tool(c, who, body(c, c.exact, "x", true));
+                assertTrue(viaMcp.path("isError").asBoolean() && text(viaMcp).startsWith("HTTP 422"), viaMcp.toString());
+                assertNoRaw(who, viaMcp.toString());
+                HttpResponse<String> listed = get(c.api, who, "/lookups");
+                JsonNode row = data(listed).get("lookups").get(0);
+                assertEquals("failed", row.get("index").get("state").asText(), row.toString());
+                assertNoRaw(who + " GET /lookups", listed.body());
+            }
+        }
+    }
+
+    /**
+     * Lookup-lane security review: the kept indexes are install-wide, so a second Space with the same Pipeline and Step
+     * must not answer from the first Space's index (its Reference rows, masked by the second Space's registry).
+     */
+    @Test
+    void aSecondSpaceNeverSharesTheFirstSpacesIndex(@TempDir Path dirA, @TempDir Path dirB) throws Exception {
+        try (Ctx a = open(dirA, BY_NAME)) {
+            data(test(a, AGENT, body(a, a.exact, KEYS.get(0), false)));   // builds Space A's index
+            try (Ctx b = open(dirB, BY_NAME)) {
+                assertEquals(a.pipeline, b.pipeline, "the same Pipeline name in both Spaces");
+                assertEquals(a.exact, b.exact, "and the same Step");
+                JsonNode state = data(get(b.api, PERSON, "/lookups")).get("lookups").get(0).get("index");
+                assertEquals("cold", state.get("state").asText(), "Space B sees no index of Space A's: " + state);
+                assertEquals("first use", data(test(b, AGENT, body(b, b.exact, KEYS.get(0), false))).get("index")
+                        .get("reloaded").asText(), "Space B builds its own");
+            }
+        }
+    }
+
     @Test
     void noSubmittedValueReachesALogLine(@TempDir Path dir) throws Exception {
         String secret = "249919998877";   // a raw value the agent asks for (D-AK15): a miss, so its answer holds no key

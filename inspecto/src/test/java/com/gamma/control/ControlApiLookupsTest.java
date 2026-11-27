@@ -38,8 +38,11 @@ class ControlApiLookupsTest {
 
     private final HttpClient client = HttpClient.newHttpClient();
 
-    private static final Authenticator FAKE = ex -> "Bearer plain".equals(ex.getRequestHeaders().getFirst("Authorization"))
-            ? Optional.of(new Subject("nobody", Set.of("canAuthorWorkbench"))) : Optional.empty();   // POST /lookups/test's gate
+    private static final Authenticator FAKE = ex -> switch (String.valueOf(ex.getRequestHeaders().getFirst("Authorization"))) {
+        case "Bearer plain" -> Optional.of(new Subject("nobody", Set.of("canAuthorWorkbench")));   // POST /lookups/test's gate
+        case "Bearer reveal" -> Optional.of(new Subject("revealer", Set.of("canAuthorWorkbench", BiResultMasking.REVEAL)));
+        default -> Optional.empty();
+    };
 
     private static final String STEPS = """
             output_store: enriched_calls
@@ -94,9 +97,13 @@ class ControlApiLookupsTest {
     }
 
     private JsonNode lookups(Ctx c) throws Exception {
+        return lookups(c, "Bearer plain");
+    }
+
+    private JsonNode lookups(Ctx c, String token) throws Exception {
         HttpResponse<String> r = client.send(HttpRequest.newBuilder(
                         URI.create("http://localhost:" + c.api.port() + "/api/v1/lookups"))
-                .header("Authorization", "Bearer plain").GET().build(), HttpResponse.BodyHandlers.ofString());
+                .header("Authorization", token).GET().build(), HttpResponse.BodyHandlers.ofString());
         assertEquals(200, r.statusCode(), r.body());
         return V1Body.of(r.body());
     }
@@ -223,7 +230,10 @@ class ControlApiLookupsTest {
         try (Ctx c = open(dir, dialSteps(ref))) {
             JsonNode s = settledIndex(c);
             assertEquals("failed", s.get("state").asText(), s.toString());
-            assertTrue(s.get("error").asText().contains(com.gamma.pipeline.exec.PointLookup.PROP_MAX_BYTES), s.toString());
+            assertEquals(LookupRoutes.WITHHELD_REFUSAL, s.get("error").asText(),
+                    "a build refusal can name Reference values, so a caller who may not reveal gets the fixed text: " + s);
+            JsonNode revealed = lookups(c, "Bearer reveal").get("lookups").get(0).get("index");
+            assertTrue(revealed.get("error").asText().contains(com.gamma.pipeline.exec.PointLookup.PROP_MAX_BYTES), revealed.toString());
         }
     }
 

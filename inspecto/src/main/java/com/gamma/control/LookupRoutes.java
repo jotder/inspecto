@@ -50,7 +50,7 @@ final class LookupRoutes implements RouteModule {
 
     @Override
     public void register(ApiContext api) {
-        api.get("/lookups", (e, m) -> list(api));
+        api.get("/lookups", (e, m) -> list(api, BiResultMasking.mayReveal(e)));
         // LOOKUP-TEST-OPEN-READ-1: it answers a Reference's own rows (and builds its index), so it is authoring, like
         // POST /enrichment/preview - never an open read
         api.post("/lookups/test", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> test(api, e, api.body(e))));
@@ -105,7 +105,7 @@ final class LookupRoutes implements RouteModule {
      */
     private static Warmed warmUp(ApiContext api, String pipeline, PipelineNode node, boolean refresh,
                                  Runnable beforeBuild) {
-        String key = pipeline + "/" + node.id();
+        String key = spaceKey(api) + "/" + pipeline + "/" + node.id();
         Map<String, Object> config = new LinkedHashMap<>(node.config());
         Warm warm;
         synchronized (WARM) { warm = WARM.get(key); }
@@ -144,8 +144,8 @@ final class LookupRoutes implements RouteModule {
     }
 
     /** {@code GET /lookups}'s per-row index readiness: ready (with its size), building, failed (with why) or cold. */
-    private static Map<String, Object> indexState(String pipeline, String step) {
-        String key = pipeline + "/" + step;
+    private static Map<String, Object> indexState(ApiContext api, String pipeline, String step, boolean reveal) {
+        String key = spaceKey(api) + "/" + pipeline + "/" + step;
         Warm warm;
         synchronized (WARM) { warm = WARM.get(key); }
         Map<String, Object> s = new LinkedHashMap<>();
@@ -155,9 +155,24 @@ final class LookupRoutes implements RouteModule {
             s.put("bytes", warm.index().bytes());
             s.put("loadedAt", warm.index().loadedAt().toString());
         }
-        if (FAILED.containsKey(key)) s.put("error", FAILED.get(key));
+        if (FAILED.containsKey(key)) s.put("error", reveal ? FAILED.get(key) : WITHHELD_REFUSAL);
         return s;
     }
+
+    /**
+     * The Space a kept index belongs to (lookup-lane security review): the cache is install-wide, so its key carries the
+     * Space's own service and write root - two Spaces with the same Pipeline and Step never share an index or its state.
+     */
+    private static String spaceKey(ApiContext api) {
+        return System.identityHashCode(HostContext.of(api).service()) + ":" + api.writeRoot();
+    }
+
+    /**
+     * What a caller who may not reveal reads instead of an index build's refusal (lookup-lane security review, as D2's
+     * run-time errors): the point engine names the duplicated key or the overlapping ranges, which are Reference values.
+     */
+    static final String WITHHELD_REFUSAL = "the lookup index could not be built (a duplicated key, overlapping ranges or "
+            + "the memory cap) - the detail names Reference values, so it is shown only to a caller who may reveal them";
 
     /** Built point indexes kept warm, at most this many (least recently used dropped first). */
     static final int MAX_WARM = 8;
@@ -262,10 +277,17 @@ final class LookupRoutes implements RouteModule {
         boolean refresh = Boolean.TRUE.equals(body.get("refresh"));
         // every build this call causes (asked, cold, evicted, changed) spends the build budget, not only refresh: true;
         // an agent's build also pays the rest of its weight 20 in the agent budget (design §3.4), before anything is read
-        Warmed w = warmUp(api, pipeline, node, refresh, () -> {
-            charge(ex, reloads, caller, "a lookup index build");
-            if (agent) chargeAgentBuild(ex);
-        });
+        Warmed w;
+        try {
+            w = warmUp(api, pipeline, node, refresh, () -> {
+                charge(ex, reloads, caller, "a lookup index build");
+                if (agent) chargeAgentBuild(ex);
+            });
+        } catch (ApiException refused) {   // a 4xx passes the agent seam unstamped: its text must hold no Reference value
+            if (refused.status == 422 && !BiResultMasking.mayReveal(ex))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, WITHHELD_REFUSAL);
+            throw refused;
+        }
         Warm warm = w.warm();
         String reason = w.reason(), stamp = w.stamp();
         String valStr = value == null ? null : value.toString();
@@ -461,7 +483,7 @@ final class LookupRoutes implements RouteModule {
         return out;
     }
 
-    private static Object list(ApiContext api) {
+    private static Object list(ApiContext api, boolean reveal) {
         DbConsignmentOutputStore store = ConsignmentOutputStores.shared();
         boolean receipts = store != null && ConsignmentOutputStores.stepsEnabled();
         List<Map<String, Object>> rows = new ArrayList<>();
@@ -479,7 +501,7 @@ final class LookupRoutes implements RouteModule {
             for (PipelineNode n : g.nodes()) {
                 if (!BuiltinNodeType.TRANSFORM_JOIN.type().equals(n.type()) || !keyed(n)) continue;
                 if (++total > MAX_LOOKUPS) continue;
-                rows.add(row(cfg.identity().pipelineName(), g.name(), n, receipts ? store : null));
+                rows.add(row(api, cfg.identity().pipelineName(), g.name(), n, receipts ? store : null, reveal));
             }
         }
         Map<String, Object> out = new LinkedHashMap<>();
@@ -496,8 +518,8 @@ final class LookupRoutes implements RouteModule {
         return false;
     }
 
-    private static Map<String, Object> row(String pipeline, String receiptPipeline, PipelineNode n,
-                                           DbConsignmentOutputStore store) {
+    private static Map<String, Object> row(ApiContext api, String pipeline, String receiptPipeline, PipelineNode n,
+                                           DbConsignmentOutputStore store, boolean reveal) {
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("pipeline", pipeline);
         r.put("step", n.id());
@@ -506,7 +528,7 @@ final class LookupRoutes implements RouteModule {
         List<String> block = blockCols(n);
         if (!block.isEmpty()) r.put("block", block);
         r.put("lookedUpBy", lookedUpBy(n));
-        r.put("index", indexState(pipeline, n.id()));
+        r.put("index", indexState(api, pipeline, n.id(), reveal));
         if (store != null) {
             StepReceipt last = null;
             try {
