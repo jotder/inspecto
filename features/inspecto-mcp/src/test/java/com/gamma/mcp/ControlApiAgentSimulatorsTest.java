@@ -131,13 +131,28 @@ class ControlApiAgentSimulatorsTest {
             Files.writeString(config.resolve("region_dim_pipeline.toon"),
                     "produces: reference\n" + Files.readString(region).replace("active: true", "active: false"));
             Files.delete(region);
+            // FEEDS routes into two stores; the second (s1/feeds/sms) is named only by sinks[] and its route branch:
+            // under none of its dirs (s1/feeds/main/...), and no registry Dataset reads it
+            String fwd = base.toString().replace("\\", "/");
+            Path feeds = TestConfigs.csv(base.resolve("feeds").resolve("main"), PipelineConfigBatchTest.miniSchema())
+                    .name("FEEDS").format("PARQUET").write();
+            Files.writeString(config.resolve("feeds_pipeline.toon"), Files.readString(feeds).replace("active: true", "active: false")
+                    + "\nsinks[2]{database,format}:\n  \"" + fwd + "/feeds/main/db\",PARQUET\n  \"" + fwd + "/feeds/sms\",PARQUET\n"
+                    + "\nroute:\n  mode: case\n  default: sms\n  branches[2]{key,where,database}:\n"
+                    + "    main,\"1 = 1\",\"" + fwd + "/feeds/main/db\"\n    sms,\"1 = 0\",\"" + fwd + "/feeds/sms\"\n");
+            Files.delete(feeds);
             String part = Files.createDirectories(base.resolve("region").resolve("db")).resolve("part0.parquet")
+                    .toString().replace("\\", "/");
+            String sms = Files.createDirectories(base.resolve("feeds").resolve("sms")).resolve("part0.parquet")
+                    .toString().replace("\\", "/");
+            String main = Files.createDirectories(base.resolve("feeds").resolve("main").resolve("db")).resolve("part0.parquet")
                     .toString().replace("\\", "/");
             DuckDbUtil.loadDriver();
             File seed = DuckDbUtil.tempDbFile("regionseed_");
             try (Connection conn = DuckDbUtil.openConnection(seed); Statement st = conn.createStatement()) {
-                st.execute("COPY (SELECT * FROM (VALUES ('" + A + "','EU'),('" + B + "','US')) t(msisdn,region)) TO '"
-                        + part + "' (FORMAT PARQUET)");
+                for (String to : List.of(part, sms, main))
+                    st.execute("COPY (SELECT * FROM (VALUES ('" + A + "','EU'),('" + B + "','US')) t(msisdn,region)) TO '"
+                            + to + "' (FORMAT PARQUET)");
             } finally {
                 DuckDbUtil.deleteTempDb(seed);
             }
@@ -331,7 +346,7 @@ class ControlApiAgentSimulatorsTest {
             Files.createDirectories(file.getParent());
             Files.writeString(file, "msisdn,region\n" + A + ",EU\n" + B + ",US\n");
         }
-        String format = file.toString().endsWith(".parquet") ? "PARQUET" : "CSV";
+        String format = file.toString().endsWith(".parquet") || Files.isDirectory(file) ? "PARQUET" : "CSV";
         return Map.of("path", file.toString().replace("\\", "/"), "format", format);
     }
 
@@ -346,26 +361,49 @@ class ControlApiAgentSimulatorsTest {
     void aPathReferenceIntoADataStoreIsRefusedToEveryCaller(@TempDir Path root) throws Exception {
         try (Ctx c = open(root, true)) {
             for (Path probe : List.of(root.resolve("s1/data/calls/dt=2026/data.parquet"),
-                    root.resolve("s1/region/errors/rejected.csv"))) {
-                Map<String, Object> body = draft(pathTo(probe));
-                HttpResponse<String> person = post(c, PERSON, "/enrichment/preview", body);
-                assertEquals(422, person.statusCode(), probe + ": " + person.body());
-                assertTrue(person.body().contains("may not name a file in a data folder"), person.body());
-                assertNoRaw("person " + probe, person.body());
-                HttpResponse<String> agent = post(c, AGENT, "/enrichment/preview", body);
-                assertEquals(422, agent.statusCode(), probe + ": " + agent.body());
-                assertNoRaw("agent " + probe, agent.body());
-                JsonNode viaMcp = tool(c, AGENT, "preview_enrichment", Map.of("body", body));
-                assertTrue(viaMcp.path("isError").asBoolean() && text(viaMcp).startsWith("HTTP 422"), viaMcp.toString());
-                assertNoRaw("agent MCP " + probe, viaMcp.toString());
-                HttpResponse<String> bot = post(c, BOT, "/enrichment/preview", body);
-                assertEquals(403, bot.statusCode(), bot.body());
-                assertNoRaw("machine " + probe, bot.body());
-            }
+                    root.resolve("s1/region/errors/rejected.csv")))
+                assertRefusedToEveryCaller(c, probe);
             // a path outside every data folder keeps today's answer (raw for a builder, D-AK22)
             HttpResponse<String> outside = post(c, PERSON, "/enrichment/preview", enrichment(root));
             assertEquals(200, outside.statusCode(), outside.body());
         }
+    }
+
+    /**
+     * A folder path: DuckDB reads every file below it, so {@code s1/feeds/main} (holding FEEDS's store {@code db}) is
+     * refused. (A folder directly under the Space root is refused by the seal already.)
+     */
+    @Test
+    void aFolderPathAboveAStoreIsRefusedToEveryCaller(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, true)) {
+            assertRefusedToEveryCaller(c, root.resolve("s1/feeds/main"));
+        }
+    }
+
+    /** A store a Pipeline names only in {@code sinks[]} ({@code s1/feeds/sms}): not under its dirs, no registry Dataset. */
+    @Test
+    void aSinkStoreIsRefusedToEveryCaller(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, true)) {
+            assertRefusedToEveryCaller(c, root.resolve("s1/feeds/sms/part0.parquet"));
+        }
+    }
+
+    /** 422 to the person and the person's agent on both doors, 403 to a machine; no answer holds a value. */
+    private void assertRefusedToEveryCaller(Ctx c, Path probe) throws Exception {
+        Map<String, Object> body = draft(pathTo(probe));
+        HttpResponse<String> person = post(c, PERSON, "/enrichment/preview", body);
+        assertEquals(422, person.statusCode(), probe + ": " + person.body());
+        assertTrue(person.body().contains("may not name a file in a data folder"), person.body());
+        assertNoRaw("person " + probe, person.body());
+        HttpResponse<String> agent = post(c, AGENT, "/enrichment/preview", body);
+        assertEquals(422, agent.statusCode(), probe + ": " + agent.body());
+        assertNoRaw("agent " + probe, agent.body());
+        JsonNode viaMcp = tool(c, AGENT, "preview_enrichment", Map.of("body", body));
+        assertTrue(viaMcp.path("isError").asBoolean() && text(viaMcp).startsWith("HTTP 422"), viaMcp.toString());
+        assertNoRaw("agent MCP " + probe, viaMcp.toString());
+        HttpResponse<String> bot = post(c, BOT, "/enrichment/preview", body);
+        assertEquals(403, bot.statusCode(), bot.body());
+        assertNoRaw("machine " + probe, bot.body());
     }
 
     /**
