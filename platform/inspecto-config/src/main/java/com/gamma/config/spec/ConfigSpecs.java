@@ -526,8 +526,7 @@ public final class ConfigSpecs {
                         "Missing required field 'dirs.poll' (only connector: dataset Job Pipelines may omit dirs.poll).",
                         Severity.ERROR,
                         List.of("dirs.poll"),
-                        raw -> "dataset".equalsIgnoreCase(str(raw, "collector.connector"))
-                                || !str(raw, "dirs.poll").isBlank()),
+                        raw -> isDatasetConnector(raw) || nonBlank(raw, "dirs.poll")),
                 new CrossFieldRule(
                         "template-cannot-be-active",
                         "template: true and active: true contradict — a template is a non-runnable authoring "
@@ -1013,6 +1012,19 @@ public final class ConfigSpecs {
         if (nonBlank(raw, "alert.maximumAge")) return "freshness";
         if (nonBlank(raw, "alert.dataset")) return "measure";
         return "ledger";
+    }
+
+    /**
+     * Mirrors {@code PipelineConfigParser.isDatasetConnector}: the {@code collector:} block, or the
+     * pre-rename {@code source:} block when there is no {@code collector:} block, says
+     * {@code connector: dataset}.
+     */
+    private static boolean isDatasetConnector(Map<String, Object> raw) {
+        Object col = at(raw, "collector");
+        if (!(col instanceof Map)) col = at(raw, "source");
+        if (!(col instanceof Map<?, ?> m)) return false;
+        Object connector = m.get("connector");
+        return connector != null && "dataset".equalsIgnoreCase(connector.toString().trim());
     }
 
     /** Present and not blank — {@code AlertRule} reads a blank value as absent, so the spec must too. */

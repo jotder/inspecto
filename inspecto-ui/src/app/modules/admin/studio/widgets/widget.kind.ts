@@ -31,6 +31,13 @@ if (!getVizComponentLoader('insight-feed')) {
     );
 }
 
+// BI-INSIGHTS-1 P4 BR-3: the Dashboard Brief tile.
+if (!getVizComponentLoader('insight-brief')) {
+    registerVizComponent('insight-brief', () =>
+        import('../insights/insight-brief-widget.component').then((m) => m.InsightBriefWidgetComponent),
+    );
+}
+
 /**
  * The `widget` {@link ComponentKind} — the adoption plan's "VizPlugin = first ComponentKind slice" made
  * concrete. A widget references a dataset (its one part kind) and authors a **mapping** wiring (field→channel),

@@ -124,6 +124,59 @@ export interface InsightPreview {
     skipped?: { dimension: string; reason: string }[];
 }
 
+/** One line of a Dashboard Brief: a stored Insight's templated sentence (`GET /insights/brief`, P4 BR-0). */
+export interface BriefLine {
+    insightId: string;
+    band: 'elevated' | 'high' | string;
+    score: number;
+    sentence: string;
+    type: string;
+    measure?: string;
+    dimension?: string | null;
+    slice?: string | null;
+    period?: string;
+    link?: string;
+}
+
+/** The Brief of one Insight Profile; a Profile the viewer may not view is not in the answer at all. */
+export interface BriefProfile {
+    profile: string;
+    runId?: string;
+    runAt?: string;
+    period?: string;
+    header?: string;
+    stale?: boolean;
+    /** "Last scan was n days ago", or "No scan has run…". */
+    note?: string;
+    /** "Nothing unusual in <period>" when no Insight qualifies. */
+    summary?: string;
+    lines: BriefLine[];
+}
+
+/** One narrated sentence: its text carries its `[n]`, `cites` the Insight ids, `source` says who wrote it. */
+export interface NarratedSentence {
+    n: number;
+    text: string;
+    cites: string[];
+    source: 'model' | 'template' | string;
+}
+
+export interface NarratedProfile {
+    profile: string;
+    runId?: string;
+    sentences: NarratedSentence[];
+    modelBacked: boolean;
+    repaired: boolean;
+    /** Why the lines are the Brief's own (e.g. "no model"). */
+    reason?: string;
+}
+
+/** `POST /insights/brief/narrate` (P4 BR-2): the Brief as the caller may see it, and its narration. */
+export interface BriefNarration {
+    brief: { profiles: BriefProfile[] };
+    narration: { mode: 'model' | 'templated' | string; profiles: NarratedProfile[] };
+}
+
 export type InsightBand = 'normal' | 'elevated' | 'high';
 
 /** The feed's filters, all supported by `GET /insights`. */
@@ -151,6 +204,18 @@ export class InsightsService {
         if (opts.band) params['band'] = opts.band;
         if (opts.limit) params['limit'] = String(opts.limit);
         return this.http.get<InsightFeed>(apiUrl('/insights'), { params });
+    }
+
+    /** The templated Dashboard Brief of up to 5 Profiles (404 for a lone Profile that was never scanned). */
+    brief(profiles: string[], max?: number): Observable<{ profiles: BriefProfile[] }> {
+        const params: Record<string, string> = { profiles: profiles.join(',') };
+        if (max) params['max'] = String(max);
+        return this.http.get<{ profiles: BriefProfile[] }>(apiUrl('/insights/brief'), { params });
+    }
+
+    /** Narrate the Brief (needs AI Assist: 503 without it). The server builds the evidence; the body names only Profiles. */
+    narrate(profiles: string[], max?: number): Observable<BriefNarration> {
+        return this.http.post<BriefNarration>(apiUrl('/insights/brief/narrate'), max ? { profiles, max } : { profiles });
     }
 
     /** Replay UNSAVED Profile content over the last `periods` buckets (4-52). */
