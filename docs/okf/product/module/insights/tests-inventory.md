@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.insights`](../../../../../product-map/module/insights.toon).
 
-15 test class(es): 10 unit, 5 real-HTTP control-plane, 0 IT.
+16 test class(es): 10 unit, 6 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -31,6 +31,7 @@ mvn -o test -pl features/inspecto-insights -Dtest=BusinessAssurancePilotInsights
 | `ControlApiInsightBriefNarrateTest` | `com.gamma.insights` | real-HTTP control-plane test | `features/inspecto-insights/src/test/java/com/gamma/insights/ControlApiInsightBriefNarrateTest.java` | {@code POST /insights/brief/narrate} over real HTTP under an ARMED authenticator (BI-INSIGHTS-1 P4 BR-2). The module's |
 | `ControlApiInsightBriefTest` | `com.gamma.insights` | real-HTTP control-plane test | `features/inspecto-insights/src/test/java/com/gamma/insights/ControlApiInsightBriefTest.java` | {@code GET /insights/brief} over real HTTP under an ARMED authenticator (BI-INSIGHTS-1 P4 BR-0): 401, the Profile the |
 | `ControlApiInsightsTest` | `com.gamma.insights` | real-HTTP control-plane test | `features/inspecto-insights/src/test/java/com/gamma/insights/ControlApiInsightsTest.java` | The Insight feed, feedback and replay preview over real HTTP under an ARMED authenticator (BI-INSIGHTS-1 P3): the |
+| `InsightBriefPagesTest` | `com.gamma.insights` | real-HTTP control-plane test | `features/inspecto-insights/src/test/java/com/gamma/insights/InsightBriefPagesTest.java` | The Report Brief page of the real Business Insights module (BI-INSIGHTS-1 P4 BR-4): {@link InsightBriefPages} builds the |
 | `InsightBriefTest` | `com.gamma.insights` | unit | `features/inspecto-insights/src/test/java/com/gamma/insights/InsightBriefTest.java` | Golden selection of the Dashboard Brief (BI-INSIGHTS-1 P4 BR-0, plan §4.1): the rules, over hand-made stored rows. |
 | `InsightProfileValidatorTest` | `com.gamma.insights` | unit | `features/inspecto-insights/src/test/java/com/gamma/insights/InsightProfileValidatorTest.java` | The {@code insight-profile} save gates and the reserved {@code insights_} store prefix. |
 | `InsightsAbsentSurfaceParityTest` | `com.gamma.insights` | unit | `features/inspecto-insights/src/test/java/com/gamma/insights/InsightsAbsentSurfaceParityTest.java` | The module's {@code module.toon} {@code provides.routes} must list EXACTLY the routes {@link ExplainRoutes} and {@link InsightsRoutes} register — |

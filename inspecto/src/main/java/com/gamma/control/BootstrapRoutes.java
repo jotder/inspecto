@@ -231,6 +231,9 @@ final class BootstrapRoutes implements RouteModule {
         f.put("cases", on.contains("cases"));
         // MODULE-REORG-P7: true only when the optional inspecto-action-requests module registered /action-requests*.
         f.put("actionRequests", on.contains("actionRequests"));
+        // BI-INSIGHTS-1 P4 BR-3: AI Assist is installed (an agent registered on this Space's service). The Dashboard Brief shows its
+        // Narrate button on it; POST /insights/brief/narrate answers 503 without it. Derived from what registered, never an edition guess.
+        f.put("agent", HostContext.of(api).service().assistAgent().isPresent());
         // P2b: every other installed module's feature id, under its own key (a module added tomorrow needs no edit here).
         for (String id : new java.util.TreeSet<>(api.registeredFeatures())) f.putIfAbsent(id, on.contains(id));
         f.put("authMode", System.getProperty("auth.mode", "none"));

@@ -40,7 +40,10 @@ extension of the one host process - no LA server, no LA main class (§1).
 ![Link Analysis modules and read path](../../assets/link-analysis.svg)
 
 1. **Investigation = op log.** Each action (`POST /inv/investigations/{id}/ops`) is appended to a hash-sealed log
-   and folded deterministically into a **Working Set**; undo, reorder and replay re-fold the log (§3.1).
+   and folded deterministically into a **Working Set**; undo, reorder and replay re-fold the log (§3.1). One exception:
+   an `expand` that leaves the Working Set's entities, links and high-connectivity flags unchanged appends nothing and
+   answers `status: "no_op"` with an empty delta (`LA-FULL-CYCLE-RESIDUALS-1` item 3, `44f34c64d`); an approved four-eyes
+   request that turns out a no-op is still marked `approved`, with `step: 0`.
 2. **Reads** come from the Dataset (flat recursive CTE in sandboxed DuckDB) or, when `index.enabled` (default on)
    and a fresh index exists, from the link index; a fallback always carries a closed `Reason` (§4).
 3. **Link index**: versioned bucketed Parquet, `full | append | compact` builds via `POST /inv/index/builds` or the

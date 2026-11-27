@@ -93,6 +93,30 @@ class ConfigSpecsTest {
     }
 
     /**
+     * A draft without {@code dirs.poll} gets the rule's finding — never an NPE from {@code str} returning
+     * null for the missing key — and a dataset connector passes, under {@code collector:} or the
+     * pre-rename {@code source:} block, exactly as {@code PipelineConfigParser.isDatasetConnector} decides.
+     */
+    @Test
+    void pollIsRequiredUnlessTheConnectorIsADataset() {
+        ConfigSpec p = ConfigSpecs.pipeline();
+        String id = "poll-required-for-non-dataset";
+
+        assertTrue(fire(p, id, Map.of()).isPresent());
+        assertTrue(fire(p, id, Map.of("dirs", Map.of("database", "db"))).isPresent());
+        assertTrue(fire(p, id, Map.of("dirs", Map.of("poll", " "))).isPresent());
+        assertTrue(fire(p, id, Map.of("collector", Map.of("connector", "sftp"))).isPresent());
+        assertTrue(fire(p, id, Map.of("dirs", Map.of("poll", "in"))).isEmpty());
+
+        assertTrue(fire(p, id, Map.of("collector", Map.of("connector", "dataset"))).isEmpty());
+        assertTrue(fire(p, id, Map.of("collector", Map.of("connector", " Dataset "))).isEmpty());
+        assertTrue(fire(p, id, Map.of("source", Map.of("connector", "dataset"))).isEmpty());
+        // the collector: block wins over a pre-rename source: block, as in the parser
+        assertTrue(fire(p, id, Map.of("collector", Map.of("connector", "sftp"),
+                "source", Map.of("connector", "dataset"))).isPresent());
+    }
+
+    /**
      * The authoring-time half of the engine's fail-closed source-zone refusal. ⚠ Filed as a real gap:
      * the offline mock refused a bad zone on the pipeline write while NO Java route did, so the mock
      * was ahead of the server rather than mirroring it. This rule is what makes it true.

@@ -15,7 +15,8 @@ import java.util.Set;
  * Every Signal Type that can be posted (SIGNAL-BOARD-1 §11.2): the declarations of every {@link SignalTypeProvider}
  * plus the dotted {@code emits} of the Job Types a Job Pack brings, which are listed with "fields not declared". A
  * type declared by two providers is an error at assembly; a pack emit that a provider already declares keeps the
- * provider's declaration.
+ * provider's declaration. A family that declares no fields carries a payload chosen at run time (the Exchange's
+ * {@code exchange.*}: the keys an offer shares) and is likewise listed with "fields not declared".
  *
  * <p>{@link #STAMPED} keys are written by the framework onto the payload of any Signal and are never a type's own field.
  */
@@ -26,7 +27,8 @@ public final class SignalTypeCatalog {
     public static final Set<String> STAMPED = Set.of("chainDepth");
 
     /** One catalogued type: its declaration, where it comes from ({@code core}, {@code module:<id>},
-     *  {@code pack:<file>}), and whether its fields are declared (false for a pack's emit). */
+     *  {@code pack:<file>}), and whether its fields are declared (false for a pack's emit, or for a family that
+     *  declares no fields). */
     public record Entry(SignalTypeDecl decl, String source, boolean fieldsDeclared) {
         /** JSON view for {@code GET /signals/types}. */
         public Map<String, Object> toMap() {
@@ -59,7 +61,7 @@ public final class SignalTypeCatalog {
         Map<String, Entry> m = new LinkedHashMap<>();
         for (SignalTypeProvider p : providers) {
             for (SignalTypeDecl d : p.signalTypes()) {
-                Entry prior = m.putIfAbsent(d.type(), new Entry(d, p.source(), true));
+                Entry prior = m.putIfAbsent(d.type(), new Entry(d, p.source(), !(d.family() && d.fields().isEmpty())));
                 if (prior != null)
                     throw new IllegalStateException("Signal type '" + d.type() + "' is declared by both "
                             + prior.source() + " and " + p.source());
@@ -94,7 +96,7 @@ public final class SignalTypeCatalog {
     /**
      * What is wrong with posting {@code signalType} with {@code payload}: the type is not catalogued, a payload key is
      * not declared, or an {@code always} field is missing. Empty when the posting fits. A type whose fields are not
-     * declared (a pack's emit) is checked for its name only.
+     * declared (a pack's emit, or a family declaring no fields) is checked for its name only.
      */
     public List<String> problems(String signalType, Map<String, ?> payload) {
         Optional<Entry> found = find(signalType);

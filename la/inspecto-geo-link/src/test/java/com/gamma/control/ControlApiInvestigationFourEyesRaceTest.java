@@ -42,9 +42,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class ControlApiInvestigationFourEyesRaceTest {
 
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static final String A = "27820000001", B = "27820000002", C = "27820000003", D = "27820000004";
+    private static final String A = "27820000001", B = "27820000002", C = "27820000003", D = "27820000004", E = "27820000005";
+    /** A chain, so each of the four approved expands adds one entity: an expand that adds nothing appends no step (no_op). */
     private static final String ROWS = String.join(",", "('" + A + "','" + B + "','voice')",
-            "('" + A + "','" + C + "','sms')", "('" + B + "','" + D + "','voice')");
+            "('" + B + "','" + C + "','sms')", "('" + C + "','" + D + "','voice')", "('" + D + "','" + E + "','voice')");
     private static final String CREATE = "{\"id\":\"case-a\",\"purpose\":\"Fraud referral FR-7\","
             + "\"dataset\":\"calls_ds\",\"sourceCol\":\"caller\",\"targetCol\":\"callee\",\"linkKindCol\":\"channel\"}";
     private static final String OPS = "/inv/investigations/case-a/ops";
