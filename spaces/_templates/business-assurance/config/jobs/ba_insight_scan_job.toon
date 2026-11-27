@@ -1,0 +1,6 @@
+job:
+  name: ba_insight_scan
+  type: insight.scan
+  profile: ba_margin_revenue
+  cron: "0 6 * * *"
+  enabled: false
