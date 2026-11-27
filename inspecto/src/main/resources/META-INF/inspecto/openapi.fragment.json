@@ -9707,7 +9707,7 @@
         "tags" : [ "pipelines" ],
         "summary" : "Validate a Pipeline graph draft without saving",
         "operationId" : "postPipelinesByPipelineIdGraphValidate",
-        "description" : "Runs the checks a graph save runs, writing nothing: the structural Pipeline validator (component use: bindings checked against the registry when a write root exists), join references, then lowering onto the existing *_pipeline.toon and the shared save gate. The path name wins over any name in the body. valid is false on any ERROR finding or lowering refusal. No capability gate (read-shaped: validates a draft, writes nothing). 400 for a malformed graph.",
+        "description" : "Runs the checks a graph save runs, writing nothing: the structural Pipeline validator (component use: bindings checked against the registry when a write root exists), join references (also only with a write root), then lowering onto the existing *_pipeline.toon and the shared save gate. The path name wins over any name in the body. valid is false on any ERROR finding or lowering refusal. No capability gate (read-shaped: validates a draft, writes nothing). 400 for a malformed graph.",
         "parameters" : [ {
           "name" : "pipelineId",
           "in" : "path",
@@ -9752,16 +9752,21 @@
                               "properties" : {
                                 "severity" : {
                                   "type" : "string",
-                                  "enum" : [ "ERROR", "WARNING", "INFO" ]
+                                  "enum" : [ "ERROR", "WARNING" ]
                                 },
                                 "code" : {
                                   "type" : "string"
                                 },
-                                "field" : {
-                                  "type" : "string"
+                                "fieldPath" : {
+                                  "type" : "string",
+                                  "description" : "Save-gate findings only: the dotted config path the finding anchors to (may be blank)."
                                 },
                                 "message" : {
                                   "type" : "string"
+                                },
+                                "guidance" : {
+                                  "type" : "string",
+                                  "description" : "Save-gate findings only: what to do about it, when known."
                                 }
                               }
                             }
@@ -9804,7 +9809,7 @@
         "tags" : [ "pipelines" ],
         "summary" : "Split a Pipeline's steps into a Job Pipeline",
         "operationId" : "postPipelinesByPipelineIdSplitJobPipeline",
-        "description" : "Moves the steps:, output_store:, webhook:, excel: and processing join/dedup/summarize/profile chain out of an onboarding Pipeline into its own inactive Job Pipeline <configRoot>/<outputStore>/<outputStore>_pipeline.toon, which reads the onboarding Pipeline's Dataset, and writes a type: pipeline Job <outputStore>_job that runs it on_pipeline of the onboarding Pipeline. preview: true returns the three files and writes nothing. Each Pipeline file passes the save gate before anything is written; the three writes are one act, so it is refused (never held) under an approval policy for pipeline or job. Gated on canAuthorWorkbench. 503 when read-only; 404 for an unknown Pipeline; 422 when it is already a Job Pipeline, has no output_store or no chain to split, or a file has ERROR findings.",
+        "description" : "Moves the steps:, webhook: and excel: chain of an onboarding Pipeline into its own inactive Job Pipeline <configRoot>/<outputStore>/<outputStore>_pipeline.toon, which reads the onboarding Pipeline's Dataset and writes output_store <outputStore>. The onboarding Pipeline loses output_store:, steps:, webhook:, excel: and its processing join/dedup/summarize/profile blocks; those processing blocks are not carried into the Job Pipeline. It also writes a type: pipeline Job <outputStore>_job that runs it on_pipeline of the onboarding Pipeline. preview: true returns the three files and writes nothing. Each Pipeline file passes the save gate before anything is written; the three writes are one act, so it is refused (never held) with 409 under an approval policy for pipeline or job. Gated on canAuthorWorkbench. 503 when read-only; 404 for an unknown Pipeline; 409 under an approval policy; 422 when it is already a Job Pipeline, has no output_store or no chain to split, or a file has ERROR findings.",
         "parameters" : [ {
           "name" : "pipelineId",
           "in" : "path",
@@ -9917,6 +9922,9 @@
           },
           "404" : {
             "$ref" : "#/components/responses/NotFound"
+          },
+          "409" : {
+            "$ref" : "#/components/responses/Conflict"
           },
           "422" : {
             "$ref" : "#/components/responses/ValidationFailed"
@@ -10062,7 +10070,7 @@
         "tags" : [ "jobs" ],
         "summary" : "Day backlog of every by-day Job",
         "operationId" : "getJobsBacklog",
-        "description" : "One row per Job scheduled by_day: its input Dataset, whether its backlog is paused, counts of ready, waiting, running and stale days, the oldest waiting age, an estimated drain time, and each pending day. Reconciles each Job's pending days first but submits nothing. No capability gate. 404 when the Space has no Job service.",
+        "description" : "One row per Job scheduled by_day: its input Dataset, whether its backlog is paused, counts of ready, waiting, running and stale days, the oldest waiting age, an estimated drain time, and each pending day. Reconciles each Job's pending days first and submits nothing, but that reconcile records day progress (WAITING, or SKIPPED/FAILED past a deadline) and can emit a deadline alert event. No capability gate. 404 when the Space has no Job service.",
         "responses" : {
           "200" : {
             "description" : "The backlog.",
@@ -10172,7 +10180,7 @@
         "tags" : [ "jobs" ],
         "summary" : "Submit a by-day Job's ready days now",
         "operationId" : "postJobsByJobIdBacklogDrain",
-        "description" : "Reconciles the named by_day Job now and submits its ready days up to max_parallel; ?force=true also ignores the quiet period. submitted is 0 for an unknown or non-by_day Job and when no output store exists. Gated on canOperateRuns. 404 when the Space has no Job service.",
+        "description" : "Reconciles the named by_day Job now and submits its ready days up to max_parallel; ?force=true also ignores the quiet period. submitted is 0 for an unknown or non-by_day Job, a Job whose backlog is paused, and when no output store exists. Gated on canOperateRuns. 404 when the Space has no Job service.",
         "parameters" : [ {
           "name" : "jobId",
           "in" : "path",
