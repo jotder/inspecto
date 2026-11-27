@@ -43,3 +43,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
 | `IDEMPOTENCY-AGENT-REPLAY-1` | P2 | defect | An Idempotency-Key replay is answered before the handler (ControlApi), so the masked-answer stamp check never sees it, and the cache key'… | — |
 | `OPENAPI-ASN1-ROUTES-1` | P2 | defect | Eleven live routes have no operation in docs/api/openapi-v1.json, so OpenApiPathsContractTest is red on master: | — |
+| `TEST-GUARD-TIGHTENING-1` | P3 | chore | Four small guard and test follow-ups the 2026-11-27 lanes raised and left: | demand |
