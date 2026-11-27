@@ -13,7 +13,7 @@
  *      `emit("<type>", Severity.X, ...)` or `emitSignal("<type>", ...)` is declared by a provider: named in a provider
  *      file as a literal, or as a `Class.CONSTANT` whose value is that literal. A `prefix.*` family covers
  *      `prefix.<anything>`.
- *   2. Each PENDING entry (a module literal SB-1b has yet to declare) still occurs in its file and is still undeclared:
+ *   2. Each PENDING entry (a literal not declared yet) still occurs in its file and is still undeclared:
  *      a stale entry is a silent exemption.
  *
  * Usage: node tools/check-signal-types.mjs [--root <dir>]   (--root is for tools/check-signal-types.test.mjs).
@@ -24,8 +24,8 @@ import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-/** Module literals not yet declared: type -> { file, why }. SB-1b declares them in each module's provider and empties
- *  this list. Empty at SB-1a: no module posts a literal type today (they post through their *Signals constants). */
+/** Literals allowed although no provider declares them yet: type -> { file, why }. Keep it empty: every module declares
+ *  its own types in its provider (SIGNAL-BOARD-1 SB-1b); an entry is a temporary, reasoned exemption. */
 export const PENDING = {};
 
 const DOTTED = /^[a-z0-9][a-z0-9_-]*(\.[a-z0-9][a-z0-9_-]*)+$/;
@@ -104,5 +104,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
         for (const p of problems) console.error(`✗ signal-type guard: ${p}`);
         process.exit(1);
     }
-    console.log(`✓ signal-type guard: every literal Signal type in main code is declared by a provider (${Object.keys(PENDING).length} pending SB-1b)`);
+    console.log(`✓ signal-type guard: every literal Signal type in main code is declared by a provider (${Object.keys(PENDING).length} pending)`);
 }

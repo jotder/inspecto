@@ -1,5 +1,8 @@
 package com.gamma.insights;
 
+import com.gamma.pipeline.ComponentStore;
+
+import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -70,6 +73,31 @@ final class InsightBrief {
         if (stale) out.put("note", "Last scan was " + days + " days ago");
         if (lines.isEmpty()) out.put("summary", "Nothing unusual in " + period);
         return out;
+    }
+
+    /**
+     * The Brief of {@code profile} from its stored Insights in {@code dir} (null before a first run), as of now: the one
+     * place that reads the rows and the Profile's grain, shared by {@code GET /insights/brief}, the narration route and the
+     * Report Brief page. The caller has already checked who may view the Profile.
+     */
+    static Map<String, Object> fromStore(Path writeRoot, Path dir, String profile, int max) throws Exception {
+        List<Map<String, Object>> rows = List.of();
+        Map<String, Map<String, Object>> fb = Map.of();
+        if (dir != null) synchronized (InsightStore.lock(dir)) {
+            rows = InsightStore.read(dir);
+            fb = InsightStore.feedback(dir);
+        }
+        return select(profile, grainOf(writeRoot, profile), rows, fb, max, Instant.now());
+    }
+
+    /** The Profile's grain (what "stale" is measured in); {@code day} when the Profile no longer resolves. */
+    private static String grainOf(Path writeRoot, String profile) {
+        try {
+            return new ComponentStore(writeRoot.resolve("registry"))
+                    .get(InsightProfile.KIND, profile).map(c -> String.valueOf(c.content().get("grain"))).orElse("day");
+        } catch (RuntimeException e) {
+            return "day";
+        }
     }
 
     private static Duration twoGrains(String grain) {

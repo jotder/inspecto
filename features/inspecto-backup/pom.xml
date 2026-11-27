@@ -12,6 +12,11 @@
     </parent>
 
     <artifactId>inspecto-backup</artifactId>
+
+    <properties>
+        <!-- SIGNAL-BOARD-1 SB-1b: every Signal a test posts must fit the Signal Type catalog (SignalPostCheck). -->
+        <signals.checkFields>true</signals.checkFields>
+    </properties>
     <packaging>jar</packaging>
 
     <name>Inspecto — backup / restore maintenance tasks (Standard edition, optional)</name>

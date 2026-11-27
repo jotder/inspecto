@@ -7,6 +7,6 @@ absentMessage: "Business Insights is not installed in this bundle - it is provid
 provides:
   features[1]: insights
   configKinds[1]: insight-profile
-  contracts[2]: JobTypeProvider,ComponentKindValidator
+  contracts[3]: JobTypeProvider,ComponentKindValidator,BriefPageProvider
   jobTypes[1]: insight.scan
   routes[6]: "POST /insights/explain","GET /insights","GET /insights/brief","POST /insights/brief/narrate","POST /insights/preview","POST /insights/([^/]+)/([^/]+)/feedback"

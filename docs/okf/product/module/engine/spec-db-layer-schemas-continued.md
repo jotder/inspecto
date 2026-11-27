@@ -163,11 +163,11 @@ declaration, and neither ever guesses which column is temporal:
 Enrichment writes and every row predating these columns still read back `NULL`.
 
 **`record_day` is derived from those bounds where it can be** (addressing step 10) — from the file's real event
-times when `min` and `max` share a day, else from the `year`/`month`/`day` partition segments as before. Bounds
+times when `min` and `max` share a day, else from the `year`/`month`/`day` partition segments, or one strict
+`yyyy-MM-dd` `ref_day=` / `dt=` / `record_day=` segment (`DATED-REFERENCE-RUNS-1`). Bounds
 win when the two disagree, since a partition value may have been cut in another timezone or off another column.
 ⚠ **Read `bounds`, not `record_day`**: one day per file cannot express a file that straddles two, which is what
-an interval is for. Nothing in the engine reads the column today; it survives because it is in the schema and
-cheap.
+an interval is for. The column's one reader is the `DATED-REFERENCE-RUNS-1` work ledger, which buckets files by day.
 
 **The per-day read over these columns is `DbConsignmentOutputStore.dailyVolume`** — files + rows per
 (pipeline, record-day), the completeness KPI's K1, shipped `31e00005`. ⚠ It has **no production caller**:
@@ -234,7 +234,8 @@ separate the derived summary tier (`<dataDir>/_summaries/<target>/record_day=…
 
 `row_count` is never a field copy — `PartitionWriter.reveal()` supplies only `(partition, outputFile, bytes)`,
 because a partitioned `COPY` reports no per-file count back. **`record_day` is currently derived from the
-partition key's `year`/`month`/`day` segments and is `null` for any other scheme** — a write-time approximation
+partition key's `year`/`month`/`day` segments or one ISO `ref_day=` / `dt=` / `record_day=` segment, and is `null`
+for any other scheme** — a write-time approximation
 that plan §10.1's pinned-timezone event-time-at-load must replace, not fall back to. ✅ `run_id` **is no
 longer null** (2026-09-13): every production path now carries a Run identity distinct from its unit of
 work — see §3.9's *"How a Run id gets here"*.

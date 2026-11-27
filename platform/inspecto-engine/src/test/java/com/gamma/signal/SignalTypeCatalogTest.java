@@ -66,6 +66,17 @@ class SignalTypeCatalogTest {
     }
 
     @Test
+    void aFamilyWithNoFieldsCarriesARunTimePayloadAndIsCheckedOnItsNameOnly() {
+        SignalTypeCatalog c = SignalTypeCatalog.assemble(List.of(provider("module:exchange", decl("exchange.*"),
+                decl("exchange.signal.delivered", SignalField.always("grant", Kind.STRING, "")))), List.of());
+        SignalTypeCatalog.Entry family = c.find("exchange.acme.fraud.alert").orElseThrow();
+        assertFalse(family.fieldsDeclared());
+        assertEquals(List.of(), c.problems("exchange.acme.fraud.alert", Map.of("msisdn", "x")));
+        assertTrue(c.find("exchange.signal.delivered").orElseThrow().fieldsDeclared(), "an exact type keeps its fields");
+        assertFalse(c.problems("exchange.signal.delivered", Map.of("other", 1)).isEmpty());
+    }
+
+    @Test
     void aPackEmitIsListedWithoutFieldsAndNeverOverridesAProvider() {
         SignalTypeCatalog c = SignalTypeCatalog.assemble(List.of(provider("core", decl("a.b"))), List.of(
                 new SignalTypeCatalog.PackEmit("acme.jar", "acme.detect", "acme.detected"),

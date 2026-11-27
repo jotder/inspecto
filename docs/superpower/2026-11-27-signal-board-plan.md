@@ -1,7 +1,7 @@
 # Signal Board — one clear meaning for Signal, and a board Jobs can trust (`SIGNAL-BOARD-1`)
 
 Status: **APPROVED 2026-11-27 — D-SB1…D-SB5 all DECIDED (operator, 2026-11-27); SB-0 done 2026-11-27 (results §10;
-the live stop test is still owed); the D-SB5 age limit is 24 hours; SB-1 designed (§11); SB-1a built 2026-11-27 (§11.6), SB-1b and SB-1c open.** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
+the live stop test is still owed); the D-SB5 age limit is 24 hours; SB-1 designed (§11); SB-1a built 2026-11-27 (§11.6), SB-1b built 2026-11-27 (§11.7), SB-1c open.** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
 Builds on the shipped Signal Backbone ([spec-signal-backbone](../okf/product/module/event/spec-signal-backbone.md));
 it replaces none of it. SB-2 lands inside the link graph of `SPACE-COHERENCE-1`
 ([plan](2026-11-27-space-coherence-plan.md)).
@@ -321,3 +321,29 @@ SB-1b without failing module tests.
 - **Board row text** (`docs/BACKLOG.md`): "SB-1a built 2026-11-27: the Signal Type catalog (`com.gamma.signal`), 52 core
   types with fields, `GET /signals/types`, the post-time check on in engine and processor tests, the name guard. Next:
   SB-1b (module providers, then the check on per module), SB-1c (Job form pick list); D-SB8 open."
+
+### 11.7 SB-1b as built (2026-11-27, lane off `origin/master` `6b1c0a0cd`)
+
+- **Eight module providers**, each beside its constants class and listed in the module's
+  `META-INF/services/com.gamma.signal.SignalTypeProvider`, fields read from each posting site:
+  `AgentSignalTypes` (7 `agent.*` types posted by `EventLogAuditSink`; §11.1 said 10, but `inspecto-intelligence` only
+  reads Signals), `BackupSignalTypes` (3), `CaseSignalTypes` (1), `ExchangeSignalTypes` (`exchange.*` plus
+  `exchange.signal.delivered|undeliverable`), `InsightSignalTypes` (`insight.scan.completed`, `insight.found`; insights
+  was missing from §11.4's list), `OpsSignalTypes` (1, two payload shapes), `ReconSignalTypes` (1),
+  `ScreeningSignalTypes` (1). `inspecto-geo-link` and `inspecto-intelligence` post nothing.
+- **Score types stay in core** (§11.5): `CollectorService` matches all three to release deferred Alert Rules, so they are
+  a core contract; `ScoringSignals` / `AnomalySignals` keep referencing the `SignalType` constants.
+- **Core change**: a family that declares no fields (`exchange.*`, whose payload is whatever keys the offer shares) is
+  listed with `fieldsDeclared: false` and checked on its name only. The rule is generic; core names no module type.
+- **Check on** (`signals.checkFields=true` in the pom) for the eleven modules that post: agent, anomaly, backup,
+  case-management, exchange, insights, ops, predictive, reconciliation, scoring, screening. All eleven get
+  `SignalPostCheckExtension` through the engine test-jar; exchange gained that test dependency here, because its
+  forwarder posts from inside an EventLog tap, which swallows every `Throwable` (the verification pass showed 22
+  misfits printed and the build green without it).
+- **Not seen by any test yet** (fields read from the code, but no test posts them to a ledger, so the check cannot
+  catch them drifting): `maintenance.backup.completed`, `maintenance.backup.verify_failed`, `insight.found`.
+  `agent.model.called` and `agent.human.decided` gained a test in `EventLogAuditSinkTest`.
+- **Guard**: `PENDING` stays empty and its wording no longer names SB-1b.
+- **Board row text**: "SB-1b built 2026-11-27: a Signal Type provider in each posting module (agent, backup,
+  case-management, exchange, insights, ops, reconciliation, screening), the check on in the eleven posting modules'
+  tests. Next: SB-1c (Job form pick list); D-SB8 open."
