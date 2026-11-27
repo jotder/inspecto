@@ -1,6 +1,6 @@
 # Space coherence — one graph behind every edit, strict for agents first (`SPACE-COHERENCE-1`)
 
-Status: **DRAFT 2026-11-27, nothing built, no decision signed.** Owner: this shift. Items: `module.config`, `module.engine`,
+Status: **APPROVED 2026-11-27 — D-CO1…D-CO6 all DECIDED (operator, 2026-11-27); nothing built; next is SC-0.** Owner: this shift. Items: `module.config`, `module.engine`,
 `module.mcp`, `layer.product`. Builds on `SPACE-LINK-CENSUS-1` and `SPACE-EVOLUTION-1`
 ([anatomy §12](../okf/product/module/config/architecture-space-anatomy.md),
 [plan-space-evolution](../okf/product/module/config/plan-space-evolution.md)); it replaces neither.
@@ -123,16 +123,16 @@ SC-1 and SC-2 are the hardening that agents need; SC-3 and SC-4 can wait for dem
   read, so it ships reader-first (evolution rule 2).
 - **Open rows it absorbs:** scope (a)–(d) of `SPACE-LINK-CENSUS-1`; it leaves the D-LC3 flip for people untouched.
 
-## 7. Decisions for the operator
+## 7. Decisions (all signed, operator, 2026-11-27)
 
-| # | Decision | Recommendation |
+| # | Decision | Decided |
 |---|---|---|
-| D-CO1 | Agents strict before people (H2)? | Yes: an agent retries from a refusal at no cost; a person keeps the warning until D-LC3 |
-| D-CO2 | "No preview, no write" for agents (H3)? | Yes, with SC-2 |
-| D-CO3 | An exact duplicate from an agent: refuse or warn (H4)? | Refuse, naming the existing component |
-| D-CO4 | How long does a retired name resolve (S1)? | Until its last referrer is rewritten, reported from day one |
-| D-CO5 | Inherit columns and dirs (S2)? | Opt-in per Space; never rewrite existing files |
-| D-CO6 | A ceiling on an agent's unused components (A4)? | Report first; decide on a ceiling after one release of numbers |
+| **D-CO1** ✅ | Agents strict before people (H2)? | **Agents strict now**, in every Space: an agent retries from a refusal at no cost; a person keeps the warning until D-LC3 |
+| **D-CO2** ✅ | "No preview, no write" for agents (H3)? | **Required**, with SC-2 |
+| **D-CO3** ✅ | An exact duplicate from an agent: refuse or warn (H4)? | **Refuse**, naming the existing component; a person gets a warning |
+| **D-CO4** ✅ | How long does a retired name resolve (S1)? | **Until its last referrer is rewritten**, reported from day one |
+| **D-CO5** ✅ | Inherit columns and dirs (S2)? | **Opt-in per Space**; never rewrite existing files; reader-first |
+| **D-CO6** ✅ | A ceiling on an agent's unused components (A4)? | **Report first**; the ceiling is decided after one release of numbers |
 
 ## 8. Not verified
 
@@ -142,5 +142,4 @@ and query ledgers hold enough to date a last read (A2). SC-0 answers each before
 
 ## 9. Board rows
 
-Not filed. On approval: one row `SPACE-COHERENCE-1` [items: module.config, module.engine, module.mcp · kind: feature],
-and this plan's row in `docs/INDEX.md`.
+Filed 2026-11-27: `SPACE-COHERENCE-1` on `docs/BACKLOG.md` (P2, §3.7); this plan's row is in `docs/INDEX.md`.

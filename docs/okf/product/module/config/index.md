@@ -38,6 +38,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `UPLOAD-DEFAULTS-1` | P3 | defect | upload defaults, remainder: | — |
 | `SPACE-CREATE-NAME-1` | P3 | defect | creating a Space ignores name and displayName: | — |
 | `TEMPLATE-GOVERNANCE-1` | P3 | feature | a Space Template carries no governance: | — |
+| `SPACE-COHERENCE-1` | P2 | feature | Space config at agent speed: one link graph behind every edit, agents strict first. | — |
 | — | P2 | feature | SPACE-LINK-CENSUS-1 the link census: the default flip and the plan scope not built | — |
 | — | P3 | defect | COMPONENT-DELETE-IN-USE-WORDS-1 the Components screen words every refused delete as "referenced by a pipeline" | — |
 | — | P3 | feature | SPACE-EVOLUTION-1 the release-gated rest of the Space evolution | operator |
