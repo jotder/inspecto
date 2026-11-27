@@ -436,9 +436,9 @@ export class WidgetHostComponent {
     );
 
     /** BI-INSIGHTS-1 P2: the explain request for this Widget's last period, when the add-on is installed, the user may
-     *  author, and the Widget is a Measure over a grained date on a Dataset; null hides the action. */
+     *  view it (operator 2026-11-26), and the Widget is a Measure over a grained date on a Dataset; null hides the action. */
     readonly explainable = computed<ExplainRequest | null>(() => {
-        if (!this.session.features()['insights'] || !this.lens.canAuthorWorkbench()) return null;
+        if (!this.session.features()['insights']) return null;
         const plugin = this.plugin();
         const widget = this.resolvedWidget();
         const dataset = this.resolvedDataset();

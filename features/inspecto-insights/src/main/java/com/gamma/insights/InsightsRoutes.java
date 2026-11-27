@@ -49,8 +49,8 @@ public final class InsightsRoutes implements RouteModule {
         api.get("/insights", (e, m) -> feed(api, e));
         api.post("/insights/preview", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> preview(api, e, api.body(e))));
-        api.post("/insights/([^/]+)/([^/]+)/feedback", ApiContext.withCapability("canAuthorWorkbench",
-                (e, m) -> feedback(api, e, m.group(1), m.group(2), api.body(e))));
+        // Anyone who may view insights_<profile> (operator 2026-11-26): the caller's own opinion, a self-service write.
+        api.post("/insights/([^/]+)/([^/]+)/feedback", (e, m) -> feedback(api, e, m.group(1), m.group(2), api.body(e)));
     }
 
     private static ApiException bad(String msg) {

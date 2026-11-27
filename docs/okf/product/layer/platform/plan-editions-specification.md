@@ -59,7 +59,7 @@ Both pages also cite the parent build file at two line numbers for the profile i
 comments, and the identifiers moved when the gating modules were inserted. **Cite the identifier, not the
 line** — the same lesson the compliance area recorded about its own citations.
 
-### 3.3 Optional modules and staged jars — 25<!--count:optional-modules--> modules, 32<!--count:advanced-first-party-jars--> first-party jars (+ the postgresql sidecar)
+### 3.3 Optional modules and staged jars — 24<!--count:optional-modules--> modules, 32<!--count:advanced-first-party-jars--> first-party jars (+ the postgresql sidecar)
 
 | Edition | Optional modules compiled | Jars staged into the bundle |
 |---|---|---|

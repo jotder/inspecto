@@ -246,9 +246,9 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                                                         (keydown.enter)="
                                                             listTrigger.activeOption
                                                                 ? $event.preventDefault()
-                                                                : addListItem(spec, $event)
+                                                                : addListItem(spec, $event, listInput)
                                                         "
-                                                        (blur)="listTrigger.panelOpen || addListItem(spec)"
+                                                        (blur)="listTrigger.panelOpen || addListItem(spec, undefined, listInput)"
                                                     />
                                                     <mat-autocomplete
                                                         #listAc="matAutocomplete"
@@ -267,7 +267,7 @@ export type AttributeOptionLoader = (value: Record<string, unknown>) => Attribut
                                                         type="button"
                                                         [attr.aria-label]="'Add entry to ' + spec.label"
                                                         [disabled]="!listDraft(spec.key).trim()"
-                                                        (click)="addListItem(spec)"
+                                                        (click)="addListItem(spec, undefined, listInput)"
                                                     >
                                                         <mat-icon svgIcon="heroicons_outline:plus" />
                                                     </button>
@@ -871,15 +871,18 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
      * Commit the draft as a new entry. Called from Enter, the + button and blur — blur included so a
      * typed-but-uncommitted value isn't silently lost when the user goes straight for Save.
      * Duplicates and blanks are ignored; `event.preventDefault()` stops Enter from submitting the form
-     * (the sr-only submit button above would otherwise fire).
+     * (the sr-only submit button above would otherwise fire). The `input` is emptied directly: in the
+     * zoneless app an Enter that lands before the scheduled render leaves the `[value]` binding at "",
+     * so clearing the draft alone writes nothing and the next entry appends (INSIGHT-PROFILE-LIST-INPUT-1).
      */
-    addListItem(spec: AttributeSpec, event?: Event): void {
+    addListItem(spec: AttributeSpec, event?: Event, input?: HTMLInputElement): void {
         event?.preventDefault();
         const text = this.listDraft(spec.key).trim();
         if (!text) return;
         const current = this.listValue(spec.key);
         if (!current.includes(text)) this.writeList(spec.key, [...current, text]);
         this.setListDraft(spec.key, '');
+        if (input) input.value = '';
     }
 
     /** A `list` field's loaded suggestions, filtered by the draft and without entries already committed. */
@@ -902,7 +905,7 @@ export class InspectoSchemaFormComponent implements AfterViewInit, OnDestroy {
 
     /** The panel closed with focus gone elsewhere (Tab away) — the blur-commit it deferred happens now. */
     commitListDraftIfLeft(spec: AttributeSpec, input: HTMLInputElement): void {
-        if (input.ownerDocument.activeElement !== input) this.addListItem(spec);
+        if (input.ownerDocument.activeElement !== input) this.addListItem(spec, undefined, input);
     }
 
     /**
