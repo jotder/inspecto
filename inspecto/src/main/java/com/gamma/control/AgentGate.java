@@ -207,7 +207,9 @@ final class AgentGate {
      * Writes an agent may make that change nothing governed: the MCP endpoint itself, validation and dry runs, the Ship
      * reads, taking back its own proposal, an Action Request (held for approval by its own design), {@code POST /db/query}
      * (the read the AK-1 {@code query_dataset} tool replays; SqlGuard and masking run as for the person) and a Pipeline
-     * run (D-AK2: a delegated person only — {@link #PERSON_ONLY}); the Link Analysis queries ({@link #LA_READS}, AK-2f);
+     * run ({@code POST /pipelines/authored/{id}/trigger}, a real run that lands data, gated {@code canOperateRuns};
+     * D-AK2: a delegated person only — {@link #PERSON_ONLY}; RUN-PIPELINE-NOW-SCRATCH-1: never the editor's scratch
+     * {@code …/run}); the Link Analysis queries ({@link #LA_READS}, AK-2f);
      * the authoring previews ({@link #AUTHORING_PREVIEWS}, W6 group A); the analyst previews ({@link #ANALYST_PREVIEWS},
      * W6 group E: score previews and the screening check, masked, weighted data routes); and the Space tests ({@code POST /tests/run}, W6
      * group C, D-AK10: a delegated person only, as a run): each case runs its Pipeline over the case folder's own files
@@ -254,7 +256,7 @@ final class AgentGate {
                 "POST /pending-actions/([^/]+)/withdraw",
                 "POST /action-requests",
                 "POST /db/query",
-                "POST /pipelines/authored/([^/]+)/run",
+                "POST /pipelines/authored/([^/]+)/trigger",
                 "POST /tests/run"));
         all.addAll(LA_READS);
         all.addAll(AUTHORING_PREVIEWS);
@@ -399,7 +401,7 @@ final class AgentGate {
 
     /** {@link #ALLOWED} routes a machine agent may not call (D-AK2: never a run for a machine; D-AK10: nor the Space tests;
      *  D-AK22: nor the enrichment preview, whose answer is raw). */
-    static final Set<String> PERSON_ONLY = Set.of("POST /pipelines/authored/([^/]+)/run", "POST /tests/run",
+    static final Set<String> PERSON_ONLY = Set.of("POST /pipelines/authored/([^/]+)/trigger", "POST /tests/run",
             "POST /enrichment/preview");
 
     /** Named never-list routes the capability and suffix rules of {@link #never} do not already cover. */

@@ -97,7 +97,7 @@ class AgentGateParityTest {
         // preview (a read behind canAdminister), a run (D-AK2, a person only) and the Space tests (W6 group C, D-AK10,
         // a person only), the simulators (W6 group B: a Decision Rule or Rule Template simulated, canAuthorWorkbench) and
         // the two score previews (W6 group E: reads behind canWorkIncidents, masked data routes)
-        assertEquals(Set.of("POST /action-requests", "POST /promotion/preview", "POST /pipelines/authored/([^/]+)/run",
+        assertEquals(Set.of("POST /action-requests", "POST /promotion/preview", "POST /pipelines/authored/([^/]+)/trigger",
                         "POST /tests/run", "POST /decision-rules/([^/]+)/simulate", "POST /rule-templates/([^/]+)/simulate",
                         "POST /enrichment/preview", "POST /risk-scores/preview", "POST /anomaly-scores/preview",
                         "POST /lookups/test"),   // AGENT-LOOKUP-PREVIEW-1: a masked data route behind canAuthorWorkbench
@@ -105,8 +105,10 @@ class AgentGateParityTest {
         assertEquals(Roles.CAN_AUTHOR_WORKBENCH, m.get(AgentGate.LOOKUP_TEST), "the lookup test keeps the route's own gate");
         for (String sim : AgentGate.SIMULATORS.keySet())
             assertEquals(Roles.CAN_AUTHOR_WORKBENCH, m.get(sim), sim + " keeps the route's own gate");
-        assertEquals(Set.of("POST /pipelines/authored/([^/]+)/run", "POST /tests/run", "POST /enrichment/preview"),
+        assertEquals(Set.of("POST /pipelines/authored/([^/]+)/trigger", "POST /tests/run", "POST /enrichment/preview"),
                 AgentGate.PERSON_ONLY);
+        assertEquals(Roles.CAN_OPERATE_RUNS, m.get("POST /pipelines/authored/([^/]+)/trigger"),
+                "a Pipeline run keeps the route's own gate (RUN-PIPELINE-NOW-SCRATCH-1)");
         assertEquals(Roles.CAN_AUTHOR_WORKBENCH, m.get("POST /tests/run"), "the Space tests keep the route's own gate");
         for (String p : java.util.List.of("POST /risk-scores/preview", "POST /anomaly-scores/preview"))
             assertEquals(Roles.CAN_WORK_INCIDENTS, m.get(p), p + " keeps the route's own gate");

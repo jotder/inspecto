@@ -506,11 +506,12 @@ final class McpTools {
                     List.of(body("The promotion request, as POST /promotion/preview takes it.", true)),
                     a -> new Call("POST", "/promotion/preview", bodyOf(a))),
             new Tool("run_pipeline_now", "Run a Pipeline now",
-                    "Run a Pipeline once, now (D-AK2: a delegated person within their own rights, never a machine). Dry-run "
-                            + "it first. Needs canAuthorWorkbench.",
-                    List.of(id("pipeline", "The Pipeline id."),
-                            body("The run request, as POST /pipelines/authored/{id}/run takes it.", false)),
-                    a -> new Call("POST", "/pipelines/authored/" + seg(a.get("pipeline")) + "/run", bodyOf(a)), true),
+                    "Run a Pipeline once, now, for real: it lands data. Answers the Job Run id (read it with get_run). "
+                            + "D-AK2: a delegated person within their own rights, never a machine. Dry-run it first. Needs "
+                            + "canOperateRuns.",
+                    List.of(id("pipeline", "The Pipeline id.")),
+                    a -> new Call("POST", "/pipelines/authored/" + seg(a.get("pipeline")) + "/trigger", McpRoutes.jsonBytes(Map.of())),
+                    true),
             new Tool("run_space_tests", "Run the Space tests",
                     "Run this Space's test cases (the folders under tests/, each a Pipeline fed the case's own sample files "
                             + "and its expected rows, rejects, checksum or column checks) and return each case's verdict, "
