@@ -58,7 +58,8 @@ export function renderShape(name, shape) {
     const L = [];
     if (name !== 'content') L.push(`#### \`${name}\``, '');
     L.push(`Keys from ${cell(shape.source)}. A key outside this list is **${shape.unknownKeys}**`
-        + (shape.unknownKeys === 'refused' ? ` (422) — except an annotation named \`${shape.extensionPrefix}…\`, which is kept.`
+        + (shape.unknownKeys === 'refused' ? (shape.extensionPrefix
+            ? ` (422) — except an annotation named \`${shape.extensionPrefix}…\`, which is kept.` : ' (422), an `x-…` annotation too.')
             : shape.unknownKeys === 'kept' ? ' as sent.' : ' (nothing reads it).'), '');
     L.push('| Key | Type | Required | Default | Allowed values | Description |', '|---|---|---|---|---|---|');
     for (const f of shape.fields) {

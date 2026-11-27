@@ -125,7 +125,7 @@ Not a `propose_change` kind: written through the component routes.
 - `update` → `PUT /components/anomaly-model/{id}`
 - `delete` → `DELETE /components/anomaly-model/{id}` — no content
 
-Keys from AnomalyModel.MODEL_KEYS + AnomalyModel.fromMap (anomaly-model's validator on the component save door). A key outside this list is **refused** (422) — except an annotation named `x-…`, which is kept.
+Keys from AnomalyModel.MODEL_KEYS + AnomalyModel.fromMap (anomaly-model's validator on the component save door). A key outside this list is **refused** (422), an `x-…` annotation too.
 
 | Key | Type | Required | Default | Allowed values | Description |
 |---|---|---|---|---|---|
@@ -194,7 +194,7 @@ Not a `propose_change` kind: written through the component routes.
 - `update` → `PUT /components/churn-model/{id}`
 - `delete` → `DELETE /components/churn-model/{id}` — no content
 
-Keys from ChurnModel.MODEL_KEYS + ChurnModel.fromMap (churn-model's validator on the component save door). A key outside this list is **refused** (422) — except an annotation named `x-…`, which is kept.
+Keys from ChurnModel.MODEL_KEYS + ChurnModel.fromMap (churn-model's validator on the component save door). A key outside this list is **refused** (422), an `x-…` annotation too.
 
 | Key | Type | Required | Default | Allowed values | Description |
 |---|---|---|---|---|---|
@@ -547,7 +547,7 @@ Not a `propose_change` kind: written through the component routes.
 - `update` → `PUT /components/forecast-model/{id}`
 - `delete` → `DELETE /components/forecast-model/{id}` — no content
 
-Keys from ForecastModel.MODEL_KEYS + ForecastModel.fromMap (forecast-model's validator on the component save door). A key outside this list is **refused** (422) — except an annotation named `x-…`, which is kept.
+Keys from ForecastModel.MODEL_KEYS + ForecastModel.fromMap (forecast-model's validator on the component save door). A key outside this list is **refused** (422), an `x-…` annotation too.
 
 | Key | Type | Required | Default | Allowed values | Description |
 |---|---|---|---|---|---|
@@ -572,6 +572,7 @@ Keys from ForecastModel.MODEL_KEYS + ForecastModel.fromMap (forecast-model's val
 | `time` | string | yes¹ |  |  |  |
 
 - Run by the `predict.forecast` Job; `alpha`, `beta` and `gamma` (0..1) are required by method `holt-winters` and refused on `seasonal-naive`.
+- `history` defaults to 364 at grain `day` (the default below, from the example) and to 156 at grain `week`.
 - Unknown keys are refused, not ignored. The save also checks, in the Space, the Datasets it reads and its output store.
 
 Example:
@@ -637,7 +638,7 @@ Keys from KpiDefinition.KEYS + KpiDefinition.fromMap (ComponentRoutes.validateKi
 |---|---|---|---|---|---|
 | `asOf` | any |  |  |  |  |
 | `bands` | object |  |  |  |  |
-| `comparison` | string |  | `previous` | `last_year` `none` `previous` |  |
+| `comparison` | string |  | `previous` | `last-year` `none` `previous` |  |
 | `dataset` | string | yes¹ |  |  |  |
 | `description` | any |  |  |  |  |
 | `direction` | string |  | `up` | `band` `down` `up` |  |
@@ -683,13 +684,14 @@ Keys from MappingRules.validate (keys read inline; declared in the generator and
 |---|---|---|---|---|---|
 | `name` | any | set by the server |  |  |  |
 | `owner` | any | set by the server |  |  |  |
-| `rules` | array | yes¹ |  |  |  |
+| `rules` | array |  |  |  |  |
 | `rules[].sourceExpression` | string | yes¹ |  |  |  |
 | `rules[].targetColumn` | string | yes¹ |  |  |  |
 | `rules[].transformType` | string |  |  |  |  |
 | `shares` | any | set by the server |  |  |  |
 
 - `rules[].transformType` is one of CONCAT_DT, DIRECT, EXPR, FILENAME_DATE (blank = DIRECT); an `EXPR` rule's SQL is emitted as written (operator-authored, trusted).
+- The save checks `rules` only when it is present: a mapping without `rules` saves and maps nothing.
 - Preview the rules with `POST /components/mapping/validate`.
 
 Example:
@@ -899,7 +901,7 @@ Keys from KpiDefinition.KEYS + KpiDefinition.fromMap (plus `id`, the KPI's own i
 |---|---|---|---|---|---|
 | `asOf` | any |  |  |  |  |
 | `bands` | object |  |  |  |  |
-| `comparison` | string |  | `previous` | `last_year` `none` `previous` |  |
+| `comparison` | string |  | `previous` | `last-year` `none` `previous` |  |
 | `dataset` | string | yes¹ |  |  |  |
 | `description` | any |  |  |  |  |
 | `direction` | string |  | `up` | `band` `down` `up` |  |
@@ -939,7 +941,7 @@ Not a `propose_change` kind: written through the component routes.
 - `update` → `PUT /components/risk-score/{id}`
 - `delete` → `DELETE /components/risk-score/{id}` — no content
 
-Keys from RiskScoreModel.MODEL_KEYS + RiskScoreModel.fromMap (risk-score's validator on the component save door). A key outside this list is **refused** (422) — except an annotation named `x-…`, which is kept.
+Keys from RiskScoreModel.MODEL_KEYS + RiskScoreModel.fromMap (risk-score's validator on the component save door). A key outside this list is **refused** (422), an `x-…` annotation too.
 
 | Key | Type | Required | Default | Allowed values | Description |
 |---|---|---|---|---|---|
@@ -1040,7 +1042,16 @@ Keys from ConfigSpecs.schema() + the spec and config-safety gates (ComponentRout
 
 | Key | Type | Required | Default | Allowed values | Description |
 |---|---|---|---|---|---|
+| `mapping` | object |  |  |  |  |
+| `mapping.canonicalName` | string |  |  |  | Canonical table name the raw source maps to. |
+| `name` | any | set by the server |  |  |  |
+| `owner` | any | set by the server |  |  |  |
 | `partitionKey` | string |  |  |  | Column whose value drives Hive partitioning (or use fields[].partitions). |
+| `raw` | object | yes¹ |  |  |  |
+| `raw.fields` | array |  |  |  | Tabular array of {name,selector,type[,format,description,unit,classification]}. format is a strptime pattern (e.g. %B %d,%Y) for a DATE/TIMESTAMP field and replaces the pipeline's date/timestamp format list for it; epoch / epoch_ms read a TIMESTAMP from a count of seconds / milliseconds since 1970 (UTC; 0 = none). |
+| `raw.format` | string |  | `CSV` | `CSV` `PARQUET` | Source file format. |
+| `raw.name` | string | yes |  |  | Logical name of the raw source. |
+| `shares` | any | set by the server |  |  |  |
 
 - `raw.fields[]` items are `{name, selector, type}` plus optional `format`, `description`, `unit` and `classification` (one the Space knows).
 - The engine parses more than the spec names (Identifiers.validateSchema at run time); a shipped schema may also carry `partitions[]`. The component's id is its `schema_file: schema/<id>` reference.
@@ -1074,7 +1085,7 @@ Not a `propose_change` kind: written through the component routes.
 - `update` → `PUT /components/segmentation-model/{id}`
 - `delete` → `DELETE /components/segmentation-model/{id}` — no content
 
-Keys from SegmentationModel.MODEL_KEYS + SegmentationModel.fromMap (segmentation-model's validator on the component save door). A key outside this list is **refused** (422) — except an annotation named `x-…`, which is kept.
+Keys from SegmentationModel.MODEL_KEYS + SegmentationModel.fromMap (segmentation-model's validator on the component save door). A key outside this list is **refused** (422), an `x-…` annotation too.
 
 | Key | Type | Required | Default | Allowed values | Description |
 |---|---|---|---|---|---|

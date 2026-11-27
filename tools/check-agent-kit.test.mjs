@@ -156,3 +156,8 @@ test('write tools: an exemption for a called, gone or read tool fails, so the li
         "WRITE_TOOL_EXEMPT names 'trigger_job', which a golden task now calls — remove the exemption"]);
     for (const [tool, why] of Object.entries(WRITE_TOOL_EXEMPT)) assert.ok(why.length > 20, `${tool} names why`);
 });
+
+test('write tools: a notice check proves no call (it never fails a task)', () => {
+    const suites = { 'a.json': { tasks: [{ grade: [], safety: [], notice: [{ check: 'tool-called', tool: 'work_alert' }] }] } };
+    assert.deepEqual([...calledTools(suites)], []);
+});

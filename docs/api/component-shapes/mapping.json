@@ -37,8 +37,7 @@
         {
           "path" : "rules",
           "type" : "array",
-          "required" : true,
-          "requiredBy" : "parser"
+          "required" : false
         },
         {
           "path" : "rules[].sourceExpression",
@@ -75,6 +74,7 @@
       },
       "notes" : [
         "`rules[].transformType` is one of CONCAT_DT, DIRECT, EXPR, FILENAME_DATE (blank = DIRECT); an `EXPR` rule's SQL is emitted as written (operator-authored, trusted).",
+        "The save checks `rules` only when it is present: a mapping without `rules` saves and maps nothing.",
         "Preview the rules with `POST /components/mapping/validate`."
       ]
     }

@@ -30,7 +30,7 @@
           "required" : false,
           "default" : "previous",
           "values" : [
-            "last_year",
+            "last-year",
             "none",
             "previous"
           ]

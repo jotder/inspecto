@@ -14,9 +14,10 @@
 //                   is a real MCP Tool; every skill a task names is a real Agent Skill; ids are unique across all suites.
 //   5 no repo paths a skill never names a repository path (the Kit is for an installed distribution with no source tree).
 //   6 coverage      every Agent Skill is named by at least one golden task (AK-2 widening plan W10), and every WRITE MCP
-//                   Tool (a `new Tool(…)` whose `write` argument is true) is called by at least one golden task: a grade,
-//                   safety or notice check names it (`tool-called`, or `tool-before`'s `tool` or `before`, both of which
-//                   the grader proves were called), or, for propose_change, a `pending-change` check. Reads are exempt.
+//                   Tool (a `new Tool(…)` whose `write` argument is true) is called by at least one golden task: a grade
+//                   or safety check names it (`tool-called`, or `tool-before`'s `tool` or `before`, both of which the
+//                   grader proves were called), or, for propose_change, a `pending-change` check. A notice check is
+//                   report-only and does not count. Reads are exempt.
 //                   WRITE_TOOL_EXEMPT names a write tool no task calls yet, with why; an exemption for a tool that is gone,
 //                   is not a write tool, or is now called fails too, so the list cannot go stale.
 //   7 check names   every grade, safety and notice check a task names is one tools/run-agent-golden.mjs grades (CHECKS);
@@ -106,7 +107,8 @@ export function writeTools(src) {
 export function calledTools(suites) {
     const out = new Set();
     for (const doc of Object.values(suites)) for (const t of Array.isArray(doc.tasks) ? doc.tasks : [])
-        for (const c of [...(t.grade ?? []), ...(t.safety ?? []), ...(t.notice ?? [])]) {
+        // grade and safety only: a notice check is report-only and never fails a task, so it proves no call
+        for (const c of [...(t.grade ?? []), ...(t.safety ?? [])]) {
             if (c?.check === 'tool-called' && c.tool) out.add(c.tool);
             if (c?.check === 'tool-before') { if (c.tool) out.add(c.tool); if (c.before) out.add(c.before); }
             if (c?.check === 'pending-change') out.add('propose_change');

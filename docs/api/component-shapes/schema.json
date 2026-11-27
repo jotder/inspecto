@@ -23,10 +23,69 @@
       "extensionPrefix" : "x-",
       "fields" : [
         {
+          "path" : "mapping",
+          "type" : "object",
+          "required" : false
+        },
+        {
+          "path" : "mapping.canonicalName",
+          "type" : "string",
+          "required" : false,
+          "description" : "Canonical table name the raw source maps to."
+        },
+        {
+          "path" : "name",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "owner",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
           "path" : "partitionKey",
           "type" : "string",
           "required" : false,
           "description" : "Column whose value drives Hive partitioning (or use fields[].partitions)."
+        },
+        {
+          "path" : "raw",
+          "type" : "object",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "raw.fields",
+          "type" : "array",
+          "required" : false,
+          "description" : "Tabular array of {name,selector,type[,format,description,unit,classification]}. format is a strptime pattern (e.g. %B %d,%Y) for a DATE/TIMESTAMP field and replaces the pipeline's date/timestamp format list for it; epoch / epoch_ms read a TIMESTAMP from a count of seconds / milliseconds since 1970 (UTC; 0 = none)."
+        },
+        {
+          "path" : "raw.format",
+          "type" : "string",
+          "required" : false,
+          "default" : "CSV",
+          "values" : [
+            "CSV",
+            "PARQUET"
+          ],
+          "description" : "Source file format."
+        },
+        {
+          "path" : "raw.name",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "spec",
+          "description" : "Logical name of the raw source."
+        },
+        {
+          "path" : "shares",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
         }
       ],
       "example" : {

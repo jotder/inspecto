@@ -7,7 +7,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { GENERATED_BANNER } from './docs-health.mjs';
-import { MCP_TOOLS, PAGE, componentShapeKinds, coverage, proposeKinds, readShapes, renderPage, shapeKinds }
+import { MCP_TOOLS, PAGE, componentShapeKinds, coverage, proposeKinds, readShapes, renderPage, renderShape, shapeKinds }
     from './render-component-shapes.mjs';
 
 test('proposeKinds: crud(...) and Map.entry(...) kinds of CHANGE_ROUTES, nothing outside it', () => {
@@ -65,4 +65,10 @@ test('renderPage: a kind propose_change does not offer gets its own index and sa
 
 test('the committed page is current against the committed shape files', () => {
     assert.equal(readFileSync(PAGE, 'utf8').replace(/\r\n/g, '\n'), renderPage(readShapes('.')));
+});
+
+test('renderShape: a refused kind whose parser refuses an x- annotation too says so', () => {
+    const shape = { ...DOC.thing.shapes.content };
+    delete shape.extensionPrefix;
+    assert.ok(renderShape('content', shape).join('\n').includes('is **refused** (422), an `x-…` annotation too.'));
 });

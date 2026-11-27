@@ -167,7 +167,8 @@ class ComponentShapesTest {
         Map<String, Object> shape = new LinkedHashMap<>();
         shape.put("source", b.source());
         shape.put("unknownKeys", unknownKeys(b));
-        shape.put("extensionPrefix", AcceptedConfigKeys.EXTENSION_PREFIX);
+        // the x- annotation is named only when the real parser keeps one (a module model's parser refuses it)
+        if (extensionKept(b)) shape.put("extensionPrefix", AcceptedConfigKeys.EXTENSION_PREFIX);
         shape.put("fields", new ArrayList<>(fields.values()));
         shape.put("example", b.example());
         if (!b.notes().isEmpty()) shape.put("notes", b.notes());
@@ -252,7 +253,7 @@ class ComponentShapesTest {
         Object v = read(from, key);
         if (v == null || v instanceof String s && s.isEmpty() || v instanceof Collection<?> c && c.isEmpty()
                 || v instanceof Map<?, ?> m && m.isEmpty()) return null;
-        if (v instanceof Enum<?> e) return e.name().toLowerCase(java.util.Locale.ROOT);
+        if (v instanceof Enum<?> e) return wire(e);
         if (v instanceof Record || !(v instanceof String || v instanceof Number || v instanceof Boolean
                 || v instanceof Map<?, ?> || v instanceof List<?>)) return null;
         return v;
@@ -310,6 +311,18 @@ class ComponentShapesTest {
         };
     }
 
+    /** {@code true} when the real parser accepts the example plus one {@code x-} annotation key. */
+    private static boolean extensionKept(Body b) {
+        Map<String, Object> probe = copy(b.example());
+        probe.put(AcceptedConfigKeys.EXTENSION_PREFIX + "zzProbe", "x");
+        try {
+            b.parse().apply(probe);
+            return true;
+        } catch (RuntimeException refused) {
+            return false;
+        }
+    }
+
     /** {@code refused}, {@code kept} or {@code ignored}: the example plus one made-up key, through the real parser. */
     private static String unknownKeys(Body b) {
         Map<String, Object> probe = copy(b.example());
@@ -341,7 +354,18 @@ class ComponentShapesTest {
     }
 
     private static List<String> lower(Enum<?>[] values) {
-        return java.util.Arrays.stream(values).map(v -> v.name().toLowerCase(java.util.Locale.ROOT)).toList();
+        return java.util.Arrays.stream(values).map(ComponentShapesTest::wire).toList();
+    }
+
+    /** An enum value as config spells it: its {@code wire()} when it has one ({@code last-year}), else its name in lower case. */
+    private static String wire(Enum<?> v) {
+        try {
+            return String.valueOf(v.getClass().getMethod("wire").invoke(v));
+        } catch (NoSuchMethodException none) {
+            return v.name().toLowerCase(java.util.Locale.ROOT);
+        } catch (ReflectiveOperationException e) {
+            throw new IllegalStateException(e);
+        }
     }
 
     private static Set<String> components(Class<? extends Record> r) {
@@ -587,7 +611,7 @@ class ComponentShapesTest {
         out.put("kpi", ops(kpi, "create", "update"));
 
         Body schema = new Body("ConfigSpecs.schema() + the spec and config-safety gates (ComponentRoutes.validateKind)",
-                Set.of(),
+                ShapeProbe.censusKeys("schema"),
                 body -> ShapeProbe.component("schema", "orders", body),
                 m("raw", m("name", "ORDERS", "format", "CSV",
                         "fields", List.of(m("name", "ORDER_ID", "selector", "order_id", "type", "VARCHAR"))),
@@ -602,14 +626,13 @@ class ComponentShapesTest {
 
         Body mapping = new Body("MappingRules.validate (keys read inline; declared in the generator and held to its source)",
                 union(Set.of("rules"), ENVELOPE),
-                body -> { ShapeProbe.component("mapping", "orders", body);
-                          if (!(body.get("rules") instanceof List<?>)) throw new IllegalArgumentException("a mapping needs 'rules'");
-                          return body; },
+                body -> ShapeProbe.component("mapping", "orders", body),
                 m("rules", List.of(m("targetColumn", "order_id", "sourceExpression", "ORDER_ID", "transformType", "DIRECT"))),
                 List.of(), "", null, Map.of(),
                 List.of(new Element("rules", MAPPING_RULE_KEYS)),
                 List.of("`rules[].transformType` is one of " + String.join(", ", com.gamma.etl.TransformCompiler.TRANSFORM_TYPES)
                         + " (blank = DIRECT); an `EXPR` rule's SQL is emitted as written (operator-authored, trusted).",
+                        "The save checks `rules` only when it is present: a mapping without `rules` saves and maps nothing.",
                         "Preview the rules with `POST /components/mapping/validate`."))
                 .with(Map.of("rules", "array"), ENVELOPE);
         out.put("mapping", ops(mapping, "create", "update"));
@@ -665,7 +688,7 @@ class ComponentShapesTest {
                 m("entityType", "product", "dataset", "sales", "key", "sku", "time", "sold_at", "measure", "count",
                   "grain", "day", "method", "seasonal-naive", "horizon", 28),
                 List.of("Run by the `predict.forecast` Job; `alpha`, `beta` and `gamma` (0..1) are required by method "
-                        + "`holt-winters` and refused on `seasonal-naive`."));
+                        + "`holt-winters` and refused on `seasonal-naive`.", "`history` defaults to 364 at grain `day` (the default below, from the example) and to 156 at grain `week`."));
         out.put("forecast-model", ops(forecast, "create", "update"));
     }
 

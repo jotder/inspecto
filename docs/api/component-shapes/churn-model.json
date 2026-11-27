@@ -20,7 +20,6 @@
     "content" : {
       "source" : "ChurnModel.MODEL_KEYS + ChurnModel.fromMap (churn-model's validator on the component save door)",
       "unknownKeys" : "refused",
-      "extensionPrefix" : "x-",
       "fields" : [
         {
           "path" : "dataset",
