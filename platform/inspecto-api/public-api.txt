@@ -2048,6 +2048,7 @@ com.gamma.pipeline.PipelineEdge | public boolean isData()
 com.gamma.pipeline.PipelineEdge | public record PipelineEdge(String from, String rel, String to)
 com.gamma.pipeline.PipelineEdge | public static PipelineEdge data(String, String)
 com.gamma.pipeline.PipelineEditable | public final class PipelineEditable
+com.gamma.pipeline.PipelineEditable | public static List<PipelineCompileException.Refusal> unsupportedNodes(PipelineGraph)
 com.gamma.pipeline.PipelineEditable | public static Map<String, Object> lower(PipelineGraph, Map<String, Object>, boolean)
 com.gamma.pipeline.PipelineEditable | public static Map<String, Object> toMap(PipelineConfig, Map<String, Object>)
 com.gamma.pipeline.PipelineEditable | public static boolean isAuthorable(String)

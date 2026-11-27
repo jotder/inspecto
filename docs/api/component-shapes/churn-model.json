@@ -1,0 +1,183 @@
+{
+  "kind" : "churn-model",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "proposeChange" : false,
+  "operations" : {
+    "create" : {
+      "route" : "POST /components/churn-model",
+      "content" : "content"
+    },
+    "update" : {
+      "route" : "PUT /components/churn-model/{id}",
+      "content" : "content"
+    },
+    "delete" : {
+      "route" : "DELETE /components/churn-model/{id}",
+      "content" : null
+    }
+  },
+  "shapes" : {
+    "content" : {
+      "source" : "ChurnModel.MODEL_KEYS + ChurnModel.fromMap (churn-model's validator on the component save door)",
+      "unknownKeys" : "refused",
+      "fields" : [
+        {
+          "path" : "dataset",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "description",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "elevatedThreshold",
+          "type" : "number",
+          "required" : false,
+          "default" : 60.0
+        },
+        {
+          "path" : "entityType",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "highThreshold",
+          "type" : "number",
+          "required" : false,
+          "default" : 80.0
+        },
+        {
+          "path" : "id",
+          "type" : "string",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "inputs",
+          "type" : "array",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "inputs[].cap",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "inputs[].coefficient",
+          "type" : "number",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "inputs[].mean",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "inputs[].measure",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "inputs[].missing",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "inputs[].name",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "inputs[].scale",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "inputs[].transform",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "intercept",
+          "type" : "number",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "key",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "maxEntities",
+          "type" : "integer",
+          "required" : false
+        },
+        {
+          "path" : "minHistoryDays",
+          "type" : "integer",
+          "required" : false,
+          "default" : 30
+        },
+        {
+          "path" : "name",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "owner",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "shares",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "time",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "window",
+          "type" : "integer",
+          "required" : false
+        }
+      ],
+      "example" : {
+        "entityType" : "customer",
+        "dataset" : "orders",
+        "key" : "customer_id",
+        "time" : "order_date",
+        "intercept" : -1.0,
+        "inputs" : [
+          {
+            "name" : "orders",
+            "measure" : "count",
+            "transform" : "log",
+            "coefficient" : -0.8
+          }
+        ]
+      },
+      "notes" : [
+        "Run by the `predict.churn` Job; nothing is fitted: the intercept and coefficients are authored.",
+        "`inputs[].transform` is none (default), log, cap (needs `cap`) or z (needs `mean` and `scale`).",
+        "Unknown keys are refused, not ignored. The save also checks, in the Space, the Datasets it reads and its output store."
+      ]
+    }
+  }
+}

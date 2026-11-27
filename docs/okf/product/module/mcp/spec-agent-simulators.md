@@ -66,17 +66,22 @@ decided instead (D-AK22, 2026-11-26, replacing §4 for this route): the answer i
   raw for a builder (D-AK22)`), and the route spends weight 2 in the agent budget. That stamp proves an answer only in a
   scope the host opened for a route on `AgentGate.RAW_FOR_BUILDERS` — today this route alone (`ControlApi.provenMasked`).
   In any other scope it records nothing, so a raw answer on any other data route still fails closed with 500.
-- **A `path:` Reference** stays as it is for a person: raw and jailed to the safety roots (`PREVIEW-REFERENCE-PATH-UNJAILED-1`).
-  A person's agent gets the same; it is not refused.
+- **A `path:` Reference** is jailed to the safety roots (`PREVIEW-REFERENCE-PATH-UNJAILED-1`) and, since D-AK26
+  (operator, 2026-11-27), may not name a file in a data folder: a path into a Dataset's store (its `physicalRef` or
+  `sourceName` under the data root), a loaded Pipeline's folders (store, `errors`/`quarantine` rejected rows, `backup`
+  raw copies, inbox, working folders, every `sinks[]` and route-branch store, a DuckLake output's `data_path`; a
+  Dataset's store is looked for under the Space data root and under `-Ddata.dir` when set, as the routes and the engine
+  disagree there: `CONTROLAPI-DATA-DIR-MISMATCH-1`) is refused 422 for every caller, before
+  anything is read; a glob, or a folder (DuckDB reads every file below a folder), is refused when what it can reach holds any of them (`PathReferenceGuard`). Such data is previewed by name. A backup archive and the
+  restricted quarantine need no rule: DuckDB refuses a `.zip`, and the sealed read's allowlist refuses a folder inside or
+  holding a `.restricted` store (`PathJail`; both falsified 2026-11-27). A path outside every data folder answers as before: raw to a
+  person or a person's agent, 403 to a machine. Refusing rather than classifying by the Dataset: the rejected rows and raw
+  copies have no Dataset to classify them by. `ENRICHMENT-PREVIEW-PATH-REACH-1` closed.
+- **A by-name `ref:` Reference** is sharing-checked as the lookup test checks it (`LookupRoutes.mayViewReference`:
+  every registry Dataset over the Reference's store must be viewable, `ComponentAccess.canView`). One the caller cannot
+  view leaves the preview's Pipeline context, so the engine refuses it exactly as a Pipeline that is not loaded (422,
+  `… but no such pipeline is loaded`): no existence oracle. `ENRICHMENT-PREVIEW-SHARING-1` closed.
 - **Board.** `ENRICHMENT-PREVIEW-UNMASKED-1` is closed as accepted for builders (D-AK22).
-- ⚠ **Two wider risks, accepted as built by the operator after the lane's security review (D-AK22, 2026-11-26), each
-  filed P2 to revisit:**
-  1. `ENRICHMENT-PREVIEW-PATH-REACH-1` — a `path:` Reference is jailed only to the Space safety roots, so a builder's
-     agent may name ANY data file under them and page any Dataset's store raw (`SELECT * FROM r LIMIT 200 OFFSET n`, 200
-     rows per call at weight 2), past `/db/query` masking and the agent `RAW_GETS` refusals (rejected rows, view data, a
-     file under an operator root).
-  2. `ENRICHMENT-PREVIEW-SHARING-1` — the route checks no Dataset sharing: a by-name Reference whose Dataset is shared
-     away is answered raw, to the person and to their agent.
 
 ## Tests
 
@@ -90,6 +95,15 @@ decided instead (D-AK22, 2026-11-26, replacing §4 for this route): the answer i
 Falsified 2026-11-26: removing the D-AK20 skip, the Decision Rule stamp, either `canView` filter, the body cap, the enrichment preview's
 `PERSON_ONLY` entry, or the `RAW_FOR_BUILDERS` allowance on the host's scope each fails `ControlApiAgentSimulatorsTest`;
 accepting the raw stamp in every scope fails `AnswerMaskingTest`.
+
+D-AK26 (2026-11-27): `ControlApiAgentSimulatorsTest` covers a path into a Dataset's store and into a Pipeline's rejected
+rows, and a shared-away by-name Reference, for the person, the person's agent (both doors) and a machine;
+`ControlApiAgentLookupTest` the same two paths for the lookup test. Falsified: without the guard's registry branch, its
+Pipeline-folder branch or the sharing check, each probe answered the raw value (200) and its test went red; so did a
+folder path above a store and a store named only by `sinks[]`/a route branch (`aFolderPathAboveAStore…`,
+`aSinkStore…`) without the folder rule and the sinks/route rule. (The sinks and route lists name the same stores, so
+neither alone can be turned red.) Likewise a DuckLake `data_path` and a Dataset store under `-Ddata.dir`
+(`aDuckLakeDataPath…`, `aDatasetStoreUnderTheDataDirOverride…`). Not tested over HTTP: a glob (`*` is no legal Windows path), a symlink spelling.
 
 ## References
 

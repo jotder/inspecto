@@ -182,10 +182,12 @@ class ModuleRemovalPipelineTest {
 
     /**
      * VERDICT: REFUSED-LOUDLY. The save is a 422 {@code UNSUPPORTED_NODE} that names the node, the type and the
-     * missing module; nothing is written. The candidate dry run answers 200 and WARNS naming the type.
+     * missing module; nothing is written. The candidate dry run refuses the same way (DRYRUN-SAVE-NODE-MISMATCH-1,
+     * 2026-11-27): it used to answer 200 with a warning, so an agent read a green dry run and then had its proposal
+     * refused.
      */
     @Test
-    void aNodeTypeNoModuleRegistersIsRefusedAtSaveNamingTheTypeAndWarnedAtDryRun(@TempDir Path dir) throws Exception {
+    void aNodeTypeNoModuleRegistersIsRefusedAtSaveAndAtDryRunNamingTheType(@TempDir Path dir) throws Exception {
         Path p = miniWith(dir, m -> { });
         byte[] before = Files.readAllBytes(p);
         try (Ctx c = open(dir, List.of(p))) {
@@ -207,9 +209,9 @@ class ModuleRemovalPipelineTest {
             body.putArray("sampleRows").addObject().put("ID", "1").put("AMT", "2.5").put("EVENT_DATE", "2026-09-24");
             HttpResponse<String> dry = send(c.port, "POST", "/pipelines/authored/mini_etl/dry-run",
                     M.writeValueAsString(body));
-            assertEquals(200, dry.statusCode(), dry.body());
-            String warnings = V1Body.of(dry.body()).get("warnings").toString();
-            assertTrue(warnings.contains(ABSENT) && warnings.contains("NOT previewed"), warnings);
+            assertEquals(422, dry.statusCode(), dry.body());
+            assertTrue(dry.body().contains("UNSUPPORTED_NODE") && dry.body().contains("node 'zz1'")
+                    && dry.body().contains(ABSENT) && dry.body().contains("module"), dry.body());
         }
     }
 

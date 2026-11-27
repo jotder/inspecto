@@ -59,9 +59,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `GRAMMAR-NO-QUOTE-1` | P3 | defect | The Grammar editor cannot state "no quote" (filed 2026-11-19, BASIC-ELT-PROFILE-1 BE-3 review). | — |
 | — | P3 | feature | D-11 hand-authored relations component | demand |
 | `TEST-WRITES-TRACKED-DIR-1` | P3 | chore | a test run deletes a tracked file: | — |
-| `ENRICHMENT-PREVIEW-PATH-REACH-1` | P2 | defect | A builder's agent can page any Dataset's store raw through an enrichment preview path: Reference: | — |
-| `LOOKUP-TEST-PATH-RAW-1` | P2 | defect | A lookup test over a path: Reference answers the file's values raw to a builder and to a builder's agent: | — |
-| `ENRICHMENT-PREVIEW-SHARING-1` | P2 | defect | The enrichment preview never checks Dataset sharing: | — |
 | `DRYRUN-PREVIEW-UNMASKED-1` | P3 | defect | Pipeline dry-run and test-run previews are not masked: | — |
 | `SAVE-AS-TEMPLATE-LEFTOVER-1` | P3 | defect | POST /pipelines/{id}/save-as-template copies the source's schema and segment schemas into the write root before its hold and removes them… | — |
 | `ENGINE-ETL-TESTS-RED-1` | P2 | defect | Eight inspecto-etl / inspecto-engine tests fail on master since the 2026-11-25 pushes of OUTPUT-NAME-OVERWRITE-1 (e37f96b1a) and DATED-RE… | — |
@@ -69,6 +66,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `PIPELINE-POLL-RULE-NPE-1` | P2 | defect | The save rule poll-required-for-non-dataset (ConfigSpecs.java, JOB-GRAPH-1 fea9792af) calls .isBlank() on RawConfig.str(raw, "dirs.poll")… | — |
 | `NUM-ROUND-TYPE-AWARE-1` | P3 | feature | The Record Transformer's num.round rounds a DOUBLE column the DuckDB 2.0.1 way (52.05 → 52.0; 2.0.0 gave 52.1). | — |
 | `RECORD-TRANSFORM-NUM-VARCHAR-1` | P3 | defect | On the ingest side the Record Transformer's num.* functions (num.round seen; num.multiply probably) do not bind: | — |
-| `DRYRUN-SAVE-NODE-MISMATCH-1` | P3 | defect | dry_run_pipeline (POST /pipelines/authored/{id}/dry-run) seeds and runs a graph whose source.dataset node propose_change (PUT /pipelines/… | — |
 | `DUCKLAKE-REAL-DRIVER-FAILURE-PROOF-1` | P3 | chore | no test proves that a real DuckLake driver's registration failure is non-fatal (filed 2026-11-16; untracked since SPEC-NOPROOF-1 closed o… | external |
 | `HOWTO-DOC-DRIFT-1` | P3 | chore | internal hub pages that contradict the code, found writing the P3 how-tos: | — |

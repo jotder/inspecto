@@ -1,7 +1,7 @@
 ---
 type: Reference
 title: Component shape reference
-description: Every propose_change kind's content — keys, types, required or optional, defaults, allowed values and an example — derived from the code. Generated.
+description: Every propose_change kind's content, and the other component kinds' — keys, types, required or optional, defaults, allowed values and an example — derived from the code. Generated.
 resource: features/inspecto-mcp/src/test/java/com/gamma/mcp/ComponentShapesTest.java
 tags: [config, reference, shapes, agent, generated]
 item: module.config
@@ -17,8 +17,10 @@ code: features/inspecto-mcp
 > `mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true` then `node tools/render-component-shapes.mjs --write`.
 
 What each config kind an agent (or a person) proposes through `propose_change` may carry, so a draft is shaped right
-before it is sent instead of after a refusal. The same facts, one JSON file per kind, are in
-`docs/api/component-shapes/<kind>.json`.
+before it is sent instead of after a refusal, and the same for the component kinds `propose_change` does not offer
+(written through `/components/<type>`; their file says `proposeChange: false`). The same facts, one JSON file per
+kind, are in `docs/api/component-shapes/<kind>.json` and the MCP Resource `inspecto://shapes/<kind>`. A component kind
+with no shape is named, with why, in `ComponentShapesTest.UNSHAPED`.
 
 How the columns are derived: **keys** from the kind's key census in code, its `ConfigSpecs` fields or the record its
 route parses into; **type, description, allowed values** from the spec when there is one, else the record or the
@@ -28,6 +30,8 @@ declares it required but the save does not refuse its absence; **default** from 
 in; **set by the server** for keys the server stamps or the store adds. These are the content
 checks of each save door without a Space: whether a named Dataset, Pipeline or Job exists is checked on save, and
 previewed with `validate_config`.
+
+**propose_change kinds**
 
 | Kind | Operations |
 |---|---|
@@ -43,6 +47,22 @@ previewed with `validate_config`.
 | [`pipeline-restore`](#pipeline-restore) | `restore` POST /pipelines/{id}/history/{version}/restore |
 | [`requirement-kpi`](#requirement-kpi) | `create` POST /requirements/{id}/kpi |
 | [`widget`](#widget) | `create` POST /components/widget · `update` PUT /components/widget/{id} · `delete` DELETE /components/widget/{id} |
+
+**Other component kinds (not offered by propose_change)**
+
+| Kind | Operations |
+|---|---|
+| [`anomaly-model`](#anomaly-model) | `create` POST /components/anomaly-model · `update` PUT /components/anomaly-model/{id} · `delete` DELETE /components/anomaly-model/{id} |
+| [`churn-model`](#churn-model) | `create` POST /components/churn-model · `update` PUT /components/churn-model/{id} · `delete` DELETE /components/churn-model/{id} |
+| [`dataset`](#dataset) | `create` POST /components/dataset · `update` PUT /components/dataset/{id} · `delete` DELETE /components/dataset/{id} |
+| [`forecast-model`](#forecast-model) | `create` POST /components/forecast-model · `update` PUT /components/forecast-model/{id} · `delete` DELETE /components/forecast-model/{id} |
+| [`kpi`](#kpi) | `create` POST /components/kpi · `update` PUT /components/kpi/{id} · `delete` DELETE /components/kpi/{id} |
+| [`mapping`](#mapping) | `create` POST /components/mapping · `update` PUT /components/mapping/{id} · `delete` DELETE /components/mapping/{id} |
+| [`reconciliation`](#reconciliation) | `create` POST /components/reconciliation · `update` PUT /components/reconciliation/{id} · `delete` DELETE /components/reconciliation/{id} |
+| [`risk-score`](#risk-score) | `create` POST /components/risk-score · `update` PUT /components/risk-score/{id} · `delete` DELETE /components/risk-score/{id} |
+| [`runbook`](#runbook) | `create` POST /components/runbook · `update` PUT /components/runbook/{id} · `delete` DELETE /components/runbook/{id} |
+| [`schema`](#schema) | `create` POST /components/schema · `update` PUT /components/schema/{id} · `delete` DELETE /components/schema/{id} |
+| [`segmentation-model`](#segmentation-model) | `create` POST /components/segmentation-model · `update` PUT /components/segmentation-model/{id} · `delete` DELETE /components/segmentation-model/{id} |
 
 ## alert-rule
 
@@ -97,6 +117,136 @@ Example:
 }
 ```
 
+## anomaly-model
+
+Not a `propose_change` kind: written through the component routes.
+
+- `create` → `POST /components/anomaly-model`
+- `update` → `PUT /components/anomaly-model/{id}`
+- `delete` → `DELETE /components/anomaly-model/{id}` — no content
+
+Keys from AnomalyModel.MODEL_KEYS + AnomalyModel.fromMap (anomaly-model's validator on the component save door). A key outside this list is **refused** (422), an `x-…` annotation too.
+
+| Key | Type | Required | Default | Allowed values | Description |
+|---|---|---|---|---|---|
+| `bucket` | string |  |  |  |  |
+| `dataScope` | string |  |  |  |  |
+| `description` | string |  |  |  |  |
+| `elevatedThreshold` | number |  | `60` |  |  |
+| `entityType` | string | yes¹ |  |  |  |
+| `exclusionList` | any |  |  |  |  |
+| `features` | array | yes¹ |  |  |  |
+| `features[].dataset` | string | yes¹ |  |  |  |
+| `features[].direction` | any |  |  |  |  |
+| `features[].evidence` | any |  |  |  |  |
+| `features[].filters` | any |  |  |  |  |
+| `features[].id` | string | yes¹ |  |  |  |
+| `features[].key` | string | yes¹ |  |  |  |
+| `features[].label` | any |  |  |  |  |
+| `features[].measure` | string | yes¹ |  |  |  |
+| `features[].time` | string | yes¹ |  |  |  |
+| `features[].unit` | any |  |  |  |  |
+| `features[].weight` | any |  |  |  |  |
+| `forest` | object |  |  |  |  |
+| `highThreshold` | number |  | `80` |  |  |
+| `id` | string | set by the server |  |  |  |
+| `maxEntities` | integer |  |  |  |  |
+| `method` | any |  |  |  |  |
+| `minBaselinePoints` | integer |  | `7` |  |  |
+| `name` | any | set by the server |  |  |  |
+| `owner` | any | set by the server |  |  |  |
+| `peers` | object |  |  |  |  |
+| `scale` | number |  | `3` |  |  |
+| `scoredPeriod` | any |  |  |  |  |
+| `seasonality` | string |  | `none` |  |  |
+| `shares` | any | set by the server |  |  |  |
+| `watchList` | any |  |  |  |  |
+| `window` | integer | yes¹ |  |  |  |
+| `zCap` | number |  | `10` |  |  |
+
+- Run by the `anomaly.score` Job; `peers` is `{by, dataset, fallback, key, minGroupSize}`.
+- Unknown keys are refused, not ignored. The save also checks, in the Space, the Datasets it reads and its output store.
+
+Example:
+
+```json
+{
+  "entityType": "wallet",
+  "bucket": "day",
+  "window": 28,
+  "features": [
+    {
+      "id": "txn_count",
+      "dataset": "wallet_txn",
+      "key": "wallet_id",
+      "time": "txn_ts",
+      "measure": "count"
+    }
+  ]
+}
+```
+
+## churn-model
+
+Not a `propose_change` kind: written through the component routes.
+
+- `create` → `POST /components/churn-model`
+- `update` → `PUT /components/churn-model/{id}`
+- `delete` → `DELETE /components/churn-model/{id}` — no content
+
+Keys from ChurnModel.MODEL_KEYS + ChurnModel.fromMap (churn-model's validator on the component save door). A key outside this list is **refused** (422), an `x-…` annotation too.
+
+| Key | Type | Required | Default | Allowed values | Description |
+|---|---|---|---|---|---|
+| `dataset` | string | yes¹ |  |  |  |
+| `description` | string |  |  |  |  |
+| `elevatedThreshold` | number |  | `60` |  |  |
+| `entityType` | string | yes¹ |  |  |  |
+| `highThreshold` | number |  | `80` |  |  |
+| `id` | string | set by the server |  |  |  |
+| `inputs` | array | yes¹ |  |  |  |
+| `inputs[].cap` | any |  |  |  |  |
+| `inputs[].coefficient` | number | yes¹ |  |  |  |
+| `inputs[].mean` | any |  |  |  |  |
+| `inputs[].measure` | string | yes¹ |  |  |  |
+| `inputs[].missing` | any |  |  |  |  |
+| `inputs[].name` | string | yes¹ |  |  |  |
+| `inputs[].scale` | any |  |  |  |  |
+| `inputs[].transform` | string |  |  |  |  |
+| `intercept` | number | yes¹ |  |  |  |
+| `key` | string | yes¹ |  |  |  |
+| `maxEntities` | integer |  |  |  |  |
+| `minHistoryDays` | integer |  | `30` |  |  |
+| `name` | any | set by the server |  |  |  |
+| `owner` | any | set by the server |  |  |  |
+| `shares` | any | set by the server |  |  |  |
+| `time` | string | yes¹ |  |  |  |
+| `window` | integer |  |  |  |  |
+
+- Run by the `predict.churn` Job; nothing is fitted: the intercept and coefficients are authored.
+- `inputs[].transform` is none (default), log, cap (needs `cap`) or z (needs `mean` and `scale`).
+- Unknown keys are refused, not ignored. The save also checks, in the Space, the Datasets it reads and its output store.
+
+Example:
+
+```json
+{
+  "entityType": "customer",
+  "dataset": "orders",
+  "key": "customer_id",
+  "time": "order_date",
+  "intercept": -1,
+  "inputs": [
+    {
+      "name": "orders",
+      "measure": "count",
+      "transform": "log",
+      "coefficient": -0.8
+    }
+  ]
+}
+```
+
 ## dashboard
 
 - `create` → `POST /components/dashboard`
@@ -132,6 +282,82 @@ Example:
   "tiles": [
     {
       "widgetId": "orders-by-region"
+    }
+  ]
+}
+```
+
+## dataset
+
+Not a `propose_change` kind: written through the component routes.
+
+- `create` → `POST /components/dataset`
+- `update` → `PUT /components/dataset/{id}`
+- `delete` → `DELETE /components/dataset/{id}` — no content
+
+Keys from UnknownComponentKeys.DATASET (the Dataset key census) + DatasetEntryRules.validate and the virtual-Dataset SQL check (ComponentRoutes.validateKind). A key outside this list is **refused** (422) — except an annotation named `x-…`, which is kept.
+
+| Key | Type | Required | Default | Allowed values | Description |
+|---|---|---|---|---|---|
+| `basedOn` | any |  |  |  |  |
+| `calculated` | any |  |  |  |  |
+| `columns` | array |  |  |  |  |
+| `compaction` | any |  |  |  |  |
+| `dataAsOf` | any |  |  |  |  |
+| `dateField` | any |  |  |  |  |
+| `defaultLinkMapping` | any |  |  |  |  |
+| `description` | string |  |  |  |  |
+| `eventDate` | any |  |  |  |  |
+| `eventDateColumn` | any |  |  |  |  |
+| `feed` | any |  |  |  |  |
+| `identifyingColumn` | any |  |  |  |  |
+| `importFilter` | any |  |  |  |  |
+| `importFormat` | any |  |  |  |  |
+| `importPipeline` | any |  |  |  |  |
+| `importSource` | any |  |  |  |  |
+| `kind` | any |  |  |  |  |
+| `lastImport` | any |  |  |  |  |
+| `mapping` | any |  |  |  |  |
+| `materialized` | any |  |  |  |  |
+| `measures` | any |  |  |  |  |
+| `name` | any | set by the server |  |  |  |
+| `origin` | any |  |  |  |  |
+| `owner` | any | set by the server |  |  |  |
+| `partitions` | any |  |  |  |  |
+| `physicalRef` | string |  |  |  |  |
+| `poll` | any |  |  |  |  |
+| `primaryEntityType` | any |  |  |  |  |
+| `query` | any |  |  |  |  |
+| `recordType` | any |  |  |  |  |
+| `retention` | any |  |  |  |  |
+| `shares` | any | set by the server |  |  |  |
+| `sourceName` | any |  |  |  |  |
+| `sql` | any |  |  |  |  |
+| `storage` | any |  |  |  |  |
+| `tags` | any |  |  |  |  |
+| `title` | any |  |  |  |  |
+| `view` | any |  |  |  |  |
+| `viz` | any |  |  |  |  |
+| `watchInbox` | any |  |  |  |  |
+
+- An unknown key is refused (422) for an agent; a person's save keeps it with an `UNKNOWN_KEY` warning (both: `POST /validate`).
+- `columns`, `calculated`, `query`, `filters` and the other blocks are accepted whole: their inner keys are not censused.
+- `sql` (a virtual Dataset) needs `sourceName` and meets the SQL safety check; `basedOn` (a Mapping) names a Dataset the caller can see; a column's `classification` must be one the Space knows.
+
+Example:
+
+```json
+{
+  "physicalRef": "orders",
+  "description": "One row per order",
+  "columns": [
+    {
+      "name": "order_id",
+      "type": "VARCHAR"
+    },
+    {
+      "name": "amount",
+      "type": "DOUBLE"
     }
   ]
 }
@@ -313,6 +539,57 @@ Example:
 }
 ```
 
+## forecast-model
+
+Not a `propose_change` kind: written through the component routes.
+
+- `create` → `POST /components/forecast-model`
+- `update` → `PUT /components/forecast-model/{id}`
+- `delete` → `DELETE /components/forecast-model/{id}` — no content
+
+Keys from ForecastModel.MODEL_KEYS + ForecastModel.fromMap (forecast-model's validator on the component save door). A key outside this list is **refused** (422), an `x-…` annotation too.
+
+| Key | Type | Required | Default | Allowed values | Description |
+|---|---|---|---|---|---|
+| `alpha` | number |  |  |  |  |
+| `beta` | number |  |  |  |  |
+| `dataset` | string | yes¹ |  |  |  |
+| `description` | string |  |  |  |  |
+| `entityType` | string | yes¹ |  |  |  |
+| `gamma` | number |  |  |  |  |
+| `grain` | string | yes¹ |  |  |  |
+| `history` | integer |  | `364` |  |  |
+| `horizon` | integer | yes¹ |  |  |  |
+| `id` | string | set by the server |  |  |  |
+| `interval` | integer |  | `95` |  |  |
+| `key` | string | yes¹ |  |  |  |
+| `maxSeries` | integer |  |  |  |  |
+| `measure` | string | yes¹ |  |  |  |
+| `method` | string | yes¹ |  |  |  |
+| `name` | any | set by the server |  |  |  |
+| `owner` | any | set by the server |  |  |  |
+| `shares` | any | set by the server |  |  |  |
+| `time` | string | yes¹ |  |  |  |
+
+- Run by the `predict.forecast` Job; `alpha`, `beta` and `gamma` (0..1) are required by method `holt-winters` and refused on `seasonal-naive`.
+- `history` defaults to 364 at grain `day` (the default below, from the example) and to 156 at grain `week`.
+- Unknown keys are refused, not ignored. The save also checks, in the Space, the Datasets it reads and its output store.
+
+Example:
+
+```json
+{
+  "entityType": "product",
+  "dataset": "sales",
+  "key": "sku",
+  "time": "sold_at",
+  "measure": "count",
+  "grain": "day",
+  "method": "seasonal-naive",
+  "horizon": 28
+}
+```
+
 ## job
 
 - `create` → `POST /jobs`
@@ -344,6 +621,90 @@ Example:
   "name": "orders-nightly-report",
   "type": "report",
   "cron": "0 2 * * *"
+}
+```
+
+## kpi
+
+Not a `propose_change` kind: written through the component routes.
+
+- `create` → `POST /components/kpi`
+- `update` → `PUT /components/kpi/{id}`
+- `delete` → `DELETE /components/kpi/{id}` — no content
+
+Keys from KpiDefinition.KEYS + KpiDefinition.fromMap (ComponentRoutes.validateKind). A key outside this list is **refused** (422) — except an annotation named `x-…`, which is kept.
+
+| Key | Type | Required | Default | Allowed values | Description |
+|---|---|---|---|---|---|
+| `asOf` | any |  |  |  |  |
+| `bands` | object |  |  |  |  |
+| `comparison` | string |  | `previous` | `last-year` `none` `previous` |  |
+| `dataset` | string | yes¹ |  |  |  |
+| `description` | any |  |  |  |  |
+| `direction` | string |  | `up` | `band` `down` `up` |  |
+| `format` | any |  |  |  |  |
+| `grain` | string | yes¹ |  | `day` `month` `quarter` `week` `year` |  |
+| `measure` | string | yes¹ |  |  |  |
+| `name` | string | set by the server |  |  |  |
+| `owner` | any | set by the server |  |  |  |
+| `requirement` | any |  |  |  |  |
+| `shares` | any | set by the server |  |  |  |
+| `target` | number |  |  |  |  |
+| `timeField` | string | yes¹ |  |  |  |
+| `timezone` | any |  |  |  |  |
+| `title` | string |  |  |  |  |
+| `unit` | any |  |  |  |  |
+
+- `measure` is `count` or `agg(field)`; the save also checks the Dataset exists and has the fields (KpiRoutes.requireMeasure).
+- `requirement` links the KPI to the Requirement it delivers.
+
+Example:
+
+```json
+{
+  "title": "Orders per day",
+  "dataset": "orders",
+  "measure": "count",
+  "timeField": "order_date",
+  "grain": "day"
+}
+```
+
+## mapping
+
+Not a `propose_change` kind: written through the component routes.
+
+- `create` → `POST /components/mapping`
+- `update` → `PUT /components/mapping/{id}`
+- `delete` → `DELETE /components/mapping/{id}` — no content
+
+Keys from MappingRules.validate (keys read inline; declared in the generator and held to its source). A key outside this list is **kept** as sent.
+
+| Key | Type | Required | Default | Allowed values | Description |
+|---|---|---|---|---|---|
+| `name` | any | set by the server |  |  |  |
+| `owner` | any | set by the server |  |  |  |
+| `rules` | array |  |  |  |  |
+| `rules[].sourceExpression` | string | yes¹ |  |  |  |
+| `rules[].targetColumn` | string | yes¹ |  |  |  |
+| `rules[].transformType` | string |  |  |  |  |
+| `shares` | any | set by the server |  |  |  |
+
+- `rules[].transformType` is one of CONCAT_DT, DIRECT, EXPR, FILENAME_DATE (blank = DIRECT); an `EXPR` rule's SQL is emitted as written (operator-authored, trusted).
+- The save checks `rules` only when it is present: a mapping without `rules` saves and maps nothing.
+- Preview the rules with `POST /components/mapping/validate`.
+
+Example:
+
+```json
+{
+  "rules": [
+    {
+      "targetColumn": "order_id",
+      "sourceExpression": "ORDER_ID",
+      "transformType": "DIRECT"
+    }
+  ]
 }
 ```
 
@@ -446,22 +807,39 @@ Example:
   "nodes": [
     {
       "id": "read",
-      "type": "source.file",
+      "type": "acquisition",
       "config": {
-        "collector": "orders_inbox"
+        "connector": "dataset",
+        "dataset": "orders"
+      }
+    },
+    {
+      "id": "total",
+      "type": "transform.summarize",
+      "config": {
+        "group_by": [
+          "region"
+        ],
+        "measures": [
+          "sum(amount)"
+        ]
       }
     },
     {
       "id": "write",
-      "type": "sink.parquet",
+      "type": "sink.persistent",
       "config": {
-        "dataset": "orders"
+        "database": "orders_by_region"
       }
     }
   ],
   "edges": [
     {
       "from": "read",
+      "to": "total"
+    },
+    {
+      "from": "total",
       "to": "write"
     }
   ]
@@ -471,6 +849,64 @@ Example:
 ## pipeline-restore
 
 - `restore` → `POST /pipelines/{id}/history/{version}/restore` — no content
+
+## reconciliation
+
+Not a `propose_change` kind: written through the component routes.
+
+- `create` → `POST /components/reconciliation`
+- `update` → `PUT /components/reconciliation/{id}`
+- `delete` → `DELETE /components/reconciliation/{id}` — no content
+
+Keys from UnknownComponentKeys.RECONCILIATION (its key census) + ReconConfigLoader.bands and buildSpec (ReconKindValidator). A key outside this list is **refused** (422) — except an annotation named `x-…`, which is kept.
+
+| Key | Type | Required | Default | Allowed values | Description |
+|---|---|---|---|---|---|
+| `bands` | any |  |  |  |  |
+| `cardinality` | any |  |  | `many_to_many` `many_to_one` `one_to_many` `one_to_one` |  |
+| `columnMap` | any |  |  |  |  |
+| `compareColumns` | array |  |  |  |  |
+| `compareColumns[].agg` | string |  |  |  |  |
+| `compareColumns[].column` | string | yes¹ |  |  |  |
+| `compareColumns[].tolerance` | number |  |  |  |  |
+| `compareColumns[].toleranceType` | string |  |  |  |  |
+| `datasets` | any |  |  |  |  |
+| `description` | any |  |  |  |  |
+| `filters` | any |  |  |  |  |
+| `impact` | any |  |  |  |  |
+| `includeRecordCount` | any |  |  |  |  |
+| `keyColumns` | array | yes¹ |  |  |  |
+| `leftDataset` | string | yes¹ |  |  |  |
+| `name` | any | set by the server |  |  |  |
+| `owner` | any | set by the server |  |  |  |
+| `rightDataset` | string | yes¹ |  |  |  |
+| `shares` | any | set by the server |  |  |  |
+| `thirdDataset` | any |  |  |  |  |
+
+- Two or three Datasets: `leftDataset` (the anchor) and `rightDataset`, optionally `thirdDataset`, or `datasets` (a list, the first is the anchor).
+- `compareColumns[].agg` is `sum` (default) or `count`; `toleranceType` is `exact` (default), `absolute` or `percent` (ReconService.Spec.of); `tolerance` defaults to 0.
+- `bands` is `{okBelow, warnAbove}` in percent, 0 <= okBelow <= warnAbove <= 100.
+- An unknown key (a `compareColumns` item's too) is refused (422) for an agent; a person's save keeps it with an `UNKNOWN_KEY` warning.
+
+Example:
+
+```json
+{
+  "leftDataset": "orders",
+  "rightDataset": "ledger",
+  "keyColumns": [
+    "order_id"
+  ],
+  "compareColumns": [
+    {
+      "column": "amount",
+      "agg": "sum",
+      "toleranceType": "absolute",
+      "tolerance": 0.01
+    }
+  ]
+}
+```
 
 ## requirement-kpi
 
@@ -482,7 +918,7 @@ Keys from KpiDefinition.KEYS + KpiDefinition.fromMap (plus `id`, the KPI's own i
 |---|---|---|---|---|---|
 | `asOf` | any |  |  |  |  |
 | `bands` | object |  |  |  |  |
-| `comparison` | string |  | `previous` | `last_year` `none` `previous` |  |
+| `comparison` | string |  | `previous` | `last-year` `none` `previous` |  |
 | `dataset` | string | yes¹ |  |  |  |
 | `description` | any |  |  |  |  |
 | `direction` | string |  | `up` | `band` `down` `up` |  |
@@ -511,6 +947,207 @@ Example:
   "measure": "count",
   "timeField": "order_date",
   "grain": "day"
+}
+```
+
+## risk-score
+
+Not a `propose_change` kind: written through the component routes.
+
+- `create` → `POST /components/risk-score`
+- `update` → `PUT /components/risk-score/{id}`
+- `delete` → `DELETE /components/risk-score/{id}` — no content
+
+Keys from RiskScoreModel.MODEL_KEYS + RiskScoreModel.fromMap (risk-score's validator on the component save door). A key outside this list is **refused** (422), an `x-…` annotation too.
+
+| Key | Type | Required | Default | Allowed values | Description |
+|---|---|---|---|---|---|
+| `dataScope` | string |  |  |  |  |
+| `description` | string |  |  |  |  |
+| `entityType` | string | yes¹ |  |  |  |
+| `factors` | array | yes¹ |  |  |  |
+| `factors[].cap` | integer |  |  |  |  |
+| `factors[].dataset` | string | yes¹ |  |  |  |
+| `factors[].evidence` | any |  |  |  |  |
+| `factors[].filters` | any |  |  |  |  |
+| `factors[].id` | string | yes¹ |  |  |  |
+| `factors[].key` | string | yes¹ |  |  |  |
+| `factors[].label` | any |  |  |  |  |
+| `factors[].measure` | string | yes¹ |  |  |  |
+| `factors[].weight` | number | yes¹ |  |  |  |
+| `factors[].when` | any |  |  |  |  |
+| `highThreshold` | number | yes¹ |  |  |  |
+| `id` | string | set by the server |  |  |  |
+| `maxEntities` | integer |  |  |  |  |
+| `name` | any | set by the server |  |  |  |
+| `owner` | any | set by the server |  |  |  |
+| `retainDays` | integer |  |  |  |  |
+| `retainRuns` | integer |  |  |  |  |
+| `segments` | array |  |  |  |  |
+| `shares` | any | set by the server |  |  |  |
+| `watchList` | object |  |  |  |  |
+
+- Run by the `risk.score` Job; the save also checks the Datasets and the output store in the Space.
+- Unknown keys are refused, not ignored. The save also checks, in the Space, the Datasets it reads and its output store.
+
+Example:
+
+```json
+{
+  "entityType": "account",
+  "highThreshold": 60,
+  "factors": [
+    {
+      "id": "cash_in",
+      "dataset": "transfers",
+      "key": "payee_account",
+      "measure": "count",
+      "weight": 0.5,
+      "cap": 40
+    }
+  ]
+}
+```
+
+## runbook
+
+Not a `propose_change` kind: written through the component routes.
+
+- `create` → `POST /components/runbook`
+- `update` → `PUT /components/runbook/{id}`
+- `delete` → `DELETE /components/runbook/{id}` — no content
+
+Keys from Runbook.MODELLED + Runbook.fromMap (the save also checks each step link's target exists). A key outside this list is **refused** (422) — except an annotation named `x-…`, which is kept.
+
+| Key | Type | Required | Default | Allowed values | Description |
+|---|---|---|---|---|---|
+| `name` | string | set by the server |  |  |  |
+| `owner` | any | set by the server |  |  |  |
+| `ownerRole` | string |  |  |  |  |
+| `shares` | any | set by the server |  |  |  |
+| `steps` | array | yes¹ |  |  |  |
+| `steps[].link` | any |  |  |  |  |
+| `steps[].text` | string | yes¹ |  |  |  |
+| `summary` | string |  |  |  |  |
+| `tags` | array |  |  |  |  |
+| `title` | string | yes¹ |  |  |  |
+
+- `steps[].link` is `{kind, id}` with kind one of case, dashboard, dataset, query; an Alert Rule names the Runbook in its `runbook` key.
+
+Example:
+
+```json
+{
+  "title": "Orders arrive late",
+  "steps": [
+    {
+      "text": "Check the Collector's last arrival"
+    }
+  ]
+}
+```
+
+## schema
+
+Not a `propose_change` kind: written through the component routes.
+
+- `create` → `POST /components/schema`
+- `update` → `PUT /components/schema/{id}`
+- `delete` → `DELETE /components/schema/{id}` — no content
+
+Keys from ConfigSpecs.schema() + the spec and config-safety gates (ComponentRoutes.validateKind). A key outside this list is **kept** as sent.
+
+| Key | Type | Required | Default | Allowed values | Description |
+|---|---|---|---|---|---|
+| `mapping` | object |  |  |  |  |
+| `mapping.canonicalName` | string |  |  |  | Canonical table name the raw source maps to. |
+| `name` | any | set by the server |  |  |  |
+| `owner` | any | set by the server |  |  |  |
+| `partitionKey` | string |  |  |  | Column whose value drives Hive partitioning (or use fields[].partitions). |
+| `raw` | object | yes¹ |  |  |  |
+| `raw.fields` | array |  |  |  | Tabular array of {name,selector,type[,format,description,unit,classification]}. format is a strptime pattern (e.g. %B %d,%Y) for a DATE/TIMESTAMP field and replaces the pipeline's date/timestamp format list for it; epoch / epoch_ms read a TIMESTAMP from a count of seconds / milliseconds since 1970 (UTC; 0 = none). |
+| `raw.format` | string |  | `CSV` | `CSV` `PARQUET` | Source file format. |
+| `raw.name` | string | yes |  |  | Logical name of the raw source. |
+| `shares` | any | set by the server |  |  |  |
+
+- `raw.fields[]` items are `{name, selector, type}` plus optional `format`, `description`, `unit` and `classification` (one the Space knows).
+- The engine parses more than the spec names (Identifiers.validateSchema at run time); a shipped schema may also carry `partitions[]`. The component's id is its `schema_file: schema/<id>` reference.
+
+Example:
+
+```json
+{
+  "raw": {
+    "name": "ORDERS",
+    "format": "CSV",
+    "fields": [
+      {
+        "name": "ORDER_ID",
+        "selector": "order_id",
+        "type": "VARCHAR"
+      }
+    ]
+  },
+  "mapping": {
+    "canonicalName": "orders"
+  }
+}
+```
+
+## segmentation-model
+
+Not a `propose_change` kind: written through the component routes.
+
+- `create` → `POST /components/segmentation-model`
+- `update` → `PUT /components/segmentation-model/{id}`
+- `delete` → `DELETE /components/segmentation-model/{id}` — no content
+
+Keys from SegmentationModel.MODEL_KEYS + SegmentationModel.fromMap (segmentation-model's validator on the component save door). A key outside this list is **refused** (422), an `x-…` annotation too.
+
+| Key | Type | Required | Default | Allowed values | Description |
+|---|---|---|---|---|---|
+| `bins` | integer |  | `5` |  |  |
+| `dataset` | string | yes¹ |  |  |  |
+| `description` | string |  |  |  |  |
+| `entityType` | string | yes¹ |  |  |  |
+| `frequency` | string |  | `count` |  |  |
+| `id` | string | set by the server |  |  |  |
+| `key` | string | yes¹ |  |  |  |
+| `maxEntities` | integer |  |  |  |  |
+| `monetary` | string | yes¹ |  |  |  |
+| `name` | any | set by the server |  |  |  |
+| `otherLabel` | string |  | `Other` |  |  |
+| `owner` | any | set by the server |  |  |  |
+| `segments` | array | yes¹ |  |  |  |
+| `segments[].frequency` | string | yes¹ |  |  |  |
+| `segments[].label` | string | yes¹ |  |  |  |
+| `segments[].monetary` | string | yes¹ |  |  |  |
+| `segments[].recency` | string | yes¹ |  |  |  |
+| `shares` | any | set by the server |  |  |  |
+| `time` | string | yes¹ |  |  |  |
+| `window` | integer |  |  |  |  |
+
+- Run by the `predict.segment` Job. A score range is `*`, `n` or `a-b` inside `1..bins`; the first matching `segments` row names the segment.
+- Unknown keys are refused, not ignored. The save also checks, in the Space, the Datasets it reads and its output store.
+
+Example:
+
+```json
+{
+  "entityType": "customer",
+  "dataset": "orders",
+  "key": "customer_id",
+  "time": "order_date",
+  "frequency": "count",
+  "monetary": "sum(amount)",
+  "segments": [
+    {
+      "label": "Champions",
+      "recency": "4-5",
+      "frequency": "4-5",
+      "monetary": "4-5"
+    }
+  ]
 }
 ```
 
