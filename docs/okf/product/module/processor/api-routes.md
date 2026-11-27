@@ -11,7 +11,7 @@ tags: [api, routes, generated]
 > `src/main` and [`docs/api/openapi-v1.json`](../../../../api/openapi-v1.json) (the HTTP contract, base `/api/v1`).
 > Never edit by hand — change the code or the contract and re-run the generator.
 
-412 route(s) registered; 401 in the OpenAPI contract, 11 not.
+412 route(s) registered; 412 in the OpenAPI contract, 0 not.
 
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
@@ -207,6 +207,11 @@ tags: [api, routes, generated]
 | GET | `/jobs/{jobId}` | One Job | jobs | — | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
 | PUT | `/jobs/{jobId}` | Replace a Job | jobs | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
 | GET | `/jobs/{jobId}/artifacts/latest` | Latest Run Artifacts of a Job | jobs | — | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
+| POST | `/jobs/{jobId}/backlog/days/{dayId}/give-up` | Stop waiting for one backlog day | jobs | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
+| POST | `/jobs/{jobId}/backlog/days/{dayId}/run` | Run one backlog day now | jobs | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
+| POST | `/jobs/{jobId}/backlog/drain` | Submit a by-day Job's ready days now | jobs | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
+| POST | `/jobs/{jobId}/backlog/pause` | Pause a Job's day backlog | jobs | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
+| POST | `/jobs/{jobId}/backlog/resume` | Resume a Job's day backlog | jobs | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
 | POST | `/jobs/{jobId}/disable` | Disable a Job | jobs | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
 | POST | `/jobs/{jobId}/enable` | Enable a Job | jobs | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
 | POST | `/jobs/{jobId}/reschedule` | Reschedule a Job | jobs | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
@@ -217,6 +222,7 @@ tags: [api, routes, generated]
 | GET | `/jobs/{jobId}/runs/{runId}/log` | One Run's structured log | jobs | — | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
 | GET | `/jobs/{jobId}/runs/{runId}/logs` | One Run's log for live tail | jobs | — | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
 | POST | `/jobs/{name}/trigger` | Trigger a job (async) | Execution & Scheduling | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
+| GET | `/jobs/backlog` | Day backlog of every by-day Job | jobs | — | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
 | GET | `/jobs/expressions` | List Job parameter expressions | jobs | — | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
 | GET | `/jobs/failures` | Job Run failure trend | jobs | — | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
 | GET | `/jobs/metrics` | Job Run metrics | jobs | — | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
@@ -272,7 +278,9 @@ tags: [api, routes, generated]
 | POST | `/origin/upgrade` | POST /origin/upgrade - apply the chosen update and add files of a template upgrade proposal | spaces | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceOriginRoutes.java` |
 | GET | `/parsers` | List parsers | parsers | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
 | POST | `/parsers/{parserId}/preview` | Preview a sample with a parser | parsers | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
+| GET | `/parsers/asn1/decoders` | List the ASN.1 value decoders | parsers | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
 | GET | `/parsers/asn1/profile` | Read an ASN.1 Decode Profile | parsers | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
+| POST | `/parsers/asn1/validate` | Validate an ASN.1 grammar draft | parsers | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
 | GET | `/pending-actions` | List Pending Actions | pending-actions | — | `inspecto/src/main/java/com/gamma/control/PendingActionRoutes.java` |
 | GET | `/pending-actions/{pendingactionId}` | Get a Pending Action | pending-actions | — | `inspecto/src/main/java/com/gamma/control/PendingActionRoutes.java` |
 | POST | `/pending-actions/{pendingactionId}/approve` | Approve a Pending Action and run it | pending-actions | `canApproveChanges` | `inspecto/src/main/java/com/gamma/control/PendingActionRoutes.java` |
@@ -290,6 +298,7 @@ tags: [api, routes, generated]
 | GET | `/pipelines/{pipelineId}/graph` | Read-only graph of a Pipeline | pipelines | — | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java` |
 | PUT | `/pipelines/{pipelineId}/graph` | Save a Pipeline's edited graph | pipelines | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java` |
 | GET | `/pipelines/{pipelineId}/graph/raw` | Editable graph of a Pipeline | pipelines | — | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java` |
+| POST | `/pipelines/{pipelineId}/graph/validate` | Validate a Pipeline graph draft without saving | pipelines | — | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java` |
 | GET | `/pipelines/{pipelineId}/history` | List a Pipeline's kept config versions, newest first | pipelines | — | `inspecto/src/main/java/com/gamma/control/PipelineHistoryRoutes.java` |
 | GET | `/pipelines/{pipelineId}/history/{historyId}` | Read one kept config version | pipelines | — | `inspecto/src/main/java/com/gamma/control/PipelineHistoryRoutes.java` |
 | POST | `/pipelines/{pipelineId}/history/{historyId}/restore` | Restore one kept config version | pipelines | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineHistoryRoutes.java` |
@@ -300,6 +309,7 @@ tags: [api, routes, generated]
 | POST | `/pipelines/{pipelineId}/save-as-template` | Copy a Pipeline into a template | pipelines | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineSettingsRoutes.java` |
 | GET | `/pipelines/{pipelineId}/settings` | Pipeline produces and reference settings | pipelines | — | `inspecto/src/main/java/com/gamma/control/PipelineSettingsRoutes.java` |
 | POST | `/pipelines/{pipelineId}/settings` | Save Pipeline produces and reference settings | pipelines | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineSettingsRoutes.java` |
+| POST | `/pipelines/{pipelineId}/split-job-pipeline` | Split a Pipeline's steps into a Job Pipeline | pipelines | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java` |
 | GET | `/pipelines/authored` | List legacy authored Pipelines | pipelines | — | `inspecto/src/main/java/com/gamma/control/PipelineListRoutes.java` |
 | DELETE | `/pipelines/authored/{authoredId}` | Delete a legacy authored Pipeline | pipelines | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineListRoutes.java` |
 | GET | `/pipelines/authored/{authoredId}` | One legacy authored Pipeline's graph | pipelines | — | `inspecto/src/main/java/com/gamma/control/PipelineListRoutes.java` |
@@ -342,6 +352,7 @@ tags: [api, routes, generated]
 | POST | `/runs/{runId}/pause` | Pause a Pipeline | runs | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java` |
 | GET | `/runs/{runId}/pending` | Inbox status of a Pipeline | runs | — | `inspecto/src/main/java/com/gamma/control/RunRoutes.java` |
 | GET | `/runs/{runId}/quarantine` | Quarantined files of a Pipeline | runs | — | `inspecto/src/main/java/com/gamma/control/RunRoutes.java` |
+| POST | `/runs/{runId}/quarantine/release` | Release one quarantined file back to the inbox | runs | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java` |
 | POST | `/runs/{runId}/replay-rejects` | Replay one file's rejected records as a new Consignment (EXECUTION-RESIDUALS X4) | runs | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java` |
 | GET | `/runs/{runId}/report` | Consignment audit report of one Pipeline | runs | — | `inspecto/src/main/java/com/gamma/control/RunRoutes.java` |
 | POST | `/runs/{runId}/reprocess` | Reprocess one Consignment | runs | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java` |
@@ -418,22 +429,6 @@ tags: [api, routes, generated]
 | GET | `/views/{viewId}/data` | Preview a view's rows | views | — | `inspecto/src/main/java/com/gamma/control/ViewRoutes.java` |
 
 ## Drift
-
-Registered in code, **missing from the OpenAPI contract**:
-
-| Method | Path | Capability | Registered in |
-|---|---|---|---|
-| POST | `/jobs/([^/]+)/backlog/days/([^/]+)/give-up` | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
-| POST | `/jobs/([^/]+)/backlog/days/([^/]+)/run` | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
-| POST | `/jobs/([^/]+)/backlog/drain` | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
-| POST | `/jobs/([^/]+)/backlog/pause` | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
-| POST | `/jobs/([^/]+)/backlog/resume` | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
-| GET | `/jobs/backlog` | — | `inspecto/src/main/java/com/gamma/control/JobRoutes.java` |
-| GET | `/parsers/asn1/decoders` | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
-| POST | `/parsers/asn1/validate` | — | `inspecto/src/main/java/com/gamma/control/ParserRoutes.java` |
-| POST | `/pipelines/([^/]+)/graph/validate` | — | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java` |
-| POST | `/pipelines/([^/]+)/split-job-pipeline` | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java` |
-| POST | `/runs/([^/]+)/quarantine/release` | `canOperateRuns` | `inspecto/src/main/java/com/gamma/control/RunRoutes.java` |
 
 In the OpenAPI contract, **registered by no module's `api.<method>("…")` call** (may be served by another mechanism):
 

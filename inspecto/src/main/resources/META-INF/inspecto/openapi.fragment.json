@@ -9610,6 +9610,842 @@
           }
         }
       }
+    },
+    "/runs/{runId}/quarantine/release" : {
+      "post" : {
+        "tags" : [ "runs" ],
+        "summary" : "Release one quarantined file back to the inbox",
+        "operationId" : "postRunsByRunIdQuarantineRelease",
+        "description" : "Moves ONE file from the Pipeline's quarantine directory back into its poll (inbox) directory under the Pipeline's run claim, taken without waiting; reprocess: true also starts a manual Run and returns its runId. Gated on canOperateRuns. 400 without path; 403 when path is absolute, climbs out of the quarantine directory or names a .restricted file; 404 for an unknown Pipeline or a file not in quarantine; 409 for a template Pipeline, while a cycle of the Pipeline is running (nothing changed; retry when it finishes), or when the Pipeline has no quarantine or poll directory.",
+        "parameters" : [ {
+          "name" : "runId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "path" ],
+                "properties" : {
+                  "path" : {
+                    "type" : "string",
+                    "description" : "The file's path relative to the quarantine directory."
+                  },
+                  "reprocess" : {
+                    "type" : "boolean",
+                    "default" : false,
+                    "description" : "Also trigger a manual Run after the release."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "The file was released.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "object",
+                        "required" : [ "pipeline", "file", "destination", "status" ],
+                        "properties" : {
+                          "pipeline" : {
+                            "type" : "string"
+                          },
+                          "file" : {
+                            "type" : "string"
+                          },
+                          "destination" : {
+                            "type" : "string",
+                            "description" : "Where the file now sits in the inbox."
+                          },
+                          "status" : {
+                            "type" : "string",
+                            "enum" : [ "released", "reprocessing" ]
+                          },
+                          "runId" : {
+                            "type" : "string",
+                            "description" : "The manual Run started when reprocess was true."
+                          }
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "400" : {
+            "$ref" : "#/components/responses/BadRequest"
+          },
+          "403" : {
+            "$ref" : "#/components/responses/PathJail"
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          },
+          "409" : {
+            "$ref" : "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/pipelines/{pipelineId}/graph/validate" : {
+      "post" : {
+        "tags" : [ "pipelines" ],
+        "summary" : "Validate a Pipeline graph draft without saving",
+        "operationId" : "postPipelinesByPipelineIdGraphValidate",
+        "description" : "Runs the checks a graph save runs, writing nothing: the structural Pipeline validator (component use: bindings checked against the registry when a write root exists), join references, then lowering onto the existing *_pipeline.toon and the shared save gate. The path name wins over any name in the body. valid is false on any ERROR finding or lowering refusal. No capability gate (read-shaped: validates a draft, writes nothing). 400 for a malformed graph.",
+        "parameters" : [ {
+          "name" : "pipelineId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "description" : "The graph draft in the shape PUT /pipelines/{pipelineId}/graph takes (nodes, edges, active, ...)."
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "The validation verdict.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "object",
+                        "required" : [ "valid", "findings", "refusals" ],
+                        "properties" : {
+                          "valid" : {
+                            "type" : "boolean"
+                          },
+                          "findings" : {
+                            "type" : "array",
+                            "items" : {
+                              "type" : "object",
+                              "required" : [ "severity", "message" ],
+                              "properties" : {
+                                "severity" : {
+                                  "type" : "string",
+                                  "enum" : [ "ERROR", "WARNING", "INFO" ]
+                                },
+                                "code" : {
+                                  "type" : "string"
+                                },
+                                "field" : {
+                                  "type" : "string"
+                                },
+                                "message" : {
+                                  "type" : "string"
+                                }
+                              }
+                            }
+                          },
+                          "refusals" : {
+                            "type" : "array",
+                            "description" : "Why the graph cannot be lowered onto a *_pipeline.toon.",
+                            "items" : {
+                              "type" : "object",
+                              "required" : [ "code", "message" ],
+                              "properties" : {
+                                "code" : {
+                                  "type" : "string"
+                                },
+                                "nodeId" : {
+                                  "type" : "string"
+                                },
+                                "message" : {
+                                  "type" : "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "400" : {
+            "$ref" : "#/components/responses/BadRequest"
+          }
+        }
+      }
+    },
+    "/pipelines/{pipelineId}/split-job-pipeline" : {
+      "post" : {
+        "tags" : [ "pipelines" ],
+        "summary" : "Split a Pipeline's steps into a Job Pipeline",
+        "operationId" : "postPipelinesByPipelineIdSplitJobPipeline",
+        "description" : "Moves the steps:, output_store:, webhook:, excel: and processing join/dedup/summarize/profile chain out of an onboarding Pipeline into its own inactive Job Pipeline <configRoot>/<outputStore>/<outputStore>_pipeline.toon, which reads the onboarding Pipeline's Dataset, and writes a type: pipeline Job <outputStore>_job that runs it on_pipeline of the onboarding Pipeline. preview: true returns the three files and writes nothing. Each Pipeline file passes the save gate before anything is written; the three writes are one act, so it is refused (never held) under an approval policy for pipeline or job. Gated on canAuthorWorkbench. 503 when read-only; 404 for an unknown Pipeline; 422 when it is already a Job Pipeline, has no output_store or no chain to split, or a file has ERROR findings.",
+        "parameters" : [ {
+          "name" : "pipelineId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "required" : false,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "properties" : {
+                  "outputStore" : {
+                    "type" : "string",
+                    "description" : "The Job Pipeline's output Dataset (lower-cased, spaces to _); defaults to the Pipeline's output_store."
+                  },
+                  "preview" : {
+                    "type" : "boolean",
+                    "default" : false,
+                    "description" : "Return the files without writing them."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "The split (or its preview).",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "object",
+                        "required" : [ "preview", "onboardingPipeline", "jobPipeline", "job" ],
+                        "properties" : {
+                          "preview" : {
+                            "type" : "boolean"
+                          },
+                          "onboardingPipeline" : {
+                            "type" : "object",
+                            "required" : [ "name", "path", "after" ],
+                            "properties" : {
+                              "name" : {
+                                "type" : "string"
+                              },
+                              "path" : {
+                                "type" : "string"
+                              },
+                              "before" : {
+                                "type" : "string",
+                                "description" : "The file text before the split (empty for a new file)."
+                              },
+                              "after" : {
+                                "type" : "string",
+                                "description" : "The TOON the split writes (or would write, under preview)."
+                              }
+                            }
+                          },
+                          "jobPipeline" : {
+                            "type" : "object",
+                            "required" : [ "name", "path", "after" ],
+                            "properties" : {
+                              "name" : {
+                                "type" : "string"
+                              },
+                              "path" : {
+                                "type" : "string"
+                              },
+                              "before" : {
+                                "type" : "string",
+                                "description" : "The file text before the split (empty for a new file)."
+                              },
+                              "after" : {
+                                "type" : "string",
+                                "description" : "The TOON the split writes (or would write, under preview)."
+                              }
+                            }
+                          },
+                          "job" : {
+                            "type" : "object",
+                            "required" : [ "name", "path", "after" ],
+                            "properties" : {
+                              "name" : {
+                                "type" : "string"
+                              },
+                              "path" : {
+                                "type" : "string"
+                              },
+                              "after" : {
+                                "type" : "string",
+                                "description" : "The TOON the split writes (or would write, under preview)."
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          },
+          "422" : {
+            "$ref" : "#/components/responses/ValidationFailed"
+          },
+          "503" : {
+            "$ref" : "#/components/responses/WriteDisabled"
+          }
+        }
+      }
+    },
+    "/parsers/asn1/decoders" : {
+      "get" : {
+        "tags" : [ "parsers" ],
+        "summary" : "List the ASN.1 value decoders",
+        "operationId" : "getParsersAsn1Decoders",
+        "description" : "The catalog of value decoders the asn1 parser can apply to a field (the default decoder registry): id, description and the SQL type each produces. No capability gate. 404 when the asn1 parser plugin is not installed.",
+        "responses" : {
+          "200" : {
+            "description" : "The decoder catalog.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "array",
+                        "items" : {
+                          "type" : "object",
+                          "required" : [ "id" ],
+                          "properties" : {
+                            "id" : {
+                              "type" : "string"
+                            },
+                            "description" : {
+                              "type" : "string"
+                            },
+                            "sqlType" : {
+                              "type" : "string"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/parsers/asn1/validate" : {
+      "post" : {
+        "tags" : [ "parsers" ],
+        "summary" : "Validate an ASN.1 grammar draft",
+        "operationId" : "postParsersAsn1Validate",
+        "description" : "Leniently parses grammar_text and, when root_type is given, compiles it against that type, collecting every problem as a diagnostic instead of failing on the first; valid is false when any diagnostic is an ERROR (a missing grammar_text is one). Writes nothing. No capability gate (read-shaped). 404 when the asn1 parser plugin is not installed.",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [ "grammar_text" ],
+                "properties" : {
+                  "grammar_text" : {
+                    "type" : "string",
+                    "description" : "The ASN.1 module source."
+                  },
+                  "root_type" : {
+                    "type" : "string",
+                    "description" : "The type to compile from; omitted = parse only."
+                  },
+                  "simplify_aliases" : {
+                    "type" : "boolean",
+                    "default" : false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "The diagnostics.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "object",
+                        "required" : [ "valid", "diagnostics" ],
+                        "properties" : {
+                          "valid" : {
+                            "type" : "boolean"
+                          },
+                          "diagnostics" : {
+                            "type" : "array",
+                            "items" : {
+                              "type" : "object",
+                              "required" : [ "severity", "message" ],
+                              "properties" : {
+                                "line" : {
+                                  "type" : "integer"
+                                },
+                                "column" : {
+                                  "type" : "integer"
+                                },
+                                "severity" : {
+                                  "type" : "string",
+                                  "description" : "ERROR or WARNING."
+                                },
+                                "message" : {
+                                  "type" : "string"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/jobs/backlog" : {
+      "get" : {
+        "tags" : [ "jobs" ],
+        "summary" : "Day backlog of every by-day Job",
+        "operationId" : "getJobsBacklog",
+        "description" : "One row per Job scheduled by_day: its input Dataset, whether its backlog is paused, counts of ready, waiting, running and stale days, the oldest waiting age, an estimated drain time, and each pending day. Reconciles each Job's pending days first but submits nothing. No capability gate. 404 when the Space has no Job service.",
+        "responses" : {
+          "200" : {
+            "description" : "The backlog.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "array",
+                        "items" : {
+                          "type" : "object",
+                          "required" : [ "jobName", "paused", "days" ],
+                          "properties" : {
+                            "jobName" : {
+                              "type" : "string"
+                            },
+                            "inputStream" : {
+                              "type" : "string",
+                              "description" : "The Dataset the Job reads by day."
+                            },
+                            "paused" : {
+                              "type" : "boolean"
+                            },
+                            "readyCount" : {
+                              "type" : "integer"
+                            },
+                            "waitingCount" : {
+                              "type" : "integer"
+                            },
+                            "runningCount" : {
+                              "type" : "integer"
+                            },
+                            "staleCount" : {
+                              "type" : "integer"
+                            },
+                            "oldestWaitingAgeSeconds" : {
+                              "type" : "integer"
+                            },
+                            "estimatedDrainSeconds" : {
+                              "type" : "integer",
+                              "description" : "(ready + waiting) days x the Job's average day duration (30 s until measured), divided by max_parallel."
+                            },
+                            "days" : {
+                              "type" : "array",
+                              "items" : {
+                                "type" : "object",
+                                "required" : [ "day", "status" ],
+                                "properties" : {
+                                  "day" : {
+                                    "type" : "string",
+                                    "description" : "The record day, yyyy-MM-dd."
+                                  },
+                                  "status" : {
+                                    "type" : "string",
+                                    "description" : "READY, WAITING, RUNNING, or a recorded progress status such as DONE or SKIPPED."
+                                  },
+                                  "pendingFiles" : {
+                                    "type" : "integer"
+                                  },
+                                  "pendingRows" : {
+                                    "type" : "integer"
+                                  },
+                                  "waitingReason" : {
+                                    "type" : "string",
+                                    "description" : "Why a WAITING day is held (for example a Reference not yet ready); null otherwise."
+                                  },
+                                  "stale" : {
+                                    "type" : "boolean",
+                                    "description" : "The day ran, or will run, against a previous Reference version."
+                                  },
+                                  "staleReason" : {
+                                    "type" : "string"
+                                  },
+                                  "referenceVersions" : {
+                                    "type" : "string"
+                                  },
+                                  "firstArrivedAt" : {
+                                    "type" : "string",
+                                    "description" : "ISO-8601 instant the day's first file arrived."
+                                  },
+                                  "updatedAt" : {
+                                    "type" : "string"
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/jobs/{jobId}/backlog/drain" : {
+      "post" : {
+        "tags" : [ "jobs" ],
+        "summary" : "Submit a by-day Job's ready days now",
+        "operationId" : "postJobsByJobIdBacklogDrain",
+        "description" : "Reconciles the named by_day Job now and submits its ready days up to max_parallel; ?force=true also ignores the quiet period. submitted is 0 for an unknown or non-by_day Job and when no output store exists. Gated on canOperateRuns. 404 when the Space has no Job service.",
+        "parameters" : [ {
+          "name" : "jobId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "force",
+          "in" : "query",
+          "required" : false,
+          "description" : "Ignore the quiet period.",
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Days submitted.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "object",
+                        "required" : [ "job", "submitted" ],
+                        "properties" : {
+                          "job" : {
+                            "type" : "string"
+                          },
+                          "submitted" : {
+                            "type" : "integer"
+                          }
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/jobs/{jobId}/backlog/pause" : {
+      "post" : {
+        "tags" : [ "jobs" ],
+        "summary" : "Pause a Job's day backlog",
+        "operationId" : "postJobsByJobIdBacklogPause",
+        "description" : "Stops the reconciler submitting days for the named Job until resumed. In memory only: a restart clears it. The name is not checked against the Job list. Gated on canOperateRuns. 404 when the Space has no Job service.",
+        "parameters" : [ {
+          "name" : "jobId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Paused.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "object",
+                        "required" : [ "job", "paused" ],
+                        "properties" : {
+                          "job" : {
+                            "type" : "string"
+                          },
+                          "paused" : {
+                            "type" : "boolean",
+                            "enum" : [ true ]
+                          }
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/jobs/{jobId}/backlog/resume" : {
+      "post" : {
+        "tags" : [ "jobs" ],
+        "summary" : "Resume a Job's day backlog",
+        "operationId" : "postJobsByJobIdBacklogResume",
+        "description" : "Lets the reconciler submit days for the named Job again. The name is not checked against the Job list. Gated on canOperateRuns. 404 when the Space has no Job service.",
+        "parameters" : [ {
+          "name" : "jobId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Resumed.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "object",
+                        "required" : [ "job", "paused" ],
+                        "properties" : {
+                          "job" : {
+                            "type" : "string"
+                          },
+                          "paused" : {
+                            "type" : "boolean",
+                            "enum" : [ false ]
+                          }
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/jobs/{jobId}/backlog/days/{dayId}/run" : {
+      "post" : {
+        "tags" : [ "jobs" ],
+        "summary" : "Run one backlog day now",
+        "operationId" : "postJobsByJobIdBacklogDaysByDayIdRun",
+        "description" : "Submits the named Job for one day's pending files immediately, bypassing the hold. ?allowPrevious=true runs it against the previous Reference version when a Reference for that day is not ready, marking the day stale. submitted is false for an unknown Job, a Job without an input Dataset, a day with no pending files, or no output store. Gated on canOperateRuns. 404 when the Space has no Job service.",
+        "parameters" : [ {
+          "name" : "jobId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "dayId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "allowPrevious",
+          "in" : "query",
+          "required" : false,
+          "description" : "Fall back to the previous Reference version when the day's is not ready.",
+          "schema" : {
+            "type" : "boolean",
+            "default" : false
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Whether the day was submitted.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "object",
+                        "required" : [ "job", "day", "submitted" ],
+                        "properties" : {
+                          "job" : {
+                            "type" : "string"
+                          },
+                          "day" : {
+                            "type" : "string"
+                          },
+                          "submitted" : {
+                            "type" : "boolean"
+                          }
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          }
+        }
+      }
+    },
+    "/jobs/{jobId}/backlog/days/{dayId}/give-up" : {
+      "post" : {
+        "tags" : [ "jobs" ],
+        "summary" : "Stop waiting for one backlog day",
+        "operationId" : "postJobsByJobIdBacklogDaysByDayIdGiveUp",
+        "description" : "Records the day's pending files for the named Job as SKIPPED (reason: operator gave up waiting), so the day leaves the backlog without running. skipped is false for an unknown Job, a Job without an input Dataset, a day with no pending files, or no output store. Gated on canOperateRuns. 404 when the Space has no Job service.",
+        "parameters" : [ {
+          "name" : "jobId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        }, {
+          "name" : "dayId",
+          "in" : "path",
+          "required" : true,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "Whether the day was skipped.",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "allOf" : [ {
+                    "$ref" : "#/components/schemas/Envelope"
+                  }, {
+                    "properties" : {
+                      "data" : {
+                        "type" : "object",
+                        "required" : [ "job", "day", "skipped" ],
+                        "properties" : {
+                          "job" : {
+                            "type" : "string"
+                          },
+                          "day" : {
+                            "type" : "string"
+                          },
+                          "skipped" : {
+                            "type" : "boolean"
+                          }
+                        }
+                      }
+                    }
+                  } ]
+                }
+              }
+            }
+          },
+          "404" : {
+            "$ref" : "#/components/responses/NotFound"
+          }
+        }
+      }
     }
   },
   "components" : {
