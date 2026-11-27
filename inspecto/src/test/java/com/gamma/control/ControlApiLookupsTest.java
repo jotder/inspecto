@@ -328,7 +328,10 @@ class ControlApiLookupsTest {
             HttpResponse<String> overlap = test(c, "{\"pipeline\":\"" + name + "\",\"step\":\"join\",\"value\":\"7\","
                     + "\"refresh\":true}");
             assertEquals(422, overlap.statusCode(), overlap.body());
-            assertTrue(overlap.body().contains("overlap"), overlap.body());
+            assertTrue(overlap.body().contains(LookupRoutes.WITHHELD_REFUSAL), "a non-revealer gets the fixed text: " + overlap.body());
+            String detail = lookups(c, "Bearer reveal").get("lookups").get(0).get("index").get("error").asText();
+            assertNotEquals(LookupRoutes.WITHHELD_REFUSAL, detail);
+            assertTrue(detail.contains("overlap"), "a revealer reads the refusal itself: " + detail);
         }
     }
 
