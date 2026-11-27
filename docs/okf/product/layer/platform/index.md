@@ -39,7 +39,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `OPENAPI-FINDING-SCHEMA-1` | P3 | defect | The API contract's Finding schema describes the wrong fields. | — |
 | `NATIVE-LICENCE-LINUX-MACOS-1` | P3 | chore | Two licence calls on the tokenizers natives wait on the operator. | operator |
 | `UPGRADE-BACKUPDIR-RELATIVE-1` | P3 | defect | upgrade.ps1 resolves a relative -BackupDir from the wrong folder: | — |
-| `CONTROLAPI-DATA-DIR-MISMATCH-1` | P2 | defect | The control plane and the engine disagree on a Space's data root when -Ddata.dir is set: | — |
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |
 | `RELEASE-PIPELINE-UNRUN-1` | P2 | chore | No release can be cut today: release.yml has never run and its secrets and scan DB are not configured. | operator |
 | `DEPLOY-EXPOSURE-KIT-1` | P3 | chore | Prove the deploy kit (proxy fence for /metrics and /health/details, TLS, upgrade, off-site backup, signature verify) on a real host. | — |

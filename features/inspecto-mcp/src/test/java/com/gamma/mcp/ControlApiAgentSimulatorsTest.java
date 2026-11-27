@@ -403,8 +403,10 @@ class ControlApiAgentSimulatorsTest {
     }
 
     /**
-     * {@code -Ddata.dir} overrides a Space's data root for its engine, while {@code ControlApi.dataRoot()} does not read
-     * it: a registry Dataset's store under {@code -Ddata.dir} ({@code calls} there) is refused too.
+     * {@code -Ddata.dir} overrides a Space's data root for its engine and, since {@code CONTROLAPI-DATA-DIR-MISMATCH-1},
+     * for the routes too ({@code ControlApi.dataRoot()}, which the guard reads): a registry Dataset's store under
+     * {@code -Ddata.dir} ({@code calls} there) is refused. Falsified 2026-11-27: with {@code dataRoot()} reading only the
+     * Space's own dir it answered 200 with the rows.
      */
     @Test
     void aDatasetStoreUnderTheDataDirOverrideIsRefusedToEveryCaller(@TempDir Path root) throws Exception {
@@ -421,6 +423,51 @@ class ControlApiAgentSimulatorsTest {
                 DuckDbUtil.deleteTempDb(seed);
             }
             assertRefusedToEveryCaller(c, store);
+        } finally {
+            System.clearProperty("data.dir");
+        }
+    }
+
+    /**
+     * With {@code -Ddata.dir} set nothing writes under the Space's own data dir any more, but a store written there before
+     * still holds data: it stays refused (fail closed, {@code CONTROLAPI-DATA-DIR-MISMATCH-1}).
+     */
+    @Test
+    void aDatasetStoreUnderTheSpacesOwnDataDirStaysRefusedWithTheOverrideSet(@TempDir Path root) throws Exception {
+        System.setProperty("data.dir", Files.createDirectories(root.resolve("elsewhere")).toString());
+        try (Ctx c = open(root, true)) {
+            assertRefusedToEveryCaller(c, root.resolve("s1/data/calls/dt=2026/data.parquet"));
+        } finally {
+            System.clearProperty("data.dir");
+        }
+    }
+
+    /**
+     * {@code CONTROLAPI-DATA-DIR-MISMATCH-1}: a data route reads a Dataset's store where the engine writes it. With
+     * {@code -Ddata.dir} set, the Rule Template simulation over {@code calls_ds} reads {@code calls} under the override (one
+     * row, amount 99), not the stale store left in the Space's own {@code data/} (two rows, 10 and 7). Falsified 2026-11-27:
+     * with {@code ControlApi.dataRoot()} reading only the Space's own dir the answer held the two stale rows.
+     */
+    @Test
+    void aDataRouteReadsTheDatasetStoreUnderTheDataDirOverride(@TempDir Path root) throws Exception {
+        Path override = root.resolve("elsewhere");
+        Path store = Files.createDirectories(override.resolve("calls").resolve("dt=2026")).resolve("data.parquet");
+        DuckDbUtil.loadDriver();
+        File seed = DuckDbUtil.tempDbFile("dataDirRead_");
+        try (Connection conn = DuckDbUtil.openConnection(seed); Statement st = conn.createStatement()) {
+            st.execute("COPY (SELECT * FROM (VALUES ('441700900303','EU',99.0)) t(msisdn,region,amount)) TO '"
+                    + store.toString().replace("\\", "/") + "' (FORMAT PARQUET)");
+        } finally {
+            DuckDbUtil.deleteTempDb(seed);
+        }
+        System.setProperty("data.dir", override.toString());
+        try (Ctx c = open(root)) {
+            HttpResponse<String> person = post(c, PERSON, "/rule-templates/big/simulate", Map.of());
+            assertEquals(200, person.statusCode(), person.body());
+            // msisdn is classified (masked even for the person): the amounts tell the two stores apart
+            JsonNode data = JSON.readTree(person.body()).get("data");
+            assertEquals(1, data.get("matched").asInt(), "read under -Ddata.dir: " + person.body());
+            assertEquals(99.0, data.at("/rows/0/amount").asDouble(), "read under -Ddata.dir: " + person.body());
         } finally {
             System.clearProperty("data.dir");
         }

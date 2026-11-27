@@ -56,7 +56,8 @@ Moved verbatim from the retired `PROJECT_NOTES.md` (D-IR5, 2026-11-19); the arch
   `forSpace(id)` for a caller holding an id). ⚠ **Move the registry root and the DATA root TOGETHER** — a
   per-Space registry beside a JVM-wide `-Ddata.dir` *is* the defect, so half a migration is worse than none.
   ⚠ Their precedence is deliberately **opposite** and must not be harmonised: `-Ddata.dir` **overrides** a
-  Space's data dir (`CollectorService`'s rule), while the config root lets the **Space win** and falls back
+  Space's data dir (`CollectorService.dataDir`, which `ControlApi.dataRoot()` also uses since
+  `CONTROLAPI-DATA-DIR-MISMATCH-1`), while the config root lets the **Space win** and falls back
   to the property for the default Space only (`ControlApi.writeRoot()`'s rule). A test pins the asymmetry.
 
 - ⚠ **A CAPABILITY-GATED ROUTE NEEDS A `CapabilityManifest` ENTRY TOO**, and the guard that says so fails in

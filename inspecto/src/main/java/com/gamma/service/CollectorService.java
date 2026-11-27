@@ -751,7 +751,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                                 : (indexWriteRoot == null || indexWriteRoot.isBlank()) ? null
                                 : java.nio.file.Path.of(indexWriteRoot.trim()).toAbsolutePath().normalize(),
                         () -> {
-                            String dd = System.getProperty("data.dir", root.dataDir());
+                            String dd = dataDir(root);
                             return (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd);
                         }));
         // Object Engine (EDITIONS CP-11): discovered, not constructed. The optional inspecto-ops module
@@ -759,7 +759,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         // surface answers 503, while events are still recorded and the audit trail is untouched.
         // Opened here, BEFORE the Job engine, so the "objects" Platform Service below exists when it registers.
         this.objectEngine = OptionalSpi.first(ObjectEngineProvider.class)
-                .map(provider -> provider.open(root, System.getProperty("data.dir", root.dataDir())));
+                .map(provider -> provider.open(root, dataDir(root)));
         // ⚠ The seam is also a Platform Service (EDG-01 cell 7) — that is how a Job Type contributed by
         // the optional inspecto-ops module reaches it: a ServiceLoader-discovered JobTypeProvider gets only
         // a JobConfig, but a RUNNING job has JobContext.services(), holding what its descriptor requires:.
@@ -776,7 +776,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                 ? null
                 : new JobService(jobConfigs, bus, scheduler, reports,
                         System.getProperty("jobs.audit.dir", root.auditDir()), ServiceStores.openJobRunStore(root),
-                        pipelineStore, System.getProperty("data.dir", root.dataDir()), provenanceStore,
+                        pipelineStore, dataDir(root), provenanceStore,
                         platformServices);   // S1-2: ctor-injected so requires: validates at registration
         if (this.jobs != null) {
             this.jobs.deletionGuard(this::checkDeletion);   // T25: fence delete jobs
@@ -849,7 +849,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         com.gamma.query.DatasetMeasureProbe measureProbe = new com.gamma.query.DatasetMeasureProbe(
                 () -> com.gamma.pipeline.SpaceConfigRoot.forSpace(probeSpace),
                 () -> {
-                    String dd = System.getProperty("data.dir", root.dataDir());
+                    String dd = dataDir(root);
                     return (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd);
                 });
         alerting.measureProbe(measureProbe::value);
@@ -867,7 +867,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         alerting.kpiProbe(com.gamma.control.KpiAlertProbe.of(
                 () -> com.gamma.pipeline.SpaceConfigRoot.forSpace(probeSpace),
                 () -> {
-                    String dd = System.getProperty("data.dir", root.dataDir());
+                    String dd = dataDir(root);
                     return (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd);
                 }));
         // BI-INSIGHTS-1 loose ends A: each sweep re-checks the KPI rule's owner (roles stamped at save); lost access =
@@ -885,7 +885,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
                     java.nio.file.Path wr = root.config() != null ? root.config()
                             : (bootWriteRoot == null || bootWriteRoot.isBlank()) ? null
                             : java.nio.file.Path.of(bootWriteRoot.trim()).toAbsolutePath().normalize();
-                    String dd = System.getProperty("data.dir", root.dataDir());   // LA-18: whole-Dataset reads
+                    String dd = dataDir(root);   // LA-18: whole-Dataset reads
                     return wr == null ? com.gamma.alert.InvestigationMeasureProbe.Reading.of(java.util.OptionalDouble.empty())
                             : probe.read(wr, (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd), rule);
                 }));
@@ -1194,7 +1194,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             writeRoot = (wr == null || wr.isBlank()) ? null : java.nio.file.Path.of(wr);
         }
         com.gamma.control.PendingAlertRules.onScoreProduced(writeRoot, () -> {
-            String dd = System.getProperty("data.dir", root.dataDir());
+            String dd = dataDir(root);
             return (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd);
         }, kind, model, alerting, eventLog);
     }
@@ -1935,8 +1935,19 @@ public final class CollectorService implements ReadModel, AutoCloseable {
      * embedded-intelligence belt's {@code query_author} tool, which renders dataset-relation SQL.
      */
     public java.nio.file.Path dataRoot() {
-        String dd = System.getProperty("data.dir", root.dataDir());
+        String dd = dataDir(root);
         return (dd == null || dd.isBlank()) ? null : java.nio.file.Path.of(dd);
+    }
+
+    /**
+     * THE data-root rule for a Space's engine and routes ({@code CONTROLAPI-DATA-DIR-MISMATCH-1}): a non-blank
+     * {@code -Ddata.dir} overrides the Space's own data dir, for every Space; else the Space's own. Every engine store
+     * and Dataset read below, and every control-plane route (through {@code ControlApi.dataRoot()}), resolves through it. Modules below this one restate it with the same precedence
+     * ({@code SpaceConfigRoot.currentDataRoot}, {@code PathJail.isDataRoot}); change them together.
+     */
+    public static String dataDir(SpaceRoot root) {
+        String dd = System.getProperty("data.dir");
+        return (dd == null || dd.isBlank()) ? root.dataDir() : dd.trim();
     }
 
     /** The report aggregator backing the Control API's status / batch-audit report endpoints. */
@@ -1961,7 +1972,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
         if (jobs == null) {
             JobService created = new JobService(List.of(), bus, scheduler, reports,
                     System.getProperty("jobs.audit.dir", root.auditDir()), ServiceStores.openJobRunStore(root),
-                    pipelineStore, System.getProperty("data.dir", root.dataDir()), null,
+                    pipelineStore, dataDir(root), null,
                     platformServices);   // S1-2: ctor-injected so requires: validates at registration
             created.deletionGuard(this::checkDeletion);
             created.spaceId(spaceId);

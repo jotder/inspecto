@@ -74,7 +74,7 @@ Every `dirs.*` value resolves under the Space directory.
 | Property | Effect |
 |---|---|
 | `-Dassist.write.root` | Config root of the default Space only; a named Space uses its own root (`SpaceConfigRoot`). |
-| `-Ddata.dir` | Overrides the data root for every Space when set. |
+| `-Ddata.dir` | Overrides the data root for every Space when set (not blank), for the engine and the control-plane routes alike. |
 | `-Dassist.safety.roots` | `;`-separated allowed roots for every jailed path a Job or Pipeline names (`PathJail`). Unset with no hosted Space means no root at all: jailed paths fail closed. |
 
 ## 3. JVM flags

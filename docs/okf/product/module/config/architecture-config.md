@@ -90,6 +90,14 @@ At load (`SpaceDataRoot.claim`) a moved Space is refused, never split, when: `da
 names another Space directory (a copied Space folder must get its own data root). A newly created Space's seeded
 `data/` is moved onto its data root (`adoptSeeded`); `DELETE ?purge=true` purges the data root only when its stamp
 names the Space; a bundle import drops the exporter's `data_root`.
+
+**`-Ddata.dir` (`CONTROLAPI-DATA-DIR-MISMATCH-1`, 2026-11-28).** A non-blank `-Ddata.dir` overrides a Space's `data/`
+folder (where Dataset stores live) for every Space; blank or unset, the Space's own `data/` applies. The rule is
+written once, `CollectorService.dataDir(SpaceRoot)`: the engine's stores and Dataset reads and the control plane's
+`ControlApi.dataRoot()` (every route that reads a Dataset's store: Dataset reads and masking, `/db/*`, simulators,
+onboarding, imports, KPIs) all resolve through it. Before, the routes read only the Space's own `data/`, so with the
+property set they read a folder the engine never wrote. `PathReferenceGuard` guards that shared root and the Space's
+own `data/` too, which may still hold stores written before the property was set.
 ⚠ DuckDB needs random writes: put `duckdb/` (the whole data root) on block storage or NFS, not on an
 object-storage mount (s3fs / mountpoint-s3). On such a mount the inbox loses atomic rename (move = copy + delete).
 **Space references.** A regular file `<spaces root>/<id>.ref` holding an absolute path boots the Space folder it

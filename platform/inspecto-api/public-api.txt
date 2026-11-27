@@ -2688,6 +2688,7 @@ com.gamma.service.CollectorService | public java.util.Optional<com.gamma.objects
 com.gamma.service.CollectorService | public long acquirePollSeconds()
 com.gamma.service.CollectorService | public long pollSeconds()
 com.gamma.service.CollectorService | public static CollectorService fromArgs(String[]) throws IOException
+com.gamma.service.CollectorService | public static String dataDir(SpaceRoot)
 com.gamma.service.CollectorService | public static synchronized void commitStep(String, int, CommitPhase, CommitStep)
 com.gamma.service.CollectorService | public static synchronized void preRunStep(String, int, PreRunStep)
 com.gamma.service.CollectorService | public static void main(String[]) throws Exception

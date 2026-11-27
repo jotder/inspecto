@@ -1929,7 +1929,9 @@ public final class ControlApi implements AutoCloseable, HostContext {
 
     @Override
     public Path dataRoot() {
-        String dir = currentContext().root().dataDir();
+        // CONTROLAPI-DATA-DIR-MISMATCH-1: the engine's rule (-Ddata.dir overrides the Space's own), so a route reads the
+        // folder the engine writes; the Space's own dir alone used to send routes elsewhere when the property was set
+        String dir = CollectorService.dataDir(currentContext().root());
         return (dir == null || dir.isBlank()) ? null : Path.of(dir);
     }
 

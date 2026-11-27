@@ -1,9 +1,12 @@
 package com.gamma.control;
 
 import com.gamma.config.safety.DataRef;
+import com.gamma.event.EventLog;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
+import com.gamma.service.SpaceId;
+import com.gamma.service.SpaceManager;
 import com.gamma.spi.auth.ApiException;
 import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
@@ -22,7 +25,8 @@ import java.util.regex.Pattern;
  * a data folder. Refused (422) when it lies in a loaded Pipeline's folders (its store, every {@code sinks[]} and route
  * branch store, a DuckLake output's {@code data_path}, its rejected rows in {@code errors}/{@code quarantine}, its raw copies in {@code backup}, its inbox and
  * working folders), or in the store of a registry Dataset (its {@code physicalRef} or {@code sourceName} under the data
- * root, and under {@code -Ddata.dir} when set: {@code CONTROLAPI-DATA-DIR-MISMATCH-1}); a glob, or a folder (DuckDB reads a folder's files below it), is refused when what it can reach holds any of them. A Dataset is read by name ({@code ref:} / {@code reference/<pipeline>}), where its sharing
+ * root the routes and the engine share, {@code -Ddata.dir} when set, and under the Space's own data dir:
+ * {@code CONTROLAPI-DATA-DIR-MISMATCH-1}); a glob, or a folder (DuckDB reads a folder's files below it), is refused when what it can reach holds any of them. A Dataset is read by name ({@code ref:} / {@code reference/<pipeline>}), where its sharing
  * and its classification apply. A path under none of them keeps its behaviour: raw for a builder and a builder's agent,
  * 403 for a machine agent.
  *
@@ -97,12 +101,14 @@ final class PathReferenceGuard {
                     out.add(Path.of(s).toAbsolutePath().normalize());
         }
         Path writeRoot = api.writeRoot();
-        // the data root the Space's engine writes Datasets under: -Ddata.dir overrides the Space's own (the rule
-        // CollectorService applies), while ControlApi.dataRoot() does not read it; guard under both (fail closed)
+        // the data root the routes and the engine share (CollectorService.dataDir: -Ddata.dir overrides the Space's own,
+        // CONTROLAPI-DATA-DIR-MISMATCH-1), and the Space's own data dir too: with the override set nothing writes there
+        // any more, but it may still hold the stores written before it was (fail closed)
         List<Path> dataRoots = new ArrayList<>();
         if (api.dataRoot() != null) dataRoots.add(api.dataRoot());
-        String dataDir = System.getProperty("data.dir");
-        if (dataDir != null && !dataDir.isBlank()) dataRoots.add(Path.of(dataDir));
+        SpaceManager spaces = HostContext.of(api).spaces();
+        String own = spaces.space(SpaceId.of(EventLog.currentSpaceId())).orElseGet(spaces::current).root().dataDir();
+        if (own != null && !own.isBlank()) dataRoots.add(Path.of(own));
         if (writeRoot == null || dataRoots.isEmpty()) return out;
         for (ComponentRegistry.Component ds : new ComponentStore(writeRoot.resolve("registry")).list("dataset"))
             for (String store : com.gamma.mask.EvidenceMasker.datasetStores(ds.content())) {

@@ -108,7 +108,7 @@ public final class SpaceConfigRoot {
      * lanes already disagreed before this class existed and silently "harmonising" them would change
      * behaviour.</b> For the <b>data</b> root an explicitly-set {@code -Ddata.dir} <b>wins</b> over the
      * Space's own directory — the exact rule {@code CollectorService}'s four call sites apply
-     * ({@code System.getProperty("data.dir", root.dataDir())}). For the <b>config</b> root the Space wins
+     * ({@code CollectorService.dataDir(root)}, which {@code ControlApi.dataRoot()} also uses). For the <b>config</b> root the Space wins
      * and the property is only the default-Space fallback — the rule {@code ControlApi.writeRoot()}
      * applies. ⛔ Do not "fix" this asymmetry here; it is a product-level question, and matching each
      * lane's existing rule is what keeps this class a refactor rather than a behaviour change.
