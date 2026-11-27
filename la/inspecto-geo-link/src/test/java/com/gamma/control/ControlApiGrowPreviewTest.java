@@ -143,7 +143,8 @@ class ControlApiGrowPreviewTest {
         assertFalse(p.get("needsApproval").asBoolean(), p.toString());
 
         JsonNode step = op(c, id, "{}".equals(body) ? "{\"op\":\"expand\"}" : "{\"op\":\"expand\"," + body.substring(1));
-        assertEquals(lines + 1, logLines(c.root(), id));
+        // an expand that changes the Working Set appends one step; one that changes nothing answers no_op and appends none
+        assertEquals("no_op".equals(step.path("status").asText()) ? lines : lines + 1, logLines(c.root(), id), step.toString());
         assertEquals(step.at("/delta/admitted").size(), p.get("addsNodes").asInt(), "nodes: " + p + " vs " + step);
         assertEquals(step.at("/delta/linksAdded").asInt(), p.get("addsLinks").asInt(), "links: " + p + " vs " + step);
         assertEquals(step.at("/read/hubsFlagged").asInt(0), p.get("heldCount").asInt(), "held: " + p + " vs " + step);

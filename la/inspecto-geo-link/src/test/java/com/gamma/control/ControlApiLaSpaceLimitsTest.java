@@ -128,11 +128,17 @@ class ControlApiLaSpaceLimitsTest {
             post(c, OPS, "{\"op\":\"expand\",\"budget\":99999}");
             assertEquals(40_000, lastParams(c, "case-a").get("budget").asInt(), "clamped to the doubled 40,000");
 
+            // case-a has read the whole fixture, so a further expand there adds nothing and appends no step (no_op):
+            // each Space-limit expand runs on a fresh Investigation, where it grows the graph and seals its params.
             limits(c, "{\"investigation.expand_budget_default\":7,\"investigation.expand_budget_max\":9}");
-            post(c, OPS, "{\"op\":\"expand\"}");
-            assertEquals(7, lastParams(c, "case-a").get("budget").asInt(), "the Space's default, no restart");
-            post(c, OPS, "{\"op\":\"expand\",\"budget\":100}");
-            assertEquals(9, lastParams(c, "case-a").get("budget").asInt(), "clamped to the Space's ceiling");
+            create(c, "case-b");
+            post(c, "/inv/investigations/case-b/ops", "{\"op\":\"seed\",\"ids\":[\"a\"]}");
+            post(c, "/inv/investigations/case-b/ops", "{\"op\":\"expand\"}");
+            assertEquals(7, lastParams(c, "case-b").get("budget").asInt(), "the Space's default, no restart");
+            create(c, "case-c");
+            post(c, "/inv/investigations/case-c/ops", "{\"op\":\"seed\",\"ids\":[\"a\"]}");
+            post(c, "/inv/investigations/case-c/ops", "{\"op\":\"expand\",\"budget\":100}");
+            assertEquals(9, lastParams(c, "case-c").get("budget").asInt(), "clamped to the Space's ceiling");
         }
     }
 
