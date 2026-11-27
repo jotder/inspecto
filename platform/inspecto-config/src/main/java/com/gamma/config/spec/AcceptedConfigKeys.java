@@ -153,6 +153,7 @@ public final class AcceptedConfigKeys {
             // ── top-level ────────────────────────────────────────────────────────
             "active",              // the arming switch itself — authored on every runnable pipeline
             "route",               // gap 9's block — the branch-aware ingest lane
+            "source",              // pre-rename alias of collector:, read only to spot a dataset connector (JOB-GRAPH-1)
             "steps",               // the ordered Stage-2 chain (gap 11)
             "template",            // template: true ⇒ never registered, so never runnable
             "trigger",             // schedule / on:dataset
