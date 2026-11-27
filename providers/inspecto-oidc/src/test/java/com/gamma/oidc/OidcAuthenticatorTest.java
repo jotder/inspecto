@@ -301,28 +301,12 @@ class OidcAuthenticatorTest {
 
     @Test
     void superRoleGrantsAllCapabilities() throws Exception {
-        // ⚠ This literal set is the WHOLE capability vocabulary and must be extended by every new
-        // capability — it went stale twice on 2026-07-25 alone (D14 canOfferDatasets, D4 canCurateMenus).
-        // It cannot assert against Roles.KNOWN_CAPABILITIES / CapabilityManifest.capabilities() because
-        // both are package-private to com.gamma.control and this test is another package in another
-        // module; widening them for a test was judged the wrong trade. Keep the list in sync.
+        // The expectation is the capability vocabulary itself (Roles.KNOWN_CAPABILITIES, built from the
+        // CapabilityManifest), so a new capability cannot leave this test stale again — a hand-kept literal
+        // list went stale repeatedly (latest: AK-2f canDraftInvestigations, 2026-11-25).
         String jwt = token(Instant.now().plusSeconds(60), List.of("super"), RSA_KEY, ISSUER, AUDIENCE, "root");
         Optional<Subject> subject = authenticateWithHeader(authenticator(ISSUER, AUDIENCE), "Bearer " + jwt);
-        assertEquals(Set.of(Roles.CAN_AUTHOR_WORKBENCH, Roles.CAN_OPERATE_RUNS, Roles.CAN_MANAGE_INCIDENTS, Roles.CAN_OPEN_INBOUND_INVESTIGATION,
-                        Roles.CAN_TRIAGE_REQUIREMENTS, Roles.CAN_ONBOARD_CONNECTIONS,
-                        Roles.CAN_CONFIGURE_ACCESS, Roles.CAN_AUTHOR_ALERT_RULES, Roles.CAN_OFFER_DATASETS,
-                        Roles.CAN_REQUEST_SHARES, Roles.CAN_APPROVE_SHARES, Roles.CAN_CURATE_MENUS,
-                        Roles.CAN_ADMINISTER,    // ROUTE-UNGATED-DEFAULT-1, 2026-09-15 — the eleventh
-                        Roles.CAN_REVEAL_LINK_ENTITIES, Roles.CAN_APPROVE_LINK_EXPANSIONS,  // LA-19, 2026-09-24
-                        Roles.CAN_WORK_INCIDENTS,    // operator, 2026-09-26
-                        Roles.CAN_APPROVE_CHANGES,   // ASSURE-MAKER-CHECKER-1, 2026-09-26
-                        Roles.CAN_OFFER_SIGNALS,     // cross-Space consequence D7, 2026-09-28
-                        Roles.CAN_RUN_LINK_GRAPH_ANALYSIS,   // LA separation D-4 step 6, 2026-10-01
-                        Roles.CAN_BUILD_LINK_INDEX,   // LA separation D-3 step 4, 2026-10-02
-                        Roles.CAN_UPLOAD_DATA,   // analyst upload, D-UP3
-                        Roles.CAN_SHARE_INVESTIGATION,   // LA-EMBED-VIEW-1, 2026-10-12
-                        Roles.CAN_MANAGE_EXCLUSION_CATEGORIES),   // LA-GROW-EXCLUDE-1 phase 4, 2026-10-22
-                subject.get().capabilities());
+        assertEquals(Roles.KNOWN_CAPABILITIES, subject.get().capabilities());
     }
 
     @Test
