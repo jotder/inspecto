@@ -406,7 +406,7 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 #### API contract & vocabulary
 
-- **P3** · `REFUSAL-CODES-REST-1` — **about 1,000 call sites still refuse with only the shared `CONFIG_VALIDATION_FAILED` and no finding code, so an agent must read the message.** `REFUSAL-CODES-1` (2026-11-27) coded the twelve refusals agents hit most (BI query, Dataset relation, Reconciliation, Decision Rule, Link Analysis query shapes: `error.details.findings[0].code`) and catalogued the 22 Pipeline save refusal codes. Next: code the rest per route family as live golden runs or the audit trail show them hit, via `RouteErrors.unprocessable` / `CodedArgumentException`. → `okf/product/layer/platform/api-error-catalogue.md` [items: layer.platform, module.api · kind: chore · hold: demand]
+- **P3** · `REFUSAL-CODES-REST-1` — **about 1,000 call sites still refuse with only the shared `CONFIG_VALIDATION_FAILED` and no finding code, so an agent must read the message.** `REFUSAL-CODES-1` (2026-11-27) coded the twelve refusals agents hit most (BI query, Dataset relation, Reconciliation, Decision Rule, Link Analysis query shapes: `error.details.findings[0].code`) and catalogued the 22 Pipeline save refusal codes. Next: route the IAE mappers that still drop a code (BiSpecRunner, KpiRoutes, QueryRoutes, ShareRoutes, RuleRoutes) through `RouteErrors.unprocessable`, then code the rest per route family as live golden runs show them hit. → `okf/product/layer/platform/api-error-catalogue.md` [items: layer.platform, module.api · kind: chore · hold: demand]
 
 
 
