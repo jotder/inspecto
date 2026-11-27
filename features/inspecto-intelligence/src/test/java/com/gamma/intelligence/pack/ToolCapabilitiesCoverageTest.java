@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ToolCapabilitiesCoverageTest {
 
     private static final Set<String> GATED = Set.of("component_draft", "query_author", "projection_author",
-            "kpi_report_builder", "pipeline_author", "anomaly_scan", "suggest_expectations",
+            "kpi_report_builder", "widget_from_question", "pipeline_author", "anomaly_scan", "suggest_expectations",
             // the act tier: mutating, and gated as well
             "component_apply", "component_rollback", "job_run", "pipeline_rerun", "alert_ack", "schedule_apply",
             "runbook_operator");

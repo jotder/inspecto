@@ -109,6 +109,7 @@ final class InspectoTools {
                 timelineBuild(service, components), diffBatches(service),
                 configVersionsDiff(components), anomalyScan(browseStores, egress),
                 configSchema(), componentDraft(), queryAuthor(service, components), kpiReportBuilder(components),
+                widgetFromQuestion(components),
                 pipelineAuthor(), projectionAuthor(), suggestExpectations(browseStores, egress),
                 componentApply(controlPlane), componentRollback(controlPlane),
                 jobRun(controlPlane), pipelineRerun(controlPlane),
@@ -1221,6 +1222,38 @@ final class InspectoTools {
             result.put("widgets", widgets);
             return ok(result);
         });
+    }
+
+    /**
+     * BI-INSIGHTS-1 P4 {@code widget_from_question} (author, L1; AQ-0): Ask the Dashboard. A draft-only tool in the
+     * {@link #queryAuthor} / {@link #kpiReportBuilder} pattern — see {@link WidgetFromQuestion}. It never persists;
+     * the gated write is {@code component_apply}.
+     */
+    private static Tool widgetFromQuestion(ComponentStore components) {
+        ToolSpec spec = new ToolSpec(WidgetFromQuestion.TOOL,
+                "Draft a Widget from a question over the Datasets the caller may view. Call with no measures to get "
+                        + "the closed vocabulary (datasets, columns, roles, allowed aggregates - never values); call "
+                        + "with measures to get a DRAFT widget plus a templated caption. You never write SQL or state "
+                        + "a number. Args: dataset (optional; asked if several fit), measures ([{agg,field}]), groupBy "
+                        + "(at most 2), grain (auto|day|week|month), filters ([{field,op,value}] - values verbatim), "
+                        + "window ({field?,days}), compare (previous|lastYear|average), topN, order (asc|desc), "
+                        + "question (the user's words), preferred (dataset ids to list first). Refuses why-questions, "
+                        + "forecasts, joins and calculated measures.",
+                "{\"type\":\"object\",\"properties\":{"
+                        + "\"dataset\":{\"type\":\"string\"},"
+                        + "\"measures\":{\"type\":\"array\",\"items\":{\"type\":\"object\"}},"
+                        + "\"groupBy\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},"
+                        + "\"grain\":{\"type\":\"string\"},"
+                        + "\"filters\":{\"type\":\"array\",\"items\":{\"type\":\"object\"}},"
+                        + "\"window\":{\"type\":\"object\"},"
+                        + "\"compare\":{\"type\":\"string\"},"
+                        + "\"topN\":{\"type\":\"integer\"},"
+                        + "\"order\":{\"type\":\"string\"},"
+                        + "\"question\":{\"type\":\"string\"},"
+                        + "\"intent\":{\"type\":\"string\"},"
+                        + "\"preferred\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}}}}",
+                false, Role.USER, Capability.AUTHOR_PIPELINE);
+        return new FunctionTool(spec, call -> WidgetFromQuestion.invoke(call, components));
     }
 
     /** A {@code widget} component draft: {@code vizType} + dataset + the plugin {@code controls}, with an
