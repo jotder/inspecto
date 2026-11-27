@@ -413,10 +413,10 @@ decided by their Roles. Basic has no sign-in, so its calls carry no token.
 
 | Method | Path | What it does | Not before |
 |---|---|---|---|
-| GET | `/insights` | List an Insight Profile's Insights | Standard and up |
-| POST | `/insights/{profile}/{insightId}/feedback` | Give feedback on an Insight | Standard and up |
-| POST | `/insights/explain` | Explain the change of a Measure between one time bucket and the bucket before it | Standard and up |
-| POST | `/insights/preview` | Replay an unsaved Insight Profile over history | Standard and up |
+| GET | `/insights` | List an Insight Profile's Insights |  |
+| POST | `/insights/{profile}/{insightId}/feedback` | Give feedback on an Insight |  |
+| POST | `/insights/explain` | Explain the change of a Measure between one time bucket and the bucket before it |  |
+| POST | `/insights/preview` | Replay an unsaved Insight Profile over history |  |
 
 ## inv
 

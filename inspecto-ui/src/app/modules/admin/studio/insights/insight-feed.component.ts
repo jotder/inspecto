@@ -13,7 +13,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { RouterLink } from '@angular/router';
 import { ToastrService } from 'ngx-toastr';
-import { switchMap } from 'rxjs';
+import { Observable, of, switchMap } from 'rxjs';
 import { ActionRequestsService } from 'app/inspecto/api/action-requests.service';
 import { apiErrorMessage, needsPermission } from 'app/inspecto/api/api-base';
 import { Insight, InsightBand, InsightFeed, InsightFeedback, InsightsService } from 'app/inspecto/api/insights.service';
@@ -66,7 +66,7 @@ const STATUS_WORDS: Record<string, string> = {
 
 /**
  * The Insight feed of one Insight Profile (BI-INSIGHTS-1 P3): `GET /insights?profile=`, the latest run, best score
- * first. Feedback needs canAuthorWorkbench on the server, so the buttons are disabled with the reason without it.
+ * first. Feedback is open to anyone who can view the feed (operator 2026-11-26).
  * A 404 means no run has written the Insights Dataset yet (or the reader may not view it) — an empty state, not an error.
  */
 @Component({
@@ -171,8 +171,7 @@ const STATUS_WORDS: Record<string, string> = {
                                     <button
                                         mat-stroked-button
                                         type="button"
-                                        [disabled]="!canFeedback() || busy() === i.insight_id"
-                                        [attr.title]="canFeedback() ? null : noFeedbackReason"
+                                        [disabled]="busy() === i.insight_id"
                                         [attr.aria-pressed]="i.status === b.status"
                                         (click)="give(i, b.status)"
                                     >
@@ -224,9 +223,6 @@ const STATUS_WORDS: Record<string, string> = {
                         </li>
                     }
                 </ul>
-                @if (!canFeedback()) {
-                    <p class="text-secondary mt-2 text-xs">{{ noFeedbackReason }}</p>
-                }
                 @if (casesInstalled() && caseBlocked(); as why) {
                     <p class="text-secondary mt-1 text-xs">Open a Case: {{ why }}</p>
                 }
@@ -267,8 +263,6 @@ export class InsightFeedComponent {
     readonly bandFilter = signal<InsightBand | null>(null);
     private injector = inject(Injector);
     readonly feedbackChoices = FEEDBACK;
-    readonly noFeedbackReason = needsPermission('canAuthorWorkbench');
-    readonly canFeedback = this.lens.canAuthorWorkbench;
     readonly loading = signal(true);
     readonly error = signal<string | null>(null);
     readonly feed = signal<InsightFeed | null>(null);
@@ -322,8 +316,13 @@ export class InsightFeedComponent {
         });
     }
 
-    /** `POST /cases/from-entities` with the Insight as its one member, so the Case carries the evidence. */
-    private caseFor(i: Insight) {
+    /**
+     * `POST /cases/from-entities` with the Insight as its one member, so the Case carries the evidence. A Case already
+     * opened for this Insight on this page is reused, so a retry does not open a second one (plan §11.13).
+     */
+    private caseFor(i: Insight): Observable<{ case: { id: string } }> {
+        const known = this.opened()[i.insight_id]?.caseId;
+        if (known) return of({ case: { id: known } });
         const e = insightEvidence(i, this.profile(), window.location.origin);
         return this.objects.openCaseFromEntities(insightCaseTitle(e), insightCaseDescription(e), [
             insightCaseMember(e),
@@ -391,7 +390,8 @@ export class InsightFeedComponent {
     }
 
     private remember(i: Insight, o: Opened): void {
-        this.opened.update((m) => ({ ...m, [i.insight_id]: o }));
+        // Merge: Open a Case on a reused Case must not drop the Action Request already shown.
+        this.opened.update((m) => ({ ...m, [i.insight_id]: { ...m[i.insight_id], ...o } }));
     }
 
     statusWords(i: Insight): string {

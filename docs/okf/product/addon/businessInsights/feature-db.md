@@ -17,10 +17,10 @@ tags: [feature-db, addon]
 
 | feature | type | module | editions | addon | status | key | source |
 |---|---|---|---|---|---|---|---|
-| insight-profile | config kind | insights | standard;advanced;preview | businessInsights | ga | `insight-profile` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
-| insights | feature | insights | standard;advanced;preview | businessInsights | ga | `insights` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
-| insight.scan | job type | insights | standard;advanced;preview | businessInsights | ga | `insight.scan` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
-| "GET /insights" | route | insights | standard;advanced;preview | businessInsights | ga | `"GET /insights"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
-| "POST /insights/([^/]+)/([^/]+)/feedback" | route | insights | standard;advanced;preview | businessInsights | ga | `"POST /insights/([^/]+)/([^/]+)/feedback"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
-| "POST /insights/explain" | route | insights | standard;advanced;preview | businessInsights | ga | `"POST /insights/explain"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
-| "POST /insights/preview" | route | insights | standard;advanced;preview | businessInsights | ga | `"POST /insights/preview"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
+| insight-profile | config kind | insights | basic;standard;advanced;preview | businessInsights | ga | `insight-profile` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
+| insights | feature | insights | basic;standard;advanced;preview | businessInsights | ga | `insights` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
+| insight.scan | job type | insights | basic;standard;advanced;preview | businessInsights | ga | `insight.scan` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
+| "GET /insights" | route | insights | basic;standard;advanced;preview | businessInsights | ga | `"GET /insights"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
+| "POST /insights/([^/]+)/([^/]+)/feedback" | route | insights | basic;standard;advanced;preview | businessInsights | ga | `"POST /insights/([^/]+)/([^/]+)/feedback"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
+| "POST /insights/explain" | route | insights | basic;standard;advanced;preview | businessInsights | ga | `"POST /insights/explain"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |
+| "POST /insights/preview" | route | insights | basic;standard;advanced;preview | businessInsights | ga | `"POST /insights/preview"` | `features/inspecto-insights/src/main/resources/META-INF/inspecto/module.toon` |

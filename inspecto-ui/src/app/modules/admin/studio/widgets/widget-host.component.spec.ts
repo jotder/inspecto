@@ -17,6 +17,10 @@ import { WidgetsService } from './widgets.service';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 import { DrillEvent, WidgetHostComponent } from './widget-host.component';
+import { SessionService } from 'app/inspecto/auth/session.service';
+import { MatDialog } from '@angular/material/dialog';
+import { signal } from '@angular/core';
+import { ExplainDialogComponent } from './explain.dialog';
 
 const DS: Dataset = {
     id: 'cdr_sample',
@@ -670,5 +674,67 @@ describe('WidgetHostComponent', () => {
         fixture.detectChanges();
         expect(fixture.componentInstance.showMeOffered()).toBe(false);
         expect(fixture.nativeElement.querySelector('[data-testid="tile-show-me"]')).toBeNull();
+    });
+    // ── BI-INSIGHTS-1 loose ends B: Explain this change is offered to every viewer, gated only on the add-on ──
+    function explainTile(insights: boolean) {
+        const open = vi.fn();
+        TestBed.overrideProvider(MatDialog, { useValue: { open } });
+        const fixture = create([
+            { provide: WidgetsService, useValue: {} },
+            { provide: DatasetsService, useValue: {} },
+            {
+                provide: DatasetResultService,
+                useValue: {
+                    run: () =>
+                        Promise.resolve({
+                            ok: true,
+                            rows: [
+                                { day: '2026-01-01', sum_duration_s: 1 },
+                                { day: '2026-01-02', sum_duration_s: 3 },
+                            ],
+                        }),
+                },
+            },
+            { provide: SessionService, useValue: { features: signal({ insights }) } },
+            {
+                provide: LensService,
+                useValue: { canAuthorWorkbench: () => false, canAuthorAlertRules: () => false },
+            },
+        ]);
+        fixture.componentRef.setInput('widget', {
+            ...WIDGET,
+            vizType: 'line',
+            controls: { x: [{ field: 'day', grain: 'day' }], y: [{ field: 'duration_s', agg: 'sum' }] },
+        });
+        fixture.componentRef.setInput('dataset', {
+            ...DS,
+            columns: [
+                { name: 'day', type: 'date', role: 'dimension' },
+                { name: 'region', type: 'string', role: 'dimension' },
+                { name: 'duration_s', type: 'number', role: 'measure' },
+            ],
+        });
+        fixture.detectChanges();
+        return { fixture, open };
+    }
+
+    it('a viewer who may not author still gets Explain this change, which opens the dialog on the last period', async () => {
+        const { fixture, open } = explainTile(true);
+        await fixture.whenStable();
+        fixture.detectChanges();
+        const button = fixture.nativeElement.querySelector('[data-testid="explain-change"]') as HTMLButtonElement;
+        expect(button).not.toBeNull();
+        button.click();
+        expect(open).toHaveBeenCalledTimes(1);
+        expect(open.mock.calls[0][0]).toBe(ExplainDialogComponent);
+        expect(open.mock.calls[0][1].data.request).toMatchObject({ field: 'day', grain: 'day', at: '2026-01-02' });
+    });
+
+    it('no Explain this change when the Business Insights add-on is not installed', async () => {
+        const { fixture } = explainTile(false);
+        await fixture.whenStable();
+        fixture.detectChanges();
+        expect(fixture.componentInstance.explainable()).toBeNull();
+        expect(fixture.nativeElement.querySelector('[data-testid="explain-change"]')).toBeNull();
     });
 });

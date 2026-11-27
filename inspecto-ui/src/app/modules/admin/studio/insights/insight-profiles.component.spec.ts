@@ -158,13 +158,13 @@ describe('InsightProfilesComponent', () => {
         await expectNoA11yViolations(el);
     });
 
-    it('disables feedback with the reason, and hides authoring, without canAuthorWorkbench', async () => {
+    it('keeps feedback open to a viewer, and hides authoring, without canAuthorWorkbench', async () => {
         const { el } = create({ author: false });
         expect(buttons(el, 'New Insight Profile').length).toBe(0);
         expect(buttons(el, 'Edit').length).toBe(0);
         const useful = buttons(el, 'Useful')[0];
-        expect(useful.disabled).toBe(true);
-        expect(useful.getAttribute('title')).toContain('Needs');
+        expect(useful.disabled).toBe(false);   // operator 2026-11-26: anyone who can view gives feedback
+        expect(useful.getAttribute('title')).toBeNull();
         await expectNoA11yViolations(el);
     });
 

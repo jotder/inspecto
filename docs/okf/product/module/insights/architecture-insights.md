@@ -11,9 +11,9 @@ code: [features/inspecto-insights, platform/inspecto-analytics, inspecto]
 
 # Business Insights
 
-> **Level 3 module page.** Layer: Add-on. Offering: Standard and above — add-on `businessInsights` (status `built`,
-> module `insights`) in `offerings/standard.toon` (D-BI2 / D-BI3, operator 2026-11-25: the module is created in P2,
-> not P3). Plan: `docs/superpower/2026-11-18-business-insights-plan.md` §11.8 (Explain) and §11.9 (Insight scan).
+> **Level 3 module page.** Layer: Add-on. Offering: every edition, Basic included — add-on `businessInsights` (status
+> `built`, module `insights`) in `offerings/basic.toon` (D-BI2; D-BI13, operator 2026-11-26, reverses D-BI3's
+> Standard-and-above placement; a default-reactor module). Plan: `docs/superpower/2026-11-18-business-insights-plan.md` §11.8 (Explain), §11.9 (Insight scan) and §11.16 (access and editions).
 
 ## 1. What it is
 
@@ -34,7 +34,8 @@ approximated.
 
 - **Kernel** (`platform/inspecto-analytics`, `com.gamma.analytics.drivers`): `Drivers`, `ShiftShare`, `MovedWith` —
   pure JVM, hand-computed goldens in `DriversGoldenTest`.
-- **Route** (`features/inspecto-insights`, `ExplainRoutes`, feature id `insights`, gated on `canAuthorWorkbench`).
+- **Route** (`features/inspecto-insights`, `ExplainRoutes`, feature id `insights`; open to anyone who may view the Widget's Dataset — a `read-shaped` exemption in the route
+  checklist, rate-limited on the standard bucket).
   It builds no SQL: each statement is a `/bi/query`-shaped spec run through **`BiSpecRunner`** (`inspecto/`,
   `com.gamma.control`) — the dataset visibility check (404), `SqlGuard`, the `QueryExecutor` sandbox and
   `BiResultMasking` (vet + mask) exactly as `POST /bi/query` applies them, as the caller.
@@ -55,8 +56,8 @@ approximated.
   form would need a new masking path. Cost: up to 13 statements per click, each bounded by its row cap.
 - **JVM, not SQL, for the statistics**: they run over a few hundred masked rows (as `ChartOverlays`, §11.4); no
   DuckDB form was added.
-- **Capability**: `canAuthorWorkbench` (Builder lens). A Business-lens viewer does not see the action yet — an
-  open question for the operator, not a technical limit.
+- **Who**: anyone who can view the Dataset (operator 2026-11-26); a Dataset the caller cannot view is the 404 of an
+  unknown one, and the UI shows the action without a capability check.
 - **A Widget on a saved Query** is not explained (the request needs the Dataset); the drawer says so.
 - **Mix and rate is not reachable from a tile yet**: no Widget authors a ratio today (`ratioMeasure` in
   `inspecto/viz/query-spec.ts` has no production caller; ratios come from KPIs and Risk factors), so the drawer's
@@ -82,8 +83,8 @@ dimensions from column roles* fills Dimensions from the Dataset's `dimension` co
 `temporal` one). *Preview on history* posts the unsaved content to `POST /insights/preview` and draws the per-period
 counts as bars, the sentence "you would have seen N Insights in the last P periods" and the top Insights; nothing is
 saved. The selected Profile's feed reads `GET /insights?profile=` (band as a status badge with its word, slice,
-period, score, sentence) with **Useful / Not useful / Expected** buttons, disabled with the reason without
-canAuthorWorkbench; a 404 is the empty state that points to an `insight.scan` Job. *This run / Every run*
+period, score, sentence) with **Useful / Not useful / Expected** buttons for every
+viewer; a 404 is the empty state that points to an `insight.scan` Job. *This run / Every run*
 (`run=latest|all`) and a band filter (`band=`) are applied by the server. **Run scan now** finds the `insight.scan` Job
 whose `profile` names the Profile (each listed one read by `GET /jobs/{name}`), triggers it (canOperateRuns), follows
 the run and reloads the feed; with none it offers **Create a scan Job…** (`POST /jobs`, `insight_scan_<profile>`, no
@@ -123,12 +124,11 @@ up to 12 dimensions, the tests, and the knobs: `sensitivity` (q ≤ 0.01 / 0.05 
 **Routes**: `GET /insights?profile=` (read-shaped, like `/bi/query`: whoever may view the Insights Dataset; latest
 run, best first, current feedback laid over `status`); `POST /insights/{profile}/{insightId}/feedback` (status
 useful / not_useful / expected, kept per type × slice); `POST /insights/preview` (an unsaved Profile replayed as of
-each of the last 4–52 buckets, as the caller, nothing saved — "you would have seen N Insights"). Both POSTs are gated
-on `canAuthorWorkbench`.
+each of the last 4–52 buckets, as the caller, nothing saved — "you would have seen N Insights"). Feedback is open to whoever may view the Insights
+Dataset (a `self-service` exemption: the caller's own opinion, else 404); the replay stays on `canAuthorWorkbench`
+(authoring).
 
-**Deliberate deferrals**: no Profile editor or Insight Feed Visualization Type yet (UI slice); feedback is
-Builder-gated because no reader-level capability exists — D-BI4 wants Business users to give it (operator
-question); owners tuning within Builder bounds (D-BI4) is not enforced — who may save the Profile tunes it; the
+**Deliberate deferrals**: no Profile editor or Insight Feed Visualization Type yet (UI slice); the
 sharing envelope does not narrow by a Mapping Dataset's `basedOn` base (the same gap as KPI History); no
 separate `_latest` store (the latest run is `max(run_id)` in the one store, so one envelope covers it); the stored
 `query` is the dimension's grouped `/bi/query` body (a masked slice cannot be filtered back by its alias); I-9

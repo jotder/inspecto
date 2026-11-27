@@ -16,8 +16,8 @@ tags: [api, routes, generated]
 | Method | Path | Summary | Tag | Capability | Registered in |
 |---|---|---|---|---|---|
 | GET | `/insights` | List an Insight Profile's Insights | insights | — | `features/inspecto-insights/src/main/java/com/gamma/insights/InsightsRoutes.java` |
-| POST | `/insights/{profile}/{insightId}/feedback` | Give feedback on an Insight | insights | `canAuthorWorkbench` | `features/inspecto-insights/src/main/java/com/gamma/insights/InsightsRoutes.java` |
-| POST | `/insights/explain` | Explain the change of a Measure between one time bucket and the bucket before it | insights | `canAuthorWorkbench` | `features/inspecto-insights/src/main/java/com/gamma/insights/ExplainRoutes.java` |
+| POST | `/insights/{profile}/{insightId}/feedback` | Give feedback on an Insight | insights | — | `features/inspecto-insights/src/main/java/com/gamma/insights/InsightsRoutes.java` |
+| POST | `/insights/explain` | Explain the change of a Measure between one time bucket and the bucket before it | insights | — | `features/inspecto-insights/src/main/java/com/gamma/insights/ExplainRoutes.java` |
 | POST | `/insights/preview` | Replay an unsaved Insight Profile over history | insights | `canAuthorWorkbench` | `features/inspecto-insights/src/main/java/com/gamma/insights/InsightsRoutes.java` |
 
 ## Drift

@@ -16,7 +16,7 @@
 
     <name>Inspecto — Business Insights (optional)</name>
     <description>
-        OPTIONAL add-on module (BI-INSIGHTS-1, D-BI2 / D-BI3): the "Business Insights" add-on. P2 ships "Explain this
+        OPTIONAL add-on module (BI-INSIGHTS-1, D-BI2; every edition since D-BI13): the "Business Insights" add-on. P2 ships "Explain this
         change" (POST /insights/explain: I-4 drivers, I-5 mix vs rate, I-6 moved with it) through ExplainRoutes; P3 adds
         Insight Profiles and the insight.scan Job here. Package com.gamma.insights. The statistics live in the Analytics
         Kernel (com.gamma.analytics.drivers); every statement runs through the core's BiSpecRunner, the same guard,

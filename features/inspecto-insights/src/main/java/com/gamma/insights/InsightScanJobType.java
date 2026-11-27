@@ -101,7 +101,7 @@ public final class InsightScanJobType implements JobTypeProvider {
                 throw new SecurityException("dataset '" + p.dataset() + "' does not exist or the Job's author '"
                         + author.id() + "' may not read it — refused");
 
-            Map<String, Object> envelope = envelope(content, dataset);
+            Map<String, Object> envelope = envelope(store, content, dataset);
             Path dir = InsightStore.claim(data, profileId);
             String datasetId = register(store, profileId, envelope);
 
@@ -223,13 +223,17 @@ public final class InsightScanJobType implements JobTypeProvider {
         return r;
     }
 
-    /** Readable only by who may read BOTH the Profile and its Dataset (as KPI History); shared differently → refused. */
-    static Map<String, Object> envelope(Map<String, Object> profile, Map<String, Object> dataset) {
+    /**
+     * Readable only by who may read the Profile, its Dataset and — for a Mapping — its base chain (as KPI History);
+     * shared differently, or a base that does not resolve → refused.
+     */
+    static Map<String, Object> envelope(ComponentStore store, Map<String, Object> profile, Map<String, Object> dataset) {
         try {
-            return SharingEnvelope.of(List.of(profile, dataset));
+            return SharingEnvelope.of(store, List.of(profile, dataset));
         } catch (SecurityException e) {
-            throw new SecurityException("the Insight Profile and its Dataset are shared differently; the Insights would "
-                    + "show one's values to the other's readers — share them alike, or leave one unshared — refused");
+            throw new SecurityException("the Insight Profile, its Dataset and a Mapping's base are not shared alike ("
+                    + e.getMessage() + "); the Insights would show one's values to another's readers — share them "
+                    + "alike, or leave all but one unshared — refused");
         }
     }
 

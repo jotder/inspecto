@@ -159,7 +159,7 @@ export function mavenProfiles(edition, root = REPO_ROOT) {
 
 /**
  * The first-party modules staged for `edition`, in classpath order.
- * Basic 7, Standard 28, Advanced 32, Preview 32 — first-party only; add PG_SIDECAR for the jar count.
+ * Basic 8, Standard 28, Advanced 32, Preview 32 — first-party only; add PG_SIDECAR for the jar count.
  * ⚠ Those numbers are ASSERTED by tools/check-sbom-modules.mjs against this table — it parses this very line.
  */
 export function bundleModules(edition) {

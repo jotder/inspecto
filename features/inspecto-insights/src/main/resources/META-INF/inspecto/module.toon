@@ -3,7 +3,7 @@ title: Business Insights
 buildRole: implementation
 offeringRole: optional
 bindingTime: boot
-absentMessage: "Business Insights is not installed in this bundle - it is provided by the optional inspecto-insights module (Standard edition and above)."
+absentMessage: "Business Insights is not installed in this bundle - it is provided by the optional inspecto-insights module (every edition)."
 provides:
   features[1]: insights
   configKinds[1]: insight-profile
