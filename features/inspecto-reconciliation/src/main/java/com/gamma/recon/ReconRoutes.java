@@ -884,7 +884,7 @@ public final class ReconRoutes implements RouteModule {
         try {
             return c.get();
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
+            throw com.gamma.control.RouteErrors.unprocessable(bad);
         } catch (SQLException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
         } catch (IOException e) {
@@ -907,7 +907,7 @@ public final class ReconRoutes implements RouteModule {
         try {
             return DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "dataset '" + datasetId + "': " + bad.getMessage());
+            throw com.gamma.control.RouteErrors.unprocessable(bad, "dataset '" + datasetId + "': " + bad.getMessage());
         }
     }
 

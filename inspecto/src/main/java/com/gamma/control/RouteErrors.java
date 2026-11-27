@@ -25,6 +25,28 @@ public final class RouteErrors {
 
     private RouteErrors() {}
 
+    /** {@code bad} as a 422 {@code CONFIG_VALIDATION_FAILED}, keeping its finding code when it is a
+     *  {@link com.gamma.config.spec.CodedArgumentException} (REFUSAL-CODES-1). */
+    public static ApiException unprocessable(IllegalArgumentException bad) {
+        return unprocessable(bad, bad.getMessage());
+    }
+
+    /** {@link #unprocessable(IllegalArgumentException)} with the route's own wording of the message. */
+    public static ApiException unprocessable(IllegalArgumentException bad, String message) {
+        return bad instanceof com.gamma.config.spec.CodedArgumentException c
+                ? new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, message, c.code(), c.fieldPath())
+                : new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, message);
+    }
+
+    /** The response body of a refusal: {@code {"error": message}}, plus its one coded finding when it has a
+     *  finding code — the v1 envelope lifts it to {@code error.details.findings[0]} (REFUSAL-CODES-1). */
+    public static Map<String, Object> body(ApiException refused) {
+        if (refused.findingCode == null) return Map.of("error", refused.getMessage());
+        return Map.of("error", refused.getMessage(), "findings", java.util.List.of(
+                new com.gamma.config.spec.Finding(com.gamma.config.spec.Severity.ERROR, refused.fieldPath,
+                        refused.getMessage(), refused.findingCode, null)));
+    }
+
     /** The engine's fail-closed lookup signals: absent target → 404, unknown kind/argument → 400. */
     public static <T> T mapErrors(Supplier<T> body) {
         try {

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-493 test class(es): 196 unit, 297 real-HTTP control-plane, 0 IT.
+494 test class(es): 196 unit, 298 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -269,6 +269,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiQueryRunV1Test` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiQueryRunV1Test.java` | Real-HTTP + real-DuckDB tests for W4 query execution ({@code POST /queries/{id}/run}): a persisted |
 | `ControlApiRateLimitTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRateLimitTest.java` | Real-HTTP tests for the per-subject token-bucket throttle on the expensive routes |
 | `ControlApiRecordTransformerSlotSaveTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRecordTransformerSlotSaveTest.java` | The default template's Record Transformer (the projection SLOT, node id {@code map}, type |
+| `ControlApiRefusalCodesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRefusalCodesTest.java` | REFUSAL-CODES-1 over real HTTP: the refusals agents hit most carry a code of their own as the one finding of the |
 | `ControlApiRejectedRowsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRejectedRowsTest.java` | {@code GET /runs/{name}/errors?file=} over real HTTP — the rejected ROWS behind an |
 | `ControlApiReplayRejectsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiReplayRejectsTest.java` | {@code POST /runs/{name}/replay-rejects} over real HTTP (EXECUTION-RESIDUALS X4): replay one file's rejected |
 | `ControlApiReprocessRefusalTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiReprocessRefusalTest.java` | {@code POST /runs/{id}/reprocess} refused over real HTTP (board {@code REPROCESS-REFUSAL-500-1}, operator ruling |

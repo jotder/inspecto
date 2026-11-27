@@ -73,9 +73,13 @@ test('the sweep sees a qualified ApiException, a computed status, a Finding lite
         'd/src/main/java/D.java': 'Map.of("code", "MAP_NEW", "key", k); out.add(new Finding(Severity.ERROR, "", m, "UNKNOWN_KEY", null));',
         'e/src/main/java/E.java': 'throw new SpaceLocations.Refused(409, SpaceLocations.HOLDS_DATA, "m"); throw new Refused(409, NOT_A_CODE, "m");',
         'f/src/main/java/F.java': 'new com.gamma.config.spec.Finding(Severity.ERROR, "a", "m", "QUALIFIED_FINDING", null); f.coded("CODED_NEW", "g");',
+        // REFUSAL-CODES-1: a coded engine refusal, and an ApiException's finding code (its fourth argument)
+        'g/src/main/java/G.java': 'throw new CodedArgumentException("ARG_CODE_NEW", "f", "m");'
+            + ' throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "m " + x,\n "API_FINDING_NEW", "f");',
     };
     const out = uncatalogued(Object.keys(files), (f) => files[f], list).join('\n');
-    for (const c of ['QUALIFIED_NEW', 'COMPUTED_NEW', 'FINDING_NEW', 'MAP_NEW', 'NOT_A_CODE', 'QUALIFIED_FINDING', 'CODED_NEW'])
+    for (const c of ['QUALIFIED_NEW', 'COMPUTED_NEW', 'FINDING_NEW', 'MAP_NEW', 'NOT_A_CODE', 'QUALIFIED_FINDING', 'CODED_NEW',
+        'ARG_CODE_NEW', 'API_FINDING_NEW'])
         assert.match(out, new RegExp(c));
     assert.doesNotMatch(out, /UNKNOWN_KEY|HOLDS_DATA|r\.code/);
 });

@@ -741,7 +741,8 @@ public final class MeasureCompiler {
                 for (Object v : vs) lits.add(typedOperand(v, p));
                 yield col + " IN (" + String.join(", ", lits) + ")";
             }
-            default -> throw new IllegalArgumentException("unknown filter op '" + op + "'");
+            default -> throw new com.gamma.config.spec.CodedArgumentException(com.gamma.config.spec.FindingCodes.ERR_BI_FILTER_OP_UNKNOWN, "filters",
+                    "unknown filter op '" + op + "'");
         };
     }
 

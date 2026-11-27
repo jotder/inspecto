@@ -154,7 +154,7 @@ final class DatasetRoutes implements RouteModule {
         try {
             relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
+            throw RouteErrors.unprocessable(bad);
         }
         int limit = Math.max(1, Math.min(MAX_ROW_LIMIT,
                 ApiContext.parseIntOr(ApiContext.query(ex, "limit"), DEFAULT_ROW_LIMIT)));

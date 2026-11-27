@@ -116,7 +116,7 @@ public final class DatasetRelation {
      */
     private static String virtualRelationSql(String userSql, String sourceName, Path dataRoot) {
         if (sourceName == null)
-            throw new IllegalArgumentException(
+            throw new com.gamma.config.spec.CodedArgumentException(com.gamma.config.spec.FindingCodes.ERR_DATASET_SQL_NO_SOURCE, "sourceName",
                     "a virtual dataset's 'sql' needs a 'sourceName' — the store its FROM reads");
         return virtualOver(userSql, sourceName, storeRelationSql(sourceName, dataRoot));   // path-jails the name first
     }
@@ -428,15 +428,20 @@ public final class DatasetRelation {
         requireFreeCalculatedNames(datasetConfig);
         StringBuilder cols = new StringBuilder();
         StringBuilder check = new StringBuilder("struct_pack(*COLUMNS(*), \"" + CALC_CHECK + "\" := NULL, \"__base\" := NULL");   // the helper and the row alias are in the check too
+        int i = 0;
         for (Object o : list) {
+            String at = "calculated[" + i++ + "]";
             if (!(o instanceof Map<?, ?> c))
-                throw new IllegalArgumentException("calculated entries must be {name, expr} objects");
+                throw new com.gamma.config.spec.CodedArgumentException(com.gamma.config.spec.FindingCodes.ERR_CALCULATED_COLUMN_INVALID, at,
+                        "calculated entries must be {name, expr} objects");
             String name = Values.trimToNull(cast(c).get("name"));
             String expr = Values.trimToNull(cast(c).get("expr"));
             if (name == null || !SAFE_IDENT.matcher(name).matches())
-                throw new IllegalArgumentException("calculated column needs a plain-identifier 'name', got '" + name + "'");
+                throw new com.gamma.config.spec.CodedArgumentException(com.gamma.config.spec.FindingCodes.ERR_CALCULATED_COLUMN_INVALID, at + ".name",
+                        "calculated column needs a plain-identifier 'name', got '" + name + "'");
             if (expr == null)
-                throw new IllegalArgumentException("calculated column '" + name + "' needs an 'expr'");
+                throw new com.gamma.config.spec.CodedArgumentException(com.gamma.config.spec.FindingCodes.ERR_CALCULATED_COLUMN_INVALID, at + ".expr",
+                        "calculated column '" + name + "' needs an 'expr'");
             cols.append(", (").append(ExpressionGuard.check(expr)).append(") AS \"").append(name).append('"');
             check.append(", \"").append(name).append("\" := NULL");
         }

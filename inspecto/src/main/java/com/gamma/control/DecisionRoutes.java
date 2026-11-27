@@ -183,7 +183,8 @@ final class DecisionRoutes implements RouteModule {
         try {
             sim.put("matched", ConditionTree.matched(rule.get("when"), sample));
         } catch (IllegalArgumentException e) {   // a rule stored before the save guard — never "matches all"
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "decision rule 'when': " + e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "decision rule 'when': " + e.getMessage(),
+                    com.gamma.config.spec.FindingCodes.ERR_DECISION_RULE_WHEN_INVALID, "when");
         }
         sim.put("total", sample.size());
         sim.put("checkedAt", System.currentTimeMillis());
@@ -490,7 +491,8 @@ final class DecisionRoutes implements RouteModule {
     private static String requireName(Map<String, Object> rule) {
         Object n = rule.get("name");
         if (n == null || String.valueOf(n).isBlank())
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "decision rule requires a 'name'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "decision rule requires a 'name'",
+                    com.gamma.config.spec.FindingCodes.ERR_DECISION_RULE_NO_NAME, "name");
         return String.valueOf(n);
     }
 
@@ -502,7 +504,8 @@ final class DecisionRoutes implements RouteModule {
     @SuppressWarnings("unchecked")
     static Map<String, Object> normalize(Map<String, Object> body) {
         if (!(body.get("consequences") instanceof List<?> cs) || cs.isEmpty())
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "decision rule requires at least one consequence");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "decision rule requires at least one consequence",
+                    com.gamma.config.spec.FindingCodes.ERR_DECISION_RULE_NO_CONSEQUENCE, "consequences");
         Map<String, Object> rule = new LinkedHashMap<>(body);
         String targetType = String.valueOf(rule.getOrDefault("targetType", "pipeline"));
         rule.put("targetType", "job".equals(targetType) ? "job" : "pipeline");
@@ -512,7 +515,8 @@ final class DecisionRoutes implements RouteModule {
         try {
             ConditionTree.requireGroupRoot(rule.get("when"));   // a bare root would match EVERY row
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "decision rule 'when': " + e.getMessage());
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "decision rule 'when': " + e.getMessage(),
+                    com.gamma.config.spec.FindingCodes.ERR_DECISION_RULE_WHEN_INVALID, "when");
         }
         Object priority = rule.get("priority");
         rule.put("priority", priority instanceof Number num ? num.intValue() : 100);

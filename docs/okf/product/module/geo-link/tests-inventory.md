@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.geo-link`](../../../../../product-map/module/geo-link.toon).
 
-136 test class(es): 19 unit, 117 real-HTTP control-plane, 0 IT.
+137 test class(es): 19 unit, 118 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -120,6 +120,7 @@ mvn -o test -pl la/inspecto-geo-link -Dtest=ControlApiAgentLinkAnalysisSeamTest,
 | `ControlApiLaShowcaseFiguresTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiLaShowcaseFiguresTest.java` | DR-T6: the user manual's section 10 worked-example figures, REPRODUCED over the shipped {@code la-showcase} corpus |
 | `ControlApiLaShowcaseGeoSceneTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiLaShowcaseGeoSceneTest.java` | The {@code la-showcase} GEO scene (operator 2026-10-12): the saved Geo Views the template ships are read with the |
 | `ControlApiLaSpaceLimitsTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiLaSpaceLimitsTest.java` | {@code LA-CONFIG-LIMITS-1} P3 over real HTTP: every Space analysis limit is read at its code site from the Space's in-force |
+| `ControlApiLinkAnalysisRefusalCodesTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiLinkAnalysisRefusalCodesTest.java` | REFUSAL-CODES-1 over real HTTP: the Link Analysis query shapes the W4 golden runs refused most (la-01, la-02, adv-06 — |
 | `ControlApiLinkTotalTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiLinkTotalTest.java` | LA-COLUMN-ROLES-2 (operator decision D-2 a): a link read may name a Measure column ({@code measureCol}, an edge mapping's |
 | `ControlApiMaskingDefaultBySignInTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiMaskingDefaultBySignInTest.java` | The masking default follows SIGN-IN, not the Link Analysis level ({@code LA-ONBOARD-1} OB-6, operator answer A-16): with |
 | `ControlApiMultiDatasetFilterTest` | `com.gamma.control` | real-HTTP control-plane test | `la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiMultiDatasetFilterTest.java` | LA-COLUMN-ROLES-2 (operator decision D-3 b): Filter by role over a read of several Datasets has one section per Dataset, |

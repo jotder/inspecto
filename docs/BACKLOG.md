@@ -28,9 +28,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 `index.md` shows its rows under **Open work**, generated from this page by `tools/render-product-docs.mjs`
 — this page stays the only list. Checked by `tools/check-backlog-items.mjs`.
 
-> **193<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 30<!--count:backlog-p2--> × P2 · 163<!--count:backlog-p3--> × P3** —
+> **194<!--count:backlog-rows--> rows: 0<!--count:backlog-p1--> × P1 · 30<!--count:backlog-p2--> × P2 · 164<!--count:backlog-p3--> × P3** —
 > Ledger entries dated before 2026-11-23 are kept verbatim in [`archived-documents/backlog-ledger-2026.md`](archived-documents/backlog-ledger-2026.md); git history has every change. The board keeps the last days of ledger (`tools/roll-backlog-ledger.mjs`, `INFO-RESTRUCTURE-1` D-IR2).
 > Ledger entries dated before 2026-11-23 are kept verbatim in [`archived-documents/backlog-ledger-2026.md`](archived-documents/backlog-ledger-2026.md); git history has every change. The board keeps the last days of ledger (`tools/roll-backlog-ledger.mjs`, `INFO-RESTRUCTURE-1` D-IR2).
+> ⬆ **193 → 194 (P3 163 → 164) on 2026-11-27**: filed P3 chore `REFUSAL-CODES-REST-1` [items: layer.platform, module.api · kind: chore · hold: demand] — the refusals still sharing `CONFIG_VALIDATION_FAILED` with no finding code; `REFUSAL-CODES-1` coded the twelve agents hit most (BI query, Dataset relation, Reconciliation, Decision Rule, Link Analysis query shapes) and catalogued the 22 Pipeline save refusal codes.
 > ⬇ **194 → 193 (P2 31 → 30) on 2026-11-27**: closed P2 defect `SPLIT-JOB-PIPELINE-UNGATED-1` [items: module.elt, module.config · kind: defect] — `POST /pipelines/{id}/split-job-pipeline` now runs `SaveGate` on the two Pipelines it writes and `JobWriteGuard` on its Job, and under an approval policy for `pipeline` or `job` is refused (409, `holdRefusing`, as the Pipeline bundle import is) because one act writes three files and cannot be one replayable Pending Change; a preview still works. Listed in `ConfigWriteFunnelTest.NO_HOLD`; `JobGraphRoutesTest` covers the refusal.
 > ↔ **196 (no count change, P2 32) on 2026-11-27**: narrowed P2 feature `AGENT-KIT-1` [items: module.mcp, module.agent, module.api, module.access, module.oidc, layer.platform · kind: feature] — W5 built: MCP Resources `inspecto://shapes/{kind}` (one per `propose_change` kind) and `inspecto://errors`, served from the generated shape reference and error catalogue with their banner kept; a guard fails when a kind has no shape resource; skills point at them ([spec-agent-resources.md](okf/product/module/mcp/spec-agent-resources.md)).
 > ↔ **196 (no count change, P3 164) on 2026-11-27**: closed P3 feature `COMPONENT-REFERENCE-GENERATED-1` [items: layer.product, module.config · kind: feature] — every `propose_change` kind's content (keys, type, required, default, allowed values, unknown-key policy, an example) is derived from the code by `ComponentShapesTest` (features/inspecto-mcp: the key censuses, `ConfigSpecs`, the parsed records and the real parsers run over the example) into `docs/api/component-shapes/<kind>.json`, rendered by `node tools/render-component-shapes.mjs` to `module/config/api-component-shapes.md` (CI guard); filed P3 feature `COMPONENT-REFERENCE-MORE-KINDS-1` [items: module.config, layer.product · kind: feature · hold: demand] — the kinds `propose_change` does not offer.
@@ -127,10 +128,10 @@ upstream release, a real account, a real user) or `demand` (waits for a customer
 > ↔ **172 (no count change) on 2026-11-24**: narrowed P2 feature `AGENT-KIT-1` [items: module.mcp, module.agent, module.api, module.access, module.oidc, layer.platform · kind: feature] — the Claude Code plugin and Gemini CLI extension, built per install by `tools/package-agent-kit.mjs`.
 > ⬆ **169 → 172 (P3 151 → 154) on 2026-11-24**: filed P3 defects `AGENT-GATEWAY-UNMARKED-1` [items: module.oidc, module.mcp · kind: defect], `PENDING-CHANGE-SECRET-READBACK-1` [items: module.config, module.mcp · kind: defect] and `DRYRUN-PREVIEW-UNMASKED-1` [items: module.elt, module.mcp · kind: defect] — the Agent Kit phase-1 security review's observations below confidence 8; and narrowed P2 feature `AGENT-KIT-1` [items: module.mcp, module.agent, module.api, module.access, module.oidc, layer.platform · kind: feature] — phase 1 close built: seven developer Agent Skills with their guard, seven golden tasks with a state-based grader, the Handbook how-to, a security review; the first live golden run and the vendor packages remain.
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 30<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 163<!--count:backlog-p3--> P3 rows are mostly a list of things
+> §0 defines P3 as demand-gated, so those 164<!--count:backlog-p3--> P3 rows are mostly a list of things
 > ⚠ **Report the 0<!--count:backlog-p1--> P1 + 30<!--count:backlog-p2--> P2 rows as the owed number** —
-> §0 defines P3 as demand-gated, so those 163<!--count:backlog-p3--> P3 rows are mostly a list of things
-> deliberately NOT being built, and reading all 193<!--count:backlog-rows--> as pending work overstates it.
+> §0 defines P3 as demand-gated, so those 164<!--count:backlog-p3--> P3 rows are mostly a list of things
+> deliberately NOT being built, and reading all 194<!--count:backlog-rows--> as pending work overstates it.
 
 ## Area index
 
@@ -405,6 +406,7 @@ Ongoing, not a row: **template seed-pack enrichment** (frontend C7) — `kpi-ove
 
 #### API contract & vocabulary
 
+- **P3** · `REFUSAL-CODES-REST-1` — **about 1,000 call sites still refuse with only the shared `CONFIG_VALIDATION_FAILED` and no finding code, so an agent must read the message.** `REFUSAL-CODES-1` (2026-11-27) coded the twelve refusals agents hit most (BI query, Dataset relation, Reconciliation, Decision Rule, Link Analysis query shapes: `error.details.findings[0].code`) and catalogued the 22 Pipeline save refusal codes. Next: code the rest per route family as live golden runs or the audit trail show them hit, via `RouteErrors.unprocessable` / `CodedArgumentException`. → `okf/product/layer/platform/api-error-catalogue.md` [items: layer.platform, module.api · kind: chore · hold: demand]
 
 
 

@@ -94,7 +94,8 @@ public final class ServerFaults {
         if (com.gamma.util.DatasetNoData.matches(raw))
             return new ApiException(409, ErrorCodes.CONFLICT,
                     com.gamma.util.DatasetNoData.message(datasetId, com.gamma.util.DatasetNoData.pipelineOf(dataset)));
-        return new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, what + ": " + sqlMessage(e.getMessage(), api));
+        return new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, what + ": " + sqlMessage(e.getMessage(), api),
+                com.gamma.config.spec.FindingCodes.ERR_DATASET_READ_FAILED, null);
     }
 
     /** A Windows drive path, or a POSIX absolute path of two or more segments, up to a quote or whitespace. */

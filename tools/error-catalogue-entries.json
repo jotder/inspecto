@@ -342,5 +342,141 @@
     "severity": "WARNING",
     "cause": "The component carries a key nothing reads. A person's save keeps it with no effect (a WARNING, warnings[].code); for an agent the same finding is an ERROR and its save is refused.",
     "fix": "Remove the key or correct its spelling against the kind's shape; prefix it with x- to mark it as deliberately extra."
+  },
+  "ERR_COLUMN_UNKNOWN": {
+    "cause": "The request names a column the Dataset does not have: a BI query's orderBy, a Link Analysis query's column or filter field, an Entity Identity or index column.",
+    "fix": "Read the Dataset's columns (its schema in GET /catalog) and use one of those names; to order a BI query by a measure, use the generated result column <agg>_<FIELD>."
+  },
+  "ERR_REQUEST_FIELD_MISSING": {
+    "cause": "The request body lacks a field this route requires; the finding's fieldPath names it (for example dataset, startNode, value, ids, or a column key such as sourceCol).",
+    "fix": "Add the field at fieldPath and resend. The route's request shape is in docs/api/openapi-v1.json."
+  },
+  "ERR_REQUEST_VALUE_NOT_ALLOWED": {
+    "cause": "A request field holds a value outside its fixed set; the message lists the allowed values (a Link Analysis query's direction).",
+    "fix": "Send one of the values the message lists, spelled as listed."
+  },
+  "ERR_BI_FILTER_OP_UNKNOWN": {
+    "cause": "A BI query filter names an operator the compiler does not know.",
+    "fix": "Use one of: = (eq), != (ne, <>), >, >=, <, <=, gt, gte, lt, lte, like, in (with a non-empty value list), isNull, notNull."
+  },
+  "ERR_DATASET_SQL_NO_SOURCE": {
+    "cause": "A virtual Dataset carries sql but no sourceName, so nothing names the store its FROM reads. A virtual Dataset reads exactly one store.",
+    "fix": "Set sourceName to the store the sql reads FROM. To combine two Datasets, derive one with a Pipeline join or an enrichment, not a virtual Dataset."
+  },
+  "ERR_CALCULATED_COLUMN_INVALID": {
+    "cause": "A Dataset's calculated[] entry is refused: it is not an object, its name is not a plain identifier, or it has no expr.",
+    "fix": "Write each entry as {name: <plain identifier>, expr: <SQL expression over the row>}; fieldPath names the entry and the key."
+  },
+  "ERR_DATASET_READ_FAILED": {
+    "cause": "Reading the Dataset's rows failed in the database: its relation names a table or column that does not exist, or a value fails a cast. The message carries the database's text, withheld while masking is in force.",
+    "fix": "Fix the Dataset's sql, sourceName or calculated columns so the relation reads only its own store's columns, then read again. A Dataset with no files yet answers 409 CONFLICT, not this."
+  },
+  "ERR_RECON_CARDINALITY_UNKNOWN": {
+    "cause": "A Reconciliation's cardinality is not one of the four words.",
+    "fix": "Set cardinality to one_to_one, one_to_many, many_to_one or many_to_many, or leave it out (many_to_many asserts nothing)."
+  },
+  "ERR_RECON_COMPARE_COLUMN_INVALID": {
+    "cause": "A Reconciliation's compareColumns[] entry is refused: the column is also a key column or the reserved record count, agg is not sum or count, toleranceType is not exact, absolute or percent, or tolerance is negative.",
+    "fix": "Write each entry as {column, agg: sum|count, toleranceType: exact|absolute|percent, tolerance: >= 0}, and compare only columns that are not keys."
+  },
+  "ERR_DECISION_RULE_NO_NAME": {
+    "cause": "The Decision Rule has no name.",
+    "fix": "Add a non-blank name."
+  },
+  "ERR_DECISION_RULE_NO_CONSEQUENCE": {
+    "cause": "The Decision Rule has no consequences, or an empty list, so it would do nothing when it matches.",
+    "fix": "Add at least one consequence {action, params}; the Decision Rule shape (inspecto://shapes/decision-rule) lists the actions."
+  },
+  "ERR_DECISION_RULE_WHEN_INVALID": {
+    "cause": "The Decision Rule's when is not a condition group, so it would match every row or none.",
+    "fix": "Write when as {kind: group, op: AND|OR, items: [...]}, each item a condition or another group; leave it out to start from an empty AND group."
+  },
+  "UNSUPPORTED_NODE": {
+    "cause": "The graph holds a node type the saved Pipeline file has no place for, or whose module is not installed here. A dry run may still run such a node (DRYRUN-SAVE-NODE-MISMATCH-1).",
+    "fix": "Replace the node with one the save accepts (see the Pipeline shape), or install the module that provides it; the message names the node."
+  },
+  "NO_ACQUISITION": {
+    "cause": "An active Pipeline graph has no acquisition (Collector) node, so it would never read a file.",
+    "fix": "Add an acquisition node, or save with active: false while it is a draft."
+  },
+  "NO_PARSER": {
+    "cause": "An active Pipeline graph has no parser node.",
+    "fix": "Add a parser node (for example parser.delimited), or save with active: false while it is a draft."
+  },
+  "NO_PERSISTENT_SINK": {
+    "cause": "An active Pipeline graph has no sink that keeps rows, so every batch would be dropped.",
+    "fix": "Add a persistent sink (a Dataset or file sink), or save with active: false while it is a draft."
+  },
+  "PARSER_NO_SCHEMA": {
+    "cause": "An active Pipeline graph's parser has no schema.",
+    "fix": "Give the parser node a schema, or save with active: false while it is a draft."
+  },
+  "UNSUPPORTED_BINDING": {
+    "cause": "A node carries a use: component reference the saved Pipeline file has no place for at that node.",
+    "fix": "Remove the use: reference from that node, or write the component's settings on the node itself."
+  },
+  "UNSUPPORTED_MAP_KEY": {
+    "cause": "A map node carries a key that is neither derived from the schema nor run by the map step.",
+    "fix": "Remove the key from the map node, or move the logic into a transform.sql step."
+  },
+  "MAPPING_CONFLICT": {
+    "cause": "A map node authors a columns list while the Pipeline also declares processing.mapping_file.",
+    "fix": "Keep one: drop the columns list, or drop mapping_file."
+  },
+  "MULTI_MAP_CONFIG": {
+    "cause": "Two map nodes carry different config, and the saved file holds one processing.map.",
+    "fix": "Merge them into one map node, or give both the same config."
+  },
+  "MULTI_PARSER": {
+    "cause": "The graph has two parser nodes; the saved file has one parse slot.",
+    "fix": "Keep one parser node."
+  },
+  "MULTI_ACQUISITION": {
+    "cause": "The graph has two acquisition nodes; the saved file has one Collector block.",
+    "fix": "Keep one acquisition node; use a second Pipeline for a second Collector."
+  },
+  "MULTI_GAP": {
+    "cause": "The graph has two gap-detection nodes; the saved file has one gap_detection block.",
+    "fix": "Keep one gap node."
+  },
+  "MULTI_MARKER": {
+    "cause": "The graph has two marker-dedup nodes; the saved file has one set of marker keys.",
+    "fix": "Keep one transform.dedup.marker node."
+  },
+  "MULTI_WEBHOOK": {
+    "cause": "The graph has two sink.webhook nodes; the saved file has one webhook block.",
+    "fix": "Keep one webhook sink."
+  },
+  "WEBHOOK_INVALID": {
+    "cause": "A sink.webhook node's config is refused: no connection, an authored url, an unknown key, or a batch size out of bounds.",
+    "fix": "Name a Connection, remove url and unknown keys, and keep the batch size within the bounds the message names."
+  },
+  "MULTI_EXCEL": {
+    "cause": "The graph has two sink.excel nodes; the saved file has one excel block.",
+    "fix": "Keep one Excel sink; put more sheets in it."
+  },
+  "EXCEL_INVALID": {
+    "cause": "A sink.excel node's config is refused: no path, a bad sheet name, a path leaving the data root, or a sheet sql that is not a plain SELECT.",
+    "fix": "Correct what the message names: a relative path under the data root, unique sheet names, a plain SELECT per sheet."
+  },
+  "PARSER_FRONTEND_MISMATCH": {
+    "cause": "A parser.delimited node's parsing.frontend names a different frontend.",
+    "fix": "Remove parsing.frontend from the node, or use the parser node that matches it."
+  },
+  "UNSUPPORTED_BRANCH_STEP": {
+    "cause": "A route branch's chain has a shape the saved file cannot hold: a node that fans out, a chain not ending in a persistent sink, or a nested route.",
+    "fix": "Make each branch a straight chain ending in one persistent sink, with no nested route."
+  },
+  "ENRICHMENT_NOT_TERMINAL": {
+    "cause": "An enrichment node has a node after it; an enrichment runs after the batch commits, not inside the walk.",
+    "fix": "Make the enrichment the last node of its chain; put row logic before it in a transform.sql step."
+  },
+  "SQL_STEP_EMPTY": {
+    "cause": "A transform.sql node has no sql.",
+    "fix": "Add the step's sql (a SELECT over input)."
+  },
+  "SQL_STEP_REFUSED": {
+    "cause": "A transform.sql node's sql is refused by the SQL guard; the message names the function, keyword or statement shape.",
+    "fix": "Rewrite the sql as a plain SELECT without what the message names (no file, extension or system access)."
   }
 }

@@ -185,4 +185,51 @@ public final class FindingCodes {
      *  column (blank or duplicate {@code name}) — the Catalog and the masking lineage read it
      *  ({@code AUTHORING-REDESIGN-1} (e)). Always ERROR: a classification nothing can attach is a silent loss. */
     public static final String ERR_STEP_COLUMN_METADATA_INVALID = "ERR_STEP_COLUMN_METADATA_INVALID";
+
+    // ── Request refusals (REFUSAL-CODES-1) ───────────────────────────────────────────────────
+    // The 422s agents hit most, given a code of their own so they need not read the message (evidence: the
+    // agent-builder spike 2026-11-21 and the W4 golden runs). Carried as the one finding of a refusal:
+    // error.details.findings[0].code, with error.errorCode still CONFIG_VALIDATION_FAILED.
+
+    /** A request or config names a column the Dataset does not have (a BI {@code orderBy}, a Link Analysis
+     *  query's column or filter field, an Entity Identity or index column). */
+    public static final String ERR_COLUMN_UNKNOWN = "ERR_COLUMN_UNKNOWN";
+
+    /** A request body lacks a field the route requires (a Link Analysis query's {@code dataset},
+     *  {@code startNode}, {@code value}, {@code ids}, or a column key). */
+    public static final String ERR_REQUEST_FIELD_MISSING = "ERR_REQUEST_FIELD_MISSING";
+
+    /** A request field holds a value outside its fixed set (a Link Analysis query's {@code direction}). */
+    public static final String ERR_REQUEST_VALUE_NOT_ALLOWED = "ERR_REQUEST_VALUE_NOT_ALLOWED";
+
+    /** A BI query filter names an operator the compiler does not know. */
+    public static final String ERR_BI_FILTER_OP_UNKNOWN = "ERR_BI_FILTER_OP_UNKNOWN";
+
+    /** A virtual Dataset (one with {@code sql}) names no {@code sourceName} store for its {@code FROM}. */
+    public static final String ERR_DATASET_SQL_NO_SOURCE = "ERR_DATASET_SQL_NO_SOURCE";
+
+    /** A Dataset's {@code calculated[]} entry is not a {@code {name, expr}} object with a plain-identifier name
+     *  and an expression. */
+    public static final String ERR_CALCULATED_COLUMN_INVALID = "ERR_CALCULATED_COLUMN_INVALID";
+
+    /** Reading a Dataset's rows failed in the database (a table or column its relation names does not exist,
+     *  a cast fails); the message carries the database's text, withheld while masking is in force. */
+    public static final String ERR_DATASET_READ_FAILED = "ERR_DATASET_READ_FAILED";
+
+    /** A Reconciliation's {@code cardinality} is not one of the four words. */
+    public static final String ERR_RECON_CARDINALITY_UNKNOWN = "ERR_RECON_CARDINALITY_UNKNOWN";
+
+    /** A Reconciliation's {@code compareColumns[]} entry is refused: a key column, the reserved record count, an
+     *  {@code agg} other than sum|count, a {@code toleranceType} other than exact|absolute|percent, or a
+     *  negative {@code tolerance}. */
+    public static final String ERR_RECON_COMPARE_COLUMN_INVALID = "ERR_RECON_COMPARE_COLUMN_INVALID";
+
+    /** A Decision Rule has no {@code name}. */
+    public static final String ERR_DECISION_RULE_NO_NAME = "ERR_DECISION_RULE_NO_NAME";
+
+    /** A Decision Rule has no {@code consequences}, or an empty list. */
+    public static final String ERR_DECISION_RULE_NO_CONSEQUENCE = "ERR_DECISION_RULE_NO_CONSEQUENCE";
+
+    /** A Decision Rule's {@code when} is not a condition group ({@code {kind: group, op, items}}). */
+    public static final String ERR_DECISION_RULE_WHEN_INVALID = "ERR_DECISION_RULE_WHEN_INVALID";
 }

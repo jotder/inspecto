@@ -10,6 +10,7 @@
 //   finding   findings[].code of a config save / validate     — com.gamma.config.spec.FindingCodes (+ ColumnRefusals, …)
 //             (on a refused save: error.details.findings[].code)
 //   graph     findings[].code of a Pipeline graph validate    — com.gamma.pipeline.PipelineValidator (+ PipelineGraphRoutes)
+//   lowering  refusals[].code of a Pipeline graph save        — com.gamma.pipeline.PipelineEditable (REFUSAL-CODES-1)
 // The code SET and each envelope code's HTTP status come from the Java source (the constant, ErrorCodes.defaultFor and
 // a "NNN —" Javadoc lead); the cause and the fix an agent or a person needs come from tools/error-catalogue-entries.json,
 // keyed by code. Outputs, each a pure function of those inputs:
@@ -41,6 +42,7 @@ export const SOURCES = [
     { family: 'finding', file: 'inspecto/src/main/java/com/gamma/control/LinkRefusals.java', pick: ['ERR_LINK_DANGLING', 'WARN_LINK_DANGLING'] },
     { family: 'graph', file: 'platform/inspecto-engine/src/main/java/com/gamma/pipeline/PipelineValidator.java', pick: 'screaming' },
     { family: 'graph', file: 'inspecto/src/main/java/com/gamma/control/PipelineGraphRoutes.java', pick: ['UNKNOWN_JOIN_REFERENCE'] },
+    { family: 'lowering', file: 'platform/inspecto-engine/src/main/java/com/gamma/pipeline/PipelineEditable.java', pick: 'screaming' },
 ];
 
 /** Codes written as string literals at their only use, not as constants. The sweep finds a new one and fails. */
@@ -53,6 +55,7 @@ export const FAMILIES = {
     envelope: { title: 'Error codes (every v1 error)', where: 'error.errorCode' },
     finding: { title: 'Config finding codes', where: 'findings[].code — on a refused save error.details.findings[].code' },
     graph: { title: 'Pipeline graph codes', where: 'findings[].code of a Pipeline graph validate or save' },
+    lowering: { title: 'Pipeline save refusals', where: 'error.details.refusals[].code of a refused PUT /pipelines/{id}/graph (refusals[].code of its validate)' },
 };
 
 const CONST = /(\/\*\*((?:(?!\*\/)[\s\S])*)\*\/\s*)?(?:public\s+|private\s+|protected\s+)?static\s+final\s+String\s+([A-Z][A-Z0-9_]*)\s*=\s*"([^"]*)"\s*;/g;
@@ -141,20 +144,22 @@ export function uncatalogued(files, read, list) {
     const out = [];
     for (const f of files) {
         const java = read(f);
+        const named = new Set();   // literals already reported by the ApiException sweep, so the finding sweep does not repeat them
         if (!sourceFiles.has(f))
             for (const c of constantsOf(java))
                 if (/^(ERR|WARN)_/.test(c.value) && !known.has(c.value)) out.push(`${f}: ${c.name} = "${c.value}"`);
         // new [pkg.]ApiException(<status expression>, CODE, …) and SpaceLocations.Refused(…) — the status may be any expression
         for (const m of java.matchAll(/new\s+(?:[\w.]+\.)?(?:ApiException|Refused)\(\s*(?:[^,()"]|\([^()]*\))+,\s*("([^"]*)"|([A-Za-z_][\w.]*))\s*,/g)) {
-            if (m[2] !== undefined) { if (!known.has(m[2])) out.push(`${f}: refusal code "${m[2]}"`); continue; }
+            if (m[2] !== undefined) { if (!known.has(m[2])) { out.push(`${f}: refusal code "${m[2]}"`); named.add(m[2]); } continue; }
             const last = m[3].split('.').pop();
             if (!/^[A-Z][A-Z0-9_]+$/.test(last) || m[3].startsWith('ErrorCodes.')) continue;   // a variable, or a catalogued ErrorCodes constant
             if (!knownNames.has(last)) out.push(`${f}: refusal code ${m[3]}`);
         }
-        // a literal code in a Finding (its whole argument list, across lines) or in a {"code": "…"} map
-        for (const m of java.matchAll(/(?:new\s+(?:[\w.]+\.)?Finding|\.coded)\(((?:[^()]|\((?:[^()]|\([^()]*\))*\))*)\)/g))
+        // a literal code in a Finding, a CodedArgumentException or an ApiException's finding code (its whole argument
+        // list, across lines) or in a {"code": "…"} map
+        for (const m of java.matchAll(/(?:new\s+(?:[\w.]+\.)?(?:Finding|CodedArgumentException|ApiException)|\.coded)\(((?:[^()]|\((?:[^()]|\([^()]*\))*\))*)\)/g))
             for (const lit of m[1].matchAll(/"([A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)"/g))
-                if (!known.has(lit[1])) out.push(`${f}: Finding code "${lit[1]}"`);
+                if (!known.has(lit[1]) && !named.has(lit[1])) out.push(`${f}: Finding code "${lit[1]}"`);
         for (const m of java.matchAll(/"code"\s*,\s*"([A-Z][A-Z0-9_]+)"/g))
             if (!known.has(m[1])) out.push(`${f}: "code", "${m[1]}"`);
     }
@@ -194,7 +199,9 @@ export function toPage(list) {
         '**Branch on `errorCode`, never on the message text.** A `422` adds `error.details.findings[]` — one',
         '`{severity, fieldPath, message, code, guidance}` per problem; fix every `ERROR` finding (its `code` is in the second',
         'table, its `guidance` says what to change at `fieldPath`) and resubmit. `WARNING` findings never block a save.',
-        '', 'Most `422`s share the one code `CONFIG_VALIDATION_FAILED`; their `message` names the key and the allowed values.',
+        '', 'Most `422`s share the one code `CONFIG_VALIDATION_FAILED`. The refusals agents hit most also carry one finding with a',
+        'code of its own (`error.details.findings[0].code`, listed under Config finding codes from `ERR_COLUMN_UNKNOWN` on);',
+        'the rest carry none yet — their `message` names the key and the allowed values (board row `REFUSAL-CODES-REST-1`).',
         'Quote the `correlationId` when you report a `500`.', ''];
     for (const [fam, { title, where }] of Object.entries(FAMILIES)) {
         const rows = list.filter((e) => e.family === fam);
@@ -210,7 +217,8 @@ export function toPage(list) {
     lines.push('## Adding a code', '',
         `A new code constant, or a \`new ApiException(status, CODE, …)\` naming a code this page does not list, fails`,
         `\`${SELF} --check\` (pre-commit and CI). Add its cause and fix to \`${ENTRIES}\`, then run \`${SELF} --write\`.`,
-        'The sweep reads `new ApiException(…)`, `new SpaceLocations.Refused(…)`, `new Finding(…)`, `.coded(…)` and `"code", "…"` maps;',
+        'The sweep reads `new ApiException(…)`, `new SpaceLocations.Refused(…)`, `new Finding(…)`, `new CodedArgumentException(…)`,',
+        '`.coded(…)` and `"code", "…"` maps;',
         'a code handed through a helper method of your own is not seen, so add a code as a constant in one of the files',
         'the generator lists (`SOURCES`) and pass the constant.',
         'Codes are API: never renamed, never reused for another meaning.', '');

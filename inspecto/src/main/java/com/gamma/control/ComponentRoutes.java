@@ -301,7 +301,7 @@ final class ComponentRoutes implements RouteModule {
             }
             return Map.of("columns", cols);
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
+            throw RouteErrors.unprocessable(e);
         }
     }
 
@@ -970,7 +970,7 @@ final class ComponentRoutes implements RouteModule {
             if (!unknownKeys.isEmpty()) doc.put("warnings", UnknownComponentKeys.warnings(type, unknownKeys));
             return doc;
         } catch (IllegalArgumentException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, e.getMessage());
+            throw RouteErrors.unprocessable(e);
         }
     }
 
@@ -1031,8 +1031,12 @@ final class ComponentRoutes implements RouteModule {
             validateKind(api, type, id, content);
             if (CENSUSED_COMPONENT_KINDS.contains(type)) refuseUnknownComponentKeys(type, content);
             if (KpiRoutes.TYPE.equals(type)) KpiRoutes.requireMeasure(api, ex, id, content);
+        } catch (com.gamma.config.spec.CodedArgumentException coded) {   // REFUSAL-CODES-1: the refusal's own code
+            out.add(new Finding(Severity.ERROR, coded.fieldPath(), coded.getMessage(), coded.code(), null));
         } catch (IllegalArgumentException | ApiException refused) {
-            out.add(new Finding(Severity.ERROR, "", refused.getMessage(), "COMPONENT_INVALID", null));
+            if (refused instanceof ApiException a && a.findingCode != null)
+                out.add(new Finding(Severity.ERROR, a.fieldPath, a.getMessage(), a.findingCode, null));
+            else out.add(new Finding(Severity.ERROR, "", refused.getMessage(), "COMPONENT_INVALID", null));
         }
         boolean agent = ApiContext.attr(ex, ApiContext.ATTR_SUBJECT) instanceof Subject who && who.agent();
         for (String key : UnknownComponentKeys.of(type, content, stored))
@@ -1070,7 +1074,8 @@ final class ComponentRoutes implements RouteModule {
         // (DatasetRelation.virtualOver); until now a save of SQL the guard refuses answered 200 and the first read answered 422.
         if ("dataset".equals(type) && content.get("sql") instanceof String userSql && !userSql.isBlank()) {
             if (!(content.get("sourceName") instanceof String source) || source.isBlank())
-                throw new IllegalArgumentException("a virtual dataset's 'sql' needs a 'sourceName' - the store its FROM reads");
+                throw new com.gamma.config.spec.CodedArgumentException(com.gamma.config.spec.FindingCodes.ERR_DATASET_SQL_NO_SOURCE, "sourceName",
+                        "a virtual dataset's 'sql' needs a 'sourceName' - the store its FROM reads");
             List<Finding> refused = SqlGuard.check(userSql, source);
             if (!refused.isEmpty())
                 throw new IllegalArgumentException("dataset 'sql' failed the SQL safety check: "

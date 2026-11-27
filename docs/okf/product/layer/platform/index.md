@@ -35,6 +35,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
 | `PARSER-SPI-KIT-1` | P3 | chore | the Parser extension point (com.gamma.parse.ParserPlugin, a public API since 4.0.0) has no starter and is missing from the developer docs. | — |
+| `REFUSAL-CODES-REST-1` | P3 | chore | about 1,000 call sites still refuse with only the shared CONFIG_VALIDATION_FAILED and no finding code, so an agent must read the message. | demand |
 | `NATIVE-LICENCE-LINUX-MACOS-1` | P3 | chore | Two licence calls on the tokenizers natives wait on the operator. | operator |
 | `UPGRADE-BACKUPDIR-RELATIVE-1` | P3 | defect | upgrade.ps1 resolves a relative -BackupDir from the wrong folder: | — |
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |

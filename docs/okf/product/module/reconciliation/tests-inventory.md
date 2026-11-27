@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.reconciliation`](../../../../../product-map/module/reconciliation.toon).
 
-35 test class(es): 26 unit, 9 real-HTTP control-plane, 0 IT.
+36 test class(es): 26 unit, 10 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -28,6 +28,7 @@ mvn -o test -pl features/inspecto-reconciliation -Dtest=ControlApiReconAccessTes
 | `ControlApiReconAccessTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-reconciliation/src/test/java/com/gamma/control/ControlApiReconAccessTest.java` | RECON-READ-UNGATED-1: the four recon reads ({@code POST /recon/columns}, {@code /recon/run}, {@code /recon/breaks}, |
 | `ControlApiReconDayTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-reconciliation/src/test/java/com/gamma/control/ControlApiReconDayTest.java` | Real-HTTP tests for the per-DAY Reconciliation (RECON-PERF-1, operator 2026-10-09): {@code day} scoping on |
 | `ControlApiReconPromoteTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-reconciliation/src/test/java/com/gamma/control/ControlApiReconPromoteTest.java` | {@code BREAK-INCIDENT-1}: {@code POST /recon/promote} hands one reconciliation Break to Ops as an |
+| `ControlApiReconRefusalCodesTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-reconciliation/src/test/java/com/gamma/control/ControlApiReconRefusalCodesTest.java` | REFUSAL-CODES-1 over real HTTP: a Reconciliation save or validate refused for its cardinality or a compare column |
 | `ControlApiReconStateTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-reconciliation/src/test/java/com/gamma/control/ControlApiReconStateTest.java` | R2-03 (operator 2026-09-26, reversing C9) — real-HTTP + real-DuckDB tests for a Reconciliation's |
 | `ControlApiReconTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-reconciliation/src/test/java/com/gamma/control/ControlApiReconTest.java` | Real-HTTP + real-DuckDB tests for the reconciliation routes (DAT-7, design |
 | `ControlApiReconValidateTest` | `com.gamma.control` | real-HTTP control-plane test | `features/inspecto-reconciliation/src/test/java/com/gamma/control/ControlApiReconValidateTest.java` | COMPONENT-VALIDATE-ALL-1 over real HTTP, in the module that owns the Reconciliation validator: its draft is judged by |

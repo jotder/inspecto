@@ -93,7 +93,8 @@ public final class ReconService {
             if (v == null || v.isBlank()) return MANY_TO_MANY;
             for (Cardinality c : values())
                 if (c.name().equalsIgnoreCase(v.trim())) return c;
-            throw new IllegalArgumentException("cardinality must be one_to_one|one_to_many|many_to_one|many_to_many, got '"
+            throw new com.gamma.config.spec.CodedArgumentException(com.gamma.config.spec.FindingCodes.ERR_RECON_CARDINALITY_UNKNOWN, "cardinality",
+                    "cardinality must be one_to_one|one_to_many|many_to_one|many_to_many, got '"
                     + v + "'");
         }
 
@@ -128,17 +129,17 @@ public final class ReconService {
             for (Measure m : ms) {
                 safeIdent(m.name(), "compare column");
                 if (RECORDS.equals(m.name()))
-                    throw new IllegalArgumentException("'" + RECORDS + "' is reserved for the implicit record count");
+                    throw compareRefused("'" + RECORDS + "' is reserved for the implicit record count");
                 if (keyColumns.contains(m.name()))
-                    throw new IllegalArgumentException("column '" + m.name() + "' cannot be both a key and a compare column");
+                    throw compareRefused("column '" + m.name() + "' cannot be both a key and a compare column");
                 if (!"sum".equals(m.agg()) && !"count".equals(m.agg()))
-                    throw new IllegalArgumentException("compare column '" + m.name() + "': agg must be sum|count, got '" + m.agg() + "'");
+                    throw compareRefused("compare column '" + m.name() + "': agg must be sum|count, got '" + m.agg() + "'");
                 if (!"exact".equals(m.toleranceType()) && !"absolute".equals(m.toleranceType())
                         && !"percent".equals(m.toleranceType()))
-                    throw new IllegalArgumentException("compare column '" + m.name()
+                    throw compareRefused("compare column '" + m.name()
                             + "': toleranceType must be exact|absolute|percent, got '" + m.toleranceType() + "'");
                 if (!(m.tolerance() >= 0))
-                    throw new IllegalArgumentException("compare column '" + m.name() + "': tolerance must be >= 0");
+                    throw compareRefused("compare column '" + m.name() + "': tolerance must be >= 0");
             }
             if (ms.isEmpty() && !includeRecordCount)
                 throw new IllegalArgumentException("nothing to compare: no compare columns and record count disabled");
@@ -171,6 +172,12 @@ public final class ReconService {
                         + RECORDS + "'");
             for (Measure m : measures) if (m.name().equals(column)) return this;
             return new Spec(sides, keyColumns, measures, includeRecordCount, cardinality, column);
+        }
+
+        /** A refused {@code compareColumns[]} entry, coded (REFUSAL-CODES-1). */
+        private static IllegalArgumentException compareRefused(String message) {
+            return new com.gamma.config.spec.CodedArgumentException(
+                    com.gamma.config.spec.FindingCodes.ERR_RECON_COMPARE_COLUMN_INVALID, "compareColumns", message);
         }
 
         /** This side's physical column for a unified column name. */

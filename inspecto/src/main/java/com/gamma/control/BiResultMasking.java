@@ -923,7 +923,8 @@ final class BiResultMasking {
     ApiException scrub(ApiException fault) {
         if (!engaged() || fault.status != 422 || compileTimeOnly(fault.getMessage())) return fault;
         return new ApiException(422, fault.errorCode, "the query failed while reading the data; the database's error text is "
-                + "withheld because it can quote a stored value of a masked key (a caller with " + REVEAL + " sees it)");
+                + "withheld because it can quote a stored value of a masked key (a caller with " + REVEAL + " sees it)",
+                fault.findingCode, fault.fieldPath);
     }
 
     private static boolean compileTimeOnly(String message) {
