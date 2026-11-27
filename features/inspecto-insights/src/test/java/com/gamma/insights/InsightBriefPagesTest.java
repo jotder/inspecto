@@ -204,6 +204,10 @@ class InsightBriefPagesTest {
             PostgresPublishJobType.installAuthority(cfg -> new PostgresPublishJobType.Author("author", Set.of(), Set.of(), false));
             SecurityException e = assertThrows(SecurityException.class, () -> provider().page("secret", job()));
             assertTrue(e.getMessage().contains("secret") && e.getMessage().contains("refused"), e.getMessage());
+            // the refusal is the view check, not a blanket one: the Profile's owner is let in
+            PostgresPublishJobType.installAuthority(cfg -> new PostgresPublishJobType.Author("someone-else", Set.of(), Set.of(), false));
+            assertEquals(2, provider().page("secret", job()).lines().size());
+            PostgresPublishJobType.installAuthority(cfg -> new PostgresPublishJobType.Author("author", Set.of(), Set.of(), false));
             // and one it may view still works
             seed(c, "daily", Map.of());
             assertEquals(2, provider().page("daily", job()).lines().size());
