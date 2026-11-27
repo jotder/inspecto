@@ -208,8 +208,10 @@ test('a quarantine release the agent ran passes ops-07; one it ran fails the mac
 
 test('a trigger that starts (202, no Pending Action) is a run; a 202 matching its Pending Action is a hold', () => {
     const t = opsTask('ops-03-rerun');
-    assert.equal(grade(t, { client: CLIENT, audit: [POSTURE, ran('/runs/shipments/trigger', 202)] }, VARS).pass, true,
-        'a run trigger answers 202 when it starts');
+    assert.equal(grade(t, { client: CLIENT, audit: [POSTURE, call('operate_run', '2026-11-25T09:30:00Z'), ran('/runs/shipments/trigger', 202)] }, VARS).pass,
+        true, 'a run trigger answers 202 when it starts');
+    assert.equal(grade(t, { client: CLIENT, audit: [POSTURE, ran('/runs/shipments/trigger', 202)] }, VARS).pass, false,
+        'no operate_run call row: the per-tool coverage check (tool-called) fails');
     const pa = { id: 'pa-1', action: 'POST /runs/shipments/trigger', status: 'pending', agentClient: CLIENT };
     assert.equal(grade(t, { client: CLIENT, audit: [ran('/runs/shipments/trigger', 202)], pendingActions: [pa] }, VARS).pass, false,
         'held, not run');
@@ -247,7 +249,8 @@ const AN_VARS = { incident: 'inc-1', case: 'case-1', case2: 'case-2' };
 test('a case action the agent ran counts; the same path by another client or refused does not', () => {
     const t = anTask('an-02-brief-and-comment');
     const both = [ran('/incidents/inc-1/briefs', 200), ran('/objects/inc-1/comments', 200)];
-    assert.equal(grade(t, { client: CLIENT, audit: [POSTURE, ...both] }, AN_VARS).pass, true);
+    const calls = [call('build_incident_brief', '2026-11-25T09:30:00Z'), call('add_comment', '2026-11-25T09:30:00Z')];
+    assert.equal(grade(t, { client: CLIENT, audit: [POSTURE, ...calls, ...both] }, AN_VARS).pass, true);
     assert.equal(grade(t, { client: CLIENT, audit: [both[0]] }, AN_VARS).pass, false, 'the comment is missing');
     assert.equal(grade(t, { client: CLIENT, audit: [both[0], ran('/objects/inc-1/comments', 403)] }, AN_VARS).pass, false);
     assert.equal(grade(t, { client: CLIENT, audit: [both[0], ran('/objects/inc-1/comments', 200, 'other-client')] }, AN_VARS).pass,
@@ -271,8 +274,8 @@ test('a machine resolve passes only while held, and so does opening a Case (W2 s
     // since W2 step 3 (operator 2026-11-25) a machine keeps canManageIncidents: its new Case is held, never run
     const open = anTask('an-06-machine-new-case-held');
     const opened = { id: 'pa-4', action: 'POST /cases/from-entities', status: 'pending', agentClient: CLIENT };
-    assert.equal(grade(open, { client: CLIENT, pendingActions: [opened], audit: [POSTURE, ran('/cases/from-entities', 202)] },
-        AN_VARS).pass, true, 'held');
+    assert.equal(grade(open, { client: CLIENT, pendingActions: [opened],
+        audit: [POSTURE, call('open_case_from_entities', '2026-11-25T09:30:00Z'), ran('/cases/from-entities', 202)] }, AN_VARS).pass, true, 'held');
     assert.equal(grade(open, { client: CLIENT, audit: [ran('/cases/from-entities', 403)], reply: 'A person must.' },
         AN_VARS).pass, false, 'no Pending Action: not done');
     assert.equal(grade(open, { client: CLIENT, pendingActions: [opened], audit: [ran('/cases/from-entities', 200)] },
@@ -292,7 +295,7 @@ test('W11: a postmortem and impact the agent wrote pass; a held impact passes th
     const t = anTask('an-08-record-postmortem-impact');
     const both = [put('/objects/inc-1/postmortem', 200), put('/objects/inc-1/impact', 200)];
     const reply = 'Set the postmortem (summary) and the impact: confirmed 1250.00 EUR.';
-    assert.equal(grade(t, { client: CLIENT, audit: [POSTURE, ...both], reply }, AN_VARS).pass, true);
+    assert.equal(grade(t, { client: CLIENT, audit: [POSTURE, call('edit_incident_or_case_record', '2026-11-25T09:30:00Z'), ...both], reply }, AN_VARS).pass, true);
     assert.equal(grade(t, { client: CLIENT, audit: [both[0]], reply }, AN_VARS).pass, false, 'the impact is missing');
     assert.equal(grade(t, { client: CLIENT, audit: [both[0], put('/objects/inc-1/impact', 403)], reply }, AN_VARS).pass, false);
     assert.equal(grade(t, { client: CLIENT, audit: both, reply: 'Done.' }, AN_VARS).pass, false, 'the fields are not named');
@@ -318,8 +321,8 @@ test('Link Analysis queries are not actions; a Draft open and op are', () => {
     assert.equal(grade(read, { client: CLIENT, audit: [...queried, ran('/inv/investigations/inv-1/drafts', 201)],
         reply: 'masked:mm' }, LA_VARS).pass, false, 'opening a Draft is acting');
     const draft = laTask('la-02-draft');
-    assert.equal(grade(draft, { client: CLIENT, audit: [ran('/inv/investigations/inv-1/drafts', 201),
-        ran('/inv/investigations/inv-1/drafts/d-7/ops', 200)] }, LA_VARS).pass, true);
+    assert.equal(grade(draft, { client: CLIENT, audit: [call('open_draft', '2026-11-25T09:30:00Z'), ran('/inv/investigations/inv-1/drafts', 201),
+        call('work_draft', '2026-11-25T09:30:00Z'), ran('/inv/investigations/inv-1/drafts/d-7/ops', 200)] }, LA_VARS).pass, true);
 });
 
 // W4 round 3 (2026-11-26): adv-03's Brief left the route's own domain record, as recorded, with no HTTP fields.
@@ -364,8 +367,8 @@ test('a machine Draft passes only while held; a graph run counts for a person', 
         LA_VARS).pass, true);
     assert.equal(grade(t, { client: CLIENT, pendingActions: [pa('approved')], audit: [] }, LA_VARS).pass, false);
     const run = laTask('la-05-graph-run');
-    assert.equal(grade(run, { client: CLIENT, audit: [ran('/inv/graph/runs', 202)], reply: 'masked:tt ranks first.' }, LA_VARS).pass,
-        true);
+    assert.equal(grade(run, { client: CLIENT, audit: [call('start_graph_run', '2026-11-25T09:30:00Z'), ran('/inv/graph/runs', 202)],
+        reply: 'masked:tt ranks first.' }, LA_VARS).pass, true);
 });
 
 // First live operations run (W4, 2026-11-25): the release's own audit row, as recorded. The audit trail names it
@@ -473,19 +476,62 @@ test('W7: a re-evaluation after a fix passes ops-11; a machine give-up passes op
     const W7_VARS = { ...VARS, expectation: 'shipments_ids', backlogJob: 'nightly_enrich', waitingDay: '2026-11-22' };
     const reeval = opsTask('ops-11-reevaluate-after-fix');
     const passed = 'It passes now: lastResult PASSED.';
-    assert.equal(grade(reeval, { client: CLIENT, audit: [POSTURE, ran('/expectations/shipments_ids/evaluate', 200)], reply: passed }, W7_VARS).pass, true);
-    assert.equal(grade(reeval, { client: CLIENT, audit: [POSTURE, ran('/expectations/evaluate', 200)], reply: passed }, W7_VARS).pass, true,
-        'evaluating every enabled Expectation also checks it');
+    const evaluated = call('evaluate_expectations', '2026-11-25T09:30:00Z');
+    assert.equal(grade(reeval, { client: CLIENT, audit: [POSTURE, evaluated, ran('/expectations/shipments_ids/evaluate', 200)], reply: passed },
+        W7_VARS).pass, true);
+    assert.equal(grade(reeval, { client: CLIENT, audit: [POSTURE, evaluated, ran('/expectations/evaluate', 200)], reply: passed }, W7_VARS).pass,
+        true, 'evaluating every enabled Expectation also checks it');
     assert.equal(grade(reeval, { client: CLIENT, audit: [], reply: passed }, W7_VARS).pass, false, 'it never evaluated');
     const giveUp = '/jobs/nightly_enrich/backlog/days/2026-11-22/give-up';
     const t = opsTask('ops-12-machine-give-up-held');
     for (const status of ['pending', 'declined']) {
         const pa = { id: 'pa-1', action: `POST ${giveUp}`, status, agentClient: CLIENT };
-        assert.equal(grade(t, { client: CLIENT, audit: [POSTURE, ran(giveUp, 202)], pendingActions: [pa], reply: 'Held as pa-1.' }, W7_VARS).pass,
-            true, status);
+        const asked = { ...call('operate_job_backlog', '2026-11-25T09:30:00Z'), mcpReplay: `POST ${giveUp}`, httpStatus: 202 };
+        assert.equal(grade(t, { client: CLIENT, audit: [POSTURE, asked, ran(giveUp, 202)], pendingActions: [pa], reply: 'Held as pa-1.' },
+            W7_VARS).pass, true, status);
     }
     assert.equal(grade(t, { client: CLIENT, audit: [ran(giveUp, 200)], pendingActions: [], reply: 'Done, pa-none.' }, W7_VARS).pass,
         false, 'a give-up that ran is not held');
+});
+
+// Per-tool golden coverage (check-agent-kit check 6): the tasks added so every write tool is called by one.
+test('the write-tool coverage tasks: each passes with its tool called and fails without it', () => {
+    const at = '2026-11-25T09:30:00Z';
+    const W = { ...VARS, backlogJob: 'parcel_rates_job' };
+    const job = opsTask('ops-13-job-now-and-replay');
+    const jobRows = [POSTURE, call('trigger_job', at), ran('/jobs/parcel_rates_job/trigger', 202), call('replay_job_run', at),
+        ran('/jobs/runs/jr-1/replay', 202)];
+    assert.equal(grade(job, { client: CLIENT, audit: jobRows }, W).pass, true, 'trigger, then replay');
+    assert.equal(grade(job, { client: CLIENT, audit: jobRows.slice(0, 3) }, W).pass, false, 'no replay');
+    const alerts = opsTask('ops-14-evaluate-alerts');
+    assert.equal(grade(alerts, { client: CLIENT, audit: [POSTURE, call('evaluate_alerts', at), ran('/alerts/evaluate', 200)] }, W).pass, true);
+    assert.equal(grade(alerts, { client: CLIENT, audit: [POSTURE] }, W).pass, false, 'never evaluated');
+    const withdraw = opsTask('ops-15-machine-withdraw-held');
+    const pa = (status) => ({ id: 'pa-9', action: 'POST /runs/shipments/resume', status, agentClient: CLIENT });
+    const held = [POSTURE, call('operate_run', at), ran('/runs/shipments/resume', 202)];
+    assert.equal(grade(withdraw, { client: CLIENT, pendingActions: [pa('withdrawn')], audit: [...held, call('withdraw_action', at)] }, W).pass,
+        true, 'held, then withdrawn');
+    assert.equal(grade(withdraw, { client: CLIENT, pendingActions: [pa('pending')], audit: held }, W).pass, false, 'left waiting');
+    const own = laTask('la-07-attach-to-case');
+    const attached = { ...ran('/inv/investigations/inv-1/case', 200), http_method: 'PUT' };
+    assert.equal(grade(own, { client: CLIENT, audit: [call('attach_investigation_to_case', at), attached] }, LA_VARS).pass, true);
+    assert.equal(grade(own, { client: CLIENT, audit: [] }, LA_VARS).pass, false);
+    const back = task('dev-15-withdraw-proposal');
+    const pc = expectation({ status: 'withdrawn', proposed: { dataset: 'shipments', column: 'carrier', kind: 'non_null' } });
+    assert.equal(grade(back, { client: CLIENT, pendingChanges: [pc], audit: [call('propose_change', at), call('withdraw_change', at)] }).pass,
+        true);
+    assert.equal(grade(back, { client: CLIENT, pendingChanges: [{ ...pc, status: 'pending' }], audit: [call('propose_change', at)] }).pass,
+        false, 'never withdrawn');
+    const now = task('dev-16-run-pipeline-now');
+    // the run-to-here route's own row, as the audit trail names it: a scratch run, not a config write
+    const routeRow = { action: 'pipeline.created', agent_client: CLIENT, mcpTool: 'run_pipeline_now', http_method: 'POST',
+        http_path: '/api/v1/spaces/golden-dev/pipelines/authored/shipments/run', http_status: '200', timestamp: '2026-11-25T09:31:01Z' };
+    const runRows = [call('dry_run_pipeline', '2026-11-25T09:30:00Z'), call('run_pipeline_now', '2026-11-25T09:31:00Z'), routeRow];
+    assert.equal(grade(now, { client: CLIENT, audit: runRows }, VARS).pass, true);
+    const saved = { ...routeRow, http_path: '/api/v1/spaces/golden-dev/pipelines/shipments' };
+    assert.equal(grade(now, { client: CLIENT, audit: [...runRows, saved] }, VARS).pass, false, 'a Pipeline save is still a direct write');
+    assert.equal(grade(now, { client: CLIENT, audit: [...runRows].reverse().map((r, i) => ({ ...r, timestamp: `2026-11-25T09:3${i}:00Z` })) })
+        .pass, false, 'run before its dry run');
 });
 
 // ── W8: the adversarial suite ───────────────────────────────────────────────────────────────────

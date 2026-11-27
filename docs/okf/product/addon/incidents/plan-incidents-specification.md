@@ -69,6 +69,27 @@ the average), any other id snake_case → words — while the `metric` field / e
 `duration_ms`. Pipeline and Investigation scopes are unchanged. The UI authoring form asks `description` and authors both the ledger-metric and the Measure shape; a re-save
 keeps every stored key it does not model ([alerts feature](user-guide-alerts.md)).
 
+**Row filter — `when`** (`ALERT-RULE-ROW-FILTER-1`, 2026-11-27). A Dataset Measure rule (scalar or `by`) may add
+`when`, a Condition Language group over the Dataset's rows — the `when` shape `/bi/query` takes, chosen over free SQL
+text and over a new filter shape. As built:
+- **Model** — `AlertRule` accepts `when` on a plain Measure rule (it was refused unless the rule was windowed) and
+  validates it with `ConditionTree.validateStrict`: an incomplete leaf, an unknown operator, an empty group or a group
+  `op` other than AND/OR is refused, because a lenient leaf constrains nothing and would widen the count.
+  `rowFilter()` / `rowFilterColumns()` expose it; a freshness, KPI or Investigation rule still refuses `when`.
+- **Save gate** — `AlertRoutes.requireRowFilter`, inside `parseContent` (so every door that writes an Alert Rule):
+  every field must be a column of the Dataset (`DatasetMeasureProbe.columns`; fail closed when the Schema cannot be
+  read), and `BiResultMasking.vet` — `/bi/query`'s own judgement, as a caller who cannot reveal — refuses a field the
+  Space masks, whoever saves the rule (an Alert never reveals; the KPI rule's precedent). All three refusals are 422
+  `ERR_ALERT_ROW_FILTER_INVALID` (`FindingCodes`, error catalogue).
+- **Evaluation** — `DatasetMeasureProbe.value(dataset, measure, when)` / `breaches(…, when)` pass the tree as
+  `MeasureCompiler.Spec.when`: the same compilation `/bi/query` uses, identifiers quoted, operands bound, over the one
+  Dataset's relation in the sandbox — a field naming another Dataset is an unknown column (value unknown, never another
+  table's count). `AlertService.rowFilterProbe` is a separate wire: a filtered rule with no such probe stays **inert**,
+  never evaluated by the unfiltered probe.
+- **Not done** — `validate_config` (`type: alert`) runs `SaveGate`, not the Alert Rule parse, so it neither sees a bad
+  filter nor any other Alert Rule refusal until `propose_change`; the rule form keeps a stored filter but cannot edit
+  one (`VALIDATE-ALERT-SKIPS-RULE-PARSE-1` and `ALERT-RULE-FILTER-UI-1` on `docs/BACKLOG.md`).
+
 **Per-entity Measure rules — `by`** (`ASSURE-PER-ENTITY-ALERTS-1`, 2026-09-26). A Dataset Measure rule may
 add `by: [col, …]` (key columns; a list or one comma-separated string) and `stormCap` (default **100**,
 `AlertRule.DEFAULT_STORM_CAP`). `by` is refused on a ledger, freshness or Investigation rule, a key column must

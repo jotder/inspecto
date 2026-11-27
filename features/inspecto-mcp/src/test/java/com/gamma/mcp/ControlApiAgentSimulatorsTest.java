@@ -110,12 +110,61 @@ class ControlApiAgentSimulatorsTest {
      * shared with nobody); the Rule Template {@code big} over it; the Decision Rule {@code high_cost}.
      */
     private Ctx open(Path root) throws Exception {
+        return open(root, false);
+    }
+
+    /**
+     * As {@link #open(Path)}; {@code withReference} also loads {@code region_dim} ({@code produces: reference}, its PARQUET
+     * store {@code s1/region/db} holding A EU and B US) and the Dataset {@code regions_ds} over it, owned by dev-2 and
+     * shared with nobody: dev-1 and dev-1's agent cannot view it.
+     */
+    private Ctx open(Path root, boolean withReference) throws Exception {
         Path base = root.resolve("s1");
         Path config = base.resolve("config");
         Files.createDirectories(config.resolve("inbox"));
         Files.createDirectories(base.resolve("duckdb"));
         Path tmp = TestConfigs.csv(config, PipelineConfigBatchTest.miniSchema()).write();
         Files.move(tmp, config.resolve("etl_pipeline.toon"));
+        if (withReference) {
+            Path region = TestConfigs.csv(base.resolve("region"), PipelineConfigBatchTest.miniSchema())
+                    .name("REGION_DIM").format("PARQUET").write();
+            Files.writeString(config.resolve("region_dim_pipeline.toon"),
+                    "produces: reference\n" + Files.readString(region).replace("active: true", "active: false"));
+            Files.delete(region);
+            // FEEDS routes into two stores; the second (s1/feeds/sms) is named only by sinks[] and its route branch:
+            // under none of its dirs (s1/feeds/main/...), and no registry Dataset reads it
+            String fwd = base.toString().replace("\\", "/");
+            Path feeds = TestConfigs.csv(base.resolve("feeds").resolve("main"), PipelineConfigBatchTest.miniSchema())
+                    .name("FEEDS").format("PARQUET").write();
+            // ...and its DuckLake output writes its files to data_path (s1/lakes/feeds), outside every other folder
+            String withLake = Files.readString(feeds).replace("output:\n  format: PARQUET\n",
+                    "output:\n  format: PARQUET\n  ducklake:\n    enabled: false\n    data_path: \"" + fwd + "/lakes/feeds\"\n");
+            assertNotEquals(Files.readString(feeds), withLake, "the DuckLake block was placed");
+            Files.writeString(config.resolve("feeds_pipeline.toon"), withLake.replace("active: true", "active: false")
+                    + "\nsinks[2]{database,format}:\n  \"" + fwd + "/feeds/main/db\",PARQUET\n  \"" + fwd + "/feeds/sms\",PARQUET\n"
+                    + "\nroute:\n  mode: case\n  default: sms\n  branches[2]{key,where,database}:\n"
+                    + "    main,\"1 = 1\",\"" + fwd + "/feeds/main/db\"\n    sms,\"1 = 0\",\"" + fwd + "/feeds/sms\"\n");
+            Files.delete(feeds);
+            String part = Files.createDirectories(base.resolve("region").resolve("db")).resolve("part0.parquet")
+                    .toString().replace("\\", "/");
+            String sms = Files.createDirectories(base.resolve("feeds").resolve("sms")).resolve("part0.parquet")
+                    .toString().replace("\\", "/");
+            String main = Files.createDirectories(base.resolve("feeds").resolve("main").resolve("db")).resolve("part0.parquet")
+                    .toString().replace("\\", "/");
+            String lake = Files.createDirectories(base.resolve("lakes").resolve("feeds")).resolve("part0.parquet")
+                    .toString().replace("\\", "/");
+            DuckDbUtil.loadDriver();
+            File seed = DuckDbUtil.tempDbFile("regionseed_");
+            try (Connection conn = DuckDbUtil.openConnection(seed); Statement st = conn.createStatement()) {
+                for (String to : List.of(part, sms, main, lake))
+                    st.execute("COPY (SELECT * FROM (VALUES ('" + A + "','EU'),('" + B + "','US')) t(msisdn,region)) TO '"
+                            + to + "' (FORMAT PARQUET)");
+            } finally {
+                DuckDbUtil.deleteTempDb(seed);
+            }
+            new ComponentStore(config.resolve("registry")).write("dataset", "regions_ds", Map.of("physicalRef", "region_dim",
+                    "owner", "dev-2", "shares", List.of(), "columns", List.of(Map.of("name", "msisdn"), Map.of("name", "region"))));
+        }
         Path partition = Files.createDirectories(base.resolve("data").resolve("calls").resolve("dt=2026"));
         String parquet = partition.resolve("data.parquet").toString().replace("\\", "/");
         DuckDbUtil.loadDriver();
@@ -283,13 +332,148 @@ class ControlApiAgentSimulatorsTest {
     private static Map<String, Object> enrichment(Path root) throws Exception {
         Path dim = Files.createDirectories(root.resolve("refdata")).resolve("dim.csv");   // a data dir, not the Space root's parent
         Files.writeString(dim, "msisdn,region\n" + A + ",EU\n" + B + ",US\n");
+        return draft(Map.of("path", dim.toString().replace("\\", "/"), "format", "CSV"));
+    }
+
+    /** An enrichment draft joining the caller's sample (region EU) to the Reference {@code dim} ({@code path:} or {@code ref:}). */
+    private static Map<String, Object> draft(Map<String, Object> dim) {
         Map<String, Object> cfg = new LinkedHashMap<>();
         cfg.put("name", "PREVIEW");
         cfg.put("input", Map.of("database", "unused", "format", "PARQUET", "partitions", List.of("day")));
         cfg.put("output", Map.of("database", "unused", "format", "PARQUET", "partitions", List.of("day")));
-        cfg.put("references", Map.of("dim", Map.of("path", dim.toString().replace("\\", "/"), "format", "CSV")));
+        cfg.put("references", Map.of("dim", dim));
         cfg.put("transform", "SELECT i.region, d.msisdn FROM input i JOIN dim d ON i.region = d.region");
         return Map.of("config", cfg, "sampleRows", List.of(Map.of("region", "EU")));
+    }
+
+    /** A {@code path:} Reference to {@code file}, written first as a CSV holding A EU and B US (PARQUET when it exists). */
+    private static Map<String, Object> pathTo(Path file) throws Exception {
+        if (!Files.exists(file)) {
+            Files.createDirectories(file.getParent());
+            Files.writeString(file, "msisdn,region\n" + A + ",EU\n" + B + ",US\n");
+        }
+        String format = file.toString().endsWith(".parquet") || Files.isDirectory(file) ? "PARQUET" : "CSV";
+        return Map.of("path", file.toString().replace("\\", "/"), "format", format);
+    }
+
+    /**
+     * ENRICHMENT-PREVIEW-PATH-REACH-1 (operator, 2026-11-27): a path Reference into a data folder is refused 422 to the
+     * person and the person's agent on both doors, and 403 to a machine as before; each probe holds A, so each would answer
+     * it without the guard. A Dataset's store (no Pipeline produces it: the registry branch), a Pipeline's rejected rows
+     * ({@code region_dim}'s {@code errors} folder: the Pipeline branch). (A backup archive and the restricted quarantine
+     * need no rule: DuckDB refuses a {@code .zip}, and the sealed read's allowlist a restricted store, {@code PathJail}.)
+     */
+    @Test
+    void aPathReferenceIntoADataStoreIsRefusedToEveryCaller(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, true)) {
+            for (Path probe : List.of(root.resolve("s1/data/calls/dt=2026/data.parquet"),
+                    root.resolve("s1/region/errors/rejected.csv")))
+                assertRefusedToEveryCaller(c, probe);
+            // a path outside every data folder keeps today's answer (raw for a builder, D-AK22)
+            HttpResponse<String> outside = post(c, PERSON, "/enrichment/preview", enrichment(root));
+            assertEquals(200, outside.statusCode(), outside.body());
+        }
+    }
+
+    /**
+     * A folder path: DuckDB reads every file below it, so {@code s1/feeds/main} (holding FEEDS's store {@code db}) is
+     * refused. (A folder directly under the Space root is refused by the seal already.)
+     */
+    @Test
+    void aFolderPathAboveAStoreIsRefusedToEveryCaller(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, true)) {
+            assertRefusedToEveryCaller(c, root.resolve("s1/feeds/main"));
+        }
+    }
+
+    /** A store a Pipeline names only in {@code sinks[]} ({@code s1/feeds/sms}): not under its dirs, no registry Dataset. */
+    @Test
+    void aSinkStoreIsRefusedToEveryCaller(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, true)) {
+            assertRefusedToEveryCaller(c, root.resolve("s1/feeds/sms/part0.parquet"));
+        }
+    }
+
+    /** A DuckLake output's {@code data_path} ({@code s1/lakes/feeds}): FEEDS writes its files there, outside its dirs. */
+    @Test
+    void aDuckLakeDataPathIsRefusedToEveryCaller(@TempDir Path root) throws Exception {
+        try (Ctx c = open(root, true)) {
+            assertRefusedToEveryCaller(c, root.resolve("s1/lakes/feeds/part0.parquet"));
+        }
+    }
+
+    /**
+     * {@code -Ddata.dir} overrides a Space's data root for its engine, while {@code ControlApi.dataRoot()} does not read
+     * it: a registry Dataset's store under {@code -Ddata.dir} ({@code calls} there) is refused too.
+     */
+    @Test
+    void aDatasetStoreUnderTheDataDirOverrideIsRefusedToEveryCaller(@TempDir Path root) throws Exception {
+        Path override = root.resolve("elsewhere");
+        Path store = Files.createDirectories(override.resolve("calls").resolve("dt=2026")).resolve("data.parquet");
+        System.setProperty("data.dir", override.toString());
+        try (Ctx c = open(root, true)) {
+            DuckDbUtil.loadDriver();
+            File seed = DuckDbUtil.tempDbFile("dataDirSeed_");
+            try (Connection conn = DuckDbUtil.openConnection(seed); Statement st = conn.createStatement()) {
+                st.execute("COPY (SELECT * FROM (VALUES ('" + A + "','EU'),('" + B + "','US')) t(msisdn,region)) TO '"
+                        + store.toString().replace("\\", "/") + "' (FORMAT PARQUET)");
+            } finally {
+                DuckDbUtil.deleteTempDb(seed);
+            }
+            assertRefusedToEveryCaller(c, store);
+        } finally {
+            System.clearProperty("data.dir");
+        }
+    }
+
+    /** 422 to the person and the person's agent on both doors, 403 to a machine; no answer holds a value. */
+    private void assertRefusedToEveryCaller(Ctx c, Path probe) throws Exception {
+        Map<String, Object> body = draft(pathTo(probe));
+        HttpResponse<String> person = post(c, PERSON, "/enrichment/preview", body);
+        assertEquals(422, person.statusCode(), probe + ": " + person.body());
+        assertTrue(person.body().contains("may not name a file in a data folder"), person.body());
+        assertNoRaw("person " + probe, person.body());
+        HttpResponse<String> agent = post(c, AGENT, "/enrichment/preview", body);
+        assertEquals(422, agent.statusCode(), probe + ": " + agent.body());
+        assertNoRaw("agent " + probe, agent.body());
+        JsonNode viaMcp = tool(c, AGENT, "preview_enrichment", Map.of("body", body));
+        assertTrue(viaMcp.path("isError").asBoolean() && text(viaMcp).startsWith("HTTP 422"), viaMcp.toString());
+        assertNoRaw("agent MCP " + probe, viaMcp.toString());
+        HttpResponse<String> bot = post(c, BOT, "/enrichment/preview", body);
+        assertEquals(403, bot.statusCode(), bot.body());
+        assertNoRaw("machine " + probe, bot.body());
+    }
+
+    /**
+     * ENRICHMENT-PREVIEW-SHARING-1: a by-name Reference whose Dataset is shared away from the caller is as absent as a
+     * Pipeline that is not loaded, for the person and the person's agent on both doors (a machine is refused 403 as
+     * before); the Dataset's owner previews it.
+     */
+    @Test
+    void aByNameReferenceWhoseDatasetIsSharedAwayIsAsAbsentAsAnUnloadedOne(@TempDir Path root) throws Exception {
+        Map<String, Object> body = draft(Map.of("ref", "region_dim"));
+        try (Ctx c = open(root, true)) {
+            HttpResponse<String> owner = post(c, OTHER, "/enrichment/preview", body);
+            assertEquals(200, owner.statusCode(), owner.body());
+            assertTrue(owner.body().contains(A), "the owner reads it: " + owner.body());
+
+            String unloaded = post(c, PERSON, "/enrichment/preview", draft(Map.of("ref", "no_such_dim"))).body();
+            assertTrue(unloaded.contains("no such pipeline is loaded"), unloaded);
+            HttpResponse<String> person = post(c, PERSON, "/enrichment/preview", body);
+            assertEquals(422, person.statusCode(), person.body());
+            assertTrue(person.body().contains("binds ref: 'region_dim' but no such pipeline is loaded"),
+                    "the same refusal as a Pipeline that is not loaded: " + person.body());
+            assertNoRaw("person", person.body());
+            HttpResponse<String> agent = post(c, AGENT, "/enrichment/preview", body);
+            assertEquals(422, agent.statusCode(), agent.body());
+            assertNoRaw("agent", agent.body());
+            JsonNode viaMcp = tool(c, AGENT, "preview_enrichment", Map.of("body", body));
+            assertTrue(viaMcp.path("isError").asBoolean() && text(viaMcp).startsWith("HTTP 422"), viaMcp.toString());
+            assertNoRaw("agent MCP", viaMcp.toString());
+            HttpResponse<String> bot = post(c, BOT, "/enrichment/preview", body);
+            assertEquals(403, bot.statusCode(), bot.body());
+            assertNoRaw("machine", bot.body());
+        }
     }
 
     /**

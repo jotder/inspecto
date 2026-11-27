@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-494 test class(es): 196 unit, 298 real-HTTP control-plane, 0 IT.
+496 test class(es): 197 unit, 299 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -34,6 +34,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `AgentGateParityTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AgentGateParityTest.java` | The agent gate's three buckets against the capability manifest (AGENT-KIT-1 AK-2a, plan §4.1, §7 "a write route that |
 | `AgentRoutesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/AgentRoutesTest.java` | Integration tests for the AGT-5 (P0) {@code /agent/*} routes over real HTTP, against a fake {@link IntelligenceAgent}. |
 | `AlertRoutesWindowGateTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/AlertRoutesWindowGateTest.java` | PA-9b: the save gates of a windowed Alert Rule ({@link AlertRoutes#requireWindow}), each 422 paired with the accepted |
+| `AlertRowFilterSaveGateTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AlertRowFilterSaveGateTest.java` | ALERT-RULE-ROW-FILTER-1: the save gate of a Dataset measure rule's row filter ({@link AlertRoutes#requireRowFilter}), |
 | `AlertRuleUnmodelledKeysTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/AlertRuleUnmodelledKeysTest.java` | {@code MODULE-REORG-P4-2} - the Alert Rule unmodelled-key policy, over real HTTP with a real Subject. |
 | `AnnotationTargetsScopeTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/AnnotationTargetsScopeTest.java` | The CORE half of the SEC-7d data-scope guard and the ABAC A3 row-level PEP: {@link AnnotationTargets}' |
 | `ApiContextQueryDecodingTest` | `com.gamma.control` | unit | `inspecto/src/test/java/com/gamma/control/ApiContextQueryDecodingTest.java` | {@link ApiContext#query} over a real JDK HttpServer: a query parameter is percent-decoded exactly ONCE. It used to |
@@ -269,6 +270,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiQueryRunV1Test` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiQueryRunV1Test.java` | Real-HTTP + real-DuckDB tests for W4 query execution ({@code POST /queries/{id}/run}): a persisted |
 | `ControlApiRateLimitTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRateLimitTest.java` | Real-HTTP tests for the per-subject token-bucket throttle on the expensive routes |
 | `ControlApiRecordTransformerSlotSaveTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRecordTransformerSlotSaveTest.java` | The default template's Record Transformer (the projection SLOT, node id {@code map}, type |
+| `ControlApiRefusalCodesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRefusalCodesTest.java` | REFUSAL-CODES-1 over real HTTP: the refusals agents hit most carry a code of their own as the one finding of the |
 | `ControlApiRejectedRowsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiRejectedRowsTest.java` | {@code GET /runs/{name}/errors?file=} over real HTTP — the rejected ROWS behind an |
 | `ControlApiReplayRejectsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiReplayRejectsTest.java` | {@code POST /runs/{name}/replay-rejects} over real HTTP (EXECUTION-RESIDUALS X4): replay one file's rejected |
 | `ControlApiReprocessRefusalTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiReprocessRefusalTest.java` | {@code POST /runs/{id}/reprocess} refused over real HTTP (board {@code REPROCESS-REFUSAL-500-1}, operator ruling |

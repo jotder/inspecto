@@ -26,6 +26,14 @@ them: do the task you were given, then end your answer with one line naming what
    condition would have fired. Tell the person: a rule that would have fired every day is noise.
 4. Draft the rule from the resource `inspecto://shapes/alert-rule` (its fields and an example); `validate_config` with `type: alert` (the config type; `alert-rule` is only the `propose_change`
    kind). Fix every error.
+   **Counting only some rows** ("more than 5 shipments are undelivered") is ONE Measure rule: add `when`, a condition
+   group over the Dataset's own columns, and the Measure counts only the rows that match —
+   `dataset: shipments`, `measure: count`, `comparator: gt`, `threshold: 5`,
+   `when: {kind: group, op: AND, items: [{kind: condition, field: delivered_on, operator: isNull}]}`. Operators:
+   `= != < <= > >= between in contains startsWith endsWith matches isNull isNotNull`. Every field must be a column of
+   that Dataset and none masked; another Dataset's column needs a derived Dataset first. `validate_config` does not
+   check the filter; `propose_change` does, and its 422 names `ERR_ALERT_ROW_FILTER_INVALID` and the condition or column. Back-test with the same condition in `query_dataset`. An Expectation is for "every
+   row must satisfy X"; an Alert Rule with `when` is for "tell me when too many rows match X".
 5. `propose_change` (`kind: alert-rule`, `operation: create`, `content`, `reason` that states the back-test, for
    example "would have fired 2 times in 30 days").
 6. After approval, `list_alerts` shows what it raises.

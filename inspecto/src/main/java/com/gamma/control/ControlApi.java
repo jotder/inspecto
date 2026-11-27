@@ -901,7 +901,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
             next.proceed(ex);
         } catch (ApiException ae) {
             if (ae.errorCode != null) ApiContext.attr(ex, ApiContext.ATTR_ERROR_CODE, ae.errorCode);
-            respond(ex, ae.status, Map.of("error", ae.getMessage()));
+            respond(ex, ae.status, RouteErrors.body(ae));
         } catch (com.gamma.config.safety.SafetyPolicyUnreadableException unreadable) {
             // A Safety Policy file in scope cannot be read (policy-narrowing-design §5.1): EVERY gate that asks for
             // the effective policy fails closed as a 422 finding naming the file - never a 500, never "no policy".
@@ -1285,7 +1285,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
         } catch (ApiException ae) {
             if (ae.status == 401 || ae.status == 403) AuditTrail.accessDenied(rx, method, path, ae.status);
             if (ae.errorCode != null) ApiContext.attr(rx, ApiContext.ATTR_ERROR_CODE, ae.errorCode);
-            respond(rx, ae.status, Map.of("error", ae.getMessage()));
+            respond(rx, ae.status, RouteErrors.body(ae));
             return new Replayed(ae.status, rx.body());
         } finally {
             if (outerAgent == null) MDC.remove(EventLog.AGENT_CLIENT_MDC_KEY);

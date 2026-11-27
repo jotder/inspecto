@@ -18,7 +18,9 @@ Every refused request answers a v1 error body `{"error": {"errorCode", "message"
 `{severity, fieldPath, message, code, guidance}` per problem; fix every `ERROR` finding (its `code` is in the second
 table, its `guidance` says what to change at `fieldPath`) and resubmit. `WARNING` findings never block a save.
 
-Most `422`s share the one code `CONFIG_VALIDATION_FAILED`; their `message` names the key and the allowed values.
+Most `422`s share the one code `CONFIG_VALIDATION_FAILED`. The refusals agents hit most also carry one finding with a
+code of its own (`error.details.findings[0].code`, listed under Config finding codes from `ERR_COLUMN_UNKNOWN` on);
+the rest carry none yet — their `message` names the key and the allowed values (board row `REFUSAL-CODES-REST-1`).
 Quote the `correlationId` when you report a `500`.
 
 ## Error codes (every v1 error)
@@ -53,20 +55,33 @@ Read from `error.errorCode`. 23 codes.
 
 ## Config finding codes
 
-Read from `findings[].code — on a refused save error.details.findings[].code`. 41 codes.
+Read from `findings[].code — on a refused save error.details.findings[].code`. 54 codes.
 
 | Code | Severity | Status | Cause | Fix |
 |---|---|---|---|---|
 | `COMPONENT_INVALID` | ERROR | 422 | POST /validate: the component draft is refused as a whole — the message is the refusal the save would give. | Fix what the message names (a missing required key, a bad value, a reference to nothing), then validate again before saving. |
+| `ERR_ALERT_ROW_FILTER_INVALID` | ERROR | 422 | A Measure Alert Rule's row filter (when) cannot be applied: it is not a complete condition group (a condition with no field, operator or value, an unknown operator, an empty group), it names a column the Dataset does not have, or it filters on a column the Space masks — an alert never reveals, so it may not count rows by a masked value. | Read the message — it names the condition or column. Complete the condition, use a column from the Dataset's Schema (GET /datasets/{id}/rows lists them), or filter on an unmasked column; a filter on another Dataset needs a derived Dataset first. |
 | `ERR_ARMED_WITHOUT_SCHEMA` | ERROR | 422 | The Pipeline is active but has no schema at all, so it would register and then be skipped every cycle. | Give it a schema (processing.schema_file or processing.schemas), or save it with active: false until it has one. |
+| `ERR_BI_FILTER_OP_UNKNOWN` | ERROR | 422 | A BI query filter names an operator the compiler does not know. | Use one of: = (eq), != (ne, <>), >, >=, <, <=, gt, gte, lt, lte, like, in (with a non-empty value list), isNull, notNull. |
+| `ERR_CALCULATED_COLUMN_INVALID` | ERROR | 422 | A Dataset's calculated[] entry is refused: it is not an object, its name is not a plain identifier, or it has no expr. | Write each entry as {name: <plain identifier>, expr: <SQL expression over the row>}; fieldPath names the entry and the key. |
 | `ERR_CHAIN_WITHOUT_OUTPUT_STORE` | ERROR | 422 | An active Pipeline has chain Steps (steps:, or processing.dedup / summarize / profile / join) but no top-level output_store:, so the chain never runs. | Add output_store: naming the Dataset the chain writes, and a pipeline Job that runs it. |
 | `ERR_COLLECTOR_CONFIG_INVALID` | ERROR | 422 | An active Pipeline's Collector cannot be honoured — for example post_action on_success: MOVE with no archive_path. | Set collector.post_action.archive_path (for example archive/yyyy/MM/dd), or choose RETAIN, DELETE or RENAME. |
 | `ERR_COLUMN_BREAKS` | ERROR | 409 | The Schema save removes, renames or narrows a column another config uses, and the Space's Safety Policy sets columns: refuse-breaking. | Repoint the consumers the body lists first, keep the column, or re-send with ?force=true to save anyway. |
+| `ERR_COLUMN_UNKNOWN` | ERROR | 422 | The request names a column the Dataset does not have: a BI query's orderBy, a Link Analysis query's column or filter field, an Entity Identity or index column. | Read the Dataset's columns (its schema in GET /catalog) and use one of those names; to order a BI query by a measure, use the generated result column <agg>_<FIELD>. |
+| `ERR_DATASET_READ_FAILED` | ERROR | 422 | Reading the Dataset's rows failed in the database: its relation names a table or column that does not exist, or a value fails a cast. The message carries the database's text, withheld while masking is in force. | Fix the Dataset's sql, sourceName or calculated columns so the relation reads only its own store's columns, then read again. A Dataset with no files yet answers 409 CONFLICT, not this. |
+| `ERR_DATASET_SQL_NO_SOURCE` | ERROR | 422 | A virtual Dataset carries sql but no sourceName, so nothing names the store its FROM reads. A virtual Dataset reads exactly one store. | Set sourceName to the store the sql reads FROM. To combine two Datasets, derive one with a Pipeline join or an enrichment, not a virtual Dataset. |
+| `ERR_DECISION_RULE_NO_CONSEQUENCE` | ERROR | 422 | The Decision Rule has no consequences, or an empty list, so it would do nothing when it matches. | Add at least one consequence {action, params}; the Decision Rule shape (inspecto://shapes/decision-rule) lists the actions. |
+| `ERR_DECISION_RULE_NO_NAME` | ERROR | 422 | The Decision Rule has no name. | Add a non-blank name. |
+| `ERR_DECISION_RULE_WHEN_INVALID` | ERROR | 422 | The Decision Rule's when is not a condition group, so it would match every row or none. | Write when as {kind: group, op: AND\|OR, items: [...]}, each item a condition or another group; leave it out to start from an empty AND group. |
 | `ERR_DEDUP_WINDOW_UNARMABLE` | ERROR | 422 | An active windowed dedup (scope: window(...)) has no order_by tie-break, or its scope: value is malformed — a durable ledger must never record a random winner. | Add an order_by that picks one winner per key, and write scope as window(<duration>). |
 | `ERR_EDITION_FEATURE` | ERROR | 422 | The config uses a feature this edition does not include — Alert Rules, the post_action MOVE archive, or DuckLake registration (Standard and Advanced only). | Remove the feature from the config, or run the Standard or Advanced edition. |
 | `ERR_EXCEL_INVALID` | ERROR | 422 | The excel: block is refused — no path, a path leaving the data root, a bad or duplicate sheet name, max_rows out of bounds, an unknown key, or a sheet sql the SQL guard refuses. | Correct the item the message names: a relative path under the data root, unique sheet names, max_rows within bounds, a plain SELECT for sheet sql. |
 | `ERR_LINK_DANGLING` | ERROR | 422 | The saved config adds a link to a Pipeline, Connection or other config that does not exist, and the server refuses dangling links. | Create the target first, or correct the name at the finding's fieldPath. |
 | `ERR_LOOKUP_ON_INGEST` | ERROR | 422 | A processing.map.fields[] row calls lookup.reference; the ingest lane cannot resolve a Reference, so every batch would fail. | Move the lookup into a Pipeline transform.sql Step or a transform.join; keep the mapping row to plain expressions. |
+| `ERR_RECON_CARDINALITY_UNKNOWN` | ERROR | 422 | A Reconciliation's cardinality is not one of the four words. | Set cardinality to one_to_one, one_to_many, many_to_one or many_to_many, or leave it out (many_to_many asserts nothing). |
+| `ERR_RECON_COMPARE_COLUMN_INVALID` | ERROR | 422 | A Reconciliation's compareColumns[] entry is refused: the column is also a key column or the reserved record count, agg is not sum or count, toleranceType is not exact, absolute or percent, or tolerance is negative. | Write each entry as {column, agg: sum\|count, toleranceType: exact\|absolute\|percent, tolerance: >= 0}, and compare only columns that are not keys. |
+| `ERR_REQUEST_FIELD_MISSING` | ERROR | 422 | The request body lacks a field this route requires; the finding's fieldPath names it (for example dataset, startNode, value, ids, or a column key such as sourceCol). | Add the field at fieldPath and resend. The route's request shape is in docs/api/openapi-v1.json. |
+| `ERR_REQUEST_VALUE_NOT_ALLOWED` | ERROR | 422 | A request field holds a value outside its fixed set; the message lists the allowed values (a Link Analysis query's direction). | Send one of the values the message lists, spelled as listed. |
 | `ERR_ROUTE_PREDICATE_COLUMN` | ERROR | 422 | An active route: branch's where: reads a column the declared schema does not carry, so the branch would fail on the first row. | Use a column the schema declares in the where: predicate (check spelling and case), or add the column to the schema. |
 | `ERR_ROUTE_UNARMABLE` | ERROR | 422 | An active Pipeline's route: block would refuse to arm; the finding's message names each reason. | Correct the branch at the finding's fieldPath as its message and guidance say, or save with active: false and fix it before activating. |
 | `ERR_SAFETY_STATE_ADVANCE_REFUSED` | ERROR | 422 | The config would advance progress state (a remote, database-export or Kafka Collector, content dedup, markers with duplicate_check, windowed dedup, a Job's incremental_column) in a Space whose Safety Policy sets permit.advance_state: false. | Remove the state-advancing setting, or have an administrator allow it in the Space's Safety Policy. |
@@ -126,11 +141,41 @@ Read from `findings[].code of a Pipeline graph validate or save`. 20 codes.
 | `UNKNOWN_USE_KIND` | — | A node's use: names a component kind that does not exist. | Write use: as <kind>/<name> with a component kind this Space has (for example grammar/<name>). |
 | `UNKNOWN_USE_REF` | — | A node's use: names a component of a known kind that does not exist — often a typo. | Name an existing component (list that kind first), or create it. |
 
+## Pipeline save refusals
+
+Read from `error.details.refusals[].code of a refused PUT /pipelines/{id}/graph (refusals[].code of its validate)`. 22 codes.
+
+| Code | Status | Cause | Fix |
+|---|---|---|---|
+| `ENRICHMENT_NOT_TERMINAL` | — | An enrichment node has a node after it; an enrichment runs after the batch commits, not inside the walk. | Make the enrichment the last node of its chain; put row logic before it in a transform.sql step. |
+| `EXCEL_INVALID` | — | A sink.excel node's config is refused: no path, a bad sheet name, a path leaving the data root, or a sheet sql that is not a plain SELECT. | Correct what the message names: a relative path under the data root, unique sheet names, a plain SELECT per sheet. |
+| `MAPPING_CONFLICT` | — | A map node authors a columns list while the Pipeline also declares processing.mapping_file. | Keep one: drop the columns list, or drop mapping_file. |
+| `MULTI_ACQUISITION` | — | The graph has two acquisition nodes; the saved file has one Collector block. | Keep one acquisition node; use a second Pipeline for a second Collector. |
+| `MULTI_EXCEL` | — | The graph has two sink.excel nodes; the saved file has one excel block. | Keep one Excel sink; put more sheets in it. |
+| `MULTI_GAP` | — | The graph has two gap-detection nodes; the saved file has one gap_detection block. | Keep one gap node. |
+| `MULTI_MAP_CONFIG` | — | Two map nodes carry different config, and the saved file holds one processing.map. | Merge them into one map node, or give both the same config. |
+| `MULTI_MARKER` | — | The graph has two marker-dedup nodes; the saved file has one set of marker keys. | Keep one transform.dedup.marker node. |
+| `MULTI_PARSER` | — | The graph has two parser nodes; the saved file has one parse slot. | Keep one parser node. |
+| `MULTI_WEBHOOK` | — | The graph has two sink.webhook nodes; the saved file has one webhook block. | Keep one webhook sink. |
+| `NO_ACQUISITION` | — | An active Pipeline graph has no acquisition (Collector) node, so it would never read a file. | Add an acquisition node, or save with active: false while it is a draft. |
+| `NO_PARSER` | — | An active Pipeline graph has no parser node. | Add a parser node (for example parser.delimited), or save with active: false while it is a draft. |
+| `NO_PERSISTENT_SINK` | — | An active Pipeline graph has no sink that keeps rows, so every batch would be dropped. | Add a persistent sink (a Dataset or file sink), or save with active: false while it is a draft. |
+| `PARSER_FRONTEND_MISMATCH` | — | A parser.delimited node's parsing.frontend names a different frontend. | Remove parsing.frontend from the node, or use the parser node that matches it. |
+| `PARSER_NO_SCHEMA` | — | An active Pipeline graph's parser has no schema. | Give the parser node a schema, or save with active: false while it is a draft. |
+| `SQL_STEP_EMPTY` | — | A transform.sql node has no sql. | Add the step's sql (a SELECT over input). |
+| `SQL_STEP_REFUSED` | — | A transform.sql node's sql is refused by the SQL guard; the message names the function, keyword or statement shape. | Rewrite the sql as a plain SELECT without what the message names (no file, extension or system access). |
+| `UNSUPPORTED_BINDING` | — | A node carries a use: component reference the saved Pipeline file has no place for at that node. | Remove the use: reference from that node, or write the component's settings on the node itself. |
+| `UNSUPPORTED_BRANCH_STEP` | — | A route branch's chain has a shape the saved file cannot hold: a node that fans out, a chain not ending in a persistent sink, or a nested route. | Make each branch a straight chain ending in one persistent sink, with no nested route. |
+| `UNSUPPORTED_MAP_KEY` | — | A map node carries a key that is neither derived from the schema nor run by the map step. | Remove the key from the map node, or move the logic into a transform.sql step. |
+| `UNSUPPORTED_NODE` | — | The graph holds a node type the saved Pipeline file has no place for, or whose module is not installed here. A dry run may still run such a node (DRYRUN-SAVE-NODE-MISMATCH-1). | Replace the node with one the save accepts (see the Pipeline shape), or install the module that provides it; the message names the node. |
+| `WEBHOOK_INVALID` | — | A sink.webhook node's config is refused: no connection, an authored url, an unknown key, or a batch size out of bounds. | Name a Connection, remove url and unknown keys, and keep the batch size within the bounds the message names. |
+
 ## Adding a code
 
 A new code constant, or a `new ApiException(status, CODE, …)` naming a code this page does not list, fails
 `node tools/render-error-catalogue.mjs --check` (pre-commit and CI). Add its cause and fix to `tools/error-catalogue-entries.json`, then run `node tools/render-error-catalogue.mjs --write`.
-The sweep reads `new ApiException(…)`, `new SpaceLocations.Refused(…)`, `new Finding(…)`, `.coded(…)` and `"code", "…"` maps;
+The sweep reads `new ApiException(…)`, `new SpaceLocations.Refused(…)`, `new Finding(…)`, `new CodedArgumentException(…)`,
+`.coded(…)` and `"code", "…"` maps;
 a code handed through a helper method of your own is not seen, so add a code as a constant in one of the files
 the generator lists (`SOURCES`) and pass the constant.
 Codes are API: never renamed, never reused for another meaning.

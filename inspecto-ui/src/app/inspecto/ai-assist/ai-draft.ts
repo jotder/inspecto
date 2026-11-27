@@ -15,7 +15,8 @@ export type AiToolName =
     | 'kpi_report_builder'
     | 'pipeline_author'
     | 'projection_author'
-    | 'suggest_expectations';
+    | 'suggest_expectations'
+    | 'widget_from_question';
 
 /**
  * One candidate the operator can review and apply — the normalized form of every tool's result, so
@@ -39,6 +40,9 @@ export interface AiDraft {
     /** Extra drafts this candidate depends on, applied FIRST (kpi_report_builder's widgets before
      *  its dashboard). Empty for every other tool. */
     prerequisites?: AiDraft[];
+    /** `widget_from_question` only: the `/bi/query` body the question compiles to — what the live preview runs
+     *  as the caller. The draft Widget itself carries no filter or window, so this is the question's full meaning. */
+    previewQuery?: Record<string, unknown>;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -126,6 +130,28 @@ export function adaptToolResult(tool: AiToolName, result: unknown): AiDraft[] {
                             clean: true,
                             findings: [],
                         })),
+                },
+            ];
+        }
+        case 'widget_from_question': {
+            // The tool's findings are `{path, message}` (it validates the Widget against the config spec).
+            const draft = result['draft'];
+            const query = result['query'];
+            if (!isRecord(draft)) return [];
+            const caption = str(result['caption'], 'Widget');
+            const raw = Array.isArray(result['findings']) ? result['findings'].filter(isRecord) : [];
+            return [
+                {
+                    label: caption,
+                    config: draft,
+                    clean: result['clean'] === true,
+                    findings: raw.map((f) => ({
+                        severity: 'ERROR' as const,
+                        fieldPath: str(f['path'], ''),
+                        message: str(f['message'], 'The draft Widget is not valid.'),
+                    })),
+                    note: caption,
+                    previewQuery: isRecord(query) ? query : undefined,
                 },
             ];
         }

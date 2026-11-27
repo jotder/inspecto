@@ -53,6 +53,7 @@ import { Widget, WidgetOptions, buildWidget } from '../widgets/widget-types';
 import { WidgetsService } from '../widgets/widgets.service';
 import { ControlValues } from 'app/inspecto/viz';
 import { AiAssistComponent } from 'app/inspecto/ai-assist/ai-assist.component';
+import { AskDashboardComponent } from './ask-dashboard.component';
 import { AiDraft } from 'app/inspecto/ai-assist/ai-draft';
 import { concatMap, from, map, of, tap } from 'rxjs';
 import { Dataset } from '../datasets/dataset-types';
@@ -130,6 +131,7 @@ function splitStores(v: string | undefined): string[] | undefined {
         TransferMenuComponent,
         ImportDraftBannerComponent,
         AiAssistComponent,
+        AskDashboardComponent,
     ],
     changeDetection: ChangeDetectionStrategy.OnPush,
     providers: [DashboardViewStore],
@@ -544,6 +546,20 @@ export class DashboardEditorComponent implements OnInit {
                     );
                 },
             });
+    }
+
+    /** Ask the Dashboard saved a Widget: re-list it and tile it (review, then Save the Dashboard). A held one is not written yet. */
+    readonly widgetIds = computed(() => this.widgets().map((w) => w.id));
+
+    onAskSaved(e: { id: string; pending: boolean }): void {
+        if (e.pending) return;
+        this.widgetsApi.list().subscribe({
+            next: (w) => {
+                this.widgets.set(w);
+                this.addWidget(e.id);
+            },
+            error: () => this.toastr.warning('The Widget was saved but could not be reloaded; refresh the page.'),
+        });
     }
 
     addWidget(widgetId: string): void {

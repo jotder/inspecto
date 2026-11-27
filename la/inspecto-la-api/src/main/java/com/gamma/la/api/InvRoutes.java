@@ -429,7 +429,8 @@ public final class InvRoutes implements RouteModule {
             if (!containsIgnoreCase(seenDatasets, want)) throw new ApiException(404, ErrorCodes.NOT_FOUND, "no dataset '" + want + "'");
         for (String want : wantColumns)
             if (!containsIgnoreCase(seenColumns, want))
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + want + "' — not a column of any profiled dataset");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + want + "' — not a column of any profiled dataset",
+                        com.gamma.config.spec.FindingCodes.ERR_COLUMN_UNKNOWN, "columns");
 
         List<Map<String, Object>> pairs = new ArrayList<>();
         int considered = 0;
@@ -558,7 +559,8 @@ public final class InvRoutes implements RouteModule {
      */
     private Object neighbors(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         String value = ApiContext.str(body, "value");
-        if (value == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'value'");
+        if (value == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'value'",
+                com.gamma.config.spec.FindingCodes.ERR_REQUEST_FIELD_MISSING, "value");
         if (Boolean.TRUE.equals(body.get("list"))) return neighbourList(api, ex, body, value);
         return project(api, ex, body, value);
     }
@@ -573,7 +575,8 @@ public final class InvRoutes implements RouteModule {
     private Object neighbourList(ApiContext api, HttpExchange ex, Map<String, Object> body, String value) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "entity projection");
         String datasetId = ApiContext.str(body, "dataset");
-        if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
+        if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'",
+                com.gamma.config.spec.FindingCodes.ERR_REQUEST_FIELD_MISSING, "dataset");
         String sourceCol = ident(body, "sourceCol", true);
         String targetCol = ident(body, "targetCol", true);
         String kindCol = ident(body, "linkKindCol", false);
@@ -651,7 +654,8 @@ public final class InvRoutes implements RouteModule {
     private Object neighboursPreview(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "entity projection");
         String datasetId = ApiContext.str(body, "dataset");
-        if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
+        if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'",
+                com.gamma.config.spec.FindingCodes.ERR_REQUEST_FIELD_MISSING, "dataset");
         String sourceCol = ident(body, "sourceCol", true);
         String targetCol = ident(body, "targetCol", true);
         String kindCol = ident(body, "linkKindCol", false);
@@ -666,10 +670,12 @@ public final class InvRoutes implements RouteModule {
                 throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'value' must be a non-blank string of at most " + maxIdLength + " chars");
             ids = List.of(value);
         }
-        if (ids.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'ids' - the entities to grow from");
+        if (ids.isEmpty()) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'ids' - the entities to grow from",
+                com.gamma.config.spec.FindingCodes.ERR_REQUEST_FIELD_MISSING, "ids");
         String direction = body.get("direction") == null ? "either" : String.valueOf(body.get("direction"));
         if (!DIRECTIONS.contains(direction))
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'direction' must be one of " + DIRECTIONS + ", got '" + direction + "'");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'direction' must be one of " + DIRECTIONS + ", got '" + direction + "'",
+                    com.gamma.config.spec.FindingCodes.ERR_REQUEST_VALUE_NOT_ALLOWED, "direction");
         List<String> kinds = body.get("linkKinds") == null ? null
                 : boundedStrings(body, "linkKinds", SpaceLimits.get(lim, LaLimit.INPUT_LINK_KINDS), maxIdLength);
         if (kinds != null && (kinds.isEmpty() || kindCol == null))
@@ -982,7 +988,8 @@ public final class InvRoutes implements RouteModule {
     private Object project(ApiContext api, HttpExchange ex, Map<String, Object> body, String neighborsOf) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "entity projection");
         String datasetId = ApiContext.str(body, "dataset");
-        if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
+        if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'",
+                com.gamma.config.spec.FindingCodes.ERR_REQUEST_FIELD_MISSING, "dataset");
         String sourceCol = ident(body, "sourceCol", true);
         String targetCol = ident(body, "targetCol", true);
         String kindCol = ident(body, "linkKindCol", false);
@@ -1305,12 +1312,14 @@ public final class InvRoutes implements RouteModule {
     private Object recursivePaths(ApiContext api, HttpExchange ex, Map<String, Object> body) throws IOException {
         Path writeRoot = WriteGates.requireWriteRoot(api, "recursive traversal");
         String datasetId = ApiContext.str(body, "dataset");
-        if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'");
+        if (datasetId == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'dataset'",
+                com.gamma.config.spec.FindingCodes.ERR_REQUEST_FIELD_MISSING, "dataset");
         String sourceCol = ident(body, "sourceCol", true);
         String targetCol = ident(body, "targetCol", true);
         String weightCol = ident(body, "weightCol", false);
         String startNodeIn = ApiContext.str(body, "startNode");
-        if (startNodeIn == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'startNode'");
+        if (startNodeIn == null) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include 'startNode'",
+                com.gamma.config.spec.FindingCodes.ERR_REQUEST_FIELD_MISSING, "startNode");
         // DR-D2: the walk runs on raw ids; the nodes leave as aliases when the Space masks them, and an alias comes back here.
         ExplorationMasking mask = ExplorationMasking.of(writeRoot, datasetId, Map.of("sourceCol", sourceCol, "targetCol", targetCol));
         String startNode = mask.in(startNodeIn);
@@ -1318,7 +1327,8 @@ public final class InvRoutes implements RouteModule {
         if (startNode.equals(targetNode)) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'targetNode' must differ from 'startNode'");
         String direction = ApiContext.str(body, "direction") != null ? ApiContext.str(body, "direction") : "DIRECTED";
         if (!direction.equals("DIRECTED") && !direction.equals("UNDIRECTED"))
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'direction' must be DIRECTED or UNDIRECTED");
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'direction' must be DIRECTED or UNDIRECTED",
+                    com.gamma.config.spec.FindingCodes.ERR_REQUEST_VALUE_NOT_ALLOWED, "direction");
         String tsColIn = null;
         boolean monotonicIn = false;
         Double maxHoursIn = null;
@@ -1392,7 +1402,8 @@ public final class InvRoutes implements RouteModule {
         DatasetProvider.Planner planner = columns -> {
         for (String col : java.util.Arrays.asList(sourceCol, targetCol, weightCol, tsCol)) {
             if (col != null && !containsIgnoreCase(columns, col))
-                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + datasetId + "'");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown column '" + col + "' — not a column of dataset '" + datasetId + "'",
+                        com.gamma.config.spec.FindingCodes.ERR_COLUMN_UNKNOWN, null);
         }
         DatasetProvider.BoundFilter filter = DatasetProvider.BoundFilter.TRUE;
         if (body.get("filter") != null) filter = checkedFilterSql(body.get("filter"), columns, datasetId);
@@ -1647,7 +1658,7 @@ public final class InvRoutes implements RouteModule {
         if (field.isEmpty()) return;
         if (!containsIgnoreCase(columns, field))
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "unknown filter field '" + field + "' — not a column of dataset '"
-                    + datasetId + "'");
+                    + datasetId + "'", com.gamma.config.spec.FindingCodes.ERR_COLUMN_UNKNOWN, "filter");
     }
 
     /** Optional {@code attrCols: string[]} — each validated as a safe identifier. */
@@ -1667,7 +1678,8 @@ public final class InvRoutes implements RouteModule {
     static String ident(Map<String, Object> body, String key, boolean required) {
         String v = ApiContext.str(body, key);
         if (v == null) {
-            if (required) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include '" + key + "'");
+            if (required) throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "body must include '" + key + "'",
+                    com.gamma.config.spec.FindingCodes.ERR_REQUEST_FIELD_MISSING, key);
             return null;
         }
         if (!SAFE_IDENT.matcher(v).matches())

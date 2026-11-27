@@ -9,4 +9,4 @@ provides:
   configKinds[1]: insight-profile
   contracts[2]: JobTypeProvider,ComponentKindValidator
   jobTypes[1]: insight.scan
-  routes[4]: "POST /insights/explain","GET /insights","POST /insights/preview","POST /insights/([^/]+)/([^/]+)/feedback"
+  routes[5]: "POST /insights/explain","GET /insights","GET /insights/brief","POST /insights/preview","POST /insights/([^/]+)/([^/]+)/feedback"

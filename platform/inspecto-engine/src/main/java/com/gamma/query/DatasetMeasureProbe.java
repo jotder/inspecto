@@ -84,6 +84,15 @@ public final class DatasetMeasureProbe {
 
     /** The measure's current value over the dataset, or empty when it cannot be computed (see class doc). */
     public OptionalDouble value(String datasetId, String measureText) {
+        return value(datasetId, measureText, null);
+    }
+
+    /**
+     * {@link #value(String, String)} over the rows matching {@code when} only (ALERT-RULE-ROW-FILTER-1): a Condition
+     * Language group, compiled into the SAME {@link MeasureCompiler} statement {@code /bi/query} builds - identifiers
+     * quoted, operands bound - over this one Dataset's relation. {@code null} = every row.
+     */
+    public OptionalDouble value(String datasetId, String measureText, Map<String, Object> when) {
         try {
             Path root = writeRoot.get();
             if (root == null) {
@@ -97,7 +106,7 @@ public final class DatasetMeasureProbe {
                     : new MeasureCompiler.Measure(m.group(2), m.group(3));
 
             MeasureCompiler.Spec spec = new MeasureCompiler.Spec(
-                    datasetId, List.of(measure), List.of(), Map.of(), List.of(), List.of(), 1);
+                    datasetId, List.of(measure), List.of(), Map.of(), List.of(), List.of(), 1, when);
             MeasureCompiler.Compiled sql = MeasureCompiler.compile(spec);
 
             ComponentStore store = new ComponentStore(root.resolve("registry"));
@@ -143,6 +152,12 @@ public final class DatasetMeasureProbe {
      */
     public Optional<Breaches> breaches(String datasetId, String measureText, List<String> by,
                                        String comparator, double threshold, int limit) {
+        return breaches(datasetId, measureText, by, comparator, threshold, limit, null);
+    }
+
+    /** {@link #breaches(String, String, List, String, double, int)} over the rows matching {@code when} only (see {@link #value(String, String, Map)}). */
+    public Optional<Breaches> breaches(String datasetId, String measureText, List<String> by,
+                                       String comparator, double threshold, int limit, Map<String, Object> when) {
         try {
             Matcher m = MEASURE.matcher(measureText.trim());
             if (!m.matches() || by == null || by.isEmpty()) return Optional.empty();
@@ -150,7 +165,7 @@ public final class DatasetMeasureProbe {
                     ? new MeasureCompiler.Measure("count", null)
                     : new MeasureCompiler.Measure(m.group(2), m.group(3));
             MeasureCompiler.Compiled grouped = MeasureCompiler.compile(new MeasureCompiler.Spec(
-                    datasetId, List.of(measure), List.copyOf(by), Map.of(), List.of(), List.of(), Integer.MAX_VALUE));
+                    datasetId, List.of(measure), List.copyOf(by), Map.of(), List.of(), List.of(), Integer.MAX_VALUE, when));
             String op = switch (comparator) {
                 case "gt" -> ">";
                 case "gte" -> ">=";

@@ -668,6 +668,57 @@ class ControlApiPipelineCrudTest {
     }
 
     /**
+     * DRYRUN-NAME-FROM-URL-1: the URL's id names a draft, as it does at save. A draft with no {@code name} — the shape
+     * {@code inspecto://shapes/pipeline} documents, since the save takes the name from the URL — used to answer 400
+     * "pipeline 'name' is required" (golden task dev-02, 2026-11-27).
+     */
+    @Test
+    void aDraftWithNoNameDryRunsUnderTheUrlsId(@TempDir Path dir) throws Exception {
+        String nodes = """
+            "nodes":[{"id":"acq","type":"acquisition"},
+                     {"id":"sink","type":"sink.persistent","config":{"store":"out"}}],
+            "edges":[{"from":"acq","rel":"data","to":"sink"}]""";
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            HttpResponse<String> r = send(c.port, "POST", "/pipelines/authored/unnamed_draft/dry-run",
+                    "{\"pipeline\":{" + nodes + "},\"sampleRows\":[{\"id\":\"1\"}]}");
+            assertEquals(200, r.statusCode(), r.body());
+            assertEquals(1, json(r).get("sinks").get(0).get("rowCount").asInt(), r.body());
+        }
+    }
+
+    /**
+     * DRYRUN-SAVE-NODE-MISMATCH-1: a graph the save refuses as {@code UNSUPPORTED_NODE} is refused by the candidate dry
+     * run too, with the same code and node id. Before, an agent's draft holding an unregistered {@code source.dataset}
+     * node (golden task dev-02) dry-ran green — the walk seeds at the entry node and never asks its type — and the
+     * proposal of the same graph was refused. Both kinds: a type no module registers, and a registered built-in the
+     * flat config has no home for.
+     */
+    @Test
+    void aGraphTheSaveRefusesAsUnsupportedNodeIsRefusedByTheDryRunToo(@TempDir Path dir) throws Exception {
+        try (Ctx c = open(dir, dir.resolve("wr"))) {
+            for (String type : List.of("source.dataset", "transform.derive")) {
+                String graph = """
+                    {"name":"derived","active":false,
+                     "nodes":[{"id":"src","type":"%s","config":{"dataset":"orders"}},
+                              {"id":"out","type":"sink.persistent","config":{"store":"orders_daily"}}],
+                     "edges":[{"from":"src","rel":"data","to":"out"}]}""".formatted(type);
+
+                HttpResponse<String> save = send(c.port, "PUT", "/pipelines/derived/graph", graph);
+                assertEquals(422, save.statusCode(), type + ": " + save.body());
+                JsonNode refusal = V1Body.envelope(save.body()).get("error").get("details").get("refusals").get(0);
+                assertEquals("UNSUPPORTED_NODE", refusal.get("code").asText(), type);
+                assertEquals("src", refusal.get("nodeId").asText(), type);
+
+                HttpResponse<String> dry = send(c.port, "POST", "/pipelines/authored/derived/dry-run",
+                        "{\"pipeline\":" + graph + ",\"sampleRows\":[{\"id\":\"1\"}]}");
+                assertEquals(422, dry.statusCode(), type + ": " + dry.body());
+                assertTrue(dry.body().contains("UNSUPPORTED_NODE") && dry.body().contains("node 'src'"),
+                        type + ": " + dry.body());
+            }
+        }
+    }
+
+    /**
      * A candidate whose {@code transform.map} carries mapping rules previews the rows it would produce.
      * This is the shape the mapping editor posts to diff an unsaved draft, and the shape a
      * {@code GET .../graph/raw} round-trip produces for any pipeline with a mapping — both used to 400

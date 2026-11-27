@@ -52,11 +52,12 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `UI-PICKER-OPTIONS-1` | P3 | feature | <inspecto-option-picker> gains nested options (a parent that opens to its children), a disabled option with its reason, and a per-picker… | demand |
 | `UI-SCHEMA-FORM-EDITOR-1` | P3 | feature | Move <inspecto-schema-form>'s in-row editor onto pen-field, which first needs several new pen-field features. | demand |
 | `UI-TOKENS-RUNS-BACKLOG-1` | P3 | defect | npm run lint:tokens (the UI workflow's design-system guard) flags four hand-rolled status fills (bg-amber-1…, bg-green-1…, bg-red-1…, bg-… | — |
+| `ALERT-RULE-FILTER-UI-1` | P3 | feature | The Alert Rule form cannot author or edit a Measure rule's row filter (when). | — |
 | `UI-BUNDLE-BUDGETS-RED-1` | P3 | defect | The la-app and gamma bundle checks fail on master (seen 2026-11-19). | — |
 | `PACK-SALES-MARKETING-1` | P3 | feature | A Sales & Marketing BI pack: sales, commissions, marketing and churn analytics. | operator |
 | `USER-HANDBOOK-1` | P2 | feature | The Handbook: users learn to build, ship and manage an App from the console's Help, organised by lifecycle for three tracks. | — |
 | `HOWTO-DOC-DRIFT-1` | P3 | chore | internal hub pages that contradict the code, found writing the P3 how-tos: | — |
-| `COMPONENT-REFERENCE-MORE-KINDS-1` | P3 | feature | the shape reference for the kinds propose_change does not offer: | demand |
+| `COMPONENT-REFERENCE-GOVERNANCE-KINDS-1` | P3 | feature | the shape reference for the four governance component kinds: | demand |
 | `GOAL-RECIPES-1` | P3 | feature | recipes keyed by goal | — |
 | `HANDBOOK-PRODUCT-DISAGREE-1` | P3 | defect | Handbook pages that disagree with the product: | — |
 | `AGENT-ENTRYPOINTS-1` | P3 | feature | ship the machine-readable entry points with the install: | — |

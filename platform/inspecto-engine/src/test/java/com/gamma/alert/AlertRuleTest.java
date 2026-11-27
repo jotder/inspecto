@@ -127,7 +127,9 @@ class AlertRuleTest {
     }
 
     @Test
-    void whenIsRejectedOnAMeasureRule() {
+    void whenIsTheRowFilterOfAMeasureRule() {
+        // ALERT-RULE-ROW-FILTER-1: refused until 2026-11-27; now the Measure counts only the matching rows
+        // (AlertRowFilterTest covers evaluation and the refusals).
         Map<String, Object> m = new HashMap<>();
         m.put("name", "low-revenue");
         m.put("dataset", "sales_ds");
@@ -136,8 +138,9 @@ class AlertRuleTest {
         m.put("threshold", 1000);
         m.put("severity", "WARNING");
         m.put("when", conditionTree());
-        assertThrows(IllegalArgumentException.class, () -> AlertRule.fromMap(m),
-                "a measure alert has no ledger rows to scope");
+        AlertRule r = AlertRule.fromMap(m);
+        assertEquals(conditionTree(), r.rowFilter());
+        assertEquals(List.of("status"), r.rowFilterColumns());
     }
 
     /** D-AN5: a Dataset Measure rule takes the statistical aggregates; an unknown name is still refused. */

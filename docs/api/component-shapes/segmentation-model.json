@@ -1,0 +1,164 @@
+{
+  "kind" : "segmentation-model",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "proposeChange" : false,
+  "operations" : {
+    "create" : {
+      "route" : "POST /components/segmentation-model",
+      "content" : "content"
+    },
+    "update" : {
+      "route" : "PUT /components/segmentation-model/{id}",
+      "content" : "content"
+    },
+    "delete" : {
+      "route" : "DELETE /components/segmentation-model/{id}",
+      "content" : null
+    }
+  },
+  "shapes" : {
+    "content" : {
+      "source" : "SegmentationModel.MODEL_KEYS + SegmentationModel.fromMap (segmentation-model's validator on the component save door)",
+      "unknownKeys" : "refused",
+      "fields" : [
+        {
+          "path" : "bins",
+          "type" : "integer",
+          "required" : false,
+          "default" : 5
+        },
+        {
+          "path" : "dataset",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "description",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "entityType",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "frequency",
+          "type" : "string",
+          "required" : false,
+          "default" : "count"
+        },
+        {
+          "path" : "id",
+          "type" : "string",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "key",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "maxEntities",
+          "type" : "integer",
+          "required" : false
+        },
+        {
+          "path" : "monetary",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "name",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "otherLabel",
+          "type" : "string",
+          "required" : false,
+          "default" : "Other"
+        },
+        {
+          "path" : "owner",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "segments",
+          "type" : "array",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "segments[].frequency",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "segments[].label",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "segments[].monetary",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "segments[].recency",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "shares",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "time",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "window",
+          "type" : "integer",
+          "required" : false
+        }
+      ],
+      "example" : {
+        "entityType" : "customer",
+        "dataset" : "orders",
+        "key" : "customer_id",
+        "time" : "order_date",
+        "frequency" : "count",
+        "monetary" : "sum(amount)",
+        "segments" : [
+          {
+            "label" : "Champions",
+            "recency" : "4-5",
+            "frequency" : "4-5",
+            "monetary" : "4-5"
+          }
+        ]
+      },
+      "notes" : [
+        "Run by the `predict.segment` Job. A score range is `*`, `n` or `a-b` inside `1..bins`; the first matching `segments` row names the segment.",
+        "Unknown keys are refused, not ignored. The save also checks, in the Space, the Datasets it reads and its output store."
+      ]
+    }
+  }
+}

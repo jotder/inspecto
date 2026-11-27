@@ -497,13 +497,26 @@ com.gamma.config.spec.Finding | public record Finding(Severity severity, String 
 com.gamma.config.spec.Finding | public static Finding error(String, String)
 com.gamma.config.spec.Finding | public static Finding warning(String, String)
 com.gamma.config.spec.FindingCodes | public final class FindingCodes
+com.gamma.config.spec.FindingCodes | public static final String ERR_ALERT_ROW_FILTER_INVALID
 com.gamma.config.spec.FindingCodes | public static final String ERR_ARMED_WITHOUT_SCHEMA
+com.gamma.config.spec.FindingCodes | public static final String ERR_BI_FILTER_OP_UNKNOWN
+com.gamma.config.spec.FindingCodes | public static final String ERR_CALCULATED_COLUMN_INVALID
 com.gamma.config.spec.FindingCodes | public static final String ERR_CHAIN_WITHOUT_OUTPUT_STORE
 com.gamma.config.spec.FindingCodes | public static final String ERR_COLLECTOR_CONFIG_INVALID
+com.gamma.config.spec.FindingCodes | public static final String ERR_COLUMN_UNKNOWN
+com.gamma.config.spec.FindingCodes | public static final String ERR_DATASET_READ_FAILED
+com.gamma.config.spec.FindingCodes | public static final String ERR_DATASET_SQL_NO_SOURCE
+com.gamma.config.spec.FindingCodes | public static final String ERR_DECISION_RULE_NO_CONSEQUENCE
+com.gamma.config.spec.FindingCodes | public static final String ERR_DECISION_RULE_NO_NAME
+com.gamma.config.spec.FindingCodes | public static final String ERR_DECISION_RULE_WHEN_INVALID
 com.gamma.config.spec.FindingCodes | public static final String ERR_DEDUP_WINDOW_UNARMABLE
 com.gamma.config.spec.FindingCodes | public static final String ERR_EDITION_FEATURE
 com.gamma.config.spec.FindingCodes | public static final String ERR_EXCEL_INVALID
 com.gamma.config.spec.FindingCodes | public static final String ERR_LOOKUP_ON_INGEST
+com.gamma.config.spec.FindingCodes | public static final String ERR_RECON_CARDINALITY_UNKNOWN
+com.gamma.config.spec.FindingCodes | public static final String ERR_RECON_COMPARE_COLUMN_INVALID
+com.gamma.config.spec.FindingCodes | public static final String ERR_REQUEST_FIELD_MISSING
+com.gamma.config.spec.FindingCodes | public static final String ERR_REQUEST_VALUE_NOT_ALLOWED
 com.gamma.config.spec.FindingCodes | public static final String ERR_ROUTE_PREDICATE_COLUMN
 com.gamma.config.spec.FindingCodes | public static final String ERR_ROUTE_UNARMABLE
 com.gamma.config.spec.FindingCodes | public static final String ERR_SAFETY_STATE_ADVANCE_REFUSED
@@ -2049,6 +2062,7 @@ com.gamma.pipeline.PipelineEdge | public boolean isData()
 com.gamma.pipeline.PipelineEdge | public record PipelineEdge(String from, String rel, String to)
 com.gamma.pipeline.PipelineEdge | public static PipelineEdge data(String, String)
 com.gamma.pipeline.PipelineEditable | public final class PipelineEditable
+com.gamma.pipeline.PipelineEditable | public static List<PipelineCompileException.Refusal> unsupportedNodes(PipelineGraph)
 com.gamma.pipeline.PipelineEditable | public static Map<String, Object> lower(PipelineGraph, Map<String, Object>, boolean)
 com.gamma.pipeline.PipelineEditable | public static Map<String, Object> toMap(PipelineConfig, Map<String, Object>)
 com.gamma.pipeline.PipelineEditable | public static boolean isAuthorable(String)
@@ -2838,7 +2852,10 @@ com.gamma.spi.auth.AccessPolicies.Policy | public record Policy(String name, Str
 com.gamma.spi.auth.AccessPolicies.Warning | public record Warning(String policy, String code, String message)
 com.gamma.spi.auth.ApiException | public ApiException(int, String)
 com.gamma.spi.auth.ApiException | public ApiException(int, String, String)
+com.gamma.spi.auth.ApiException | public ApiException(int, String, String, String, String)
 com.gamma.spi.auth.ApiException | public final String errorCode
+com.gamma.spi.auth.ApiException | public final String fieldPath
+com.gamma.spi.auth.ApiException | public final String findingCode
 com.gamma.spi.auth.ApiException | public final class ApiException extends RuntimeException
 com.gamma.spi.auth.ApiException | public final int status
 com.gamma.spi.auth.Authenticator | Optional<Subject> authenticate(HttpExchange)

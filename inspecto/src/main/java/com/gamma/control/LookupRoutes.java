@@ -232,6 +232,10 @@ final class LookupRoutes implements RouteModule {
      * by the Reference's classification, or raw by decision for a {@code path:} Reference, D-AK25, which a machine agent is
      * refused: 403); its per-route budgets are its own (agent client and subject), and a call that builds the index pays
      * {@link AgentGate#LOOKUP_BUILD_WEIGHT} of the agent budget in all.
+     *
+     * <p>LOOKUP-TEST-PATH-RAW-1 (operator, 2026-11-27): a {@code path:} Reference into a data folder (a Dataset's store,
+     * rejected rows, raw copies: {@link PathReferenceGuard}) is refused 422 for every caller, before any build;
+     * such data is tested through a by-name Reference, masked and sharing-checked as above.
      */
     private static Object test(ApiContext api, HttpExchange ex, Map<String, Object> body) throws Exception {
         com.gamma.spi.auth.Subject subject = ApiContext.subject(ex).orElse(null);
@@ -274,6 +278,11 @@ final class LookupRoutes implements RouteModule {
         if (agent && mask.path() && subject.machine())   // D-AK25: a path Reference answers raw, so never to a machine
             throw new ApiException(403, ErrorCodes.PERMISSION_DENIED, "a machine agent tests a lookup over a by-name "
                     + "Reference only: a path Reference has no classification, so its values would answer unmasked (D-AK25)");
+        if (mask.path()) {   // LOOKUP-TEST-PATH-RAW-1: a path into a data folder is refused (422); read a Dataset by name
+            String field = "transform.join.reference";
+            PathReferenceGuard.refuseDataStore(api, com.gamma.access.WriteGates.jailToAllowedRoots(
+                    ReferenceReader.parse(node.cfg("reference").toString()).path(), field), field);
+        }
         boolean refresh = Boolean.TRUE.equals(body.get("refresh"));
         // every build this call causes (asked, cold, evicted, changed) spends the build budget, not only refresh: true;
         // an agent's build also pays the rest of its weight 20 in the agent budget (design §3.4), before anything is read
@@ -437,11 +446,7 @@ final class LookupRoutes implements RouteModule {
         }
         Path writeRoot = api.writeRoot();
         if (ref == null || writeRoot == null) return new Masking(List.of(), keyColumns, null, path);   // no classification
-        // the stores the Reference is: the producing Pipeline's name and its Stream (PipelineSchemas.producers' rule)
-        java.util.Set<String> stores = new java.util.LinkedHashSet<>();
-        stores.add(ref);
-        for (PipelineConfig p : loaded)
-            if (p.identity().pipelineName().equals(ref) && p.stream() != null) stores.add(p.stream());
+        java.util.Set<String> stores = referenceStores(ref, loaded);
         ComponentStore registry = new ComponentStore(writeRoot.resolve("registry"));
         ViewStore views = new ViewStore(writeRoot.resolve("views"));
         boolean reveal = BiResultMasking.mayReveal(ex);
@@ -460,6 +465,30 @@ final class LookupRoutes implements RouteModule {
         if (it.hasNext()) overStore.put("sourceName", it.next());
         bis.add(BiResultMasking.of(writeRoot, registry, views, "(lookup " + ref + ")", overStore, reveal));
         return new Masking(bis, keyColumns, "lookup " + ref, false);
+    }
+
+    /** The stores by-name Reference {@code ref} is: the producing Pipeline's name and its Stream (PipelineSchemas.producers' rule). */
+    private static java.util.Set<String> referenceStores(String ref, List<PipelineConfig> loaded) {
+        java.util.Set<String> stores = new java.util.LinkedHashSet<>();
+        stores.add(ref);
+        for (PipelineConfig p : loaded)
+            if (p.identity().pipelineName().equals(ref) && p.stream() != null) stores.add(p.stream());
+        return stores;
+    }
+
+    /**
+     * Whether the caller may view every registry Dataset over by-name Reference {@code ref}'s store
+     * ({@link ComponentAccess#canView}): the sharing rule {@link #masking} applies, for the enrichment preview's
+     * {@code ref:} References too ({@code ENRICHMENT-PREVIEW-SHARING-1}). {@code true} with no write root: no registry
+     * shares anything away.
+     */
+    static boolean mayViewReference(ApiContext api, HttpExchange ex, String ref, List<PipelineConfig> loaded) {
+        Path writeRoot = api.writeRoot();
+        if (writeRoot == null) return true;
+        java.util.Set<String> stores = referenceStores(ref, loaded);
+        for (ComponentRegistry.Component d : new ComponentStore(writeRoot.resolve("registry")).list("dataset"))
+            if (readsStore(d.content(), stores) && !ComponentAccess.canView(ex, d.content())) return false;
+        return true;
     }
 
     /** {@code dataset} reads one of {@code stores} directly (its {@code physicalRef} or {@code sourceName}, by its head). */

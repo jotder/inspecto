@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.intelligence`](../../../../../product-map/module/intelligence.toon).
 
-38 test class(es): 38 unit, 0 real-HTTP control-plane, 0 IT.
+39 test class(es): 39 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -51,6 +51,7 @@ mvn -o test -pl features/inspecto-intelligence -Dtest=AgentApprovalsTest,Approva
 | `KillSwitchActTierTest` | `com.gamma.intelligence.pack` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/pack/KillSwitchActTierTest.java` | Round-2 verification item 4 (2026-09-29): the autonomy kill switch reached only the ops_monitor loop, so an |
 | `ToolCapabilitiesCoverageTest` | `com.gamma.intelligence.pack` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/pack/ToolCapabilitiesCoverageTest.java` | Every tool the pack hands the platform is classified. If a tool is gated by {@link ToolCapabilities}, its |
 | `ToolSchemaAdopterContractTest` | `com.gamma.intelligence.pack` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/pack/ToolSchemaAdopterContractTest.java` | Pins each agent tool's declared {@code jsonSchema} against what its REAL adopter actually sends. |
+| `WidgetFromQuestionTest` | `com.gamma.intelligence.pack` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/pack/WidgetFromQuestionTest.java` | AQ-0 (BI-INSIGHTS-1 P4): {@code widget_from_question} - closed vocabulary, refusals in words, draft only. |
 | `ActionBudgetTest` | `com.gamma.intelligence.policy` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/policy/ActionBudgetTest.java` | Unit coverage for the rolling-window rate budget (AGT-5 P4). The clock is injected, so window rollover |
 | `AutonomyPolicyEngineTest` | `com.gamma.intelligence.policy` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/policy/AutonomyPolicyEngineTest.java` | AGT-5 P4 (L3) policy substrate: the kill switch / mode / budget precedence in |
 | `OpsMonitorTest` | `com.gamma.intelligence.policy` | unit | `features/inspecto-intelligence/src/test/java/com/gamma/intelligence/policy/OpsMonitorTest.java` | AGT-5 P4 slice 2: the {@code ops_monitor} driver — that a {@code pipeline.batch.failed} Signal is |

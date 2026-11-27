@@ -1,6 +1,7 @@
 {
   "kind" : "entity-list",
   "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "proposeChange" : true,
   "operations" : {
     "members" : {
       "route" : "POST /entity-lists/{id}/members",

@@ -5,6 +5,7 @@ import com.gamma.spi.auth.ErrorCodes;
 import com.gamma.spi.http.ApiContext;
 import com.gamma.spi.http.RouteModule;
 import com.gamma.config.spec.Finding;
+import com.gamma.config.spec.FindingCodes;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
@@ -80,7 +81,7 @@ final class BiRoutes implements RouteModule {
             sql = MeasureCompiler.compile(probe);
             echoSql = MeasureCompiler.render(spec);
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
+            throw RouteErrors.unprocessable(bad);
         }
 
         // 2. Defence in depth: the compiled text still passes the same guard as caller-authored SQL.
@@ -100,7 +101,7 @@ final class BiRoutes implements RouteModule {
         try {
             relationSql = DatasetRelation.relationSql(dataset, api.dataRoot(), new ViewStore(writeRoot.resolve("views")));
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
+            throw RouteErrors.unprocessable(bad);
         }
 
         vetHiddenOrderColumns(spec, dataset, store, new ViewStore(writeRoot.resolve("views")));
@@ -186,7 +187,8 @@ final class BiRoutes implements RouteModule {
             for (String h : hidden)
                 if (!known.contains(h.toLowerCase(java.util.Locale.ROOT)))
                     throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
-                            "orderBy column '" + h + "' is not a column of dataset '" + spec.dataset() + "'");
+                            "orderBy column '" + h + "' is not a column of dataset '" + spec.dataset() + "'",
+                            FindingCodes.ERR_COLUMN_UNKNOWN, "orderBy");
         }
         java.util.Set<String> sensitive = com.gamma.mask.EvidenceMasker.sensitiveColumns(store, views, spec.dataset());
         for (String h : hidden)
@@ -227,7 +229,7 @@ final class BiRoutes implements RouteModule {
             resolved = Parameters.resolve(text, QueryRoutes.declaredParams(query), Map.of(),
                     Parameters.Context.of(ApiContext.actor(ex), null));
         } catch (IllegalArgumentException bad) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
+            throw RouteErrors.unprocessable(bad);
         }
         return resolved.strip().replaceAll(";+$", "").strip();
     }

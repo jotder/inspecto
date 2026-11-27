@@ -125,8 +125,8 @@ system: the evidence cannot say something the code does not.
 | POST | `/auth/exchange` | exempt | identity-flow | `inspecto/src/main/java/com/gamma/control/AuthRoutes.java:49` |
 | POST | `/auth/logout` | exempt | identity-flow | `inspecto/src/main/java/com/gamma/control/AuthRoutes.java:51` |
 | POST | `/auth/refresh` | exempt | identity-flow | `inspecto/src/main/java/com/gamma/control/AuthRoutes.java:50` |
-| POST | `/bi/query` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/BiRoutes.java:55` |
-| POST | `/bi/templates/([^/]+)/apply` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/BiRoutes.java:59` |
+| POST | `/bi/query` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/BiRoutes.java:56` |
+| POST | `/bi/templates/([^/]+)/apply` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/BiRoutes.java:60` |
 | POST | `/bundle/export` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/BundleRoutes.java:146` |
 | POST | `/bundle/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/BundleRoutes.java:149` |
 | POST | `/bundle/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/BundleRoutes.java:147` |
@@ -224,9 +224,9 @@ system: the evidence cannot say something the code does not.
 | POST | `/import` | gated | `canAuthorWorkbench` | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:78` |
 | POST | `/import/preview` | exempt | read-shaped | `inspecto/src/main/java/com/gamma/control/DataSourceRoutes.java:79` |
 | POST | `/incidents/([^/]+)/briefs` | gated | `canWorkIncidents` | `features/inspecto-action-requests/src/main/java/com/gamma/actionrequests/IncidentBriefRoutes.java:54` |
-| POST | `/insights/([^/]+)/([^/]+)/feedback` | exempt | self-service | `features/inspecto-insights/src/main/java/com/gamma/insights/InsightsRoutes.java:53` |
+| POST | `/insights/([^/]+)/([^/]+)/feedback` | exempt | self-service | `features/inspecto-insights/src/main/java/com/gamma/insights/InsightsRoutes.java:54` |
 | POST | `/insights/explain` | exempt | read-shaped | `features/inspecto-insights/src/main/java/com/gamma/insights/ExplainRoutes.java:75` |
-| POST | `/insights/preview` | gated | `canAuthorWorkbench` | `features/inspecto-insights/src/main/java/com/gamma/insights/InsightsRoutes.java:50` |
+| POST | `/insights/preview` | gated | `canAuthorWorkbench` | `features/inspecto-insights/src/main/java/com/gamma/insights/InsightsRoutes.java:51` |
 | POST | `/integrity/accept` | gated | `canAdminister` | `inspecto/src/main/java/com/gamma/control/SpaceIntegrityRoutes.java:45` |
 | POST | `/inv/case-history` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/CaseHistoryRoutes.java:28` |
 | POST | `/inv/datasets/([^/]+)/query` | exempt | read-shaped | `la/inspecto-la-api/src/main/java/com/gamma/la/api/QueryRoutes.java:47` |

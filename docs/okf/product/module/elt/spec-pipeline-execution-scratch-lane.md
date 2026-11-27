@@ -191,6 +191,18 @@ it over the sample would preview something no real run does. **Why not a refusal
 preview of every graph with an enrichment in it, because of one node the rest of the walk doesn't need.
 Any future node type the walk has no executor for gets the same named warning.
 
+✅ **The candidate dry run refuses what the save has no home for (2026-11-27, `DRYRUN-SAVE-NODE-MISMATCH-1`).** A
+dry run with a `pipeline` body first runs the save's node check, `PipelineEditable.unsupportedNodes`, the same
+check `lower` makes: an unregistered type (an agent's guessed `source.dataset`) or a built-in that is deliberately
+not authorable is a **422** `CONFIG_VALIDATION_FAILED` naming `UNSUPPORTED_NODE`, the node and the type in its message,
+the code and words `PUT …/graph` gives in its `refusals[]` (the dry run has no `refusals[]` list). Before, the walk seeded at that node without asking its type, so the dry run was green and the
+proposal refused (golden task dev-02). ⚖ Only that check: the save's completeness refusals (`NO_ACQUISITION`,
+`NO_PARSER`, `NO_PERSISTENT_SINK`) and shape refusals such as `ENRICHMENT_NOT_TERMINAL` stay save-only, so a partial
+draft still previews and a mid-walk enrichment still gets the warning above. A stored Pipeline's dry run is not
+checked: it was saved, so it lowers. Pinned by `ControlApiPipelineCrudTest` and `ModuleRemovalPipelineTest`.
+The draft is named by the URL's id, as the save names it (`DRYRUN-NAME-FROM-URL-1`, 2026-11-27): a draft with no `name`,
+the shape `inspecto://shapes/pipeline` documents, used to answer 400 "pipeline 'name' is required" (golden task dev-02).
+
 ✅ **A mid-walk enrichment cannot be SAVED (2026-09-24, `ENRICHMENT-MIDWALK-LANES-DISAGREE-1`, operator
 decision).** The two lanes disagreed about it: `PipelineExecutor.execute` skips the node and starves
 everything below it, while `PipelineEditable.lower` drops the node and so the flat file feeds its downstream

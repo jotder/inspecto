@@ -326,7 +326,7 @@ public final class EntityIdentityRoutes implements RouteModule {
     private static String realColumn(List<String> columns, String col, String datasetId) {
         for (String c : columns) if (c.equalsIgnoreCase(col)) return c;
         throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "'" + col + "' is not a column of dataset '"
-                + datasetId + "' " + columns);
+                + datasetId + "' " + columns, com.gamma.config.spec.FindingCodes.ERR_COLUMN_UNKNOWN, null);
     }
 
     /**

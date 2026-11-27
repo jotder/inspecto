@@ -217,7 +217,8 @@ public final class IndexRoutes implements RouteModule {
         mapped.addAll(attrs);
         for (String c : mapped)
             if (columns.stream().noneMatch(x -> x.equalsIgnoreCase(c)))
-                throw bad("'" + c + "' is not a column of dataset '" + dataset + "'");
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                        "'" + c + "' is not a column of dataset '" + dataset + "'", com.gamma.config.spec.FindingCodes.ERR_COLUMN_UNKNOWN, null);
 
         IndexMapping mapping = new IndexMapping(source, target, kind, time, zone, weight, attrs);
         LinkAnalysisSettings.Index ix = LinkAnalysisSettings.forRoot(writeRoot).effectiveIndex();

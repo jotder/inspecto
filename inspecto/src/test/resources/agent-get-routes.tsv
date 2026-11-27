@@ -97,6 +97,7 @@ GET /export	raw	exportSpace(): zip of the whole config tree PLUS state/ (recon-s
 GET /findings/([^/]+)	none	the Findings SPEC for a type (sections/fields), not Case findings values (ObjectRoutes.java:120)
 GET /incidents/([^/]+)/briefs	stored	list(): Incident Briefs (free text + citations written by agent/operators); citations filtered by reader visibility, text not masked (IncidentBriefRoutes.java:52)
 GET /insights	raw	feed(): stored Insight rows (slice values, explanations) read from insights_<profile>; masked only at scan WRITE time by BiSpecRunner (reveal=false), nothing stamped at read (InsightsRoutes.java:74)
+GET /insights/brief	raw	brief(): the latest run's stored Insight sentences read from insights_<profile>; masked only at scan WRITE time (alias-only at rest), nothing stamped at read (InsightsRoutes.java brief)
 GET /integrity	none	Space lock report: config paths changed outside the server (SpaceIntegrityRoutes.java:44)
 GET /inv/datasets/([^/]+)/discover	data	discover(): column profile + candidate values; DatasetDiscovery.mask(raw, ExplorationMasking) (DiscoverRoutes.java:123)
 GET /inv/datasets/([^/]+)/files	none	per-File ingest state: name, day, Collector, Pipeline, Consignment, counts (DatasetFilesRoutes.java:57); metadata only

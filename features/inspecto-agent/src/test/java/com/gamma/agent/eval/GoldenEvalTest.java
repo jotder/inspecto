@@ -5,6 +5,7 @@ import com.gamma.agent.skill.DiagnoseAndAlertSkill;
 import com.gamma.agent.skill.ExplainEntitySkill;
 import com.gamma.agent.skill.KpiToSqlSkill;
 import com.gamma.agent.skill.NlToScheduleSkill;
+import com.gamma.agent.skill.InsightBriefSkill;
 import com.gamma.agent.skill.ReportNarrativeSkill;
 import com.gamma.agent.skill.ReportSqlSkill;
 import com.gamma.agent.skill.SuggestConfigSkill;
@@ -51,12 +52,12 @@ class GoldenEvalTest {
     /** Intents whose happy path needs a model; {@code _cross} (unknown-intent) is model-agnostic. */
     private static final List<String> WITH_MODEL = List.of(
             "explain-entity", "kpi-to-sql", "nl-to-schedule", "suggest-config",
-            "report-sql", "report-narrative", "diagnose-and-alert", "_cross");
+            "report-sql", "report-narrative", "diagnose-and-alert", "insight-brief", "_cross");
 
     /** Intents with a {@code cases-nomodel.json} (abstain, or report-narrative's template fallback). */
     private static final List<String> NO_MODEL = List.of(
             "explain-entity", "kpi-to-sql", "nl-to-schedule", "suggest-config",
-            "report-sql", "report-narrative", "diagnose-and-alert");
+            "report-sql", "report-narrative", "diagnose-and-alert", "insight-brief");
 
     /** Per-intent canned model response for the model-available suites (formerly the fixture {@code model} block). */
     private static final Map<String, String> MODEL = Map.ofEntries(
@@ -75,6 +76,7 @@ class GoldenEvalTest {
                 {"sql":"SELECT status, COUNT(*) AS n FROM batches GROUP BY status",\
                 "logicExplanation":"count batches by terminal status"}"""),
             Map.entry("report-narrative", "No batches have run yet: 0 total, 0 succeeded, 0 failed."),
+            Map.entry("insight-brief", "[1] {measure} for {slice} rose to {value} against {expected}."),
             Map.entry("diagnose-and-alert", """
                 {"name":"high-error-rate","metric":"error_rate","comparator":"gt","threshold":0.05,\
                 "window":"1h","severity":"CRITICAL"}"""),
@@ -98,7 +100,8 @@ class GoldenEvalTest {
                 new KpiToSqlSkill(),
                 new DiagnoseAndAlertSkill(),
                 new ReportSqlSkill(),
-                new ReportNarrativeSkill()));
+                new ReportNarrativeSkill(),
+                new InsightBriefSkill()));
     }
 
     @AfterAll

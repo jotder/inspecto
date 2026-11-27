@@ -113,6 +113,51 @@
         }
       }
     },
+    "/insights/brief" : {
+      "get" : {
+        "tags" : [
+          "insights"
+        ],
+        "summary" : "Dashboard Brief of Insight Profiles",
+        "operationId" : "insightBrief",
+        "description" : "BI-INSIGHTS-1 P4 (BR-0), Business Insights add-on, every edition, no language model. Read-shaped like GET /insights: each Profile by the caller's view of the Dataset insights_<profile>; a Profile the caller may not view (or that does not exist) is OMITTED, the others still answer. Per Profile: the latest run's Insights of band elevated or high, status not not_useful / expected, best score first (ties by insight_id), at most max, each as its stored templated sentence plus a link into the feed. Nothing qualifying -> summary 'Nothing unusual in <period>'. A latest run older than two grains of the Profile -> note 'Last scan was <n> days ago'. Slice values are stored aliases, so a revealer and a reader who may not reveal receive the same text.",
+        "parameters" : [
+          {
+            "name" : "profiles",
+            "in" : "query",
+            "required" : true,
+            "description" : "Comma-separated Insight Profile ids, at most 5.",
+            "schema" : {
+              "type" : "string"
+            }
+          },
+          {
+            "name" : "max",
+            "in" : "query",
+            "schema" : {
+              "type" : "integer",
+              "minimum" : 1,
+              "maximum" : 10,
+              "default" : 5
+            }
+          }
+        ],
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped: data = {profiles[{profile, runId, runAt, period, header, stale, note?, summary?, lines[{insightId, band, score, sentence, type, dimension, slice, period, value, expected, delta, link, query}]}]}. A Profile never scanned, in a list of several, is an entry with a note naming the insight.scan Job and no lines."
+          },
+          "404": {
+            "description" : "A single requested Profile that is visible but has never been scanned (words name the insight.scan Job)."
+          },
+          "422" : {
+            "description" : "No 'profiles', more than 5, or 'max' outside 1-10."
+          },
+          "503" : {
+            "description" : "No Space write root, or the Business Insights module is not installed."
+          }
+        }
+      }
+    },
     "/insights/preview" : {
       "post" : {
         "tags" : [

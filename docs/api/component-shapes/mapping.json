@@ -1,0 +1,82 @@
+{
+  "kind" : "mapping",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "proposeChange" : false,
+  "operations" : {
+    "create" : {
+      "route" : "POST /components/mapping",
+      "content" : "content"
+    },
+    "update" : {
+      "route" : "PUT /components/mapping/{id}",
+      "content" : "content"
+    },
+    "delete" : {
+      "route" : "DELETE /components/mapping/{id}",
+      "content" : null
+    }
+  },
+  "shapes" : {
+    "content" : {
+      "source" : "MappingRules.validate (keys read inline; declared in the generator and held to its source)",
+      "unknownKeys" : "kept",
+      "extensionPrefix" : "x-",
+      "fields" : [
+        {
+          "path" : "name",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "owner",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "rules",
+          "type" : "array",
+          "required" : false
+        },
+        {
+          "path" : "rules[].sourceExpression",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "rules[].targetColumn",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "rules[].transformType",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "shares",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        }
+      ],
+      "example" : {
+        "rules" : [
+          {
+            "targetColumn" : "order_id",
+            "sourceExpression" : "ORDER_ID",
+            "transformType" : "DIRECT"
+          }
+        ]
+      },
+      "notes" : [
+        "`rules[].transformType` is one of CONCAT_DT, DIRECT, EXPR, FILENAME_DATE (blank = DIRECT); an `EXPR` rule's SQL is emitted as written (operator-authored, trusted).",
+        "The save checks `rules` only when it is present: a mapping without `rules` saves and maps nothing.",
+        "Preview the rules with `POST /components/mapping/validate`."
+      ]
+    }
+  }
+}
