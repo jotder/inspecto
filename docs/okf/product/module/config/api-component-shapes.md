@@ -446,22 +446,39 @@ Example:
   "nodes": [
     {
       "id": "read",
-      "type": "source.file",
+      "type": "acquisition",
       "config": {
-        "collector": "orders_inbox"
+        "connector": "dataset",
+        "dataset": "orders"
+      }
+    },
+    {
+      "id": "total",
+      "type": "transform.summarize",
+      "config": {
+        "group_by": [
+          "region"
+        ],
+        "measures": [
+          "sum(amount)"
+        ]
       }
     },
     {
       "id": "write",
-      "type": "sink.parquet",
+      "type": "sink.persistent",
       "config": {
-        "dataset": "orders"
+        "database": "orders_by_region"
       }
     }
   ],
   "edges": [
     {
       "from": "read",
+      "to": "total"
+    },
+    {
+      "from": "total",
       "to": "write"
     }
   ]

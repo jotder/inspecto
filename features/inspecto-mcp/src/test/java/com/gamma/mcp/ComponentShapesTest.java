@@ -19,6 +19,7 @@ import com.gamma.notify.ChannelConfig;
 import com.gamma.notify.NotificationRule;
 import com.gamma.pipeline.PipelineCodec;
 import com.gamma.pipeline.PipelineEdge;
+import com.gamma.pipeline.PipelineEditable;
 import com.gamma.pipeline.PipelineGraph;
 import com.gamma.pipeline.PipelineNode;
 import com.gamma.query.KpiDefinition;
@@ -339,9 +340,14 @@ class ComponentShapesTest {
                 body -> { Map<String, Object> named = new LinkedHashMap<>(body); named.putIfAbsent("name", "orders");
                           return PipelineCodec.fromMap(named); },
                 m("active", true,
-                  "nodes", List.of(m("id", "read", "type", "source.file", "config", m("collector", "orders_inbox")),
-                                   m("id", "write", "type", "sink.parquet", "config", m("dataset", "orders"))),
-                  "edges", List.of(m("from", "read", "to", "write"))),
+                  // DRYRUN-SAVE-NODE-MISMATCH-1: real node types, a graph the save lowers (the example used to say
+                  // source.file / sink.parquet, which no module registers, and an agent extrapolated source.dataset).
+                  // A Dataset is read by an acquisition with connector: dataset; thePipelineExampleIsAGraphTheSaveLowers.
+                  "nodes", List.of(m("id", "read", "type", "acquisition", "config", m("connector", "dataset", "dataset", "orders")),
+                                   m("id", "total", "type", "transform.summarize",
+                                     "config", m("group_by", List.of("region"), "measures", List.of("sum(amount)"))),
+                                   m("id", "write", "type", "sink.persistent", "config", m("database", "orders_by_region"))),
+                  "edges", List.of(m("from", "read", "to", "total"), m("from", "total", "to", "write"))),
                 List.of(), "", PipelineGraph.class, Map.of(),
                 List.of(new Element("nodes", PipelineNode.class), new Element("edges", PipelineEdge.class)),
                 List.of("`name` comes from the URL (`PUT /pipelines/{id}/graph`); a name in the body is overwritten.",
@@ -600,6 +606,18 @@ class ComponentShapesTest {
         }
         if (!stale.isEmpty())
             fail("docs/api/component-shapes is stale against the code: " + stale + " - regenerate: " + REGENERATE);
+    }
+
+    /**
+     * DRYRUN-SAVE-NODE-MISMATCH-1: the Pipeline example is a graph the save LOWERS, not one the codec merely parses —
+     * an agent copies it, and an example naming node types no module registers taught it to guess another
+     * ({@code source.dataset}). Strict, as an active Pipeline's save is.
+     */
+    @Test
+    void thePipelineExampleIsAGraphTheSaveLowers() {
+        Map<String, Object> example = copy(bodies().get("pipeline").get("create").example());
+        example.putIfAbsent("name", "orders");
+        PipelineEditable.lower(PipelineCodec.fromMap(example), new LinkedHashMap<>(), true);
     }
 
     @Test

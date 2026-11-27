@@ -42,7 +42,11 @@ Alongside the three that were there: `inspecto://glossary`, `inspecto://catalog`
   replaying a route, so they need no capability beyond reaching the endpoint, and each read still leaves the
   `mcp.resource.read` AUDIT row. A missing file answers the resource error `<name> is not packaged in this build`.
 - **Discovery.** The endpoint's `instructions` tell the agent to read `inspecto://shapes/{kind}` before drafting a
-  `propose_change` and `inspecto://errors` on a refusal.
+  `propose_change` and `inspecto://errors` on a refusal, and (2026-11-27, `AGENT-ANSWERS-WITHOUT-SERVER-1`) to ask
+  the server, through `preview_config` and `dry_run_pipeline`, for types, casts, parsing and what a draft does to
+  rows instead of working it out; `McpInstructionsTest` checks that every tool the text names exists. The Pipeline
+  shape's example is a graph the save lowers (`ComponentShapesTest.thePipelineExampleIsAGraphTheSaveLowers`):
+  agents copy it.
 
 ## The skills
 
