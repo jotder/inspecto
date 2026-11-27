@@ -1,0 +1,162 @@
+{
+  "kind" : "reconciliation",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "proposeChange" : false,
+  "operations" : {
+    "create" : {
+      "route" : "POST /components/reconciliation",
+      "content" : "content"
+    },
+    "update" : {
+      "route" : "PUT /components/reconciliation/{id}",
+      "content" : "content"
+    },
+    "delete" : {
+      "route" : "DELETE /components/reconciliation/{id}",
+      "content" : null
+    }
+  },
+  "shapes" : {
+    "content" : {
+      "source" : "UnknownComponentKeys.RECONCILIATION (its key census) + ReconConfigLoader.bands and buildSpec (ReconKindValidator)",
+      "unknownKeys" : "refused",
+      "extensionPrefix" : "x-",
+      "fields" : [
+        {
+          "path" : "bands",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "cardinality",
+          "type" : "any",
+          "required" : false,
+          "values" : [
+            "many_to_many",
+            "many_to_one",
+            "one_to_many",
+            "one_to_one"
+          ]
+        },
+        {
+          "path" : "columnMap",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "compareColumns",
+          "type" : "array",
+          "required" : false
+        },
+        {
+          "path" : "compareColumns[].agg",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "compareColumns[].column",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "compareColumns[].tolerance",
+          "type" : "number",
+          "required" : false
+        },
+        {
+          "path" : "compareColumns[].toleranceType",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "datasets",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "description",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "filters",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "impact",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "includeRecordCount",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "keyColumns",
+          "type" : "array",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "leftDataset",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "name",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "owner",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "rightDataset",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "shares",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "thirdDataset",
+          "type" : "any",
+          "required" : false
+        }
+      ],
+      "example" : {
+        "leftDataset" : "orders",
+        "rightDataset" : "ledger",
+        "keyColumns" : [
+          "order_id"
+        ],
+        "compareColumns" : [
+          {
+            "column" : "amount",
+            "agg" : "sum",
+            "toleranceType" : "absolute",
+            "tolerance" : 0.01
+          }
+        ]
+      },
+      "notes" : [
+        "Two or three Datasets: `leftDataset` (the anchor) and `rightDataset`, optionally `thirdDataset`, or `datasets` (a list, the first is the anchor).",
+        "`compareColumns[].agg` is `sum` (default) or `count`; `toleranceType` is `exact` (default), `absolute` or `percent` (ReconService.Spec.of); `tolerance` defaults to 0.",
+        "`bands` is `{okBelow, warnAbove}` in percent, 0 <= okBelow <= warnAbove <= 100.",
+        "An unknown key (a `compareColumns` item's too) is refused (422) for an agent; a person's save keeps it with an `UNKNOWN_KEY` warning."
+      ]
+    }
+  }
+}

@@ -398,14 +398,14 @@ class ControlApiMcpTest {
         }
     }
 
-    /** AK-2 W5 guard: every propose_change kind has a shape resource, and it reads its packaged generated file. */
+    /** AK-2 W5 guard: every propose_change kind, and every other shaped component kind (COMPONENT-REFERENCE-MORE-KINDS-1), has a shape resource reading its packaged generated file. */
     @Test
     void everyProposeKindHasAShapeResource() {
-        for (String kind : McpTools.CHANGE_ROUTES.keySet()) {
+        for (String kind : McpTools.shapeKinds()) {
             McpTools.Resource r = McpTools.resource("inspecto://shapes/" + kind);
-            assertNotNull(r, "propose_change kind " + kind + " has no inspecto://shapes resource");
+            assertNotNull(r, "shape kind " + kind + " has no inspecto://shapes resource");
             assertNotNull(McpRoutes.class.getClassLoader().getResource(r.classpath()),
-                    "propose_change kind " + kind + " has no packaged shape file " + r.classpath()
+                    "shape kind " + kind + " has no packaged shape file " + r.classpath()
                             + " - regenerate docs/api/component-shapes (ComponentShapesTest -Dshapes.write=true)");
         }
     }
@@ -414,11 +414,15 @@ class ControlApiMcpTest {
     @Test
     void theShapeAndErrorResourcesAreServed(@TempDir Path dir) throws Exception {
         try (Ctx c = open(dir)) {
+            // more reads than the standard bucket's burst of 20: each read moves the test clock 3 s, one token's refill
+            java.util.concurrent.atomic.AtomicLong now = new java.util.concurrent.atomic.AtomicLong(System.nanoTime());
+            com.gamma.control.AgentGateProbe.useRateLimitClock(c.api, now::get);
             JsonNode list = body(modern(c.port, OPS, "resources/list", Map.of())).path("result").path("resources");
             java.util.Set<String> uris = new java.util.HashSet<>();
             list.forEach(n -> uris.add(n.path("uri").asText()));
             assertTrue(uris.contains("inspecto://errors"), "listed: " + uris);
-            for (String kind : McpTools.CHANGE_ROUTES.keySet()) {
+            for (String kind : McpTools.shapeKinds()) {
+                now.addAndGet(3_000_000_000L);
                 String uri = "inspecto://shapes/" + kind;
                 assertTrue(uris.contains(uri), "listed: " + uri);
                 JsonNode content = body(modern(c.port, OPS, "resources/read", Map.of("uri", uri)))

@@ -1,0 +1,54 @@
+{
+  "kind" : "schema",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "proposeChange" : false,
+  "operations" : {
+    "create" : {
+      "route" : "POST /components/schema",
+      "content" : "content"
+    },
+    "update" : {
+      "route" : "PUT /components/schema/{id}",
+      "content" : "content"
+    },
+    "delete" : {
+      "route" : "DELETE /components/schema/{id}",
+      "content" : null
+    }
+  },
+  "shapes" : {
+    "content" : {
+      "source" : "ConfigSpecs.schema() + the spec and config-safety gates (ComponentRoutes.validateKind)",
+      "unknownKeys" : "kept",
+      "extensionPrefix" : "x-",
+      "fields" : [
+        {
+          "path" : "partitionKey",
+          "type" : "string",
+          "required" : false,
+          "description" : "Column whose value drives Hive partitioning (or use fields[].partitions)."
+        }
+      ],
+      "example" : {
+        "raw" : {
+          "name" : "ORDERS",
+          "format" : "CSV",
+          "fields" : [
+            {
+              "name" : "ORDER_ID",
+              "selector" : "order_id",
+              "type" : "VARCHAR"
+            }
+          ]
+        },
+        "mapping" : {
+          "canonicalName" : "orders"
+        }
+      },
+      "notes" : [
+        "`raw.fields[]` items are `{name, selector, type}` plus optional `format`, `description`, `unit` and `classification` (one the Space knows).",
+        "The engine parses more than the spec names (Identifiers.validateSchema at run time); a shipped schema may also carry `partitions[]`. The component's id is its `schema_file: schema/<id>` reference."
+      ]
+    }
+  }
+}

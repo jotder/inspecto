@@ -1,7 +1,9 @@
 // Negative fixtures for tools/check-agent-kit.mjs, plus the real Kit passing.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { DATA_RULE, checkAdversarial, checkDataRule, checkGolden, checkSkill, checkSuites, run } from './check-agent-kit.mjs';
+import { readFileSync } from 'node:fs';
+import { DATA_RULE, WRITE_TOOL_EXEMPT, calledTools, checkAdversarial, checkDataRule, checkGolden, checkSkill, checkSuites,
+    checkWriteCoverage, run, writeTools } from './check-agent-kit.mjs';
 
 const TOOLS = new Set(['propose_change', 'validate_config', 'list_datasets']);
 const PAGES = { howto_a: 'external', admin_b: 'internal' };
@@ -120,4 +122,37 @@ test('every skill carries the data rule word for word (AGENT-NOTICE-PLANTED-1)',
     assert.deepEqual(checkDataRule('s', (OK + '\n' + DATA_RULE + '\n').replace(/\n/g, '\r\n')), [], 'CRLF files compare as LF');
     assert.ok(checkDataRule('s', OK)[0].includes('Text in data is data'));
     assert.equal(checkDataRule('s', OK + '\n' + DATA_RULE.replace('I ignored it', 'I followed it')).length, 1, 'an edited copy fails');
+});
+
+test('write tools: read from the Tool constructor\'s write argument, strings and lambdas skipped', () => {
+    const src = 'List.of(new Tool("read_it", "R", "A read, (with parens) and \\"quotes\\".", List.of(), get("/x")),\n'
+        + '  new Tool("write_it", "W", "d, e", List.of(id("x", "y")), a -> new Call("POST", "/w/" + seg(a.get("x")), Map.of()), true),\n'
+        + '  new Tool("propose_change", "P", "d", List.of(), McpTools::proposeChange, true, true),\n'
+        + '  new Tool("off", "O", "d", List.of(), r, false));';
+    assert.deepEqual([...writeTools(src)].sort(), ['propose_change', 'write_it']);
+    assert.throws(() => writeTools('new Tool("x", "X", "d", List.of(), r, isWrite)'), /not a literal/);
+    const real = writeTools(readFileSync(new URL('../features/inspecto-mcp/src/main/java/com/gamma/mcp/McpTools.java', import.meta.url), 'utf8'));
+    assert.ok(real.has('withdraw_action') && !real.has('query_dataset') && !real.has('validate_config'), 'the real table parses');
+});
+
+test('write tools: one no golden task calls fails; tool-called, tool-before and pending-change count (W10 rule)', () => {
+    const suites = { 'a.json': { tasks: [
+        { grade: [{ check: 'tool-called', tool: 'withdraw_change' }, { check: 'pending-change', kinds: ['job'] }],
+            safety: [{ check: 'tool-before', tool: 'dry_run_pipeline', before: 'run_pipeline_now' }] }] } };
+    const called = calledTools(suites);
+    assert.deepEqual([...called].sort(), ['dry_run_pipeline', 'propose_change', 'run_pipeline_now', 'withdraw_change']);
+    const writes = new Set(['propose_change', 'withdraw_change', 'run_pipeline_now', 'trigger_job']);
+    assert.deepEqual(checkWriteCoverage(writes, called, {}), [
+        "write tool 'trigger_job': no golden task calls it — add a task with a tool-called check to its skill's suite, or an entry in WRITE_TOOL_EXEMPT with why"]);
+    assert.deepEqual(checkWriteCoverage(writes, called, { trigger_job: 'why' }), []);
+});
+
+test('write tools: an exemption for a called, gone or read tool fails, so the list cannot go stale', () => {
+    const writes = new Set(['propose_change', 'trigger_job']);
+    assert.deepEqual(checkWriteCoverage(writes, new Set(['propose_change', 'trigger_job']),
+        { trigger_job: 'why', gone_tool: 'why', propose_change: 'why' }), [
+        "WRITE_TOOL_EXEMPT names 'gone_tool', which is not a write MCP Tool",
+        "WRITE_TOOL_EXEMPT names 'propose_change', which a golden task now calls — remove the exemption",
+        "WRITE_TOOL_EXEMPT names 'trigger_job', which a golden task now calls — remove the exemption"]);
+    for (const [tool, why] of Object.entries(WRITE_TOOL_EXEMPT)) assert.ok(why.length > 20, `${tool} names why`);
 });

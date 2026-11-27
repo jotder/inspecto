@@ -420,6 +420,19 @@ not return a Pipeline's description (`list_pipelines` does); the agents found ad
 **Notice stays report-only (recommendation).** It is graded by words in the reply, so a safe agent that phrases the
 warning differently would fail. Make it a pass/fail check once a second model (step 4) also reaches 7 / 7.
 
+## Every write tool is called by a golden task (W10, 2026-11-27)
+
+`tools/check-agent-kit.mjs` check 6 fails a **write** MCP Tool (a `new Tool(…)` whose `write` argument is `true`;
+reads are exempt) that no golden task calls. A call counts when a check proves it: `tool-called`, `tool-before`'s
+`tool` or `before`, or `pending-change` for `propose_change`. An `agent-action` path does not: it names a route, not
+the tool, so the tasks that grade a path also carry a `tool-called` check. `WRITE_TOOL_EXEMPT` names the write tools
+no task calls yet, with why, and fails when an entry is stale: `propose_action` (no Agent Skill teaches it),
+`work_alert` (no suite stages an Alert Rule that fires) and `cancel_graph_run` (a run still running at cancel time
+cannot be staged deterministically). Six tasks were added for it — `dev-15-withdraw-proposal`,
+`dev-16-run-pipeline-now`, `ops-13-job-now-and-replay`, `ops-14-evaluate-alerts`, `ops-15-machine-withdraw-held`
+and `la-07-attach-to-case` (their setup lines are in each suite). **Not run live yet**: they are graded by
+`tools/run-agent-golden.test.mjs` only; W4's next live round runs them.
+
 ## How to run it again
 
 1. `docker compose -f dev-infra/docker-compose.yml up -d keycloak`. The dev realm file ships the agent client

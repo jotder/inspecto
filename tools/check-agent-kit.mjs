@@ -13,8 +13,12 @@
 //                   task has id, role, prompt, skills[], grade[] and safety[]; every `tool` a grade or safety check names
 //                   is a real MCP Tool; every skill a task names is a real Agent Skill; ids are unique across all suites.
 //   5 no repo paths a skill never names a repository path (the Kit is for an installed distribution with no source tree).
-//   6 coverage      every Agent Skill is named by at least one golden task (AK-2 widening plan W10). Per-tool coverage is
-//                   not checked yet: the suites check only two tools by name (plan W10 note proposes a write-tool rule).
+//   6 coverage      every Agent Skill is named by at least one golden task (AK-2 widening plan W10), and every WRITE MCP
+//                   Tool (a `new Tool(…)` whose `write` argument is true) is called by at least one golden task: a grade,
+//                   safety or notice check names it (`tool-called`, or `tool-before`'s `tool` or `before`, both of which
+//                   the grader proves were called), or, for propose_change, a `pending-change` check. Reads are exempt.
+//                   WRITE_TOOL_EXEMPT names a write tool no task calls yet, with why; an exemption for a tool that is gone,
+//                   is not a write tool, or is now called fails too, so the list cannot go stale.
 //   7 check names   every grade, safety and notice check a task names is one tools/run-agent-golden.mjs grades (CHECKS);
 //                   an unknown name would only fail at grading time, after a paid live run (W8).
 //   8 adversarial   agent-kit/golden/adversarial.json exists, and each of its tasks (any task with `planted`) says where
@@ -57,6 +61,70 @@ export function mcpTools(root) {
     const names = [...src.matchAll(/new Tool\("([a-z_]+)"/g)].map((m) => m[1]);
     if (names.length < 20) throw new Error(`${MCP_TOOLS}: found only ${names.length} tools — the pattern no longer matches`);
     return new Set(names);
+}
+
+/**
+ * Write MCP Tools that no golden task calls yet, each with why (check 6). Remove an entry when a task calls the tool.
+ * A golden task grades a skill, so a tool no skill teaches has no task to be in; the others need a fixture the suites'
+ * setup does not stage yet (AK-2 W4's live runs are where such a task gets added and proved).
+ */
+export const WRITE_TOOL_EXEMPT = {
+    propose_action: 'no Agent Skill teaches it (no skill lists it), and a golden task grades a skill',
+    work_alert: 'needs an Alert to work, and no suite stages an Alert Rule that fires (the analyst setup has Incidents and Cases only)',
+    cancel_graph_run: 'needs a graph run still running when the agent cancels it, which no setup can stage deterministically',
+};
+
+/** Top-level arguments of the Java call whose '(' is at `open`, skipping string, char literals and line comments. */
+function callArgs(src, open) {
+    const args = [];
+    let depth = 0, start = open + 1;
+    for (let i = open; i < src.length; i++) {
+        const ch = src[i];
+        if (ch === '"' || ch === "'") { for (i++; i < src.length && src[i] !== ch; i++) if (src[i] === '\\') i++; continue; }
+        if (ch === '/' && src[i + 1] === '/') { while (i < src.length && src[i] !== '\n') i++; continue; }
+        if ('({['.includes(ch)) depth++;
+        else if (')}]'.includes(ch)) {
+            if (--depth === 0) { args.push(src.slice(start, i).trim()); return args; }
+        } else if (ch === ',' && depth === 1) { args.push(src.slice(start, i).trim()); start = i + 1; }
+    }
+    throw new Error('unbalanced call');
+}
+
+/** The write MCP Tools: `new Tool(name, title, description, args, router, write[, destructive])` with write `true`. */
+export function writeTools(src) {
+    const out = new Set();
+    for (const m of src.matchAll(/new Tool\("([a-z_]+)"/g)) {
+        const a = callArgs(src, m.index + 'new Tool'.length);
+        if (a.length >= 6 && a[5] === 'true') out.add(m[1]);
+        else if (a.length >= 6 && a[5] !== 'false') throw new Error(`${MCP_TOOLS}: tool ${m[1]}'s write argument is '${a[5]}', not a literal`);
+    }
+    if (!out.has('propose_change')) throw new Error(`${MCP_TOOLS}: propose_change is not read as a write tool — the parser no longer matches`);
+    return out;
+}
+
+/** The tools a suite's tasks prove were called (check 6). `suites` is { file → parsed doc }. */
+export function calledTools(suites) {
+    const out = new Set();
+    for (const doc of Object.values(suites)) for (const t of Array.isArray(doc.tasks) ? doc.tasks : [])
+        for (const c of [...(t.grade ?? []), ...(t.safety ?? []), ...(t.notice ?? [])]) {
+            if (c?.check === 'tool-called' && c.tool) out.add(c.tool);
+            if (c?.check === 'tool-before') { if (c.tool) out.add(c.tool); if (c.before) out.add(c.before); }
+            if (c?.check === 'pending-change') out.add('propose_change');
+        }
+    return out;
+}
+
+/** Write tools no golden task calls and that are not exempt, and exemptions that are stale. */
+export function checkWriteCoverage(writes, called, exempt = WRITE_TOOL_EXEMPT) {
+    const out = [];
+    for (const w of [...writes].sort())
+        if (!called.has(w) && !(w in exempt))
+            out.push(`write tool '${w}': no golden task calls it — add a task with a tool-called check to its skill's suite, or an entry in WRITE_TOOL_EXEMPT with why`);
+    for (const e of Object.keys(exempt).sort()) {
+        if (!writes.has(e)) out.push(`WRITE_TOOL_EXEMPT names '${e}', which is not a write MCP Tool`);
+        else if (called.has(e)) out.push(`WRITE_TOOL_EXEMPT names '${e}', which a golden task now calls — remove the exemption`);
+    }
+    return out;
 }
 
 /** Page ids of the Handbook manifest with their audience: { id → audience }. */
@@ -201,14 +269,17 @@ export function run(root = ROOT_DEFAULT) {
         if (!found.some((m) => m.includes('not JSON'))) suites[f] = JSON.parse(json);
     }
     findings.push(...checkSuites(suites, names));
-    return { findings, skills: names.length, tools: tools.size };
+    const writes = writeTools(readFileSync(join(root, MCP_TOOLS), 'utf8'));
+    findings.push(...checkWriteCoverage(writes, calledTools(suites)));
+    return { findings, skills: names.length, tools: tools.size, writes: writes.size };
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-    const { findings, skills, tools } = run();
+    const { findings, skills, tools, writes } = run();
     if (findings.length) {
         for (const f of findings) console.error(`check-agent-kit: ${f}`);
         process.exit(1);
     }
-    console.log(`check-agent-kit: ${skills} Agent Skill(s) name only the ${tools} MCP Tools and external Handbook pages; golden tasks well-formed.`);
+    console.log(`check-agent-kit: ${skills} Agent Skill(s) name only the ${tools} MCP Tools and external Handbook pages; golden tasks well-formed; `
+        + `${writes - Object.keys(WRITE_TOOL_EXEMPT).length} of ${writes} write tools called by a golden task, ${Object.keys(WRITE_TOOL_EXEMPT).length} exempt with why.`);
 }
