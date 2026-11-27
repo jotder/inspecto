@@ -79,6 +79,10 @@ read-shaped exemptions, like `POST /bi/query`: what guards them is the Dataset's
   column (a prefix `LIKE` bisects the raw values, a failed cast prints one; with an untraceable lineage every undeclared
   word counts; an internal `__` name such as the side view `__recon_b` is refused outright, since it reads the whole row); and a `masked:` alias sent as a `path` or `key` value of a hidden key column (it matches no raw value;
   the UI shows the reason). A raw key value is accepted (D-AK15).
+- **Error text withheld (2026-11-27, AGENT-KIT-1 W6 D2 security review).** DuckDB quotes a stored value in a run-time
+  error (a classified VARCHAR key compared with another side's integer or date key: `Could not convert string
+  '<value>'`). For a caller with masking in force, a failed comparison's 422 on run, breaks or rows keeps a compile-time
+  error's text (Parser, Binder, Catalog) and withholds any other, as `/bi/query` does (`DatasetCellMasking.scrub`).
 - **Accepted residuals:** pages and Break lists are ordered by the raw key, so their order follows the raw key's order.
   When one side's Dataset classifies the key and the other's does not, `/recon/rows` shows the unclassified side's raw
   value next to the alias, linking the two; the caller can read that side raw through `/bi/query` anyway.

@@ -117,6 +117,7 @@ class ControlApiAgentReconReadsTest {
         Path data = root.resolve("s1").resolve("data");
         seedStore(data, "subs_a", "VALUES ('m1',1,199.0),('m2',1,149.0),('m3',1,99.0),('m4',0,50.0)");
         seedStore(data, "subs_b", "VALUES ('m1',1,199.0),('m2',0,149.0),('m4',0,50.0),('m5',1,30.0)");
+        seedStore(data, "num_b", "VALUES (1,1,199.0),(2,0,149.0)");   // the key typed as an integer
         ComponentStore store = new ComponentStore(config.resolve("registry"));
         store.write("dataset", "subs_a_ds", dataset("subs_a"));
         store.write("dataset", "subs_b_ds", dataset("subs_b"));
@@ -125,6 +126,8 @@ class ControlApiAgentReconReadsTest {
         hidden.put("shares", List.of());   // shared with no one
         store.write("dataset", "hidden_ds", hidden);
         store.write("reconciliation", "subs_recon", SUBS);
+        store.write("dataset", "num_b_ds", Map.of("dateField", "event_date", "physicalRef", "num_b", "columns", List.of(
+                Map.of("name", "msisdn"), Map.of("name", "active_flag"), Map.of("name", "fee"), Map.of("name", "event_date"))));
         if (laSettings != null) Files.writeString(config.resolve("link-analysis.toon"), laSettings);
         Roles.write(config, Map.of(), List.of(), List.of("bot"));   // the Space admits the machine client
         SpaceManager spaces = SpaceManager.discover(root);
@@ -343,6 +346,41 @@ class ControlApiAgentReconReadsTest {
                 assertTrue(r.body().contains("canRevealLinkEntities"), r.body());
                 assertNoRaw("refused", r.body());
             }
+        }
+    }
+
+    /**
+     * D2 security review: a classified VARCHAR key compared with another side's integer key fails in DuckDB with the stored
+     * value quoted ({@code Could not convert string 'm1'}); a 4xx passes the seam unstamped, so the error text itself is
+     * withheld while masking is in force, as {@code /bi/query} withholds it.
+     */
+    @Test
+    void aFailedComparisonNeverQuotesAMaskedKeyInItsErrorText(@TempDir Path root) throws Exception {
+        Map<String, Object> mixed = new LinkedHashMap<>(SUBS);
+        mixed.put("datasets", List.of("subs_a_ds", "num_b_ds"));
+        try (Ctx c = open(root, null)) {
+            for (Map.Entry<String, Map<String, Object>> read : reads(mixed, "m2").entrySet())
+                for (String who : List.of(AGENT, MACHINE, PERSON)) {
+                    HttpResponse<String> r = post(c, who, read.getKey(), read.getValue());
+                    assertNoRaw(who + " " + read.getKey(), r.body());
+                    assertFalse(r.body().contains("'m1'") || r.body().contains("'m2'") || r.body().contains("'m3'")
+                            || r.body().contains("'m4'"), who + " " + read.getKey() + " quoted a stored key: " + r.body());
+                    if (r.statusCode() != 200) {
+                        assertEquals(422, r.statusCode(), r.body());
+                        // a run-time error's text is withheld; a compile-time one (Binder) quotes no stored value
+                        assertTrue(r.body().contains("withheld") || r.body().contains("Binder Error"), r.body());
+                    }
+                }
+            // the missing-row join compares the raw typed keys, so it fails at run time on a stored value
+            Map<String, Object> missing = Map.of("config", mixed, "type", "missing_right");
+            for (String who : List.of(AGENT, PERSON)) {
+                HttpResponse<String> r = post(c, who, "/recon/breaks", missing);
+                assertEquals(422, r.statusCode(), who + ": " + r.body());
+                assertTrue(r.body().contains("withheld"), who + " gets the fixed sentence: " + r.body());
+                assertNoRaw(who + " missing_right", r.body());
+            }
+            JsonNode viaMcp = tool(c, MACHINE, "/recon/breaks", missing);
+            assertTrue(text(viaMcp).startsWith("HTTP 422") && text(viaMcp).contains("withheld"), viaMcp.toString());
         }
     }
 

@@ -160,7 +160,12 @@ public final class ReconRoutes implements RouteModule {
             page = bigDayPage.page();
         } else {
             int cap = rowCap;
-            ReconService.DayPage dp = compute(api, () -> ReconService.dayRun(spec, sample, mask, offset, limit, cap));
+            ReconService.DayPage dp;
+            try {
+                dp = compute(api, () -> ReconService.dayRun(spec, sample, mask, offset, limit, cap));
+            } catch (ApiException fault) {
+                throw read.scrub(fault);
+            }
             day = dp.day();
             page = dp.page();
             if (cacheKey != null) {
@@ -227,7 +232,7 @@ public final class ReconRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
+            throw read.scrub(new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + ServerFaults.sqlMessage(e.getMessage(), api)));
         } catch (IOException e) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
         }
@@ -282,7 +287,7 @@ public final class ReconRoutes implements RouteModule {
         } catch (IllegalArgumentException bad) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, bad.getMessage());
         } catch (SQLException e) {
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
+            throw read.scrub(new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "reconciliation failed: " + ServerFaults.sqlMessage(e.getMessage(), api)));
         } catch (IOException e) {
             throw ServerFaults.curated(503, ErrorCodes.CAPABILITY_UNAVAILABLE, "query sandbox unavailable", "sandbox could not be opened", e);
         }
@@ -780,6 +785,17 @@ public final class ReconRoutes implements RouteModule {
                 out.put(col, s < 0 ? v : sides.get(s).cell(scoped.spec().physical(s, col), v));
             });
             return out;
+        }
+
+        /**
+         * A 422 built from a failed comparison as this caller may see it (D2 security review): DuckDB quotes a stored value
+         * in a run-time error — a classified VARCHAR key joined to another side's BIGINT or DATE key fails with
+         * {@code Could not convert string '<value>'} — so while any side's masking is in force the text is withheld, as
+         * {@code /bi/query} withholds it. A revealer keeps the full text.
+         */
+        ApiException scrub(ApiException fault) {
+            for (DatasetCellMasking side : sides) fault = side.scrub(fault);
+            return fault;
         }
 
         /** Grain or Break rows with each {@code key} as the caller sees it; stamped. */

@@ -50,6 +50,15 @@ public final class DatasetCellMasking {
         return masking.cell(column, value);
     }
 
+    /**
+     * {@code fault} (a 422 built from a failed comparison's DuckDB text) as this caller may see it: while masking is in force,
+     * any run-time error text (which can quote a stored key value, e.g. a failed cast) is replaced by a fixed sentence, as
+     * {@code /bi/query} does ({@link BiResultMasking#scrub}).
+     */
+    public ApiException scrub(ApiException fault) {
+        return masking.scrub(fault);
+    }
+
     /** 422 when {@code column} is hidden from this caller and {@code what} (e.g. {@code sum over}) would read its values. */
     public void refuseValueRead(String column, String what) {
         if (hides(column))
