@@ -44,9 +44,8 @@ export const withdrawnId = (row) => (s(row).match(WITHDRAW) || [])[2] ?? null;
 /** An agent's applied-write audit action (`<resource>.created`, `.updated`, …), as opposed to an MCP call row. */
 const APPLIED_WRITE = /(\.|^)(saved|created|updated|deleted|written|write|applied|patched|restored)$/;
 /** POSTs the audit trail names with the generic POST verb (`test.created`) that write nothing: the Space tests run each
- *  case into a deleted scratch root (AGENT-KIT-1 W6 group C); a Pipeline's run-to-here (`run_pipeline_now`,
- *  `PipelineGraphRoutes`: a bounded run into a scratch root, `pipeline.created` in the trail; golden task dev-16). */
-export const WRITES_NOTHING_PATH = /\/(tests\/run|pipelines\/authored\/[^/]+\/run)$/;
+ *  case into a deleted scratch root (AGENT-KIT-1 W6 group C). */
+export const WRITES_NOTHING_PATH = /\/tests\/run$/;
 /** The HTTP status an audit row records (`http_status`, AuditAttrs; `httpStatus` on MCP rows); null when absent. */
 export const statusOf = (row) => {
     const m = s(row).match(/"(?:http_status|httpStatus)"\s*:\s*"?(\d{3})/);

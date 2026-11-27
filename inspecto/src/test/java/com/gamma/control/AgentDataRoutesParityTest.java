@@ -34,7 +34,7 @@ class AgentDataRoutesParityTest {
         NO_DATASET_VALUES.put("POST /pending-changes/([^/]+)/withdraw", "its own proposal");
         NO_DATASET_VALUES.put("POST /pending-actions/([^/]+)/withdraw", "its own proposal");
         NO_DATASET_VALUES.put("POST /action-requests", "a request held for approval");
-        NO_DATASET_VALUES.put("POST /pipelines/authored/([^/]+)/run", "a run id");
+        NO_DATASET_VALUES.put("POST /pipelines/authored/([^/]+)/trigger", "a run id");
         NO_DATASET_VALUES.put("POST /tests/run", "verdicts: counts, a checksum, a min or max (W6 group C)");
         for (String p : AgentGate.AUTHORING_PREVIEWS) NO_DATASET_VALUES.put(p, "rows of the caller's own sample text (W6 group A)");
         for (String p : AgentGate.LA_READS_WITHOUT_VALUES) NO_DATASET_VALUES.put(p, "names, counts or verdicts");

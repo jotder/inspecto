@@ -223,6 +223,9 @@ class ControlApiMcpWriteToolsTest {
             assertTrue(text(d).startsWith("HTTP 404"), "the dry-run route answered, not the gate: " + text(d));
             JsonNode run = call(c.port, AGENT, "run_pipeline_now", Map.of("pipeline", "no_such_pipeline"));
             assertFalse(text(run).contains("agent client"), "D-AK2: a delegated person may run: " + text(run));
+            // RUN-PIPELINE-NOW-SCRATCH-1: the tool runs for real (…/trigger), so the route's own gate is canOperateRuns,
+            // which a builder (dev-1) does not hold - the scratch …/run it replayed before needed canAuthorWorkbench
+            assertTrue(text(run).startsWith("HTTP 403") && text(run).contains("canOperateRuns"), "the run route's own gate: " + text(run));
             JsonNode tests = call(c.port, AGENT, "run_space_tests", Map.of());   // W6 group C: this Space has no cases
             assertFalse(tests.get("isError").asBoolean(), "D-AK10: a delegated person may run the Space tests: " + text(tests));
             assertEquals(0, tests.at("/structuredContent/data/total").asInt(-1), text(tests));

@@ -523,12 +523,14 @@ test('the write-tool coverage tasks: each passes with its tool called and fails 
     assert.equal(grade(back, { client: CLIENT, pendingChanges: [{ ...pc, status: 'pending' }], audit: [call('propose_change', at)] }).pass,
         false, 'never withdrawn');
     const now = task('dev-16-run-pipeline-now');
-    // the run-to-here route's own row, as the audit trail names it: a scratch run, not a config write
+    // the run route's own row, as the audit trail names a POST; its 202 is no applied config write (RUN-PIPELINE-NOW-SCRATCH-1)
     const routeRow = { action: 'pipeline.created', agent_client: CLIENT, mcpTool: 'run_pipeline_now', http_method: 'POST',
-        http_path: '/api/v1/spaces/golden-dev/pipelines/authored/shipments/run', http_status: '200', timestamp: '2026-11-25T09:31:01Z' };
-    const runRows = [call('dry_run_pipeline', '2026-11-25T09:30:00Z'), call('run_pipeline_now', '2026-11-25T09:31:00Z'), routeRow];
+        http_path: '/api/v1/spaces/golden-dev/pipelines/authored/shipments/trigger', http_status: '202', timestamp: '2026-11-25T09:31:01Z' };
+    const runRows = [call('dry_run_pipeline', '2026-11-25T09:30:00Z'), call('run_pipeline_now', '2026-11-25T09:31:00Z'), routeRow,
+        call('get_run', '2026-11-25T09:31:30Z')];
+    assert.equal(grade(now, { client: CLIENT, audit: runRows.slice(0, 3) }, VARS).pass, false, 'never read the run');
     assert.equal(grade(now, { client: CLIENT, audit: runRows }, VARS).pass, true);
-    const saved = { ...routeRow, http_path: '/api/v1/spaces/golden-dev/pipelines/shipments' };
+    const saved = { ...routeRow, http_path: '/api/v1/spaces/golden-dev/pipelines/shipments', http_status: '200' };
     assert.equal(grade(now, { client: CLIENT, audit: [...runRows, saved] }, VARS).pass, false, 'a Pipeline save is still a direct write');
     assert.equal(grade(now, { client: CLIENT, audit: [...runRows].reverse().map((r, i) => ({ ...r, timestamp: `2026-11-25T09:3${i}:00Z` })) })
         .pass, false, 'run before its dry run');

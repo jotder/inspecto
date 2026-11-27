@@ -262,7 +262,7 @@ Every tool replays one existing route; none is a new write path. Write tools are
 | `propose_action` | `POST /action-requests` | needs `canWorkIncidents`; held for approval by design |
 | `export_bundle` | `POST /bundle/export` | read-shaped |
 | `preview_promotion` | `POST /promotion/preview` | needs `canAdminister` — so in practice a person tool, never a machine one |
-| `run_pipeline_now` | `POST /pipelines/authored/{id}/run` (gate `canAuthorWorkbench`) | **only if D-AK2 says so** |
+| `run_pipeline_now` | `POST /pipelines/authored/{id}/run` (gate `canAuthorWorkbench`) | **only if D-AK2 says so** — since 2026-11-27 `POST /pipelines/authored/{id}/trigger` (`canOperateRuns`): the `/run` route is the editor's scratch run-to-here (RUN-PIPELINE-NOW-SCRATCH-1, operator) |
 
 **Never offered:** the §4.1 never-list. The host refuses it to a marked Subject on every door; the endpoint refuses it
 too, and a test asserts no tool's router can produce such a path.
@@ -657,7 +657,7 @@ recommended**, see the **Signed** lines under the table. Phase 2 is no longer bl
 | # | Question | Recommended |
 |---|---|---|
 | **D-AK1** | Who may approve an agent's Pending Change? | **Another person — four-eyes always** (the agent's token never; the delegating person never). This follows the parent plan §7.2 (four-eyes for destructive or promoting changes) and the code's own precedent: four-eyes treats the person who asked and the Assistant as two makers (`IncidentBriefRoutes`). *Alternative, for single-administrator installs:* the delegating person may approve a non-destructive, non-promoting proposal (one human review), switched on per Space. A machine's proposal always needs a person. |
-| **D-AK2** | Is `run_pipeline_now` in AK-2? | **Yes for a delegated person** who passes the run route's own gate (`canAuthorWorkbench`) — a run writes data, not config, and the person could press Run; **never** for a machine. The Agent Skills require a dry run first. |
+| **D-AK2** | Is `run_pipeline_now` in AK-2? | **Yes for a delegated person** who passes the run route's own gate (`canAuthorWorkbench`) — a run writes data, not config, and the person could press Run; **never** for a machine. The Agent Skills require a dry run first. **Amended 2026-11-27 (operator, RUN-PIPELINE-NOW-SCRATCH-1):** the route is the real run `POST /pipelines/authored/{id}/trigger`, so the person's gate is `canOperateRuns`; `…/run` was the editor's scratch run-to-here and is no agent route. Person only, never a machine, unchanged. |
 | **D-AK3** | Do write tools require a verified agent client? | **Yes.** A token from the SPA client keeps AK-1's read tools; write tools answer 403 "sign in through an agent client", so every write names a verified client. |
 | **D-AK4** | The machine agent capability set | The authoring capabilities of the `propose_change` kinds plus `canWorkIncidents`; listed per client in `auth.oidc.agentMachineClients`. Widens operator decision B1, as D-UE5 anticipated. Phase 2 adds `canOperateRuns` for the operations role. |
 | **D-AK5** | How are an agent's operational and case actions governed (phases 2–3)? | The two tiers of §4.6: **low** actions allowed for a delegated person within that person's rights; **outcome** actions held for a person to approve; every machine action held. |

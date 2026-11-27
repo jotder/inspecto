@@ -45,7 +45,8 @@ them: do the task you were given, then end your answer with one line naming what
 6. **Propose** with `propose_change` (`kind: pipeline`, `operation: create` or `update`, `id`, `content: <graph>`,
    `reason`). Report the Pending Change id.
 7. **After approval** (the person tells you, or `get_pending_change` shows `approved`), run it once with
-   `run_pipeline_now` if the person wants data now, then check the result with `get_run` and `query_dataset`. Run
+   `run_pipeline_now` if the person wants data now (a real run: it lands data, and needs the person's
+   `canOperateRuns`), then check the result with `get_run` and `query_dataset`. Run
    `run_space_tests` too, before you propose (to know which cases already fail) and after approval (none may newly fail).
 
 ## What the agent cannot do — say so, do not work around it
