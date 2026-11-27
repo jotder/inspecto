@@ -30,7 +30,7 @@ Method: a read-only scan of `git ls-files spaces`; the script is not committed. 
 | # | Finding | Evidence |
 |---|---|---|
 | F1 | **The census reads 14 kinds; at least 9 kinds that hold links are outside it.** | 168 files are of kinds with no link declared. Unread keys: `kpi.dataset` (26), `risk-score.dataset` (24), `anomaly-model.dataset` (8), `view.pipeline` (4), `insight-profile.dataset`, and `model` + `dataset` in six entity-score files. Runbook, pattern-pack and case-rule links were not traced. |
-| F2 | **11 of the 48 declared links are checked by nothing.** | anatomy §12.2 rows marked **none**: Job `dataset`, `target`, `pipeline_config`, `on_signal`, `when`, `dir`; Enrichment `input.database`, `references.*.path`; Expectation `refDataset`; `nav-menus` binding |
+| F2 | **11 of the 48 declared links are checked by nothing** (9 since 2026-11-28: the Job save checks `on_signal` and `when`, `SIGNAL-BOARD-1` SB-2). | anatomy §12.2 rows marked **none**: Job `dataset`, `target`, `pipeline_config`, `on_signal`, `when`, `dir`; Enrichment `input.database`, `references.*.path`; Expectation `refDataset`; `nav-menus` binding |
 | F3 | **Two derivations of "what does this reference".** | the server's census, and `refsForComponent` in `inspecto-ui/.../component-model/refs.ts`, which feeds the Usage graph and the bundle closure |
 | F4 | **Every check judges one file or one target.** | Pipeline impact, column impact and delete `brokenLinks` are separate reads; nothing answers "what do these five edits do together". Whether `propose_change` takes more than one component is not verified |
 | F5 | **Refusals are in shadow, for agents too.** | `-Dlinks.delete` and `-Dlinks.save` default `shadow`. Precedent for treating agents differently: an unknown key is 422 for an agent and a warning for a person (`UNKNOWN-KEYS-SILENT-1`) |
@@ -107,7 +107,7 @@ Each phase follows the evolution rules: shadow, then opt-in, then default; one k
 |---|---|---|
 | **SC-0 Measure** | the §3 scan as a committed tool with a ratcheted baseline; graph build time on the largest Space; the answers to the "not verified" items | numbers in this plan replaced by tool output |
 | **SC-1 One graph** | H1, I1; retire `refsForComponent` | parity test green; Usage tab and server show equal edges on the corpus; baseline still 0 findings |
-| **SC-2 Change sets** | I2, I3, H2, H3 | one planted break per link type is refused for an agent and previewed for a person; a five-edit set applies or fails as one |
+| **SC-2 Change sets** | I2, I3, H2, H3; absorb `AgentStrict`, the agent/person split the Job save checks of `SIGNAL-BOARD-1` SB-2 carry on their own until now (2026-11-28) | one planted break per link type is refused for an agent and previewed for a person; a five-edit set applies or fails as one |
 | **SC-3 Hygiene** | H4, H5, A1, A2 | the 22 duplicate groups and every differing `columns` list are reported; provenance present on every new component |
 | **SC-4 Simplify** | S1, S2, S3, I4, I5, A3, A4 | a rename touches one file and the Space loads identically; preview time within the SC-0 budget |
 

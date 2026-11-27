@@ -56,14 +56,14 @@ const KIND = {
     reconciliation: 'Reconciliation', query: 'Query', 'nav-menu': '`nav-menus.toon`',
     'schema-file': '`*_schema.toon` file', component: 'registry component', connection: 'Connection',
     store: 'store', file: 'file', 'job-template': '`*_job_template.toon`', 'pipeline-file': '`*_pipeline.toon` file',
-    directory: 'directory', signal: 'signal', column: 'column',
+    directory: 'directory', 'signal-type': 'Signal Type', column: 'column',
 };
 const TYPE = {
     ID: 'id', ID_LIST: 'id, or a comma list of ids', PATH: 'path', STORE: 'store name', COLUMN: 'column name',
     SQL_RELATION: 'SQL relation', SQL_COLUMN: 'SQL column', TEXT: 'text',
 };
-const CHECK = { LOAD: 'load', RUN: 'run', DELETE: 'delete 409', RENAME: 'rename', IMPACT: 'impact', VALIDATE: 'validate', IMPORT: 'import' };
-const CHECK_ORDER = ['LOAD', 'RUN', 'DELETE', 'RENAME', 'IMPACT', 'VALIDATE', 'IMPORT'];
+const CHECK = { LOAD: 'load', RUN: 'run', DELETE: 'delete 409', RENAME: 'rename', IMPACT: 'impact', VALIDATE: 'validate', IMPORT: 'import', SAVE: 'save' };
+const CHECK_ORDER = ['LOAD', 'RUN', 'DELETE', 'RENAME', 'IMPACT', 'VALIDATE', 'IMPORT', 'SAVE'];
 const kind = (k) => KIND[k] ?? `\`${k}\``;
 
 export function renderTable(links) {
