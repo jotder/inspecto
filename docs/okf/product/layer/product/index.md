@@ -41,6 +41,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `ADD-DATA-ENTRY-1` | P3 | feature | Add data has no entry in the main navigation: once a Space has a Dataset, the screen is reached by dropping a file on Home or the Catalog… | — |
 | — | P3 | defect | COMPONENT-DELETE-IN-USE-WORDS-1 the Components screen words every refused delete as "referenced by a pipeline" | — |
 | `BI-INSIGHTS-1` | P2 | feature | Advanced insights on business data in Widgets and Dashboards, authored and tuned as Insight Profiles. | — |
+| `INSIGHT-LANGUAGE-FOLLOWUPS-1` | P3 | chore | Loose ends of the Dashboard Brief and Ask the Dashboard (filed 2026-11-27, BI-INSIGHTS-1 P4 BR-5). | — |
 | `SPACE-TO-APP-CONSOLE-1` | P3 | feature | Turn a working Space into a Space Template, and into an App, from the console. | — |
 | `APPS-UPGRADE-CONSOLE-1` | P3 | feature | Apps, a Space's template upgrade and the audit-chain check have no console: | — |
 | `ASSISTANT-SCREEN-HELP-1` | P3 | feature | The Assistant explains the screen or Widget a user is on | operator |

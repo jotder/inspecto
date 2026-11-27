@@ -7,7 +7,7 @@ timestamp: 2026-11-26T00:00:00Z
 item: module.insights
 audience: internal
 status: current
-verified: 2026-11-26 code-reviewed
+verified: 2026-11-27 code-reviewed
 code: features/inspecto-insights
 ---
 
@@ -75,3 +75,31 @@ Incidents and Cases permission (and Incident work, for a request).
 
 No Insights yet? Add an `insight.scan` Job on the **Jobs** screen with the parameter `profile` set to the Profile's
 id, and run it.
+
+## Dashboard Brief
+
+A **Dashboard Brief** is the top Insights of one Insight Profile's latest scan in plain sentences: elevated or high band, best score
+first, at most five, each with a link to the Insight. Add an **Insight Brief** Widget to a Dashboard and pick the Profile (it is offered
+where Business Insights is installed). It works in **every edition**, Basic included: the sentences are the ones stored with each
+Insight. When nothing is unusual it says "Nothing unusual in *period*"; when the last scan is old it says "Last scan was *n* days ago";
+when no scan has run it tells you to run the `insight.scan` Job.
+
+**Narrate** (Standard and up, where AI Assist is installed) rewrites the Brief as a short paragraph above the lines. Each sentence names
+the Insight it is about, and the figures in it are filled in by the server from that Insight — the model never writes a number. A sentence
+that fails a check is replaced by the stored one and marked *Template*. The result is shown, not saved. Without AI Assist the button is
+absent.
+
+**Privacy.** A Brief never shows a classified value: Insights are stored with the Space alias. Values that are **not** classified (region,
+product…) **are sent to the configured model provider** when you press Narrate.
+
+**In a Report PDF.** Put the Brief Widget's id in a Report Job's `widgets:`; its page is drawn at that position (first in the list = first
+page). The Job reads the Insights as its author, so an author who may not view the Profile fails the run with a message. The footer reads
+"Templated from the stored Insights" or "Model-written, checked against the Insights". A public share has no Brief.
+
+## Ask the Dashboard
+
+On the Dashboard editor, type a question about a Dataset you may view. It only **drafts**: you get a draft Widget and a one-line caption,
+previewed live with your own rights; nothing is saved by itself. **Save** goes through the same gated route as any Widget, so a Pending
+Change policy still asks for approval. A question it cannot express (an unknown column or value, a masked column, a Measure it does not
+allow) is refused in words. A filter or window in your question is not part of the draft Widget, and the box says so. The box appears only
+where the intelligence feature is reported, which no build does yet (architecture page § 7.5).

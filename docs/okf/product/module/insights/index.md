@@ -37,4 +37,5 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `BI-INSIGHTS-1` | P2 | feature | Advanced insights on business data in Widgets and Dashboards, authored and tuned as Insight Profiles. | — |
 | `INSIGHT-PILOT-TELCO-RA-1` | P3 | defect | The telco-ra Business Insights pilot has no history to scan (filed 2026-11-27). | — |
 | `INSIGHT-CASE-EXISTING-1` | P3 | feature | An Insight can only open a NEW Case (filed 2026-11-26, BI-INSIGHTS-1 I-17). | demand |
+| `INSIGHT-LANGUAGE-FOLLOWUPS-1` | P3 | chore | Loose ends of the Dashboard Brief and Ask the Dashboard (filed 2026-11-27, BI-INSIGHTS-1 P4 BR-5). | — |
 | `WIDGETS-SPEC-SESSION-MOCK-1` | P3 | defect | widgets.component.spec.ts fails 11 of its tests on master (seen 2026-11-27, BR-3): TypeError: this.session.features is not a function at… | — |

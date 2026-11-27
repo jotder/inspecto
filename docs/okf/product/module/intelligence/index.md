@@ -34,5 +34,6 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `INSIGHT-LANGUAGE-FOLLOWUPS-1` | P3 | chore | Loose ends of the Dashboard Brief and Ask the Dashboard (filed 2026-11-27, BI-INSIGHTS-1 P4 BR-5). | — |
 | `ASSISTANT-SCREEN-HELP-1` | P3 | feature | The Assistant explains the screen or Widget a user is on | operator |
 | `AGENTIC-INVESTIGATION-1` | P2 | feature | An agent that works an Incident and proposes the next action for a human to approve: slices S2-S6 remain. | — |
