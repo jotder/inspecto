@@ -8597,6 +8597,20 @@
         "x-generated" : true
       }
     },
+    "/signals/types" : {
+      "get" : {
+        "tags" : [ "signals" ],
+        "summary" : "Signal Type catalog",
+        "operationId" : "getSignalsTypes",
+        "description" : "{types, count}: every Signal Type that can be posted in this Space (SIGNAL-BOARD-1), each with type (a dotted name or a prefix.* family), title, poster, fields [{name, kind, always, description}], since, source (core, module:<id> or pack:<file>) and fieldsDeclared (false for a Job Pack's emits). Gated on canAuthorWorkbench.",
+        "responses" : {
+          "default" : {
+            "description" : "Envelope-wrapped response (see #/components/schemas/Envelope); per-status schemas undocumented."
+          }
+        },
+        "x-generated" : true
+      }
+    },
     "/jobs/{jobId}/runs/{runId}/diff/{diffId}" : {
       "get" : {
         "tags" : [ "jobs" ],
@@ -13532,7 +13546,7 @@
         ],
         "responses" : {
           "200" : {
-            "description" : "Envelope-wrapped: data = {profiles[{profile, runId, runAt, period, header, stale, note?, summary?, lines[{insightId, band, score, sentence, type, dimension, slice, period, value, expected, delta, link, query}]}]}. A Profile never scanned, in a list of several, is an entry with a note naming the insight.scan Job and no lines."
+            "description" : "Envelope-wrapped: data = {profiles[{profile, runId, runAt, period, header, stale, note?, summary?, lines[{insightId, band, score, sentence, type, measure, dimension, slice, period, value, expected, delta, link, query}]}]}. A Profile never scanned, in a list of several, is an entry with a note naming the insight.scan Job and no lines."
           },
           "404": {
             "description" : "A single requested Profile that is visible but has never been scanned (words name the insight.scan Job)."
@@ -13542,6 +13556,61 @@
           },
           "503" : {
             "description" : "No Space write root, or the Business Insights module is not installed."
+          }
+        }
+      }
+    },
+    "/insights/brief/narrate" : {
+      "post" : {
+        "tags" : [
+          "insights"
+        ],
+        "summary" : "Narrate a Dashboard Brief",
+        "operationId" : "narrateInsightBrief",
+        "description" : "BI-INSIGHTS-1 P4 (BR-2), needs AI Assist (the insight-brief capability). Builds the same Brief as GET /insights/brief AS THE CALLER (a Profile the caller may not view is omitted) and asks the narrator; any evidence in the body is ignored. A narration is cached per (Profile, run_id, max, cited Insights) and served only after the caller's view check, so one scan reads identically; a Profile answered without a model is not cached. Standard rate-limit bucket.",
+        "requestBody" : {
+          "required" : true,
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "type" : "object",
+                "required" : [
+                  "profiles"
+                ],
+                "properties" : {
+                  "profiles" : {
+                    "type" : "array",
+                    "maxItems" : 5,
+                    "items" : {
+                      "type" : "string"
+                    }
+                  },
+                  "max" : {
+                    "type" : "integer",
+                    "minimum" : 1,
+                    "maximum" : 10,
+                    "default" : 5
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses" : {
+          "200" : {
+            "description" : "Envelope-wrapped: data = {brief: {profiles[...]} as GET /insights/brief, narration: {mode: model|templated, profiles[{profile, runId, sentences[{n, text, cites[], source: model|template}], modelBacked, repaired, reason?}]}}."
+          },
+          "404" : {
+            "description" : "A single requested Profile that is visible but has never been scanned."
+          },
+          "422" : {
+            "description" : "No 'profiles', more than 5, or 'max' outside 1-10."
+          },
+          "429" : {
+            "description" : "Rate limit exceeded."
+          },
+          "503" : {
+            "description" : "AI Assist is not installed (CAPABILITY_UNAVAILABLE), or no Space write root."
           }
         }
       }

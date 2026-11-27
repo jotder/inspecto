@@ -86,6 +86,7 @@ final class JobTypeRegistry {
             throw new IllegalStateException("duplicate job type id '" + provider.id() + "'");
         owners.put(provider.id(), owner);
         sources.put(provider.id(), source);
+        if (owner != null) com.gamma.signal.SignalPostCheck.packDeclared(provider.descriptor().emits());
     }
 
     /** One type's provenance, if registered. */

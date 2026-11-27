@@ -278,6 +278,9 @@ public final class CapabilityManifest {
             // ScreeningRoutes (SCREENING-1) — deciding a Screening Hit is working a triage item (SCR-D13).
             new Entry("POST", "/screening/hits/([^/]+)/decide", Roles.CAN_WORK_INCIDENTS),
             new Entry("GET", "/screening/hits/([^/]+)/reveal", Roles.CAN_REVEAL_LINK_ENTITIES),
+            // SignalRoutes (SIGNAL-BOARD-1 SB-1a) — the Signal Type catalog feeds the Job form's on_signal pick list, so it
+            // is read by whoever authors Jobs. The ledger reads (/signals, /signals/tree, ...) stay Space-access only.
+            new Entry("GET", "/signals/types", Roles.CAN_AUTHOR_WORKBENCH),
             // EnrichmentRoutes
             new Entry("POST", "/enrichment", Roles.CAN_AUTHOR_WORKBENCH),
             // SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1: the preview executes the draft's transform — authoring, not a read.
@@ -631,6 +634,7 @@ public final class CapabilityManifest {
                     "gated IN the handler: canAuthorWorkbench for an operational (ops:*) group — the control-plane DB, the rows the anomaly_scan / suggest_expectations agent tools read; business-store SQL stays open as read-shaped (SqlGuard-checked) because Viewer dashboards read Dataset rows through it. GET /db/table carries the same in-handler gate. Invisible to the route-gating scanners — pinned by ControlApiDbBrowserTest"),
             new Exemption("POST", "/bi/query", "read-shaped", "a Measure query; the body is the query spec"),
             // BI-INSIGHTS-1 loose ends B (operator 2026-11-26): Explain and feedback are for anyone who can view.
+            new Exemption("POST", "/insights/brief/narrate", "read-shaped", "Narrate a Dashboard Brief (inspecto-insights, BI-INSIGHTS-1 P4 BR-2): builds the Brief AS THE CALLER (each Profile by the caller's view of insights_<profile>, hidden ones omitted) and never reads evidence from the body; persists nothing (a narration cache keyed by Profile and run_id, served only after the view check); 503 without AI Assist; standard rate-limit bucket - pinned by ControlApiInsightBriefNarrateTest"),
             new Exemption("POST", "/insights/explain", "read-shaped", "Explain this change (inspecto-insights): runs only /bi/query-shaped statements as the caller, so the Widget's Dataset visibility and masking decide (404 for a Dataset the caller cannot view); persists nothing; standard rate-limit bucket - pinned by ControlApiExplainTest"),
             new Exemption("POST", "/insights/([^/]+)/([^/]+)/feedback", "self-service", "records the CALLER's own opinion of one Insight (useful / not useful / expected, stamped with the caller as actor) in the Profile's feedback store; a caller who cannot view the insights_<profile> Dataset gets the 404 of an unknown Profile, so no capability could add anything - pinned by ControlApiInsightsTest"),
             // AGENT-KIT-1 AK-1 (2026-11-20): the MCP endpoint of the optional inspecto-mcp module. Every MCP Tool is an

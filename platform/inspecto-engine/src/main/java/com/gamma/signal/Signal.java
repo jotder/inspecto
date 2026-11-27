@@ -28,6 +28,10 @@ public record Signal(String signalId, String type, Instant at, Severity severity
                      Ref subject, String correlationId, String causationId, String space,
                      Ref actor, String message, Map<String, Object> payload, int schemaVersion) {
 
+    // Tests only (-Dsignals.checkFields=true, SIGNAL-BOARD-1 §11.3): every Signal posted to a ledger must fit the
+    // Signal Type catalog. Every posting builds a Signal first, so loading this class is the moment to arm it.
+    static { SignalPostCheck.install(); }
+
     /** Fills framework-stamped defaults: a random {@code signalId} when absent, {@code at = now},
      *  {@code severity = INFO}, {@code message = type}, an empty {@code payload}, {@code schemaVersion = 1}. */
     public Signal {

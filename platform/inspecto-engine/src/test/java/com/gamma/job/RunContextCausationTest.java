@@ -36,7 +36,7 @@ class RunContextCausationTest {
         EventLog.current().installStore(store);
 
         ctx("corr-1", "sig-parent").signals()
-                .emit("job.run.started", Severity.INFO, Map.of("job", "loader"));
+                .emit("job.run.started", Severity.INFO, Map.of("job", "loader", "run", "r1", "trigger", "manual"));
 
         // 🔴 Filter by THIS test's correlation id, not by type alone. `EventLog.current().installStore` swaps
         // a process-wide store, and `JobService` emits `job.run.started` in production code — so background
@@ -70,7 +70,7 @@ class RunContextCausationTest {
         InMemoryEventStore store = new InMemoryEventStore();
         EventLog.current().installStore(store);
 
-        ctx("r1", null).signals().emit("job.run.started", Severity.INFO, Map.of("job", "loader"));
+        ctx("r1", null).signals().emit("job.run.started", Severity.INFO, Map.of("job", "loader", "run", "r1", "trigger", "manual"));
 
         // Same isolation as above — `findFirst()` on the type alone could pick up another class's emission
         // and assert against the wrong signal. It had not failed yet; that is luck, not coverage.

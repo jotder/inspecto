@@ -2,7 +2,11 @@ package com.gamma.insights;
 
 import com.gamma.access.ComponentAccess;
 import com.gamma.access.WriteGates;
+import com.gamma.assist.AssistRequest;
+import com.gamma.assist.AssistResult;
+import com.gamma.assist.spi.AssistAgent;
 import com.gamma.control.BiSpecRunner;
+import com.gamma.control.HostContext;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.spi.auth.ApiException;
@@ -48,6 +52,9 @@ public final class InsightsRoutes implements RouteModule {
     public void register(ApiContext api) {
         api.get("/insights", (e, m) -> feed(api, e));
         api.get("/insights/brief", (e, m) -> brief(api, e));
+        // No capability: read-shaped like GET /insights/brief (the caller's own view decides); the narrator's cost is the
+        // standard rate-limit bucket (ControlApi.isRateLimited) and AI Assist being installed.
+        api.post("/insights/brief/narrate", (e, m) -> narrate(api, e, api.body(e)));
         api.post("/insights/preview", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> preview(api, e, api.body(e))));
         // Anyone who may view insights_<profile> (operator 2026-11-26): the caller's own opinion, a self-service write.
@@ -145,6 +152,11 @@ public final class InsightsRoutes implements RouteModule {
             }
             if (max < 1 || max > InsightBrief.CAP) throw bad("'max' must be 1-" + InsightBrief.CAP);
         }
+        return Map.of("profiles", briefOf(api, ex, ids, max));
+    }
+
+    /** The selection of {@link #brief} for {@code ids}, as the caller: the one place the view check and the select live. */
+    private List<Map<String, Object>> briefOf(ApiContext api, HttpExchange ex, List<String> ids, int max) throws Exception {
         List<Map<String, Object>> profiles = new ArrayList<>();
         for (String id : ids) {
             Path dir;
@@ -165,7 +177,109 @@ public final class InsightsRoutes implements RouteModule {
                         + "' yet - no scan has run; run its insight.scan Job");
             profiles.add(InsightBrief.select(id.trim(), grainOf(api, id.trim()), rows, fb, max, Instant.now()));
         }
-        return Map.of("profiles", profiles);
+        return profiles;
+    }
+
+    /** Narrations kept per run (D-BI17): small, since an entry is a few sentences and a new run replaces the old one. */
+    private static final int CACHE_MAX = 64;
+    private final Map<String, Map<String, Object>> narrations = new LinkedHashMap<>(16, 0.75f, true) {
+        @Override protected boolean removeEldestEntry(Map.Entry<String, Map<String, Object>> eldest) {
+            return size() > CACHE_MAX;
+        }
+    };
+
+    /**
+     * {@code POST /insights/brief/narrate} {@code {profiles, max?}} (P4 BR-2): the Brief of {@link #brief}, built AS THE
+     * CALLER, narrated by the {@code insight-brief} capability. The body is never a source of evidence. No agent ⇒ 503;
+     * a Profile's narration is cached by (Profile, {@code run_id}, max, the cited Insights) once the caller's view of the
+     * Profile has been checked, so the same scan reads identically and costs one model call. A Profile whose model was
+     * unavailable is not cached (the next click may succeed). Per sentence {@code source} is {@code model|template}.
+     */
+    private Object narrate(ApiContext api, HttpExchange ex, Map<String, Object> body) throws Exception {
+        List<String> ids = new ArrayList<>();
+        if (body.get("profiles") instanceof List<?> l) for (Object o : l) ids.add(String.valueOf(o).trim());
+        else if (body.get("profiles") instanceof String s && !s.isBlank()) for (String p : s.split(",", -1)) ids.add(p.trim());
+        if (ids.isEmpty()) throw bad("'profiles' is required (a list of Insight Profile ids)");
+        if (ids.size() > InsightBrief.MAX_PROFILES) throw bad("'profiles' is at most " + InsightBrief.MAX_PROFILES);
+        int max = InsightBrief.DEFAULT_MAX;
+        if (body.get("max") != null) {
+            if (!(body.get("max") instanceof Number n) || n.intValue() < 1 || n.intValue() > InsightBrief.CAP)
+                throw bad("'max' must be 1-" + InsightBrief.CAP);
+            max = n.intValue();
+        }
+        AssistAgent agent = HostContext.of(api).service().assistAgent().orElseThrow(() -> new ApiException(503,
+                ErrorCodes.CAPABILITY_UNAVAILABLE, "AI Assist is not installed"));
+
+        List<Map<String, Object>> briefs = briefOf(api, ex, ids, max);   // the view check: a hidden Profile is gone here
+        List<Map<String, Object>> narrated = new ArrayList<>();
+        boolean anyModel = false;
+        for (Map<String, Object> p : briefs) {
+            Map<String, Object> n = narrateProfile(api, agent, p, max);
+            anyModel |= Boolean.TRUE.equals(n.get("modelBacked"));
+            narrated.add(n);
+        }
+        Map<String, Object> narration = new LinkedHashMap<>();
+        narration.put("mode", anyModel ? "model" : "templated");
+        narration.put("profiles", narrated);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("brief", Map.of("profiles", briefs));
+        out.put("narration", narration);
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> narrateProfile(ApiContext api, AssistAgent agent, Map<String, Object> p, int max) {
+        String profile = String.valueOf(p.get("profile"));
+        List<Map<String, Object>> lines = p.get("lines") instanceof List<?> l ? (List<Map<String, Object>>) l : List.of();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("profile", profile);
+        out.put("runId", p.get("runId"));
+        if (lines.isEmpty()) {
+            out.put("sentences", List.of());
+            out.put("modelBacked", false);
+            out.put("repaired", false);
+            return out;
+        }
+        String key = api.dataRoot() + "|" + profile + "|" + p.get("runId") + "|" + max + "|"
+                + lines.stream().map(x -> String.valueOf(x.get("insightId"))).toList();
+        synchronized (narrations) {
+            Map<String, Object> hit = narrations.get(key);
+            if (hit != null) return hit;
+        }
+        Map<String, Object> reply = Map.of();
+        String reason = null;
+        try {
+            AssistResult r = agent.assist(new AssistRequest("insight-brief", Map.of(),
+                    Map.of("profile", profile, "evidence", lines), null));
+            if (r.status() == AssistResult.Status.OK) reply = r.data();
+            else reason = r.message() == null ? "no narrator" : r.message();
+        } catch (RuntimeException e) {
+            reason = "narration failed";
+        }
+        boolean model = Boolean.TRUE.equals(reply.get("modelBacked"));
+        out.put("sentences", reply.get("sentences") instanceof List<?> s && !s.isEmpty() ? s : templated(lines));
+        out.put("modelBacked", model);
+        out.put("repaired", Boolean.TRUE.equals(reply.get("repaired")));
+        if (reason == null) reason = reply.get("reason") instanceof String s ? s : null;
+        if (reason != null) out.put("reason", reason);
+        if (model) synchronized (narrations) {
+            narrations.put(key, out);
+        }
+        return out;
+    }
+
+    /** The Brief's own sentences in the narration's shape, for a Profile the narrator could not answer. */
+    private static List<Map<String, Object>> templated(List<Map<String, Object>> lines) {
+        List<Map<String, Object>> out = new ArrayList<>();
+        for (Map<String, Object> l : lines) {
+            Map<String, Object> s = new LinkedHashMap<>();
+            s.put("n", out.size() + 1);
+            s.put("text", "[" + (out.size() + 1) + "] " + l.get("sentence"));
+            s.put("cites", List.of(String.valueOf(l.get("insightId"))));
+            s.put("source", "template");
+            out.add(s);
+        }
+        return out;
     }
 
     /** The Profile's grain (what "stale" is measured in); {@code day} when the Profile no longer resolves. */

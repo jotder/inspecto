@@ -410,7 +410,7 @@ class ControlApiConsignmentTrailTest {
                     Map.of()))));
             c.svc.eventLog().emit(new Signal(null, "pipeline.batch.failed", Instant.now(), Severity.ERROR,
                     Ref.of("pipeline", "cdr_rollup"), null, "c-mask", null, null, null,
-                    "commit failed: password=hunter2", Map.of(), 1).toEvent());
+                    "commit failed: password=hunter2", Map.of("dryRun", false, "status", "FAILED", "durationMs", 0L), 1).toEvent());
 
             JsonNode body = trail(c.port, "c-mask");
             JsonNode signals = body.get("signals");

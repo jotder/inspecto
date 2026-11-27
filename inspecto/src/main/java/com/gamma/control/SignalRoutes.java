@@ -49,6 +49,25 @@ final class SignalRoutes implements RouteModule {
         api.get("/signals/count", (e, m) -> count(api, e));
         api.get("/signals/tree", (e, m) -> signalTree(api, e));
         api.get("/signals/stream", (e, m) -> stream(api, e));
+        // SIGNAL-BOARD-1 SB-1a: what can be posted - the Signal Types and their payload fields; the Job form's pick list.
+        api.get("/signals/types", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> types(api)));
+    }
+
+    /**
+     * {@code GET /signals/types} -> {@code {types, count}}: every Signal Type of this Space (SIGNAL-BOARD-1 §11.3) with
+     * its {@code title}, {@code poster}, {@code fields}, {@code since}, {@code source} ({@code core}, {@code module:<id>},
+     * {@code pack:<file>}) and {@code fieldsDeclared} (false for a Job Pack's emit). Bounded by the installed code.
+     */
+    private Object types(ApiContext api) {
+        com.gamma.signal.SignalTypeCatalog catalog = HostContext.of(api).service().jobService()
+                .map(com.gamma.job.JobService::signalTypeCatalog)
+                .orElseGet(com.gamma.signal.SignalTypeCatalog::installed);
+        List<Map<String, Object>> types = catalog.entries().stream()
+                .map(com.gamma.signal.SignalTypeCatalog.Entry::toMap).toList();
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("types", types);
+        out.put("count", types.size());
+        return out;
     }
 
     /**

@@ -150,7 +150,11 @@ class ControlApiDatasetFreshnessTest {
                     null, type, java.time.Instant.ofEpochMilli(ts), com.gamma.signal.Severity.INFO,
                     com.gamma.signal.Ref.of("dataset", "xdr"), com.gamma.signal.Ref.of("dataset", "xdr"),
                     null, null, null, null, type,
-                    Map.of("dataset", "xdr", "job", "xdr-index", "result", "BUILT"), 1).toEvent();
+                    // each type's real payload shape (the post-time check, SIGNAL-BOARD-1 SB-1a)
+                    com.gamma.signal.DatasetWriteSignal.TYPE.equals(type)
+                            ? Map.of("dataset", "xdr", "rows", 10L, "at", java.time.Instant.ofEpochMilli(ts).toString())
+                            : Map.of("dataset", "xdr", "job", "xdr-index", "result", "BUILT", "edges", 0, "nodes", 0, "deltas", 0),
+                    1).toEvent();
             com.gamma.event.EventLog.current().emit(signal.apply(com.gamma.signal.DatasetWriteSignal.TYPE, now - 2 * 3_600_000L));
             JsonNode lag = V1Body.of(get(c.port, "/datasets/xdr/freshness").body()).get("verdicts").get(0);
             assertEquals("index-lag", lag.get("kind").asText());

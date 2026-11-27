@@ -185,6 +185,18 @@ public final class EventLog implements EventSink {
     private static final CopyOnWriteArrayList<java.util.function.BiConsumer<EventLog, Event>> TAPS =
             new CopyOnWriteArrayList<>();
 
+    /**
+     * A test-only check run on every event BEFORE it is recorded, on every log (SIGNAL-BOARD-1 §11.3). Unlike a tap it
+     * may throw, and the throw reaches the poster: that is its purpose. Installed by {@code com.gamma.signal.Signal}
+     * only when {@code -Dsignals.checkFields=true}; {@code null} (the default, and production) costs one read.
+     */
+    private static volatile Consumer<Event> postCheck;
+
+    /** Install (or, with {@code null}, remove) the test-only {@link #postCheck}. */
+    public static void postCheck(Consumer<Event> check) {
+        postCheck = check;
+    }
+
     /** Install a process-wide tap (idempotent for the same instance). */
     public static void addTap(java.util.function.BiConsumer<EventLog, Event> tap) {
         if (tap != null) TAPS.addIfAbsent(tap);
@@ -325,9 +337,12 @@ public final class EventLog implements EventSink {
                 e.message(), attrs, e.payload());
     }
 
-    /** Append one event and bump the {@code inspecto_events_total{level,type}} counter. Never throws. */
+    /** Append one event and bump the {@code inspecto_events_total{level,type}} counter. Never throws, except through
+     *  the test-only {@link #postCheck}. */
     public void emit(Event event) {
         if (event == null) return;
+        Consumer<Event> check = postCheck;
+        if (check != null) check.accept(event);
         if (discard) {
             long now = System.currentTimeMillis(), last = lastDropNotice.get();
             if (now - last >= 60_000 && lastDropNotice.compareAndSet(last, now))

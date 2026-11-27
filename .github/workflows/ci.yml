@@ -310,6 +310,12 @@ jobs:
       - name: Guard — every extension point honours the signed entitlement
         run: node tools/check-entitled-loaders.mjs && node --test tools/check-entitled-loaders.test.mjs
 
+      # Signal Type name guard (SIGNAL-BOARD-1 SB-1a, 2026-11-27). Every Signal Type is declared with its payload fields by
+      # a SignalTypeProvider (CoreSignalTypes, one per module). This fails on a dotted literal passed straight as the type
+      # of new Signal(...), emit(..., Severity.X, ...) or emitSignal(...) in main code that no provider declares.
+      - name: Guard — every literal Signal type is declared by a provider
+        run: node tools/check-signal-types.mjs && node --test tools/check-signal-types.test.mjs
+
       # Product guard (PRODUCT-ASSEMBLY-1 PA-1, 2026-11-10). products/, apps/ and industries/ name Offerings, Add-ons,
       # Space Templates, Industry packs and Angular projects; this fails when a name does not resolve, when a required
       # App's Add-ons are missing from an edition the Product lists, when an App serves another Industry, when a

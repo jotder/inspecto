@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-495 test class(es): 197 unit, 298 real-HTTP control-plane, 0 IT.
+496 test class(es): 197 unit, 299 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -288,6 +288,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiShareTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiShareTest.java` | BI-6 public dashboard sharing, every gate: disabled-by-default 503, issue + anonymous resolve, <!-- vocab-allow: quoted Javadoc --> |
 | `ControlApiSignalsStreamTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSignalsStreamTest.java` | Integration test for the SSE live-push counterpart to {@code GET /signals} |
 | `ControlApiSignalsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSignalsTest.java` | {@code GET /signals} over real HTTP: a failing Job run emits {@code job.run.started} (INFO) and |
+| `ControlApiSignalTypesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSignalTypesTest.java` | {@code GET /signals/types} (SIGNAL-BOARD-1 SB-1a) over real HTTP with an armed Authenticator: 401 without a |
 | `ControlApiSinkDuckLakeSharedTableTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSinkDuckLakeSharedTableTest.java` | Two {@code sinks[]} destinations registering into ONE DuckLake table |
 | `ControlApiSnapshotExportTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSnapshotExportTest.java` | A Postgres snapshot's Run now, redesigned 2026-11-05 (operator): EXPORT the table into a temporary folder under the data |
 | `ControlApiSpaceAdmissionTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiSpaceAdmissionTest.java` | Space admission over real HTTP ({@code LA-FULL-CYCLE-TEST-1} finding 32, decision D5; the rule is |

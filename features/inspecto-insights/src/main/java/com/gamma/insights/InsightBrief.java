@@ -84,6 +84,7 @@ final class InsightBrief {
         l.put("score", r.get("score"));
         l.put("sentence", sentence(r));
         l.put("type", r.get("insight_type"));
+        l.put("measure", r.get("measure"));
         l.put("dimension", r.get("dimension"));
         l.put("slice", r.get("slice_value"));
         l.put("period", r.get("period"));

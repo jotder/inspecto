@@ -273,6 +273,7 @@ GET /signals	stored	signals(): Signal ledger rows with payloads written by other
 GET /signals/count	none	count + distinct dataset NAMES (SignalRoutes.java:49)
 GET /signals/stream	stored	stream(): SSE of the same Signals; no masking (SignalRoutes.java:51)
 GET /signals/tree	none	signal type tree with counts (SignalRoutes.java:50)
+GET /signals/types	none	the Signal Type catalog: type names and declared payload fields from code, no ledger rows (SignalRoutes.java:53)
 GET /spaces	none	Space list, meta and templates (SpaceRoutes.java:68)
 GET /spaces/_meta	none	Space list, meta and templates (SpaceRoutes.java:80)
 GET /spaces/templates	none	Space list, meta and templates (SpaceRoutes.java:85)

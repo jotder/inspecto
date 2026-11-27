@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-439 test class(es): 439 unit, 0 real-HTTP control-plane, 0 IT.
+440 test class(es): 440 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -463,4 +463,5 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `PipelineConsignmentSignalTest` | `com.gamma.signal` | unit | `platform/inspecto-engine/src/test/java/com/gamma/signal/PipelineConsignmentSignalTest.java` | S1 (event-signal-backbone-plan §4.2): a terminal batch lands a canonical |
 | `SchemaDriftSignalTest` | `com.gamma.signal` | unit | `platform/inspecto-engine/src/test/java/com/gamma/signal/SchemaDriftSignalTest.java` | The REPORT half of {@code quality.schema.drift}: one {@code quality.schema_drift} WARN Signal per |
 | `SignalsTest` | `com.gamma.signal` | unit | `platform/inspecto-engine/src/test/java/com/gamma/signal/SignalsTest.java` | {@link Signals#query} filter logic over an {@link InMemoryEventStore} — the dotted-type glob, the |
+| `SignalTypeCatalogTest` | `com.gamma.signal` | unit | `platform/inspecto-engine/src/test/java/com/gamma/signal/SignalTypeCatalogTest.java` | SIGNAL-BOARD-1 SB-1a: the Signal Type catalog, the core declarations and the post-time check. |
 | `SignalTypeTest` | `com.gamma.signal` | unit | `platform/inspecto-engine/src/test/java/com/gamma/signal/SignalTypeTest.java` | Pins every emitted Signal type byte-for-byte: they are persisted and matched, so a rename is a data break. |

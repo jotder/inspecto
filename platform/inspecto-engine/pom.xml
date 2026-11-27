@@ -24,6 +24,11 @@
          below event. See fp-etl's/fp-event's/fp-acquire's poms for the rationale.) -->
     <artifactId>inspecto-engine</artifactId>
 
+    <properties>
+        <!-- SIGNAL-BOARD-1 SB-1a: every Signal a test posts must fit the Signal Type catalog (SignalPostCheck). -->
+        <signals.checkFields>true</signals.checkFields>
+    </properties>
+
     <dependencies>
         <!-- Extracted reactor leaves — version managed by the parent. -->
         <dependency>

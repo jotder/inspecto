@@ -18,6 +18,11 @@
          zero-new-dependency; the optional agent lives in a sibling module (inspecto-agent). -->
     <artifactId>inspecto-processor</artifactId>
 
+    <properties>
+        <!-- SIGNAL-BOARD-1 SB-1a: every Signal a test posts must fit the Signal Type catalog (SignalPostCheck). -->
+        <signals.checkFields>true</signals.checkFields>
+    </properties>
+
     <!-- Compiler/encoding/argLine properties and the compiler + surefire plugin config are
          inherited from the parent POM. Only the core-specific shade (fat-JAR) and the optional
          jacoco 'coverage' profile live here. -->
