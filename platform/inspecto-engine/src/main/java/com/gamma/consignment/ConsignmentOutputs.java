@@ -275,7 +275,8 @@ public final class ConsignmentOutputs {
 
     /**
      * The event-time day a file's rows belong to, read off the {@code year}/{@code month}/{@code day} segments of
-     * a Hive partition key ({@code null} when the partition scheme carries no such triple).
+     * a Hive partition key, or off one strict {@code yyyy-MM-dd} {@code ref_day} / {@code dt} / {@code record_day}
+     * segment (DATED-REFERENCE-RUNS-1) — {@code null} when the partition scheme carries neither.
      *
      * <p>⚠ <b>This is a write-time approximation, deliberately accepted for slice 2 and superseded by §10.1.</b>
      * The plan defines {@code record_day} as event time cut with the pipeline's <em>pinned</em> timezone (§5.6,
@@ -295,8 +296,8 @@ public final class ConsignmentOutputs {
      * is no single record day to state, so the partition derivation stands (and may itself be {@code null}).
      *
      * <p>⚠ <b>Read {@code bounds}, not this.</b> {@code record_day} is one day per file where bounds are a real
-     * interval, so it cannot express a straddling file at all. It is kept because it is in the schema and cheap,
-     * not because anything should prefer it — nothing in the engine reads it today.
+     * interval, so it cannot express a straddling file at all. Its one reader is the DATED-REFERENCE-RUNS-1 work
+     * ledger ({@code DbConsignmentOutputStore}), which buckets files by day.
      */
     static String recordDay(String partitionKey, EventTimeBounds bounds) {
         String fromBounds = sameDay(bounds);

@@ -157,8 +157,8 @@ depend on directory scan order. `DatasetRelation.temporalColumn` therefore has n
 path, and the general principle is: **a write path must read a declaration it already holds.**
 
 `record_day` is derived from these bounds when a file's event times share a day, else from the
-`year`/`month`/`day` partition segments. It is superseded — one day per file cannot express a file that
-straddles two — and nothing in the engine reads it.
+`year`/`month`/`day` partition segments or one strict `yyyy-MM-dd` `ref_day=` / `dt=` / `record_day=` segment. One
+day per file cannot express a file that straddles two; its one reader is the `DATED-REFERENCE-RUNS-1` work ledger.
 
 ## A.3 The Selector
 

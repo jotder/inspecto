@@ -902,6 +902,19 @@ interface ConsignmentIngestStrategy {
     }
 
     /**
+     * A member's origin as the Consignment manifest records it ({@code MemberEntry.originalRelPath}, written by
+     * {@code ConsignmentIngestor}): the original inbox path relative to {@code dirs.poll}, {@code archive!entry}
+     * for one entry of a multi-entry archive.
+     */
+    static String manifestOrigin(PipelineConfig cfg, java.io.File file) {
+        java.io.File src = com.gamma.etl.unpack.UnpackOrigins.originalOr(file);
+        if (cfg.dirs().poll() == null) return src.getName();
+        java.nio.file.Path poll = Paths.get(cfg.dirs().poll()).toAbsolutePath().normalize();
+        String rel = poll.relativize(src.toPath().toAbsolutePath().normalize()).toString().replace('\\', '/');
+        return com.gamma.etl.unpack.UnpackOrigins.totalFor(src) > 1 ? rel + "!" + file.getName() : rel;
+    }
+
+    /**
      * The write of a batch's survivors: ONE call named by {@link #consolidatedBaseName} when
      * {@code processing.output_per_member} is off (byte-identical to the old call), else one write per member,
      * each named by {@link #memberStem}, over that member's own rows (a copy of {@code table} filtered on
@@ -958,15 +971,23 @@ interface ConsignmentIngestStrategy {
 
     /**
      * Cross-batch output-name collision guard ({@code OUTPUT-NAME-OVERWRITE-1}): when {@code candidateBaseName}
-     * would write an output file that already exists in {@code dbDir} and belongs to an already-committed
-     * batch (either another batch, or an earlier committed execution of the same {@code batchId} under
-     * {@code on_change: reprocess}), disambiguate with {@code __<8 hex of batchId>} so the earlier output is
-     * never silently overwritten. An uncommitted retry of the same {@code batchId} (failover after crash
-     * before ack) keeps {@code candidateBaseName} so it overwrites its own partial output in place.
+     * would write an output file that already exists in {@code dbDir} and belongs to a committed batch of a
+     * DIFFERENT origin (e.g. {@code later/feed.csv} after {@code feed.csv}), disambiguate so the earlier file's
+     * output is never silently overwritten. A re-delivery of the SAME origin path (a re-run, or a corrected
+     * same-name day under {@code on_change: reprocess}) keeps the name and so REPLACES its own earlier output —
+     * the LA-DAILY-INGEST-1 owner call of 2026-10-14; accumulating would serve every row twice
+     * ({@code ENGINE-ETL-TESTS-RED-1}). A one-origin name is disambiguated by its origin's fingerprint, so that
+     * file's own re-delivery lands on the same disambiguated name; only a multi-origin name uses the batch id.
      */
     static String nonCollidingBaseName(String candidateBaseName, Consignment batch, PipelineConfig cfg, String dbDir) {
         if (candidateBaseName == null || batch == null || cfg == null || dbDir == null) return candidateBaseName;
-        if (!hasCommittedCollision(candidateBaseName, batch.batchId(), cfg, dbDir)) return candidateBaseName;
+        java.util.Set<String> origins = new java.util.HashSet<>();
+        for (Consignment.Member m : batch.members())
+            if (memberStem(cfg, m.file()).equalsIgnoreCase(candidateBaseName)) origins.add(manifestOrigin(cfg, m.file()));
+        if (!hasCommittedCollision(candidateBaseName, batch.batchId(), origins, cfg, dbDir)) return candidateBaseName;
+        if (origins.size() == 1)
+            return candidateBaseName + "__"
+                    + com.gamma.etl.FailureText.fingerprint(cfg, origins.iterator().next()).substring(3, 11);
         String tag = shortBatchTag(batch.batchId());
         String disambiguated = candidateBaseName + "__" + tag;
         int suffix = 2;
@@ -976,7 +997,7 @@ interface ConsignmentIngestStrategy {
         return disambiguated;
     }
 
-    private static boolean hasCommittedCollision(String candidateBaseName, String batchId,
+    private static boolean hasCommittedCollision(String candidateBaseName, String batchId, java.util.Set<String> origins,
                                                  PipelineConfig cfg, String dbDir) {
         boolean isUri = com.gamma.config.safety.PathJail.isUri(dbDir);
         if (!isUri && !stemExistsInDbDir(dbDir, candidateBaseName)) return false;
@@ -986,10 +1007,8 @@ interface ConsignmentIngestStrategy {
         java.nio.file.Path mDir = Paths.get(manifestsDir);
         if (!java.nio.file.Files.isDirectory(mDir)) return false;
 
-        // If this exact batchId already has a committed manifest (e.g. on_change: reprocess with identical
-        // byte size), re-running it is a new execution rather than an uncommitted crash-before-ack retry.
-        if (java.nio.file.Files.isRegularFile(mDir.resolve(batchId + ".json"))) return true;
-
+        // A committed manifest of this same batchId (or of another batch of the same origin) is a re-delivery of
+        // the same file: its output is this file's own, and is replaced.
         java.nio.file.Path dbRoot = isUri ? null : Paths.get(dbDir).toAbsolutePath().normalize();
         try (java.util.stream.Stream<java.nio.file.Path> files = java.nio.file.Files.list(mDir)) {
             for (java.nio.file.Path p : files.toList()) {
@@ -1000,6 +1019,9 @@ interface ConsignmentIngestStrategy {
                 try {
                     ConsignmentManifest m = ManifestStore.read(manifestsDir, otherId);
                     if (m.outputs == null) continue;
+                    if (m.members != null && m.members.stream()
+                            .anyMatch(me -> me.originalRelPath() != null && origins.contains(me.originalRelPath())))
+                        continue;   // same origin: a re-delivery, not a collision
                     for (ConsignmentManifest.OutputEntry oe : m.outputs) {
                         if (oe.outputFile() == null) continue;
                         if (isUri) {
