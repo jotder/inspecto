@@ -30,6 +30,8 @@ export interface ExplainRequest {
     at: string;
     dimensions: string[];
     related: ExplainMeasureWire[];
+    /** 1 (default) or 2: also the pairs of dimensions an Insight Profile's scan stored (plan §11.12). */
+    depth?: 1 | 2;
 }
 
 export const MAX_DIMENSIONS = 12;

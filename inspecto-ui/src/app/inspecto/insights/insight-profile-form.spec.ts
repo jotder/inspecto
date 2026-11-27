@@ -56,6 +56,20 @@ describe('insight-profile-form', () => {
         expect('calendar' in out).toBe(false);
     });
 
+    it('authors pairs and maxPairValues (depth 2): written only when pairs is on, the stored value round-trips', () => {
+        const a = insightProfileAttributes(true);
+        expect(a.find((x) => x.key === 'pairs')?.type).toBe('boolean');
+        const mp = a.find((x) => x.key === 'maxPairValues')!;
+        expect([mp.min, mp.max]).toEqual([10, 1000]);
+        expect(mp.dependsOn).toEqual({ key: 'pairs', equals: true });
+        const stored = { id: 'p', dimensions: ['a', 'b'], pairs: true, maxPairValues: 300 };
+        const init = insightProfileInitial(stored);
+        expect(init['pairs']).toBe(true);
+        expect(toInsightProfileContent('p', init, [], stored)).toMatchObject({ pairs: true, maxPairValues: 300 });
+        const off = toInsightProfileContent('p', { ...init, pairs: false }, [], stored);
+        expect('pairs' in off || 'maxPairValues' in off).toBe(false);
+    });
+
     it('names bands and slices in words', () => {
         expect(bandBadge('high')).toEqual({ tone: 'error', label: 'High' });
         expect(bandBadge('elevated').label).toBe('Elevated');
