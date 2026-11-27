@@ -307,7 +307,16 @@ Each computation compares its findings with the previous lock and emits, into th
 | Type | Level | Once per | Attributes |
 |---|---|---|---|
 | `CONFIG_LINK_BROKEN` | WARN | DANGLING link the previous lock did not hold (same file, key and value) | `space`, `path` (the linking file), `fromKind`, `fromName`, `key`, `toKind`, `target` |
-| `CONFIG_CHANGED_OUTSIDE` (the plan's `config.changed.outside`) | INFO | file this computation marked changed outside the server (§4), a removal included | `space`, `path`, `kind`, `id`, `change` (`added`, `modified`, `moved`, `removed`), `brokenLinks` (dangling links the file now holds) |
+| `CONFIG_CHANGED_OUTSIDE` (the plan's `config.changed.outside`) | INFO (WARN when not applied) | file this computation marked changed outside the server (§4), a removal included | `space`, `path`, `kind`, `id`, `change` (`added`, `modified`, `moved`, `removed`), `brokenLinks` (dangling links the file now holds), `applied` (Job files only, see below) |
+
+**Applying a Job file changed outside (SB-2c of `SIGNAL-BOARD-1`).** The scheduled computation hands the files it
+newly marked changed outside to the installed `SpaceLock.OutsideApplier` (the control plane's `OnDiskJobs`) before it
+emits. A live `*_job.toon` is applied through the API save path — `JobRoutes.parseJob` and
+`JobRoutes.refuseBeforeRegister`, then `JobService.upsertJob` / `removeJob` — with no restart. The outcome is the event's
+`applied` attribute: `applied: …`, `unchanged: …` (the Job already runs that config) or `not applied: <why>` (WARN; the
+running Job is unchanged). Because the lock computes only when asked, `OnDiskJobs` stats the Job files every 5 s
+(`-Djobs.ondisk.poll.seconds`, `0` = off) and asks for a computation when one changed. The close-time flush applies
+nothing. Test: `ControlApiOnDiskJobsTest`.
 
 A finding the previous lock already holds is never emitted again, so a steady Space emits nothing. With no previous
 lock (first boot, or a lock that does not verify) every broken link is new and nothing is marked outside. At most

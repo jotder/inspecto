@@ -358,6 +358,9 @@ public final class ControlApi implements AutoCloseable, HostContext {
         // SE-1b (D-SE12): both schedulers ask the activation check before an automatic run; it acts only in a Space
         // that opted in (links: refuse-activation, or an approval policy) and only on what the Space lock reports.
         com.gamma.pipeline.ActivationGate.install(activationCheck);
+        // SB-2c (SIGNAL-BOARD-1): a Job file changed on disk is applied through the API save path, no restart.
+        this.onDiskJobs = new OnDiskJobs(spaces, this);
+        com.gamma.service.SpaceLock.installApplier(onDiskJobs);
         // ASSURE-BI-PUBLICATION-1: publish.postgres runs as its author — Dataset sharing and canAdminister NOW.
         com.gamma.job.PostgresPublishJobType.installAuthority(publishAuthority);
         com.gamma.job.PostgresPublishJobType.installApprovalVerifier(publishVerifier);
@@ -380,6 +383,7 @@ public final class ControlApi implements AutoCloseable, HostContext {
 
     private final com.gamma.job.JobService.RunAuthority runAuthority = JobAuthority.runAuthority(this::writeRoot);
     private final com.gamma.pipeline.ActivationGate.Check activationCheck = ActivationHolds::reason;
+    private final OnDiskJobs onDiskJobs;
     private final com.gamma.job.PostgresPublishJobType.Authority publishAuthority = JobAuthority.publishAuthority(this::writeRoot);
 
     /**
@@ -547,6 +551,8 @@ public final class ControlApi implements AutoCloseable, HostContext {
         http.stop(SHUTDOWN_DRAIN_SECONDS);
         if (com.gamma.job.JobService.runAuthority() == runAuthority) com.gamma.job.JobService.installRunAuthority(null);
         if (com.gamma.pipeline.ActivationGate.installed() == activationCheck) com.gamma.pipeline.ActivationGate.install(null);
+        onDiskJobs.close();
+        if (com.gamma.service.SpaceLock.installedApplier() == onDiskJobs) com.gamma.service.SpaceLock.installApplier(null);
         if (com.gamma.job.PostgresPublishJobType.authority() == publishAuthority)
             com.gamma.job.PostgresPublishJobType.installAuthority(null);
         if (com.gamma.job.PostgresPublishJobType.approvalVerifier() == publishVerifier)
