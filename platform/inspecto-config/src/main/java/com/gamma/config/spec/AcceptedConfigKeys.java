@@ -189,8 +189,7 @@ public final class AcceptedConfigKeys {
      */
     public static final Set<String> ALERT_PARSER_ONLY = Set.of(
             "alert.dataset",   // BI-5 measure rule: the Dataset the Measure is read from
-            "alert.measure",   // BI-5 measure rule: count or agg(field)
-            "alert.when");     // the ledger-row scope filter
+            "alert.measure");  // BI-5 measure rule: count or agg(field)
 
     /**
      * The top-level blocks {@code EnrichmentConfig} reads that {@link ConfigSpecs#enrichment()} does
