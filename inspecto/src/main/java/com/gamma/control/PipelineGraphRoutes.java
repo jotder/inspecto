@@ -1245,7 +1245,17 @@ final class PipelineGraphRoutes implements RouteModule {
      */
     private PipelineGraph candidateGraph(ApiContext api, Map<String, Object> body) {
         if (body == null || !(body.get("pipeline") instanceof Map<?, ?>)) return null;
-        return parseAndValidateFlow(api, mapAt(body, "pipeline"));
+        PipelineGraph g = parseAndValidateFlow(api, mapAt(body, "pipeline"));
+        // DRYRUN-SAVE-NODE-MISMATCH-1: the save's node check too, so a node type the save refuses as UNSUPPORTED_NODE
+        // is refused here, with the same code and words, instead of seeding a green run. Only this check: the save's
+        // completeness refusals (NO_ACQUISITION, NO_PARSER, ...) stay save-only, because a dry run of a partial draft
+        // is how an author tries one Step before the rest exists.
+        List<PipelineCompileException.Refusal> unsupported = PipelineEditable.unsupportedNodes(g);
+        if (!unsupported.isEmpty())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "dry-run refused - the save would refuse "
+                    + "this draft: " + unsupported.stream()
+                    .map(r -> r.code() + " - node '" + r.nodeId() + "': " + r.message()).toList());
+        return g;
     }
 
     /**

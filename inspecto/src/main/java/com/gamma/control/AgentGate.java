@@ -390,6 +390,7 @@ final class AgentGate {
             "GET /recon/promoted", "it answers Break match keys unmasked",
             "GET /recon/([^/]+)/state", "it answers recorded Breaks with their key and side values unmasked",
             "GET /insights", "it answers stored Insight rows it cannot prove masked at read",
+            "GET /insights/brief", "it answers stored Insight sentences it cannot prove masked at read",
             "GET /screening/hits/([^/]+)/reveal", "it answers a screened subject's raw name and entry");
 
     /** {@link #ALLOWED} routes a machine agent may not call (D-AK2: never a run for a machine; D-AK10: nor the Space tests;

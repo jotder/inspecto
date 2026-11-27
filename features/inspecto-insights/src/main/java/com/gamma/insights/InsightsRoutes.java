@@ -47,6 +47,7 @@ public final class InsightsRoutes implements RouteModule {
     @Override
     public void register(ApiContext api) {
         api.get("/insights", (e, m) -> feed(api, e));
+        api.get("/insights/brief", (e, m) -> brief(api, e));
         api.post("/insights/preview", ApiContext.withCapability("canAuthorWorkbench",
                 (e, m) -> preview(api, e, api.body(e))));
         // Anyone who may view insights_<profile> (operator 2026-11-26): the caller's own opinion, a self-service write.
@@ -123,6 +124,58 @@ public final class InsightsRoutes implements RouteModule {
         out.put("total", shown.size());
         out.put("insights", shown.subList(0, Math.min(limit, shown.size())));
         return out;
+    }
+
+    /**
+     * The Dashboard Brief (P4 BR-0, {@link InsightBrief}) of up to {@link InsightBrief#MAX_PROFILES} Profiles. A Profile
+     * whose Insights Dataset the caller may not view is OMITTED (the others still answer); a lone Profile that was
+     * never scanned is the 404 in words, in a list it is an entry carrying that note.
+     */
+    private Object brief(ApiContext api, HttpExchange ex) throws Exception {
+        String raw = ApiContext.query(ex, "profiles");
+        if (raw == null || raw.isBlank()) throw bad("query parameter 'profiles' is required (a comma-separated list)");
+        List<String> ids = List.of(raw.split(",", -1));
+        if (ids.size() > InsightBrief.MAX_PROFILES) throw bad("'profiles' is at most " + InsightBrief.MAX_PROFILES);
+        int max = InsightBrief.DEFAULT_MAX;
+        if (ApiContext.query(ex, "max") != null) {
+            try {
+                max = Integer.parseInt(ApiContext.query(ex, "max"));
+            } catch (NumberFormatException e) {
+                max = -1;
+            }
+            if (max < 1 || max > InsightBrief.CAP) throw bad("'max' must be 1-" + InsightBrief.CAP);
+        }
+        List<Map<String, Object>> profiles = new ArrayList<>();
+        for (String id : ids) {
+            Path dir;
+            try {
+                dir = visibleStore(api, ex, id.trim());   // the one view check: 404 → omitted below
+            } catch (ApiException e) {
+                if (e.status == 404) continue;
+                throw e;
+            }
+            List<Map<String, Object>> rows = List.of();
+            Map<String, Map<String, Object>> fb = Map.of();
+            if (dir != null) synchronized (InsightStore.lock(dir)) {
+                rows = InsightStore.read(dir);
+                fb = InsightStore.feedback(dir);
+            }
+            if (rows.isEmpty() && ids.size() == 1)
+                throw new ApiException(404, ErrorCodes.NOT_FOUND, "no Insights for insight-profile '" + id.trim()
+                        + "' yet - no scan has run; run its insight.scan Job");
+            profiles.add(InsightBrief.select(id.trim(), grainOf(api, id.trim()), rows, fb, max, Instant.now()));
+        }
+        return Map.of("profiles", profiles);
+    }
+
+    /** The Profile's grain (what "stale" is measured in); {@code day} when the Profile no longer resolves. */
+    private static String grainOf(ApiContext api, String profile) {
+        try {
+            return new ComponentStore(WriteGates.requireWriteRoot(api, "Insights").resolve("registry"))
+                    .get(InsightProfile.KIND, profile).map(c -> String.valueOf(c.content().get("grain"))).orElse("day");
+        } catch (RuntimeException e) {
+            return "day";
+        }
     }
 
     /** ISO instants do not sort as text (".5Z" after ".55Z"), so compare them parsed. */

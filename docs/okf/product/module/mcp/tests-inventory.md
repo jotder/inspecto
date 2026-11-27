@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.mcp`](../../../../../product-map/module/mcp.toon).
 
-14 test class(es): 3 unit, 11 real-HTTP control-plane, 0 IT.
+15 test class(es): 4 unit, 11 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -37,5 +37,6 @@ mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest,ControlApiAgent
 | `ControlApiMcpProposeKindsTest` | `com.gamma.mcp` | real-HTTP control-plane test | `features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiMcpProposeKindsTest.java` | AK-2 widening plan W2 over real HTTP ({@code 2026-11-25-agent-kit-ak2-widening-plan.md} §3 W2, D-AK9): every kind that |
 | `ControlApiMcpTest` | `com.gamma.mcp` | real-HTTP control-plane test | `features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiMcpTest.java` | {@code POST /mcp} over real HTTP (AGENT-KIT-1 AK-1): the transport's refusals in order, both protocol eras, that |
 | `ControlApiMcpWriteToolsTest` | `com.gamma.mcp` | real-HTTP control-plane test | `features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiMcpWriteToolsTest.java` | The AK-2b write MCP Tools over real HTTP (AGENT-KIT-1, plan {@code 2026-11-20-agent-kit-ak2-plan.md} §4.4, D-AK1, D-AK3): |
+| `McpInstructionsTest` | `com.gamma.mcp` | unit | `features/inspecto-mcp/src/test/java/com/gamma/mcp/McpInstructionsTest.java` | The MCP server's {@code instructions} (AGENT-ANSWERS-WITHOUT-SERVER-1): they tell the agent to ask the server for |
 | `McpRoutesManifestParityTest` | `com.gamma.mcp` | unit | `features/inspecto-mcp/src/test/java/com/gamma/mcp/McpRoutesManifestParityTest.java` | The module's {@code module.toon} {@code provides.routes} must list EXACTLY the routes {@link McpRoutes} registers - |
 | `McpToolRoutesTest` | `com.gamma.mcp` | unit | `features/inspecto-mcp/src/test/java/com/gamma/mcp/McpToolRoutesTest.java` | Every MCP Tool's replayed route against the capability manifest (AGENT-KIT-1 AK-2b, plan §4.4 and §4.7): every |

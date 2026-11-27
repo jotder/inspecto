@@ -23,8 +23,13 @@ them: do the task you were given, then end your answer with one line naming what
 2. **Look at real rows.** `query_dataset` with a small `limit` (for example `SELECT * FROM <dataset> LIMIT 20`). The
    query is read-only and masked columns come back masked; never ask for them unmasked.
 3. **Draft the graph.** Read the resource `inspecto://shapes/pipeline` for the graph's fields and an example. Keep
-   the node ids readable; one Step per idea. For a derived Dataset (a join, a daily summary,
-   a pivot), follow the recipe page below rather than guessing Step names. When the person gives you a raw sample of a
+   the node ids readable; one Step per idea. Never guess a node type: one the save has no home for (there is no
+   `source.dataset` or `source.file`) is refused as `UNSUPPORTED_NODE`, by the dry run as well as by
+   `propose_change`. For a **derived Dataset** (a total per carrier, a join, a pivot) the shape's example is the
+   pattern: an `acquisition` node with `config: {connector: dataset, dataset: <source Dataset>}` (no parser), then
+   the Steps (`transform.summarize` with its group-by columns and measures such as `sum(cost_eur)`, `transform.join` with a
+   `reference`, `transform.matrix.pivot`), then a `sink.persistent` with a `database`. SQL over several Datasets at
+   once is a `sql.template` Job instead (`propose_change` `kind: job`; the recipe page below). When the person gives you a raw sample of a
    new feed, or the draft maps values, **preview the pieces first** with `preview_config` (skill
    `safe-config-change`, step 3): parse the sample, read the types the server suggests, check which rows a schema
    draft rejects, check the mapping rules. Nothing is written; fix the draft until each
