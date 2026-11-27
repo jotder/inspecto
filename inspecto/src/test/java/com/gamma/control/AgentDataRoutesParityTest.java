@@ -42,21 +42,28 @@ class AgentDataRoutesParityTest {
 
     private static final String SIMULATORS_PROOF = "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentSimulatorsTest.java";
 
+    private static final String RECON_PROOF = "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentReconReadsTest.java";
+
     /** Each data route → the test file (from the repo root) that proves it over real HTTP, and the text it probes it by. */
-    private static final Map<String, String> PROOF_FILE = Map.of(
-            "POST /db/query", "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentDataSeamTest.java",
-            "POST /inv/", "la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiAgentLinkAnalysisSeamTest.java",
+    private static final Map<String, String> PROOF_FILE = Map.ofEntries(
+            Map.entry("POST /db/query", "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentDataSeamTest.java"),
+            Map.entry("POST /inv/", "la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiAgentLinkAnalysisSeamTest.java"),
             // W6 group E: each module's own preview proof; both doors, the budget and the audit scan in ControlApiAgentAnalystPreviewsTest
-            "POST /risk-scores/preview", "features/inspecto-scoring/src/test/java/com/gamma/control/ControlApiRiskScoreTest.java",
-            "POST /anomaly-scores/preview", "features/inspecto-anomaly/src/test/java/com/gamma/anomaly/ControlApiAnomalyScoreTest.java",
-            "POST /screening/check", "features/inspecto-screening/src/test/java/com/gamma/control/ControlApiScreeningTest.java",
+            Map.entry("POST /risk-scores/preview", "features/inspecto-scoring/src/test/java/com/gamma/control/ControlApiRiskScoreTest.java"),
+            Map.entry("POST /anomaly-scores/preview", "features/inspecto-anomaly/src/test/java/com/gamma/anomaly/ControlApiAnomalyScoreTest.java"),
+            Map.entry("POST /screening/check", "features/inspecto-screening/src/test/java/com/gamma/control/ControlApiScreeningTest.java"),
             // D1 (W6 group D): the analytic reads
-            "POST /bi/query", "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentAnalyticReadsTest.java",
-            "POST /queries/([^/]+)/run", "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentAnalyticReadsTest.java",
+            Map.entry("POST /bi/query", "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentAnalyticReadsTest.java"),
+            Map.entry("POST /queries/([^/]+)/run", "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentAnalyticReadsTest.java"),
             // W6 group B: the simulators
-            "POST /decision-rules/([^/]+)/simulate", SIMULATORS_PROOF,
-            "POST /rule-templates/([^/]+)/simulate", SIMULATORS_PROOF,
-            "POST /enrichment/preview", SIMULATORS_PROOF);
+            Map.entry("POST /decision-rules/([^/]+)/simulate", SIMULATORS_PROOF),
+            Map.entry("POST /rule-templates/([^/]+)/simulate", SIMULATORS_PROOF),
+            Map.entry("POST /enrichment/preview", SIMULATORS_PROOF),
+            // D2 (W6 group D): the reconciliation reads
+            Map.entry("POST /recon/columns", RECON_PROOF),
+            Map.entry("POST /recon/run", RECON_PROOF),
+            Map.entry("POST /recon/breaks", RECON_PROOF),
+            Map.entry("POST /recon/rows", RECON_PROOF));
 
     private static final String MCP_PROOF = "features/inspecto-mcp/src/test/java/com/gamma/mcp/ControlApiAgentDataSeamTest.java";
     private static final String LA_PROOF = "la/inspecto-geo-link/src/test/java/com/gamma/control/ControlApiAgentLinkAnalysisSeamTest.java";

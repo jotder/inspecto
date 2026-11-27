@@ -85,6 +85,11 @@ read-shaped exemptions, like `POST /bi/query`: what guards them is the Dataset's
 - **Not covered yet (`RECON-STATE-READS-UNMASKED-1`):** `GET /recon/state`, `GET /recon/{id}/state`,
   `GET /recon/promoted` and the answer of `POST /recon/{id}/record` return recorded Break keys raw, and the two state
   reads do not ask `canView` of the Reconciliation.
+- **Agents (AGENT-KIT-1 W6 D2, 2026-11-27).** The four reads are open to every agent, a person's or a machine's (MCP Tool
+  `reconcile_preview`), masked exactly as above (an agent never reveals) and weighted in the agent budget (run and breaks
+  5, rows 2, columns 1). Each masking step above stamps the answer after the cache read, so an agent's answer whose copy
+  was not masked is withheld (500). Record, Break status and promote stay refused to agents; the state GETs were already.
+  As built: [spec-agent-data-seam.md § D2](../mcp/spec-agent-data-seam.md#d2--the-reconciliation-reads).
 
 ## Limits
 

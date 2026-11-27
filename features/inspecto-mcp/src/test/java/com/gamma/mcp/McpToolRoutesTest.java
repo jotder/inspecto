@@ -55,6 +55,11 @@ class McpToolRoutesTest {
                     calls.add(t.router().route(t.validate(new LinkedHashMap<>(Map.of("kind", kind, "body", Map.of())))));
                 continue;
             }
+            if (t.name().equals("reconcile_preview")) {   // W6 group D, D2: every reconciliation read
+                for (String step : McpTools.RECON_STEPS.keySet())
+                    calls.add(t.router().route(t.validate(new LinkedHashMap<>(Map.of("step", step, "body", Map.of())))));
+                continue;
+            }
             if (t.name().equals("operate_job_backlog")) {   // W7: every backlog action, a day for the per-day ones
                 for (Map.Entry<String, String> e : McpTools.JOB_BACKLOG_ACTIONS.entrySet()) {
                     Map<String, Object> a = new LinkedHashMap<>(Map.of("job", "nightly", "action", e.getKey()));
@@ -390,6 +395,28 @@ class McpToolRoutesTest {
         assertEquals("POST /screening/check", c.method() + " " + c.path());
         assertEquals("read-shaped", CapabilityManifest.exemptionFor("POST", "/screening/check").category());
         assertThrows(McpTools.BadArgs.class, () -> check.validate(new LinkedHashMap<>()), "the body is required");
+    }
+
+    /**
+     * W6 group D, D2: reconcile_preview only reads and replays each of the four reconciliation reads (exemptions), never the
+     * recon routes that persist or promote; the body is passed on as the route takes it.
+     */
+    @Test
+    void reconcilePreviewReplaysTheFourReconReadsOnly() {
+        McpTools.Tool t = McpTools.tool("reconcile_preview");
+        assertFalse(t.write());
+        assertEquals(java.util.Set.of("/recon/columns", "/recon/run", "/recon/breaks", "/recon/rows"),
+                java.util.Set.copyOf(McpTools.RECON_STEPS.values()));
+        for (Map.Entry<String, String> e : McpTools.RECON_STEPS.entrySet()) {
+            McpTools.Call c = t.router().route(t.validate(new LinkedHashMap<>(Map.of("step", e.getKey(),
+                    "body", Map.of("id", "r1", "key", Map.of("msisdn", "k1"))))));
+            assertEquals("POST " + e.getValue(), c.method() + " " + c.path());
+            assertTrue(new String(c.body(), java.nio.charset.StandardCharsets.UTF_8).contains("\"id\":\"r1\""));
+            assertNotNull(CapabilityManifest.exemptionFor("POST", e.getValue()), e.getValue() + " is an exemption");
+        }
+        assertThrows(McpTools.BadArgs.class, () -> t.validate(new LinkedHashMap<>(Map.of("step", "record", "body", Map.of()))),
+                "no step persists");
+        assertThrows(McpTools.BadArgs.class, () -> t.validate(new LinkedHashMap<>(Map.of("step", "run"))), "the body is required");
     }
 
     /** AGENT-NOTICE-PLANTED-1: list_comments only reads, and replays the one route whose masking

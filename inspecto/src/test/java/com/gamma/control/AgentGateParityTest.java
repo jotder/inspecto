@@ -88,7 +88,9 @@ class AgentGateParityTest {
             assertFalse(PendingChanges.REPLAYABLE.contains(key), key + " reaches the hold — it belongs in HELD");
             String where = m.get(key);
             if (where.startsWith("exempt:"))
-                assertTrue(Set.of("exempt:read-shaped", "exempt:self-service", "exempt:group-gated", "exempt:replay-gated").contains(where), key + " " + where);
+                assertTrue(Set.of("exempt:read-shaped", "exempt:self-service", "exempt:group-gated", "exempt:replay-gated").contains(where)
+                        // W6 D2: a recon day run computes and returns, persisting nothing (signed for agents, D-AK16)
+                        || "POST /recon/run".equals(key) && "exempt:stateless-compute".equals(where), key + " " + where);
             else gatedButAllowed.add(key);
         }
         // the four capability-gated writes the plan allows: an Action Request (held by its own design), the promotion
@@ -123,6 +125,26 @@ class AgentGateParityTest {
             assertEquals(AgentGate.Bucket.ALLOWED, bucket(key), key);
             assertFalse(AgentGate.PERSON_ONLY.contains(key), key);
         }
+    }
+
+    /**
+     * W6 group D, change D2 (signed design D-AK13, D-AK16, D-AK17): the four reconciliation reads are allowed to every agent —
+     * exemptions, none person-only — each a data route weighted by its cost (a day run 5, one key's rows 2, the column
+     * inventory 1); the two recon routes that persist and the promote stay out of the allowed bucket.
+     */
+    @Test
+    void theReconReadsAreAllowedToEveryAgentAsWeightedDataRoutes() {
+        Map<String, String> m = manifest();
+        assertEquals(Map.of("POST /recon/columns", 1, "POST /recon/run", 5, "POST /recon/breaks", 5, "POST /recon/rows", 2),
+                AgentGate.RECON_READS);
+        for (Map.Entry<String, Integer> e : AgentGate.RECON_READS.entrySet()) {
+            assertTrue(m.get(e.getKey()).startsWith("exempt:"), e.getKey() + " is an exemption: " + m.get(e.getKey()));
+            assertEquals(AgentGate.Bucket.ALLOWED, bucket(e.getKey()), e.getKey());
+            assertFalse(AgentGate.PERSON_ONLY.contains(e.getKey()), e.getKey());
+            assertEquals(e.getValue(), AgentGate.DATA_ROUTES.get(e.getKey()), e.getKey());
+        }
+        for (String persists : java.util.List.of("POST /recon/([^/]+)/record", "POST /recon/([^/]+)/breaks/status", "POST /recon/promote"))
+            assertNotEquals(AgentGate.Bucket.ALLOWED, bucket(persists), persists + " is not a read");
     }
 
     /**

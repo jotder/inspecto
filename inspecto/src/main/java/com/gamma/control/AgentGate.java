@@ -191,8 +191,8 @@ final class AgentGate {
      * W6 group E: score previews and the screening check, masked, weighted data routes); and the Space tests ({@code POST /tests/run}, W6
      * group C, D-AK10: a delegated person only, as a run): each case runs its Pipeline over the case folder's own files
      * into a JVM-temp scratch root deleted afterwards, with no batch commit, batch audit, provenance or Signal, and answers
-     * verdicts (counts, a checksum, a named column's min or max), never rows; and the simulators ({@link #SIMULATORS},
-     * W6 group B), each an agent data route.
+     * verdicts (counts, a checksum, a named column's min or max), never rows; the simulators ({@link #SIMULATORS},
+     * W6 group B) and the reconciliation reads ({@link #RECON_READS}, D2), each an agent data route.
      */
     static final Set<String> ALLOWED;
 
@@ -204,6 +204,21 @@ final class AgentGate {
      * saved query that names no Dataset runs no masking step and so is withheld from an agent (500).
      */
     static final Set<String> ANALYTIC_READS = Set.of("POST /bi/query", "POST /queries/([^/]+)/run");
+
+    /**
+     * The reconciliation reads (widening plan W6 group D, change D2 of the signed design, operator 2026-11-26: for every
+     * agent, a person's or a machine's; MCP Tool {@code reconcile_preview}) → their weight in the agent budget: the column
+     * inventory (names only, 1), a day's Board page and its Break sets (5 each: a day run), the rows behind one key (2).
+     * Each runs a saved Reconciliation or an inline one (D-AK16: ad-hoc allowed) over Datasets the caller may view, with a
+     * person's bounds (D-AK18), and masks every side as for a person without reveal, on a copy made after the shared answer
+     * cache is read ({@code ReconRoutes.Read}, which stamps it there). The raw {@code key} of the rows read is allowed
+     * (D-AK15). {@code /recon/{id}/record} and {@code /recon/{id}/breaks/status} persist and stay refused.
+     */
+    static final Map<String, Integer> RECON_READS = Map.of(
+            "POST /recon/columns", 1,
+            "POST /recon/run", 5,
+            "POST /recon/breaks", 5,
+            "POST /recon/rows", 2);
 
     static {
         Set<String> all = new java.util.HashSet<>(Set.of(
@@ -223,6 +238,7 @@ final class AgentGate {
         all.addAll(AUTHORING_PREVIEWS);
         all.addAll(ANALYST_PREVIEWS.keySet());
         all.addAll(ANALYTIC_READS);
+        all.addAll(RECON_READS.keySet());
         all.addAll(SIMULATORS.keySet());
         ALLOWED = Set.copyOf(all);
     }
@@ -241,8 +257,8 @@ final class AgentGate {
      * keyed by agent client and subject, and (b) answers 500 {@code masking not proven} instead of a 2xx answer no masking
      * step stamped ({@code com.gamma.util.AnswerMasking}). S0 lists {@code POST /db/query} and the Link Analysis reads that
      * answer entity ids or rows, and the masked value GETs ({@link #VALUE_GETS}); D1 adds {@link #ANALYTIC_READS}, group B
-     * {@link #SIMULATORS}, group E the analyst previews ({@link #ANALYST_PREVIEWS}, weights 5 and 2); D2 (recon) and
-     * {@code /lookups/test} join one change each.
+     * {@link #SIMULATORS}, group E the analyst previews ({@link #ANALYST_PREVIEWS}, weights 5 and 2), D2 the reconciliation
+     * reads ({@link #RECON_READS}); {@code /lookups/test} joins in its own change.
      */
     static final Map<String, Integer> DATA_ROUTES;
 
@@ -290,6 +306,7 @@ final class AgentGate {
         for (String r : VALUE_GETS) m.put(r, 1);
         m.putAll(ANALYST_PREVIEWS);
         m.putAll(SIMULATORS);
+        m.putAll(RECON_READS);
         DATA_ROUTES = Map.copyOf(m);
     }
 

@@ -13,6 +13,7 @@ import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
 import com.gamma.pipeline.ViewStore;
 import com.gamma.query.DatasetRelation;
+import com.gamma.util.AnswerMasking;
 import com.sun.net.httpserver.HttpExchange;
 
 import java.io.IOException;
@@ -108,7 +109,9 @@ public final class ReconRoutes implements RouteModule {
                 .map(id -> new ReconService.Side(id, relationSql(api, ex, store, writeRoot, id), null, null))
                 .toList();
         try {
-            return ReconService.columns(sides);
+            Map<String, Object> inventory = ReconService.columns(sides);
+            AnswerMasking.applied(String.join(",", ids), 0);   // names and types only, no value (D2: an agent data route)
+            return inventory;
         } catch (SQLException e) {
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "column inventory failed: " + ServerFaults.sqlMessage(e.getMessage(), api));
         } catch (IOException e) {
@@ -741,8 +744,21 @@ public final class ReconRoutes implements RouteModule {
      * One recon read as THIS caller sees it (RECON-READ-UNGATED-1): the resolved spec, and per side the masking of that
      * side's Dataset ({@code sides} empty = the caller may reveal, answers stay raw). Every mask runs on a COPY after the
      * cache read — {@link ReconDay.Cache} holds the raw answer, shared across callers.
+     *
+     * <p>AGENT-KIT-1 W6 D2: each of {@link #maskKeys}, {@link #maskBreakSets} and {@link #maskRows} stamps the answer
+     * ({@code AnswerMasking}) as it makes this caller's copy, so the stamp sits AFTER the cache read: a path that
+     * served a cached answer without masking it would carry no stamp, and an agent's answer is then withheld (500).
      */
     private record Read(ReconDay.Scoped scoped, List<DatasetCellMasking> sides) {
+
+        /** The masking proof (D-AK13): basis = the sides' Dataset ids, masked = the unified key columns hidden from this caller. */
+        private void stamp() {
+            List<String> ids = new ArrayList<>();
+            for (ReconService.Side s : scoped.spec().sides()) ids.add(s.datasetId());
+            int hidden = 0;
+            for (String k : scoped.spec().keyColumns()) if (hidingSide(k) >= 0) hidden++;
+            AnswerMasking.applied(String.join(",", ids), hidden);
+        }
 
         /** The side that hides unified key column {@code k}, or -1 (a grain key is one value for every side). */
         private int hidingSide(String k) {
@@ -766,8 +782,14 @@ public final class ReconRoutes implements RouteModule {
             return out;
         }
 
-        /** Grain or Break rows with each {@code key} as the caller sees it. */
+        /** Grain or Break rows with each {@code key} as the caller sees it; stamped. */
         List<Map<String, Object>> maskKeys(List<Map<String, Object>> rows) {
+            List<Map<String, Object>> shown = keys(rows);
+            stamp();
+            return shown;
+        }
+
+        private List<Map<String, Object>> keys(List<Map<String, Object>> rows) {
             if (sides.isEmpty() || !anyKeyHidden()) return rows;
             List<Map<String, Object>> out = new ArrayList<>(rows.size());
             for (Map<String, Object> r : rows) {
@@ -778,22 +800,27 @@ public final class ReconRoutes implements RouteModule {
             return out;
         }
 
-        /** A {@code /recon/breaks} answer with every set's Break keys masked. */
+        /** A {@code /recon/breaks} answer with every set's Break keys masked; stamped. */
         Map<String, Object> maskBreakSets(Map<String, Object> data) {
+            stamp();
             if (sides.isEmpty() || !anyKeyHidden()) return data;
             Map<String, Object> out = new LinkedHashMap<>(data);
             data.forEach((type, v) -> {
                 if (v instanceof Map<?, ?> set && set.get("rows") instanceof List<?> rows) {
                     Map<String, Object> copy = new LinkedHashMap<>(cast(set));
-                    copy.put("rows", maskKeys(castRows(rows)));
+                    copy.put("rows", keys(castRows(rows)));
                     out.put(type, copy);
                 }
             });
             return out;
         }
 
-        /** A {@code /recon/rows} answer: side {@code a}'s rows by the anchor's masking, {@code b}'s by side {@code other}'s, the echoed key masked. */
+        /**
+         * A {@code /recon/rows} answer: side {@code a}'s rows by the anchor's masking, {@code b}'s by side {@code other}'s,
+         * the echoed key masked; stamped.
+         */
         Map<String, Object> maskRows(Map<String, Object> data, int other) {
+            stamp();
             if (sides.isEmpty()) return data;
             Map<String, Object> out = new LinkedHashMap<>(data);
             if (data.get("key") instanceof Map<?, ?> key) out.put("key", maskKey(key));

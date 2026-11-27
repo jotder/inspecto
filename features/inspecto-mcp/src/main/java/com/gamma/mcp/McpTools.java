@@ -177,6 +177,10 @@ final class McpTools {
 
     private static Router get(String path) { return a -> new Call("GET", path, null); }
 
+    /** {@code reconcile_preview}'s steps → the reconciliation read each replays (W6 group D, D2; {@code AgentGate.RECON_READS}). */
+    static final Map<String, String> RECON_STEPS = Map.of("columns", "/recon/columns", "run", "/recon/run",
+            "breaks", "/recon/breaks", "rows", "/recon/rows");
+
     static final List<Tool> TOOLS = List.of(
             new Tool("edition_and_modules", "Edition and modules",
                     "The modules this install carries, their state and whether this Space switched them off. Check it "
@@ -233,6 +237,19 @@ final class McpTools {
                             body("The run request, as POST /queries/{id}/run takes it: {parameters?, limit?, offset?, "
                                     + "projection?, sort?}.", false)),
                     a -> new Call("POST", "/queries/" + seg(a.get("query")) + "/run", bodyOf(a))),
+            // W6 group D, change D2: the reconciliation reads; masked per side and budgeted (AgentGate.RECON_READS)
+            new Tool("reconcile_preview", "Preview a reconciliation",
+                    "Compare two or three Datasets for one day and save nothing: step columns (each Dataset's columns and "
+                            + "the cross-side matches, body {datasets: [ids]}), run (a page of the day's Board rows with exact "
+                            + "totals and the Break summary), breaks (the paged Break sets) or rows (the rows behind one key, "
+                            + "body key: every key column's value). run, breaks and rows take {id} (a saved Reconciliation) or "
+                            + "{config} (an inline one), and day?, limit?, offset?. Classified values come back masked (an "
+                            + "agent never reveals them); you may send a key as you know it, and the answer names it masked. "
+                            + "A sum or a filter over a masked column is refused. Each call spends from your data budget: "
+                            + "columns 1, run 5, breaks 5, rows 2.",
+                    List.of(new Arg("step", Kind.ENUM, true, "Which read.", List.copyOf(new java.util.TreeSet<>(RECON_STEPS.keySet()))),
+                            body("The request, as the step's route takes it (see the description).", true)),
+                    a -> new Call("POST", RECON_STEPS.get((String) a.get("step")), bodyOf(a))),
             new Tool("list_pipelines", "List Pipelines",
                     "The Pipelines registered in this Space, broken ones included with their reason.",
                     List.of(), get("/pipelines")),

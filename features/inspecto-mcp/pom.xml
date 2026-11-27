@@ -92,6 +92,14 @@
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>
+        <!-- W6 group D, D2: the reconciliation reads reconcile_preview replays, so their masking, cache, budget and bounds
+             tests meet the real routes, not the absent-module stub. -->
+        <dependency>
+            <groupId>com.gamma.inspector</groupId>
+            <artifactId>inspecto-reconciliation</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>com.gamma.inspector</groupId>
             <artifactId>inspecto-etl</artifactId>

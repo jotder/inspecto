@@ -8,8 +8,8 @@
 > [`spec-agent-simulators.md`](../okf/product/module/mcp/spec-agent-simulators.md)); **E built
 > 2026-11-26** (score previews weight 5, a draft raw for a person's agent and 403 for a machine (D-AK23); screening check weight 2 per started 10 subjects (D-AK24) with at most 10 matches per subject for an agent; MCP
 > Tools `preview_score` and `check_screening`, as built in `spec-agent-data-seam.md` § Group E); **D1 built 2026-11-26** (as built:
-> [`spec-agent-data-seam.md`](../okf/product/module/mcp/spec-agent-data-seam.md) § D1). D2 and the lookup change not
-> built.**
+> [`spec-agent-data-seam.md`](../okf/product/module/mcp/spec-agent-data-seam.md) § D1); **D2 built 2026-11-27** (the four recon reads for every agent, weights 1, 5, 5, 2, MCP Tool `reconcile_preview`, the stamp set
+> after the shared answer cache is read; as built: `spec-agent-data-seam.md` § D2). The lookup change not built.**
 > Unblocks widening plan
 > [`2026-11-25-agent-kit-ak2-widening-plan.md`](2026-11-25-agent-kit-ak2-widening-plan.md) § W6 groups B, D and E (D-AK10:
 > "once masking is proven per route") and board row `AGENT-LOOKUP-PREVIEW-1`. The operator chose on 2026-11-26 to settle
