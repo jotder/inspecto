@@ -150,6 +150,32 @@ describe('InsightFeedComponent — Case / Action Request (I-17)', () => {
         expect(el.querySelector('[data-testid="opened"]')?.textContent).toContain('CASE-7');
     });
 
+    it('a retry after a refused request reuses the Case it opened (INSIGHT-ACTION-RETRY-DUP-CASE-1)', () => {
+        const { fixture, btn, openCaseFromEntities, propose } = create({
+            dialogResult: { connection: 'ticketing', reason: '' },
+            proposeFails: true,
+        });
+        btn('request-action')!.click();
+        fixture.detectChanges();
+        btn('request-action')!.click();
+        fixture.detectChanges();
+        expect(openCaseFromEntities).toHaveBeenCalledTimes(1);
+        expect(propose).toHaveBeenCalledTimes(2);
+        expect((propose.mock.calls[1] as unknown as [Record<string, unknown>])[0]['caseId']).toBe('CASE-7');
+    });
+
+    it('Open a Case after Request action reuses the Case already opened', () => {
+        const { fixture, btn, openCaseFromEntities } = create({
+            dialogResult: { connection: 'ticketing', reason: '' },
+            proposeFails: true,
+        });
+        btn('request-action')!.click();
+        fixture.detectChanges();
+        btn('open-case')!.click();
+        fixture.detectChanges();
+        expect(openCaseFromEntities).toHaveBeenCalledTimes(1);
+    });
+
     it('hides each action when its module is not installed', () => {
         const { btn } = create({ features: { insights: true } });
         expect(btn('open-case')).toBeNull();

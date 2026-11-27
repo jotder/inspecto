@@ -111,6 +111,23 @@ class ControlApiRateLimitTest {
         }
     }
 
+    /**
+     * BI-INSIGHTS-1 loose ends B: {@code POST /insights/explain} is open to every viewer and runs up to 13 statements
+     * per call, so it spends the standard bucket (20), not {@code /bi/query}'s dashboard bucket (120).
+     */
+    @Test
+    void explainSpendsTheStandardBucketNotTheDashboardOne(@TempDir Path cfg) throws Exception {
+        try (Ctx c = open(cfg)) {
+            for (int i = 0; i < 20; i++)
+                assertNotEquals(429, invRequest(c.port, "POST", "/insights/explain").statusCode(), "explain " + i);
+            HttpResponse<String> r = invRequest(c.port, "POST", "/insights/explain");
+            assertEquals(429, r.statusCode(), "the 21st Explain finds the standard bucket empty");
+            assertTrue(r.body().contains("rate limit"), r.body());
+            assertEquals(429, agentTriageRuns(c.port).statusCode(), "Explain and the standard routes share a bucket");
+            assertNotEquals(429, biQuery(c.port).statusCode(), "the dashboard bucket is untouched");
+        }
+    }
+
     private HttpResponse<String> invRequest(int port, String method, String path) throws Exception {
         return client.send(HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/v1" + path))
                 .header("Content-Type", "application/json")
