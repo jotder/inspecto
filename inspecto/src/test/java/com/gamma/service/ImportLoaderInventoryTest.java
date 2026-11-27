@@ -123,6 +123,16 @@ class ImportLoaderInventoryTest {
         // so the literal chain is split there and the scan sees it without the audit/la-uploads/ prefix.
         ALLOWED.put("records", "audit/la-uploads/records/ (UploadRoutes) - inside the RESERVED audit/ of the config root, "
                 + "or under the Space's data root when it has one; never a path an import lands");
+        // SPACE-LOCATIONS-1 D5: SpaceDataRoot.holdsData resolves data/events under a variable already holding
+        // <data root>/data, so the scan sees it without the prefix; "data/events" itself is a NOT_CONFIG row above.
+        ALLOWED.put("events", "<data root>/data/events/ (SpaceDataRoot.holdsData), the file-backed event log - on the data "
+                + "root (or the Space root's data/), a sibling of config/, where an import writes; and it is read only to "
+                + "EXCLUDE its files from the holds-data test, so a planted file there changes nothing");
+        // BASIC-ELT-PROFILE-1 B5: PipelineHistory.schemaDirFor resolves schema under .history/pipelines/<id>/.
+        // Pinned reserved in the test below.
+        ALLOWED.put("schema", "<write root>/.history/pipelines/<id>/schema/ (PipelineHistory.schemaDirFor) - inside the "
+                + "RESERVED .history/ (reserved at any depth; ImportPaths also refuses a leading-dot segment), and only "
+                + "written and purged by the server, never read back as config");
         ALLOWED.put("archived-config","ConfigMigrator's backup of a migrated config — written, never read back as "
                 + "live config, so a planted file there changes nothing");
         // AccessGrants.java:79-80 resolves these under a variable already holding <config>/registry — the literal
@@ -338,6 +348,7 @@ class ImportLoaderInventoryTest {
     @Test
     void theAllowReasonsThatPointAtAReservedDirectoryAreTrue() {
         assertTrue(ReservedConfigPaths.reserved("registry/access-catalog/catalog.toon"));
+        assertTrue(ReservedConfigPaths.reserved(".history/pipelines/p/schema/v1.toon"));
     }
 
     @Test
