@@ -19,9 +19,7 @@ import { WidgetsService } from './widgets.service';
 import { Dataset } from '../datasets/dataset-types';
 import { DatasetsService } from '../datasets/datasets.service';
 import { DrillEvent, WidgetHostComponent } from './widget-host.component';
-import { SessionService } from 'app/inspecto/auth/session.service';
 import { MatDialog } from '@angular/material/dialog';
-import { signal } from '@angular/core';
 import { ExplainDialogComponent } from './explain.dialog';
 
 const DS: Dataset = {
