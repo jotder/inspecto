@@ -6,6 +6,7 @@ import {
     ConnectionsService,
     DbBrowserService,
     DecisionRulesService,
+    EventsService,
     JobsService,
     RunsService,
 } from 'app/inspecto/api';
@@ -24,6 +25,19 @@ const toOptions = (names: string[]): AttributeOption[] =>
 export function pipelineOptionLoader(): AttributeOptionLoader {
     const runs = inject(RunsService);
     return async () => toOptions((await firstValueFrom(runs.list())).map((r) => r.name));
+}
+
+/**
+ * The Signal Types this Space can post (`GET /signals/types`, SIGNAL-BOARD-1 SB-1c) — the Job's `on_signal`. The label
+ * adds the type's title, so an author can type the words as well as the name; the value is the bare type (a family
+ * stays `prefix.*`, itself a valid `on_signal` glob). A refusal (no authoring right) degrades to no suggestions.
+ */
+export function signalTypeOptionLoader(): AttributeOptionLoader {
+    const events = inject(EventsService);
+    return async () =>
+        (await firstValueFrom(events.signalTypes()))
+            .map((t) => ({ value: t.type, label: t.title && t.title !== t.type ? `${t.type} · ${t.title}` : t.type }))
+            .sort((a, b) => a.value.localeCompare(b.value));
 }
 
 /** Pipelines or jobs, following a sibling type discriminator (default key `targetType`). */

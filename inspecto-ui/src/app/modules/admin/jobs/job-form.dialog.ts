@@ -44,6 +44,7 @@ import {
     datasetOptionLoader,
     pipelineOptionLoader,
     riskScoreModelOptionLoader,
+    signalTypeOptionLoader,
 } from 'app/inspecto/components/entity-option-loaders';
 import { guardDirtyClose } from 'app/inspecto/dialog-dirty-guard';
 import { AttributeSpec } from 'app/inspecto/component-model';
@@ -327,8 +328,8 @@ export class JobFormDialog implements AfterViewInit {
         this.confirm,
     );
 
-    /** Suggestion source for the on-signal trigger's pipeline. */
-    readonly optionLoaders = { onPipeline: pipelineOptionLoader() };
+    /** Suggestion sources for the event trigger's Pipeline and the signal trigger's Signal Type (SIGNAL-BOARD-1 SB-1c). */
+    readonly optionLoaders = { onPipeline: pipelineOptionLoader(), onSignal: signalTypeOptionLoader() };
 
     /** Suggestion sources for the DECLARED parameters — built per descriptor, because the keys are the
      *  Job Type's own (a `DATASET_REF` renders as an autocomplete and would otherwise offer nothing). */

@@ -925,6 +925,9 @@ describe('JobFormDialog - the Link Analysis Job Types', () => {
         const { c } = await open('la.index.build');
         const on = c.attributes().find((a) => a.key === 'onSignal')!;
         const when = c.attributes().find((a) => a.key === 'when')!;
+        // SIGNAL-BOARD-1 SB-1c: a pick list over the Signal Type catalog, free text still allowed
+        expect(on.type).toBe('autocomplete');
+        expect(typeof c.optionLoaders.onSignal).toBe('function');
         expect(on.placeholder).toBe('e.g. pipeline.commit');
         expect(on.help).toContain('pipeline.commit');
         expect(when.placeholder).toContain('$signal.pipeline');
