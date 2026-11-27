@@ -396,8 +396,8 @@
     "fix": "Write when as {kind: group, op: AND|OR, items: [...]}, each item a condition or another group; leave it out to start from an empty AND group."
   },
   "ERR_SPLIT_CHAIN_NOT_MOVABLE": {
-    "cause": "Splitting the Pipeline into a Job Pipeline would change what it does: it routes records (route runs on the ingest lane, where each branch lands its own store), or processing.disabled_steps disables a step that would move into the Job Pipeline. fieldPath names which.",
-    "fix": "For a route, keep the Pipeline as it is or author the Job Pipeline yourself; for a disabled step, enable it or remove it, then split again. Nothing was written."
+    "cause": "Splitting the Pipeline into a Job Pipeline would change what it does: it routes records (route runs on the ingest lane, where each branch lands its own store), it is multi-schema (it lands several stores), an authored filter step carries a pre-parse key (include_prefixes and the like, which read raw lines), or processing.disabled_steps disables a step that would move into the Job Pipeline. fieldPath names which.",
+    "fix": "For a route, a multi-schema Pipeline or a pre-parse filter, keep the Pipeline as it is or author the Job Pipeline yourself; for a disabled step, enable it or remove it, then split again. Nothing was written."
   },
   "UNSUPPORTED_NODE": {
     "cause": "The graph holds a node type the saved Pipeline file has no place for, or whose module is not installed here. A dry run may still run such a node (DRYRUN-SAVE-NODE-MISMATCH-1).",

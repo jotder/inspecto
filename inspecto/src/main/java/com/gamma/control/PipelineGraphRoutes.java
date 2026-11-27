@@ -838,8 +838,10 @@ final class PipelineGraphRoutes implements RouteModule {
      * {@code processing.csv_settings.where} is Stage-1 (a pre-map filter the ingest lane applies) and stays on the
      * onboarding Pipeline (SPLIT-JOB-PIPELINE-DROPS-PROCESSING-1).
      *
-     * <p>Refused ({@value #ERR_SPLIT_CHAIN_NOT_MOVABLE}): a {@code route}, which runs on the ingest lane, and a
-     * {@code processing.disabled_steps} entry naming a step that would move.
+     * <p>Refused ({@value #ERR_SPLIT_CHAIN_NOT_MOVABLE}), as the at-rest run ({@code PipelineLift.stageTwo}) refuses
+     * them: a {@code route}, which runs on the ingest lane; a multi-schema Pipeline, which lands several stores; an
+     * authored filter step carrying a pre-parse key; and a {@code processing.disabled_steps} entry naming a step that
+     * would move.
      */
     private static List<Object> stageTwoChain(String name, PipelineConfig cfg, Map<String, Object> raw) {
         if (cfg.routeConfig() != null || cfg.steps().stream().anyMatch(s -> PipelineConfig.Step.ROUTE.equals(s.kind())))
@@ -847,6 +849,19 @@ final class PipelineGraphRoutes implements RouteModule {
                     + "records, and route runs on the ingest lane, where each branch lands its own store; a Job Pipeline "
                     + "runs at rest into one output_store, so the split would change what the Pipeline does",
                     ERR_SPLIT_CHAIN_NOT_MOVABLE, cfg.routeConfig() != null ? "route" : "steps");
+        PipelineConfig.Schemas s = cfg.schemas();
+        if ((s.selector() != null && s.selector().hasSchemas()) || (s.segments() != null && !s.segments().isEmpty()))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pipeline '" + name + "' is multi-schema "
+                    + "— it lands several stores, and a Job Pipeline reads one input Dataset, so the split cannot pick "
+                    + "its seed", ERR_SPLIT_CHAIN_NOT_MOVABLE, "schemas");
+        for (PipelineConfig.Step st : cfg.steps())
+            if (cfg.hasExplicitSteps() && PipelineConfig.Step.FILTER.equals(st.kind()))
+                for (String k : PipelineLift.PRE_PARSE_FILTER_KEYS)
+                    if (st.config().containsKey(k))
+                        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pipeline '" + name
+                                + "' chains a filter carrying pre-parse key '" + k + "', which reads raw lines the "
+                                + "landed store no longer has; the Job Pipeline could not run it as the original does",
+                                ERR_SPLIT_CHAIN_NOT_MOVABLE, "steps");
         List<Object> chain = new ArrayList<>();
         List<String> kinds = new ArrayList<>();
         if (raw.get("steps") instanceof List<?> authored) {

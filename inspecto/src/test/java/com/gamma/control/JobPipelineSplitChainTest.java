@@ -177,7 +177,7 @@ class JobPipelineSplitChainTest {
     }
 
     @Test
-    void aRouteOrADisabledMovingStepRefusesTheSplitAndWritesNothing(@TempDir Path dir) throws Exception {
+    void aChainThatCannotMoveRefusesTheSplitAndWritesNothing(@TempDir Path dir) throws Exception {
         Path writeRoot = Files.createDirectories(dir.resolve("config"));
         Path pipe = seedCdr(dir, writeRoot, """
                   dedup:
@@ -211,6 +211,25 @@ class JobPipelineSplitChainTest {
             JsonNode f = ApiContext.JSON.readTree(r.body()).path("error").path("details").path("findings").path(0);
             assertEquals(PipelineGraphRoutes.ERR_SPLIT_CHAIN_NOT_MOVABLE, f.path("code").asText(), r.body());
             assertEquals("route", f.path("fieldPath").asText(), r.body());
+        }
+
+        // An authored filter with a pre-parse key: the at-rest run refuses it, so the split must too.
+        Path writeRoot3 = Files.createDirectories(dir.resolve("third/config"));
+        Path preParse = seedCdr(dir.resolve("third"), writeRoot3, "", "", """
+                steps[1]:
+                  - filter:
+                      where: "duration > 0"
+                      include_prefixes[1]: "2499"
+                """);
+        try (Ctx ctx = start(dir.resolve("third"), writeRoot3, preParse)) {
+            for (boolean preview : new boolean[]{true, false}) {
+                HttpResponse<String> r = split(ctx.port(), preview);
+                assertEquals(422, r.statusCode(), r.body());
+                JsonNode f = ApiContext.JSON.readTree(r.body()).path("error").path("details").path("findings").path(0);
+                assertEquals(PipelineGraphRoutes.ERR_SPLIT_CHAIN_NOT_MOVABLE, f.path("code").asText(), r.body());
+                assertEquals("steps", f.path("fieldPath").asText(), r.body());
+            }
+            assertFalse(Files.exists(writeRoot3.resolve("cdr_enriched")), "no Job Pipeline or Job written");
         }
     }
 

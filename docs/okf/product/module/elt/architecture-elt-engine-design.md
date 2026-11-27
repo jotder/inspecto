@@ -356,9 +356,9 @@ chain this route runs into its own Job Pipeline, so the two files together do wh
 not as the parser's resolved absolute path. Its `processing.csv_settings.where` is the Stage-1 filter and stays
 on the onboarding Pipeline. The Job Pipeline's `output.format` is `PARQUET`, as the at-rest run's format-less
 sink wrote, never the onboarding Pipeline's `output.format`, which names the landed store. The parser refuses `steps:` together with any of the four blocks, so no file holds
-both. ⛔ The split refuses, with 422 `ERR_SPLIT_CHAIN_NOT_MOVABLE` (also on a preview), and writes nothing in two
-cases. One is a `route`, block or step, which runs on the ingest lane. The other is a
-`processing.disabled_steps` entry naming a step that would move. `JobPipelineSplitChainTest` runs the original's
+both. ⛔ The split refuses, with 422 `ERR_SPLIT_CHAIN_NOT_MOVABLE` (also on a preview), and writes nothing in the cases the at-rest run refuses: a `route`, block or step, which runs on the ingest lane; a
+multi-schema Pipeline, which lands several stores; and an authored filter step carrying a pre-parse key
+(`include_prefixes` and the like). It also refuses a `processing.disabled_steps` entry naming a step that would move. `JobPipelineSplitChainTest` runs the original's
 at-rest chain and the split Job Pipeline over the same landed rows and compares the output, dedup included
 (`SPLIT-JOB-PIPELINE-DROPS-PROCESSING-1`, 2026-11-28).
 
