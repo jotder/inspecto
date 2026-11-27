@@ -34,8 +34,10 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
+| `SPLIT-JOB-PIPELINE-DROPS-PROCESSING-1` | P2 | defect | Splitting a Pipeline into a Job Pipeline deletes its processing.join, processing.dedup, processing.summarize and processing.profile block… | — |
 | `COMPONENT-VALIDATE-ALL-1` | P3 | feature | a dry run (executing preview) for a KPI, Reconciliation, Dataset, Widget or Dashboard: | — |
 | `REFUSAL-CODES-REST-1` | P3 | chore | about 1,000 call sites still refuse with only the shared CONFIG_VALIDATION_FAILED and no finding code, so an agent must read the message. | demand |
+| `OPENAPI-FINDING-SCHEMA-1` | P3 | defect | The API contract's Finding schema describes the wrong fields. | — |
 | `CONTROLAPI-DATA-DIR-MISMATCH-1` | P2 | defect | The control plane and the engine disagree on a Space's data root when -Ddata.dir is set: | — |
 | `DB-QUERY-STORE-SHARING-1` | P3 | chore | verify: may a /db/query store read reach a shared-away Dataset? | — |
 | `AGENT-KIT-1` | P2 | feature | The Agent Kit: AI agents build, ship and manage Apps on a running Inspecto safely, through an optional MCP module. | — |

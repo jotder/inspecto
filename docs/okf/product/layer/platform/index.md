@@ -36,6 +36,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 |---|---|---|---|---|
 | `PARSER-SPI-KIT-1` | P3 | chore | the Parser extension point (com.gamma.parse.ParserPlugin, a public API since 4.0.0) has no starter and is missing from the developer docs. | — |
 | `REFUSAL-CODES-REST-1` | P3 | chore | about 1,000 call sites still refuse with only the shared CONFIG_VALIDATION_FAILED and no finding code, so an agent must read the message. | demand |
+| `OPENAPI-FINDING-SCHEMA-1` | P3 | defect | The API contract's Finding schema describes the wrong fields. | — |
 | `NATIVE-LICENCE-LINUX-MACOS-1` | P3 | chore | Two licence calls on the tokenizers natives wait on the operator. | operator |
 | `UPGRADE-BACKUPDIR-RELATIVE-1` | P3 | defect | upgrade.ps1 resolves a relative -BackupDir from the wrong folder: | — |
 | `CONTROLAPI-DATA-DIR-MISMATCH-1` | P2 | defect | The control plane and the engine disagree on a Space's data root when -Ddata.dir is set: | — |
