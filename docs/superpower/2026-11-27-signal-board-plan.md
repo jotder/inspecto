@@ -1,7 +1,7 @@
 # Signal Board — one clear meaning for Signal, and a board Jobs can trust (`SIGNAL-BOARD-1`)
 
 Status: **APPROVED 2026-11-27 — D-SB1…D-SB5 all DECIDED (operator, 2026-11-27); SB-0 done 2026-11-27 (results §10;
-the live stop test and the D-SB5 age limit wait on the operator); nothing built; next is SB-1.** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
+the live stop test is still owed); the D-SB5 age limit is 24 hours; SB-1 in design (§11); nothing built.** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
 Builds on the shipped Signal Backbone ([spec-signal-backbone](../okf/product/module/event/spec-signal-backbone.md));
 it replaces none of it. SB-2 lands inside the link graph of `SPACE-COHERENCE-1`
 ([plan](2026-11-27-space-coherence-plan.md)).
@@ -136,7 +136,7 @@ so it goes last and one fact at a time.
 | **D-SB2** ✅ | Keep `on_pipeline` beside `on_signal`? | **Keep the key**, defined as short for `on_signal: pipeline.commit` on that Pipeline, on one code path; no config changes |
 | **D-SB3** ✅ | An `on_signal` type nothing posts: warn or refuse? | **Warn everyone**, agents included (differs from the recommendation, which refused an agent); the finding names the type |
 | **D-SB4** ✅ | May a Space declare its own Signal Types in config? | **Yes, in SB-1**, so a Space's own Jobs can post a type with declared fields |
-| **D-SB5** ✅ | If G8 is confirmed: catch up at boot, and how far back? | **Yes (SB-2b), with an age limit**, so a long outage does not start a flood of stale Runs; the limit's value is set in SB-0 |
+| **D-SB5** ✅ | If G8 is confirmed: catch up at boot, and how far back? | **Yes (SB-2b), with an age limit of 24 hours** (operator, 2026-11-27), configurable per Space, so a long outage does not start a flood of stale Runs |
 
 ## 8. Not verified
 
@@ -161,7 +161,7 @@ Filed 2026-11-27: `SIGNAL-BOARD-1` on `docs/BACKLOG.md` (P2, §3.5); this plan's
 - **Crash:** a queued Run leaves no record at all.
 - **Boot:** `catchUpMissedFires` replays only a cron Job with `catch_up: true` and a missed fire. Signal Jobs have no
   catch-up.
-- So SB-2b is needed. **Age limit for D-SB5, proposed (operator to confirm): 24 hours**, the same as the default Run
+- So SB-2b is needed. **Age limit for D-SB5: 24 hours (confirmed, operator, 2026-11-27)**, the same as the default Run
   deadline ceiling (`job.deadlineCeilingSeconds` = 86400), configurable per Space. A missed Signal older than that is
   not replayed; the board (SB-3) lists it as missed.
 
@@ -210,3 +210,65 @@ it removes a posting. The Alert Signal names are not in `SignalType` (more evide
 
 Per-file progress, security and audit rows are high in volume or sensitive, and no Job is meant to start from them.
 The sort is a judgement on names and comments, not on use; SB-4 reconfirms each before it promotes one.
+
+## 11. SB-1 design (2026-11-27)
+
+**Decided (operator, 2026-11-27):** **D-SB6** each module declares its own Signal Types through a provider it ships
+beside its constants class (core never names a module's types); **D-SB7** every Signal Type gets its payload fields
+in SB-1, not only the ones Jobs listen to today.
+
+### 11.1 Inventory (read on `origin/master` `b0008af9f`)
+
+About 65 types, posted from four places:
+
+| Poster | Types | Where the names live today |
+|---|---|---|
+| Core Jobs and the Job service | 30 | `SignalType` constants |
+| Core engine, outside a Job | about 12: `pipeline.batch.committed`, `.failed`, `.parked`, `.retry_exhausted`, `pipeline.step.abandoned`, `job.run.step`, `alert-rule.fired`, `alert-rule.cleared`, `expectation.violated`, `decision-rule.applied`, `decision-rule.create-alert`, `consignment.counted` | string literals at the posting line |
+| Modules | 8 in seven `*Signals` classes, plus `exchange.signal.delivered` / `.undeliverable` | the module's constants class |
+| Agents | 10 `agent.*` types | string literals in `inspecto-agent` and `inspecto-intelligence` |
+
+`exchange.<opco>.<type>` is a family whose middle part is chosen at run time; it is declared once as a prefix.
+
+### 11.2 Shape (core, `com.gamma.signal`, public API)
+
+- `SignalTypeDecl(type, title, poster, fields, since)`: `type` is a dotted name, or a `prefix.*` family;
+  `poster` names what posts it (`job-type:<id>`, `engine`, `step`, `agent`, `exchange`).
+- `SignalField(name, kind, always, description)`: `kind` is `string | integer | number | boolean | list | map`;
+  `always` says the field is present on every posting (a `when` or `bind` on a field that is not `always` gets a
+  warning in SB-2, never a refusal).
+- `SignalTypeProvider`: `List<SignalTypeDecl> signalTypes()`, found by `ServiceLoader` like `JobTypeProvider`. Core
+  ships `CoreSignalTypes`; each module ships one beside its constants class.
+- `SignalTypeCatalog`: gathers every provider, plus the dotted `emits` of a Job Pack's Job Types (listed with
+  "fields not declared"). The same type from two providers is an error at assembly.
+
+### 11.3 Read and check
+
+- `GET /signals/types` → each type with `title`, `poster`, `fields`, `since` and `source` (`core`, `module:<id>`,
+  `pack:<id>`). It follows the new-route checklist (literal capability, armed tests, `openapi-v1.json` regenerated).
+- **Checked on every post, in tests.** With `-Dsignals.checkFields=true` (set for every Surefire run), posting a Signal
+  whose type is not catalogued, or whose payload has a key its type does not declare, or lacks an `always` field,
+  fails the test that posted it. In production the same check is off. This keeps the fields true without a
+  hand-kept list of who posts what: every existing test that posts a Signal becomes a check of its declaration.
+- **A guard for names.** `tools/check-signal-types.mjs` refuses a dotted string literal passed straight to
+  `new Signal(…)`, `emit(…)` or `emitSignal(…)` in main code unless that name is declared by some provider. It runs in
+  the pre-commit set.
+
+### 11.4 Slices
+
+| Slice | Scope | Size |
+|---|---|---|
+| SB-1a | Core records, SPI, catalog, `CoreSignalTypes` (the 30 constants and the engine literals, with fields), `GET /signals/types`, the post-time check, the guard | one lane |
+| SB-1b | A provider with fields in each module: anomaly, backup, case-management, ops, reconciliation, scoring, screening, exchange, agent and intelligence | one lane; each module's own tests run under the post-time check |
+| SB-1c | The `on_signal` pick list in the Job form | small; UI |
+
+The post-time check is switched on for a module only when that module's provider exists, so SB-1a can land before
+SB-1b without failing module tests.
+
+### 11.5 Found while designing
+
+- **Nothing in config can post a Signal of the author's choosing today.** Only code posts; `ConsignmentProcessJobType`
+  passes a type through, but its callers are code too. So D-SB4 (a Space declares its own types) also needs a way to
+  post one from config, for example a Step or a Job parameter. That is a new decision, **D-SB8**, before SB-1c.
+- Three score types (`risk.score.produced`, `anomaly.score.produced`, `churn.score.produced`) are core `SignalType`
+  constants although their Jobs live in modules; SB-1b checks whether they move.
