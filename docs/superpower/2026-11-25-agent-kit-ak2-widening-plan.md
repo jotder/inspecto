@@ -2,8 +2,9 @@
 
 > **Status: APPROVED 2026-11-25 — D-AK8…D-AK12 signed (operator interview, §5; D-AK8 not as recommended, which adds
 > task W11); built (§3): W1, W2, W3, W4 steps 1–3, W6 groups A, B, C, D (D1 and D2) and E and the agent change of
-> `POST /lookups/test` (`AGENT-LOOKUP-PREVIEW-1`, MCP Tool `test_lookup`, 2026-11-27), W7, W8, W9, W10 and W11
-> (2026-11-25/27; W8's and W9's live golden runs belong to W4); open: W4 from step 4 and W5.** The follow-on to phases 1–3b of
+> `POST /lookups/test` (`AGENT-LOOKUP-PREVIEW-1`, MCP Tool `test_lookup`, 2026-11-27), W5, W7, W8, W9, W10 and
+> W11 (2026-11-25/27; W8's and W9's live golden runs and W5's fewer-refusals re-run belong to W4); open: W4 from
+> step 4.** The follow-on to phases 1–3b of
 > [`2026-11-20-agent-kit-ak2-plan.md`](2026-11-20-agent-kit-ak2-plan.md) (all built 2026-11-25). It takes the gaps a
 > peer's product review of that plan listed
 ([`2026-11-25-agent-kit-ak2-product-review.md`](2026-11-25-agent-kit-ak2-product-review.md)), keeps the ones
@@ -213,8 +214,18 @@ needs only W3 and can start now.
 
 ### W5 — Shape reference and error catalogue as MCP Resources
 
+> **Built 2026-11-27.** As specified. `McpTools.RESOURCES` adds `inspecto://errors` and one `inspecto://shapes/<kind>`
+> per key of `CHANGE_ROUTES` (12), read verbatim (the files' own `generatedBy` banner kept) from
+> `docs/api/component-shapes/*.json` and `docs/api/errors-v1.json`, which `features/inspecto-mcp/pom.xml` packages
+> into the jar as it does `GLOSSARY.md`; `package.ps1` refuses a bundle whose MCP jar lacks them; the endpoint's
+> instructions name both. Guard `ControlApiMcpTest.everyProposeKindHasAShapeResource` (falsified: a removed shape file
+> fails it); `theShapeAndErrorResourcesAreServed` reads every kind over HTTP. Six skills point at the shapes; the
+> Decision Rule `when` tree stays in prose, because the shape types `when` only as an object. Not done here: the
+> fewer-refusals re-run, a live W4 run. As-built:
+> [`spec-agent-resources.md`](../okf/product/module/mcp/spec-agent-resources.md).
+
 - **Goal.** An agent reads a kind's keys, types and an example before it writes, and reads what a refusal means.
-- **Today.** `resources/list` serves `inspecto://glossary`, `inspecto://catalog` and `inspecto://modules`. The shape
+- **Today (before W5; built — see the note above).** `resources/list` served `inspecto://glossary`, `inspecto://catalog` and `inspecto://modules`. The shape
   reference exists (`COMPONENT-REFERENCE-GENERATED-1`, 2026-11-27): one `docs/api/component-shapes/<kind>.json` per
   `propose_change` kind, derived from the code by `ComponentShapesTest` (features/inspecto-mcp), which also fails when a
   kind has no file; serving it is a resource include in the module's pom, as `GLOSSARY.md` is. The error catalogue
