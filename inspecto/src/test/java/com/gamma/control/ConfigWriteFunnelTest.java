@@ -254,6 +254,12 @@ class ConfigWriteFunnelTest {
             Map.entry("KpiSnapshotJobType#register", MACHINE + "; the kpi_history_<kpi> system Dataset is registered "
                     + "regardless of a Dataset approval policy by operator ruling D-BI11 (2026-11-24, BI-INSIGHTS-1 I-3); it "
                     + "only copies the source Dataset's owner/shares and never overwrites a Dataset that reads another store"),
+            Map.entry("InsightScanJobType#register", MACHINE + "; the insights_<profile> system Dataset is registered "
+                    + "regardless of a Dataset approval policy, as KpiSnapshotJobType#register by operator ruling D-BI11 "
+                    + "(2026-11-24, BI-INSIGHTS-1 P3); it only copies the Profile's owner/shares and never overwrites a "
+                    + "Dataset that reads another store"),
+            Map.entry("InsightScanJobType#store", MACHINE + "; rewrites the Insights store's own data rows "
+                    + "(insights_<profile>), a Job output, not a config kind"),
             Map.entry("NotificationRoutes#write", HELPER), Map.entry("NotificationRoutes#writeRule", HELPER),
             Map.entry("RequirementRoutes#write", "requirement: " + NOT_GOVERNED),
             Map.entry("PipelineListRoutes#deletePipeline", "a grandfathered PipelineStore graph (authored-pipeline) — "

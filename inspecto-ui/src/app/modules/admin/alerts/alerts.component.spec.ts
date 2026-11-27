@@ -552,3 +552,66 @@ describe('fired Alerts grid text (ALERTS-PAGE-WORDS-1)', () => {
         });
     });
 });
+
+describe('Alerts table layout & expandable detail panel (LA-ALERTS-TABLE-TRUNCATION-1)', () => {
+    it('gives Alert Rule, Scope, Watches, and Message readable minWidths and flex while keeping fixed columns flex: 0', async () => {
+        const { fixture } = await create();
+        const c = fixture.componentInstance;
+        const byCol = (key: string) => c.columnDefs.find((d) => d.colId === key || d.field === key)!;
+
+        for (const fixed of ['epochMillis', 'severity', 'state', 'value']) {
+            expect(byCol(fixed).flex).toBe(0);
+        }
+        expect(byCol('rule').minWidth).toBeGreaterThanOrEqual(160);
+        expect(byCol('scope').minWidth).toBeGreaterThanOrEqual(160);
+        expect(byCol('watches').minWidth).toBeGreaterThanOrEqual(170);
+        expect(byCol('message').minWidth).toBeGreaterThanOrEqual(240);
+
+        expect(byCol('message').tooltipField).toBe('message');
+        expect((byCol('scope').tooltipValueGetter as (p: unknown) => unknown)({ data: FIRED })).toBe(
+            `Pipeline ${FIRED.pipeline}`,
+        );
+        expect((byCol('watches').tooltipValueGetter as (p: unknown) => unknown)({ data: FIRED })).toBe(
+            'Failed Consignments',
+        );
+    });
+
+    it('toggles an accessible expandable detail panel with full alert message and metadata', async () => {
+        const longMessage =
+            'Very long alert message explaining threshold breach across multiple consignments without truncation';
+        const detailedAlert: FiredAlert = { ...STORED, message: longMessage };
+        const { fixture } = await create({ recent: () => of([detailedAlert]) });
+        const c = fixture.componentInstance;
+        const el = fixture.nativeElement as HTMLElement;
+
+        expect(el.querySelector('[aria-label="Alert details"]')).toBeNull();
+
+        c.toggleAlertDetail(detailedAlert);
+        fixture.detectChanges();
+
+        const panel = el.querySelector('[aria-label="Alert details"]');
+        expect(panel).not.toBeNull();
+        expect(panel!.textContent).toContain(longMessage);
+        expect(panel!.textContent).toContain('Failed batches');
+        expect(panel!.textContent).toContain(`Pipeline ${detailedAlert.pipeline}`);
+        expect(panel!.textContent).toContain('Failed Consignments');
+        expect(panel!.textContent).toContain('15 minutes');
+        await expectNoA11yViolations(panel as HTMLElement);
+
+        // Clicking the same alert again collapses the detail panel
+        c.toggleAlertDetail(detailedAlert);
+        fixture.detectChanges();
+        expect(el.querySelector('[aria-label="Alert details"]')).toBeNull();
+
+        // Re-open, acknowledge updates state in panel, and close button dismisses it
+        c.toggleAlertDetail(detailedAlert);
+        fixture.detectChanges();
+        c.work(detailedAlert, 'acknowledged');
+        fixture.detectChanges();
+        expect(el.querySelector('[aria-label="Alert details"]')?.textContent).toContain('ACKNOWLEDGED');
+
+        (el.querySelector('button[aria-label="Close alert details"]') as HTMLButtonElement).click();
+        fixture.detectChanges();
+        expect(el.querySelector('[aria-label="Alert details"]')).toBeNull();
+    });
+});

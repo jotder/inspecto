@@ -202,7 +202,7 @@ describe('MyWorkComponent - the home page My work (LA-ONBOARD-1 phase 7)', () =>
         expect(terms).toEqual(['What is an Entity List?']);
     });
 
-    it('pages the saved views 5 at a time, most recent first, and the search narrows them', () => {
+    it('pages the saved views 6 at a time, most recent first, and the search narrows them', () => {
         const views = Array.from({ length: 12 }, (_, i) => ({
             type: 'link-analysis-view',
             name: `v${i}`,
@@ -213,18 +213,18 @@ describe('MyWorkComponent - the home page My work (LA-ONBOARD-1 phase 7)', () =>
         const { f, el } = create({ views: of(views) });
         const names = () =>
             Array.from(el.querySelectorAll('[data-testid="la-cases"] a')).map((a) => a.textContent?.trim());
-        expect(names()).toEqual(['View 11', 'View 10', 'View 9', 'View 8', 'View 7']);
-        expect(el.querySelector('[data-testid="la-cases-pager"]')?.textContent).toContain('1–5 of 12');
+        expect(names()).toEqual(['View 11', 'View 10', 'View 9', 'View 8', 'View 7', 'View 6']);
+        expect(el.querySelector('[data-testid="la-cases-pager"]')?.textContent).toContain('1–6 of 12');
         // a view that uses no Entity List says only when it was saved, not "No Entity List yet" on every card
         const meta = Array.from(el.querySelectorAll('[data-testid="la-cases"] li .text-xs')).map((s) =>
             s.textContent?.trim(),
         );
-        expect(meta.length).toBe(5);
+        expect(meta.length).toBe(6);
         for (const m of meta) expect(m).toMatch(/^Saved \d+ Oct 2026$/);
 
         (el.querySelector('[aria-label="Next page of saved views"]') as HTMLButtonElement).click();
         f.detectChanges();
-        expect(names()[0]).toBe('View 6');
+        expect(names()[0]).toBe('View 5');
 
         f.componentInstance.setPageSize(25);
         f.detectChanges();

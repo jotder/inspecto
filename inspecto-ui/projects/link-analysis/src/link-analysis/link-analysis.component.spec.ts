@@ -3983,9 +3983,9 @@ describe('LinkAnalysisComponent - one header row: File, the title, both toolbars
         expect(el.querySelector('inspecto-page-header')).toBeNull();
         const file = header.querySelector('[data-testid="la-file"]') as HTMLElement;
         const rail = header.querySelector('nav[data-testid="la-tool-rail"]') as HTMLElement;
-        expect(rail.querySelector('button')).toBe(file); // File is the first icon of the toolbox
+        expect(rail.querySelector('button')).toBe(file); // File is the first action of the toolbox
         expect(file.getAttribute('aria-label')).toBe('File');
-        expect(file.textContent?.trim()).toBe(''); // icon only
+        expect(file.textContent?.trim()).toBe('File');
         const h1 = header.querySelector('h1') as HTMLElement;
         expect(h1.textContent?.trim()).toBe('Link Analysis');
         expect(header.querySelector('inspecto-ai-explain')).toBeTruthy();
@@ -4012,7 +4012,9 @@ describe('LinkAnalysisComponent - one header row: File, the title, both toolbars
             const label = b.getAttribute('aria-label') ?? '';
             expect(label, b.outerHTML.slice(0, 120)).not.toBe('');
         }
-        for (const id of ['la-grow-button', 'la-held-button', 'la-exclusions-button', 'cleanup-toggle']) {
+        const growBtn = header.querySelector('[data-testid="la-grow-button"]') as HTMLElement;
+        expect(growBtn.textContent?.trim()).toBe('Expand');
+        for (const id of ['la-held-button', 'la-exclusions-button', 'cleanup-toggle']) {
             const b = header.querySelector(`[data-testid="${id}"]`) as HTMLElement;
             expect(b.hasAttribute('mat-icon-button'), id).toBe(true);
         }
@@ -4754,7 +4756,7 @@ describe('LinkAnalysisComponent - Grow, Held and Exclude on the graph (LA-GROW-E
         const grow = el.querySelector('[data-testid="la-grow-button"]') as HTMLButtonElement;
         // icon only, named by its aria-label; its glyph differs from Full screen's (operator 2026-10-28)
         expect(grow.getAttribute('aria-label')).toBe('Expand');
-        expect(grow.textContent?.trim()).toBe('');
+        expect(grow.textContent?.trim()).toBe('Expand');
         expect(grow.querySelector('mat-icon')?.getAttribute('svgIcon')).toBe('mat_outline:open_with');
         expect(grow.getAttribute('aria-keyshortcuts')).toBe('G');
         expect(el.querySelector('[data-testid="la-exclusions-button"]')?.getAttribute('aria-label')).toBe(

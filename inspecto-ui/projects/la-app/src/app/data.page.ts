@@ -189,9 +189,13 @@ import { provideAddDataLinkAnalysis } from '@inspecto/link-analysis/link-analysi
                                                 d.name
                                             }}</span>
                                             <!-- presentability 2: the meta line wraps, never clipped mid-word -->
-                                            <span class="text-secondary break-words text-xs" data-testid="data-meta">{{
-                                                d.name !== d.id ? d.id + ' · ' + summary(d) : summary(d)
-                                            }}</span>
+                                            <span class="text-secondary break-words text-xs" data-testid="data-meta">
+                                                @if (d.name !== d.id) {
+                                                    <span class="font-mono">{{ d.id }}</span> · {{ summary(d) }}
+                                                } @else {
+                                                    {{ summary(d) }}
+                                                }
+                                            </span>
                                             <!-- LA-EMPTY-DATASET-WORDING-1: a Pipeline-fed Dataset whose store holds nothing yet;
                                                  a normal wait, so the secondary ink (presentability 2) -->
                                             @if (d.origin === 'other' && d.empty) {
@@ -367,62 +371,70 @@ import { provideAddDataLinkAnalysis } from '@inspecto/link-analysis/link-analysi
                                             </button>
                                         </div>
                                     }
-                                    <div class="grid grid-cols-1 gap-x-8 sm:grid-cols-2">
+                                    <div class="flex flex-col divide-y" style="border-color: var(--gamma-border)">
                                         @for (col of d.columns; track col.name) {
                                             @let r = roleShown(d, col);
-                                            <div class="flex flex-col" [attr.data-testid]="'column-' + col.name">
-                                                <inspecto-option-picker
-                                                    [label]="col.name"
-                                                    [options]="roleOptions"
-                                                    [formControl]="roles().get(d.id)!.get(col.name)!"
-                                                    [attr.data-testid]="'role-' + col.name"
-                                                ></inspecto-option-picker>
-                                                @if (derivedRoles().get(d.id)?.get(col.name); as dr) {
-                                                    @if (dr.role === r) {
-                                                        <p
-                                                            class="text-secondary m-0 text-xs"
-                                                            [attr.data-testid]="'derived-' + col.name"
-                                                        >
-                                                            From
-                                                            {{ dr.mappings.length === 1 ? 'Mapping' : 'Mappings' }}
-                                                            {{ dr.mappings.join(', ') }}: not set on this Dataset.
-                                                        </p>
-                                                    }
-                                                }
-                                                @if (r === 'entity') {
+                                            <div
+                                                class="grid grid-cols-1 gap-x-6 gap-y-1 py-2 first:pt-0 last:pb-0 md:grid-cols-2"
+                                                [attr.data-testid]="'column-' + col.name"
+                                            >
+                                                <div class="flex flex-col">
                                                     <inspecto-option-picker
-                                                        [label]="col.name + ' holds'"
-                                                        [options]="
-                                                            holdsOptions().get(d.id + '/' + col.name) ?? typeOptions()
-                                                        "
-                                                        [formControl]="holds().get(d.id)!.get(col.name)!"
-                                                        [attr.data-testid]="'entity-' + col.name"
+                                                        [label]="col.name"
+                                                        [options]="roleOptions"
+                                                        [formControl]="roles().get(d.id)!.get(col.name)!"
+                                                        [attr.data-testid]="'role-' + col.name"
                                                     ></inspecto-option-picker>
-                                                    @if (!holds().get(d.id)!.get(col.name)!.value) {
-                                                        <p class="text-warn m-0 text-xs" role="alert">
-                                                            Pick the Entity Type it holds to save it as an Entity.
-                                                        </p>
+                                                    @if (derivedRoles().get(d.id)?.get(col.name); as dr) {
+                                                        @if (dr.role === r) {
+                                                            <p
+                                                                class="text-secondary m-0 text-xs"
+                                                                [attr.data-testid]="'derived-' + col.name"
+                                                            >
+                                                                From
+                                                                {{ dr.mappings.length === 1 ? 'Mapping' : 'Mappings' }}
+                                                                {{ dr.mappings.join(', ') }}: not set on this Dataset.
+                                                            </p>
+                                                        }
                                                     }
-                                                } @else if (r === 'measure') {
-                                                    <inspecto-pen-field
-                                                        label="Unit"
-                                                        [ariaLabel]="col.name + ' unit'"
-                                                        placeholder="USD, s, bytes"
-                                                        [maxlength]="32"
-                                                        help="What it counts in"
-                                                        [formControl]="units().get(d.id)!.get(col.name)!"
-                                                        [attr.data-testid]="'unit-' + col.name"
-                                                    ></inspecto-pen-field>
-                                                }
-                                                <!-- LA-COLUMN-ROLES-1 P2: a Time, Measure or Category rides on every link unless kept off -->
-                                                @if (r === 'temporal' || r === 'measure' || r === 'dimension') {
-                                                    <inspecto-option-picker
-                                                        label="Keep on each link"
-                                                        [options]="carriedOptions"
-                                                        [formControl]="carried().get(d.id)!.get(col.name)!"
-                                                        [attr.data-testid]="'carried-' + col.name"
-                                                    ></inspecto-option-picker>
-                                                }
+                                                </div>
+                                                <div class="flex flex-col">
+                                                    @if (r === 'entity') {
+                                                        <inspecto-option-picker
+                                                            [label]="col.name + ' holds'"
+                                                            [options]="
+                                                                holdsOptions().get(d.id + '/' + col.name) ??
+                                                                typeOptions()
+                                                            "
+                                                            [formControl]="holds().get(d.id)!.get(col.name)!"
+                                                            [attr.data-testid]="'entity-' + col.name"
+                                                        ></inspecto-option-picker>
+                                                        @if (!holds().get(d.id)!.get(col.name)!.value) {
+                                                            <p class="text-warn m-0 text-xs" role="alert">
+                                                                Pick the Entity Type it holds to save it as an Entity.
+                                                            </p>
+                                                        }
+                                                    } @else if (r === 'measure') {
+                                                        <inspecto-pen-field
+                                                            label="Unit"
+                                                            [ariaLabel]="col.name + ' unit'"
+                                                            placeholder="USD, s, bytes"
+                                                            [maxlength]="32"
+                                                            help="What it counts in"
+                                                            [formControl]="units().get(d.id)!.get(col.name)!"
+                                                            [attr.data-testid]="'unit-' + col.name"
+                                                        ></inspecto-pen-field>
+                                                    }
+                                                    <!-- LA-COLUMN-ROLES-1 P2: a Time, Measure or Category rides on every link unless kept off -->
+                                                    @if (r === 'temporal' || r === 'measure' || r === 'dimension') {
+                                                        <inspecto-option-picker
+                                                            label="Keep on each link"
+                                                            [options]="carriedOptions"
+                                                            [formControl]="carried().get(d.id)!.get(col.name)!"
+                                                            [attr.data-testid]="'carried-' + col.name"
+                                                        ></inspecto-option-picker>
+                                                    }
+                                                </div>
                                             </div>
                                         }
                                     </div>

@@ -237,9 +237,9 @@ export class MyWorkComponent implements OnInit {
     readonly cases = signal<CaseRow[] | null>(null);
     /** The saved views could not be read (the empty state then says so instead of "No case yet"). */
     readonly casesFailed = signal(false);
-    protected readonly pageSizes = [5, 10, 25] as const;
+    protected readonly pageSizes = [6, 12, 24] as const;
     readonly query = signal('');
-    readonly pageSize = signal<number>(5);
+    readonly pageSize = signal<number>(6);
     readonly pageIndex = signal(0);
     /** The cases the search keeps, still most recent first. */
     readonly matches = computed(() => filterCases(this.cases() ?? [], this.query()));

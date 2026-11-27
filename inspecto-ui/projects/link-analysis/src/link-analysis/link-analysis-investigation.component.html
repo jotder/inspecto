@@ -1033,7 +1033,9 @@
                     >
                         Start Investigation{{
                             store.queuedSeeds().length
-                                ? ' with ' + store.queuedSeeds().length + ' queued start entities'
+                                ? ' (' +
+                                  store.queuedSeeds().length +
+                                  (store.queuedSeeds().length === 1 ? ' entity)' : ' entities)')
                                 : ''
                         }}
                     </button>

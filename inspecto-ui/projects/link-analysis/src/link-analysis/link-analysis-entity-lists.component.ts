@@ -120,63 +120,94 @@ import { SuggestedList, activeDomainProfileId, domainProfile } from '@inspecto/l
                                         {{ purposeLabel(l.purpose) }} · {{ typeLabel(l.entityType) }} · {{ l.size }}
                                         {{ l.size === 1 ? 'member' : 'members' }}
                                     </div>
-                                    @if (canWrite() && !l.retired) {
-                                        <div class="mt-1 flex flex-wrap gap-1">
-                                            <button
-                                                mat-button
-                                                [disabled]="busy() || !selection().ids.length"
-                                                (click)="addSelection(l)"
-                                                [attr.aria-label]="'Add the selected entity to ' + l.title"
-                                            >
-                                                Add selection
-                                            </button>
-                                            <button
-                                                mat-button
-                                                [disabled]="busy()"
-                                                (click)="editEntries(l)"
-                                                [attr.aria-label]="'Edit the entries of ' + l.title"
-                                            >
-                                                Edit entries…
-                                            </button>
-                                            @if (store.active()) {
+                                    @if ((canWrite() || canAuthorDataset()) && !l.retired) {
+                                        <div
+                                            class="mt-2 flex flex-wrap items-center gap-1.5 border-t pt-2"
+                                            style="border-color: var(--gamma-border)"
+                                        >
+                                            @if (canWrite()) {
                                                 <button
-                                                    mat-button
-                                                    [disabled]="store.busy()"
-                                                    (click)="excludeBy(l)"
-                                                    [attr.aria-label]="'Exclude by list ' + l.title"
+                                                    mat-stroked-button
+                                                    type="button"
+                                                    class="!h-7 !min-w-0 !px-2.5 !text-xs"
+                                                    [disabled]="busy() || !selection().ids.length"
+                                                    (click)="addSelection(l)"
+                                                    [attr.aria-label]="'Add the selected entity to ' + l.title"
                                                 >
-                                                    Exclude by list
+                                                    <mat-icon
+                                                        class="icon-size-3.5"
+                                                        svgIcon="heroicons_outline:plus"
+                                                    ></mat-icon>
+                                                    Add selection
                                                 </button>
                                                 <button
-                                                    mat-button
-                                                    [disabled]="store.busy()"
-                                                    (click)="seedBy(l)"
-                                                    [attr.aria-label]="'Seed by list ' + l.title"
+                                                    mat-stroked-button
+                                                    type="button"
+                                                    class="!h-7 !min-w-0 !px-2.5 !text-xs"
+                                                    [disabled]="busy()"
+                                                    (click)="editEntries(l)"
+                                                    [attr.aria-label]="'Edit the entries of ' + l.title"
                                                 >
-                                                    Seed by list
+                                                    <mat-icon
+                                                        class="icon-size-3.5"
+                                                        svgIcon="heroicons_outline:pencil-square"
+                                                    ></mat-icon>
+                                                    Edit entries…
+                                                </button>
+                                                @if (store.active()) {
+                                                    <button
+                                                        mat-stroked-button
+                                                        type="button"
+                                                        class="!h-7 !min-w-0 !px-2.5 !text-xs"
+                                                        [disabled]="store.busy()"
+                                                        (click)="excludeBy(l)"
+                                                        [attr.aria-label]="'Exclude by list ' + l.title"
+                                                    >
+                                                        <mat-icon
+                                                            class="icon-size-3.5"
+                                                            svgIcon="heroicons_outline:no-symbol"
+                                                        ></mat-icon>
+                                                        Exclude by list
+                                                    </button>
+                                                    <button
+                                                        mat-stroked-button
+                                                        type="button"
+                                                        class="!h-7 !min-w-0 !px-2.5 !text-xs"
+                                                        [disabled]="store.busy()"
+                                                        (click)="seedBy(l)"
+                                                        [attr.aria-label]="'Seed by list ' + l.title"
+                                                    >
+                                                        <mat-icon
+                                                            class="icon-size-3.5"
+                                                            svgIcon="heroicons_outline:play"
+                                                        ></mat-icon>
+                                                        Seed by list
+                                                    </button>
+                                                }
+                                                <button
+                                                    mat-stroked-button
+                                                    type="button"
+                                                    color="warn"
+                                                    class="!h-7 !min-w-0 !px-2.5 !text-xs"
+                                                    [disabled]="busy()"
+                                                    (click)="retire(l)"
+                                                    [attr.aria-label]="'Retire ' + l.title"
+                                                >
+                                                    Retire
                                                 </button>
                                             }
-                                            <button
-                                                mat-button
-                                                color="warn"
-                                                [disabled]="busy()"
-                                                (click)="retire(l)"
-                                                [attr.aria-label]="'Retire ' + l.title"
-                                            >
-                                                Retire
-                                            </button>
-                                        </div>
-                                    }
-                                    @if (canAuthorDataset() && !l.retired) {
-                                        <div class="mt-1 flex flex-wrap gap-1">
-                                            <button
-                                                mat-button
-                                                [disabled]="busy()"
-                                                (click)="registerDataset(l)"
-                                                [attr.aria-label]="'Register ' + l.title + ' as a Dataset'"
-                                            >
-                                                Register as Dataset
-                                            </button>
+                                            @if (canAuthorDataset()) {
+                                                <button
+                                                    mat-stroked-button
+                                                    type="button"
+                                                    class="!h-7 !min-w-0 !px-2.5 !text-xs"
+                                                    [disabled]="busy()"
+                                                    (click)="registerDataset(l)"
+                                                    [attr.aria-label]="'Register ' + l.title + ' as a Dataset'"
+                                                >
+                                                    Register as Dataset
+                                                </button>
+                                            }
                                         </div>
                                     }
                                 </li>

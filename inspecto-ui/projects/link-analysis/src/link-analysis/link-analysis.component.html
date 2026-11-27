@@ -201,19 +201,26 @@
                 aria-label="Link Analysis tools"
                 data-testid="la-tool-rail"
             >
-                <!-- File ▾ is the first icon of the toolbox (operator 2026-10-28) -->
+                <!-- File ▾ is the first action of the toolbox (operator 2026-10-28) -->
                 <button
-                    mat-icon-button
-                    class="shrink-0"
+                    mat-button
+                    type="button"
+                    class="!h-8 !min-w-0 shrink-0 !px-2 text-xs font-medium"
                     [matMenuTriggerFor]="fileMenu"
                     #fileTrigger="matMenuTrigger"
                     matTooltip="File"
                     aria-label="File"
                     data-testid="la-file"
                 >
-                    <mat-icon svgIcon="heroicons_outline:document-text"></mat-icon>
+                    <mat-icon class="icon-size-4" svgIcon="heroicons_outline:document-text"></mat-icon>
+                    <span>File</span>
                 </button>
                 @if (graph()) {
+                    <span
+                        class="mx-0.5 h-5 w-px shrink-0"
+                        style="background: var(--gamma-border)"
+                        aria-hidden="true"
+                    ></span>
                     <!-- search nodes (icon → popover) -->
                     <button
                         mat-icon-button
@@ -287,13 +294,16 @@
 
                     <!-- layout toolbox -->
                     <button
-                        mat-icon-button
+                        mat-button
+                        type="button"
+                        class="!h-8 !min-w-0 shrink-0 !px-2 text-xs font-medium"
                         [matMenuTriggerFor]="layoutMenu"
                         [color]="layoutId() !== 'dagre' ? 'primary' : undefined"
                         matTooltip="Layout"
                         aria-label="Layout"
                     >
-                        <mat-icon svgIcon="heroicons_outline:squares-2x2"></mat-icon>
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:squares-2x2"></mat-icon>
+                        <span>Layout</span>
                     </button>
                     <mat-menu #layoutMenu="matMenu">
                         @for (l of layouts; track l.id) {
@@ -442,6 +452,11 @@
                     </form>
                 </mat-menu>
 
+                <span
+                    class="mx-0.5 h-5 w-px shrink-0"
+                    style="background: var(--gamma-border)"
+                    aria-hidden="true"
+                ></span>
                 <inspecto-link-analysis-glossary />
 
                 @if (graph() || workingSetCanvas()) {
@@ -840,9 +855,17 @@
                     >
                         <mat-icon svgIcon="heroicons_outline:viewfinder-circle"></mat-icon>
                     </button>
-                    <!-- Export group: one rail icon, the four formats as menu items -->
-                    <button mat-icon-button [matMenuTriggerFor]="exportMenu" matTooltip="Export" aria-label="Export">
-                        <mat-icon svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+                    <!-- Export group: one rail action, the four formats as menu items -->
+                    <button
+                        mat-button
+                        type="button"
+                        class="!h-8 !min-w-0 shrink-0 !px-2 text-xs font-medium"
+                        [matMenuTriggerFor]="exportMenu"
+                        matTooltip="Export"
+                        aria-label="Export"
+                    >
+                        <mat-icon class="icon-size-4" svgIcon="heroicons_outline:arrow-down-tray"></mat-icon>
+                        <span>Export</span>
                     </button>
                     <mat-menu #exportMenu="matMenu">
                         <button mat-menu-item (click)="exportPng()" aria-label="Export as PNG">
@@ -992,8 +1015,9 @@
                         data-testid="la-group-edits"
                     >
                         <button
-                            mat-icon-button
+                            mat-button
                             type="button"
+                            class="!h-8 !min-w-0 shrink-0 !px-2 text-xs font-medium"
                             (click)="growExclude.growOpen() ? closeExpand() : openExpand()"
                             [color]="growExclude.growOpen() ? 'primary' : undefined"
                             [attr.aria-expanded]="growMode() === 'investigation' ? null : growExclude.growOpen()"
@@ -1007,7 +1031,8 @@
                             data-testid="la-grow-button"
                         >
                             <!-- outward arrows from a centre: distinct from Full screen's corner arrows (operator 2026-10-28) -->
-                            <mat-icon svgIcon="mat_outline:open_with" aria-hidden="true"></mat-icon>
+                            <mat-icon class="icon-size-4" svgIcon="mat_outline:open_with" aria-hidden="true"></mat-icon>
+                            <span>Expand</span>
                         </button>
                         <!-- slot: Collapse (lane P1c, §5.5) -->
                         <button

@@ -38,9 +38,12 @@ import { AiStatusData, AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.d
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { ALERTS_INVESTIGATION_ROUTE } from './alerts-investigation-route';
 import {
+    comparatorWords,
+    durationWords,
     firedScopeKind,
     firedScopeText,
     firedWatchText,
+    numberWords,
     readableId,
     ruleConditionText,
     ruleName,
@@ -119,9 +122,28 @@ export class AlertsComponent implements OnInit {
                 if (!a) return '—';
                 return `${a.kind === 'anomaly-model' ? 'Anomaly Model' : 'Risk Score'} ${a.model}`;
             },
+            tooltipValueGetter: (p) => {
+                const a = p.data?.afterScore;
+                if (!a) return '';
+                return `${a.kind === 'anomaly-model' ? 'Anomaly Model' : 'Risk Score'} ${a.model}`;
+            },
         },
-        { field: 'dataset', headerName: 'Dataset', flex: 1, minWidth: 140, valueFormatter: (p) => p.value || '—' },
-        { field: 'error', headerName: 'Problem', flex: 2, minWidth: 160, valueFormatter: (p) => p.value || '' },
+        {
+            field: 'dataset',
+            headerName: 'Dataset',
+            flex: 1,
+            minWidth: 140,
+            valueFormatter: (p) => p.value || '—',
+            tooltipField: 'dataset',
+        },
+        {
+            field: 'error',
+            headerName: 'Problem',
+            flex: 2,
+            minWidth: 160,
+            valueFormatter: (p) => p.value || '',
+            tooltipField: 'error',
+        },
         {
             colId: 'lastRefusal',
             headerName: 'Why still pending',
@@ -134,40 +156,52 @@ export class AlertsComponent implements OnInit {
                 const at = new Date(r.at);
                 return `${r.reason} (${isNaN(at.getTime()) ? r.at : at.toLocaleString()})`;
             },
+            tooltipValueGetter: (p) => {
+                const r = p.data?.lastRefusal;
+                if (!r) return '';
+                const at = new Date(r.at);
+                return `${r.reason} (${isNaN(at.getTime()) ? r.at : at.toLocaleString()})`;
+            },
         },
     ];
 
     /** True once any pending rule carries its latest refusal — the reason is then shown per row, not in the audit log. */
     readonly pendingHasRefusal = computed(() => this.pending().some((p) => !!p.lastRefusal));
 
-    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed badges also cap (maxWidth).
+    // DataTable's default flex overrides a bare width, so widths here are floors (minWidth); fixed-width columns set
+    // flex: 0 so they do not steal horizontal space from Alert Rule, Scope, Watches, and Message at 1366x768.
     readonly columnDefs: ColDef<FiredAlert>[] = [
         {
             field: 'epochMillis',
             headerName: 'When',
-            minWidth: 180,
+            width: 170,
+            minWidth: 155,
+            flex: 0,
             sort: 'desc',
             valueFormatter: (p) => fmtDateTime(p.value),
         },
         {
             field: 'severity',
             headerName: 'Severity',
-            minWidth: 120,
-            maxWidth: 120,
+            minWidth: 145,
+            maxWidth: 155,
+            flex: 0,
             cellRenderer: (p: ICellRendererParams<FiredAlert>) => statusBadgeHtml(p.value as string),
         },
         {
             field: 'state',
             headerName: 'State',
-            minWidth: 150,
+            minWidth: 145,
             maxWidth: 150,
+            flex: 0,
             cellRenderer: (p: ICellRendererParams<FiredAlert>) => (p.value ? statusBadgeHtml(p.value as string) : '—'),
         },
         // The stored id stays in the tooltip; the cell is what a person calls the rule.
         {
             colId: 'rule',
             headerName: 'Alert Rule',
-            flex: 1,
+            minWidth: 170,
+            flex: 1.5,
             valueGetter: (p) => (p.data ? ruleName(this.ruleOf(p.data), p.data.rule) : ''),
             tooltipValueGetter: (p) => p.data?.rule,
         },
@@ -175,51 +209,113 @@ export class AlertsComponent implements OnInit {
         {
             colId: 'scope',
             headerName: 'Scope',
-            flex: 1,
+            minWidth: 160,
+            flex: 1.5,
             valueGetter: (p) => (p.data ? firedScopeText(p.data, this.ruleOf(p.data)) : ''),
+            tooltipValueGetter: (p) => (p.data ? firedScopeText(p.data, this.ruleOf(p.data)) : ''),
         },
         {
             colId: 'watches',
             headerName: 'Watches',
-            minWidth: 160,
+            minWidth: 170,
+            flex: 1.5,
             valueGetter: (p) => (p.data ? firedWatchText(p.data.metric) : ''),
+            tooltipValueGetter: (p) => (p.data ? firedWatchText(p.data.metric) : ''),
         },
-        { field: 'value', headerName: 'Value', minWidth: 110 },
-        // One line per row, full text in the tooltip: `autoHeight` measured the message before the flex columns were
-        // sized, so the first render drew very tall rows with empty cells until a search re-rendered them.
-        { field: 'message', headerName: 'Message', flex: 3, tooltipField: 'message' },
+        { field: 'value', headerName: 'Value', width: 115, minWidth: 110, flex: 0 },
+        // One line per row, full text in the tooltip and expandable detail panel below.
+        { field: 'message', headerName: 'Message', minWidth: 240, flex: 2.5, tooltipField: 'message' },
     ];
 
     readonly ruleColumnDefs: ColDef<AlertRule>[] = [
         {
             colId: 'name',
             headerName: 'Name',
-            flex: 1,
-            minWidth: 160,
+            flex: 1.5,
+            minWidth: 180,
             valueGetter: (p) => (p.data ? ruleName(p.data, p.data.name) : ''),
             tooltipValueGetter: (p) => p.data?.name,
         },
         {
             colId: 'watches',
             headerName: 'Watches',
-            flex: 1,
-            minWidth: 140,
+            flex: 1.5,
+            minWidth: 170,
             valueGetter: (p) => (p.data ? ruleWatchText(p.data) : ''),
+            tooltipValueGetter: (p) => (p.data ? ruleWatchText(p.data) : ''),
         },
-        { headerName: 'Condition', minWidth: 170, valueGetter: (p) => (p.data ? ruleConditionText(p.data) : '') },
+        {
+            headerName: 'Condition',
+            flex: 1.5,
+            minWidth: 180,
+            valueGetter: (p) => (p.data ? ruleConditionText(p.data) : ''),
+            tooltipValueGetter: (p) => (p.data ? ruleConditionText(p.data) : ''),
+        },
         {
             field: 'severity',
             headerName: 'Severity',
-            minWidth: 120,
-            maxWidth: 120,
+            minWidth: 145,
+            maxWidth: 155,
+            flex: 0,
             cellRenderer: (p: ICellRendererParams<AlertRule>) => statusBadgeHtml(p.value as string),
         },
         {
             headerName: 'Scope',
-            minWidth: 160,
+            flex: 1.5,
+            minWidth: 170,
             valueGetter: (p) => (p.data ? ruleScopeText(p.data) : ''),
+            tooltipValueGetter: (p) => (p.data ? ruleScopeText(p.data) : ''),
         },
     ];
+
+    /** Selected fired alert for the inline expandable detail panel; clicking the same row again collapses it. */
+    readonly selectedAlert = signal<FiredAlert | null>(null);
+
+    /** Toggle the inline detail panel for a fired alert row. */
+    toggleAlertDetail(alert: FiredAlert): void {
+        const cur = this.selectedAlert();
+        if (cur && sameAlert(cur, alert)) {
+            this.selectedAlert.set(null);
+            return;
+        }
+        this.selectedAlert.set(alert);
+    }
+
+    /** Close the inline alert detail panel. */
+    closeAlertDetail(): void {
+        this.selectedAlert.set(null);
+    }
+
+    /** Human-readable rule name for the selected alert detail header. */
+    alertRuleLabel(a: FiredAlert): string {
+        return ruleName(this.ruleOf(a), a.rule);
+    }
+
+    /** Human-readable scope for the selected alert detail panel. */
+    alertScopeLabel(a: FiredAlert): string {
+        return firedScopeText(a, this.ruleOf(a));
+    }
+
+    /** Human-readable watched metric for the selected alert detail panel. */
+    alertWatchLabel(a: FiredAlert): string {
+        return firedWatchText(a.metric) || a.metric || '—';
+    }
+
+    /** Human-readable threshold condition for the selected alert detail panel. */
+    alertConditionLabel(a: FiredAlert): string {
+        const base = `${comparatorWords(a.comparator)} ${numberWords(a.threshold)}`;
+        return a.window ? `${base} over the last ${durationWords(a.window)}` : base;
+    }
+
+    /** Formatted timestamp for the selected alert detail panel. */
+    alertTimeLabel(a: FiredAlert): string {
+        return fmtDateTime(a.epochMillis);
+    }
+
+    /** Formatted observed value for the selected alert detail panel. */
+    alertValueLabel(a: FiredAlert): string {
+        return numberWords(a.value);
+    }
 
     /** Polite live region: success ("<title> acknowledged") and plain-language failures. Focus lands here after an action. */
     readonly statusMessage = signal<{ text: string; error: boolean } | null>(null);
@@ -310,8 +406,10 @@ export class AlertsComponent implements OnInit {
         if (!id) return;
         const before = alert.state;
         const title = alertTitle(alert);
-        const setState = (state: FiredAlert['state']) =>
+        const setState = (state: FiredAlert['state']) => {
             this.alerts.update((rows) => rows.map((r) => (r.id === id ? { ...r, state } : r)));
+            this.selectedAlert.update((cur) => (cur?.id === id ? { ...cur, state } : cur));
+        };
         optimisticMutate({
             apply: () => setState(verb === 'acknowledged' ? 'ACKNOWLEDGED' : 'RESOLVED'),
             commit: verb === 'acknowledged' ? this.api.acknowledge(id) : this.api.resolve(id),
@@ -463,6 +561,11 @@ export class AlertsComponent implements OnInit {
             error: (err) => this.toastr.error(apiErrorMessage(err, `Could not delete “${name}”.`)),
         });
     }
+}
+
+export function sameAlert(a: FiredAlert, b: FiredAlert): boolean {
+    if (a.id && b.id) return a.id === b.id;
+    return a.rule === b.rule && a.epochMillis === b.epochMillis && a.pipeline === b.pipeline;
 }
 
 /** What an Alert is called in a button name or announcement: its message, else its rule. */

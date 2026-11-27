@@ -205,9 +205,14 @@ const TABS = ['types', 'columns'] as const;
                     ></inspecto-status-badge>
                 </div>
                 @if (primaryIn?.length) {
-                    <div>
-                        <inspecto-chip variant="soft" tone="primary" data-testid="primary-chip"
-                            >Primary in {{ primaryIn.join(', ') }}</inspecto-chip
+                    <div class="min-w-0">
+                        <inspecto-chip
+                            class="max-w-full truncate"
+                            variant="soft"
+                            tone="primary"
+                            data-testid="primary-chip"
+                            [title]="'Primary in ' + primaryIn.join(', ')"
+                            >Primary in {{ primaryIn.length > 2 ? primaryIn.slice(0, 2).join(', ') + ' +' + (primaryIn.length - 2) : primaryIn.join(', ') }}</inspecto-chip
                         >
                     </div>
                 }

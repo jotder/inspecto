@@ -49,7 +49,10 @@ export class FirstRun {
      * the Space list has loaded (`multiSpace` starts false), so nothing flashes on sign-in.
      */
     readonly noAccess = computed(
-        () => this.spaces.multiSpace() && this.spaces.availableSpaces().length === 0 && !this.canCreate(),
+        () =>
+            (this.spaces.multiSpace() || (this.session.authMode() === 'oidc' && this.spaces.loaded())) &&
+            this.spaces.availableSpaces().length === 0 &&
+            !this.canCreate(),
     );
 
     /**

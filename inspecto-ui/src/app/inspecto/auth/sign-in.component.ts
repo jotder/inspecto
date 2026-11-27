@@ -114,7 +114,7 @@ import { APP_ENVIRONMENT } from '../api/app-environment';
                     @if (startupError()) {
                         <!-- No picker and no SSO button: either would lead to a session the server cannot serve. -->
                     } @else if (demo()) {
-                        <inspecto-alert class="mt-4 block text-left" variant="warning" title="Local sign-in">
+                        <inspecto-alert class="mt-4 block text-left" variant="info" title="Local sign-in">
                             Not secure, local only.
                         </inspecto-alert>
                         @if (noSpace()) {

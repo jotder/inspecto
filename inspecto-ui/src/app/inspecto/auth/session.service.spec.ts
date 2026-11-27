@@ -721,6 +721,24 @@ describe('SessionService (W6d edition switch)', () => {
         await tick();
         expect(svc.capabilities()).toEqual(['a']);
     });
+
+    it('deliberate sign-out resets SpacesService so the next user does not inherit the prior Space roster', async () => {
+        const spaces = TestBed.inject(SpacesService);
+        spaces.multiSpace.set(true);
+        spaces.availableSpaces.set([
+            { id: 'la-banking', displayName: 'Banking and finance', description: '', createdAt: '' },
+        ]);
+        spaces.loaded.set(true);
+        spaces.selectSpace('la-banking');
+
+        svc.logout();
+        httpMock.expectOne(`${base}/auth/logout`).flush({ loggedOut: true });
+        await tick();
+
+        expect(spaces.availableSpaces()).toEqual([]);
+        expect(spaces.loaded()).toBe(false);
+        expect(spaces.currentSpaceId()).toBeNull();
+    });
 });
 
 describe('SessionService return path (mock sign-in)', () => {
