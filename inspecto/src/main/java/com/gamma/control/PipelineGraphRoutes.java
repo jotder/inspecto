@@ -8,6 +8,7 @@ import com.gamma.config.io.ConfigCodec;
 import com.gamma.config.io.ConfigLoader;
 import com.gamma.config.spec.Finding;
 import com.gamma.config.spec.Severity;
+import com.gamma.job.AttachApprovals;
 import com.gamma.etl.PipelineConfig;
 import com.gamma.pipeline.ComponentRegistry;
 import com.gamma.pipeline.ComponentStore;
@@ -788,6 +789,21 @@ final class PipelineGraphRoutes implements RouteModule {
 
         boolean preview = body != null && Boolean.TRUE.equals(body.get("preview"));
         if (!preview) {
+            // One act writes three files (the onboarding Pipeline, the Job Pipeline, the Job), so it cannot become ONE
+            // replayable Pending Change: under a policy for any of those kinds it is refused (holdRefusing), as the
+            // Pipeline bundle import is. Each file passes the gate every save path runs before anything is written.
+            PendingChanges.holdRefusing(api, List.of("pipeline", "job"),
+                    "splitting a Pipeline writes two Pipelines and a Job in one act");
+            List<Finding> refused = new ArrayList<>();
+            refused.addAll(SaveGate.check(api, "pipeline", afterOnboardingMap, writeRoot, parent,
+                    SaveGate.Referents.MUST_EXIST));
+            refused.addAll(SaveGate.check(api, "pipeline", jobPipeMap, writeRoot, jobFolder,
+                    SaveGate.Referents.MUST_EXIST));
+            if (SaveGate.refuses(refused))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "the split has ERROR-level findings; "
+                        + "nothing written: " + refused.stream().filter(f -> f.severity() == Severity.ERROR)
+                        .map(f -> f.fieldPath() + " " + f.message()).toList());
+            JobWriteGuard.refuseImport(jobBody, AttachApprovals.templates(writeRoot));
             Files.createDirectories(jobFolder);
             AtomicFiles.write(onboardingPath, afterOnboarding.getBytes(StandardCharsets.UTF_8), ".cfg-");
             AtomicFiles.write(jobPipePath, jobPipeToon.getBytes(StandardCharsets.UTF_8), ".cfg-");

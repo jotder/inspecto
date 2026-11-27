@@ -61,30 +61,27 @@ class JobGraphRoutesTest {
     }
 
     @Test
+    void splitJobPipelineIsRefusedUnderAnApprovalPolicyAndWritesNothing(@TempDir Path dir) throws Exception {
+        Path writeRoot = Files.createDirectories(dir.resolve("config"));
+        Path pipe = seedCdr(dir, writeRoot);
+        Files.writeString(writeRoot.resolve("approval.toon"), "approval:\n  pipeline:\n    required: true\n");
+        String before = Files.readString(pipe);
+        try (Ctx ctx = start(dir, writeRoot, List.of(pipe))) {
+            assertEquals(200, send(ctx.port(), "POST", "/pipelines/cdr/split-job-pipeline", "{\"preview\":true}")
+                    .statusCode(), "a preview writes nothing, so a policy does not refuse it");
+            HttpResponse<String> apply = send(ctx.port(), "POST", "/pipelines/cdr/split-job-pipeline",
+                    "{\"preview\":false}");
+            assertEquals(409, apply.statusCode(), apply.body());
+            assertTrue(apply.body().contains("approval policy"), apply.body());
+            assertEquals(before, Files.readString(pipe), "the onboarding Pipeline is untouched");
+            assertFalse(Files.exists(writeRoot.resolve("cdr_enriched")), "no Job Pipeline or Job folder written");
+        }
+    }
+
+    @Test
     void splitJobPipelinePreviewsAndWritesTwoFilesPlusJob(@TempDir Path dir) throws Exception {
         Path writeRoot = Files.createDirectories(dir.resolve("config"));
-        Path cdrDir = Files.createDirectories(writeRoot.resolve("cdr"));
-        Files.writeString(cdrDir.resolve("cdr_schema.toon"), """
-                raw:
-                  name: cdr
-                  format: CSV
-                  fields[2]{name,selector,type}:
-                    dial_prefix,"0",VARCHAR
-                    duration,"1",VARCHAR
-                """);
-        Path mini = PipelineConfigBatchTest.writePipeline(Files.createDirectories(dir.resolve("seed")), "", false);
-        String miniSchema = mini.resolveSibling("mini_schema.toon").toString().replace('\\', '/');
-        Path pipe = cdrDir.resolve("cdr_pipeline.toon");
-        Files.writeString(pipe, Files.readString(mini)
-                .replace("name: MINI_ETL", "name: cdr")
-                .replace("active: false\n", """
-                        active: false
-                        output_store: cdr_enriched
-                        steps[1]:
-                          - sql:
-                              sql: SELECT dial_prefix, TRY_CAST(duration AS BIGINT) AS duration FROM input
-                        """)
-                .replace(miniSchema, "cdr_schema.toon"));
+        Path pipe = seedCdr(dir, writeRoot);
 
         try (Ctx ctx = start(dir, writeRoot, List.of(pipe))) {
             // 1. Preview returns diff without writing
@@ -110,6 +107,33 @@ class JobGraphRoutesTest {
             assertFalse(Files.readString(pipe).contains("output_store:"), "onboarding pipeline stripped output_store");
             assertTrue(Files.readString(jobFile).contains("on_pipeline: cdr"), "Job triggered on_pipeline: cdr");
         }
+    }
+
+    /** A registered onboarding Pipeline {@code cdr} with a Stage-2 chain and {@code output_store: cdr_enriched}. */
+    private Path seedCdr(Path dir, Path writeRoot) throws Exception {
+        Path cdrDir = Files.createDirectories(writeRoot.resolve("cdr"));
+        Files.writeString(cdrDir.resolve("cdr_schema.toon"), """
+                raw:
+                  name: cdr
+                  format: CSV
+                  fields[2]{name,selector,type}:
+                    dial_prefix,"0",VARCHAR
+                    duration,"1",VARCHAR
+                """);
+        Path mini = PipelineConfigBatchTest.writePipeline(Files.createDirectories(dir.resolve("seed")), "", false);
+        String miniSchema = mini.resolveSibling("mini_schema.toon").toString().replace('\\', '/');
+        Path pipe = cdrDir.resolve("cdr_pipeline.toon");
+        Files.writeString(pipe, Files.readString(mini)
+                .replace("name: MINI_ETL", "name: cdr")
+                .replace("active: false\n", """
+                        active: false
+                        output_store: cdr_enriched
+                        steps[1]:
+                          - sql:
+                              sql: SELECT dial_prefix, TRY_CAST(duration AS BIGINT) AS duration FROM input
+                        """)
+                .replace(miniSchema, "cdr_schema.toon"));
+        return pipe;
     }
 
     @Test

@@ -127,6 +127,9 @@ class ConfigWriteFunnelTest {
             Map.entry("PUT /settings/approvers", APPROVERS),
             Map.entry("PUT /settings/publication-destinations", PUBLICATION_DESTINATIONS),
             Map.entry("PUT /settings/mail-attachments", MAIL_ATTACH),
+            Map.entry("POST /pipelines/([^/]+)/split-job-pipeline", "writes two Pipelines and a Job in ONE act, which "
+                    + "cannot be one replayable Pending Change — under a policy for pipeline or job it is refused "
+                    + "(PendingChanges.holdRefusing), as the Pipeline bundle import is"),
             Map.entry("POST /pipelines/rename/resume",
                     "finishes a rename that was already let through (held and approved, or ungoverned) — holding "
                             + "the recovery would strand a half-moved identity")
