@@ -1,0 +1,95 @@
+{
+  "kind" : "notification-rule",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "operations" : {
+    "create" : {
+      "route" : "POST /notifications/rules",
+      "content" : "content"
+    },
+    "update" : {
+      "route" : "PUT /notifications/rules/{id}",
+      "content" : "content"
+    },
+    "delete" : {
+      "route" : "DELETE /notifications/rules/{id}",
+      "content" : null
+    }
+  },
+  "shapes" : {
+    "content" : {
+      "source" : "NotificationRule.MODELLED + NotificationRule.fromMap",
+      "unknownKeys" : "refused",
+      "extensionPrefix" : "x-",
+      "fields" : [
+        {
+          "path" : "bodyTemplate",
+          "type" : "string",
+          "required" : false,
+          "default" : "{{message}}"
+        },
+        {
+          "path" : "category",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "dedupeKeyTemplate",
+          "type" : "string",
+          "required" : false,
+          "default" : "{{type}}:{{correlationId}}"
+        },
+        {
+          "path" : "enabled",
+          "type" : "boolean",
+          "required" : false,
+          "default" : true
+        },
+        {
+          "path" : "eventType",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "id",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "minLevel",
+          "type" : "string",
+          "required" : false,
+          "values" : [
+            "DEBUG",
+            "ERROR",
+            "INFO",
+            "TRACE",
+            "WARN"
+          ]
+        },
+        {
+          "path" : "name",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "titleTemplate",
+          "type" : "string",
+          "required" : false,
+          "default" : "{{type}}"
+        }
+      ],
+      "example" : {
+        "id" : "batch-failures",
+        "eventType" : "BATCH_FAILED",
+        "category" : "pipeline"
+      },
+      "notes" : [
+        "`eventType` names an Event type (the `type` of an Event in `GET /events`); `category` is also the notification preference key that gates delivery (the built-in rules use `pipeline`)."
+      ]
+    }
+  }
+}

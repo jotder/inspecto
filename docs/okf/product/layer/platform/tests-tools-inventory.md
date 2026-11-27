@@ -11,7 +11,7 @@ tags: [tests, layer]
 > **Generated** by `tools/render-tests-inventory.mjs` from the git-tracked `tools/*.test.mjs` files — never edit this table. Hub:
 > [index](index.md) · Product Map Item [`layer.platform`](../../../../../product-map/layer/platform.toon).
 
-131 test file(s). Run one, or all:
+133 test file(s). Run one, or all:
 
 ```bash
 node --test tools/affected-modules.test.mjs
@@ -111,6 +111,8 @@ node --test tools/
 | `tools/regroup-modules.test.mjs` | Fixture-based tests for tools/regroup-modules.mjs: a tiny synthetic git repo in a temp dir, never the real tree. |
 | `tools/release-notes.test.mjs` | Fixture test for tools/release-notes.mjs. Run: node --test tools/release-notes.test.mjs |
 | `tools/render-api-routes.test.mjs` |  |
+| `tools/render-component-shapes.test.mjs` | Tests for tools/render-component-shapes.mjs. Run: node --test tools/render-component-shapes.test.mjs |
+| `tools/render-error-catalogue.test.mjs` | Tests for tools/render-error-catalogue.mjs (ERROR-CATALOGUE-1). Run: node --test tools/render-error-catalogue.test.mjs |
 | `tools/render-feature-db.test.mjs` | Fixture test for tools/render-feature-db.mjs. Run: node --test tools/render-feature-db.test.mjs |
 | `tools/render-handbook-reference.test.mjs` | Tests for tools/render-handbook-reference.mjs. Run: node --test tools/render-handbook-reference.test.mjs |
 | `tools/render-handbook.test.mjs` | Tests for tools/render-handbook.mjs. Run: node --test tools/render-handbook.test.mjs |

@@ -1,0 +1,100 @@
+// Tests for tools/render-error-catalogue.mjs (ERROR-CATALOGUE-1). Run: node --test tools/render-error-catalogue.test.mjs
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { SOURCES, ENTRIES, build, constantsOf, defaultStatuses, uncatalogued, toJson } from './render-error-catalogue.mjs';
+
+const ROOT = join(fileURLToPath(import.meta.url), '..', '..');
+const read = (f) => readFileSync(join(ROOT, f), 'utf8');
+const entries = () => JSON.parse(read(ENTRIES));
+const ERROR_CODES = SOURCES[0].file;
+const FINDING_CODES = SOURCES.find((s) => s.file.endsWith('FindingCodes.java')).file;
+
+/** The real sources, with one file's text replaced. */
+const readWith = (file, edit) => (f) => (f === file ? edit(read(f)) : read(f));
+
+test('the repo builds: every code has a cause and a fix, every envelope code a status', () => {
+    const list = build(read, entries());
+    assert.ok(list.length > 70, `only ${list.length} codes`);
+    for (const e of list) {
+        assert.ok(e.cause && e.fix, e.code);
+        if (e.family === 'envelope') assert.equal(typeof e.status, 'number', e.code);
+    }
+    assert.equal(list.find((e) => e.code === 'CONFIG_VALIDATION_FAILED').status, 422);
+    assert.equal(list.find((e) => e.code === 'RATE_LIMITED').status, 429);   // from the "429 —" Javadoc lead
+    assert.equal(list.find((e) => e.code === 'ERR_STEP_CONFIG_INVALID').severity, 'ERROR');
+    assert.equal(list.find((e) => e.code === 'WARN_STEP_CONFIG_INVALID').severity, 'WARNING');
+});
+
+test('every v1 ErrorCodes constant is in the catalogue (the openapi enum stays the contract)', () => {
+    const codes = new Set(build(read, entries()).map((e) => e.code));
+    const contract = JSON.parse(read('docs/api/openapi-v1.json')).components.schemas.ErrorCode.enum;
+    for (const c of contract) assert.ok(codes.has(c), c);
+});
+
+test('a new code with no entry fails, naming it', () => {
+    const r = readWith(FINDING_CODES, (s) => s.replace(/}\s*$/, '    public static final String ERR_BRAND_NEW = "ERR_BRAND_NEW";\n}\n'));
+    assert.throws(() => build(r, entries()), /ERR_BRAND_NEW .*has no entry/);
+});
+
+test('an entry whose code is gone fails, and an entry with no fix fails', () => {
+    assert.throws(() => build(read, { ...entries(), ERR_GONE: { cause: 'x', fix: 'y' } }), /ERR_GONE is no longer a code/);
+    const e = entries(); delete e.CONFLICT.fix;
+    assert.throws(() => build(read, e), /CONFLICT: no fix/);
+});
+
+test('an envelope code with no derivable status and none authored fails', () => {
+    const r = readWith(ERROR_CODES, (s) => s.replace(/}\s*$/, '    public static final String BRAND_NEW = "BRAND_NEW";\n}\n'));
+    assert.throws(() => build(r, { ...entries(), BRAND_NEW: { cause: 'x', fix: 'y' } }), /BRAND_NEW: no HTTP status/);
+});
+
+test('the sweep finds a stray ERR_ constant and an ApiException naming an uncatalogued code', () => {
+    const list = build(read, entries());
+    const files = { 'a/src/main/java/A.java': 'static final String ERR_ELSEWHERE = "ERR_ELSEWHERE";',
+        'b/src/main/java/B.java': 'throw new ApiException(422, "SOME_LITERAL", "m"); throw new ApiException(409, LOCAL_CODE, "m");',
+        'c/src/main/java/C.java': 'throw new ApiException(422, ErrorCodes.CONFLICT, "m"); throw new ApiException(s, code, "m");'
+            + ' throw new ApiException(422, PipelineValidator.JOIN_REFERENCE_MISSING, "m"); throw new ApiException(422, "NOT_FOUND", "m");' };
+    const out = uncatalogued(Object.keys(files), (f) => files[f], list);
+    assert.equal(out.length, 3, out.join('\n'));
+    assert.match(out.join('\n'), /ERR_ELSEWHERE/);
+    assert.match(out.join('\n'), /SOME_LITERAL/);
+    assert.match(out.join('\n'), /LOCAL_CODE/);
+});
+
+test('the sweep sees a qualified ApiException, a computed status, a Finding literal across lines and a code map', () => {
+    const list = build(read, entries());
+    const files = {
+        'a/src/main/java/A.java': 'throw new com.gamma.spi.auth.ApiException(422, "QUALIFIED_NEW", "m");',
+        'b/src/main/java/B.java': 'throw new ApiException(b ? 409 : 422, "COMPUTED_NEW", "m"); throw new ApiException(r.status(), r.code(), "m");',
+        'c/src/main/java/C.java': 'out.add(new Finding(Severity.ERROR, f(x),\n   "msg " + g(y),\n   "FINDING_NEW", null));',
+        'd/src/main/java/D.java': 'Map.of("code", "MAP_NEW", "key", k); out.add(new Finding(Severity.ERROR, "", m, "UNKNOWN_KEY", null));',
+        'e/src/main/java/E.java': 'throw new SpaceLocations.Refused(409, SpaceLocations.HOLDS_DATA, "m"); throw new Refused(409, NOT_A_CODE, "m");',
+        'f/src/main/java/F.java': 'new com.gamma.config.spec.Finding(Severity.ERROR, "a", "m", "QUALIFIED_FINDING", null); f.coded("CODED_NEW", "g");',
+    };
+    const out = uncatalogued(Object.keys(files), (f) => files[f], list).join('\n');
+    for (const c of ['QUALIFIED_NEW', 'COMPUTED_NEW', 'FINDING_NEW', 'MAP_NEW', 'NOT_A_CODE', 'QUALIFIED_FINDING', 'CODED_NEW'])
+        assert.match(out, new RegExp(c));
+    assert.doesNotMatch(out, /UNKNOWN_KEY|HOLDS_DATA|r\.code/);
+});
+
+test('the sweep over the repo finds nothing uncatalogued', () => {
+    const files = execFileSync('git', ['ls-files', '*/src/main/java/*.java'], { cwd: ROOT, encoding: 'utf8' }).split('\n').filter(Boolean);
+    assert.deepEqual(uncatalogued(files, read, build(read, entries())), []);
+});
+
+test('constant and status parsing', () => {
+    const java = '/** 418 — teapot. */\n public static final String TEA = "TEA";\n static final String B = "B";\n'
+        + 'switch (s) { case 404 -> NOT_FOUND; case 422 -> B; }';
+    assert.deepEqual(constantsOf(java).map((c) => c.name), ['TEA', 'B']);
+    assert.match(constantsOf(java)[0].doc, /^418 — teapot\./);
+    assert.deepEqual(defaultStatuses(java), { NOT_FOUND: 404, B: 422 });
+});
+
+test('the checked-in JSON is the generator output and carries its banner', () => {
+    const have = read('docs/api/errors-v1.json').replace(/\r\n/g, '\n');
+    assert.equal(have, toJson(build(read, entries())));
+    assert.match(JSON.parse(have).$comment, /^Generated by `node tools\/render-error-catalogue\.mjs`/);
+});

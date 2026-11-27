@@ -1,0 +1,242 @@
+{
+  "kind" : "expectation",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "operations" : {
+    "create" : {
+      "route" : "POST /expectations",
+      "content" : "content"
+    },
+    "update" : {
+      "route" : "PUT /expectations/{id}",
+      "content" : "content"
+    },
+    "delete" : {
+      "route" : "DELETE /expectations/{id}",
+      "content" : null
+    }
+  },
+  "shapes" : {
+    "content" : {
+      "source" : "ConfigSpecs.expectation() + Expectation.fromMap (the component key census refuses any other key)",
+      "unknownKeys" : "refused",
+      "extensionPrefix" : "x-",
+      "fields" : [
+        {
+          "path" : "baselineWindow",
+          "type" : "integer",
+          "required" : false,
+          "default" : 7,
+          "description" : "Baseline kind: the median of this many most recent accepted profiles is the baseline."
+        },
+        {
+          "path" : "column",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser",
+          "description" : "The column the check applies to (required for every kind except condition, whose when tree names its own fields)."
+        },
+        {
+          "path" : "columns",
+          "type" : "array",
+          "required" : false,
+          "description" : "Baseline kind: the columns the per-column measures apply to."
+        },
+        {
+          "path" : "createdAt",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "description",
+          "type" : "string",
+          "required" : false,
+          "description" : "What this check asserts."
+        },
+        {
+          "path" : "enabled",
+          "type" : "boolean",
+          "required" : false,
+          "default" : true,
+          "description" : "Whether evaluate-all includes this expectation."
+        },
+        {
+          "path" : "groupBy",
+          "type" : "array",
+          "required" : false,
+          "description" : "Baseline kind: profile each group of these columns separately."
+        },
+        {
+          "path" : "kind",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser",
+          "values" : [
+            "non_null",
+            "range",
+            "regex",
+            "referential",
+            "condition",
+            "baseline"
+          ],
+          "description" : "The data-quality constraint: not-null, numeric range, regex match, referential lookup, an arbitrary condition tree, or a profile baseline."
+        },
+        {
+          "path" : "lastResult",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "limitUnit",
+          "type" : "string",
+          "required" : false,
+          "default" : "percent",
+          "values" : [
+            "percent",
+            "absolute"
+          ],
+          "description" : "Baseline kind: limits as a percentage of the baseline, or absolute."
+        },
+        {
+          "path" : "max",
+          "type" : "string",
+          "required" : false,
+          "description" : "Range upper bound (range kind)."
+        },
+        {
+          "path" : "maxDecrease",
+          "type" : "string",
+          "required" : false,
+          "description" : "Baseline kind: allowed fall under the baseline (in limitUnit)."
+        },
+        {
+          "path" : "maxIncrease",
+          "type" : "string",
+          "required" : false,
+          "description" : "Baseline kind: allowed rise over the baseline (in limitUnit)."
+        },
+        {
+          "path" : "measures",
+          "type" : "array",
+          "required" : false,
+          "description" : "Baseline kind: row_count, null_count, null_rate, distinct_count, min, max, mean."
+        },
+        {
+          "path" : "min",
+          "type" : "string",
+          "required" : false,
+          "description" : "Range lower bound (range kind)."
+        },
+        {
+          "path" : "minPriorDays",
+          "type" : "integer",
+          "required" : false,
+          "default" : 3,
+          "description" : "Baseline kind, trailingDays only: a day with fewer prior days than this is not judged."
+        },
+        {
+          "path" : "name",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "spec",
+          "description" : "Unique name for the data-quality check."
+        },
+        {
+          "path" : "owner",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "pattern",
+          "type" : "string",
+          "required" : false,
+          "description" : "Regex the value must match (regex kind)."
+        },
+        {
+          "path" : "refColumn",
+          "type" : "string",
+          "required" : false,
+          "description" : "Column in the reference dataset (referential kind)."
+        },
+        {
+          "path" : "refDataset",
+          "type" : "string",
+          "required" : false,
+          "description" : "Lookup relation the value must exist in (referential kind)."
+        },
+        {
+          "path" : "requireExistingGroups",
+          "type" : "boolean",
+          "required" : false,
+          "default" : false,
+          "description" : "Baseline kind: a group the baseline has but the input lacks is a violation."
+        },
+        {
+          "path" : "severity",
+          "type" : "string",
+          "required" : false,
+          "default" : "MAJOR",
+          "values" : [
+            "MINOR",
+            "MAJOR",
+            "CRITICAL"
+          ],
+          "description" : "Severity of the Incident raised on failure."
+        },
+        {
+          "path" : "shares",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "target",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "spec",
+          "description" : "Name of the pipeline/job whose at-rest Parquet is scanned."
+        },
+        {
+          "path" : "targetType",
+          "type" : "string",
+          "required" : false,
+          "default" : "pipeline",
+          "values" : [
+            "pipeline",
+            "job"
+          ],
+          "description" : "Whether the target's at-rest data comes from a pipeline or a job."
+        },
+        {
+          "path" : "trailingDays",
+          "type" : "integer",
+          "required" : false,
+          "default" : 0,
+          "description" : "Baseline kind: 0 = off. Above 0 each group (one event day, via groupBy) is judged against the median of this many groups before it in the same data."
+        },
+        {
+          "path" : "updatedAt",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "when",
+          "type" : "object",
+          "required" : false,
+          "description" : "The violation predicate tree (condition kind) — the same query-types shape a Decision Rule authors; compiled to SQL by ConditionSql."
+        }
+      ],
+      "example" : {
+        "name" : "orders-id-present",
+        "kind" : "non_null",
+        "target" : "orders",
+        "column" : "order_id"
+      },
+      "notes" : [
+        "`range` needs `min` or `max`; `regex` a `pattern`; `referential` `refDataset` and `refColumn`; `condition` a `when` tree; `baseline` its baseline keys."
+      ]
+    }
+  }
+}

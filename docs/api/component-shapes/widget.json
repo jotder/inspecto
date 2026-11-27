@@ -1,0 +1,115 @@
+{
+  "kind" : "widget",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "operations" : {
+    "create" : {
+      "route" : "POST /components/widget",
+      "content" : "content"
+    },
+    "update" : {
+      "route" : "PUT /components/widget/{id}",
+      "content" : "content"
+    },
+    "delete" : {
+      "route" : "DELETE /components/widget/{id}",
+      "content" : null
+    }
+  },
+  "shapes" : {
+    "content" : {
+      "source" : "ConfigSpecs.widget() (the component key census refuses any other key)",
+      "unknownKeys" : "refused",
+      "extensionPrefix" : "x-",
+      "fields" : [
+        {
+          "path" : "controls",
+          "type" : "object",
+          "required" : false,
+          "description" : "The field→channel mapping the viz plugin compiles to a query (e.g. value / x / y / series)."
+        },
+        {
+          "path" : "dataset",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "datasetId",
+          "type" : "string",
+          "required" : false,
+          "description" : "The dataset the widget queries (empty for a view-bound widget, which uses viewId)."
+        },
+        {
+          "path" : "description",
+          "type" : "string",
+          "required" : false,
+          "description" : "Library-card subtitle."
+        },
+        {
+          "path" : "name",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "options",
+          "type" : "object",
+          "required" : false,
+          "description" : "Caption/title and render options."
+        },
+        {
+          "path" : "owner",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "queryId",
+          "type" : "string",
+          "required" : false,
+          "description" : "A saved query component that supplies the rows instead of the dataset's own columns."
+        },
+        {
+          "path" : "shares",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "tags",
+          "type" : "array",
+          "required" : false,
+          "description" : "Free-text tags for the widget gallery."
+        },
+        {
+          "path" : "viewId",
+          "type" : "string",
+          "required" : false,
+          "description" : "A saved investigation view (geo-map/link-analysis) rendered instead of a dataset query — or, for a working-set widget, the Investigation whose Working Set it reads."
+        },
+        {
+          "path" : "vizType",
+          "type" : "string",
+          "required" : false,
+          "specRequired" : true,
+          "description" : "The viz plugin type: kpi, bar, line, pie, table, geo-map, link-analysis, …"
+        },
+        {
+          "path" : "workingSet",
+          "type" : "object",
+          "required" : false,
+          "description" : "A working-set widget's binding (LA-21): {relation: entities|links|excluded, mode: frozen|live, pin: {step, workingSetHash, pinnedAt}}. Frozen (the default) re-reads the relation at the pinned step; live re-reads the head and shows drift since the pin."
+        }
+      ],
+      "example" : {
+        "name" : "orders-by-region",
+        "vizType" : "bar",
+        "datasetId" : "orders",
+        "controls" : {
+          "x" : "region",
+          "y" : "count"
+        }
+      },
+      "notes" : [
+        "`vizType` names a Visualization Type; `controls` maps its fields to columns."
+      ]
+    }
+  }
+}

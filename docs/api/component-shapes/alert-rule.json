@@ -1,0 +1,228 @@
+{
+  "kind" : "alert-rule",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "operations" : {
+    "create" : {
+      "route" : "POST /alerts/rules",
+      "content" : "content"
+    },
+    "update" : {
+      "route" : "PUT /alerts/rules/{id}",
+      "content" : "content"
+    },
+    "delete" : {
+      "route" : "DELETE /alerts/rules/{id}",
+      "content" : null
+    }
+  },
+  "shapes" : {
+    "content" : {
+      "source" : "AlertRule.MODELLED + AlertRoutes.parseContent (the save also checks the Dataset and the edition)",
+      "unknownKeys" : "refused",
+      "extensionPrefix" : "x-",
+      "fields" : [
+        {
+          "path" : "by",
+          "type" : "array",
+          "required" : false,
+          "description" : "Key columns of the Dataset (a Dataset measure rule only): the Measure is evaluated per key and every breaching key raises its own Alert and Incident. Each column must exist in the Dataset's Schema."
+        },
+        {
+          "path" : "comparator",
+          "type" : "string",
+          "required" : false,
+          "default" : "gt",
+          "values" : [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "description" : "How the value meets the threshold."
+        },
+        {
+          "path" : "dataset",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "description",
+          "type" : "string",
+          "required" : false,
+          "description" : "Optional human-readable name, used as the title of the Alert and Incident the rule raises; blank = a title generated from what the rule watches."
+        },
+        {
+          "path" : "healAfterSweeps",
+          "type" : "integer",
+          "required" : false,
+          "description" : "A Dataset measure rule only: how many consecutive healthy sweeps before its Alert is cleared (the all-clear). Until then a relapse raises nothing new. Default 1 (clear on the first healthy sweep); at most 1000."
+        },
+        {
+          "path" : "indexLag",
+          "type" : "boolean",
+          "required" : false,
+          "description" : "true = fire when Files have waited for the Link Analysis index longer than alert.maximumAge (a literal duration). Requires alert.dataset."
+        },
+        {
+          "path" : "investigation",
+          "type" : "string",
+          "required" : false,
+          "description" : "The Investigation whose Working Set the rule watches. Requires alert.relation and alert.measure; takes no metric, window or dataset."
+        },
+        {
+          "path" : "kpi",
+          "type" : "string",
+          "required" : false,
+          "description" : "The id of a KPI the rule watches (its value to date, or with alert.projection its projection). Takes no metric, window, dataset or measure."
+        },
+        {
+          "path" : "maximumAge",
+          "type" : "string",
+          "required" : false,
+          "description" : "Dataset freshness limit: Ns/Nm/Nh/Nd since the Dataset last published (e.g. 6h, 1d). Requires alert.dataset; takes no metric, window or threshold. Absent = this rule does not check freshness. Instead of a duration, 'auto' (2x) or 'Nxpoll' takes a multiple of the poll interval of the Pipeline named by alert.onPipeline (its feeding Collector)."
+        },
+        {
+          "path" : "measure",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "metric",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser",
+          "values" : [
+            "error_rate",
+            "failed_batches",
+            "rejected_files",
+            "duration_ms"
+          ],
+          "description" : "The batches-ledger metric the rule watches. Required for a ledger rule."
+        },
+        {
+          "path" : "name",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "spec",
+          "description" : "Unique, kebab-case alert rule name."
+        },
+        {
+          "path" : "onPipeline",
+          "type" : "string",
+          "required" : false,
+          "description" : "Restrict to one pipeline (display or normalized name); blank = every pipeline."
+        },
+        {
+          "path" : "owner",
+          "type" : "string",
+          "required" : false,
+          "setBy" : "server",
+          "description" : "The Subject id this rule's alerts are addressed to. Set by the platform to the authenticated author; blank = appUser (unowned: every reader is notified)."
+        },
+        {
+          "path" : "pattern",
+          "type" : "object",
+          "required" : false,
+          "description" : "A shape an aggregate cannot express, on a windowed Dataset rule (it needs the window block): {type: sequence, steps: [<when A>, <when B>]} - A then B for the same key within the window's size (a tumbling window; no rule-level when) - or {type: absence} - a key that had an event in the slide before a Window and none in it, judged once the Window closes. Takes no measure, comparator or threshold."
+        },
+        {
+          "path" : "projection",
+          "type" : "string",
+          "required" : false,
+          "values" : [
+            "value",
+            "probability"
+          ],
+          "description" : "A KPI rule only: watch the projected landing (value) or the chance of meeting the target (probability, 0..1) instead of the value to date."
+        },
+        {
+          "path" : "rag",
+          "type" : "string",
+          "required" : false,
+          "values" : [
+            "amber",
+            "red"
+          ],
+          "description" : "A KPI rule only: fire when the RAG band is at or worse than this; fixes the comparator and threshold."
+        },
+        {
+          "path" : "relation",
+          "type" : "string",
+          "required" : false,
+          "values" : [
+            "entities",
+            "links",
+            "excluded"
+          ],
+          "description" : "Which relation of the Investigation's Working Set the Measure is computed over."
+        },
+        {
+          "path" : "runbook",
+          "type" : "string",
+          "required" : false,
+          "description" : "The id of a Runbook component. The Incident or Case this rule raises shows that Runbook. A save naming a Runbook that does not exist is refused."
+        },
+        {
+          "path" : "severity",
+          "type" : "string",
+          "required" : false,
+          "default" : "WARNING",
+          "values" : [
+            "INFO",
+            "WARNING",
+            "CRITICAL"
+          ],
+          "description" : "Operator-facing severity."
+        },
+        {
+          "path" : "shares",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "stormCap",
+          "type" : "integer",
+          "required" : false,
+          "description" : "With alert.by: above this many breaching keys, one storm Alert replaces the per-key Alerts. Default 100."
+        },
+        {
+          "path" : "threshold",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser",
+          "description" : "Positive number; error_rate is a fraction in (0, 1]. Required unless the rule checks freshness (alert.maximumAge)."
+        },
+        {
+          "path" : "valueMeasure",
+          "type" : "object",
+          "required" : false,
+          "description" : "A named value Measure over the whole Dataset {name, valueCol, timeCol, a window — from + to, or a rolling last: <N>h|<N>d (at most 31 days, resolved in UTC at every sweep) — the Measure's own visible thresholds, and for cashOutConcentration an optional agentList (an Entity List of Entity Type agent)}. The rule fires when at least one entity breaches them; requires alert.investigation, takes no alert.measure."
+        },
+        {
+          "path" : "when",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "window",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser",
+          "description" : "Ns/Nm/Nh/Nd elapsed time, or Nb = the last N batches (e.g. 1h, 30m, 20b). Required for a ledger rule; a freshness or Investigation rule takes none. A Dataset measure rule may take a block instead, an event-time Window evaluated on each commit of a Stream: {type: tumbling|sliding, size, slide, time, lateness, distinctOn}, size + lateness at most 1h, at most 60 slides, comparator gt or gte."
+        }
+      ],
+      "example" : {
+        "name" : "orders-error-rate",
+        "metric" : "error_rate",
+        "comparator" : "gt",
+        "threshold" : 0.05,
+        "window" : "1h",
+        "onPipeline" : "orders"
+      },
+      "notes" : [
+        "Three shapes: a ledger rule (`metric`, `threshold`, `window`, optionally `onPipeline`), a Dataset measure rule (`dataset`, `measure`, `threshold`) and a freshness rule (`dataset`, `maximumAge`); `required` below is the example's shape (a ledger rule).",
+        "`owner` is stamped by the server on create (the signed-in Subject)."
+      ]
+    }
+  }
+}

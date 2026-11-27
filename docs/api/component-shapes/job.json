@@ -1,0 +1,94 @@
+{
+  "kind" : "job",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "operations" : {
+    "create" : {
+      "route" : "POST /jobs",
+      "content" : "content"
+    },
+    "update" : {
+      "route" : "PUT /jobs/{id}",
+      "content" : "content"
+    },
+    "delete" : {
+      "route" : "DELETE /jobs/{id}",
+      "content" : null
+    }
+  },
+  "shapes" : {
+    "content" : {
+      "source" : "ConfigSpecs.job() + JobConfig.fromMap (any other key is a parameter of the Job type)",
+      "unknownKeys" : "kept",
+      "extensionPrefix" : "x-",
+      "fields" : [
+        {
+          "path" : "args",
+          "type" : "object",
+          "required" : false
+        },
+        {
+          "path" : "bind",
+          "type" : "object",
+          "required" : false
+        },
+        {
+          "path" : "catch_up",
+          "type" : "boolean",
+          "required" : false
+        },
+        {
+          "path" : "cron",
+          "type" : "string (cron)",
+          "required" : false,
+          "description" : "Calendar schedule (5 or 6 cron fields), or blank."
+        },
+        {
+          "path" : "enabled",
+          "type" : "boolean",
+          "required" : false,
+          "default" : true,
+          "description" : "Whether the scheduler arms this job."
+        },
+        {
+          "path" : "name",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "spec",
+          "description" : "Unique job name."
+        },
+        {
+          "path" : "on_pipeline",
+          "type" : "string",
+          "required" : false,
+          "description" : "Run when this upstream pipeline/job commits a batch."
+        },
+        {
+          "path" : "on_signal",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "type",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "spec",
+          "description" : "The Job Type id — an open registry key (built-ins: enrich, report, maintenance, pipeline; plus any module/pack-provided id). See GET /jobs/types."
+        },
+        {
+          "path" : "when",
+          "type" : "string",
+          "required" : false
+        }
+      ],
+      "example" : {
+        "name" : "orders-nightly-report",
+        "type" : "report",
+        "cron" : "0 2 * * *"
+      },
+      "notes" : [
+        "`type` is an open registry: `GET /jobs/types` lists the installed ones and each type's own parameters, which sit beside these keys as single values: an object-valued key is refused (422), except `args`, `bind` and the `incremental` block.",
+        "The author keys (createdBy, updatedBy, updatedByRoles) are stamped by the server; a value in the body is discarded."
+      ]
+    }
+  }
+}

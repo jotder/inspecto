@@ -500,7 +500,7 @@ final class DecisionRoutes implements RouteModule {
      *  empty AND-group in the canonical {@code query-types} shape ({@code kind/op/items}) so a rule
      *  with no filter reads identically to what the UI authors and {@link ConditionTree} evaluates. */
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> normalize(Map<String, Object> body) {
+    static Map<String, Object> normalize(Map<String, Object> body) {
         if (!(body.get("consequences") instanceof List<?> cs) || cs.isEmpty())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "decision rule requires at least one consequence");
         Map<String, Object> rule = new LinkedHashMap<>(body);

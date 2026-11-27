@@ -470,6 +470,13 @@ jobs:
       - name: Guard — spec-editions offerings matrix is generated, not hand-edited
         run: node tools/render-offerings-matrix.mjs --check && node --test tools/render-offerings-matrix.test.mjs
 
+      # Component shape reference (COMPONENT-REFERENCE-GENERATED-1): every propose_change kind has a
+      # docs/api/component-shapes/<kind>.json, and the config hub's api-component-shapes.md is rendered from them. The JSON
+      # itself is derived from the code by features/inspecto-mcp ComponentShapesTest, which fails when a file is stale.
+      # The fix is `node tools/render-component-shapes.mjs --write`, never a hand edit.
+      - name: Guard — component shape reference covers every propose_change kind and is rendered
+        run: node tools/render-component-shapes.mjs --check && node --test tools/render-component-shapes.test.mjs
+
       # Module-architecture report (informational, exit 0) + REGRESSION ratchet: split packages and populated closed
       # registries may only fall vs tools/module-architecture-baseline.json. Never wire --check (non-zero by design).
       - name: Guard — module-architecture report and no-regression ratchet
@@ -506,6 +513,13 @@ jobs:
       # current — the fix when stale is `node tools/render-handbook-reference.mjs --write`, never a hand edit.
       - name: Guard — the Handbook manifest holds together and its external render cannot leak
         run: node tools/check-handbook.mjs && node tools/render-handbook-reference.mjs --check && node --test tools/check-handbook.test.mjs tools/render-handbook.test.mjs tools/publish-handbook.test.mjs tools/handbook-checks.test.mjs tools/run-handbook-checks.test.mjs tools/handbook-editions.test.mjs tools/render-handbook-reference.test.mjs
+
+      # Error catalogue (ERROR-CATALOGUE-1): docs/api/errors-v1.json and the hub page api-error-catalogue.md are current, every
+      # refusal code (ErrorCodes, FindingCodes, the Pipeline graph codes) has a cause and a fix in
+      # tools/error-catalogue-entries.json, and no main-code ApiException or ERR_/WARN_ constant names an uncatalogued code.
+      # The fix when it fails: add the entry, then `node tools/render-error-catalogue.mjs --write` — never a hand edit.
+      - name: Guard — the error catalogue is current and covers every refusal code
+        run: node tools/render-error-catalogue.mjs --check && node --test tools/render-error-catalogue.test.mjs
 
       # Agent Kit guard (AGENT-KIT-1 AK-3/AK-4): every Agent Skill names only real MCP Tools and external Handbook pages and
       # no repository path; the golden tasks are well-formed; the golden grader's logic holds on recorded states. Reads

@@ -1,0 +1,125 @@
+{
+  "kind" : "dashboard",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "operations" : {
+    "create" : {
+      "route" : "POST /components/dashboard",
+      "content" : "content"
+    },
+    "update" : {
+      "route" : "PUT /components/dashboard/{id}",
+      "content" : "content"
+    },
+    "delete" : {
+      "route" : "DELETE /components/dashboard/{id}",
+      "content" : null
+    }
+  },
+  "shapes" : {
+    "content" : {
+      "source" : "ConfigSpecs.dashboard() (the component key census refuses any other key)",
+      "unknownKeys" : "refused",
+      "extensionPrefix" : "x-",
+      "fields" : [
+        {
+          "path" : "asOf",
+          "type" : "string",
+          "required" : false,
+          "description" : "The calendar day the figures describe (YYYY-MM-DD), shown as \"As of <date>\"."
+        },
+        {
+          "path" : "dataset",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "datasetId",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "dateField",
+          "type" : "string",
+          "required" : false,
+          "description" : "The date column the viewer's date range filters; a tile whose Dataset lacks it is not range-filtered."
+        },
+        {
+          "path" : "defaultRange",
+          "type" : "string",
+          "required" : false,
+          "description" : "The range a viewer starts from, counted back from asOf (or today): one of last-7-days, last-30-days, last-90-days, month-to-date, quarter-to-date, year-to-date, last-12-months, or a custom {from, to} of YYYY-MM-DD days. A shared link is fenced to it."
+        },
+        {
+          "path" : "description",
+          "type" : "string",
+          "required" : false,
+          "description" : "One line naming the question the dashboard answers, shown under its title."
+        },
+        {
+          "path" : "exposedFields",
+          "type" : "array",
+          "required" : false,
+          "description" : "Columns offered to viewers as quick filters (the dashboard filter bar)."
+        },
+        {
+          "path" : "filter",
+          "type" : "object",
+          "required" : false,
+          "description" : "A Query Core condition group injected into every tile's query."
+        },
+        {
+          "path" : "illustrative",
+          "type" : "boolean",
+          "required" : false,
+          "description" : "The figures are synthetic, shown to illustrate the view — viewers see an Illustrative data chip."
+        },
+        {
+          "path" : "name",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "owner",
+          "type" : "any",
+          "required" : false,
+          "setBy" : "server"
+        },
+        {
+          "path" : "shares",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "tiles",
+          "type" : "array",
+          "required" : false,
+          "specRequired" : true,
+          "description" : "Placed widgets — each {widgetId, span:1-4} on a four-column grid (1 = quarter, 4 = full row); array order is the layout order."
+        },
+        {
+          "path" : "widget",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "widgetId",
+          "type" : "any",
+          "required" : false
+        },
+        {
+          "path" : "widgets",
+          "type" : "any",
+          "required" : false
+        }
+      ],
+      "example" : {
+        "name" : "orders-overview",
+        "tiles" : [
+          {
+            "widgetId" : "orders-by-region"
+          }
+        ]
+      }
+    }
+  }
+}

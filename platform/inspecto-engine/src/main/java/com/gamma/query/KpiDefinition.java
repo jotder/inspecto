@@ -88,7 +88,7 @@ public record KpiDefinition(String name, String dataset, MeasureCompiler.Measure
     public record Window(LocalDate from, LocalDate to) {}
 
     /** The keys a {@code kpi} component may carry; anything else is refused, never silently dropped. */
-    static final Set<String> KEYS = Set.of("name", "title", "description", "dataset", "measure", "timeField",
+    public static final Set<String> KEYS = Set.of("name", "title", "description", "dataset", "measure", "timeField",
             "grain", "comparison", "direction", "target", "bands", "unit", "format", "owner", "shares", "requirement", "timezone", "asOf");
 
     /**

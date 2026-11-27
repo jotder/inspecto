@@ -1,0 +1,122 @@
+{
+  "kind" : "pipeline",
+  "generatedBy" : "ComponentShapesTest (features/inspecto-mcp) - never edit by hand; regenerate: mvn -o test -pl features/inspecto-mcp -Dtest=ComponentShapesTest -Dshapes.write=true && node tools/render-component-shapes.mjs --write",
+  "operations" : {
+    "create" : {
+      "route" : "PUT /pipelines/{id}/graph",
+      "content" : "content"
+    },
+    "update" : {
+      "route" : "PUT /pipelines/{id}/graph",
+      "content" : "content"
+    },
+    "delete" : {
+      "route" : "DELETE /config/pipeline/{id}",
+      "content" : null
+    }
+  },
+  "shapes" : {
+    "content" : {
+      "source" : "PipelineCodec.fromMap (the graph the Pipeline editor saves; the URL's id is its name)",
+      "unknownKeys" : "ignored",
+      "extensionPrefix" : "x-",
+      "fields" : [
+        {
+          "path" : "active",
+          "type" : "boolean",
+          "required" : false,
+          "default" : false
+        },
+        {
+          "path" : "edges",
+          "type" : "array",
+          "required" : false
+        },
+        {
+          "path" : "edges[].from",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "edges[].rel",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "edges[].to",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "nodes",
+          "type" : "array",
+          "required" : false
+        },
+        {
+          "path" : "nodes[].config",
+          "type" : "object",
+          "required" : false
+        },
+        {
+          "path" : "nodes[].description",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "nodes[].id",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "nodes[].name",
+          "type" : "string",
+          "required" : false
+        },
+        {
+          "path" : "nodes[].type",
+          "type" : "string",
+          "required" : true,
+          "requiredBy" : "parser"
+        },
+        {
+          "path" : "nodes[].use",
+          "type" : "string",
+          "required" : false
+        }
+      ],
+      "example" : {
+        "active" : true,
+        "nodes" : [
+          {
+            "id" : "read",
+            "type" : "source.file",
+            "config" : {
+              "collector" : "orders_inbox"
+            }
+          },
+          {
+            "id" : "write",
+            "type" : "sink.parquet",
+            "config" : {
+              "dataset" : "orders"
+            }
+          }
+        ],
+        "edges" : [
+          {
+            "from" : "read",
+            "to" : "write"
+          }
+        ]
+      },
+      "notes" : [
+        "`name` comes from the URL (`PUT /pipelines/{id}/graph`); a name in the body is overwritten.",
+        "`nodes[].config` is the node type's own keys: read them from `GET /pipelines/node-types` (or preview with `preview_config`); the save then lowers the graph and runs the SaveGate.",
+        "`edges[].rel` defaults to `data`."
+      ]
+    }
+  }
+}

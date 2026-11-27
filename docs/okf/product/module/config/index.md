@@ -22,7 +22,7 @@ tags: [product-item, module]
 | feature-db | n/a | no feature rows derive to this item (`tools/render-feature-db.mjs`) |
 | user-guide | current | [Space Template](user-guide-concept-space-template.md) · [Space](user-guide-concept-space.md) · [Config](user-guide-config.md) · [Grammar configuration (the one surface)](user-guide-grammar-config.md) · [Spaces — screens](user-guide-spaces.md) · [Tutorial 1 — Your first Space and Dataset](user-guide-tutorial-first-space.md) |
 | admin-guide | current | [Configuration reference — The collector block, type mapping and the Postgres state store](admin-guide-configuration-reference-collector-types.md) · [Configuration reference — Configuration reference and Spaces](admin-guide-configuration-reference-spaces.md) · [Configuration reference](admin-guide-configuration-reference.md) |
-| api | current | [Spaces — API](api-spaces.md) |
+| api | current | [Component shape reference](api-component-shapes.md) · [Spaces — API](api-spaces.md) |
 | tests | current | [Config model and codecs — tests inventory](tests-inventory.md) |
 | brochure | n/a | per edition / solution pack |
 
@@ -60,4 +60,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `PIPELINE-POLL-RULE-NPE-1` | P2 | defect | The save rule poll-required-for-non-dataset (ConfigSpecs.java, JOB-GRAPH-1 fea9792af) calls .isBlank() on RawConfig.str(raw, "dirs.poll")… | — |
 | `INSIGHT-SCAN-WRITER-UNLISTED-1` | P2 | defect | ConfigWriteFunnelTest.everyConfigWriterRepoWideReachesTheHoldOrIsOnTheInventory is red on master: InsightScanJobType#register (writes the… | — |
 | `SCALEOUT-OBJSTORE-DATABASE-DIR-1` | P2 | feature | The shapes the object-store ingest lane still refuses (sinks:, produces: reference, the readers). | operator |
-| `COMPONENT-REFERENCE-GENERATED-1` | P3 | feature | a component shape reference generated from the code: | — |
+| `COMPONENT-REFERENCE-MORE-KINDS-1` | P3 | feature | the shape reference for the kinds propose_change does not offer: | demand |
