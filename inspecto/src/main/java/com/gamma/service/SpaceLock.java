@@ -250,7 +250,7 @@ public final class SpaceLock {
             for (Window w : taken) if (w.end != 0) ended.add(w);
         }
         try {
-            s.last = compute(s.spaceId, s.configRoot, taken, () -> s.closed);
+            s.last = compute(s.spaceId, s.configRoot, taken, () -> s.closed, true);
             rewriteRenames(s);
         } catch (RuntimeException | IOException ex) {
             log.warn("[SPACE-LOCK] could not compute the lock of Space '{}': {}", s.spaceId, ex.toString());
@@ -360,6 +360,48 @@ public final class SpaceLock {
         return s == null ? null : s.last;
     }
 
+    // ── applying a change made outside the server (SB-2c, SIGNAL-BOARD-1) ───────────────────
+
+    /** One config file a computation newly found changed outside the server; {@code previousId} is the id its
+     *  previous version declared ({@code null} when added). {@code change}: {@code added|modified|moved|removed}. */
+    public record OutsideChange(String path, String kind, String id, String previousId, String change) {}
+
+    /**
+     * Applies config files changed outside the server to the running Space, installed by the control plane (with none
+     * installed nothing is applied, which is every engine-only use). It answers, per path it handled, what became of
+     * the file — {@code applied}, {@code unchanged}, or {@code not applied: <why>} — and that answer rides on the
+     * file's {@code CONFIG_CHANGED_OUTSIDE} event. Called on the lock's thread, after the lock is written.
+     */
+    @FunctionalInterface
+    public interface OutsideApplier {
+        Map<String, String> apply(String spaceId, Path configRoot, List<OutsideChange> changes);
+    }
+
+    private static volatile OutsideApplier applier;
+
+    /** Install (or, with {@code null}, remove) the process-wide applier. */
+    public static void installApplier(OutsideApplier a) {
+        applier = a;
+    }
+
+    public static OutsideApplier installedApplier() {
+        return applier;
+    }
+
+    /** The installed applier's answer for {@code changes}; empty when none is installed, nothing changed, or it threw. */
+    private static Map<String, String> applyOutside(String spaceId, Path root, List<OutsideChange> changes) {
+        OutsideApplier a = applier;
+        if (a == null || changes.isEmpty()) return Map.of();
+        try {
+            Map<String, String> out = a.apply(spaceId, root, List.copyOf(changes));
+            return out == null ? Map.of() : out;
+        } catch (RuntimeException ex) {
+            log.warn("[SPACE-LOCK] could not apply the files changed outside the server in Space '{}': {}", spaceId,
+                    ex.toString());
+            return Map.of();
+        }
+    }
+
     /** SE-1b: schedule a (debounced) computation of a tracked Space, so a hand fix or a hand edit is seen with no
      *  server write. No-op for an untracked or closed Space. */
     public static void refresh(Path configRoot) {
@@ -411,6 +453,13 @@ public final class SpaceLock {
      * {@code .inspecto/}, no key folder is ever recreated.
      */
     static Report compute(String spaceId, Path configRoot, List<Window> windows, BooleanSupplier stop) throws IOException {
+        return compute(spaceId, configRoot, windows, stop, false);
+    }
+
+    /** As above; {@code apply}: hand the files newly changed outside to the installed {@link OutsideApplier} — only the
+     *  scheduled computation of a live Space does, never the close-time flush. */
+    static Report compute(String spaceId, Path configRoot, List<Window> windows, BooleanSupplier stop, boolean apply)
+            throws IOException {
         Path root = configRoot.toAbsolutePath().normalize();
         if (!Files.isDirectory(root)) return Report.of("absent");
         Path lockFile = file(root);
@@ -434,6 +483,7 @@ public final class SpaceLock {
         Set<String> usedUids = new HashSet<>();
         List<Map<String, Object>> files = new ArrayList<>();
         List<Map<String, Object>> renamesFound = new ArrayList<>();
+        List<OutsideChange> outsideNow = new ArrayList<>();
         for (Scanned sc : scanned) {
             Map<String, Object> before = prevByPath.get(sc.path());
             String change = null;
@@ -462,8 +512,11 @@ public final class SpaceLock {
             Object outside = null;
             if (prev != null) {
                 if (change == null) outside = before.get("outside");   // unchanged: keeps its mark
-                else if (!byServer(change, sc.mtime(), windows, anyWindow, now))
+                else if (!byServer(change, sc.mtime(), windows, anyWindow, now)) {
                     outside = new LinkedHashMap<>(Map.of("change", change, "at", nowIso));
+                    outsideNow.add(new OutsideChange(sc.path(), sc.kind(), sc.id(),
+                            before == null ? null : str(before.get("id")), change));
+                }
             }
             if (outside != null) f.put("outside", outside);
             files.add(f);
@@ -566,7 +619,17 @@ public final class SpaceLock {
             AtomicFiles.write(lockFile, PRETTY.writeValueAsBytes(lock), ".lock-");
             writtenAt = nowIso;
         }
-        SpaceLockEvents.emit(spaceId, prev, files, removed, links, nowIso);   // LC-4/LC-6: new findings only
+        Map<String, String> applied = Map.of();
+        if (apply) {   // SB-2c: removals first, so a Job moved to another file is re-added after its old file is gone
+            List<OutsideChange> changes = new ArrayList<>();
+            for (Map<String, Object> r : removed)
+                if (nowIso.equals(r.get("at")))
+                    changes.add(new OutsideChange(str(r.get("path")), str(r.get("kind")), str(r.get("id")),
+                            str(r.get("id")), "removed"));
+            changes.addAll(outsideNow);
+            applied = applyOutside(spaceId, root, changes);
+        }
+        SpaceLockEvents.emit(spaceId, prev, files, removed, links, nowIso, applied);   // LC-4/LC-6: new findings only
         Report r = ready(nowIso, writtenAt, prev != null, note[0], files, removed, links);
         r.body().put("columnChanges", columns == null ? Map.of("status", "disabled") : columns.report());
         List<Map<String, Object>> renamedReport = new ArrayList<>(), deletedReport = new ArrayList<>();

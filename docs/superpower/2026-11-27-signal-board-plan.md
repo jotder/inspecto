@@ -83,7 +83,7 @@ test; results in §10.**
   stored Signal and its Run, boot it, and see whether the Job runs. It confirms G8; it does not change the plan.
 
 **No restart, as a rule of this plan (operator, 2026-11-27).** Saving a Job or a Signal Type takes effect at once, with
-no server or Space restart. SB-1 keeps it for Signal Types. G9 (a Job file changed on disk) is fixed in SB-2c.
+no server or Space restart. SB-1 keeps it for Signal Types. G9 (a Job file changed on disk) is fixed in SB-2c (built 2026-11-28, §12).
 
 **SB-2c Apply a Job file changed on disk.** When the Space lock finds a `config/jobs` file added, changed or removed
 outside the server, the Job service applies it through the same path as the API save (`upsertJob` / `removeJob`),
@@ -405,8 +405,9 @@ SB-1b without failing module tests.
 - **Tests**: `JobSignalCheckTest` (12), `LinkGraphTest` (+1), `ControlApiJobSignalChecksTest` (5, real HTTP: agent 422 and
   person warning for both refusable findings, enable closing a loop, an unposted type warning agent and person and
   refusing neither, an inherited finding not refusing an agent's edit).
-- **Open, for later slices**: (1) SB-2c should apply a Job file changed on disk through the same check
-  (`JobSignalCheck.check(jobService, cfg)`). (2) `on_pipeline` (D-SB2: short for `on_signal: pipeline.commit`) is not
+- **Open, for later slices**: (1) A Job file changed on disk (SB-2c, §12) does not run these checks yet: they sit
+  in `JobRoutes.signalChecks`, not in `refuseBeforeRegister`, the seam SB-2c applies files through. An on-disk edit has
+  no Subject, so it would only gain the warnings (`JobSignalCheck.check(jobService, cfg)`). (2) `on_pipeline` (D-SB2: short for `on_signal: pipeline.commit`) is not
   followed in the chain: the commit mirror is posted with the Pipeline as source and depth 0, so the self-loop guard and
   the chain cut may not stop a Pipeline Job that listens to its own Pipeline's commit — not verified. (3) The Job form
   does not yet show the chosen type's fields beside `when` / `bind`. (4) `signalListeners` is not served by a route; the
@@ -417,3 +418,45 @@ SB-1b without failing module tests.
 - **Board row text**: "SB-2 built 2026-11-28: a saved Job is checked against the catalog (`on_signal`, `$signal`
   fields in `when` / `bind`, a chain that closes on itself); an unposted type warns everyone, the other two refuse an
   agent and warn a person (own split in `AgentStrict` until SC-2); `on_signal` is a checked Signal Type link."
+
+## 12. SB-2c as built (2026-11-28, lane off `origin/master` `d9a88975e`)
+
+- **The seam is the Space lock's, not a second watcher.** `SpaceLock` gains an `OutsideApplier` (installed by
+  `ControlApi`, removed at its close, as `ActivationGate` is). The scheduled computation (`computeNow`) hands it the
+  files it newly marked changed outside the server — removals first, then added / modified / moved, each with the id
+  its previous version declared — after the lock is written. The close-time flush never applies anything.
+- **`OnDiskJobs` (`com.gamma.control`) applies a Job file through the API save path.** It binds the Space on the
+  lock's thread, loads the file as `ServiceBootstrap.loadJobs` does (an unknown `template:` refuses it), parses it with
+  `JobRoutes.parseJob` and checks it with `JobRoutes.refuseBeforeRegister` — the pre-write checks `persistJob` ran
+  inline until now, split out so one method holds them. **A save check added there (SB-2) applies to on-disk edits
+  with no further change.** Then `JobService.upsertJob`; a removed file calls `removeJob` and forgets the
+  publication approval, as `DELETE /jobs/{name}` does. `JobService` is unchanged.
+- **Refused = not applied, and reported.** A file that fails a check (a half-written one, an unknown type, a link the
+  Space refuses) leaves the running Job as it was. Its `CONFIG_CHANGED_OUTSIDE` event carries the outcome in a new
+  `applied` attribute (`applied: …`, `unchanged: …` or `not applied: <the check's message>`), at WARN when refused;
+  the lock keeps the file marked changed outside. Fixing the file is a new change and is applied.
+- **Rules beyond the API's:** a file whose Job already runs with the same config (judged as the boot loads it, before
+  the stricter save parse) is `unchanged` — the first computation after a boot re-finds files edited while the server
+  was down, which the boot already loaded. `OnDiskJobs` remembers, per file, the Job it last ran (seeded from the
+  lock's previous id the first time), because the lock records every version it saw, refused ones included: a rename
+  removes the Job the file really ran, and a half-written name never blocks the finished write. A file onto a name
+  another file runs is refused, as `POST /jobs` answers 409. A system Job is refused, as the API refuses it. An
+  identical copy of a running Job under a new path reports `unchanged`, not a duplicate — and deleting that copy
+  removes the Job although the original file still declares it (it comes back at the original's next change or a
+  restart).
+- **The trigger.** The lock computes only when asked (boot, a server write, a read of its report). A light poll in
+  `OnDiskJobs` walks each Space's config tree and stats every live `*_job.toon` every 5 s (`-Djobs.ondisk.poll.seconds`, `0` = off) and
+  asks the lock to recompute when a time or size changed. `-Dspace.integrity=off` turns all of it off.
+- **Deliberate limits.** A hand edit made within the lock's slack (about 2 s) of a server write in the same Space is
+  attributed to the server and not applied until the next change; the lock does not see removals in a computation
+  that also covers a server write (its existing rule). A file moved with changed content is a removal plus an add, so
+  if the new file is refused the Job is gone. In a Space whose approval policy governs Jobs, an applied edit is still
+  held from automatic runs until accepted (the existing activation hold), exactly as after a restart.
+- **Tests:** `ControlApiOnDiskJobsTest` over real HTTP — an edit, a new file and a rename apply with no restart; a
+  removed file removes the Job; a half-written file and a nameless one are not applied, the Job keeps its type and
+  state, the event is WARN with the reason, and the finished write of the same file is then applied; a rename after a
+  refused write leaves no orphan Job; a cut name followed by the finished write is not refused as a duplicate (the two
+  probes of the verification review).
+- **Board row text**: "SB-2c built 2026-11-28: a Job file changed on disk is applied live through the API save
+  checks (the Space lock's change detection plus a 5 s poll); a file that fails a check is not applied and its
+  CONFIG_CHANGED_OUTSIDE event says why."

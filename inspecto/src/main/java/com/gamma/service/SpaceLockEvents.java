@@ -30,9 +30,11 @@ final class SpaceLockEvents {
 
     private SpaceLockEvents() {}
 
-    /** {@code prev}: the previous verified lock or null; the rest is what this computation produced. */
+    /** {@code prev}: the previous verified lock or null; {@code applied}: per path, what the installed
+     *  {@link SpaceLock.OutsideApplier} did with a file changed outside (SB-2c); the rest is what this computation produced. */
     static void emit(String spaceId, Map<String, Object> prev, List<Map<String, Object>> files,
-                     List<Map<String, Object>> removed, List<Map<String, Object>> links, String nowIso) {
+                     List<Map<String, Object>> removed, List<Map<String, Object>> links, String nowIso,
+                     Map<String, String> applied) {
         try {
             List<Event.Builder> broken = new ArrayList<>(), outside = new ArrayList<>();
             Set<String> before = new HashSet<>();
@@ -53,9 +55,9 @@ final class SpaceLockEvents {
             }
             for (Map<String, Object> f : files)
                 if (f.get("outside") instanceof Map<?, ?> o && nowIso.equals(o.get("at")))
-                    outside.add(changed(spaceId, f, String.valueOf(o.get("change")), brokenByFile));
+                    outside.add(changed(spaceId, f, String.valueOf(o.get("change")), brokenByFile, applied));
             for (Map<String, Object> r : removed)
-                if (nowIso.equals(r.get("at"))) outside.add(changed(spaceId, r, "removed", brokenByFile));
+                if (nowIso.equals(r.get("at"))) outside.add(changed(spaceId, r, "removed", brokenByFile, applied));
             if (broken.isEmpty() && outside.isEmpty()) return;
 
             String prior = MDC.get(EventLog.SPACE_MDC_KEY);
@@ -72,14 +74,20 @@ final class SpaceLockEvents {
         }
     }
 
-    private static Event.Builder changed(String spaceId, Map<String, Object> f, String change, Map<String, Integer> brokenByFile) {
+    private static Event.Builder changed(String spaceId, Map<String, Object> f, String change, Map<String, Integer> brokenByFile,
+                                         Map<String, String> applied) {
         String path = String.valueOf(f.get("path"));
         int brokenLinks = "removed".equals(change) ? 0 : brokenByFile.getOrDefault(path, 0);
-        return Event.builder(EventType.CONFIG_CHANGED_OUTSIDE).level(EventLevel.INFO).source("space-lock")
+        String outcome = applied.get(path);   // SB-2c: absent when no applier handled this file
+        boolean refused = outcome != null && outcome.startsWith("not applied");
+        Event.Builder b = Event.builder(EventType.CONFIG_CHANGED_OUTSIDE).level(refused ? EventLevel.WARN : EventLevel.INFO)
+                .source("space-lock")
                 .message(path + " was " + change + " outside the server in Space " + spaceId
-                        + (brokenLinks > 0 ? "; it now holds " + brokenLinks + " broken link(s)" : ""))
+                        + (brokenLinks > 0 ? "; it now holds " + brokenLinks + " broken link(s)" : "")
+                        + (outcome != null ? "; " + outcome : ""))
                 .attr("space", spaceId).attr("path", path).attr("kind", f.get("kind")).attr("id", f.get("id"))
                 .attr("change", change).attr("brokenLinks", String.valueOf(brokenLinks));
+        return outcome == null ? b : b.attr("applied", outcome);
     }
 
     private static void send(String spaceId, String type, List<Event.Builder> events) {

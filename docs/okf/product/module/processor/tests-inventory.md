@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-497 test class(es): 197 unit, 300 real-HTTP control-plane, 0 IT.
+498 test class(es): 197 unit, 301 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -234,6 +234,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiOnboardingLifecycleTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOnboardingLifecycleTest.java` | Integration tests for the stream-onboarding draft lifecycle (v5.1.0) over real HTTP: |
 | `ControlApiOnboardMatchesTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOnboardMatchesTest.java` | ONBOARDING-FIRST-RUN-1 C6a over real HTTP: the Add data draft answers {@code matches}, the columns the new file shares |
 | `ControlApiOnboardTimeColumnTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOnboardTimeColumnTest.java` | {@code BASIC-ELT-PROFILE-1}, operator ruling 2026-11-19: a time of day is Basic's {@code TIME} column type, end to end |
+| `ControlApiOnDiskJobsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOnDiskJobsTest.java` | SB-2c of {@code SIGNAL-BOARD-1} over real HTTP: a Job file added, changed, renamed or removed on disk takes effect in |
 | `ControlApiOutputLoadTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiOutputLoadTest.java` | {@code BASIC-ELT-PROFILE-1} O6 ({@code output.load}): the save path refuses a {@code replace} / {@code period} on a store |
 | `ControlApiPackParserPreviewTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiPackParserPreviewTest.java` | Real-HTTP proof of operator decision D4 (parser-plugins-trust-design.md slice P4, 2026-09-25): |
 | `ControlApiParsersTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiParsersTest.java` | Real-HTTP tests for the parser-catalog routes: {@code GET /parsers} (the self-describing |
