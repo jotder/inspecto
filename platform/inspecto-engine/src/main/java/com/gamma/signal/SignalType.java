@@ -95,6 +95,10 @@ public final class SignalType {
     /** Signal type {@code job.signal.refused}. */
     public static final String JOB_SIGNAL_REFUSED = "job.signal.refused";
 
+    /** Signal type {@code job.signal.missed}: at boot, a Job's missed Signals older than the catch-up age limit
+     *  (SIGNAL-BOARD-1 SB-2b), not replayed. */
+    public static final String JOB_SIGNAL_MISSED = "job.signal.missed";
+
     /** Signal type {@code la.index.build.completed} (Link Analysis is core, like {@link #LA_DETECT_COMPLETED}). */
     public static final String LA_INDEX_BUILD_COMPLETED = "la.index.build.completed";
 

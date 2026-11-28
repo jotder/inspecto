@@ -17,6 +17,10 @@ public final class TestSignalTypes implements SignalTypeProvider {
         return List.of(
                 new SignalTypeDecl("probe.burst", "Test: a burst of Signals for on_signal Jobs", "test",
                         List.of(SignalField.always("i", Kind.INTEGER, "The posting's index in the burst")), "4.0.0"),
+                new SignalTypeDecl("probe.catchup", "Test: a Signal missed while the Job service was down (SB-2b)", "test",
+                        List.of(), "4.0.0"),
+                new SignalTypeDecl("probe.other", "Test: another type an on_signal Job may switch to (SB-2b)", "test",
+                        List.of(), "4.0.0"),
                 new SignalTypeDecl("loop.ping", "Test: a Signal a Job posts to itself", "test",
                         List.of(SignalField.optional("k", Kind.STRING, "Any value")), "4.0.0"));
     }

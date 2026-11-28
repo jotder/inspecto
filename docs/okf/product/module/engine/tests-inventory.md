@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-441 test class(es): 441 unit, 0 real-HTTP control-plane, 0 IT.
+442 test class(es): 442 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -281,6 +281,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `ScaffoldTemplatesTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ScaffoldTemplatesTest.java` | Guards the scaffolder's templates (S1-8) against the rot they are uniquely prone to: they are Java |
 | `SecretMaskingTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SecretMaskingTest.java` | PARAM-SECRET-LEAK-1 — a {@code secret}-declared parameter must not reach the run log or a rejection |
 | `SharedDottedPathGrammarTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SharedDottedPathGrammarTest.java` | S2 core DoD: a notification template's {@code {{payload.<path>}}} and a job's {@code $signal.<path>} |
+| `SignalCatchUpTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SignalCatchUpTest.java` | SIGNAL-BOARD-1 SB-2b: catch-up at boot of the Signals an {@code on_signal} Job missed while the service was down. |
 | `SnapshotSwapLockTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SnapshotSwapLockTest.java` | JOB-SNAPSHOT-SWAP-READER-RACE-1: a Job reading a snapshot Dataset while the Job that writes it publishes. The |
 | `SpaceComparisonJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SpaceComparisonJobTest.java` | The {@code space.comparison} Job Type (space-comparison design, decided 2026-09-24): the per-axis |
 | `SqlParamScannerTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SqlParamScannerTest.java` | P3b: the SQL text is the parameter contract — {@code $name} tokens are scanned; {@code $}-context |

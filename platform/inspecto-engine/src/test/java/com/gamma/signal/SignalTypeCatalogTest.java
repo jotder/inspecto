@@ -38,8 +38,8 @@ class SignalTypeCatalogTest {
             assertEquals("core", e.source());
             assertFalse(e.decl().fields().isEmpty(), type + " declares no fields");
         }
-        assertEquals(30, constants, "SignalType holds 30 constants (SIGNAL-BOARD-1 §11.1)");
-        assertEquals(52, catalog.entries().size(), "CoreSignalTypes declares 52 types (plan §11.6): update both together");
+        assertEquals(31, constants, "SignalType holds 31 constants (SIGNAL-BOARD-1 §11.1; + job.signal.missed, SB-2b)");
+        assertEquals(53, catalog.entries().size(), "CoreSignalTypes declares 53 types (plan §11.6; + job.signal.missed, SB-2b): update both together");
     }
 
     @Test
