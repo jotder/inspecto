@@ -785,6 +785,7 @@ public final class CollectorService implements ReadModel, AutoCloseable {
             this.jobs.jobTaskGate(com.gamma.control.ModuleGate.taskGateForSpace(root.config()));   // P4f: ...nor its maintenance tasks
             this.jobs.unhostedTypeModule(com.gamma.control.JobModuleGate::absentModuleOf);   // P4e: name the missing module
             this.jobs.eventLog(eventLog);                   // P1c: this space's ledger = the on-signal Trigger source
+            this.jobs.signalCatchUpSettings(root.config());   // SB-2b: the Space's Signal catch-up age limit
             this.jobs.knownPipelines(this::pipelineNamesForAudit);   // MNT-4: orphan on_pipeline detection
             this.jobs.pipelineOutputStores(this::pipelineOutputStoresForAudit);   // MNT-4: orphan output_store detection
             this.jobs.componentRegistry(this::componentRegistry);    // resolve `use:` bindings before a run

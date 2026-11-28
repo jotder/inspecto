@@ -1,7 +1,7 @@
 # Signal Board — one clear meaning for Signal, and a board Jobs can trust (`SIGNAL-BOARD-1`)
 
 Status: **APPROVED 2026-11-27 — D-SB1…D-SB5 all DECIDED (operator, 2026-11-27); SB-0 done 2026-11-27 (results §10;
-the live stop test is still owed); the D-SB5 age limit is 24 hours; SB-1 designed (§11); SB-1a built 2026-11-27 (§11.6), SB-1b built 2026-11-27 (§11.7), SB-1c built 2026-11-27 (§11.8): SB-1 complete.** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
+the live stop test is still owed); the D-SB5 age limit is 24 hours; SB-1 designed (§11); SB-1a built 2026-11-27 (§11.6), SB-1b built 2026-11-27 (§11.7), SB-1c built 2026-11-27 (§11.8): SB-1 complete; SB-2c built 2026-11-28 (§12), SB-2b built 2026-11-28 (§13).** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
 Builds on the shipped Signal Backbone ([spec-signal-backbone](../okf/product/module/event/spec-signal-backbone.md));
 it replaces none of it. SB-2 lands inside the link graph of `SPACE-COHERENCE-1`
 ([plan](2026-11-27-space-coherence-plan.md)).
@@ -460,3 +460,55 @@ SB-1b without failing module tests.
 - **Board row text**: "SB-2c built 2026-11-28: a Job file changed on disk is applied live through the API save
   checks (the Space lock's change detection plus a 5 s poll); a file that fails a check is not applied and its
   CONFIG_CHANGED_OUTSIDE event says why."
+
+## 13. SB-2b as built (2026-11-28, lane off `origin/master` `d9a88975e`)
+
+- **One collaborator.** `com.gamma.job.SignalCatchUp` holds the marks and the boot replay. `JobService` changes stay
+  small: the per-Job body of `onSignalEvent` moved, unchanged in its guards, into `reactToSignal(JobConfig, Signal)`,
+  which the live subscriber and the boot replay both call, so `when`, the self-loop guard, the chain cut, the queued-Run
+  bound, folding (`coalesce`), dry-run inheritance and the causation link are one code path. Each outcome tells the
+  collaborator: a guard that said no, a refusal or a fold is handled at once; a Run is handled when it leaves the
+  worker. Other hooks: `start()` (the cut, then `catchUpMissedSignals`), `upsertJob` / `removeJob`, the three early
+  returns and the `finally` of `submitRun`.
+- **The mark** is per Job: `(time, signal id)` of the last Signal it handled, in `signal-marks.tsv` in the Job audit
+  directory (temp file, then an atomic move). It is a **low-water mark**: Runs finish out of order, so it never passes
+  a Signal whose Run is still in flight. A crash therefore replays that Signal and every later one of the Job —
+  delivery is **at least once**: a later Signal whose Run had finished may run again. A Run that a planned stop skipped
+  or cancelled (`closing`, status `SKIPPED` / `CANCELLED` / still `RUNNING`) pins its Signal, so the next boot replays it.
+- **Boot.** `start()` takes the cut just before the live subscriber attaches, then reads the Space ledger's Signals
+  (`EventQuery` on type `SIGNAL`) from the oldest mark to the cut, oldest first, at most 100 000 rows (a longer backlog
+  is a WARN and its oldest part is skipped). Each Signal goes to every enabled `on_signal` Job whose type matches and
+  whose mark is behind it. Before the subscriber attaches, `SignalCatchUp.hold` **holds** each listening Job: its
+  mark does not move until the replay ends (and the cut sits in its in-flight set as a sentinel), so a live Signal
+  handled before or during the replay — even one stamped just before the cut — cannot move the mark past the backlog.
+  The replay releases the hold at its end, whatever happens. Found by the verification review in two passes;
+  regression tests `aLiveSignalHandledBeforeTheReplayDoesNotSkipTheBacklog` and
+  `aLiveSignalStampedJustBeforeTheCutDoesNotSkipTheBacklog`.
+- **New listening replays nothing.** A Job with no mark starts at the cut (at boot: a Job added while the server was
+  down, and every Job on the first boot with this code). A save that adds a Job, enables it or changes its
+  `on_signal` starts it at "now"; other edits keep the mark; a removal forgets it. SB-2c's on-disk apply goes through
+  `upsertJob`, so it gets the same rule.
+- **Age limit (D-SB5).** Default 24 hours; per Space `config/signal-catch-up.toon` with `max_age_hours: <n>` (a
+  positive whole number; anything else reads as 24), read by `JobService.signalCatchUpSettings(configRoot)`, wired in
+  `CollectorService`. The file is reserved from import (`ReservedConfigPaths`). An older missed Signal is not replayed;
+  each such Job gets one `job.signal.missed` WARN Signal (new core Signal Type, catalog now 53 types / 31 constants):
+  `job`, `onSignal`, `count`, `oldestAt`, `newestAt`, `signalIds` (first 100), `maxAgeHours`. SB-3 lists it.
+- **Tests** (`SignalCatchUpTest`, engine): a Signal stored while the service was down starts its Run at boot, and a
+  third boot replays nothing; the age limit (a 2-hour-old Signal under a 1-hour limit is posted as missed, a fresh one
+  runs); a new Job replays no history, a save that changes `on_signal` restarts the mark, a removal forgets it; two Jobs
+  on one type catch up from their own marks; the low-water mark; a skipped Run pins the mark across a restart; the
+  setting's default and per-Space value.
+- **Not covered / known edges.** The live stop test of §8 is still owed (the tests stop and start the service on one
+  in-memory ledger). A Job disabled in config with an old mark and enabled again by a file edit made while the server
+  was down replays, at boot, the Signals of that window (within the limit). A Signal built before the cut but stored
+  just after the subscriber attached may be handled twice (at least once). A mark is written on each advance; a very
+  high Signal rate costs one small file write per handled Signal per Job. Marks order by (milliseconds, Signal id),
+  and the id is random, so of two Signals in one millisecond one can sort behind the mark and be lost to a crash. A
+  Job on a rarely posted type keeps an old mark, so each boot reads the ledger from it (up to 100 000 rows). The mark
+  does not record `on_signal`, so an `on_signal` changed on disk while the server was down replays the new type from
+  the old mark. The Parquet event store sorts by time alone, so the 10 000-row pages can repeat or drop Signals that
+  share a millisecond at a page edge. If `start()` throws between `hold` and the replay (a pack watcher, cron arming,
+  the cron catch-up), the held marks stay frozen for that process; the Space's start fails with it. All are low; none
+  is fixed in SB-2b.
+- **Board row text**: "SB-2b built 2026-11-28: each on_signal Job keeps a durable mark; at boot the missed Signals
+  are replayed under the same guards, older than 24 h (per Space) posted as `job.signal.missed`."
