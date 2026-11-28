@@ -1438,6 +1438,7 @@ com.gamma.job.JobService | public void pipelineConfigLookup(java.util.function.F
 com.gamma.job.JobService | public void pipelineConfigs(java.util.function.Supplier<List<com.gamma.etl.PipelineConfig>>)
 com.gamma.job.JobService | public void pipelineOutputStores(java.util.function.Supplier<Map<String, String>>)
 com.gamma.job.JobService | public void setMaxConcurrentRuns(int)
+com.gamma.job.JobService | public void signalCatchUpSettings(java.nio.file.Path)
 com.gamma.job.JobService | public void spaceId(String)
 com.gamma.job.JobService | public void start()
 com.gamma.job.JobService | public void unhostedTypeModule(java.util.function.Function<String, String>)

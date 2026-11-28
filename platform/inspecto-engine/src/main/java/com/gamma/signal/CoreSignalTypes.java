@@ -47,6 +47,14 @@ public final class CoreSignalTypes implements SignalTypeProvider {
                 a("refusedSignalId", Kind.STRING, "The Signal it would have reacted to"),
                 a("refusedType", Kind.STRING, "That Signal's type"),
                 a("maxPending", Kind.INTEGER, "The bound on queued Signal Runs per Job")));
+        t.add(decl(SignalType.JOB_SIGNAL_MISSED, "Signals missed while down, too old to replay at boot", "engine",
+                a("job", Kind.STRING, "The Job that did not react"),
+                a("onSignal", Kind.STRING, "The Signal Type the Job listens to"),
+                a("count", Kind.INTEGER, "How many Signals were not replayed"),
+                a("oldestAt", Kind.STRING, "When the oldest of them was posted"),
+                a("newestAt", Kind.STRING, "When the newest of them was posted"),
+                a("signalIds", Kind.LIST, "Their Signal ids, at most 100"),
+                a("maxAgeHours", Kind.INTEGER, "The Space's catch-up age limit")));
         t.add(decl(SignalType.PIPELINE_COMMIT, "Consignment committed (mirror of the commit event)", "engine",
                 a("dryRun", Kind.BOOLEAN, "Whether the Consignment was a dry run"),
                 a("pipeline", Kind.STRING, "The Pipeline"), a("batchId", Kind.STRING, "The Consignment id"),

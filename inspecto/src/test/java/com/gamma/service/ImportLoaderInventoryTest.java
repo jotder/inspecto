@@ -146,6 +146,8 @@ class ImportLoaderInventoryTest {
         ALLOWED.put("dedupe-index.json", "the screening Run's dedupe index (ScreeningHits, SCREENING-1 D6) in "
                 + "<write root>/screening-hits/ - a RESERVED directory, so no import reaches it; the index is signed, "
                 + "so a planted one is refused and rebuilt from the hits");
+        ALLOWED.put("signal-marks.tsv", "each on_signal Job's Signal catch-up mark (SignalCatchUp, SIGNAL-BOARD-1 SB-2b) "
+                + "in the Job audit dir - outside config/, where an import writes");
         ALLOWED.put("job-gate-pending.tsv", "a Job's on_pipeline_gate=all pending set (JobService, JOB-GATE-PERSIST-1) "
                 + "in the audit directory - the RESERVED audit/, so no import reaches it");
         ALLOWED.put("manifest.json", "the LA index manifest (IndexManifest, D-3) in <write root>/la-index/<dataset>/<mappingHash>/"

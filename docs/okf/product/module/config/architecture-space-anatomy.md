@@ -236,6 +236,7 @@ authoring; **no import, bundle or Exchange may write any of them** (`ReservedCon
 | `timezone.toon` | the Space's time zone (`TimezoneSettings`) |
 | `list-limit.toon` | default row limit for lists; a value outside the allowed range reads as the default (`ListLimitSettings`) |
 | `pipeline-history.toon` | Pipeline history settings (`PipelineHistorySettings`) |
+| `signal-catch-up.toon` | `max_age_hours`: how old a Signal missed while the server was down may be and still start its on_signal Job's Run at boot; default 24, anything but a positive whole number reads as 24 (`SignalCatchUp`) |
 | `data.toon` | the Add data switch `data.self_import` (`DataSettings`); an unreadable file reads as unset |
 | `scheduler.toon`, `la-limits.toon`, `partition.toon`, `notification-preferences.toon`, `onboarding-counters.tsv` | **install-wide**: read beside the Spaces root (or the single Space's write root), not per Space |
 | `rename.journal` | an in-progress Pipeline rename (`/pipelines/rename/resume`) |
