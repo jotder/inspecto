@@ -66,6 +66,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `l
 | `SCALEOUT-LIVE-HALVES-1` | P3 | chore | The live halves of spike S5 and an end-to-end S1 run across N processes; D13 has no code. | operator |
 | `MODULE-REORG-P4-3` | P3 | feature | A disabled module's Link Analysis graph runs and index builds in flight run to their end. | — |
 | `MODULE-REORG-P3-THIN-JARS` | P3 | feature | Thin per-module jars and an Offering-driven launcher classpath. | — |
+| `GATE-FLAKES-2026-11-28-1` | P3 | chore | Two likely-flaky reds in the 2026-11-28 full gate on 98951267d: | demand |
 | `TEST-GUARD-TIGHTENING-1` | P3 | chore | Four small guard and test follow-ups the 2026-11-27 lanes raised and left: | demand |
 | `CODEGRAPH-AFFECTED-UNUSABLE-1` | P3 | chore | Re-drive codegraph affected on any codegraph upgrade before relaxing the guidance. | — |
 | `PRODUCT-MAP-S6-1` | P3 | feature | Product Map slice S6, on demand: | demand |

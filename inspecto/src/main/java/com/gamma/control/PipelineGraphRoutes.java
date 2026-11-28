@@ -715,12 +715,12 @@ final class PipelineGraphRoutes implements RouteModule {
         if (outStore == null || outStore.isBlank())
             throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
                     "pipeline '" + name + "' has no output_store: to split into a Job Pipeline");
-        if (cfg.steps().isEmpty() && cfg.webhookConfig() == null && cfg.excelConfig() == null)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
-                    "pipeline '" + name + "' has no Stage-2 chain to split");
-
         Map<String, Object> onboardingRaw = ConfigLoader.filesystem().decode(onboardingPath.toString());
         String beforeOnboarding = Files.readString(onboardingPath, StandardCharsets.UTF_8);
+        List<Object> chain = stageTwoChain(name, cfg, onboardingRaw);
+        if (chain.isEmpty() && cfg.webhookConfig() == null && cfg.excelConfig() == null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED,
+                    "pipeline '" + name + "' has no Stage-2 chain to split");
 
         Map<String, Object> afterOnboardingMap = new LinkedHashMap<>(onboardingRaw);
         afterOnboardingMap.remove("output_store");
@@ -752,18 +752,12 @@ final class PipelineGraphRoutes implements RouteModule {
         dirs.put("database", "database/" + outStore);
         jobPipeMap.put("dirs", dirs);
         Map<String, Object> output = new LinkedHashMap<>();
-        output.put("format", cfg.output().format() != null ? cfg.output().format() : "PARQUET");
+        // PARQUET, not the onboarding Pipeline's output.format: that names the LANDED store's format, while the
+        // at-rest run this replaces (PipelineLift.stageTwo) writes output_store with a format-less sink, i.e. Parquet.
+        output.put("format", "PARQUET");
         jobPipeMap.put("output", output);
         jobPipeMap.put("output_store", outStore);
-        if (onboardingRaw.get("steps") != null) {
-            jobPipeMap.put("steps", onboardingRaw.get("steps"));
-        } else if (!cfg.steps().isEmpty()) {
-            List<Map<String, Object>> stepsList = new ArrayList<>();
-            for (PipelineConfig.Step st : cfg.steps()) {
-                stepsList.add(Map.of(st.kind(), st.config()));
-            }
-            jobPipeMap.put("steps", stepsList);
-        }
+        if (!chain.isEmpty()) jobPipeMap.put("steps", chain);
         if (onboardingRaw.get("webhook") != null) jobPipeMap.put("webhook", onboardingRaw.get("webhook"));
         if (onboardingRaw.get("excel") != null) jobPipeMap.put("excel", onboardingRaw.get("excel"));
         String jobPipeToon = ConfigCodec.toToon(jobPipeMap);
@@ -829,6 +823,75 @@ final class PipelineGraphRoutes implements RouteModule {
                 "path", jobPath.toString().replace('\\', '/'),
                 "after", jobToon));
         return resp;
+    }
+
+    /** The refusal code for a split whose chain cannot move into a Job Pipeline without changing what it does. */
+    static final String ERR_SPLIT_CHAIN_NOT_MOVABLE = "ERR_SPLIT_CHAIN_NOT_MOVABLE";
+
+    /**
+     * The chain a split's Job Pipeline receives as {@code steps:}: what the onboarding Pipeline's at-rest run
+     * ({@link PipelineLift#stageTwo}) executes today. An authored {@code steps:} list travels verbatim. A file without
+     * one carries its Stage-2 blocks {@code processing.join}, {@code dedup}, {@code summarize} and {@code profile}
+     * (all four Stage-2: {@code prepare()} arms none of them without {@code output_store:}) as {@code steps:} entries in
+     * the order {@link PipelineConfig#steps()} projects them, each join's {@code reference} as authored — the parser
+     * resolves a path, which would write this machine's absolute path into the new file. Its
+     * {@code processing.csv_settings.where} is Stage-1 (a pre-map filter the ingest lane applies) and stays on the
+     * onboarding Pipeline (SPLIT-JOB-PIPELINE-DROPS-PROCESSING-1).
+     *
+     * <p>Refused ({@value #ERR_SPLIT_CHAIN_NOT_MOVABLE}), as the at-rest run ({@code PipelineLift.stageTwo}) refuses
+     * them: a {@code route}, which runs on the ingest lane; a multi-schema Pipeline, which lands several stores; an
+     * authored filter step carrying a pre-parse key; and a {@code processing.disabled_steps} entry naming a step that
+     * would move.
+     */
+    private static List<Object> stageTwoChain(String name, PipelineConfig cfg, Map<String, Object> raw) {
+        if (cfg.routeConfig() != null || cfg.steps().stream().anyMatch(s -> PipelineConfig.Step.ROUTE.equals(s.kind())))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pipeline '" + name + "' routes its "
+                    + "records, and route runs on the ingest lane, where each branch lands its own store; a Job Pipeline "
+                    + "runs at rest into one output_store, so the split would change what the Pipeline does",
+                    ERR_SPLIT_CHAIN_NOT_MOVABLE, cfg.routeConfig() != null ? "route" : "steps");
+        PipelineConfig.Schemas s = cfg.schemas();
+        if ((s.selector() != null && s.selector().hasSchemas()) || (s.segments() != null && !s.segments().isEmpty()))
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pipeline '" + name + "' is multi-schema "
+                    + "— it lands several stores, and a Job Pipeline reads one input Dataset, so the split cannot pick "
+                    + "its seed", ERR_SPLIT_CHAIN_NOT_MOVABLE, "schemas");
+        for (PipelineConfig.Step st : cfg.steps())
+            if (cfg.hasExplicitSteps() && PipelineConfig.Step.FILTER.equals(st.kind()))
+                for (String k : PipelineLift.PRE_PARSE_FILTER_KEYS)
+                    if (st.config().containsKey(k))
+                        throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pipeline '" + name
+                                + "' chains a filter carrying pre-parse key '" + k + "', which reads raw lines the "
+                                + "landed store no longer has; the Job Pipeline could not run it as the original does",
+                                ERR_SPLIT_CHAIN_NOT_MOVABLE, "steps");
+        List<Object> chain = new ArrayList<>();
+        List<String> kinds = new ArrayList<>();
+        if (raw.get("steps") instanceof List<?> authored) {
+            chain.addAll(authored);
+            for (PipelineConfig.Step st : cfg.steps()) kinds.add(st.kind());
+        } else {
+            Object rawRef = raw.get("processing") instanceof Map<?, ?> proc && proc.get("join") instanceof Map<?, ?> join
+                    ? join.get("reference") : null;
+            for (PipelineConfig.Step st : cfg.steps()) {
+                if (PipelineConfig.Step.FILTER.equals(st.kind())) continue;
+                Map<String, Object> c = new LinkedHashMap<>(st.config());
+                if (PipelineConfig.Step.JOIN.equals(st.kind()) && rawRef instanceof String ref) c.put("reference", ref);
+                Map<String, Object> entry = new LinkedHashMap<>();
+                entry.put(st.kind(), c);
+                chain.add(entry);
+                kinds.add(st.kind());
+            }
+        }
+        // The node ids the Job Pipeline's lift gives these steps (PipelineLift.liftJobPipeline's scheme).
+        Map<String, Integer> seen = new LinkedHashMap<>();
+        for (int i = 0; i < kinds.size(); i++) {
+            int nth = seen.merge(kinds.get(i), 1, Integer::sum);
+            String id = kinds.get(i) + (nth == 1 ? "" : "__s" + i);
+            if (cfg.disabledSteps().contains(id))
+                throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "pipeline '" + name + "' disables "
+                        + "step '" + id + "' (processing.disabled_steps), which the split would move into the Job "
+                        + "Pipeline; enable it or remove it first", ERR_SPLIT_CHAIN_NOT_MOVABLE,
+                        "processing.disabled_steps");
+        }
+        return chain;
     }
 
     /** Parse a pipeline definition (400 on a malformed shape) and validate it (422 on validation errors). */

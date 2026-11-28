@@ -239,7 +239,7 @@ public final class PipelineLift {
     static final String STAGE2_SINK = "sink";
 
     /** Filter-step keys that only execute pre-parse (raw {@code c<N>} columns) — impossible at rest. */
-    private static final List<String> PRE_PARSE_FILTER_KEYS = List.of(
+    public static final List<String> PRE_PARSE_FILTER_KEYS = List.of(
             "filter_target_column", "include_prefixes", "include_regex", "exclude_prefixes", "exclude_regex");
 
     /**

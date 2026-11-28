@@ -24,6 +24,7 @@ import {
     EventFilter,
     EventRow,
     EventsService,
+    LensService,
     SessionService,
     SavedEventView,
     visibleInterval,
@@ -40,6 +41,8 @@ import { AiStatusData, AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.d
 import { EventDetailDialog, EventDrilldown } from './event-detail.dialog';
 import { InspectoPageHeaderComponent } from 'app/inspecto/components/page-header.component';
 import { PenFieldComponent } from 'app/inspecto/components/pen-field.component';
+import { InspectoSectionTabsComponent, SectionTab } from 'app/inspecto/components/section-tabs.component';
+import { SignalBoardComponent } from './signal-board.component';
 
 /** Selectable live-tail poll cadences (seconds) — polling pauses while the tab is hidden via {@link visibleInterval}. */
 const LIVE_TAIL_SECONDS = [2, 5, 10, 30, 60] as const;
@@ -70,6 +73,8 @@ const LIVE_TAIL_SECONDS = [2, 5, 10, 30, 60] as const;
         InspectoEmptyStateComponent,
         DataTableComponent,
         PenFieldComponent,
+        InspectoSectionTabsComponent,
+        SignalBoardComponent,
     ],
     templateUrl: './events.component.html',
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -88,6 +93,23 @@ export class EventsComponent implements OnInit, OnDestroy {
      * here, so the screen explains itself instead of toasting "Failed to load events" nine times.
      */
     readonly eventsEnabled = this.session.eventsEnabled;
+
+    private lens = inject(LensService);
+
+    /** SIGNAL-BOARD-1 SB-3: the Board tab, for whoever may author Jobs (`GET /signals/board` is gated on it). */
+    readonly showBoardTab = this.lens.canAuthorWorkbench;
+    readonly tabs: SectionTab[] = [
+        { id: 'ledger', label: 'Ledger' },
+        { id: 'board', label: 'Board' },
+    ];
+    /** The open tab; `board` only when {@link showBoardTab}. */
+    readonly tab = signal<'ledger' | 'board'>('ledger');
+
+    pickTab(id: string): void {
+        this.tab.set(id === 'board' && this.showBoardTab() ? 'board' : 'ledger');
+        // the live tail belongs to the Ledger: its toggle is hidden on the Board, so it must not keep running
+        if (this.tab() === 'board' && this.live()) this.toggleLive(false);
+    }
 
     readonly levels = EVENT_LEVELS;
     readonly types = EVENT_TYPES;

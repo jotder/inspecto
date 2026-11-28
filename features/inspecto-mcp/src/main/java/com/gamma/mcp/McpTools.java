@@ -260,6 +260,14 @@ final class McpTools {
                     a -> new Call("GET", "/pipelines/" + seg(a.get("pipeline")) + "/graph", null)),
             new Tool("list_jobs", "List Jobs", "The Jobs defined in this Space and their schedules.",
                     List.of(), get("/jobs")),
+            // SIGNAL-BOARD-1 SB-3: the same Signal Board a person sees on the Signal Ledger page.
+            new Tool("get_signal_board", "Get the Signal Board",
+                    "Each Signal Type of this Space: what posts it, which Jobs listen (on_signal), when it was last posted, "
+                            + "and over the window the Runs it started, the when guards that said no, refusals and chain "
+                            + "cuts. Lists the types posted that no enabled Job hears (unheard) and the Jobs whose on_signal "
+                            + "matches no catalogued type and nothing posted (unposted). Needs canAuthorWorkbench.",
+                    List.of(new Arg("hours", Kind.INT, false, "The window in hours (1-168, default 24).")),
+                    a -> new Call("GET", "/signals/board" + query(a, "hours", "hours"), null)),
             new Tool("list_job_runs", "List Job Runs", "Recent Job Runs, newest first; optionally of one Job.",
                     List.of(new Arg("job", Kind.ID, false, "Only this Job's Runs."), limit()),
                     a -> new Call("GET", "/jobs/runs" + query(a, "job", "job", "limit", "limit"), null)),

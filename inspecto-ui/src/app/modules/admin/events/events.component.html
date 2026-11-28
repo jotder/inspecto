@@ -3,12 +3,20 @@
     <inspecto-page-header
         title="Signal Ledger"
         subtitle="The unified signal stream — every run, job, alert, expectation and operator action, with its emitting source and severity"
+        [hasTabs]="showBoardTab()"
     >
+        <!-- SIGNAL-BOARD-1 SB-3: the Board tab is shown to whoever may author Jobs (the route's gate). -->
+        @if (showBoardTab()) {
+            <!-- the [tabs] slot wraps the strip: a bare `tabs` attribute would bind the strip's own `tabs` input -->
+            <div tabs>
+                <inspecto-section-tabs [tabs]="tabs" [selected]="tab()" (selectedChange)="pickTab($event)" />
+            </div>
+        }
         <ng-container actions>
             <!-- ⛔ No live-tail controls when the events module is absent: neither transport can run,
                  and an affordance that can only answer "nothing" is worse than none. The pane already
                  explains the absence where the grid would be. -->
-            @if (eventsEnabled()) {
+            @if (eventsEnabled() && tab() === 'ledger') {
                 <mat-slide-toggle
                     [checked]="live()"
                     (change)="toggleLive($event.checked)"
@@ -51,7 +59,7 @@
                     }
                 }
             }
-            @if (eventsEnabled()) {
+            @if (eventsEnabled() && tab() === 'ledger') {
                 <button mat-icon-button (click)="load()" matTooltip="Refresh" aria-label="Refresh">
                     <mat-icon svgIcon="heroicons_outline:arrow-path"></mat-icon>
                 </button>
@@ -61,7 +69,10 @@
 
     <!-- Main -->
     <div class="flex flex-auto flex-col p-6 sm:p-10">
-        @if (!eventsEnabled()) {
+        <!-- The board reads core routes, not the events module, so it stands even where the ledger cannot. -->
+        @if (tab() === 'board') {
+            <app-signal-board />
+        } @else if (!eventsEnabled()) {
             <!-- EDG-01 cell 6: this screen's whole data source is the optional inspecto-events module.
                  The nav entry is hidden when it is absent, but a bookmark still lands here — so explain,
                  never 503-toast, and use @if/@else so no empty ag-grid is left mounted (axe

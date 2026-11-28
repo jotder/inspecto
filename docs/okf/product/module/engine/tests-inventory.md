@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.engine`](../../../../../product-map/module/engine.toon).
 
-441 test class(es): 441 unit, 0 real-HTTP control-plane, 0 IT.
+443 test class(es): 443 unit, 0 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -225,6 +225,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `JobServiceSharedPipelineAuditTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceSharedPipelineAuditTest.java` | The default-on shared-pipeline audit ({@link JobService#auditSharedPipelines()}) — |
 | `JobServiceTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobServiceTest.java` | Tests for the {@link JobService} registry/scheduler: manual / cron / event triggers, |
 | `JobShutdownTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobShutdownTest.java` | JOB-SHUTDOWN-FAILED-1 (Basic live check 2026-11-06): on a graceful stop a scheduled {@code la_index_build} started |
+| `JobSignalCheckTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobSignalCheckTest.java` | SIGNAL-BOARD-1 SB-2: the Job save checks, against a small fixed catalog. |
 | `JobSignalCoalesceTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobSignalCoalesceTest.java` | JOB-SIGNAL-OVERLAP-SKIP-1 (la-card Basic live check 2026-11-07): a coalescing {@code on_signal} Job that is |
 | `JobTaskGateTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobTaskGateTest.java` | {@code MODULE-REORG-1 P4f}: the task half of the Space's module gate. A {@code maintenance} Job whose {@code task:} |
 | `JobTemplateDiscoveryTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/JobTemplateDiscoveryTest.java` | ASSURE-XLSX-ATTACHMENTS-1 round 5 item 3: ONE template discovery for the loader, the hold and the approve. |
@@ -281,6 +282,7 @@ mvn -o test -pl platform/inspecto-engine -Dtest=AlertEvaluateRuleTest,AlertKeyCo
 | `ScaffoldTemplatesTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/ScaffoldTemplatesTest.java` | Guards the scaffolder's templates (S1-8) against the rot they are uniquely prone to: they are Java |
 | `SecretMaskingTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SecretMaskingTest.java` | PARAM-SECRET-LEAK-1 — a {@code secret}-declared parameter must not reach the run log or a rejection |
 | `SharedDottedPathGrammarTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SharedDottedPathGrammarTest.java` | S2 core DoD: a notification template's {@code {{payload.<path>}}} and a job's {@code $signal.<path>} |
+| `SignalCatchUpTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SignalCatchUpTest.java` | SIGNAL-BOARD-1 SB-2b: catch-up at boot of the Signals an {@code on_signal} Job missed while the service was down. |
 | `SnapshotSwapLockTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SnapshotSwapLockTest.java` | JOB-SNAPSHOT-SWAP-READER-RACE-1: a Job reading a snapshot Dataset while the Job that writes it publishes. The |
 | `SpaceComparisonJobTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SpaceComparisonJobTest.java` | The {@code space.comparison} Job Type (space-comparison design, decided 2026-09-24): the per-axis |
 | `SqlParamScannerTest` | `com.gamma.job` | unit | `platform/inspecto-engine/src/test/java/com/gamma/job/SqlParamScannerTest.java` | P3b: the SQL text is the parameter contract — {@code $name} tokens are scanned; {@code $}-context |

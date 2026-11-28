@@ -39,3 +39,4 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `INSIGHT-CASE-EXISTING-1` | P3 | feature | An Insight can only open a NEW Case (filed 2026-11-26, BI-INSIGHTS-1 I-17). | demand |
 | `INSIGHT-LANGUAGE-FOLLOWUPS-1` | P3 | chore | Loose ends of the Dashboard Brief and Ask the Dashboard (filed 2026-11-27, BI-INSIGHTS-1 P4 BR-5). | — |
 | `WIDGETS-SPEC-SESSION-MOCK-1` | P3 | defect | widgets.component.spec.ts fails 11 of its tests on master (seen 2026-11-27, BR-3): TypeError: this.session.features is not a function at… | — |
+| `GATE-FLAKES-2026-11-28-1` | P3 | chore | Two likely-flaky reds in the 2026-11-28 full gate on 98951267d: | demand |

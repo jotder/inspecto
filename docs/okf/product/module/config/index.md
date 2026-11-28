@@ -50,6 +50,7 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 | `SPACE-TO-APP-CONSOLE-1` | P3 | feature | Turn a working Space into a Space Template, and into an App, from the console. | — |
 | `APPS-UPGRADE-CONSOLE-1` | P3 | feature | Apps, a Space's template upgrade and the audit-chain check have no console: | — |
 | `SPACE-EXPORT-CLEAN-1` | P3 | feature | a Space is not cleanly exportable as a Space Template: | — |
+| `ZERO-SPACE-BOOTSTRAP-RED-1` | P2 | defect | With no Space attached, bootstrap now answers CAPABILITY_UNAVAILABLE ("No Space is attached …") where four tests expect a clean zero-Spac… | — |
 | `APPROVAL-POLICY-PRESET-1` | P3 | feature | a Standard install is not gated by default: | — |
 | `PENDING-CHANGE-SECRET-READBACK-1` | P3 | defect | a Job's secret parameter can be read back through its Pending Change: | — |
 | `ORIGIN-UPGRADE-UNHELD-1` | P3 | defect | a Space Template upgrade that adds and updates nothing rewrites the Space origin record without holdSet, even under an approval policy. | — |

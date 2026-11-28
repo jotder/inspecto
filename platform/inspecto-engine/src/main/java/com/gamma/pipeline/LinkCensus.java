@@ -33,8 +33,9 @@ public final class LinkCensus {
     public enum OnRename { REWRITE, REPORT }
 
     /** The existing checks that read a link (as of LC-1). {@code RUN}: the Pipeline's run resolves it and fails
-     *  without it (its Collector cannot be built, every cycle) - SE-1b. */
-    public enum Check { LOAD, IMPACT, VALIDATE, IMPORT, RENAME, DELETE, RUN }
+     *  without it (its Collector cannot be built, every cycle) - SE-1b. {@code SAVE}: the Job save door judges it
+     *  against the Signal Type catalog ({@code JobSignalCheck}, SIGNAL-BOARD-1 SB-2). */
+    public enum Check { LOAD, IMPACT, VALIDATE, IMPORT, RENAME, DELETE, RUN, SAVE }
 
     /**
      * One link.
@@ -80,7 +81,8 @@ public final class LinkCensus {
     private static final OnDelete REFUSE = OnDelete.REFUSE, WARN = OnDelete.WARN;
     private static final OnRename REWRITE = OnRename.REWRITE, REPORT = OnRename.REPORT;
     private static final Check LOAD = Check.LOAD, IMPACT = Check.IMPACT, VALIDATE = Check.VALIDATE,
-            IMPORT = Check.IMPORT, RENAME = Check.RENAME, DELETE = Check.DELETE, RUN = Check.RUN;
+            IMPORT = Check.IMPORT, RENAME = Check.RENAME, DELETE = Check.DELETE, RUN = Check.RUN,
+            SAVE = Check.SAVE;
 
     /**
      * The census. Within one {@code fromKind}, {@link LinkGraph} emits a component's edges in this order — the
@@ -107,8 +109,8 @@ public final class LinkCensus {
             link("job", "dataset", "dataset", Type.ID, REFUSE, REWRITE),
             link("job", "target", "dataset", Type.ID, REFUSE, REWRITE),
             link("job", "dir", "directory", Type.PATH, WARN, REPORT),
-            link("job", "on_signal", "signal", Type.TEXT, WARN, REPORT),
-            link("job", "when", "signal", Type.TEXT, WARN, REPORT),
+            link("job", "on_signal", "signal-type", Type.TEXT, WARN, REPORT, SAVE),
+            link("job", "when", "signal-type", Type.TEXT, WARN, REPORT, SAVE),
             // ── Registry components ──────────────────────────────────────────────────────────────
             link("expectation", "target", "pipeline", Type.ID, REFUSE, REWRITE, RENAME, IMPACT, VALIDATE),
             link("expectation", "column", "column", Type.COLUMN, WARN, REPORT, VALIDATE, IMPACT),

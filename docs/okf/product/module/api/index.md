@@ -34,8 +34,8 @@ Generated from the rows of [`docs/BACKLOG.md`](../../../../BACKLOG.md) tagged `m
 
 | Row | Priority | Kind | Title | Hold |
 |---|---|---|---|---|
-| `SPLIT-JOB-PIPELINE-DROPS-PROCESSING-1` | P2 | defect | Splitting a Pipeline into a Job Pipeline deletes its processing.join, processing.dedup, processing.summarize and processing.profile block… | — |
 | `COMPONENT-VALIDATE-ALL-1` | P3 | feature | a dry run (executing preview) for a KPI, Reconciliation, Dataset, Widget or Dashboard: | — |
+| `ZERO-SPACE-BOOTSTRAP-RED-1` | P2 | defect | With no Space attached, bootstrap now answers CAPABILITY_UNAVAILABLE ("No Space is attached …") where four tests expect a clean zero-Spac… | — |
 | `REFUSAL-CODES-REST-1` | P3 | chore | about 1,000 call sites still refuse with only the shared CONFIG_VALIDATION_FAILED and no finding code, so an agent must read the message. | demand |
 | `OPENAPI-FINDING-SCHEMA-1` | P3 | defect | The API contract's Finding schema describes the wrong fields. | — |
 | `DB-QUERY-STORE-SHARING-1` | P3 | chore | verify: may a /db/query store read reach a shared-away Dataset? | — |
