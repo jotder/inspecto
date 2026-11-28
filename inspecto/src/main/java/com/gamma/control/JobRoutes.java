@@ -17,6 +17,7 @@ import com.gamma.job.DbJobRunStore;
 import com.gamma.job.JobConfig;
 import com.gamma.job.JobRun;
 import com.gamma.job.JobService;
+import com.gamma.job.JobSignalCheck;
 import com.gamma.job.RunArtifact;
 import com.gamma.job.SecretMasking;
 import com.gamma.util.AtomicFiles;
@@ -309,9 +310,10 @@ final class JobRoutes implements RouteModule {
         Map<String, Object> m = new LinkedHashMap<>(existing.toMap());
         m.put("enabled", enabled);
         JobConfig c = parseJob(m);
-        PendingChanges.hold(api, ex, KIND, name, c.toMap(), existing.toMap());   // maker-checker (operator, 2026-09-28)
+        List<Map<String, Object>> warnings = signalChecks(api, ex, c, existing);   // enabling may close a chain
+        hold(api, ex, name, c.toMap(), existing.toMap(), warnings);   // maker-checker (operator, 2026-09-28)
         persistJob(api, c);
-        return c.toMap();
+        return withWarnings(c.toMap(), warnings);
     }
 
     /** {@code POST /jobs/{name}/reschedule} — replace the persisted {@code cron}; 422 without one, 404 if unknown. */
@@ -334,7 +336,7 @@ final class JobRoutes implements RouteModule {
      * and re-derived on every boot and rule change, so an edit here would either be silently undone or —
      * a delete or a disable — silently switch off the check it exists for. It stays triggerable.
      */
-    private static void refuseSystemJob(ApiContext api, String name) {
+    static void refuseSystemJob(ApiContext api, String name) {
         boolean system = HostContext.of(api).service().jobService().map(js -> js.isSystemJob(name)).orElse(false);
         WriteGates.conflictIf(system, "job '" + name + "' is a system job armed by the platform; it is "
                 + "derived from the Alert Rules and cannot be edited, disabled or deleted here");
@@ -432,9 +434,10 @@ final class JobRoutes implements RouteModule {
         WriteGates.conflictIf(HostContext.of(api).service().jobServiceOrCreate().jobs().stream()
                         .anyMatch(v -> v.name().equals(c.name())),
                 "job '" + c.name() + "' already exists (use PUT to update)");
-        PendingChanges.hold(api, ex, KIND, c.name(), c.toMap(), null);   // maker-checker (operator, 2026-09-28)
+        List<Map<String, Object>> warnings = signalChecks(api, ex, c, null);
+        hold(api, ex, c.name(), c.toMap(), null, warnings);   // maker-checker (operator, 2026-09-28)
         persistJob(api, c);
-        return c.toMap();
+        return withWarnings(c.toMap(), warnings);
     }
 
     /** {@code PUT /jobs/{name}} — replace a job's config; 404 if unknown, 400 on a body/path name
@@ -453,10 +456,52 @@ final class JobRoutes implements RouteModule {
         requireAdministerForEventPrune(ex, existing);   // turning an event_prune INTO something else, too
         requireAdministerForEventPrune(ex, c);
         if (!name.equals(c.name())) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body 'name' must match the path id");
-        PendingChanges.hold(api, ex, KIND, name, c.toMap(), existing.toMap());   // maker-checker (operator, 2026-09-28)
+        List<Map<String, Object>> warnings = signalChecks(api, ex, c, existing);
+        hold(api, ex, name, c.toMap(), existing.toMap(), warnings);   // maker-checker (operator, 2026-09-28)
         persistJob(api, c);
         ETags.set(ex, ETags.of(ContentHash.of(c.toMap())));
-        return c.toMap();
+        return withWarnings(c.toMap(), warnings);
+    }
+
+    /**
+     * SIGNAL-BOARD-1 SB-2: the Signal checks of a Job save ({@link JobSignalCheck}), before the hold so an agent never
+     * proposes what it would be refused. A finding D-CO1 refuses for an agent ({@link JobSignalCheck.Finding#agentRefusable})
+     * and that this save introduces (absent from {@code existing}) is refused through {@link AgentStrict}; everything
+     * else, and everything for a person, is returned as the response's {@code warnings}. An unposted type warns
+     * everyone (D-SB3).
+     */
+    private static List<Map<String, Object>> signalChecks(ApiContext api, HttpExchange ex, JobConfig c, JobConfig existing) {
+        JobService svc = HostContext.of(api).service().jobServiceOrCreate();
+        List<JobSignalCheck.Finding> found = JobSignalCheck.check(svc, c);
+        if (found.isEmpty()) return List.of();
+        Set<String> before = new java.util.HashSet<>();
+        if (existing != null) for (JobSignalCheck.Finding f : JobSignalCheck.check(svc, existing)) before.add(f.identity());
+        List<AgentStrict.Problem> refusable = new ArrayList<>();
+        for (JobSignalCheck.Finding f : found)
+            if (f.agentRefusable() && !before.contains(f.identity()))
+                refusable.add(new AgentStrict.Problem(f.kind().code, f.key(), f.message(), f.fix()));
+        AgentStrict.refuseForAgent(ex, "job '" + c.name() + "'", refusable);
+        return found.stream().map(JobSignalCheck.Finding::toMap).toList();
+    }
+
+    /** {@link PendingChanges#hold} for a Job; a held write's 202 body carries the save's {@code warnings} too, so an
+     *  agent whose change is held still reads them (D-SB3: an unposted type warns agents as well). */
+    private static void hold(ApiContext api, HttpExchange ex, String name, Map<String, Object> proposed,
+                             Map<String, Object> current, List<Map<String, Object>> warnings) throws IOException {
+        try {
+            PendingChanges.hold(api, ex, KIND, name, proposed, current);   // maker-checker (operator, 2026-09-28)
+        } catch (PendingChanges.Held held) {
+            if (!warnings.isEmpty()) held.body().put("warnings", warnings);
+            throw held;
+        }
+    }
+
+    /** {@code job} with a {@code warnings} list when there is any (a Job body never has that key). */
+    private static Map<String, Object> withWarnings(Map<String, Object> job, List<Map<String, Object>> warnings) {
+        if (warnings.isEmpty()) return job;
+        Map<String, Object> out = new LinkedHashMap<>(job);
+        out.put("warnings", warnings);
+        return out;
     }
 
     /** {@code DELETE /jobs/{name}} — remove a job's config + file; 404 if unknown. */
@@ -513,7 +558,7 @@ final class JobRoutes implements RouteModule {
 
     private static final java.util.Set<String> ADMINISTER_ONLY_TASKS = java.util.Set.of("event_prune", "restore", "audit_anchor_export");
 
-    private static JobConfig parseJob(Map<String, Object> body) {
+    static JobConfig parseJob(Map<String, Object> body) {
         refuseNestedSettings(body);
         JobConfig cfg;
         try {
@@ -559,26 +604,38 @@ final class JobRoutes implements RouteModule {
 
     /** Encode the config as a {@code job { … }} TOON doc, write it atomically, and hot-register it. */
     private void persistJob(ApiContext api, JobConfig c) throws IOException {
-        // MODULE-REORG-1 P4a: refuse BEFORE the write. upsertJob builds an enabled job and throws on an unregistered
-        // type — after the file was already rewritten and the old config dropped from memory (a 500 and a job that
-        // vanished from the list). A DISABLED job of an absent type stays savable: buildDisabled is lenient.
-        if (c.enabled() && jobs(api).jobTypeView(c.type()).isEmpty())
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' has type '" + c.type()
-                    + "', which no installed module registers — nothing was written (an existing config stays as it is)");
-        String sinkRefusal = jobs(api).incrementalSinkRefusal(c);
-        if (sinkRefusal != null)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' refused at save: incremental "
-                    + sinkRefusal + " - nothing was written");
-        String typeRefusal = jobs(api).typeSaveRefusal(c);
-        if (typeRefusal != null)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' refused at save: "
-                    + typeRefusal + " - nothing was written");
+        refuseBeforeRegister(api, c, () -> LinkRefusals.stored(jobFile(api, c.name())));
         Path target = jobFile(api, c.name());
-        // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: every Job write (create, update, enable, reschedule).
-        LinkRefusals.requireLinks(api, api.writeRoot(), "job", c.name(), Map.of("job", c.toMap()), LinkRefusals.stored(target));
         byte[] bytes = ConfigCodec.toToon(Map.of("job", c.toMap())).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".job-");
         HostContext.of(api).service().jobServiceOrCreate().upsertJob(c);
+    }
+
+    /**
+     * <b>The save checks on a parsed Job</b>, run before it is registered live: by the API save before it writes the
+     * file, and by {@link OnDiskJobs} before it applies a file changed on disk (SB-2c). A save check added here applies
+     * to both. {@code stored}: the {@code job:} document the save replaces (for the link check, read last), or null.
+     * Throws the 422 {@link ApiException} that names the refusal.
+     */
+    static void refuseBeforeRegister(ApiContext api, JobConfig c, java.util.function.Supplier<Map<String, Object>> stored)
+            throws IOException {
+        // MODULE-REORG-1 P4a: refuse BEFORE the write. upsertJob builds an enabled job and throws on an unregistered
+        // type — after the file was already rewritten and the old config dropped from memory (a 500 and a job that
+        // vanished from the list). A DISABLED job of an absent type stays savable: buildDisabled is lenient.
+        JobService js = HostContext.of(api).service().jobServiceOrCreate();
+        if (c.enabled() && js.jobTypeView(c.type()).isEmpty())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' has type '" + c.type()
+                    + "', which no installed module registers — nothing was written (an existing config stays as it is)");
+        String sinkRefusal = js.incrementalSinkRefusal(c);
+        if (sinkRefusal != null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' refused at save: incremental "
+                    + sinkRefusal + " - nothing was written");
+        String typeRefusal = js.typeSaveRefusal(c);
+        if (typeRefusal != null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' refused at save: "
+                    + typeRefusal + " - nothing was written");
+        // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: every Job write (create, update, enable, reschedule).
+        LinkRefusals.requireLinks(api, api.writeRoot(), "job", c.name(), Map.of("job", c.toMap()), stored.get());
     }
 
     /** The jailed {@code jobs/<name>_job.toon} path under the write root; 422 on an unsafe name, 403 on escape. */

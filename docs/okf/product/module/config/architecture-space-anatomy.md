@@ -236,6 +236,7 @@ authoring; **no import, bundle or Exchange may write any of them** (`ReservedCon
 | `timezone.toon` | the Space's time zone (`TimezoneSettings`) |
 | `list-limit.toon` | default row limit for lists; a value outside the allowed range reads as the default (`ListLimitSettings`) |
 | `pipeline-history.toon` | Pipeline history settings (`PipelineHistorySettings`) |
+| `signal-catch-up.toon` | `max_age_hours`: how old a Signal missed while the server was down may be and still start its on_signal Job's Run at boot; default 24, anything but a positive whole number reads as 24 (`SignalCatchUp`) |
 | `data.toon` | the Add data switch `data.self_import` (`DataSettings`); an unreadable file reads as unset |
 | `scheduler.toon`, `la-limits.toon`, `partition.toon`, `notification-preferences.toon`, `onboarding-counters.tsv` | **install-wide**: read beside the Spaces root (or the single Space's write root), not per Space |
 | `rename.journal` | an in-progress Pipeline rename (`/pipelines/rename/resume`) |
@@ -458,7 +459,7 @@ input file ─► Pipeline ─────────┬─ processing.schema_f
                ◄── Alert Rule dataset · Reconciliation left/right/thirdDataset · Job dataset / target
                ◄── Link Analysis / Geo Map view query.projection.datasetId · Dataset-consumer Pipeline
    Query id    ◄── Widget queryId
-   signal name ◄── Job on_signal + when  ("$signal.dataset == orders_summary")
+   Signal Type ◄── Job on_signal + when  ("$signal.dataset == orders_summary")
 ```
 
 ### 12.2 Every link and what protects it
@@ -475,7 +476,7 @@ Pipeline's run resolves it and fails without it (its Collector cannot be built, 
 deleting the target is refused by a check of its own, in every link mode (`ComponentRoutes`, `ConnectionRoutes`) · **rename** = `POST /pipelines/{name}/rename`
 rewrites the link · **impact** = listed by `GET /config/pipeline/{name}/impact` (or the column impact read) and before a
 Pipeline delete · **validate** = reported by the `metadata_validate` maintenance task · **import** = a bundle import
-refuses to add the break · **none** = no check reads it yet. Independently of this column, every link the census
+refuses to add the break · **save** = the Job save door checks it against the Signal Type catalog (an unknown type warns everyone; an undeclared `$signal` field is refused for an agent and a warning for a person; `SIGNAL-BOARD-1` SB-2) · **none** = no check reads it yet. Independently of this column, every link the census
 resolves is judged by the LC-3 delete and save checks below and reported by the Space lock
 (`GET /spaces/{id}/integrity`). A Pipeline's own links are judged as their loaders resolve them, and only where the
 loader reads them (SE-1b, `PipelineLinks`): `collector.connection` for a remote connector other than `dataset`,
@@ -501,8 +502,8 @@ loader reads a `use` key in a `*_pipeline.toon`. A column link to SQL the parser
 | Job | `dataset` | Dataset | id | refuse | rewrite | **none** |
 | Job | `target` | Dataset | id | refuse | rewrite | **none** |
 | Job | `dir` | directory | path | warn | report | **none** |
-| Job | `on_signal` | signal | text | warn | report | **none** |
-| Job | `when` | signal | text | warn | report | **none** |
+| Job | `on_signal` | Signal Type | text | warn | report | save |
+| Job | `when` | Signal Type | text | warn | report | save |
 | Expectation | `target` | Pipeline | data path; its first segment names the store | refuse | rewrite | rename, impact, validate |
 | Expectation | `column` | column | column name | warn | report | impact, validate |
 | Expectation | `refDataset` | store | store name | warn | report | **none** |

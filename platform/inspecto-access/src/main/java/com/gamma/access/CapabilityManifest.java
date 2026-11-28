@@ -281,6 +281,8 @@ public final class CapabilityManifest {
             // SignalRoutes (SIGNAL-BOARD-1 SB-1a) — the Signal Type catalog feeds the Job form's on_signal pick list, so it
             // is read by whoever authors Jobs. The ledger reads (/signals, /signals/tree, ...) stay Space-access only.
             new Entry("GET", "/signals/types", Roles.CAN_AUTHOR_WORKBENCH),
+            // SB-3: the Signal Board lists every Job's on_signal beside the types, so it has the catalog's audience.
+            new Entry("GET", "/signals/board", Roles.CAN_AUTHOR_WORKBENCH),
             // EnrichmentRoutes
             new Entry("POST", "/enrichment", Roles.CAN_AUTHOR_WORKBENCH),
             // SEC-ENRICH-TRANSFORM-SQL-UNSEALED-1: the preview executes the draft's transform — authoring, not a read.

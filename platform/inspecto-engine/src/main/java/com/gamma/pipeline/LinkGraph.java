@@ -110,6 +110,16 @@ public final class LinkGraph {
         return edges.stream().filter(e -> e.link() == l).toList();
     }
 
+    /**
+     * The Jobs listening to {@code signalType} (SIGNAL-BOARD-1 SB-2): each {@code on_signal} edge whose value fires on
+     * it (exact, or a {@code prefix.*} family) as the dispatcher matches ({@link com.gamma.signal.Signals#matchesType}).
+     * Impact analysis: these are the Jobs that stop firing when nothing posts {@code signalType} any more.
+     */
+    public List<Edge> signalListeners(String signalType) {
+        return edges("job", "on_signal").stream()
+                .filter(e -> com.gamma.signal.Signals.matchesType(signalType, e.value())).toList();
+    }
+
     /** The edges held by one kind, in graph order. */
     public List<Edge> from(String fromKind) {
         return edges.stream().filter(e -> e.fromKind().equals(fromKind)).toList();

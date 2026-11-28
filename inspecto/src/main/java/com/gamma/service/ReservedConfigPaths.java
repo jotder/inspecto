@@ -48,6 +48,7 @@ public final class ReservedConfigPaths {
             "scheduler.toon", "nav-menus.toon", "notification-preferences.toon", "partition.toon", "space.toon",
             "data.toon",   // LA-ONBOARD-1 OB-7 data.self_import: an import must not turn Add data on (canAdminister decides)
             "la-limits.toon",   // LA-CONFIG-LIMITS-1 install-wide Link Analysis limits, beside scheduler.toon (may be the sole Space's write root)
+            "signal-catch-up.toon",   // SIGNAL-BOARD-1 SB-2b: the Space's Signal catch-up age limit; an import must not widen a boot replay
             "rename.journal", "dataset-publications.tsv",
             "onboarding-counters.tsv",   // LA-ONBOARD-1 OB-13 install-wide onboarding counters, beside scheduler.toon (may be the sole Space's write root)
             "day-manifest.tsv",   // LA-DAILY-INGEST-1 T8 per-day delivery manifest; a forged copy could fake or hide re-delivery/gap signals (operator, 2026-10-06)

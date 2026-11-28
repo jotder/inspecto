@@ -100,8 +100,7 @@ holds no table of capabilities. The tool → route map is a fixed list in code; 
 URL-encoded into a path segment or a query value of that fixed route, so no argument can choose a route.
 A replay's refusal (`401`/`403`/`404`/`422`…) comes back as a tool result with `isError: true` and the
 route's own message, never as a JSON-RPC protocol error. A `resources/read` whose replay is refused, like an
-unknown resource, is a JSON-RPC `-32602` error carrying the status and the route's message (the 2026-07-28
-code for a resource that cannot be read).
+unknown resource, is a JSON-RPC `-32602` error carrying the status and the route's message.
 
 `POST /mcp` itself is listed in `CapabilityManifest.EXEMPTIONS` as **`replay-gated`** (AK-2b; `read-shaped` in
 AK-1): it persists nothing itself, and every route it reaches carries its own gate, so the endpoint needs no
@@ -128,6 +127,7 @@ over 256 KiB is cut and the result says so.
 | `list_pipelines` | — | `GET /pipelines` |
 | `get_pipeline` | `pipeline` | `GET /pipelines/{pipeline}/graph` |
 | `list_jobs` | — | `GET /jobs` |
+| `get_signal_board` | `hours?` | `GET /signals/board` |
 | `list_job_runs` | `job?`, `limit?` | `GET /jobs/runs` |
 | `get_run` | `run` | `GET /jobs/runs/{run}` |
 | `list_incidents` | `status?`, `severity?`, `q?`, `limit?` | `GET /objects?type=incident` |

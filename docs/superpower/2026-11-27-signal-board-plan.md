@@ -1,7 +1,7 @@
 # Signal Board — one clear meaning for Signal, and a board Jobs can trust (`SIGNAL-BOARD-1`)
 
 Status: **APPROVED 2026-11-27 — D-SB1…D-SB5 all DECIDED (operator, 2026-11-27); SB-0 done 2026-11-27 (results §10;
-the live stop test is still owed); the D-SB5 age limit is 24 hours; SB-1 designed (§11); SB-1a built 2026-11-27 (§11.6), SB-1b built 2026-11-27 (§11.7), SB-1c built 2026-11-27 (§11.8): SB-1 complete.** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
+the live stop test is still owed); the D-SB5 age limit is 24 hours; SB-1 designed (§11); SB-1a built 2026-11-27 (§11.6), SB-1b built 2026-11-27 (§11.7), SB-1c built 2026-11-27 (§11.8): SB-1 complete; SB-2c built 2026-11-28 (§12), SB-2b built 2026-11-28 (§13), SB-3 built 2026-11-28 (§14).** Owner: this shift. Items: `module.event`, `module.engine`, `module.observability`, `module.config`.
 Builds on the shipped Signal Backbone ([spec-signal-backbone](../okf/product/module/event/spec-signal-backbone.md));
 it replaces none of it. SB-2 lands inside the link graph of `SPACE-COHERENCE-1`
 ([plan](2026-11-27-space-coherence-plan.md)).
@@ -83,7 +83,7 @@ test; results in §10.**
   stored Signal and its Run, boot it, and see whether the Job runs. It confirms G8; it does not change the plan.
 
 **No restart, as a rule of this plan (operator, 2026-11-27).** Saving a Job or a Signal Type takes effect at once, with
-no server or Space restart. SB-1 keeps it for Signal Types. G9 (a Job file changed on disk) is fixed in SB-2c.
+no server or Space restart. SB-1 keeps it for Signal Types. G9 (a Job file changed on disk) is fixed in SB-2c (built 2026-11-28, §12).
 
 **SB-2c Apply a Job file changed on disk.** When the Space lock finds a `config/jobs` file added, changed or removed
 outside the server, the Job service applies it through the same path as the API save (`upsertJob` / `removeJob`),
@@ -366,3 +366,198 @@ SB-1b without failing module tests.
   SB-2 (the save check).
 - **Board row text**: "SB-1c built 2026-11-27: the Job form's On signal suggests the catalogued Signal Types, free text
   kept. SB-1 is complete. Next: SB-2 (a saved Job is checked against the catalog); D-SB8 open."
+
+### 11.9 SB-2 as built (2026-11-28, lane off `origin/master` `d9a88975e`)
+
+- **The check** (`platform/inspecto-engine`, `com.gamma.job.JobSignalCheck`, pure): a Job with `on_signal` gets four
+  kinds of finding. `SIGNAL_TYPE_UNPOSTED`: the value matches no catalogued type (an exact name, matched
+  case-insensitively as the dispatcher does; a `prefix.*` that overlaps no type or family, matched case-sensitively as
+  the dispatcher does). An exact type the catalog lists itself is checked against that entry's fields only, never a
+  covering family's, as `SignalTypeCatalog.find` resolves it. `SIGNAL_FIELD_UNDECLARED`:
+  a `$signal.<field>` in `when` or in a `bind` value whose first path segment no matched type declares (`chainDepth`,
+  the framework stamp, always passes; for a `prefix.*` a field any matched type declares passes); the fix lists the
+  declared fields. `SIGNAL_FIELDS_NOT_DECLARED` (INFO): a matched type whose fields are not declared (a Job Pack's
+  emit, `exchange.*`), so the fields cannot be checked; never a refusal. `JOB_CHAIN_LOOP`: saving the Job closes a
+  chain on itself, named as `a → b → a`.
+- **What a Job posts, for the chain**: `job.run.started|completed|failed|rejected` (every Run) plus its Job Type's
+  `emits`. A Job is never fired by its own Signal (the dispatcher's self-loop guard), so a loop needs two Jobs or more.
+  A Job with a `when` guard is not a link of the chain (the guard may stop it and a save cannot evaluate it); a
+  disabled Job is not either, and a disabled draft joins no chain.
+- **Severity (D-SB3, D-CO1)**: `SIGNAL_TYPE_UNPOSTED` warns everyone, agents included. `SIGNAL_FIELD_UNDECLARED` and
+  `JOB_CHAIN_LOOP` are refused (422 `CONFIG_VALIDATION_FAILED`, the finding code in the envelope, each problem and its
+  fix in the message) for an agent Subject and a warning for a person. Only a finding the save **introduces** refuses
+  an agent: one the stored Job already had stays a warning, so an agent can edit an inherited Job. A loop is one
+  finding per Job whichever Jobs it runs through (the check names only the first loop it finds, and an edit that
+  removes one path may name another the Job already closed).
+- **SB-2 carries its own agent/person split** for these two findings until `SPACE-COHERENCE-1` SC-2 generalises it:
+  one helper, `com.gamma.control.AgentStrict`, that SC-2 absorbs. `LinkRefusals`, `-Dlinks.save` and the D-LC3 flip
+  are untouched; a person stays on the warning.
+- **The save door** (`JobRoutes`): `POST /jobs`, `PUT /jobs/{name}` and `POST /jobs/{name}/enable` (enabling may close
+  a chain) run the check before the maker-checker hold, so an agent never proposes what it would be refused. The
+  response gains `warnings: [{severity, code, key, message, fix}]` when there are any, on a saved Job and on a held
+  change's 202 alike (so an agent whose write is held still reads them). `disable` and `reschedule` cannot introduce a
+  finding and are not checked. No route was added.
+- **The link** (`LinkCensus`): `job.on_signal` and `job.when` now name `signal-type` (was `signal`) and carry a new
+  check, `SAVE` ("save" in the anatomy §12.2 table, rendered by `tools/render-space-links.mjs`); 9 of the 48 links
+  are now checked by nothing (`SPACE-COHERENCE-1` F2 said 11). The graph keeps them `UNCHECKED`, so the census save and
+  delete refusals never judge them (a type nothing posts is a warning, D-SB3). `LinkGraph.signalListeners(type)` lists
+  the Jobs whose `on_signal` fires on a type: the impact answer to "which Jobs stop firing if nothing posts it".
+- **Tests**: `JobSignalCheckTest` (12), `LinkGraphTest` (+1), `ControlApiJobSignalChecksTest` (5, real HTTP: agent 422 and
+  person warning for both refusable findings, enable closing a loop, an unposted type warning agent and person and
+  refusing neither, an inherited finding not refusing an agent's edit).
+- **Open, for later slices**: (1) A Job file changed on disk (SB-2c, §12) does not run these checks yet: they sit
+  in `JobRoutes.signalChecks`, not in `refuseBeforeRegister`, the seam SB-2c applies files through. An on-disk edit has
+  no Subject, so it would only gain the warnings (`JobSignalCheck.check(jobService, cfg)`). (2) `on_pipeline` (D-SB2: short for `on_signal: pipeline.commit`) is not
+  followed in the chain: the commit mirror is posted with the Pipeline as source and depth 0, so the self-loop guard and
+  the chain cut may not stop a Pipeline Job that listens to its own Pipeline's commit — not verified. (3) The Job form
+  does not yet show the chosen type's fields beside `when` / `bind`. (4) `signalListeners` is not served by a route; the
+  board (SB-3) or the SC-1 graph read can expose it. (5) An exact type that only families cover accepts the fields of
+  every covering family, while the catalog resolves it to the longest one: lenient (a wrong field may pass), never a
+  false refusal. (6) An edit that adds a second loop to a Job already in one is a warning, not a refusal (one loop
+  finding per Job).
+- **Board row text**: "SB-2 built 2026-11-28: a saved Job is checked against the catalog (`on_signal`, `$signal`
+  fields in `when` / `bind`, a chain that closes on itself); an unposted type warns everyone, the other two refuse an
+  agent and warn a person (own split in `AgentStrict` until SC-2); `on_signal` is a checked Signal Type link."
+
+## 12. SB-2c as built (2026-11-28, lane off `origin/master` `d9a88975e`)
+
+- **The seam is the Space lock's, not a second watcher.** `SpaceLock` gains an `OutsideApplier` (installed by
+  `ControlApi`, removed at its close, as `ActivationGate` is). The scheduled computation (`computeNow`) hands it the
+  files it newly marked changed outside the server — removals first, then added / modified / moved, each with the id
+  its previous version declared — after the lock is written. The close-time flush never applies anything.
+- **`OnDiskJobs` (`com.gamma.control`) applies a Job file through the API save path.** It binds the Space on the
+  lock's thread, loads the file as `ServiceBootstrap.loadJobs` does (an unknown `template:` refuses it), parses it with
+  `JobRoutes.parseJob` and checks it with `JobRoutes.refuseBeforeRegister` — the pre-write checks `persistJob` ran
+  inline until now, split out so one method holds them. **A save check added there (SB-2) applies to on-disk edits
+  with no further change.** Then `JobService.upsertJob`; a removed file calls `removeJob` and forgets the
+  publication approval, as `DELETE /jobs/{name}` does. `JobService` is unchanged.
+- **Refused = not applied, and reported.** A file that fails a check (a half-written one, an unknown type, a link the
+  Space refuses) leaves the running Job as it was. Its `CONFIG_CHANGED_OUTSIDE` event carries the outcome in a new
+  `applied` attribute (`applied: …`, `unchanged: …` or `not applied: <the check's message>`), at WARN when refused;
+  the lock keeps the file marked changed outside. Fixing the file is a new change and is applied.
+- **Rules beyond the API's:** a file whose Job already runs with the same config (judged as the boot loads it, before
+  the stricter save parse) is `unchanged` — the first computation after a boot re-finds files edited while the server
+  was down, which the boot already loaded. `OnDiskJobs` remembers, per file, the Job it last ran (seeded from the
+  lock's previous id the first time), because the lock records every version it saw, refused ones included: a rename
+  removes the Job the file really ran, and a half-written name never blocks the finished write. A file onto a name
+  another file runs is refused, as `POST /jobs` answers 409. A system Job is refused, as the API refuses it. An
+  identical copy of a running Job under a new path reports `unchanged`, not a duplicate — and deleting that copy
+  removes the Job although the original file still declares it (it comes back at the original's next change or a
+  restart).
+- **The trigger.** The lock computes only when asked (boot, a server write, a read of its report). A light poll in
+  `OnDiskJobs` walks each Space's config tree and stats every live `*_job.toon` every 5 s (`-Djobs.ondisk.poll.seconds`, `0` = off) and
+  asks the lock to recompute when a time or size changed. `-Dspace.integrity=off` turns all of it off.
+- **Deliberate limits.** A hand edit made within the lock's slack (about 2 s) of a server write in the same Space is
+  attributed to the server and not applied until the next change; the lock does not see removals in a computation
+  that also covers a server write (its existing rule). A file moved with changed content is a removal plus an add, so
+  if the new file is refused the Job is gone. In a Space whose approval policy governs Jobs, an applied edit is still
+  held from automatic runs until accepted (the existing activation hold), exactly as after a restart.
+- **Tests:** `ControlApiOnDiskJobsTest` over real HTTP — an edit, a new file and a rename apply with no restart; a
+  removed file removes the Job; a half-written file and a nameless one are not applied, the Job keeps its type and
+  state, the event is WARN with the reason, and the finished write of the same file is then applied; a rename after a
+  refused write leaves no orphan Job; a cut name followed by the finished write is not refused as a duplicate (the two
+  probes of the verification review).
+- **Board row text**: "SB-2c built 2026-11-28: a Job file changed on disk is applied live through the API save
+  checks (the Space lock's change detection plus a 5 s poll); a file that fails a check is not applied and its
+  CONFIG_CHANGED_OUTSIDE event says why."
+
+## 13. SB-2b as built (2026-11-28, lane off `origin/master` `d9a88975e`)
+
+- **One collaborator.** `com.gamma.job.SignalCatchUp` holds the marks and the boot replay. `JobService` changes stay
+  small: the per-Job body of `onSignalEvent` moved, unchanged in its guards, into `reactToSignal(JobConfig, Signal)`,
+  which the live subscriber and the boot replay both call, so `when`, the self-loop guard, the chain cut, the queued-Run
+  bound, folding (`coalesce`), dry-run inheritance and the causation link are one code path. Each outcome tells the
+  collaborator: a guard that said no, a refusal or a fold is handled at once; a Run is handled when it leaves the
+  worker. Other hooks: `start()` (the cut, then `catchUpMissedSignals`), `upsertJob` / `removeJob`, the three early
+  returns and the `finally` of `submitRun`.
+- **The mark** is per Job: `(time, signal id)` of the last Signal it handled, in `signal-marks.tsv` in the Job audit
+  directory (temp file, then an atomic move). It is a **low-water mark**: Runs finish out of order, so it never passes
+  a Signal whose Run is still in flight. A crash therefore replays that Signal and every later one of the Job —
+  delivery is **at least once**: a later Signal whose Run had finished may run again. A Run that a planned stop skipped
+  or cancelled (`closing`, status `SKIPPED` / `CANCELLED` / still `RUNNING`) pins its Signal, so the next boot replays it.
+- **Boot.** `start()` takes the cut just before the live subscriber attaches, then reads the Space ledger's Signals
+  (`EventQuery` on type `SIGNAL`) from the oldest mark to the cut, oldest first, at most 100 000 rows (a longer backlog
+  is a WARN and its oldest part is skipped). Each Signal goes to every enabled `on_signal` Job whose type matches and
+  whose mark is behind it. Before the subscriber attaches, `SignalCatchUp.hold` **holds** each listening Job: its
+  mark does not move until the replay ends (and the cut sits in its in-flight set as a sentinel), so a live Signal
+  handled before or during the replay — even one stamped just before the cut — cannot move the mark past the backlog.
+  The replay releases the hold at its end, whatever happens. Found by the verification review in two passes;
+  regression tests `aLiveSignalHandledBeforeTheReplayDoesNotSkipTheBacklog` and
+  `aLiveSignalStampedJustBeforeTheCutDoesNotSkipTheBacklog`.
+- **New listening replays nothing.** A Job with no mark starts at the cut (at boot: a Job added while the server was
+  down, and every Job on the first boot with this code). A save that adds a Job, enables it or changes its
+  `on_signal` starts it at "now"; other edits keep the mark; a removal forgets it. SB-2c's on-disk apply goes through
+  `upsertJob`, so it gets the same rule.
+- **Age limit (D-SB5).** Default 24 hours; per Space `config/signal-catch-up.toon` with `max_age_hours: <n>` (a
+  positive whole number; anything else reads as 24), read by `JobService.signalCatchUpSettings(configRoot)`, wired in
+  `CollectorService`. The file is reserved from import (`ReservedConfigPaths`). An older missed Signal is not replayed;
+  each such Job gets one `job.signal.missed` WARN Signal (new core Signal Type, catalog now 53 types / 31 constants):
+  `job`, `onSignal`, `count`, `oldestAt`, `newestAt`, `signalIds` (first 100), `maxAgeHours`. SB-3 lists it.
+- **Tests** (`SignalCatchUpTest`, engine): a Signal stored while the service was down starts its Run at boot, and a
+  third boot replays nothing; the age limit (a 2-hour-old Signal under a 1-hour limit is posted as missed, a fresh one
+  runs); a new Job replays no history, a save that changes `on_signal` restarts the mark, a removal forgets it; two Jobs
+  on one type catch up from their own marks; the low-water mark; a skipped Run pins the mark across a restart; the
+  setting's default and per-Space value.
+- **Not covered / known edges.** The live stop test of §8 is still owed (the tests stop and start the service on one
+  in-memory ledger). A Job disabled in config with an old mark and enabled again by a file edit made while the server
+  was down replays, at boot, the Signals of that window (within the limit). A Signal built before the cut but stored
+  just after the subscriber attached may be handled twice (at least once). A mark is written on each advance; a very
+  high Signal rate costs one small file write per handled Signal per Job. Marks order by (milliseconds, Signal id),
+  and the id is random, so of two Signals in one millisecond one can sort behind the mark and be lost to a crash. A
+  Job on a rarely posted type keeps an old mark, so each boot reads the ledger from it (up to 100 000 rows). The mark
+  does not record `on_signal`, so an `on_signal` changed on disk while the server was down replays the new type from
+  the old mark. The Parquet event store sorts by time alone, so the 10 000-row pages can repeat or drop Signals that
+  share a millisecond at a page edge. If `start()` throws between `hold` and the replay (a pack watcher, cron arming,
+  the cron catch-up), the held marks stay frozen for that process; the Space's start fails with it. All are low; none
+  is fixed in SB-2b.
+- **Board row text**: "SB-2b built 2026-11-28: each on_signal Job keeps a durable mark; at boot the missed Signals
+  are replayed under the same guards, older than 24 h (per Space) posted as `job.signal.missed`."
+
+## 14. SB-3 as built (2026-11-28, lane off `origin/master` `d9a88975e`)
+
+- **`GET /signals/board?hours=`** (`SignalRoutes.board`, logic in `SignalBoard`, processor `com.gamma.control`): the board
+  of the Space over the last `hours` (default 24, clamped to 1…168; a non-number is a 400). Gated on
+  `canAuthorWorkbench`, the audience of `/signals/types`, because it lists every Job's `on_signal`; manifest entry, core
+  fragment, `openapi-v1.json` regenerated; classified `none` in `agent-get-routes.tsv` (type names, counts, emitter refs
+  and Job names, no payload values). No engine change: it reads `JobService.signalTypeCatalog()`, `jobs()` and
+  `runsFor()`, plus one ledger page.
+- **Rows**: every catalog entry, plus any posted type the catalog does not know (`catalogued: false`). A posted member of
+  a family (`exchange.acme.offer`) counts under the family row. Each row: `title, poster, source, family, posted,
+  lastPosted, postedBy` (emitter refs seen, at most 10, with `postedByTotal` / `postedByTruncated`), `listeners`
+  (`{job, key, value, enabled}`, at most 50, with `listenersTotal` / `listenersTruncated`), `runsStarted`
+  (`job.run.started` whose `trigger` is `signal:<type>`; for `pipeline.commit` also `event:<pipeline>`, the Runs of
+  `on_pipeline` Jobs), `guardsSaidNo`, `refused`
+  (`job.signal.refused` by `refusedType`), `chainCuts` (`job.chain.cut` by `signalType`) and `missed`.
+- **The two findings**: `unheard`, a type posted in the window that no ENABLED Job hears, decided per posted type with the
+  Job service's own match (a family member nobody listens to is listed even when another member is heard; found by the
+  verification pass); `unposted`, a Job whose
+  `on_signal` overlaps no catalog entry and no type posted in the window (disabled Jobs included, with `enabled`). A
+  family row and a glob overlap when either prefix contains the other. `on_pipeline` is listed as a listener of
+  `pipeline.commit` (D-SB2), so a Pipeline's commits are not reported unheard.
+- **Bounds and honesty**: `types` ≤ 500, `unheard` and `unposted` ≤ 100, each with `<name>Total` and `<name>Truncated`.
+  The ledger is ONE page of `EventQuery.MAX_LIMIT` Signals; `capped` says it was full, so every ledger count is a
+  floor. A `when` guard that says no posts no Signal: it is counted from each Job's in-memory Run history (a `SKIPPED`
+  Run, message `when guard false`), which keeps 50 Runs per Job and starts empty at each server start; `guardsCapped`
+  says the server started inside the window, or a Job's history is full and began inside it. ⚠ Open: the start is the
+  JVM's; a Space whose Job service is created later (added at run time) begins its history later, so for it
+  `guardsCapped` can read false while the count is still a floor. Closing it needs a start time on `JobService`
+  (an engine change, left out of this lane). `lastPosted` is within the window only.
+- **SB-2b hook**: SB-2b was not on `origin/master` when this lane was built (it landed just before the push, §13; feeding its `job.signal.missed` into the seam is open). `SignalBoard.Inputs.missedByType` is the
+  seam (the route passes `null`): while it is `null`, `missedTracked` is false and every row's `missed` is `null`
+  (unknown, never 0); SB-2b passes a type → count map and the UI then shows a Missed column. Its storage was not guessed.
+- **Agents**: MCP tool `get_signal_board` (`hours?`) replays the route (`spec-mcp.md` table). The `-Pai` intelligence
+  tools (`signals_query`, `signal_timeline`) were left as they are.
+- **UI**: the Signal Ledger page (`/events`) gains Ledger / Board section tabs in the page header, shown only with
+  `canAuthorWorkbench`; `signal-board.component.ts` shows the window (24 h, 3 days, 7 days), a lower-bound alert when
+  `capped` or `guardsCapped`, the two findings first, then every type in `<inspecto-data-table>`. The Board reads core
+  routes, so it shows even where the events module (the Ledger tab) is absent.
+- **Tests**: `SignalBoardTest` (each count on its type, family rows, both findings, `on_pipeline`, every bound, the
+  `missed` seam) and `ControlApiSignalBoardTest` (armed 401 / 403 / 200, a live `when` guard counted, `hours` clamped,
+  400 for a non-number); UI `signal-board.component.spec.ts` (incl. axe) and two tab tests in `events.component.spec.ts`.
+- **Preview** (backend from this lane on :8181, `spaces/` of the lane): Default Space, 54 types, `maintenance.scheduler.findings`
+  posted by `job:orphan_audit` and heard by no Job; on `demo`, `backup_verify` listens to `maintenance.backup.completed`,
+  which no provider on that classpath declares (the backup module is not on `run-backend.ps1`'s classpath), so it is
+  reported unposted, correctly for that build.
+- **Board row text**: "SB-3 built 2026-11-28: `GET /signals/board` (types, posters, listeners, Runs started, guards, refusals,
+  chain cuts; the unheard and unposted lists), the Board tab on the Signal Ledger page, MCP `get_signal_board`; `missed`
+  waits on SB-2b. Next: SB-2, SB-4; D-SB8 open."

@@ -51,6 +51,49 @@ final class SignalRoutes implements RouteModule {
         api.get("/signals/stream", (e, m) -> stream(api, e));
         // SIGNAL-BOARD-1 SB-1a: what can be posted - the Signal Types and their payload fields; the Job form's pick list.
         api.get("/signals/types", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> types(api)));
+        // SIGNAL-BOARD-1 SB-3: the Signal Board - each type, who posts it, which Jobs listen and how listening went.
+        // Same audience as /signals/types: it lists every Job's on_signal, which is authoring config.
+        api.get("/signals/board", ApiContext.withCapability("canAuthorWorkbench", (e, m) -> board(api, e)));
+    }
+
+    /** Default and largest window of {@code GET /signals/board}, in hours. */
+    static final int BOARD_DEFAULT_HOURS = 24;
+    static final int BOARD_MAX_HOURS = 168;
+
+    /**
+     * {@code GET /signals/board?hours=} -> the Signal Board of this Space over the last {@code hours} (default 24,
+     * at most 168), see {@link SignalBoard}. The ledger is read as one page of at most {@code EventQuery.MAX_LIMIT}
+     * Signals; {@code capped} says it was full, so the ledger counts are floors.
+     */
+    private Object board(ApiContext api, HttpExchange e) {
+        String raw = ApiContext.query(e, "hours");
+        int hours = BOARD_DEFAULT_HOURS;
+        if (raw != null && !raw.isBlank()) {
+            try {
+                hours = Integer.parseInt(raw.trim());
+            } catch (NumberFormatException ex) {
+                throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "invalid 'hours' (expected a whole number of hours): " + raw);
+            }
+        }
+        hours = Math.max(1, Math.min(BOARD_MAX_HOURS, hours));
+        long until = System.currentTimeMillis();
+        long since = until - hours * 3_600_000L;
+        var service = HostContext.of(api).service();
+        int page = com.gamma.audit.EventQuery.MAX_LIMIT;
+        List<Signal> window = Signals.query(service.events(), null, since, until, null, null, page);
+        java.util.Optional<com.gamma.job.JobService> jobs = service.jobService();
+        com.gamma.signal.SignalTypeCatalog catalog = jobs.map(com.gamma.job.JobService::signalTypeCatalog)
+                .orElseGet(com.gamma.signal.SignalTypeCatalog::installed);
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("hours", hours);
+        out.putAll(SignalBoard.build(new SignalBoard.Inputs(catalog,
+                jobs.map(com.gamma.job.JobService::jobs).orElse(List.of()),
+                name -> jobs.map(j -> j.runsFor(name)).orElse(List.of()),
+                window, window.size() >= page, since, until,
+                // the in-memory Run history (the guard count) starts empty at each server start
+                java.lang.management.ManagementFactory.getRuntimeMXBean().getStartTime(),
+                null)));   // SB-2b hook: missed Signals by type, once catch-up at boot records them
+        return out;
     }
 
     /**

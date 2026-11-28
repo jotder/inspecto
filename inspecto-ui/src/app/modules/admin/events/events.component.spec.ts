@@ -4,7 +4,8 @@ import { provideNoopAnimations } from '@angular/platform-browser/animations';
 import { of, Subject, throwError } from 'rxjs';
 import { describe, expect, it, vi } from 'vitest';
 import { GammaConfigService } from '@gamma/services/config';
-import { EventRow, EventsService, SavedEventView, SessionService } from 'app/inspecto/api';
+import { signal } from '@angular/core';
+import { EventRow, EventsService, LensService, SavedEventView, SessionService } from 'app/inspecto/api';
 import { AiStatusDialog } from 'app/inspecto/ai-assist/ai-status.dialog';
 import { InspectoConfirmService } from 'app/inspecto/confirm.service';
 import { InspectoGridThemeService } from 'app/inspecto/grid';
@@ -25,6 +26,24 @@ const EVENT: EventRow = {
     attributes: {},
 };
 
+const BOARD = {
+    hours: 24,
+    since: '2026-11-27T00:00:00Z',
+    until: '2026-11-28T00:00:00Z',
+    capped: false,
+    guardsCapped: false,
+    missedTracked: false,
+    types: [],
+    typesTotal: 0,
+    typesTruncated: false,
+    unheard: [],
+    unheardTotal: 0,
+    unheardTruncated: false,
+    unposted: [],
+    unpostedTotal: 0,
+    unpostedTruncated: false,
+};
+
 const VIEW: SavedEventView = {
     name: 'errors',
     filters: { level: 'ERROR', pipeline: 'cdr_ingest' },
@@ -35,6 +54,7 @@ async function create(
     overrides: Partial<Record<keyof EventsService, unknown>> = {},
     dialog: unknown = {},
     eventsEnabled = true,
+    canAuthor?: boolean,
 ) {
     const search = vi.fn(() => of([EVENT]));
     const api = {
@@ -58,6 +78,9 @@ async function create(
             { provide: ToastrService, useValue: { success: vi.fn(), error: vi.fn() } },
             { provide: InspectoGridThemeService, useValue: { theme: () => ({}) } },
             { provide: GammaConfigService, useValue: { config$: of({ scheme: 'dark' }) } },
+            ...(canAuthor === undefined
+                ? []
+                : [{ provide: LensService, useValue: { canAuthorWorkbench: signal(canAuthor) } }]),
         ],
     });
     // The data-table injects the real MatDialog, so a stub must be OVERRIDDEN, not just provided.
@@ -270,5 +293,35 @@ describe('EventsComponent', () => {
         fixture.detectChanges();
         expect(fixture.nativeElement.textContent).toContain('No events match the current filters.');
         await expectNoA11yViolations(fixture.nativeElement);
+    });
+
+    // SIGNAL-BOARD-1 SB-3: the Board tab, for whoever may author Jobs.
+    it('offers the Signal Board as a tab to an author, and switches to it', async () => {
+        const signalBoard = vi.fn(() => of(BOARD));
+        const { fixture } = await create({ signalBoard }, {}, true, true);
+        const el: HTMLElement = fixture.nativeElement;
+        expect(el.textContent).toContain('Board');
+        fixture.componentInstance.pickTab('board');
+        fixture.detectChanges();
+        expect(signalBoard).toHaveBeenCalledWith(24);
+        expect(el.textContent).toContain('Posted, but no Job hears it');
+        expect(el.querySelector('inspecto-filter-bar'), 'the ledger filters give way to the board').toBeNull();
+    });
+
+    it('stops the live tail when the Board is opened, since its toggle is hidden there', async () => {
+        const { fixture } = await create({ signalBoard: vi.fn(() => of(BOARD)) }, {}, true, true);
+        const c = fixture.componentInstance;
+        c.toggleLive(true);
+        expect(c.live()).toBe(true);
+        c.pickTab('board');
+        expect(c.live()).toBe(false);
+    });
+
+    it('offers no Board tab to someone who may not author Jobs', async () => {
+        const { fixture } = await create({}, {}, true, false);
+        fixture.componentInstance.pickTab('board');
+        fixture.detectChanges();
+        expect(fixture.componentInstance.tab()).toBe('ledger');
+        expect(fixture.nativeElement.querySelector('inspecto-section-tabs')).toBeNull();
     });
 });
