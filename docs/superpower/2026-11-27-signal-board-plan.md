@@ -367,6 +367,58 @@ SB-1b without failing module tests.
 - **Board row text**: "SB-1c built 2026-11-27: the Job form's On signal suggests the catalogued Signal Types, free text
   kept. SB-1 is complete. Next: SB-2 (a saved Job is checked against the catalog); D-SB8 open."
 
+### 11.9 SB-2 as built (2026-11-28, lane off `origin/master` `d9a88975e`)
+
+- **The check** (`platform/inspecto-engine`, `com.gamma.job.JobSignalCheck`, pure): a Job with `on_signal` gets four
+  kinds of finding. `SIGNAL_TYPE_UNPOSTED`: the value matches no catalogued type (an exact name, matched
+  case-insensitively as the dispatcher does; a `prefix.*` that overlaps no type or family, matched case-sensitively as
+  the dispatcher does). An exact type the catalog lists itself is checked against that entry's fields only, never a
+  covering family's, as `SignalTypeCatalog.find` resolves it. `SIGNAL_FIELD_UNDECLARED`:
+  a `$signal.<field>` in `when` or in a `bind` value whose first path segment no matched type declares (`chainDepth`,
+  the framework stamp, always passes; for a `prefix.*` a field any matched type declares passes); the fix lists the
+  declared fields. `SIGNAL_FIELDS_NOT_DECLARED` (INFO): a matched type whose fields are not declared (a Job Pack's
+  emit, `exchange.*`), so the fields cannot be checked; never a refusal. `JOB_CHAIN_LOOP`: saving the Job closes a
+  chain on itself, named as `a → b → a`.
+- **What a Job posts, for the chain**: `job.run.started|completed|failed|rejected` (every Run) plus its Job Type's
+  `emits`. A Job is never fired by its own Signal (the dispatcher's self-loop guard), so a loop needs two Jobs or more.
+  A Job with a `when` guard is not a link of the chain (the guard may stop it and a save cannot evaluate it); a
+  disabled Job is not either, and a disabled draft joins no chain.
+- **Severity (D-SB3, D-CO1)**: `SIGNAL_TYPE_UNPOSTED` warns everyone, agents included. `SIGNAL_FIELD_UNDECLARED` and
+  `JOB_CHAIN_LOOP` are refused (422 `CONFIG_VALIDATION_FAILED`, the finding code in the envelope, each problem and its
+  fix in the message) for an agent Subject and a warning for a person. Only a finding the save **introduces** refuses
+  an agent: one the stored Job already had stays a warning, so an agent can edit an inherited Job. A loop is one
+  finding per Job whichever Jobs it runs through (the check names only the first loop it finds, and an edit that
+  removes one path may name another the Job already closed).
+- **SB-2 carries its own agent/person split** for these two findings until `SPACE-COHERENCE-1` SC-2 generalises it:
+  one helper, `com.gamma.control.AgentStrict`, that SC-2 absorbs. `LinkRefusals`, `-Dlinks.save` and the D-LC3 flip
+  are untouched; a person stays on the warning.
+- **The save door** (`JobRoutes`): `POST /jobs`, `PUT /jobs/{name}` and `POST /jobs/{name}/enable` (enabling may close
+  a chain) run the check before the maker-checker hold, so an agent never proposes what it would be refused. The
+  response gains `warnings: [{severity, code, key, message, fix}]` when there are any, on a saved Job and on a held
+  change's 202 alike (so an agent whose write is held still reads them). `disable` and `reschedule` cannot introduce a
+  finding and are not checked. No route was added.
+- **The link** (`LinkCensus`): `job.on_signal` and `job.when` now name `signal-type` (was `signal`) and carry a new
+  check, `SAVE` ("save" in the anatomy §12.2 table, rendered by `tools/render-space-links.mjs`); 9 of the 48 links
+  are now checked by nothing (`SPACE-COHERENCE-1` F2 said 11). The graph keeps them `UNCHECKED`, so the census save and
+  delete refusals never judge them (a type nothing posts is a warning, D-SB3). `LinkGraph.signalListeners(type)` lists
+  the Jobs whose `on_signal` fires on a type: the impact answer to "which Jobs stop firing if nothing posts it".
+- **Tests**: `JobSignalCheckTest` (12), `LinkGraphTest` (+1), `ControlApiJobSignalChecksTest` (5, real HTTP: agent 422 and
+  person warning for both refusable findings, enable closing a loop, an unposted type warning agent and person and
+  refusing neither, an inherited finding not refusing an agent's edit).
+- **Open, for later slices**: (1) A Job file changed on disk (SB-2c, §12) does not run these checks yet: they sit
+  in `JobRoutes.signalChecks`, not in `refuseBeforeRegister`, the seam SB-2c applies files through. An on-disk edit has
+  no Subject, so it would only gain the warnings (`JobSignalCheck.check(jobService, cfg)`). (2) `on_pipeline` (D-SB2: short for `on_signal: pipeline.commit`) is not
+  followed in the chain: the commit mirror is posted with the Pipeline as source and depth 0, so the self-loop guard and
+  the chain cut may not stop a Pipeline Job that listens to its own Pipeline's commit — not verified. (3) The Job form
+  does not yet show the chosen type's fields beside `when` / `bind`. (4) `signalListeners` is not served by a route; the
+  board (SB-3) or the SC-1 graph read can expose it. (5) An exact type that only families cover accepts the fields of
+  every covering family, while the catalog resolves it to the longest one: lenient (a wrong field may pass), never a
+  false refusal. (6) An edit that adds a second loop to a Job already in one is a warning, not a refusal (one loop
+  finding per Job).
+- **Board row text**: "SB-2 built 2026-11-28: a saved Job is checked against the catalog (`on_signal`, `$signal`
+  fields in `when` / `bind`, a chain that closes on itself); an unposted type warns everyone, the other two refuse an
+  agent and warn a person (own split in `AgentStrict` until SC-2); `on_signal` is a checked Signal Type link."
+
 ## 12. SB-2c as built (2026-11-28, lane off `origin/master` `d9a88975e`)
 
 - **The seam is the Space lock's, not a second watcher.** `SpaceLock` gains an `OutsideApplier` (installed by

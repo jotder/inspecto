@@ -17,6 +17,7 @@ import com.gamma.job.DbJobRunStore;
 import com.gamma.job.JobConfig;
 import com.gamma.job.JobRun;
 import com.gamma.job.JobService;
+import com.gamma.job.JobSignalCheck;
 import com.gamma.job.RunArtifact;
 import com.gamma.job.SecretMasking;
 import com.gamma.util.AtomicFiles;
@@ -309,9 +310,10 @@ final class JobRoutes implements RouteModule {
         Map<String, Object> m = new LinkedHashMap<>(existing.toMap());
         m.put("enabled", enabled);
         JobConfig c = parseJob(m);
-        PendingChanges.hold(api, ex, KIND, name, c.toMap(), existing.toMap());   // maker-checker (operator, 2026-09-28)
+        List<Map<String, Object>> warnings = signalChecks(api, ex, c, existing);   // enabling may close a chain
+        hold(api, ex, name, c.toMap(), existing.toMap(), warnings);   // maker-checker (operator, 2026-09-28)
         persistJob(api, c);
-        return c.toMap();
+        return withWarnings(c.toMap(), warnings);
     }
 
     /** {@code POST /jobs/{name}/reschedule} — replace the persisted {@code cron}; 422 without one, 404 if unknown. */
@@ -432,9 +434,10 @@ final class JobRoutes implements RouteModule {
         WriteGates.conflictIf(HostContext.of(api).service().jobServiceOrCreate().jobs().stream()
                         .anyMatch(v -> v.name().equals(c.name())),
                 "job '" + c.name() + "' already exists (use PUT to update)");
-        PendingChanges.hold(api, ex, KIND, c.name(), c.toMap(), null);   // maker-checker (operator, 2026-09-28)
+        List<Map<String, Object>> warnings = signalChecks(api, ex, c, null);
+        hold(api, ex, c.name(), c.toMap(), null, warnings);   // maker-checker (operator, 2026-09-28)
         persistJob(api, c);
-        return c.toMap();
+        return withWarnings(c.toMap(), warnings);
     }
 
     /** {@code PUT /jobs/{name}} — replace a job's config; 404 if unknown, 400 on a body/path name
@@ -453,10 +456,52 @@ final class JobRoutes implements RouteModule {
         requireAdministerForEventPrune(ex, existing);   // turning an event_prune INTO something else, too
         requireAdministerForEventPrune(ex, c);
         if (!name.equals(c.name())) throw new ApiException(400, ErrorCodes.MALFORMED_REQUEST, "body 'name' must match the path id");
-        PendingChanges.hold(api, ex, KIND, name, c.toMap(), existing.toMap());   // maker-checker (operator, 2026-09-28)
+        List<Map<String, Object>> warnings = signalChecks(api, ex, c, existing);
+        hold(api, ex, name, c.toMap(), existing.toMap(), warnings);   // maker-checker (operator, 2026-09-28)
         persistJob(api, c);
         ETags.set(ex, ETags.of(ContentHash.of(c.toMap())));
-        return c.toMap();
+        return withWarnings(c.toMap(), warnings);
+    }
+
+    /**
+     * SIGNAL-BOARD-1 SB-2: the Signal checks of a Job save ({@link JobSignalCheck}), before the hold so an agent never
+     * proposes what it would be refused. A finding D-CO1 refuses for an agent ({@link JobSignalCheck.Finding#agentRefusable})
+     * and that this save introduces (absent from {@code existing}) is refused through {@link AgentStrict}; everything
+     * else, and everything for a person, is returned as the response's {@code warnings}. An unposted type warns
+     * everyone (D-SB3).
+     */
+    private static List<Map<String, Object>> signalChecks(ApiContext api, HttpExchange ex, JobConfig c, JobConfig existing) {
+        JobService svc = HostContext.of(api).service().jobServiceOrCreate();
+        List<JobSignalCheck.Finding> found = JobSignalCheck.check(svc, c);
+        if (found.isEmpty()) return List.of();
+        Set<String> before = new java.util.HashSet<>();
+        if (existing != null) for (JobSignalCheck.Finding f : JobSignalCheck.check(svc, existing)) before.add(f.identity());
+        List<AgentStrict.Problem> refusable = new ArrayList<>();
+        for (JobSignalCheck.Finding f : found)
+            if (f.agentRefusable() && !before.contains(f.identity()))
+                refusable.add(new AgentStrict.Problem(f.kind().code, f.key(), f.message(), f.fix()));
+        AgentStrict.refuseForAgent(ex, "job '" + c.name() + "'", refusable);
+        return found.stream().map(JobSignalCheck.Finding::toMap).toList();
+    }
+
+    /** {@link PendingChanges#hold} for a Job; a held write's 202 body carries the save's {@code warnings} too, so an
+     *  agent whose change is held still reads them (D-SB3: an unposted type warns agents as well). */
+    private static void hold(ApiContext api, HttpExchange ex, String name, Map<String, Object> proposed,
+                             Map<String, Object> current, List<Map<String, Object>> warnings) throws IOException {
+        try {
+            PendingChanges.hold(api, ex, KIND, name, proposed, current);   // maker-checker (operator, 2026-09-28)
+        } catch (PendingChanges.Held held) {
+            if (!warnings.isEmpty()) held.body().put("warnings", warnings);
+            throw held;
+        }
+    }
+
+    /** {@code job} with a {@code warnings} list when there is any (a Job body never has that key). */
+    private static Map<String, Object> withWarnings(Map<String, Object> job, List<Map<String, Object>> warnings) {
+        if (warnings.isEmpty()) return job;
+        Map<String, Object> out = new LinkedHashMap<>(job);
+        out.put("warnings", warnings);
+        return out;
     }
 
     /** {@code DELETE /jobs/{name}} — remove a job's config + file; 404 if unknown. */

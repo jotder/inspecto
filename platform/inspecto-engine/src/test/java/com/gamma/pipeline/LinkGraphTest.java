@@ -195,6 +195,24 @@ class LinkGraphTest {
                 draft.stream().map(e -> e.key() + "=" + e.status()).sorted().toList());
     }
 
+    /** SIGNAL-BOARD-1 SB-2: on_signal is a Job → Signal Type link the save checks, never judged DANGLING by the graph. */
+    @Test
+    void onSignalIsASignalTypeLinkAndTheGraphListsWhoListens(@TempDir Path root) throws IOException {
+        LinkCensus.Link l = LinkCensus.of("job", "on_signal");
+        assertEquals("signal-type", l.toKind());
+        assertTrue(l.checks().contains(LinkCensus.Check.SAVE));
+        Files.writeString(root.resolve("exact_job.toon"), "job:\n  on_signal: order.landed\n");
+        Files.writeString(root.resolve("family_job.toon"), "job:\n  on_signal: \"order.*\"\n");
+        Files.writeString(root.resolve("other_job.toon"), "job:\n  on_signal: order.failed\n");
+        Files.writeString(root.resolve("cron_job.toon"), "job:\n  cron: \"0 0 * * * ?\"\n");
+        LinkGraph g = LinkGraph.of(root, rel -> false);
+        assertEquals(List.of("exact_job", "family_job"),
+                g.signalListeners("order.landed").stream().map(LinkGraph.Edge::fromName).sorted().toList());
+        assertEquals(List.of(), g.signalListeners("invoice.landed"));
+        assertTrue(g.edges("job", "on_signal").stream().allMatch(e -> e.status() == LinkGraph.Status.UNCHECKED),
+                "a type nothing posts is a save warning (D-SB3), never a census refusal");
+    }
+
     @Test
     void anAbsentRootIsAnEmptyGraph(@TempDir Path root) {
         assertTrue(LinkGraph.of(root.resolve("nope"), rel -> false).edges().isEmpty());

@@ -12,7 +12,7 @@ tags: [tests, module]
 > rename tests and re-run the tool. Hub: [index](index.md) · Product Map Item
 > [`module.processor`](../../../../../product-map/module/processor.toon).
 
-499 test class(es): 198 unit, 301 real-HTTP control-plane, 0 IT.
+500 test class(es): 198 unit, 302 real-HTTP control-plane, 0 IT.
 Kind is inferred: `*IT` → IT; a `ControlApi*` class, or one using both `HttpClient` and `ControlApi` → real-HTTP
 control-plane test; else unit.
 
@@ -202,6 +202,7 @@ mvn -o test -pl inspecto -Dtest=SmokeTest,ShippedExamplesRoundTripTest
 | `ControlApiJobRunDiffTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJobRunDiffTest.java` | DUCKLE-C2-RUN-DIFF-1: {@code GET /jobs/{name}/runs/{a}/diff/{b}} over real HTTP — two real runs, recorded facts only. |
 | `ControlApiJobRunReplayTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJobRunReplayTest.java` | Real-HTTP tests for {@code POST /jobs/runs/{runId}/replay} (E3 — the at-rest analog of |
 | `ControlApiJobRunsPageTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJobRunsPageTest.java` | {@code GET /jobs/runs} cursor pagination over real HTTP (api-contract-design §7): the v1 envelope's |
+| `ControlApiJobSignalChecksTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJobSignalChecksTest.java` | SIGNAL-BOARD-1 SB-2 over real HTTP: the Signal checks of a Job save. An undeclared {@code $signal.<field>} and a chain |
 | `ControlApiJobsPageTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJobsPageTest.java` | {@code GET /jobs} cursor pagination over real HTTP (api-contract-design §7): on the {@code /api/v1} |
 | `ControlApiJoinAddedColumnsTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiJoinAddedColumnsTest.java` | LOOKUP-1 P1d — "Columns this Step adds" over real HTTP: {@code POST /components/transform/describe} with a |
 | `ControlApiKpiProjectionAlertTest` | `com.gamma.control` | real-HTTP control-plane test | `inspecto/src/test/java/com/gamma/control/ControlApiKpiProjectionAlertTest.java` | `BI-INSIGHTS-1` I-12 + I-17 over real HTTP, with an armed Authenticator: {@code GET /kpis/{id}/value?projection=true} |
