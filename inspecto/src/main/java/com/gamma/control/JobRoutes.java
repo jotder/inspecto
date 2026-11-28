@@ -334,7 +334,7 @@ final class JobRoutes implements RouteModule {
      * and re-derived on every boot and rule change, so an edit here would either be silently undone or —
      * a delete or a disable — silently switch off the check it exists for. It stays triggerable.
      */
-    private static void refuseSystemJob(ApiContext api, String name) {
+    static void refuseSystemJob(ApiContext api, String name) {
         boolean system = HostContext.of(api).service().jobService().map(js -> js.isSystemJob(name)).orElse(false);
         WriteGates.conflictIf(system, "job '" + name + "' is a system job armed by the platform; it is "
                 + "derived from the Alert Rules and cannot be edited, disabled or deleted here");
@@ -513,7 +513,7 @@ final class JobRoutes implements RouteModule {
 
     private static final java.util.Set<String> ADMINISTER_ONLY_TASKS = java.util.Set.of("event_prune", "restore", "audit_anchor_export");
 
-    private static JobConfig parseJob(Map<String, Object> body) {
+    static JobConfig parseJob(Map<String, Object> body) {
         refuseNestedSettings(body);
         JobConfig cfg;
         try {
@@ -559,26 +559,38 @@ final class JobRoutes implements RouteModule {
 
     /** Encode the config as a {@code job { … }} TOON doc, write it atomically, and hot-register it. */
     private void persistJob(ApiContext api, JobConfig c) throws IOException {
-        // MODULE-REORG-1 P4a: refuse BEFORE the write. upsertJob builds an enabled job and throws on an unregistered
-        // type — after the file was already rewritten and the old config dropped from memory (a 500 and a job that
-        // vanished from the list). A DISABLED job of an absent type stays savable: buildDisabled is lenient.
-        if (c.enabled() && jobs(api).jobTypeView(c.type()).isEmpty())
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' has type '" + c.type()
-                    + "', which no installed module registers — nothing was written (an existing config stays as it is)");
-        String sinkRefusal = jobs(api).incrementalSinkRefusal(c);
-        if (sinkRefusal != null)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' refused at save: incremental "
-                    + sinkRefusal + " - nothing was written");
-        String typeRefusal = jobs(api).typeSaveRefusal(c);
-        if (typeRefusal != null)
-            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' refused at save: "
-                    + typeRefusal + " - nothing was written");
+        refuseBeforeRegister(api, c, () -> LinkRefusals.stored(jobFile(api, c.name())));
         Path target = jobFile(api, c.name());
-        // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: every Job write (create, update, enable, reschedule).
-        LinkRefusals.requireLinks(api, api.writeRoot(), "job", c.name(), Map.of("job", c.toMap()), LinkRefusals.stored(target));
         byte[] bytes = ConfigCodec.toToon(Map.of("job", c.toMap())).getBytes(StandardCharsets.UTF_8);
         AtomicFiles.write(target, bytes, ".job-");
         HostContext.of(api).service().jobServiceOrCreate().upsertJob(c);
+    }
+
+    /**
+     * <b>The save checks on a parsed Job</b>, run before it is registered live: by the API save before it writes the
+     * file, and by {@link OnDiskJobs} before it applies a file changed on disk (SB-2c). A save check added here applies
+     * to both. {@code stored}: the {@code job:} document the save replaces (for the link check, read last), or null.
+     * Throws the 422 {@link ApiException} that names the refusal.
+     */
+    static void refuseBeforeRegister(ApiContext api, JobConfig c, java.util.function.Supplier<Map<String, Object>> stored)
+            throws IOException {
+        // MODULE-REORG-1 P4a: refuse BEFORE the write. upsertJob builds an enabled job and throws on an unregistered
+        // type — after the file was already rewritten and the old config dropped from memory (a 500 and a job that
+        // vanished from the list). A DISABLED job of an absent type stays savable: buildDisabled is lenient.
+        JobService js = HostContext.of(api).service().jobServiceOrCreate();
+        if (c.enabled() && js.jobTypeView(c.type()).isEmpty())
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' has type '" + c.type()
+                    + "', which no installed module registers — nothing was written (an existing config stays as it is)");
+        String sinkRefusal = js.incrementalSinkRefusal(c);
+        if (sinkRefusal != null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' refused at save: incremental "
+                    + sinkRefusal + " - nothing was written");
+        String typeRefusal = js.typeSaveRefusal(c);
+        if (typeRefusal != null)
+            throw new ApiException(422, ErrorCodes.CONFIG_VALIDATION_FAILED, "job '" + c.name() + "' refused at save: "
+                    + typeRefusal + " - nothing was written");
+        // SPACE-LINK-CENSUS-1 LC-3 (D-LC1), mode links.save: every Job write (create, update, enable, reschedule).
+        LinkRefusals.requireLinks(api, api.writeRoot(), "job", c.name(), Map.of("job", c.toMap()), stored.get());
     }
 
     /** The jailed {@code jobs/<name>_job.toon} path under the write root; 422 on an unsafe name, 403 on escape. */
